@@ -198,7 +198,7 @@ Get <code><a href="validator_consensus_info.md#0x1_validator_consensus_info_Vali
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 </code></pre>
 
 

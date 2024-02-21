@@ -27,7 +27,9 @@ This module defines a struct storing the metadata of the block and new block eve
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `update_epoch_interval_microsecs`](#@Specification_1_update_epoch_interval_microsecs)
     -  [Function `get_epoch_interval_secs`](#@Specification_1_get_epoch_interval_secs)
+    -  [Function `block_prologue_common`](#@Specification_1_block_prologue_common)
     -  [Function `block_prologue`](#@Specification_1_block_prologue)
+    -  [Function `block_prologue_ext`](#@Specification_1_block_prologue_ext)
     -  [Function `get_current_block_height`](#@Specification_1_get_current_block_height)
     -  [Function `emit_new_block_event`](#@Specification_1_emit_new_block_event)
     -  [Function `emit_genesis_block_event`](#@Specification_1_emit_genesis_block_event)
@@ -716,8 +718,7 @@ new block event for WriteSetPayload.
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -790,6 +791,34 @@ The number of new events created does not exceed MAX_U64.
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>let</b> <a href="account.md#0x1_account">account</a> = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
 <b>aborts_if</b> <a href="account.md#0x1_account">account</a>.guid_creation_num + 2 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
+</code></pre>
+
+
+
+
+<a id="0x1_block_BlockRequirement"></a>
+
+
+<pre><code><b>schema</b> <a href="block.md#0x1_block_BlockRequirement">BlockRequirement</a> {
+    vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>;
+    epoch: u64;
+    round: u64;
+    proposer: <b>address</b>;
+    failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;;
+    previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64;
+    <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+    <b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(vm);
+    // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+    <b>requires</b> proposer == @vm_reserved || <a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(proposer);
+    <b>requires</b> (proposer == @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
+    <b>requires</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>);
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
+    <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
+    <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
+}
 </code></pre>
 
 
@@ -884,6 +913,24 @@ The BlockResource existed under the @aptos_framework.
 
 
 
+<a id="@Specification_1_block_prologue_common"></a>
+
+### Function `block_prologue_common`
+
+
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue_common">block_prologue_common</a>(vm: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 1000;
+<b>include</b> <a href="block.md#0x1_block_BlockRequirement">BlockRequirement</a>;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
 <a id="@Specification_1_block_prologue"></a>
 
 ### Function `block_prologue`
@@ -895,18 +942,30 @@ The BlockResource existed under the @aptos_framework.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
-<b>requires</b> <a href="system_addresses.md#0x1_system_addresses_is_vm">system_addresses::is_vm</a>(vm);
-// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
-<b>requires</b> proposer == @vm_reserved || <a href="stake.md#0x1_stake_spec_is_current_epoch_validator">stake::spec_is_current_epoch_validator</a>(proposer);
+<pre><code><b>pragma</b> verify_duration_estimate = 1000;
 <b>requires</b> <a href="timestamp.md#0x1_timestamp">timestamp</a> &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
-<b>requires</b> (proposer == @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() == <a href="timestamp.md#0x1_timestamp">timestamp</a>);
-<b>requires</b> (proposer != @vm_reserved) ==&gt; (<a href="timestamp.md#0x1_timestamp_spec_now_microseconds">timestamp::spec_now_microseconds</a>() &lt; <a href="timestamp.md#0x1_timestamp">timestamp</a>);
-<b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
-<b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
-<b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
-<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
+<b>include</b> <a href="block.md#0x1_block_BlockRequirement">BlockRequirement</a>;
+<b>aborts_if</b> <b>false</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_block_prologue_ext"></a>
+
+### Function `block_prologue_ext`
+
+
+<pre><code><b>fun</b> <a href="block.md#0x1_block_block_prologue_ext">block_prologue_ext</a>(vm: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">hash</a>: <b>address</b>, epoch: u64, round: u64, proposer: <b>address</b>, failed_proposer_indices: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_block_votes_bitvec: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="timestamp.md#0x1_timestamp">timestamp</a>: u64, randomness_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 1000;
+<b>requires</b> <a href="timestamp.md#0x1_timestamp">timestamp</a> &gt;= <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>();
+<b>include</b> <a href="block.md#0x1_block_BlockRequirement">BlockRequirement</a>;
+<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
+<b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">stake::GetReconfigStartTimeRequirement</a>;
 <b>aborts_if</b> <b>false</b>;
 </code></pre>
 

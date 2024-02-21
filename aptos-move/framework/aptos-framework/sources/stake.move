@@ -439,24 +439,33 @@ module aptos_framework::stake {
         let validator_set = borrow_global_mut<ValidatorSet>(@aptos_framework);
         let active_validators = &mut validator_set.active_validators;
         let pending_inactive = &mut validator_set.pending_inactive;
-        let len = vector::length(validators);
+        spec {
+            update ghost_active_num = len(active_validators);
+            update ghost_pending_inactive_num = len(pending_inactive);
+        };
+        let len_validators = vector::length(validators);
         let i = 0;
         // Remove each validator from the validator set.
         while ({
             spec {
-                invariant i <= len;
+                invariant i <= len_validators;
                 invariant spec_validators_are_initialized(active_validators);
                 invariant spec_validator_indices_are_valid(active_validators);
                 invariant spec_validators_are_initialized(pending_inactive);
                 invariant spec_validator_indices_are_valid(pending_inactive);
+                invariant ghost_active_num + ghost_pending_inactive_num == len(active_validators) + len(pending_inactive);
             };
-            i < len
+            i < len_validators
         }) {
             let validator = *vector::borrow(validators, i);
             let validator_index = find_validator(active_validators, validator);
             if (option::is_some(&validator_index)) {
                 let validator_info = vector::swap_remove(active_validators, *option::borrow(&validator_index));
                 vector::push_back(pending_inactive, validator_info);
+                spec {
+                    update ghost_active_num = ghost_active_num - 1;
+                    update ghost_pending_inactive_num = ghost_pending_inactive_num + 1;
+                };
             };
             i = i + 1;
         };
@@ -1090,6 +1099,7 @@ module aptos_framework::stake {
         while ({
             spec {
                 invariant spec_validators_are_initialized(next_epoch_validators);
+                invariant i <= vlen;
             };
             i < vlen
         }) {
@@ -1128,6 +1138,8 @@ module aptos_framework::stake {
                 invariant vlen == len(validator_set.active_validators);
                 invariant forall i in 0..validator_index:
                     global<ValidatorConfig>(validator_set.active_validators[i].addr).validator_index < validator_index;
+                invariant forall i in 0..validator_index:
+                    validator_set.active_validators[i].config.validator_index < validator_index;
                 invariant len(validator_perf.validators) == validator_index;
             };
             validator_index < vlen
@@ -1189,8 +1201,22 @@ module aptos_framework::stake {
         let new_total_power = 0;
         let num_cur_actives = vector::length(&cur_validator_set.active_validators);
         let num_cur_pending_actives = vector::length(&cur_validator_set.pending_active);
+        spec {
+            assume num_cur_actives + num_cur_pending_actives <= MAX_U64;
+        };
         let num_candidates = num_cur_actives + num_cur_pending_actives;
-        while (candidate_idx < num_candidates) {
+        while ({
+            spec {
+                invariant candidate_idx <= num_candidates;
+                invariant spec_validators_are_initialized(new_active_validators);
+                invariant len(new_active_validators) == num_new_actives;
+                invariant forall i in 0..len(new_active_validators):
+                    new_active_validators[i].config.validator_index == i;
+                invariant num_new_actives <= candidate_idx;
+                invariant spec_validators_are_initialized(new_active_validators);
+            };
+            candidate_idx < num_candidates
+        }) {
             let candidate_in_current_validator_set = candidate_idx < num_cur_actives;
             let candidate = if (candidate_idx < num_cur_actives) {
                 vector::borrow(&cur_validator_set.active_validators, candidate_idx)
@@ -1203,7 +1229,13 @@ module aptos_framework::stake {
             let cur_pending_inactive = coin::value(&stake_pool.pending_inactive);
 
             let cur_reward = if (candidate_in_current_validator_set && cur_active > 0) {
+                spec {
+                    assert candidate.config.validator_index < len(validator_perf.validators);
+                };
                 let cur_perf = vector::borrow(&validator_perf.validators, candidate.config.validator_index);
+                spec {
+                    assume cur_perf.successful_proposals + cur_perf.failed_proposals <= MAX_U64;
+                };
                 calculate_rewards_amount(cur_active, cur_perf.successful_proposals, cur_perf.successful_proposals + cur_perf.failed_proposals, rewards_rate, rewards_rate_denominator)
             } else {
                 0
@@ -1219,6 +1251,10 @@ module aptos_framework::stake {
             };
 
             let lockup_expired = get_reconfig_start_time_secs() >= stake_pool.locked_until_secs;
+            spec {
+                assume cur_active + cur_pending_active + cur_reward + cur_fee <= MAX_U64;
+                assume cur_active + cur_pending_inactive + cur_pending_active + cur_reward + cur_fee <= MAX_U64;
+            };
             let new_voting_power =
                 cur_active
                 + if (lockup_expired) { 0 } else { cur_pending_inactive }
@@ -1235,6 +1271,9 @@ module aptos_framework::stake {
                 };
 
                 // Update ValidatorSet.
+                spec {
+                    assume new_total_power + new_voting_power <= MAX_U128;
+                };
                 new_total_power = new_total_power + (new_voting_power as u128);
                 vector::push_back(&mut new_active_validators, new_validator_info);
                 num_new_actives = num_new_actives + 1;
@@ -1260,33 +1299,62 @@ module aptos_framework::stake {
 
         let num_active = vector::length(&validator_set.active_validators);
         let num_pending_inactive = vector::length(&validator_set.pending_inactive);
+        spec {
+            assume num_active + num_pending_inactive <= MAX_U64;
+        };
         let total = num_active + num_pending_inactive;
 
         // Pre-fill the return value with dummy values.
         let idx = 0;
-        while (idx < total) {
+        while ({
+            spec {
+                invariant idx <= len(validator_set.active_validators) + len(validator_set.pending_inactive);
+                invariant len(validator_consensus_infos) == idx;
+                invariant len(validator_consensus_infos) <= len(validator_set.active_validators) + len(validator_set.pending_inactive);
+            };
+            idx < total
+        }) {
             vector::push_back(&mut validator_consensus_infos, validator_consensus_info::default());
             idx = idx + 1;
+        };
+        spec {
+            assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+            assert spec_validator_indices_are_valid_config(validator_set.active_validators,
+                len(validator_set.active_validators) + len(validator_set.pending_inactive));
         };
 
         vector::for_each_ref(&validator_set.active_validators, |obj| {
             let vi: &ValidatorInfo = obj;
+            spec {
+                assume len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+                assert vi.config.validator_index < len(validator_consensus_infos);
+            };
             let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
             *vci = validator_consensus_info::new(
                 vi.addr,
                 vi.config.consensus_pubkey,
                 vi.voting_power
             );
+            spec {
+                assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+            };
         });
 
         vector::for_each_ref(&validator_set.pending_inactive, |obj| {
             let vi: &ValidatorInfo = obj;
+            spec {
+                assume len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+                assert vi.config.validator_index < len(validator_consensus_infos);
+            };
             let vci = vector::borrow_mut(&mut validator_consensus_infos, vi.config.validator_index);
             *vci = validator_consensus_info::new(
                 vi.addr,
                 vi.config.consensus_pubkey,
                 vi.voting_power
             );
+            spec {
+                assert len(validator_consensus_infos) == len(validator_set.active_validators) + len(validator_set.pending_inactive);
+            };
         });
 
         validator_consensus_infos

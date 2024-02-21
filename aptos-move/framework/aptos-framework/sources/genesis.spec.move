@@ -44,10 +44,11 @@ spec aptos_framework::genesis {
     /// Enforcement: Formally verified via [high-level-req-5](set_genesis_end).
     /// </high-level-req>
     spec module {
-        pragma verify = false;
+        pragma verify = true;
     }
 
     spec initialize {
+        pragma verify_duration_estimate = 120;
         pragma aborts_if_is_partial;
         include InitalizeRequires;
 
@@ -112,12 +113,15 @@ spec aptos_framework::genesis {
         pragma verify_duration_estimate = 120;
 
         include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         include CompareTimeRequires;
         include aptos_coin::ExistsAptosCoin;
     }
 
     spec create_initialize_validators {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved).
         include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         include CompareTimeRequires;
         include aptos_coin::ExistsAptosCoin;
     }

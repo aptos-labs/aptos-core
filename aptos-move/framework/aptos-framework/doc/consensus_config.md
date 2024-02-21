@@ -20,6 +20,10 @@ Reconfiguration, and may be updated by root.
     -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `set`](#@Specification_1_set)
+    -  [Function `set_for_next_epoch`](#@Specification_1_set_for_next_epoch)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
+    -  [Function `validator_txn_enabled`](#@Specification_1_validator_txn_enabled)
+    -  [Function `validator_txn_enabled_internal`](#@Specification_1_validator_txn_enabled_internal)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
@@ -284,8 +288,9 @@ See <code>aptos_framework::aptos_governance::reconfigure()</code> for more detai
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -327,7 +332,7 @@ Ensure the caller is admin and <code><a href="consensus_config.md#0x1_consensus_
 When setting now time must be later than last_reconfiguration_time.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify_duration_estimate = 600;
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
@@ -341,6 +346,82 @@ When setting now time must be later than last_reconfiguration_time.
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
 <b>ensures</b> <b>global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework).config == config;
+</code></pre>
+
+
+
+<a id="@Specification_1_set_for_next_epoch"></a>
+
+### Function `set_for_next_epoch`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_set_for_next_epoch">set_for_next_epoch</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_SetForNextEpochAbortsIf">config_buffer::SetForNextEpochAbortsIf</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_on_new_epoch"></a>
+
+### Function `on_new_epoch`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_on_new_epoch">on_new_epoch</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochAbortsIf">config_buffer::OnNewEpochAbortsIf</a>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;;
+</code></pre>
+
+
+
+<a id="@Specification_1_validator_txn_enabled"></a>
+
+### Function `validator_txn_enabled`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled">validator_txn_enabled</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework);
+<b>ensures</b> [abstract] result == <a href="consensus_config.md#0x1_consensus_config_spec_validator_txn_enabled_internal">spec_validator_txn_enabled_internal</a>(<b>global</b>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">ConsensusConfig</a>&gt;(@aptos_framework).config);
+</code></pre>
+
+
+
+<a id="@Specification_1_validator_txn_enabled_internal"></a>
+
+### Function `validator_txn_enabled_internal`
+
+
+<pre><code><b>fun</b> <a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled_internal">validator_txn_enabled_internal</a>(config_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>ensures</b> [abstract] result == <a href="consensus_config.md#0x1_consensus_config_spec_validator_txn_enabled_internal">spec_validator_txn_enabled_internal</a>(config_bytes);
+</code></pre>
+
+
+
+
+<a id="0x1_consensus_config_spec_validator_txn_enabled_internal"></a>
+
+
+<pre><code><b>fun</b> <a href="consensus_config.md#0x1_consensus_config_spec_validator_txn_enabled_internal">spec_validator_txn_enabled_internal</a>(config_bytes: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): bool;
 </code></pre>
 
 

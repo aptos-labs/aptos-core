@@ -80,6 +80,7 @@ on a proposal multiple times as long as the total voting power of these votes do
     -  [Function `resolve_multi_step_proposal`](#@Specification_1_resolve_multi_step_proposal)
     -  [Function `remove_approved_hash`](#@Specification_1_remove_approved_hash)
     -  [Function `reconfigure`](#@Specification_1_reconfigure)
+    -  [Function `force_end_epoch`](#@Specification_1_force_end_epoch)
     -  [Function `toggle_features`](#@Specification_1_toggle_features)
     -  [Function `get_signer_testnet_only`](#@Specification_1_get_signer_testnet_only)
     -  [Function `get_voting_power`](#@Specification_1_get_voting_power)
@@ -1789,7 +1790,7 @@ Return a signer for making changes to 0x1 as part of on-chain governance proposa
 ### Module-level Specification
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_strict;
 </code></pre>
 
@@ -2650,14 +2651,49 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify_duration_estimate = 600;
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
+<b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
+    <a href="account.md#0x1_account">account</a>: aptos_framework
+};
+<b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">stake::GetReconfigStartTimeRequirement</a>;
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;CoinInfo&lt;AptosCoin&gt;&gt;(@aptos_framework);
 <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework);
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
+</code></pre>
+
+
+
+<a id="@Specification_1_force_end_epoch"></a>
+
+### Function `force_end_epoch`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 600;
+<b>let</b> <b>address</b> = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
+<b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
+    <a href="account.md#0x1_account">account</a>: aptos_framework
+};
+</code></pre>
+
+
+
+
+<a id="0x1_aptos_governance_VotingInitializationAbortIfs"></a>
+
+
+<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingInitializationAbortIfs">VotingInitializationAbortIfs</a> {
+    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_partial_governance_voting_enabled">features::spec_partial_governance_voting_enabled</a>() && !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
+}
 </code></pre>
 
 
@@ -2675,9 +2711,13 @@ Signer address must be @aptos_framework.
 Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 200;
+<pre><code><b>pragma</b> verify_duration_estimate = 600;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
+<b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
+    <a href="account.md#0x1_account">account</a>: aptos_framework
+};
+<b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">stake::GetReconfigStartTimeRequirement</a>;
 <b>include</b> <a href="transaction_fee.md#0x1_transaction_fee_RequiresCollectedFeesPerValueLeqBlockAptosSupply">transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply</a>;
 <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
@@ -2834,17 +2874,6 @@ pool_address must exist in StakePool.
 
 
 <pre><code><b>include</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingInitializationAbortIfs">VotingInitializationAbortIfs</a>;
-</code></pre>
-
-
-
-
-<a id="0x1_aptos_governance_VotingInitializationAbortIfs"></a>
-
-
-<pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingInitializationAbortIfs">VotingInitializationAbortIfs</a> {
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_partial_governance_voting_enabled">features::spec_partial_governance_voting_enabled</a>() && !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
-}
 </code></pre>
 
 
