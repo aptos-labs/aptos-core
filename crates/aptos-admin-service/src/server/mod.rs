@@ -23,7 +23,7 @@ use tokio::runtime::Runtime;
 
 mod consensus;
 #[cfg(target_os = "linux")]
-mod profiling;
+pub mod profiling;
 #[cfg(target_os = "linux")]
 mod thread_dump;
 mod utils;

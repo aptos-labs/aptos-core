@@ -349,7 +349,7 @@ impl BatchStore {
         match self.db.get_batch(digest) {
             Ok(Some(value)) => Ok(value),
             Ok(None) | Err(_) => {
-                error!("Could not get batch from db");
+                warn!("Could not get batch from db");
                 Err(ExecutorError::CouldNotGetData)
             },
         }

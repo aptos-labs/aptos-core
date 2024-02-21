@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, zkid::Claims};
+use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, oidb::Claims};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::poseidon_bn254;
 use base64::URL_SAFE_NO_PAD;
@@ -58,7 +58,7 @@ impl RSA_JWK {
         self.kid.as_bytes().to_vec()
     }
 
-    // TODO(zkid): Move this to aptos-crypto so other services can use this
+    // TODO(oidb): Move this to aptos-crypto so other services can use this
     pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
         let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
         // The circuit only supports RSA256

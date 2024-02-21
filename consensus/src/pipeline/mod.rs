@@ -31,10 +31,10 @@ pub mod errors;
 pub mod execution_schedule_phase;
 pub mod execution_wait_phase;
 pub mod hashable;
-pub mod ordering_state_computer;
 pub mod persisting_phase;
 pub mod pipeline_phase;
 pub mod signing_phase;
 
+pub mod execution_client;
 #[cfg(test)]
 mod tests;
