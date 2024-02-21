@@ -348,60 +348,65 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Finalizes types in this translator, producing errors if some could not be inferred
     /// and remained incomplete.
     pub fn finalize_types(&mut self) {
-        for i in self.node_counter_start..self.parent.parent.env.next_free_node_number() {
-            let node_id = NodeId::new(i);
+        if !self.had_errors {
+            let mut vec_types = vec![];
+            for i in self.node_counter_start..self.parent.parent.env.next_free_node_number() {
+                let node_id = NodeId::new(i);
 
-            if let Some(ty) = self.get_node_type_opt(node_id) {
-                let ty = self.finalize_type(node_id, &ty);
-                self.update_node_type(node_id, ty);
-            }
-            if let Some(inst) = self.get_node_instantiation_opt(node_id) {
-                let inst = inst
-                    .iter()
-                    .map(|ty| self.finalize_type(node_id, ty))
-                    .collect_vec();
-                self.update_node_instantiation(node_id, inst);
+                if let Some(ty) = self.get_node_type_opt(node_id) {
+                    let ty = self.finalize_type(node_id, &ty, &mut vec_types);
+                    self.update_node_type(node_id, ty);
+                }
+                if let Some(inst) = self.get_node_instantiation_opt(node_id) {
+                    let inst = inst
+                        .iter()
+                        .map(|ty| self.finalize_type(node_id, ty, &mut vec_types))
+                        .collect_vec();
+                    self.update_node_instantiation(node_id, inst);
+                }
             }
         }
     }
 
     /// Finalize the the given type, producing an error if it is not complete, or if
     /// invalid type instantiations are found.
-    fn finalize_type(&mut self, node_id: NodeId, ty: &Type) -> Type {
+    fn finalize_type(&mut self, node_id: NodeId, ty: &Type, vector_type: &mut Vec<Type>) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
-        // Report error only if there are no other errors in this builder,
-        // to avoid noisy followup errors.
-        if !self.had_errors {
-            let loc = self.parent.parent.env.get_node_loc(node_id);
-            let mut incomplete = false;
-            let mut visitor = |t: &Type| {
-                use Type::*;
-                match t {
-                    Var(_) => {
-                        incomplete = true;
-                    },
-                    Struct(_, _, inst) => {
-                        for i in inst {
-                            self.check_valid_instantiation(&loc, i)
-                        }
-                    },
-                    Vector(t) => self.check_valid_instantiation(&loc, t),
-                    _ => {},
-                }
-            };
-            ty.visit(&mut visitor);
-
-            if incomplete {
-                // This type could not be fully inferred.
-                self.error(
-                    &loc,
-                    &format!(
-                        "unable to infer type: `{}`",
-                        ty.display(&self.type_display_context())
-                    ),
-                );
+        let loc = self.parent.parent.env.get_node_loc(node_id);
+        let mut visitor = |t: &Type| {
+            use Type::*;
+            match t {
+                Var(_) => {
+                    self.error(
+                        &loc,
+                        &format!(
+                            "unable to infer type: `{}`",
+                            ty.display(&self.type_display_context())
+                        ),
+                    );
+                    let _ = self.subs.unify(
+                        &self.unification_context,
+                        self.type_variance(),
+                        WideningOrder::RightToLeft,
+                        t,
+                        &Error,
+                    );
+                },
+                Struct(_, _, inst) => {
+                    for i in inst {
+                        self.check_valid_instantiation(&loc, i)
+                    }
+                },
+                Vector(t) => {
+                    if !vector_type.contains(t) {
+                        self.check_valid_instantiation(&loc, t);
+                        vector_type.push(*t.clone());
+                    }
+                },
+                _ => {},
             }
-        }
+        };
+        ty.visit(&mut visitor);
         ty
     }
 
