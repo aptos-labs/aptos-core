@@ -31,7 +31,7 @@ mod groth16_vk;
 mod openid_sig;
 pub mod test_utils;
 
-use crate::zkid::circuit_constants::devnet_prepared_vk;
+use crate::oidb::circuit_constants::devnet_prepared_vk;
 pub use bn254_circom::get_public_inputs_hash;
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Zkp, SignedGroth16Zkp};
@@ -68,7 +68,7 @@ pub enum ZkpOrOpenIdSig {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct ZkIdSignature {
+pub struct OidbSignature {
     /// A \[ZKPoK of an\] OpenID signature over several relevant fields (e.g., `aud`, `sub`, `iss`,
     /// `nonce`) where `nonce` contains a commitment to `ephemeral_pubkey` and an expiration time
     /// `exp_timestamp_secs`.
@@ -89,16 +89,16 @@ pub struct ZkIdSignature {
     pub ephemeral_signature: EphemeralSignature,
 }
 
-impl TryFrom<&[u8]> for ZkIdSignature {
+impl TryFrom<&[u8]> for OidbSignature {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
-        bcs::from_bytes::<ZkIdSignature>(bytes)
+        bcs::from_bytes::<OidbSignature>(bytes)
             .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
-impl ValidCryptoMaterial for ZkIdSignature {
+impl ValidCryptoMaterial for OidbSignature {
     fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
     }
@@ -110,9 +110,9 @@ pub struct JWTHeader {
     pub alg: String,
 }
 
-impl ZkIdSignature {
-    /// A reasonable upper bound for the number of bytes we expect in a zkID public key. This is
-    /// enforced by our full nodes when they receive zkID TXNs.
+impl OidbSignature {
+    /// A reasonable upper bound for the number of bytes we expect in an OIDB public key. This is
+    /// enforced by our full nodes when they receive OIDB TXNs.
     pub const MAX_LEN: usize = 4000;
 
     pub fn parse_jwt_header(&self) -> anyhow::Result<JWTHeader> {
@@ -126,14 +126,14 @@ impl ZkIdSignature {
         let expiry_time = seconds_from_epoch(self.exp_timestamp_secs);
 
         if block_time > expiry_time {
-            bail!("zkID Signature is expired");
+            bail!("OIDB signature is expired");
         } else {
             Ok(())
         }
     }
 }
 
-/// The pepper is used to create a _hiding_ identity commitment (IDC) when deriving a zkID address.
+/// The pepper is used to create a _hiding_ identity commitment (IDC) when deriving an OIDB address.
 /// We fix its size at `poseidon_bn254::BYTES_PACKED_PER_SCALAR` to avoid extra hashing work when
 /// computing the public inputs hash.
 ///
@@ -174,17 +174,17 @@ impl Pepper {
 pub struct IdCommitment(#[serde(with = "serde_bytes")] pub(crate) Vec<u8>);
 
 impl IdCommitment {
-    /// The max length of the value of the JWT's `aud` field supported in our circuit. zkID address
+    /// The max length of the value of the JWT's `aud` field supported in our circuit. OIDB address
     /// derivation depends on this, so it should not be changed.
     pub const MAX_AUD_VAL_BYTES: usize = circuit_constants::MAX_AUD_VAL_BYTES;
     /// The max length of the JWT field name that stores the user's ID (e.g., `sub`, `email`) which is
-    /// supported in our circuit. zkID address derivation depends on this, so it should not be changed.
+    /// supported in our circuit. OIDB address derivation depends on this, so it should not be changed.
     pub const MAX_UID_KEY_BYTES: usize = circuit_constants::MAX_UID_KEY_BYTES;
     /// The max length of the value of the JWT's UID field (`sub`, `email`) that stores the user's ID
-    /// which is supported in our circuit. zkID address derivation depends on this, so it should not
+    /// which is supported in our circuit. OIDB address derivation depends on this, so it should not
     /// be changed.
     pub const MAX_UID_VAL_BYTES: usize = circuit_constants::MAX_UID_VAL_BYTES;
-    /// The size of the identity commitment (IDC) used to derive a zkID address. This value should **NOT*
+    /// The size of the identity commitment (IDC) used to derive an OIDB address. This value should **NOT*
     /// be changed since on-chain addresses are based on it (e.g., hashing a larger-sized IDC would lead
     /// to a different address).
     pub const NUM_BYTES: usize = 32;
@@ -231,7 +231,7 @@ impl TryFrom<&[u8]> for IdCommitment {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct ZkIdPublicKey {
+pub struct OidbPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
     /// e.g., https://accounts.google.com
     pub iss_val: String,
@@ -246,9 +246,9 @@ pub struct ZkIdPublicKey {
     pub idc: IdCommitment,
 }
 
-impl ZkIdPublicKey {
-    /// A reasonable upper bound for the number of bytes we expect in a zkID public key. This is
-    /// enforced by our full nodes when they receive zkID TXNs.
+impl OidbPublicKey {
+    /// A reasonable upper bound for the number of bytes we expect in an OIDB public key. This is
+    /// enforced by our full nodes when they receive OIDB TXNs.
     pub const MAX_LEN: usize = 200 + IdCommitment::NUM_BYTES;
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -256,25 +256,25 @@ impl ZkIdPublicKey {
     }
 }
 
-impl TryFrom<&[u8]> for ZkIdPublicKey {
+impl TryFrom<&[u8]> for OidbPublicKey {
     type Error = CryptoMaterialError;
 
     fn try_from(_value: &[u8]) -> Result<Self, Self::Error> {
-        bcs::from_bytes::<ZkIdPublicKey>(_value)
+        bcs::from_bytes::<OidbPublicKey>(_value)
             .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
-pub fn get_zkid_authenticators(
+pub fn get_oidb_authenticators(
     transaction: &SignedTransaction,
-) -> anyhow::Result<Vec<(ZkIdPublicKey, ZkIdSignature)>> {
+) -> anyhow::Result<Vec<(OidbPublicKey, OidbSignature)>> {
     // Check all the signers in the TXN
     let single_key_authenticators = transaction
         .authenticator_ref()
         .to_single_key_authenticators()?;
     let mut authenticators = Vec::with_capacity(MAX_NUM_OF_SIGS);
     for authenticator in single_key_authenticators {
-        if let (AnyPublicKey::ZkId { public_key }, AnySignature::ZkId { signature }) =
+        if let (AnyPublicKey::OIDB { public_key }, AnySignature::OIDB { signature }) =
             (authenticator.public_key(), authenticator.signature())
         {
             authenticators.push((public_key.clone(), signature.clone()))

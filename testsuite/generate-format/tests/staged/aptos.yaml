@@ -64,10 +64,10 @@ AnyPublicKey:
           - public_key:
               TYPENAME: Secp256r1EcdsaPublicKey
     3:
-      ZkId:
+      OIDB:
         STRUCT:
           - public_key:
-              TYPENAME: ZkIdPublicKey
+              TYPENAME: OidbPublicKey
 AnySignature:
   ENUM:
     0:
@@ -86,10 +86,10 @@ AnySignature:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
     3:
-      ZkId:
+      OIDB:
         STRUCT:
           - signature:
-              TYPENAME: ZkIdSignature
+              TYPENAME: OidbSignature
 AssertionSignature:
   ENUM:
     0:
@@ -286,6 +286,21 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
+OidbPublicKey:
+  STRUCT:
+    - iss_val: STR
+    - idc:
+        TYPENAME: IdCommitment
+OidbSignature:
+  STRUCT:
+    - sig:
+        TYPENAME: ZkpOrOpenIdSig
+    - jwt_header_b64: STR
+    - exp_timestamp_secs: U64
+    - ephemeral_pubkey:
+        TYPENAME: EphemeralPublicKey
+    - ephemeral_signature:
+        TYPENAME: EphemeralSignature
 OpenIdSig:
   STRUCT:
     - jwt_sig_b64: STR
@@ -662,21 +677,6 @@ WriteSetPayload:
 WriteSetV0:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut
-ZkIdPublicKey:
-  STRUCT:
-    - iss_val: STR
-    - idc:
-        TYPENAME: IdCommitment
-ZkIdSignature:
-  STRUCT:
-    - sig:
-        TYPENAME: ZkpOrOpenIdSig
-    - jwt_header_b64: STR
-    - exp_timestamp_secs: U64
-    - ephemeral_pubkey:
-        TYPENAME: EphemeralPublicKey
-    - ephemeral_signature:
-        TYPENAME: EphemeralSignature
 ZkpOrOpenIdSig:
   ENUM:
     0:

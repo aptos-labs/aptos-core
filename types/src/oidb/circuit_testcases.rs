@@ -1,16 +1,16 @@
 // Copyright © Aptos Foundation
 
-//^ This file stores the details associated with a sample zkID proof. The constants are outputted by
-//^ `input_gen.py` in the `zkid-circuit` repo (or can be derived implicitly from that code).
+//^ This file stores the details associated with a sample OIDB ZK proof. The constants are outputted by
+//^ `input_gen.py` in the `oidb-circuit` repo (or can be derived implicitly from that code).
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    transaction::authenticator::EphemeralPublicKey,
-    zkid::{
+    oidb::{
         base64url_encode_str,
         bn254_circom::{G1Bytes, G2Bytes},
-        Claims, Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, ZkIdPublicKey,
+        Claims, Configuration, Groth16Zkp, IdCommitment, OidbPublicKey, OpenIdSig, Pepper,
     },
+    transaction::authenticator::EphemeralPublicKey,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use once_cell::sync::Lazy;
@@ -43,7 +43,7 @@ static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     .unwrap()
 });
 
-/// TODO(zkid): Use a multiline format here, for diff-friendliness
+/// TODO(oidb): Use a multiline format here, for diff-friendliness
 pub(crate) static SAMPLE_JWT_PAYLOAD_DECODED: Lazy<String> = Lazy::new(|| {
     format!(
         r#"{{"iss":"https://accounts.google.com","azp":"407408718192.apps.googleusercontent.com","aud":"407408718192.apps.googleusercontent.com","sub":"113990307082899718775","hd":"aptoslabs.com","email":"michael@aptoslabs.com","email_verified":true,"at_hash":"bxIESuI59IoZb5alCASqBg","name":"Michael Straka","picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c","given_name":"Michael","family_name":"Straka","locale":"en","iat":1700255944,"exp":2700259544,"nonce":"{}"}}"#,
@@ -101,7 +101,7 @@ MHEVe8PBGOZYLcAdq4YiOIBgddoYyRsq5bzHtTQFgYQVK99Cnxo+PQAvzGb+dpjN
 acgc4kgDThAjD7VlXad9UHpNMO8=
 -----END PRIVATE KEY-----"#;
 
-    // TODO(zkid): Hacking around the difficulty of parsing PKCS#8-encoded PEM files with the `pem` crate
+    // TODO(oidb): Hacking around the difficulty of parsing PKCS#8-encoded PEM files with the `pem` crate
     let der = rsa::RsaPrivateKey::from_pkcs8_pem(sk)
         .unwrap()
         .to_pkcs1_der()
@@ -127,10 +127,10 @@ pub(crate) static SAMPLE_EPK: Lazy<EphemeralPublicKey> =
 
 pub(crate) static SAMPLE_EPK_BLINDER: Lazy<Vec<u8>> = Lazy::new(|| vec![42u8]);
 
-pub(crate) static SAMPLE_ZKID_PK: Lazy<ZkIdPublicKey> = Lazy::new(|| {
+pub(crate) static SAMPLE_OIDB_PK: Lazy<OidbPublicKey> = Lazy::new(|| {
     assert_eq!(SAMPLE_UID_KEY, "sub");
 
-    ZkIdPublicKey {
+    OidbPublicKey {
         iss_val: SAMPLE_JWT_PARSED.oidc_claims.iss.to_owned(),
         idc: IdCommitment::new_from_preimage(
             &SAMPLE_PEPPER,
@@ -150,24 +150,24 @@ pub(crate) static SAMPLE_ZKID_PK: Lazy<ZkIdPublicKey> = Lazy::new(|| {
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Zkp> = Lazy::new(|| {
     Groth16Zkp::new(
         G1Bytes::new_unchecked(
-            "12231709561876342858591497461541533679382707548832581865026884128195038623819",
-            "19550065013334671766459652895464943208897555190003385241537366958524038549651",
+            "4470668953498815291118813694625852066171551105654596174374858885226578750734",
+            "14788589714058859505243017007182544407755183524390103786436121684254044340756",
         )
         .unwrap(),
         G2Bytes::new_unchecked(
             [
-                "17760114700472440073566664035341233176332867365948052821768844085204638465257",
-                "2074118366711830630562352153651013053077229376039883853182809642185973784582",
+                "19964271555454493822493487427388576160988441374693973346071644217966495467723",
+                "13323381916967628034087987623567037272731886344747801700777864344050235336348",
             ],
             [
-                "21474168538255367719812229486236305962320711305273777702403534410487962424082",
-                "17404352079167923594003522667505828016450036154572779269542685309363067054790",
+                "3774003850436718557803458636202686199624507874355327512447206480984626693729",
+                "1716739756344109596192893154802286969758937949519569315162844587816368174496",
             ],
         )
         .unwrap(),
         G1Bytes::new_unchecked(
-            "9194799847136645728085689496796085217935413772780751043375835048405276952071",
-            "17704024912475005725846633700069393676807658122056968962396516331631047675983",
+            "20907992905438744331671589598826747010257757425816109725506966167718927036107",
+            "21699679298680052085273235372827765370228252154570456225953796655272884519170",
         )
         .unwrap(),
     )

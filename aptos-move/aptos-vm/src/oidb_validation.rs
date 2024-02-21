@@ -7,13 +7,13 @@ use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
-    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
+    oidb::{
+        get_public_inputs_hash, Configuration, Groth16VerificationKey, OidbPublicKey,
+        OidbSignature, ZkpOrOpenIdSig,
+    },
+    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     transaction::authenticator::EphemeralPublicKey,
     vm_status::{StatusCode, VMStatus},
-    zkid::{
-        get_public_inputs_hash, Configuration, Groth16VerificationKey, ZkIdPublicKey,
-        ZkIdSignature, ZkpOrOpenIdSig,
-    },
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
@@ -78,20 +78,20 @@ fn get_configs_onchain(
     get_resource_on_chain::<Configuration>(resolver)
 }
 
-fn get_jwk_for_zkid_authenticator(
+fn get_jwk_for_oidb_authenticator(
     jwks: &PatchedJWKs,
-    zkid_pub_key: &ZkIdPublicKey,
-    zkid_sig: &ZkIdSignature,
+    oidb_pub_key: &OidbPublicKey,
+    oidb_sig: &OidbSignature,
 ) -> Result<JWK, VMStatus> {
-    let jwt_header = zkid_sig
+    let jwt_header = oidb_sig
         .parse_jwt_header()
         .map_err(|_| invalid_signature!("Failed to parse JWT header"))?;
     let jwk_move_struct = jwks
-        .get_jwk(&zkid_pub_key.iss_val, &jwt_header.kid)
+        .get_jwk(&oidb_pub_key.iss_val, &jwt_header.kid)
         .map_err(|_| {
             invalid_signature!(format!(
                 "JWK for {} with KID {} was not found",
-                zkid_pub_key.iss_val, jwt_header.kid
+                oidb_pub_key.iss_val, jwt_header.kid
             ))
         })?;
 
@@ -99,25 +99,36 @@ fn get_jwk_for_zkid_authenticator(
         .map_err(|_| invalid_signature!("Could not unpack Any in JWK Move struct"))?;
     Ok(jwk)
 }
-
-pub fn validate_zkid_authenticators(
-    authenticators: &Vec<(ZkIdPublicKey, ZkIdSignature)>,
+pub(crate) fn validate_oidb_authenticators(
+    authenticators: &Vec<(OidbPublicKey, OidbSignature)>,
+    features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
+    // OIDB feature gating.
+    for (_, sig) in authenticators {
+        if !features.is_oidb_enabled() && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. }) {
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+        }
+        if (!features.is_oidb_enabled() || !features.is_oidb_zkless_enabled())
+            && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+        {
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+        }
+    }
+
     if authenticators.is_empty() {
         return Ok(());
     }
 
     let config = &get_configs_onchain(resolver)?;
-
-    if authenticators.len() > config.max_zkid_signatures_per_txn as usize {
-        return Err(invalid_signature!("Too many zkID authenticators"));
+    if authenticators.len() > config.max_oidb_signatures_per_txn as usize {
+        return Err(invalid_signature!("Too many OIDB authenticators"));
     }
 
     let onchain_timestamp_obj = get_current_time_onchain(resolver)?;
     // Check the expiry timestamp on all authenticators first to fail fast
-    for (_, zkid_sig) in authenticators {
-        zkid_sig
+    for (_, oidb_sig) in authenticators {
+        oidb_sig
             .verify_expiry(&onchain_timestamp_obj)
             .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
     }
@@ -136,10 +147,10 @@ pub fn validate_zkid_authenticators(
         )),
     };
 
-    for (zkid_pub_key, zkid_sig) in authenticators {
-        let jwk = get_jwk_for_zkid_authenticator(&patched_jwks, zkid_pub_key, zkid_sig)?;
+    for (oidb_pub_key, oidb_sig) in authenticators {
+        let jwk = get_jwk_for_oidb_authenticator(&patched_jwks, oidb_pub_key, oidb_sig)?;
 
-        match &zkid_sig.sig {
+        match &oidb_sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
                 JWK::RSA(rsa_jwk) => {
                     if proof.exp_horizon_secs > config.max_exp_horizon_secs {
@@ -162,7 +173,7 @@ pub fn validate_zkid_authenticators(
                     }
 
                     let public_inputs_hash =
-                        get_public_inputs_hash(zkid_sig, zkid_pub_key, &rsa_jwk, config).map_err(
+                        get_public_inputs_hash(oidb_sig, oidb_pub_key, &rsa_jwk, config).map_err(
                             |_| invalid_signature!("Could not compute public inputs hash"),
                         )?;
                     proof
@@ -176,9 +187,9 @@ pub fn validate_zkid_authenticators(
                     JWK::RSA(rsa_jwk) => {
                         openid_sig
                             .verify_jwt_claims(
-                                zkid_sig.exp_timestamp_secs,
-                                &zkid_sig.ephemeral_pubkey,
-                                zkid_pub_key,
+                                oidb_sig.exp_timestamp_secs,
+                                &oidb_sig.ephemeral_pubkey,
+                                oidb_pub_key,
                                 config,
                             )
                             .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
@@ -195,7 +206,7 @@ pub fn validate_zkid_authenticators(
                         //
                         // We are now ready to verify the RSA signature
                         openid_sig
-                            .verify_jwt_signature(&rsa_jwk, &zkid_sig.jwt_header_b64)
+                            .verify_jwt_signature(&rsa_jwk, &oidb_sig.jwt_header_b64)
                             .map_err(|_| {
                                 invalid_signature!(
                                     "RSA signature verification failed for OpenIdSig"

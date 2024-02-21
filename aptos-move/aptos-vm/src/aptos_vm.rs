@@ -12,10 +12,11 @@ use crate::{
         get_max_binary_format_version, AptosMoveResolver, MoveVmExt, RespawnedSession, SessionExt,
         SessionId,
     },
+    oidb_validation,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, zkid_validation, VMExecutor, VMValidator,
+    transaction_validation, verifier, VMExecutor, VMValidator,
 };
 use anyhow::{anyhow, Result};
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -53,7 +54,6 @@ use aptos_types::{
         ViewFunctionOutput, WriteSetPayload,
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
-    zkid::ZkpOrOpenIdSig,
 };
 use aptos_utils::{aptos_try, return_on_failure};
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
@@ -1323,29 +1323,9 @@ impl AptosVM {
             ));
         }
 
-        // zkID feature gating
-        let authenticators = aptos_types::zkid::get_zkid_authenticators(transaction);
-        match &authenticators {
-            Ok(authenticators) => {
-                for (_, sig) in authenticators {
-                    if !self.features.is_zkid_enabled()
-                        && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. })
-                    {
-                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-                    }
-                    if (!self.features.is_zkid_enabled() || !self.features.is_zkid_zkless_enabled())
-                        && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
-                    {
-                        return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-                    }
-                }
-            },
-            Err(_) => {
-                return Err(VMStatus::error(StatusCode::INVALID_SIGNATURE, None));
-            },
-        }
-
-        zkid_validation::validate_zkid_authenticators(&authenticators.unwrap(), resolver)?;
+        let authenticators = aptos_types::oidb::get_oidb_authenticators(transaction)
+            .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
+        oidb_validation::validate_oidb_authenticators(&authenticators, &self.features, resolver)?;
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
