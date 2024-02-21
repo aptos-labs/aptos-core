@@ -68,6 +68,7 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
+use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
@@ -1217,20 +1218,25 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let max_batch_expiry_gap_usecs =
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
-            self.bounded_executor
-                .spawn(async move {
-                    match monitor!(
-                        "verify_message",
-                        unverified_event.clone().verify(
-                            peer_id,
-                            &epoch_state.verifier,
-                            quorum_store_enabled,
-                            peer_id == my_peer_id,
-                            max_num_batches,
-                            max_batch_expiry_gap_usecs,
-                        )
-                    ) {
-                        Ok(verified_event) => {
+
+            let unverified_event_clone = unverified_event.clone();
+            let verified_result = THREAD_MANAGER.get_exe_cpu_pool().install(move || {
+                monitor!(
+                    "verify_message",
+                    unverified_event_clone.verify(
+                        peer_id,
+                        &epoch_state.verifier,
+                        quorum_store_enabled,
+                        peer_id == my_peer_id,
+                        max_num_batches,
+                        max_batch_expiry_gap_usecs,
+                    )
+                )
+            });
+            match verified_result {
+                Ok(verified_event) => {
+                    self.bounded_executor
+                        .spawn(async move {
                             Self::forward_event(
                                 quorum_store_msg_tx,
                                 round_manager_tx,
@@ -1239,18 +1245,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                                 verified_event,
                                 payload_manager,
                             );
-                        },
-                        Err(e) => {
-                            error!(
-                                SecurityEvent::ConsensusInvalidMessage,
-                                remote_peer = peer_id,
-                                error = ?e,
-                                unverified_event = unverified_event
-                            );
-                        },
-                    }
-                })
-                .await;
+                        })
+                        .await;
+                },
+                Err(e) => {
+                    error!(
+                        SecurityEvent::ConsensusInvalidMessage,
+                        remote_peer = peer_id,
+                        error = ?e,
+                        unverified_event = unverified_event
+                    );
+                },
+            }
         }
         Ok(())
     }
