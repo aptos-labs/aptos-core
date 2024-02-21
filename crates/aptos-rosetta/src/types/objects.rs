@@ -29,7 +29,7 @@ use aptos_rest_client::aptos_api_types::{TransactionOnChainData, U64};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CoinStoreResource, WithdrawEvent},
-    contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
+    contract_event::ContractEvent,
     event::EventKey,
     fee_statement::FeeStatement,
     stake_pool::{SetOperatorEvent, StakePool},
@@ -1842,9 +1842,14 @@ fn get_amount_from_event(events: &[ContractEvent], event_key: &EventKey) -> Vec<
 fn get_fee_statement_from_event(events: &[ContractEvent]) -> Vec<FeeStatement> {
     events
         .iter()
+        .filter(|event| event.is_v2())
         .filter_map(|event| {
-            if let Ok(Some(fee_statement)) = event.try_v2_typed(&FEE_STATEMENT_EVENT_TYPE) {
-                Some(fee_statement)
+            if let Ok(fee_statement_event) = bcs::from_bytes::<FeeStatement>(event.event_data()) {
+                if fee_statement_event.storage_fee_refund() != 0 {
+                    Some(fee_statement_event) // Collect only if storage_fee_refund_octas is non-zero
+                } else {
+                    None
+                }
             } else {
                 None
             }
