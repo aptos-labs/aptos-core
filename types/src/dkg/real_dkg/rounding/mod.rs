@@ -23,13 +23,17 @@ pub fn total_weight_upper_bound(
     secrecy_threshold_in_stake_ratio: f64,
 ) -> usize {
     assert!(reconstruct_threshold_in_stake_ratio > secrecy_threshold_in_stake_ratio);
-    let bound_1 =
-        ((1.0 / (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio)) + 1.0)
-            * (validator_stakes.len() as f64);
+    let bound_1 = ((U64F64::from_num(1)
+        / U64F64::from_num(
+            reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio,
+        ))
+        + U64F64::from_num(1))
+    .to_num::<u64>()
+        * (validator_stakes.len() as u64);
 
     let stake_sum = validator_stakes.iter().sum::<u64>();
     let stake_min = *validator_stakes.iter().min().unwrap();
-    let bound_2 = stake_sum / stake_min + 1;
+    let bound_2 = stake_sum / max(1, stake_min) + 1;
 
     max(bound_1 as usize, bound_2 as usize)
 }
@@ -128,7 +132,7 @@ impl DKGRoundingProfile {
         assert!(total_weight_min >= validator_stakes.len());
         assert!(total_weight_max >= total_weight_min);
         assert!(secrecy_threshold_in_stake_ratio > 1.0 / 3.0);
-        assert!(secrecy_threshold_in_stake_ratio <= reconstruct_threshold_in_stake_ratio);
+        assert!(secrecy_threshold_in_stake_ratio < reconstruct_threshold_in_stake_ratio);
         assert!(reconstruct_threshold_in_stake_ratio <= 2.0 / 3.0);
 
         let mut weight_low = total_weight_min as u64;
@@ -159,6 +163,16 @@ impl DKGRoundingProfile {
             } else {
                 weight_low = weight_mid + 1;
             }
+        }
+
+        // todo: remove once aptos-dkg supports 0 weights
+        if !is_valid_profile(&best_profile, reconstruct_threshold_in_stake_ratio) {
+            println!("[Randomness] Rounding error: failed to find a valid profile, using default");
+            return Self::default(
+                validator_stakes.len(),
+                secrecy_threshold_in_stake_ratio,
+                reconstruct_threshold_in_stake_ratio,
+            );
         }
 
         best_profile
