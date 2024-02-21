@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::mime_types::BCS;
+use aptos_api_types::mime_types::{BCS, JSON};
 use poem::{web::Accept, FromRequest, Request, RequestBody, Result};
 
 /// Accept types from input headers
@@ -29,6 +29,9 @@ impl<'a> FromRequest<'a> for AcceptType {
 /// overriding explicit accept type, default to JSON.
 fn parse_accept(accept: &Accept) -> Result<AcceptType> {
     for mime in &accept.0 {
+        if matches!(mime.as_ref(), JSON) {
+            return Ok(AcceptType::Json);
+        }
         if matches!(mime.as_ref(), BCS) {
             return Ok(AcceptType::Bcs);
         }
