@@ -21,7 +21,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock
+    common::Author, executed_block::ExecutedBlock, pipeline::commit_decision::CommitDecision,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -348,6 +348,13 @@ impl BufferManager {
                 let block = aggregated_item.executed_blocks.last().unwrap().block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
+                if block.author() == Some(self.author) {
+                    let commit_decision = CommitMessage::Decision(CommitDecision::new(
+                        aggregated_item.commit_proof.clone(),
+                    ));
+                    self.commit_proof_rb_handle
+                        .replace(self.do_reliable_broadcast(commit_decision));
+                }
                 if aggregated_item.commit_proof.ledger_info().ends_epoch() {
                     self.commit_msg_tx
                         .send_epoch_change(EpochChangeProof::new(
