@@ -265,8 +265,11 @@ module aptos_framework::account {
         borrow_global<Account>(addr).authentication_key
     }
 
-    /// This function is used to rotate a resource account's authentication key to 0, so that no private key can control
-    /// the resource account.
+    /// This function is used to rotate a resource account's authentication key to `new_auth_key`. This is done in
+    /// many contexts:
+    /// 1. During normal key rotation via `rotate_authentication_key` or `rotate_authentication_key_call`
+    /// 2. During resource account initialization so that no private key can control the resource account
+    /// 3. During multisig_v2 account creation
     public(friend) fun rotate_authentication_key_internal(account: &signer, new_auth_key: vector<u8>) acquires Account {
         let addr = signer::address_of(account);
         assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
@@ -278,16 +281,13 @@ module aptos_framework::account {
         account_resource.authentication_key = new_auth_key;
     }
 
-    /// Entry function-only rotation key function that allows the signer update their authentication_key.
-    entry fun rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) acquires Account, OriginatingAddress {
-        let addr = signer::address_of(account);
-        assert!(exists_at(addr), error::not_found(EACCOUNT_DOES_NOT_EXIST));
-        assert!(
-            vector::length(&new_auth_key) == 32,
-            error::invalid_argument(EMALFORMED_AUTHENTICATION_KEY)
-        );
-        let account_resource = borrow_global_mut<Account>(addr);
-        update_auth_key_and_originating_address_table(addr, account_resource, new_auth_key);
+    /// Private entry function for key rotation that allows the signer to update their authentication key.
+    /// Note that this does not update the `OriginatingAddress` table because the `new_auth_key` is not "verified": it
+    /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+    /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+    /// the format expected in `rotate_authentication_key`.
+    entry fun rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) acquires Account {
+        rotate_authentication_key_internal(account, new_auth_key);
     }
 
     /// Generic authentication key rotation function that allows the user to rotate their authentication key from any scheme to any scheme.
@@ -1337,7 +1337,7 @@ module aptos_framework::account {
 
 
     #[test(account = @aptos_framework)]
-    public entry fun test_simple_rotation(account: &signer) acquires Account, OriginatingAddress {
+    public entry fun test_simple_rotation(account: &signer) acquires Account {
         initialize(account);
 
         let alice_addr = @0x1234;
@@ -1349,10 +1349,6 @@ module aptos_framework::account {
         let new_addr = from_bcs::to_address(new_auth_key);
 
         rotate_authentication_key_call(&alice, new_auth_key);
-
-        let address_map = &mut borrow_global_mut<OriginatingAddress>(@aptos_framework).address_map;
-        let expected_originating_address = table::borrow(address_map, new_addr);
-        assert!(*expected_originating_address == alice_addr, 0);
         assert!(borrow_global<Account>(alice_addr).authentication_key == new_auth_key, 0);
     }
 
