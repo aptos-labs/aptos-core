@@ -20,9 +20,7 @@ use crate::{
     state_replication::StateComputerCommitCallBackType,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_consensus_types::{
-    common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
-};
+use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
