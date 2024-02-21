@@ -15,7 +15,7 @@ use move_binary_format::{
     errors::*,
     file_format::{
         Ability, AbilitySet, AccessKind, Bytecode, FieldInstantiationIndex, FunctionHandleIndex,
-        FunctionInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
+        FunctionInstantiationIndex, LocalIndex, SignatureIndex, StructDefInstantiationIndex,
     },
 };
 use move_core_types::{

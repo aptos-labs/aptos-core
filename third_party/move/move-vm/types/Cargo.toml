@@ -25,8 +25,8 @@ move-binary-format = { path = "../../move-binary-format" }
 move-core-types = { path = "../../move-core/types" }
 
 [dev-dependencies]
-move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
 claims = "0.7"
+move-binary-format = { path = "../../move-binary-format", features = ["fuzzing"] }
 proptest = "1.0.0"
 rand = "0.8.5"
 
