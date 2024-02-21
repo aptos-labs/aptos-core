@@ -302,7 +302,7 @@ impl RoundManager {
                         .await?;
                 }
             }
-            self.network.clone().broadcast_proposal(proposal_msg).await;
+            self.network.broadcast_proposal(proposal_msg).await;
             counters::PROPOSALS_COUNT.inc();
         }
         Ok(())
