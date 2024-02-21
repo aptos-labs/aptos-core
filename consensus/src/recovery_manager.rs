@@ -9,8 +9,8 @@ use crate::{
     network::NetworkSender,
     payload_manager::PayloadManager,
     persistent_liveness_storage::{PersistentLivenessStorage, RecoveryData},
+    pipeline::execution_client::TExecutionClient,
     round_manager::VerifiedEvent,
-    state_replication::StateComputer,
 };
 use anyhow::{anyhow, ensure, Context, Result};
 use aptos_channels::aptos_channel;
@@ -29,7 +29,7 @@ pub struct RecoveryManager {
     epoch_state: Arc<EpochState>,
     network: Arc<NetworkSender>,
     storage: Arc<dyn PersistentLivenessStorage>,
-    state_computer: Arc<dyn StateComputer>,
+    execution_client: Arc<dyn TExecutionClient>,
     last_committed_round: Round,
     max_blocks_to_request: u64,
     payload_manager: Arc<PayloadManager>,
@@ -40,7 +40,7 @@ impl RecoveryManager {
         epoch_state: Arc<EpochState>,
         network: Arc<NetworkSender>,
         storage: Arc<dyn PersistentLivenessStorage>,
-        state_computer: Arc<dyn StateComputer>,
+        execution_client: Arc<dyn TExecutionClient>,
         last_committed_round: Round,
         max_blocks_to_request: u64,
         payload_manager: Arc<PayloadManager>,
@@ -49,7 +49,7 @@ impl RecoveryManager {
             epoch_state,
             network,
             storage,
-            state_computer,
+            execution_client,
             last_committed_round,
             max_blocks_to_request,
             payload_manager,
@@ -95,7 +95,7 @@ impl RecoveryManager {
             sync_info.highest_commit_cert(),
             &mut retriever,
             self.storage.clone(),
-            self.state_computer.clone(),
+            self.execution_client.clone(),
             self.payload_manager.clone(),
         )
         .await?;

@@ -239,10 +239,6 @@ impl RoundManager {
         }
     }
 
-    fn decoupled_execution(&self) -> bool {
-        self.onchain_config.decoupled_execution()
-    }
-
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
     fn create_block_retriever(&self, author: Author) -> BlockRetriever {
         BlockRetriever::new(
@@ -554,16 +550,12 @@ impl RoundManager {
     }
 
     fn sync_only(&self) -> bool {
-        if self.decoupled_execution() {
-            let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
-            counters::OP_COUNTERS
-                .gauge("sync_only")
-                .set(sync_or_not as i64);
+        let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
+        counters::OP_COUNTERS
+            .gauge("sync_only")
+            .set(sync_or_not as i64);
 
-            sync_or_not
-        } else {
-            self.local_config.sync_only
-        }
+        sync_or_not
     }
 
     /// The replica broadcasts a "timeout vote message", which includes the round signature, which
@@ -741,7 +733,7 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
-        if self.decoupled_execution() && self.block_store.vote_back_pressure() {
+        if self.block_store.vote_back_pressure() {
             counters::CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED.observe(1.0);
             // In case of back pressure, we delay processing proposal. This is done by resending the
             // same proposal to self after some time. Even if processing proposal is delayed, we add
@@ -753,7 +745,7 @@ impl RoundManager {
             // tries to add the same block again, which is okay as `execute_and_insert_block` call
             // is idempotent.
             self.block_store
-                .execute_and_insert_block(proposal.clone())
+                .insert_ordered_block(proposal.clone())
                 .await
                 .context("[RoundManager] Failed to execute_and_insert the block")?;
             self.resend_verified_proposal_to_self(
@@ -824,7 +816,7 @@ impl RoundManager {
     async fn execute_and_vote(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
         let executed_block = self
             .block_store
-            .execute_and_insert_block(proposed_block)
+            .insert_ordered_block(proposed_block)
             .await
             .context("[RoundManager] Failed to execute_and_insert the block")?;
 
@@ -840,7 +832,7 @@ impl RoundManager {
             "[RoundManager] sync_only flag is set, stop voting"
         );
 
-        let vote_proposal = executed_block.vote_proposal(self.decoupled_execution());
+        let vote_proposal = executed_block.vote_proposal();
         let vote_result = self.safety_rules.lock().construct_and_sign_vote_two_chain(
             &vote_proposal,
             self.block_store.highest_2chain_timeout_cert().as_deref(),
