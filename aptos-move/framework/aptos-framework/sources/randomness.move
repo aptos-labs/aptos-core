@@ -44,10 +44,12 @@ module aptos_framework::randomness {
     /// Invoked in block prologues to update the block-level randomness seed.
     public(friend) fun on_new_block(vm: &signer, epoch: u64, round: u64, seed_for_new_block: Option<vector<u8>>) acquires PerBlockRandomness {
         system_addresses::assert_vm(vm);
-        let randomness = borrow_global_mut<PerBlockRandomness>(@aptos_framework);
-        randomness.epoch = epoch;
-        randomness.round = round;
-        randomness.seed = seed_for_new_block;
+        if (exists<PerBlockRandomness>(@aptos_framework)) {
+            let randomness = borrow_global_mut<PerBlockRandomness>(@aptos_framework);
+            randomness.epoch = epoch;
+            randomness.round = round;
+            randomness.seed = seed_for_new_block;
+        }
     }
 
     /// Generate 32 random bytes.
