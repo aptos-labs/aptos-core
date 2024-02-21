@@ -28,6 +28,7 @@ use aptos_protos::{
     transaction::v1::Transaction,
 };
 use futures::Stream;
+use mini_moka::sync::Cache;
 use prost::Message;
 use redis::Client;
 use std::{
@@ -80,6 +81,9 @@ pub struct RawDataServerWrapper {
     pub file_store_config: IndexerGrpcFileStoreConfig,
     pub data_service_response_channel_size: usize,
     pub cache_storage_format: StorageFormat,
+    /// Read through cache for the data service.
+    /// Map from cache key to the transaction bytes.
+    read_through_cache: Cache<String, Vec<u8>>,
 }
 
 impl RawDataServerWrapper {
@@ -88,6 +92,7 @@ impl RawDataServerWrapper {
         file_store_config: IndexerGrpcFileStoreConfig,
         data_service_response_channel_size: usize,
         cache_storage_format: StorageFormat,
+        read_through_cache: Cache<String, Vec<u8>>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -98,6 +103,7 @@ impl RawDataServerWrapper {
             file_store_config,
             data_service_response_channel_size,
             cache_storage_format,
+            read_through_cache,
         })
     }
 }
@@ -172,6 +178,7 @@ impl RawData for RawDataServerWrapper {
         let redis_client = self.redis_client.clone();
         let cache_storage_format = self.cache_storage_format;
         let request_metadata = Arc::new(request_metadata);
+        let read_through_cache = self.read_through_cache.clone();
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -183,6 +190,7 @@ impl RawData for RawDataServerWrapper {
                     transactions_count,
                     tx,
                     current_version,
+                    read_through_cache,
                 )
                 .await;
             }
@@ -341,6 +349,7 @@ async fn data_fetcher_task(
     transactions_count: Option<u64>,
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     mut current_version: u64,
+    read_through_cache: Cache<String, Vec<u8>>,
 ) {
     let mut connection_start_time = Some(std::time::Instant::now());
     let mut transactions_count = transactions_count;
@@ -368,7 +377,8 @@ async fn data_fetcher_task(
             return;
         },
     };
-    let mut cache_operator = CacheOperator::new(conn, cache_storage_format);
+    let mut cache_operator =
+        CacheOperator::new(conn, cache_storage_format, Some(read_through_cache));
 
     // Validate chain id
     let mut metadata = file_store_operator.get_file_store_metadata().await;

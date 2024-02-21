@@ -204,6 +204,18 @@ pub static TRANSACTION_UNIX_TIMESTAMP: Lazy<GaugeVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub const CACHE_STATS_TYPE_HIT: &str = "hit";
+pub const CACHE_STATS_TYPE_MISS: &str = "miss";
+/// In-memory cache stats counter.
+pub static IN_MEMORY_CACHE_STATS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_in_memory_cache_stats",
+        "In-memory cache stats",
+        &["cache_stats_type"]
+    )
+    .unwrap()
+});
+
 pub fn log_grpc_step(
     service_type: &str,
     step: IndexerGrpcStep,
