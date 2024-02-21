@@ -1192,6 +1192,7 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
             criteria: Some(SuccessCriteria::new(8)),
         }),
     })
+    .with_emit_job(EmitJobRequest::default().txn_expiration_time_secs(1800))
     .with_genesis_helm_config_fn(Arc::new(|helm_values| {
         // no epoch change.
         helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
