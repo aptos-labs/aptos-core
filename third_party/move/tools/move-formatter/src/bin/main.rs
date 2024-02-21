@@ -13,7 +13,7 @@ use movefmt::{
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 use tracing_subscriber::EnvFilter;
@@ -53,8 +53,6 @@ enum Operation {
     ConfigOutputDefault { path: Option<String> },
     /// Output current config (as if formatting to a file) to stdout
     ConfigOutputCurrent { path: Option<String> },
-    /// No file specified, read from stdin
-    Stdin { input: String },
 }
 
 /// movefmt operations errors.
@@ -159,17 +157,8 @@ fn execute(opts: &Options) -> Result<i32> {
 
             Ok(0)
         }
-        Operation::Stdin { input } => format_string(input, options),
         Operation::Format { files } => format(files, &options),
     }
-}
-
-fn format_string(input: String, options: GetOptsOptions) -> Result<i32> {
-    tracing::info!("input = {}, options = {:?}", input, options);
-    let (config, _) = load_config(None, Some(options.clone()))?;
-    let output = format_entry(input.clone(), config.clone());
-    tracing::info!("output = {:?}", output);
-    Ok(0)
 }
 
 fn format(files: Vec<PathBuf>, options: &GetOptsOptions) -> Result<i32> {
@@ -306,11 +295,9 @@ fn determine_operation(matches: &Matches) -> Result<Operation, OperationError> {
         })
         .collect();
 
-    // if no file argument is supplied, read from stdin
     if files.is_empty() {
-        let mut buffer = String::new();
-        io::stdin().read_to_string(&mut buffer)?;
-        return Ok(Operation::Stdin { input: buffer });
+        eprintln!("no file argument is supplied \n-------------------------------------\n");
+        return Ok(Operation::Help(HelpOp::None));
     }
 
     Ok(Operation::Format { files })

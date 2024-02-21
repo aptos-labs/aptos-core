@@ -419,7 +419,7 @@ impl Format {
     fn add_new_line_after_nested_begin(
         &self,
         kind: &NestKind,
-        elements: &Vec<TokenTree>,
+        elements: &[TokenTree],
         b_new_line_mode: bool,
     ) {
         if !b_new_line_mode {
@@ -432,7 +432,7 @@ impl Format {
         }
 
         if !elements.is_empty() {
-            let next_token = elements.get(0).unwrap();
+            let next_token = elements.first().unwrap();
             let mut next_token_start_pos: u32 = 0;
             self.analyzer_token_tree_start_pos_(&mut next_token_start_pos, next_token);
             if self.translate_line(next_token_start_pos) > self.translate_line(kind.start_pos) {
@@ -768,16 +768,32 @@ impl Format {
             }
             self.format_context.borrow_mut().cur_tok = *tok;
 
+            let mut split_line_after_content = false;
             if self.judge_change_new_line_when_over_limits(*tok, *note, next_token) {
                 tracing::debug!("last_line = {:?}", self.last_line());
                 tracing::debug!(
                     "SimpleToken{:?} too long, add a new line because of split line",
                     content
                 );
+
+                if matches!(*tok,
+                    | Tok::Period
+                    | Tok::Equal
+                    | Tok::EqualEqual
+                    | Tok::EqualEqualGreater
+                    | Tok::LessEqualEqualGreater) {
+                    self.push_str(content.as_str());
+                    split_line_after_content = true;
+                }
+                self.inc_depth();
                 self.new_line(None);
+                self.dec_depth();
             }
 
-            self.push_str(content.as_str());
+            if !split_line_after_content {
+                self.push_str(content.as_str());
+            }
+
             self.cur_line.set(self.translate_line(*pos));
             if new_line_after {
                 return;
@@ -788,7 +804,9 @@ impl Format {
                     "SimpleToken{:?}, add a new line because of split line",
                     content
                 );
+                self.inc_depth();
                 self.new_line(None);
+                self.dec_depth();
                 return;
             }
             if expr_fmt::need_space(token, next_token) {
@@ -1134,7 +1152,6 @@ impl Format {
             | Tok::Plus
             | Tok::Minus
             | Tok::Period
-            | Tok::PeriodPeriod
             | Tok::Slash
             | Tok::LessEqual
             | Tok::LessLess

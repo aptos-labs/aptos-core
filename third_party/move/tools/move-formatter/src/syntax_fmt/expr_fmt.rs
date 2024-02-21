@@ -185,6 +185,12 @@ pub(crate) fn need_space(current: &TokenTree, next: Option<&TokenTree>) -> bool 
 
     let is_to_execpt = is_to_or_except(&Some(current)) || is_to_or_except(&next);
 
+    if let Tok::Greater = get_end_tok(current) {
+        if let TokType::Alphabet = TokType::from(next.map(get_start_tok).unwrap()) {
+            return true
+        }
+    }
+
     match (
         TokType::from(get_start_tok(current)),
         TokType::from(next.map(get_start_tok).unwrap()),
@@ -193,7 +199,7 @@ pub(crate) fn need_space(current: &TokenTree, next: Option<&TokenTree>) -> bool 
         (TokType::MathSign, _) => true,
         (TokType::Sign, TokType::Alphabet) => Tok::Exclaim != get_end_tok(current),
         (TokType::Sign, TokType::Number) => true,
-        (TokType::Sign, TokType::String | TokType::AtSign) => {
+        (TokType::Sign, TokType::String | TokType::AtSign | TokType::Amp | TokType::AmpMut) => {
             let mut result = false;
             let mut next_tok = Tok::EOF;
             if let Some(x) = next {
@@ -223,13 +229,13 @@ pub(crate) fn need_space(current: &TokenTree, next: Option<&TokenTree>) -> bool 
                 }
             }
 
-            if Tok::Comma == get_start_tok(current) && Tok::AtSign == next_tok {
+            if Tok::Comma == get_start_tok(current) && 
+                (Tok::AtSign == next_tok || Tok::Amp == next_tok || Tok::AmpMut == next_tok) {
                 result = true;
-                // tracing::debug!("after Comma, result = {}, next_tok = {:?}", result, next_tok);
+                tracing::debug!("after Comma, result = {}, next_tok = {:?}", result, next_tok);
             }
             result
         }
-        (_, TokType::MathSign) => true,
         (TokType::Alphabet, TokType::String) => true,
         (TokType::Number, TokType::Alphabet) => true,
         (_, TokType::AmpMut) => true,
@@ -237,7 +243,18 @@ pub(crate) fn need_space(current: &TokenTree, next: Option<&TokenTree>) -> bool 
         (TokType::Alphabet, TokType::Number) => true,
 
         (_, TokType::Less) => is_bin_next,
-        (TokType::Less, TokType::Alphabet) => true,
+        (TokType::Alphabet, TokType::MathSign) => {
+            if let Some(next_tk) = next {
+                if let Some(content) = next_tk.simple_str() {
+                    if content.contains('>') {
+                        return is_bin_next
+                    }
+                }
+            }
+            true
+        },
+        (_, TokType::MathSign) => true,
+        (TokType::Less, TokType::Alphabet) => _is_bin_current,
         (TokType::Less, _) => false,
 
         (_, TokType::Amp) => is_bin_next,
@@ -360,6 +377,12 @@ pub(crate) fn need_space(current: &TokenTree, next: Option<&TokenTree>) -> bool 
                 result = true;
             }
 
+            if let Some(content) = current.simple_str() {
+                if content.contains("aborts_if") || content.contains("ensures") {
+                    result = true;
+                }
+            }
+
             if next_tok == Tok::Exclaim {
                 result = matches!(TokType::from(get_start_tok(current)), TokType::Alphabet)
                     || Tok::RParen == get_end_tok(current);
@@ -404,7 +427,7 @@ pub(crate) fn judge_simple_paren_expr(
     true
 }
 
-pub(crate) fn process_link_access(elements: &Vec<TokenTree>, idx: usize) -> (usize, usize) {
+pub(crate) fn process_link_access(elements: &[TokenTree], idx: usize) -> (usize, usize) {
     tracing::debug!("process_link_access >>");
     if idx >= elements.len() - 1 {
         return (0, 0);

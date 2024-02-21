@@ -396,5 +396,5 @@ pub fn cpu_pprof(_seconds: u64) {
 }
 #[cfg(target_os = "windows")]
 pub fn cpu_pprof(_seconds: u64) {
-    log::error!("Can't run pprof in Windows");
+    tracing::error!("Can't run pprof in Windows");
 }
