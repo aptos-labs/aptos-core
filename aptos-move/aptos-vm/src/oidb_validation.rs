@@ -7,13 +7,13 @@ use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
-    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
-    transaction::authenticator::EphemeralPublicKey,
-    vm_status::{StatusCode, VMStatus},
     oidb::{
         get_public_inputs_hash, Configuration, Groth16VerificationKey, OidbPublicKey,
         OidbSignature, ZkpOrOpenIdSig,
     },
+    on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
+    transaction::authenticator::EphemeralPublicKey,
+    vm_status::{StatusCode, VMStatus},
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};

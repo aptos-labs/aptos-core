@@ -5,8 +5,8 @@ use crate::oidb::bn254_circom::{
     G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
 };
 use crate::{
-    transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
     oidb::bn254_circom::{G1Bytes, G2Bytes},
+    transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
 };
 use anyhow::bail;
 use aptos_crypto::CryptoMaterialError;

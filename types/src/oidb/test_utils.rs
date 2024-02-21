@@ -2,16 +2,16 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    transaction::authenticator::EphemeralSignature,
     oidb::{
         base64url_encode_bytes, base64url_encode_str,
         circuit_testcases::{
             SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
             SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
-            SAMPLE_JWT_PARSED, SAMPLE_PEPPER, SAMPLE_PROOF, SAMPLE_UID_KEY, SAMPLE_OIDB_PK,
+            SAMPLE_JWT_PARSED, SAMPLE_OIDB_PK, SAMPLE_PEPPER, SAMPLE_PROOF, SAMPLE_UID_KEY,
         },
-        Groth16Zkp, OpenIdSig, SignedGroth16Zkp, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig,
+        Groth16Zkp, OidbPublicKey, OidbSignature, OpenIdSig, SignedGroth16Zkp, ZkpOrOpenIdSig,
     },
+    transaction::authenticator::EphemeralSignature,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, SigningKey, Uniform};
 use once_cell::sync::Lazy;

@@ -15,7 +15,7 @@ use aptos_logger::warn;
 use aptos_protos::{
     transaction::{
         v1 as transaction,
-        v1::{any_signature, Ed25519, Secp256k1Ecdsa, WebAuthn, Oidb},
+        v1::{any_signature, Ed25519, Oidb, Secp256k1Ecdsa, WebAuthn},
     },
     util::timestamp,
 };

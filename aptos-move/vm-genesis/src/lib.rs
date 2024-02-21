@@ -22,14 +22,14 @@ use aptos_types::{
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     move_utils::as_move_value::AsMoveValue,
+    oidb,
+    oidb::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
-    oidb,
-    oidb::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY},
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,

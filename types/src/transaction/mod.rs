@@ -10,6 +10,7 @@ use crate::{
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     ledger_info::LedgerInfo,
+    oidb::{OidbPublicKey, OidbSignature},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
     transaction::authenticator::{
@@ -18,7 +19,6 @@ use crate::{
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
-    oidb::{OidbPublicKey, OidbSignature},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{

@@ -2,8 +2,8 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    serialize,
     oidb::{Configuration, IdCommitment, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
+    serialize,
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};

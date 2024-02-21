@@ -12,10 +12,11 @@ use crate::{
         get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, MoveVmExt,
         RespawnedSession, SessionExt, SessionId,
     },
+    oidb_validation,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, oidb_validation, VMExecutor, VMValidator,
+    transaction_validation, verifier, VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;

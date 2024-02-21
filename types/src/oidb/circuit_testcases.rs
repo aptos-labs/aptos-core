@@ -5,12 +5,12 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    transaction::authenticator::EphemeralPublicKey,
     oidb::{
         base64url_encode_str,
         bn254_circom::{G1Bytes, G2Bytes},
-        Claims, Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, OidbPublicKey,
+        Claims, Configuration, Groth16Zkp, IdCommitment, OidbPublicKey, OpenIdSig, Pepper,
     },
+    transaction::authenticator::EphemeralPublicKey,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use once_cell::sync::Lazy;

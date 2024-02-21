@@ -4,10 +4,10 @@
 
 use crate::{
     account_address::AccountAddress,
+    oidb::{OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
-    oidb::{OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
 };
 use anyhow::{bail, ensure, Error, Result};
 use aptos_crypto::{
@@ -1125,10 +1125,10 @@ impl TryFrom<&[u8]> for EphemeralPublicKey {
 mod tests {
     use super::*;
     use crate::{
-        transaction::{webauthn::AssertionSignature, SignedTransaction},
         oidb::test_utils::{
             get_sample_esk, get_sample_oidb_groth16_sig_and_pk, get_sample_oidb_openid_sig_and_pk,
         },
+        transaction::{webauthn::AssertionSignature, SignedTransaction},
     };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,

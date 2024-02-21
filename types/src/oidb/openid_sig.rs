@@ -2,11 +2,11 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    transaction::authenticator::EphemeralPublicKey,
     oidb::{
-        base64url_decode_as_str, seconds_from_epoch, Configuration, IdCommitment, Pepper,
-        OidbPublicKey,
+        base64url_decode_as_str, seconds_from_epoch, Configuration, IdCommitment, OidbPublicKey,
+        Pepper,
     },
+    transaction::authenticator::EphemeralPublicKey,
 };
 use anyhow::{ensure, Context};
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};

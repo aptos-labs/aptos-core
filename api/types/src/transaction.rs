@@ -20,6 +20,7 @@ use aptos_types::{
     block_metadata::BlockMetadata,
     block_metadata_ext::BlockMetadataExt,
     contract_event::{ContractEvent, EventWithVersion},
+    oidb,
     transaction::{
         authenticator::{
             AccountAuthenticator, AnyPublicKey, AnySignature, MultiKey, MultiKeyAuthenticator,
@@ -28,7 +29,6 @@ use aptos_types::{
         webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
-    oidb,
 };
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};

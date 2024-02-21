@@ -15,16 +15,16 @@ use aptos_types::{
         jwk::{JWKMoveStruct, JWK},
         AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
     },
-    transaction::{
-        authenticator::{AnyPublicKey, EphemeralSignature},
-        SignedTransaction,
-    },
     oidb::{
         test_utils::{
             get_sample_esk, get_sample_iss, get_sample_jwk, get_sample_oidb_groth16_sig_and_pk,
             get_sample_oidb_openid_sig_and_pk,
         },
         Configuration, Groth16VerificationKey, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig,
+    },
+    transaction::{
+        authenticator::{AnyPublicKey, EphemeralSignature},
+        SignedTransaction,
     },
 };
 use move_core_types::account_address::AccountAddress;
@@ -252,7 +252,10 @@ async fn spawn_network_and_execute_gov_proposals(
     println!("Groth16 VK: {:?}", vk);
 
     let maybe_response = client
-        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::openid_account::Configuration")
+        .get_account_resource_bcs::<Configuration>(
+            AccountAddress::ONE,
+            "0x1::openid_account::Configuration",
+        )
         .await;
     let config = maybe_response.unwrap().into_inner();
     println!("OIDB configuration before: {:?}", config);
@@ -317,7 +320,10 @@ fun main(core_resources: &signer) {{
     assert_eq!(expected_providers_jwks, patched_jwks.jwks);
 
     let maybe_response = client
-        .get_account_resource_bcs::<Configuration>(AccountAddress::ONE, "0x1::openid_account::Configuration")
+        .get_account_resource_bcs::<Configuration>(
+            AccountAddress::ONE,
+            "0x1::openid_account::Configuration",
+        )
         .await;
     let config = maybe_response.unwrap().into_inner();
     println!("OIDB configuration after: {:?}", config);
