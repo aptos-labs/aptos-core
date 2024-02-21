@@ -4,7 +4,7 @@
 use crate::{
     compression_util::{CacheEntry, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT},
     counters::{
-        log_grpc_step, IndexerGrpcStep, CACHE_STATS_TYPE_HIT, CACHE_STATS_TYPE_MISS,
+        log_grpc_step, IndexerGrpcStep, CACHE_STATS_TYPE_HIT, CACHE_STATS_TYPE_MISS, IN_MEMORY_CACHE_DUPLICATE_FETCH_COUNTER,
         IN_MEMORY_CACHE_STATS,
     },
 };
@@ -106,6 +106,8 @@ pub struct CacheOperator<T: redis::aio::ConnectionLike + Send> {
     conn: T,
     storage_format: StorageFormat,
     read_through_cache: Option<Cache<String, Vec<u8>>>,
+    // TODO: remove this.
+    cache_stats: Cache<String, u8>,
 }
 
 impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
@@ -118,6 +120,7 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
             conn,
             storage_format,
             read_through_cache,
+            cache_stats: Cache::builder().max_capacity(100_000).time_to_live(std::time::Duration::from_secs(60)).build(),
         }
     }
 
@@ -353,6 +356,14 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
                                 .with_label_values(&[CACHE_STATS_TYPE_MISS])
                                 .inc();
                             cache_miss_versions.push(version);
+                            match self.cache_stats.get(&cache_key) {
+                                Some(_) => {
+                                    IN_MEMORY_CACHE_DUPLICATE_FETCH_COUNTER.inc();
+                                }
+                                None => {
+                                    self.cache_stats.insert(cache_key, 1);
+                                }
+                            }
                         }
                     }
                 } else {
