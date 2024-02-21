@@ -345,6 +345,24 @@ pub struct AttributeValidationError {
     pub attribute: u8,
 }
 
+pub fn is_valid_function_which_uses_randomness(
+    functions: &BTreeMap<Identifier, Function>,
+    fun: &str,
+) -> Result<(), AttributeValidationError> {
+    if let Ok(ident_fun) = Identifier::new(fun) {
+        if let Some(f) = functions.get(&ident_fun) {
+            if f.is_entry {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(AttributeValidationError {
+        key: fun.to_string(),
+        attribute: KnownAttributeKind::UsesRandomness as u8,
+    })
+}
+
 pub fn is_valid_view_function(
     functions: &BTreeMap<Identifier, Function>,
     fun: &str,
@@ -429,10 +447,10 @@ pub fn verify_module_metadata(
     for (fun, attrs) in &metadata.fun_attributes {
         for attr in attrs {
             if attr.is_view_function() {
-                is_valid_view_function(&functions, fun)?
-            };
-
-            if !attr.is_uses_randomness() && !attr.is_view_function() {
+                is_valid_view_function(&functions, fun)?;
+            } else if attr.is_uses_randomness() {
+                is_valid_function_which_uses_randomness(&functions, fun)?;
+            } else {
                 return Err(AttributeValidationError {
                     key: fun.clone(),
                     attribute: attr.kind,
