@@ -155,12 +155,12 @@ fn create_node_for_fuzzing() -> RoundManager {
         epoch: 1,
         verifier: storage.get_validator_set().into(),
     });
-    let network = NetworkSender::new(
+    let network = Arc::new(NetworkSender::new(
         signer.author(),
         consensus_network_client,
         self_sender,
         epoch_state.verifier.clone(),
-    );
+    ));
 
     // TODO: mock
     let block_store = build_empty_store(storage.clone(), initial_data);

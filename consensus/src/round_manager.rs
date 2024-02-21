@@ -189,7 +189,7 @@ pub struct RoundManager {
     proposer_election: UnequivocalProposerElection,
     proposal_generator: ProposalGenerator,
     safety_rules: Arc<Mutex<MetricsSafetyRules>>,
-    network: NetworkSender,
+    network: Arc<NetworkSender>,
     storage: Arc<dyn PersistentLivenessStorage>,
     onchain_config: OnChainConsensusConfig,
     vtxn_config: ValidatorTxnConfig,
@@ -207,7 +207,7 @@ impl RoundManager {
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proposal_generator: ProposalGenerator,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
-        network: NetworkSender,
+        network: Arc<NetworkSender>,
         storage: Arc<dyn PersistentLivenessStorage>,
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
@@ -299,7 +299,6 @@ impl RoundManager {
             self.log_collected_vote_stats(&new_round_event);
             self.round_state.setup_leader_timeout();
             let proposal_msg = self.generate_proposal(new_round_event).await?;
-            let mut network = self.network.clone();
             #[cfg(feature = "failpoints")]
             {
                 if self.check_whether_to_inject_reconfiguration_error() {
@@ -307,7 +306,7 @@ impl RoundManager {
                         .await?;
                 }
             }
-            network.broadcast_proposal(proposal_msg).await;
+            self.network.broadcast_proposal(proposal_msg).await;
             counters::PROPOSALS_COUNT.inc();
         }
         Ok(())
@@ -388,7 +387,7 @@ impl RoundManager {
     ) -> anyhow::Result<ProposalMsg> {
         // Proposal generator will ensure that at most one proposal is generated per round
         let sync_info = self.block_store.sync_info();
-        let mut sender = self.network.clone();
+        let sender = self.network.clone();
         let callback = async move {
             sender.broadcast_sync_info(sync_info).await;
         }
@@ -1195,7 +1194,6 @@ impl RoundManager {
                 .collect();
             half_peers.truncate(half_peers.len() / 2);
             self.network
-                .clone()
                 .send_proposal(proposal_msg.clone(), half_peers)
                 .await;
             Err(anyhow::anyhow!("Injected error in reconfiguration suffix"))
