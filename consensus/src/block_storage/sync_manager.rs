@@ -346,7 +346,7 @@ impl BlockStore {
     async fn sync_to_highest_commit_cert(
         &self,
         ledger_info: &LedgerInfoWithSignatures,
-        network: &NetworkSender,
+        network: &Arc<NetworkSender>,
     ) {
         // if the block exists between commit root and ordered root
         if self.commit_root().round() < ledger_info.commit_info().round()
@@ -404,7 +404,7 @@ impl BlockStore {
 
 /// BlockRetriever is used internally to retrieve blocks
 pub struct BlockRetriever {
-    network: NetworkSender,
+    network: Arc<NetworkSender>,
     preferred_peer: Author,
     validator_addresses: Vec<AccountAddress>,
     max_blocks_to_request: u64,
@@ -412,7 +412,7 @@ pub struct BlockRetriever {
 
 impl BlockRetriever {
     pub fn new(
-        network: NetworkSender,
+        network: Arc<NetworkSender>,
         preferred_peer: Author,
         validator_addresses: Vec<AccountAddress>,
         max_blocks_to_request: u64,
