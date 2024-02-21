@@ -3,13 +3,18 @@
 
 use crate::{
     monitor,
-    quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
+    quorum_store::{
+        batch_generator::BackPressure,
+        counters,
+        request_response::{GetPayloadCommand, GetPayloadResponse},
+        utils::ProofQueue,
+    },
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
 };
+use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_types::PeerId;
 use futures::StreamExt;
@@ -29,6 +34,7 @@ pub struct ProofManager {
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
+    latest_executed_block_id: Option<HashValue>,
 }
 
 impl ProofManager {
@@ -43,6 +49,7 @@ impl ProofManager {
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
+            latest_executed_block_id: None,
         }
     }
 

@@ -1,11 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{monitor, quorum_store::counters};
+use crate::{
+    monitor,
+    quorum_store::{
+        counters,
+        request_response::{GetPayloadCommand, GetPayloadResponse},
+    },
+};
 use anyhow::Result;
-use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, TransactionInProgress, TransactionSummary},
-    request_response::{GetPayloadCommand, GetPayloadResponse},
+use aptos_consensus_types::common::{
+    Payload, PayloadFilter, TransactionInProgress, TransactionSummary,
 };
 use aptos_logger::prelude::*;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};

@@ -3,7 +3,7 @@
 
 use crate::{error::MempoolError, monitor};
 use anyhow::{format_err, Result};
-use aptos_consensus_types::common::RejectedTransactionSummary;
+use aptos_consensus_types::common::{RejectedTransactionSummary, TransactionSummary};
 use aptos_executor_types::StateComputeResult;
 use aptos_mempool::QuorumStoreRequest;
 use aptos_types::transaction::{SignedTransaction, TransactionStatus};
@@ -17,7 +17,7 @@ use tokio::time::timeout;
 pub trait TxnNotifier: Send + Sync {
     /// Notification of txns which failed execution. (Committed txns is notified by
     /// state sync.)
-    async fn notify_failed_txn(
+    async fn notify_executed_txns(
         &self,
         txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
@@ -46,12 +46,13 @@ impl MempoolNotifier {
 
 #[async_trait::async_trait]
 impl TxnNotifier for MempoolNotifier {
-    async fn notify_failed_txn(
+    async fn notify_executed_txns(
         &self,
         user_txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
+        let mut executed_txns = vec![];
 
         if user_txns.is_empty() {
             return Ok(());
@@ -74,22 +75,33 @@ impl TxnNotifier for MempoolNotifier {
         }
         let user_txn_status = &compute_status[1..user_txns.len() + 1];
         for (txn, status) in user_txns.iter().zip_eq(user_txn_status) {
-            if let TransactionStatus::Discard(reason) = status {
-                rejected_txns.push(RejectedTransactionSummary {
-                    sender: txn.sender(),
-                    sequence_number: txn.sequence_number(),
-                    hash: txn.clone().committed_hash(),
-                    reason: *reason,
-                });
+            match status {
+                TransactionStatus::Discard(reason) => {
+                    rejected_txns.push(RejectedTransactionSummary {
+                        sender: txn.sender(),
+                        sequence_number: txn.sequence_number(),
+                        hash: txn.clone().committed_hash(),
+                        reason: *reason,
+                    });
+                },
+                TransactionStatus::Keep(_) => {
+                    executed_txns
+                        .push(TransactionSummary::new(txn.sender(), txn.sequence_number()));
+                },
+                TransactionStatus::Retry => {},
             }
         }
 
-        if rejected_txns.is_empty() {
+        if rejected_txns.is_empty() && executed_txns.is_empty() {
             return Ok(());
         }
 
         let (callback, callback_rcv) = oneshot::channel();
-        let req = QuorumStoreRequest::RejectNotification(rejected_txns, callback);
+        let req = QuorumStoreRequest::ExecutedTransactionsNotification(
+            executed_txns,
+            rejected_txns,
+            callback,
+        );
 
         // send to shared mempool
         self.consensus_to_mempool_sender

@@ -18,6 +18,7 @@ pub mod quorum_store_db;
 pub mod types;
 pub(crate) mod utils;
 
+pub mod request_response;
 mod schema;
 #[cfg(test)]
 mod tests;

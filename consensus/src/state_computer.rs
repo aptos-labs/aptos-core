@@ -184,12 +184,14 @@ impl StateComputer for ExecutionProxy {
         randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
         let block_id = block.id();
+        let payload = block.payload().cloned();
         debug!(
             block = %block,
             parent_id = parent_block_id,
             "Executing block",
         );
 
+        let payload_manager = self.payload_manager.lock().clone();
         let txn_notifier = self.txn_notifier.clone();
         let transaction_generator = BlockPreparer::new(
             self.payload_manager.lock().as_ref().unwrap().clone(),
@@ -229,11 +231,15 @@ impl StateComputer for ExecutionProxy {
 
             observe_block(timestamp, BlockStage::EXECUTED);
 
-            // notify mempool about failed transaction
-            if let Err(e) = txn_notifier.notify_failed_txn(input_txns, result).await {
+            // first remove txns from mempool
+            if let Err(e) = txn_notifier.notify_executed_txns(input_txns, result).await {
                 error!(
-                    error = ?e, "Failed to notify mempool of rejected txns",
+                    error = ?e, "Failed to notify mempool of executed txns",
                 );
+            }
+            // then remove batches from quorum store
+            if let Some(payload_manager) = payload_manager {
+                payload_manager.notify_executed_block(block_id, payload);
             }
             Ok(pipeline_execution_result)
         })
@@ -456,7 +462,7 @@ async fn test_commit_sync_race() {
 
     #[async_trait::async_trait]
     impl TxnNotifier for RecordedCommit {
-        async fn notify_failed_txn(
+        async fn notify_executed_txns(
             &self,
             _txns: Vec<SignedTransaction>,
             _compute_results: &StateComputeResult,

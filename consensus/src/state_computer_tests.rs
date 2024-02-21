@@ -62,7 +62,7 @@ struct DummyTxnNotifier {}
 
 #[async_trait::async_trait]
 impl TxnNotifier for DummyTxnNotifier {
-    async fn notify_failed_txn(
+    async fn notify_executed_txns(
         &self,
         _txns: Vec<SignedTransaction>,
         _compute_results: &StateComputeResult,

@@ -23,6 +23,7 @@ pub const SIZE_BYTES_LABEL: &str = "size_bytes";
 pub const GAS_UPGRADED_INDEX_LABEL: &str = "gas_upgraded";
 
 // Core mempool stages labels
+pub const EXECUTED_LABEL: &str = "executed";
 pub const COMMIT_ACCEPTED_LABEL: &str = "commit_accepted";
 pub const COMMIT_ACCEPTED_BLOCK_LABEL: &str = "commit_accepted_block";
 pub const COMMIT_REJECTED_LABEL: &str = "commit_rejected";

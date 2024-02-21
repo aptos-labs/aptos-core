@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::direct_mempool_quorum_store::DirectMempoolQuorumStore;
-use aptos_consensus_types::{
-    common::PayloadFilter,
+use crate::quorum_store::{
+    direct_mempool_quorum_store::DirectMempoolQuorumStore,
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
+use aptos_consensus_types::common::PayloadFilter;
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use futures::{
     channel::{mpsc, oneshot},

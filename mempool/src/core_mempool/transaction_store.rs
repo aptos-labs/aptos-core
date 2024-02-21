@@ -518,6 +518,13 @@ impl TransactionStore {
         self.process_ready_transactions(account, new_seq_number);
     }
 
+    pub fn executed_transaction(&mut self, account: &AccountAddress, sequence_number: u64) {
+        let txn = self.get_mempool_txn(account, sequence_number).cloned();
+        if let Some(txn) = txn {
+            self.priority_index.remove(&txn);
+        }
+    }
+
     pub fn reject_transaction(
         &mut self,
         account: &AccountAddress,

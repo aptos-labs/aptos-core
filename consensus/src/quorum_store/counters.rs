@@ -171,6 +171,14 @@ pub static BATCH_IN_PROGRESS_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static BATCH_IN_PROGRESS_EXECUTED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "quorum_store_batch_in_progress_executed",
+        "Number of batches that are removed from in progress by execution."
+    )
+    .unwrap()
+});
+
 pub static BATCH_IN_PROGRESS_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_batch_in_progress_expired",

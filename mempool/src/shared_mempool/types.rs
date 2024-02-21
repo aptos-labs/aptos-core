@@ -176,9 +176,10 @@ pub enum QuorumStoreRequest {
         // callback to respond to
         oneshot::Sender<Result<QuorumStoreResponse>>,
     ),
-    // TODO: Do we use it in the real QS as well?
-    /// Notifications about *rejected* committed txns.
-    RejectNotification(
+    /// Notifications about *executed* committed txns.
+    ExecutedTransactionsNotification(
+        // executed transactions from consensus
+        Vec<TransactionSummary>,
         // rejected transactions from consensus
         Vec<RejectedTransactionSummary>,
         // callback to respond to
@@ -206,9 +207,14 @@ impl fmt::Display for QuorumStoreRequest {
                     excluded_txns.len()
                 )
             },
-            QuorumStoreRequest::RejectNotification(rejected_txns, _) => {
+            QuorumStoreRequest::ExecutedTransactionsNotification(
+                executed_txns,
+                rejected_txns,
+                _,
+            ) => {
                 format!(
-                    "RejectNotification [rejected_txns_length: {}]",
+                    "ExecutedTransactionsNotification [executed_txns_length: {}, rejected_txns_length: {}]",
+                    executed_txns.len(),
                     rejected_txns.len()
                 )
             },

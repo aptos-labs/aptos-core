@@ -210,7 +210,7 @@ fn test_reject_transaction() {
     ]);
 
     // reject with wrong hash should have no effect
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(0),
         0,
         &txns[1].clone().committed_hash(), // hash of other txn
@@ -220,7 +220,7 @@ fn test_reject_transaction() {
         .get_transaction_store()
         .get(&TestTransaction::get_address(0), 0)
         .is_some());
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(0),
         1,
         &txns[0].clone().committed_hash(), // hash of other txn
@@ -233,7 +233,7 @@ fn test_reject_transaction() {
 
     // reject with sequence number too new should have no effect
     // reject with wrong hash should have no effect
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(0),
         0,
         &txns[0].clone().committed_hash(),
@@ -243,7 +243,7 @@ fn test_reject_transaction() {
         .get_transaction_store()
         .get(&TestTransaction::get_address(0), 0)
         .is_some());
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(0),
         1,
         &txns[1].clone().committed_hash(),
@@ -255,7 +255,7 @@ fn test_reject_transaction() {
         .is_some());
 
     // reject with correct hash should have effect
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(0),
         0,
         &txns[0].clone().committed_hash(),
@@ -265,7 +265,7 @@ fn test_reject_transaction() {
         .get_transaction_store()
         .get(&TestTransaction::get_address(0), 0)
         .is_none());
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(0),
         1,
         &txns[1].clone().committed_hash(),
@@ -333,13 +333,13 @@ fn test_reset_sequence_number_on_failure() {
     ]);
 
     // Notify mempool about failure in arbitrary order
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(1),
         0,
         &hashes[0],
         &DiscardedVMStatus::MALFORMED,
     );
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(1),
         1,
         &hashes[1],
@@ -807,7 +807,7 @@ fn test_transaction_store_remove_account_if_empty() {
     add_signed_txn(&mut pool, txn).unwrap();
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 1);
 
-    pool.reject_transaction(
+    pool.rejected_transaction(
         &TestTransaction::get_address(2),
         2,
         &hash,

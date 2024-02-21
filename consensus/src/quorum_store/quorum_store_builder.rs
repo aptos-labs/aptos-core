@@ -18,13 +18,14 @@ use crate::{
         proof_coordinator::{ProofCoordinator, ProofCoordinatorCommand},
         proof_manager::{ProofManager, ProofManagerCommand},
         quorum_store_coordinator::{CoordinatorCommand, QuorumStoreCoordinator},
+        request_response::GetPayloadCommand,
         types::{Batch, BatchResponse},
     },
     round_manager::VerifiedEvent,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
-use aptos_consensus_types::{common::Author, request_response::GetPayloadCommand};
+use aptos_consensus_types::common::Author;
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
