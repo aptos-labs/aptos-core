@@ -621,10 +621,7 @@ impl RoundManager {
 
         self.round_state.record_vote(timeout_vote.clone());
         let timeout_vote_msg = VoteMsg::new(timeout_vote, self.block_store.sync_info());
-        self.network
-            .clone()
-            .broadcast_timeout_vote(timeout_vote_msg)
-            .await;
+        self.network.broadcast_timeout_vote(timeout_vote_msg).await;
         warn!(
             round = round,
             remote_peer = self.proposer_election.get_valid_proposer(round),
