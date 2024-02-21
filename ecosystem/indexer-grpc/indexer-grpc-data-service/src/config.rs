@@ -12,6 +12,7 @@ use aptos_protos::{
     transaction::v1::FILE_DESCRIPTOR_SET as TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
+use mini_moka::sync::Cache;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, net::SocketAddr};
 use tonic::{
@@ -23,6 +24,8 @@ use tonic::{
 };
 
 pub const SERVER_NAME: &str = "idxdatasvc";
+const READ_THROUGH_CACHE_TTL_IN_SECONDS: u64 = 10;
+const MAX_CACHE_SIZE: u64 = 20_000;
 
 // Default max response channel size.
 const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
@@ -161,12 +164,19 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         } else {
             StorageFormat::Base64UncompressedProto
         };
+        let cache = Cache::builder()
+            .time_to_live(std::time::Duration::from_secs(
+                READ_THROUGH_CACHE_TTL_IN_SECONDS,
+            ))
+            .max_capacity(MAX_CACHE_SIZE)
+            .build();
         // Add authentication interceptor.
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
             self.data_service_response_channel_size,
             cache_storage_format,
+            cache,
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)

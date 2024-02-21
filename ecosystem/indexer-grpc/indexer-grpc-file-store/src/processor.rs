@@ -55,7 +55,7 @@ impl Processor {
                     redis_main_instance_address.0
                 )
             })?;
-        let mut cache_operator = CacheOperator::new(conn, cache_storage_format);
+        let mut cache_operator = CacheOperator::new(conn, cache_storage_format, None);
 
         let mut file_store_operator: Box<dyn FileStoreOperator> = file_store_config.create();
         file_store_operator.verify_storage_bucket_existence().await;
