@@ -190,4 +190,10 @@ impl SyncInfo {
             || self.highest_ordered_round() > other.highest_ordered_round()
             || self.highest_commit_round() > other.highest_commit_round()
     }
+
+    pub fn has_newer_non_commit_certificates(&self, other: &SyncInfo) -> bool {
+        self.highest_certified_round() > other.highest_certified_round()
+            || self.highest_timeout_round() > other.highest_timeout_round()
+            || self.highest_ordered_round() > other.highest_ordered_round()
+    }
 }

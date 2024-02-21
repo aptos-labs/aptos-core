@@ -487,22 +487,28 @@ impl RoundManager {
                     .remote_peer(author),
                 "Local state {}, remote state {}", local_sync_info, sync_info
             );
-            // Some information in SyncInfo is ahead of what we have locally.
-            // First verify the SyncInfo (didn't verify it in the yet).
-            sync_info
-                .verify(&self.epoch_state().verifier)
-                .map_err(|e| {
-                    error!(
-                        SecurityEvent::InvalidSyncInfoMsg,
-                        sync_info = sync_info,
-                        remote_peer = author,
-                        error = ?e,
-                    );
-                    VerifyError::from(e)
-                })?;
 
             let highest_commit_round = sync_info.highest_commit_round();
             let mut sync_commit_certs = false;
+            if self.pending_highest_commit_round.is_none()
+                || highest_commit_round > self.pending_highest_commit_round.unwrap()
+                || sync_info.has_newer_non_commit_certificates(&local_sync_info)
+            {
+                // Some information in SyncInfo is ahead of what we have locally.
+                // First verify the SyncInfo (didn't verify it in the yet).
+                sync_info
+                    .verify(&self.epoch_state().verifier)
+                    .map_err(|e| {
+                        error!(
+                            SecurityEvent::InvalidSyncInfoMsg,
+                            sync_info = sync_info,
+                            remote_peer = author,
+                            error = ?e,
+                        );
+                        VerifyError::from(e)
+                    })?;
+            }
+
             if self.pending_highest_commit_round.is_none()
                 || highest_commit_round > self.pending_highest_commit_round.unwrap()
             {
