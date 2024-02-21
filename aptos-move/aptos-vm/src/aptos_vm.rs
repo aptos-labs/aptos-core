@@ -15,7 +15,7 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, zkid_validation, VMExecutor, VMValidator,
+    transaction_validation, verifier, oidb_validation, VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -1293,9 +1293,9 @@ impl AptosVM {
             ));
         }
 
-        let authenticators = aptos_types::zkid::get_oidb_authenticators(transaction)
+        let authenticators = aptos_types::oidb::get_oidb_authenticators(transaction)
             .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
-        zkid_validation::validate_oidb_authenticators(&authenticators, self.features(), resolver)?;
+        oidb_validation::validate_oidb_authenticators(&authenticators, self.features(), resolver)?;
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and

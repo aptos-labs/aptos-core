@@ -3,7 +3,7 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     transaction::authenticator::EphemeralSignature,
-    zkid::{
+    oidb::{
         base64url_encode_bytes, base64url_encode_str,
         circuit_testcases::{
             SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
@@ -104,7 +104,7 @@ pub fn get_sample_oidb_openid_sig_and_pk() -> (OidbSignature, OidbPublicKey) {
 
 #[cfg(test)]
 mod test {
-    use crate::zkid::{
+    use crate::oidb::{
         circuit_testcases::{SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_EXP_DATE, SAMPLE_JWK},
         get_public_inputs_hash,
         test_utils::get_sample_oidb_groth16_sig_and_pk,

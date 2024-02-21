@@ -10,7 +10,7 @@ use aptos_types::{
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     transaction::authenticator::EphemeralPublicKey,
     vm_status::{StatusCode, VMStatus},
-    zkid::{
+    oidb::{
         get_public_inputs_hash, Configuration, Groth16VerificationKey, OidbPublicKey,
         OidbSignature, ZkpOrOpenIdSig,
     },

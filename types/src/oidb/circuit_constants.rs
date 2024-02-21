@@ -2,7 +2,7 @@
 
 //! These constants are from commit 125522b4b226f8ece3e3162cecfefe915d13bc30 of oidb-circuit.
 
-use crate::zkid::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
+use crate::oidb::bn254_circom::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 use aptos_crypto::poseidon_bn254;
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};

@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 
 #[cfg(test)]
-use crate::zkid::bn254_circom::{
+use crate::oidb::bn254_circom::{
     G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
 };
 use crate::{
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
-    zkid::bn254_circom::{G1Bytes, G2Bytes},
+    oidb::bn254_circom::{G1Bytes, G2Bytes},
 };
 use anyhow::bail;
 use aptos_crypto::CryptoMaterialError;

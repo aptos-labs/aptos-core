@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::zkid::{
+use crate::oidb::{
     base64url_encode_str,
     bn254_circom::get_public_inputs_hash,
     circuit_testcases::*,
@@ -23,7 +23,7 @@ fn test_oidb_groth16_proof_verification() {
     let public_inputs_hash = get_public_inputs_hash(&zk_sig, &zk_pk, &SAMPLE_JWK, &config).unwrap();
 
     println!(
-        "zkID Groth16 test public inputs hash: {}",
+        "OIDB Groth16 test public inputs hash: {}",
         public_inputs_hash
     );
 

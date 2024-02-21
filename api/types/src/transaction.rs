@@ -28,7 +28,7 @@ use aptos_types::{
         webauthn::{PartialAuthenticatorAssertionResponse, MAX_WEBAUTHN_SIGNATURE_BYTES},
         Script, SignedTransaction, TransactionOutput, TransactionWithProof,
     },
-    zkid,
+    oidb,
 };
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
@@ -1207,15 +1207,15 @@ impl VerifyInput for OidbSignature {
     fn verify(&self) -> anyhow::Result<()> {
         let public_key_len = self.public_key.inner().len();
         let signature_len = self.signature.inner().len();
-        if public_key_len > zkid::OidbPublicKey::MAX_LEN {
+        if public_key_len > oidb::OidbPublicKey::MAX_LEN {
             bail!(
                 "OIDB public key length is greater than the maximum number of {} bytes: found {} bytes",
-                zkid::OidbPublicKey::MAX_LEN, public_key_len
+                oidb::OidbPublicKey::MAX_LEN, public_key_len
             )
-        } else if signature_len > zkid::OidbSignature::MAX_LEN {
+        } else if signature_len > oidb::OidbSignature::MAX_LEN {
             bail!(
                 "OIDB signature length is greater than the maximum number of {} bytes: found {} bytes",
-                zkid::OidbSignature::MAX_LEN, signature_len
+                oidb::OidbSignature::MAX_LEN, signature_len
             )
         } else {
             Ok(())

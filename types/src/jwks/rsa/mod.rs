@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, zkid::Claims};
+use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, oidb::Claims};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::poseidon_bn254;
 use base64::URL_SAFE_NO_PAD;

@@ -28,8 +28,8 @@ use aptos_types::{
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
-    zkid,
-    zkid::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY},
+    oidb,
+    oidb::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY},
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -536,7 +536,7 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
 }
 
 fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
-    let config = zkid::Configuration::new_for_devnet();
+    let config = oidb::Configuration::new_for_devnet();
     exec_function(
         session,
         OIDB_MODULE_NAME,

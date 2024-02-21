@@ -3,7 +3,7 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     transaction::authenticator::EphemeralPublicKey,
-    zkid::{
+    oidb::{
         base64url_decode_as_str, seconds_from_epoch, Configuration, IdCommitment, Pepper,
         OidbPublicKey,
     },

@@ -7,7 +7,7 @@ use crate::{
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
-    zkid::{OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
+    oidb::{OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
 };
 use anyhow::{bail, ensure, Error, Result};
 use aptos_crypto::{
@@ -1126,7 +1126,7 @@ mod tests {
     use super::*;
     use crate::{
         transaction::{webauthn::AssertionSignature, SignedTransaction},
-        zkid::test_utils::{
+        oidb::test_utils::{
             get_sample_esk, get_sample_oidb_groth16_sig_and_pk, get_sample_oidb_openid_sig_and_pk,
         },
     };

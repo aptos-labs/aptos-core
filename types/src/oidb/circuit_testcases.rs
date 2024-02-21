@@ -6,7 +6,7 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     transaction::authenticator::EphemeralPublicKey,
-    zkid::{
+    oidb::{
         base64url_encode_str,
         bn254_circom::{G1Bytes, G2Bytes},
         Claims, Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, OidbPublicKey,

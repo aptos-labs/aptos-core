@@ -19,7 +19,7 @@ use aptos_types::{
         authenticator::{AnyPublicKey, EphemeralSignature},
         SignedTransaction,
     },
-    zkid::{
+    oidb::{
         test_utils::{
             get_sample_esk, get_sample_iss, get_sample_jwk, get_sample_oidb_groth16_sig_and_pk,
             get_sample_oidb_openid_sig_and_pk,

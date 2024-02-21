@@ -3,7 +3,7 @@
 use crate::{
     invalid_signature,
     move_utils::as_move_value::AsMoveValue,
-    zkid::{circuit_constants, circuit_testcases::SAMPLE_EXP_HORIZON_SECS},
+    oidb::{circuit_constants, circuit_testcases::SAMPLE_EXP_HORIZON_SECS},
 };
 use move_core_types::{
     ident_str,

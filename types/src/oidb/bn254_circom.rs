@@ -3,7 +3,7 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     serialize,
-    zkid::{Configuration, IdCommitment, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
+    oidb::{Configuration, IdCommitment, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
@@ -246,7 +246,7 @@ pub fn get_public_inputs_hash(
 
 #[cfg(test)]
 mod test {
-    use crate::zkid::{
+    use crate::oidb::{
         bn254_circom::{
             G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES,
             G2_PROJECTIVE_COMPRESSED_NUM_BYTES,

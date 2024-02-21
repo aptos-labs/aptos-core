@@ -47,7 +47,7 @@ mod txn_emitter;
 #[cfg(test)]
 mod upgrade;
 #[cfg(test)]
-mod zkid;
+mod oidb;
 
 #[cfg(test)]
 mod smoke_test_environment;

@@ -18,7 +18,7 @@ use crate::{
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::WriteSet,
-    zkid::{OidbPublicKey, OidbSignature},
+    oidb::{OidbPublicKey, OidbSignature},
 };
 use anyhow::{ensure, format_err, Context, Error, Result};
 use aptos_crypto::{

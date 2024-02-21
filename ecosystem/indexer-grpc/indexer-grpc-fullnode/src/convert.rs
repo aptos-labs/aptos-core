@@ -15,7 +15,7 @@ use aptos_logger::warn;
 use aptos_protos::{
     transaction::{
         v1 as transaction,
-        v1::{any_signature, Ed25519, Secp256k1Ecdsa, WebAuthn, ZkId},
+        v1::{any_signature, Ed25519, Secp256k1Ecdsa, WebAuthn, Oidb},
     },
     util::timestamp,
 };
@@ -603,9 +603,9 @@ fn convert_signature(signature: &Signature) -> transaction::AnySignature {
             })),
         },
         Signature::Oidb(s) => transaction::AnySignature {
-            r#type: transaction::any_signature::Type::OIDB as i32,
+            r#type: transaction::any_signature::Type::Oidb as i32,
             signature: s.0.clone(),
-            signature_variant: Some(any_signature::SignatureVariant::Zkid(ZkId {
+            signature_variant: Some(any_signature::SignatureVariant::Oidb(Oidb {
                 signature: s.0.clone(),
             })),
         },
@@ -627,7 +627,7 @@ fn convert_public_key(public_key: &PublicKey) -> transaction::AnyPublicKey {
             public_key: p.0.clone(),
         },
         PublicKey::Oidb(p) => transaction::AnyPublicKey {
-            r#type: transaction::any_public_key::Type::Zkid as i32,
+            r#type: transaction::any_public_key::Type::Oidb as i32,
             public_key: p.0.clone(),
         },
     }
