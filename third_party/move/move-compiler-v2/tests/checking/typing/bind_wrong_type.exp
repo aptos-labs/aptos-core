@@ -18,13 +18,31 @@ error: expected `()` but found `integer` (from assignment or declaration context
 12 │         let () = 0;
    │             ^^
 
+error: unable to infer type: `?1`
+   ┌─ tests/checking/typing/bind_wrong_type.move:12:18
+   │
+12 │         let () = 0;
+   │                  ^
+
 error: expected 4 item(s), found 3
    ┌─ tests/checking/typing/bind_wrong_type.move:13:13
    │
 13 │         let (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
    │             ^^^^^^^^^^^^
 
+error: unable to infer type: `?9`
+   ┌─ tests/checking/typing/bind_wrong_type.move:13:13
+   │
+13 │         let (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
+   │             ^^^^^^^^^^^^
+
 error: expected 2 item(s), found 3
+   ┌─ tests/checking/typing/bind_wrong_type.move:14:13
+   │
+14 │         let (x, b, R{f}) = (0, false);
+   │             ^^^^^^^^^^^^
+
+error: unable to infer type: `?14`
    ┌─ tests/checking/typing/bind_wrong_type.move:14:13
    │
 14 │         let (x, b, R{f}) = (0, false);
@@ -54,6 +72,12 @@ error: expected 4 item(s), found 3
 20 │         let (x, b, R{f}): (u64, bool, R, R) = (0, false, R{f: 0});
    │             ^^^^^^^^^^^^
 
+error: unable to infer type: `?4`
+   ┌─ tests/checking/typing/bind_wrong_type.move:20:13
+   │
+20 │         let (x, b, R{f}): (u64, bool, R, R) = (0, false, R{f: 0});
+   │             ^^^^^^^^^^^^
+
 error: expected 4 item(s), found 3
    ┌─ tests/checking/typing/bind_wrong_type.move:20:47
    │
@@ -61,6 +85,12 @@ error: expected 4 item(s), found 3
    │                                               ^^^^^^^^^^^^^^^^^^^
 
 error: expected 2 item(s), found 3
+   ┌─ tests/checking/typing/bind_wrong_type.move:21:13
+   │
+21 │         let (x, b, R{f}): (u64, bool) = (0, false, R{f: 0});
+   │             ^^^^^^^^^^^^
+
+error: unable to infer type: `?6`
    ┌─ tests/checking/typing/bind_wrong_type.move:21:13
    │
 21 │         let (x, b, R{f}): (u64, bool) = (0, false, R{f: 0});

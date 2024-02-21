@@ -1,10 +1,22 @@
 
 Diagnostics:
+error: unable to infer type: `?0`
+  ┌─ tests/checking/naming/unbound_module_name.move:7:13
+  │
+7 │         let x = N::c;
+  │             ^
+
 error: undeclared `N::c`
   ┌─ tests/checking/naming/unbound_module_name.move:7:17
   │
 7 │         let x = N::c;
   │                 ^^^^
+
+error: unable to infer type: `?1`
+  ┌─ tests/checking/naming/unbound_module_name.move:8:13
+  │
+8 │         let y = Self::c;
+  │             ^
 
 error: undeclared `M::c`
   ┌─ tests/checking/naming/unbound_module_name.move:8:17

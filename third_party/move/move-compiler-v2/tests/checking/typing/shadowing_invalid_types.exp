@@ -24,6 +24,12 @@ error: expected `address` but found `bool`
 13 │         { let x = false; { let x = @0x0; (x: u64); }; (x: address); };
    │                                                        ^
 
+error: unable to infer type: `?0`
+   ┌─ tests/checking/typing/shadowing_invalid_types.move:18:17
+   │
+18 │         let x = 0;
+   │                 ^
+
 error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/shadowing_invalid_types.move:21:14
    │
@@ -41,6 +47,12 @@ error: expected `address` but found `integer`
    │
 27 │         (x: address);
    │          ^
+
+error: unable to infer type: `?0`
+   ┌─ tests/checking/typing/shadowing_invalid_types.move:31:17
+   │
+31 │         let x = 0;
+   │                 ^
 
 error: expected `u64` but found `bool`
    ┌─ tests/checking/typing/shadowing_invalid_types.move:34:14

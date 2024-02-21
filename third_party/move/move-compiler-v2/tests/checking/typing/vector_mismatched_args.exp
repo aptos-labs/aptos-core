@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: unable to infer type: `?2`
+  ┌─ tests/checking/typing/vector_mismatched_args.move:7:16
+  │
+7 │         vector[0, false];
+  │                ^
+
 error: expected `bool` but found `integer`
   ┌─ tests/checking/typing/vector_mismatched_args.move:7:19
   │
@@ -12,6 +18,12 @@ error: expected `u8` but found `u64`
 8 │         vector[0u8, 0u64, 0u128];
   │                     ^^^^
 
+error: unable to infer type: `?12`
+  ┌─ tests/checking/typing/vector_mismatched_args.move:9:16
+  │
+9 │         vector[0, @0];
+  │                ^
+
 error: expected `address` but found `integer`
   ┌─ tests/checking/typing/vector_mismatched_args.move:9:19
   │
@@ -23,6 +35,12 @@ error: expected `Test::X` but found `Test::Y`
    │
 10 │         vector[X{}, Y{}];
    │                     ^^^
+
+error: unable to infer type: `?22`
+   ┌─ tests/checking/typing/vector_mismatched_args.move:11:17
+   │
+11 │         vector[&0, &false];
+   │                 ^
 
 error: expected `bool` but found `integer`
    ┌─ tests/checking/typing/vector_mismatched_args.move:11:20

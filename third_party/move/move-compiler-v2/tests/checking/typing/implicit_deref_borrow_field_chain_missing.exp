@@ -12,13 +12,49 @@ error: field `f` not declared in struct `M::X2`
 8 │         x1.x2.f;
   │         ^^^^^
 
+error: unable to infer type: `?3`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:8:9
+  │
+8 │         x1.x2.f;
+  │         ^^^^^
+
+error: unable to infer type: `?7`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:9:9
+  │
+9 │         x1.x2.x3.g;
+  │         ^^^^^
+
 error: field `g` not declared in struct `M::X3`
   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:9:9
   │
 9 │         x1.x2.x3.g;
   │         ^^^^^^^^
 
+error: unable to infer type: `?6`
+  ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:9:9
+  │
+9 │         x1.x2.x3.g;
+  │         ^^^^^^^^
+
+error: unable to infer type: `?12`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:10:9
+   │
+10 │         x1.x2.x3.f.g;
+   │         ^^^^^
+
+error: unable to infer type: `?11`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:10:9
+   │
+10 │         x1.x2.x3.f.g;
+   │         ^^^^^^^^
+
 error: expected a struct with field `g` but found `u64`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:10:9
+   │
+10 │         x1.x2.x3.f.g;
+   │         ^^^^^^^^^^
+
+error: unable to infer type: `?10`
    ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:10:9
    │
 10 │         x1.x2.x3.f.g;
@@ -36,13 +72,49 @@ error: field `f` not declared in struct `M::X2`
 12 │         x1_mut.x2.f;
    │         ^^^^^^^^^
 
+error: unable to infer type: `?17`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:12:9
+   │
+12 │         x1_mut.x2.f;
+   │         ^^^^^^^^^
+
+error: unable to infer type: `?21`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:13:9
+   │
+13 │         x1_mut.x2.x3.g;
+   │         ^^^^^^^^^
+
 error: field `g` not declared in struct `M::X3`
    ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:13:9
    │
 13 │         x1_mut.x2.x3.g;
    │         ^^^^^^^^^^^^
 
+error: unable to infer type: `?20`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:13:9
+   │
+13 │         x1_mut.x2.x3.g;
+   │         ^^^^^^^^^^^^
+
+error: unable to infer type: `?26`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:14:9
+   │
+14 │         x1_mut.x2.x3.f.g;
+   │         ^^^^^^^^^
+
+error: unable to infer type: `?25`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:14:9
+   │
+14 │         x1_mut.x2.x3.f.g;
+   │         ^^^^^^^^^^^^
+
 error: expected a struct with field `g` but found `u64`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:14:9
+   │
+14 │         x1_mut.x2.x3.f.g;
+   │         ^^^^^^^^^^^^^^
+
+error: unable to infer type: `?24`
    ┌─ tests/checking/typing/implicit_deref_borrow_field_chain_missing.move:14:9
    │
 14 │         x1_mut.x2.x3.f.g;

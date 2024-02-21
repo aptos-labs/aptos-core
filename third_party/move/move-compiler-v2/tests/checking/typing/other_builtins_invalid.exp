@@ -6,6 +6,12 @@ error: invalid call of `freeze`: mutability mismatch (&mut != &) for argument 1
 4 │         (freeze<u64>(x): &mut u64);
   │                      ^
 
+error: unable to infer type: `?4`
+  ┌─ tests/checking/typing/other_builtins_invalid.move:5:32
+  │
+5 │         (freeze<vector<bool>>(&any()): &mut vector<bool>);
+  │                                ^^^^^
+
 error: invalid call of `freeze`: mutability mismatch (&mut != &) for argument 1
   ┌─ tests/checking/typing/other_builtins_invalid.move:5:31
   │

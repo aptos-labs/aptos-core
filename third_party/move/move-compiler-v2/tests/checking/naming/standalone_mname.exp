@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: unable to infer type: `?0`
+  ┌─ tests/checking/naming/standalone_mname.move:3:13
+  │
+3 │         let m = M;
+  │             ^
+
 error: undeclared `M::M`
   ┌─ tests/checking/naming/standalone_mname.move:3:17
   │

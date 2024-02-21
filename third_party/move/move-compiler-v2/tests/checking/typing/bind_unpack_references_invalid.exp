@@ -6,6 +6,12 @@ error: expected `&u64` but found `integer` (from assignment or declaration conte
 7 │         f = 0;
   │         ^
 
+error: unable to infer type: `?3`
+  ┌─ tests/checking/typing/bind_unpack_references_invalid.move:7:13
+  │
+7 │         f = 0;
+  │             ^
+
 error: expected `&M::S` but found `M::S` (from assignment or declaration context)
   ┌─ tests/checking/typing/bind_unpack_references_invalid.move:8:9
   │
@@ -17,6 +23,12 @@ error: expected `&mut u64` but found `integer` (from assignment or declaration c
    │
 13 │         f = 0;
    │         ^
+
+error: unable to infer type: `?3`
+   ┌─ tests/checking/typing/bind_unpack_references_invalid.move:13:13
+   │
+13 │         f = 0;
+   │             ^
 
 error: expected `&mut M::S` but found `M::S` (from assignment or declaration context)
    ┌─ tests/checking/typing/bind_unpack_references_invalid.move:14:9

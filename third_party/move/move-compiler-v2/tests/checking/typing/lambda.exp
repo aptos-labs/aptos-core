@@ -36,7 +36,31 @@ error: invalid call of `M::foreach`: expected `integer` but found `&?19` for arg
 67 │         foreach(&v, |e| sum = sum + e) // expected to cannot infer type
    │                     ^^^^^^^^^^^^^^^^^
 
+error: unable to infer type: `&integer`
+   ┌─ tests/checking/typing/lambda.move:73:22
+   │
+73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
+   │                      ^
+
+error: unable to infer type: `&Error`
+   ┌─ tests/checking/typing/lambda.move:73:40
+   │
+73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
+   │                                        ^
+
+error: unable to infer type: `&Error`
+   ┌─ tests/checking/typing/lambda.move:73:44
+   │
+73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
+   │                                            ^
+
 error: invalid call of `M::foreach`: expected `()` but found `integer` for argument 2
+   ┌─ tests/checking/typing/lambda.move:73:21
+   │
+73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
+   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unable to infer type: `|&Error|*error*`
    ┌─ tests/checking/typing/lambda.move:73:21
    │
 73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda

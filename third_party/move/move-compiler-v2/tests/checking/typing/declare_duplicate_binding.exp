@@ -8,6 +8,12 @@ error: duplicate declaration of `x`
   │              │
   │              previous declaration of `x`
 
+error: unable to infer type: `?2`
+  ┌─ tests/checking/typing/declare_duplicate_binding.move:5:17
+  │
+5 │         let (x, x);
+  │                 ^
+
 error: duplicate declaration of `f`
   ┌─ tests/checking/typing/declare_duplicate_binding.move:6:19
   │
@@ -23,3 +29,9 @@ error: duplicate declaration of `f`
   │              -        ^
   │              │
   │              previous declaration of `f`
+
+error: unable to infer type: `?6`
+  ┌─ tests/checking/typing/declare_duplicate_binding.move:6:23
+  │
+6 │         let (f, R{f}, f);
+  │                       ^

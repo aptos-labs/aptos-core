@@ -12,13 +12,37 @@ error: expected `M::S` but found `M::R`
 9 │         (S { g }, R { f }) = (R{ f: 0 }, R{ f: 1 });
   │          ^^^^^^^
 
+error: unable to infer type: `?1`
+   ┌─ tests/checking/typing/assign_wrong_type.move:14:13
+   │
+14 │         let b;
+   │             ^
+
+error: unable to infer type: `?2`
+   ┌─ tests/checking/typing/assign_wrong_type.move:15:13
+   │
+15 │         let f;
+   │             ^
+
 error: expected `()` but found `integer` (from assignment or declaration context)
    ┌─ tests/checking/typing/assign_wrong_type.move:17:9
    │
 17 │         () = 0;
    │         ^^
 
+error: unable to infer type: `?6`
+   ┌─ tests/checking/typing/assign_wrong_type.move:17:14
+   │
+17 │         () = 0;
+   │              ^
+
 error: expected 4 item(s), found 3
+   ┌─ tests/checking/typing/assign_wrong_type.move:18:9
+   │
+18 │         (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
+   │         ^^^^^^^^^^^^
+
+error: unable to infer type: `?15`
    ┌─ tests/checking/typing/assign_wrong_type.move:18:9
    │
 18 │         (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
@@ -29,6 +53,18 @@ error: expected 2 item(s), found 3
    │
 19 │         (x, b, R{f}) = (0, false);
    │         ^^^^^^^^^^^^
+
+error: unable to infer type: `?21`
+   ┌─ tests/checking/typing/assign_wrong_type.move:19:9
+   │
+19 │         (x, b, R{f}) = (0, false);
+   │         ^^^^^^^^^^^^
+
+error: unable to infer type: `?1`
+   ┌─ tests/checking/typing/assign_wrong_type.move:24:17
+   │
+24 │         let b = 0;
+   │                 ^
 
 error: expected `bool` but found `integer` (from assignment or declaration context)
    ┌─ tests/checking/typing/assign_wrong_type.move:27:10
@@ -53,3 +89,9 @@ error: expected `M::S` but found `M::R` (from assignment or declaration context)
    │
 27 │         (x, b, R{f}, r) = (0, false, R{f: 0}, R{f: 0});
    │                      ^
+
+error: unable to infer type: `?7`
+   ┌─ tests/checking/typing/assign_wrong_type.move:27:28
+   │
+27 │         (x, b, R{f}, r) = (0, false, R{f: 0}, R{f: 0});
+   │                            ^

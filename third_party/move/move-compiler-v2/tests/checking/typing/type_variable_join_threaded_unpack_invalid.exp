@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: unable to infer type: `Container::T<M::Box<?11>>`
+   ┌─ tests/checking/typing/type_variable_join_threaded_unpack_invalid.move:31:17
+   │
+31 │         let v = Container::new();
+   │                 ^^^^^^^^^^^^^^^^
+
 error: expected `bool` but found `integer`
    ┌─ tests/checking/typing/type_variable_join_threaded_unpack_invalid.move:34:9
    │

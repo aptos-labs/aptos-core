@@ -23,3 +23,9 @@ error: expected 0 item(s), found 2
    │
 26 │         let (x, y) = loop { if (false) break };
    │             ^^^^^^
+
+error: unable to infer type: `?2`
+   ┌─ tests/checking/typing/loop_result_type_invalid.move:26:13
+   │
+26 │         let (x, y) = loop { if (false) break };
+   │             ^^^^^^

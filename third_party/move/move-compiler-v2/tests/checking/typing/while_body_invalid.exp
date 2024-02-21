@@ -18,6 +18,12 @@ error: expected `()` but found `address`
 5 │         while (cond) { @0x0 };
   │                        ^^^^
 
+error: unable to infer type: `?5`
+  ┌─ tests/checking/typing/while_body_invalid.move:6:32
+  │
+6 │         while (cond) { let x = 0; x };
+  │                                ^
+
 error: expected `()` but found `integer`
   ┌─ tests/checking/typing/while_body_invalid.move:6:35
   │

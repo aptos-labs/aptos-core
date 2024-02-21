@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: unable to infer type: `?0`
+   ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:11:13
+   │
+11 │         let x = foo<>(0);
+   │             ^
+
 error: invalid call of `M::foo`: generic count mismatch (expected 1 but found 0)
    ┌─ tests/checking/typing/bad_type_argument_arity_fun.move:11:17
    │

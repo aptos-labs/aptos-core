@@ -6,6 +6,12 @@ error: field `b` not declared in struct `Test::T`
 11 │         let T { i, x, b: flag } = t;
    │                       ^
 
+error: unable to infer type: `?1`
+   ┌─ tests/checking/typing/v1-commands/unpack_extra_binding.move:11:13
+   │
+11 │         let T { i, x, b: flag } = t;
+   │             ^^^^^^^^^^^^^^^^^^^
+
 error: undeclared `Test::i`
    ┌─ tests/checking/typing/v1-commands/unpack_extra_binding.move:12:10
    │

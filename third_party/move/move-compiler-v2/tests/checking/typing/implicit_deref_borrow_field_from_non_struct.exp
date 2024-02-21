@@ -47,3 +47,9 @@ error: expected a struct with field `f` but found `(?18, ?19)`
    │
 13 │         (S{f: 0}, S{f:0}).f;
    │         ^^^^^^^^^^^^^^^^^
+
+error: unable to infer type: `?17`
+   ┌─ tests/checking/typing/implicit_deref_borrow_field_from_non_struct.move:13:9
+   │
+13 │         (S{f: 0}, S{f:0}).f;
+   │         ^^^^^^^^^^^^^^^^^

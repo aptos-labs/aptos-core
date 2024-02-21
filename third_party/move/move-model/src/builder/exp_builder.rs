@@ -369,39 +369,36 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// invalid type instantiations are found.
     fn finalize_type(&mut self, node_id: NodeId, ty: &Type) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
-        // Report error only if there are no other errors in this builder,
-        // to avoid noisy followup errors.
-        if !self.had_errors {
-            let loc = self.parent.parent.env.get_node_loc(node_id);
-            let mut incomplete = false;
-            let mut visitor = |t: &Type| {
-                use Type::*;
-                match t {
-                    Var(_) => {
-                        incomplete = true;
-                    },
-                    Struct(_, _, inst) => {
-                        for i in inst {
-                            self.check_valid_instantiation(&loc, i)
-                        }
-                    },
-                    Vector(t) => self.check_valid_instantiation(&loc, t),
-                    _ => {},
-                }
-            };
-            ty.visit(&mut visitor);
-
-            if incomplete {
-                // This type could not be fully inferred.
-                self.error(
-                    &loc,
-                    &format!(
-                        "unable to infer type: `{}`",
-                        ty.display(&self.type_display_context())
-                    ),
-                );
+        let loc = self.parent.parent.env.get_node_loc(node_id);
+        let mut visitor = |t: &Type| {
+            use Type::*;
+            match t {
+                Var(_) => {
+                    self.error(
+                        &loc,
+                        &format!(
+                            "unable to infer type: `{}`",
+                            ty.display(&self.type_display_context())
+                        ),
+                    );
+                    let _ = self.subs.unify(
+                        &self.unification_context,
+                        self.type_variance(),
+                        WideningOrder::RightToLeft,
+                        t,
+                        &Error,
+                    );
+                },
+                Struct(_, _, inst) => {
+                    for i in inst {
+                        self.check_valid_instantiation(&loc, i)
+                    }
+                },
+                Vector(t) => self.check_valid_instantiation(&loc, t),
+                _ => {},
             }
-        }
+        };
+        ty.visit(&mut visitor);
         ty
     }
 

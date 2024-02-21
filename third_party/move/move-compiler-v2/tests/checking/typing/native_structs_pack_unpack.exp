@@ -12,8 +12,20 @@ error: native struct `C::T` cannot be packed or unpacked
 12 │         let C::T {} = c;
    │             ^^^^
 
+error: unable to infer type: `?1`
+   ┌─ tests/checking/typing/native_structs_pack_unpack.move:12:13
+   │
+12 │         let C::T {} = c;
+   │             ^^^^^^^
+
 error: field `f` not declared in struct `C::T`
    ┌─ tests/checking/typing/native_structs_pack_unpack.move:15:17
    │
 15 │         let f = c.f;
    │                 ^
+
+error: unable to infer type: `?0`
+   ┌─ tests/checking/typing/native_structs_pack_unpack.move:15:17
+   │
+15 │         let f = c.f;
+   │                 ^^^

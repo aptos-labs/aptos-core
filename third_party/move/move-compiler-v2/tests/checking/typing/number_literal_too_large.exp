@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: unable to infer type: `u128|u256`
+  ┌─ tests/checking/typing/number_literal_too_large.move:3:9
+  │
+3 │         340282366920938463463374607431768211455;
+  │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error: constant does not fit into `u64`
   ┌─ tests/checking/typing/number_literal_too_large.move:5:10
   │

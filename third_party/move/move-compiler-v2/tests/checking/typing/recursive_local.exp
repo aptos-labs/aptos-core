@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: unable to infer type: `?3`
+  ┌─ tests/checking/typing/recursive_local.move:4:13
+  │
+4 │         let x;
+  │             ^
+
 error: type unification cycle check failed (`?3 =?= (?3, integer)`, try to annotate type) (from assignment or declaration context)
   ┌─ tests/checking/typing/recursive_local.move:5:9
   │

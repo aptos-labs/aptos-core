@@ -5,3 +5,9 @@ error: expected 3 item(s), found 2
   │
 7 │         (_, _) = three();
   │         ^^^^^^
+
+error: unable to infer type: `?2`
+  ┌─ tests/checking/typing/v1-commands/pop_positive.move:7:9
+  │
+7 │         (_, _) = three();
+  │         ^^^^^^

@@ -6,11 +6,23 @@ error: struct incompatible with integer
 6 │         &0.f;
   │          ^
 
+error: unable to infer type: `?1`
+  ┌─ tests/checking/typing/borrow_field_from_non_struct.move:6:10
+  │
+6 │         &0.f;
+  │          ^^^
+
 error: struct incompatible with integer
   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:7:10
   │
 7 │         &0.g;
   │          ^
+
+error: unable to infer type: `?5`
+  ┌─ tests/checking/typing/borrow_field_from_non_struct.move:7:10
+  │
+7 │         &0.g;
+  │          ^^^
 
 error: expected a struct with field `value` but found `u64`
   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:8:10
@@ -18,11 +30,23 @@ error: expected a struct with field `value` but found `u64`
 8 │         &u.value;
   │          ^
 
+error: unable to infer type: `?9`
+  ┌─ tests/checking/typing/borrow_field_from_non_struct.move:8:10
+  │
+8 │         &u.value;
+  │          ^^^^^^^
+
 error: expected a struct with field `value` but found `bool`
   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:9:10
   │
 9 │         &cond.value;
   │          ^^^^
+
+error: unable to infer type: `?12`
+  ┌─ tests/checking/typing/borrow_field_from_non_struct.move:9:10
+  │
+9 │         &cond.value;
+  │          ^^^^^^^^^^
 
 error: expected a struct with field `R` but found `address`
    ┌─ tests/checking/typing/borrow_field_from_non_struct.move:10:10
@@ -30,11 +54,23 @@ error: expected a struct with field `R` but found `address`
 10 │         &addr.R;
    │          ^^^^
 
+error: unable to infer type: `?15`
+   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:10:10
+   │
+10 │         &addr.R;
+   │          ^^^^^^
+
 error: expected a struct with field `f` but found `address`
    ┌─ tests/checking/typing/borrow_field_from_non_struct.move:11:10
    │
 11 │         &addr.f;
    │          ^^^^
+
+error: unable to infer type: `?18`
+   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:11:10
+   │
+11 │         &addr.f;
+   │          ^^^^^^
 
 error: expected a struct with field `R` but found `()`
    ┌─ tests/checking/typing/borrow_field_from_non_struct.move:12:10
@@ -42,8 +78,26 @@ error: expected a struct with field `R` but found `()`
 12 │         &().R;
    │          ^^
 
+error: unable to infer type: `?21`
+   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:12:10
+   │
+12 │         &().R;
+   │          ^^^^
+
 error: expected a struct with field `f` but found `(?26, ?27)`
    ┌─ tests/checking/typing/borrow_field_from_non_struct.move:13:10
    │
 13 │         &(&S{f: 0}, &S{f:0}).f;
    │          ^^^^^^^^^^^^^^^^^^^
+
+error: unable to infer type: `?25`
+   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:13:10
+   │
+13 │         &(&S{f: 0}, &S{f:0}).f;
+   │          ^^^^^^^^^^^^^^^^^^^
+
+error: unable to infer type: `?24`
+   ┌─ tests/checking/typing/borrow_field_from_non_struct.move:13:10
+   │
+13 │         &(&S{f: 0}, &S{f:0}).f;
+   │          ^^^^^^^^^^^^^^^^^^^^^

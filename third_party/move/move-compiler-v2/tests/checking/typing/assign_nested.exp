@@ -5,3 +5,9 @@ error: expected 4 item(s), found 3
    │
 14 │         (_, x, _) = four();
    │         ^^^^^^^^^
+
+error: unable to infer type: `?7`
+   ┌─ tests/checking/typing/assign_nested.move:14:9
+   │
+14 │         (_, x, _) = four();
+   │         ^^^^^^^^^

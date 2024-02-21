@@ -30,11 +30,23 @@ error: undeclared struct `M::S`
 12 │         S {} = bar();
    │         ^
 
+error: unable to infer type: `?2`
+   ┌─ tests/checking/naming/unbound_struct_in_current.move:12:9
+   │
+12 │         S {} = bar();
+   │         ^^^^
+
 error: undeclared struct `M::S`
    ┌─ tests/checking/naming/unbound_struct_in_current.move:13:9
    │
 13 │         Self::S {} = bar();
    │         ^^^^^^^
+
+error: unable to infer type: `?5`
+   ┌─ tests/checking/naming/unbound_struct_in_current.move:13:9
+   │
+13 │         Self::S {} = bar();
+   │         ^^^^^^^^^^
 
 error: undeclared struct `M::S`
    ┌─ tests/checking/naming/unbound_struct_in_current.move:17:13
@@ -42,8 +54,20 @@ error: undeclared struct `M::S`
 17 │         let S {} = bar();
    │             ^
 
+error: unable to infer type: `?1`
+   ┌─ tests/checking/naming/unbound_struct_in_current.move:17:13
+   │
+17 │         let S {} = bar();
+   │             ^^^^
+
 error: undeclared struct `M::S`
    ┌─ tests/checking/naming/unbound_struct_in_current.move:18:13
    │
 18 │         let Self::S {} = bar();
    │             ^^^^^^^
+
+error: unable to infer type: `?3`
+   ┌─ tests/checking/naming/unbound_struct_in_current.move:18:13
+   │
+18 │         let Self::S {} = bar();
+   │             ^^^^^^^^^^

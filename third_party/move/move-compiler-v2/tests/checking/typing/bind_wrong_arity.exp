@@ -12,7 +12,19 @@ error: expected 4 item(s), found 3
 7 │         let (x, b, R{f}): (u64, bool, R, R) = (0, false, R{f: 0}, R{f: 0});
   │             ^^^^^^^^^^^^
 
+error: unable to infer type: `?3`
+  ┌─ tests/checking/typing/bind_wrong_arity.move:7:13
+  │
+7 │         let (x, b, R{f}): (u64, bool, R, R) = (0, false, R{f: 0}, R{f: 0});
+  │             ^^^^^^^^^^^^
+
 error: expected 2 item(s), found 3
+  ┌─ tests/checking/typing/bind_wrong_arity.move:8:13
+  │
+8 │         let (x, b, R{f}): (u64, bool) = (0, false);
+  │             ^^^^^^^^^^^^
+
+error: unable to infer type: `?5`
   ┌─ tests/checking/typing/bind_wrong_arity.move:8:13
   │
 8 │         let (x, b, R{f}): (u64, bool) = (0, false);

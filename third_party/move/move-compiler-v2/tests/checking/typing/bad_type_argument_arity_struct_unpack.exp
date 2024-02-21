@@ -6,6 +6,12 @@ error: generic count mismatch (expected 1 but found 0)
 7 │         let S<> { f } = copy s;
   │             ^^^^^^^^^
 
+error: unable to infer type: `?1`
+  ┌─ tests/checking/typing/bad_type_argument_arity_struct_unpack.move:7:13
+  │
+7 │         let S<> { f } = copy s;
+  │             ^^^^^^^^^
+
 error: undeclared `M::f`
   ┌─ tests/checking/typing/bad_type_argument_arity_struct_unpack.move:8:9
   │
@@ -13,6 +19,12 @@ error: undeclared `M::f`
   │         ^
 
 error: generic count mismatch (expected 1 but found 2)
+  ┌─ tests/checking/typing/bad_type_argument_arity_struct_unpack.move:9:13
+  │
+9 │         let S<u64, u64> { f } = copy s;
+  │             ^^^^^^^^^^^^^^^^^
+
+error: unable to infer type: `?4`
   ┌─ tests/checking/typing/bad_type_argument_arity_struct_unpack.move:9:13
   │
 9 │         let S<u64, u64> { f } = copy s;

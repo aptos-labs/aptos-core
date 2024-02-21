@@ -36,6 +36,12 @@ error: invalid call of `M::wrongly_typed_callee`: expected `bool` but found `u25
 32 │       wrongly_typed_callee(1, 1) // Wrongly typed function application
    │                               ^
 
+error: unable to infer type: `?1`
+   ┌─ tests/checking/specs/expressions_err.move:37:37
+   │
+37 │       wrongly_typed_fun_arg_callee(|x| false) // Wrongly typed function argument.
+   │                                     ^
+
 error: invalid call of `M::wrongly_typed_fun_arg_callee`: expected `num` but found `bool` for argument 1
    ┌─ tests/checking/specs/expressions_err.move:37:36
    │

@@ -6,6 +6,12 @@ error: no function named `bar` found
 3 │         bar();
   │         ^^^^^
 
+error: unable to infer type: `?1`
+  ┌─ tests/checking/naming/unbound_unqualified_function.move:4:13
+  │
+4 │         let x = bar();
+  │             ^
+
 error: no function named `bar` found
   ┌─ tests/checking/naming/unbound_unqualified_function.move:4:17
   │

@@ -12,13 +12,43 @@ error: expected `()` but found `integer` (from assignment or declaration context
 8 │         () = 0;
   │         ^^
 
+error: unable to infer type: `?12`
+  ┌─ tests/checking/typing/assign_wrong_arity.move:8:14
+  │
+8 │         () = 0;
+  │              ^
+
+error: unable to infer type: `?14`
+  ┌─ tests/checking/typing/assign_wrong_arity.move:9:13
+  │
+9 │         let b;
+  │             ^
+
+error: unable to infer type: `?15`
+   ┌─ tests/checking/typing/assign_wrong_arity.move:10:13
+   │
+10 │         let f;
+   │             ^
+
 error: expected 4 item(s), found 3
    ┌─ tests/checking/typing/assign_wrong_arity.move:11:9
    │
 11 │         (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
    │         ^^^^^^^^^^^^
 
+error: unable to infer type: `?23`
+   ┌─ tests/checking/typing/assign_wrong_arity.move:11:9
+   │
+11 │         (x, b, R{f}) = (0, false, R{f: 0}, R{f: 0});
+   │         ^^^^^^^^^^^^
+
 error: expected 2 item(s), found 3
+   ┌─ tests/checking/typing/assign_wrong_arity.move:12:9
+   │
+12 │         (x, b, R{f}) = (0, false);
+   │         ^^^^^^^^^^^^
+
+error: unable to infer type: `?29`
    ┌─ tests/checking/typing/assign_wrong_arity.move:12:9
    │
 12 │         (x, b, R{f}) = (0, false);
