@@ -25,6 +25,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
+use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -140,7 +141,7 @@ fn setup(
     let time_service = TimeService::mock();
     let validators = signers.iter().map(|vs| vs.author()).collect();
     let (tx, _) = unbounded();
-    let order_rule = OrderRule::new(
+    let order_rule = Arc::new(Mutex::new(OrderRule::new(
         epoch_state.clone(),
         1,
         dag.clone(),
@@ -148,7 +149,7 @@ fn setup(
         Arc::new(TestNotifier { tx }),
         TEST_DAG_WINDOW as Round,
         None,
-    );
+    )));
 
     let fetch_requester = Arc::new(MockFetchRequester {});
 
