@@ -17,7 +17,7 @@ use aptos_schemadb::{
 use aptos_storage_interface::AptosDbError;
 pub use schema::{
     block::BlockSchema,
-    dag::{CertifiedNodeSchema, DagVoteSchema, DecoupledPayloadSchema, NodeMsgSchema, NodeSchema},
+    dag::{CertifiedNodeSchema, DagVoteSchema, DecoupledPayloadSchema, NodeMsgSchema},
     quorum_certificate::QCSchema,
 };
 use schema::{

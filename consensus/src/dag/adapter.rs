@@ -149,10 +149,9 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let timestamp = anchor.metadata().timestamp();
         let author = *anchor.author();
         let mut validator_txns = vec![];
-        let mut payload = if matches!(anchor.payload(), DagPayload::Decoupled(_)) {
-            Payload::empty_dag_payload()
-        } else {
-            Payload::empty(anchor.payload().is_in_quorum_store())
+        let mut payload = match anchor.payload() {
+            DagPayload::Inline(payload) => Payload::empty(payload.is_in_quorum_store()),
+            DagPayload::Decoupled(_) => Payload::empty_dag_payload(),
         };
         let mut node_digests = vec![];
         for node in &ordered_nodes {

@@ -2,7 +2,10 @@ use super::{
     payload_fetcher::PayloadRequester,
     store::{DagPayloadStore, DagPayloadStoreError},
 };
-use crate::dag::{dag_store::DagStore, types::DagPayload, CertifiedNode};
+use crate::{
+    dag::{dag_store::DagStore, types::DagPayload, CertifiedNode},
+    payload_manager::TPayloadManager,
+};
 use anyhow::bail;
 use aptos_collections::BoundedVecDeque;
 use aptos_consensus_types::{
@@ -26,6 +29,7 @@ pub struct DagPayloadManager {
     payload_store: Arc<DagPayloadStore>,
     requester: PayloadRequester,
     waiters: DashMap<PayloadDigest, BoundedVecDeque<oneshot::Sender<Vec<SignedTransaction>>>>,
+    external_payload_manager: Arc<dyn TPayloadManager>,
 }
 
 impl DagPayloadManager {
@@ -33,12 +37,14 @@ impl DagPayloadManager {
         dag_store: Arc<DagStore>,
         payload_store: Arc<DagPayloadStore>,
         requester: PayloadRequester,
+        external_payload_manager: Arc<dyn TPayloadManager>,
     ) -> Self {
         Self {
             dag_store,
             payload_store,
             requester,
             waiters: DashMap::new(),
+            external_payload_manager,
         }
     }
 

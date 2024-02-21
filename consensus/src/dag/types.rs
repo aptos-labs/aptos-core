@@ -159,7 +159,7 @@ pub enum DagPayload {
 impl DagPayload {
     pub fn digest(&self) -> Option<&PayloadDigest> {
         match self {
-            DagPayload::Inline(payload) => None,
+            DagPayload::Inline(_) => None,
             DagPayload::Decoupled(info) => Some(info.digest()),
         }
     }
@@ -175,17 +175,6 @@ impl DagPayload {
         match self {
             DagPayload::Inline(payload) => payload.size(),
             DagPayload::Decoupled(info) => info.size(),
-        }
-    }
-}
-
-impl Deref for DagPayload {
-    type Target = Payload;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            DagPayload::Inline(payload) => payload,
-            _ => unimplemented!(),
         }
     }
 }
@@ -464,9 +453,11 @@ impl NodeMessage {
     }
 
     pub fn payload(&self) -> &Payload {
-        match &self.decoupled_payload {
-            Some(payload) => payload.payload(),
-            None => self.node.payload(),
+        match self.node.payload() {
+            DagPayload::Inline(payload) => payload,
+            DagPayload::Decoupled(_) => self
+                .decoupled_payload()
+                .expect("must exist in decoupled mode"),
         }
     }
 

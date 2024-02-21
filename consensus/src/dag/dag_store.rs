@@ -486,7 +486,7 @@ impl DagStore {
     pub fn new_empty(
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
-        payload_manager: Arc<dyn TPayloadManager>,
+        external_payload_manager: Arc<dyn TPayloadManager>,
         start_round: Round,
         window_size: u64,
     ) -> Self {
@@ -494,19 +494,19 @@ impl DagStore {
         Self {
             dag: RwLock::new(dag),
             storage,
-            external_payload_manager: payload_manager,
+            external_payload_manager,
         }
     }
 
     pub fn new_for_test(
         dag: InMemDag,
         storage: Arc<dyn DAGStorage>,
-        payload_manager: Arc<dyn TPayloadManager>,
+        external_payload_manager: Arc<dyn TPayloadManager>,
     ) -> Self {
         Self {
             dag: RwLock::new(dag),
             storage,
-            external_payload_manager: payload_manager,
+            external_payload_manager,
         }
     }
 
@@ -522,7 +522,7 @@ impl DagStore {
 
         debug!("Added node {}", node.id());
         self.external_payload_manager
-            .prefetch_payload_data(node.payload(), node.metadata().timestamp());
+            .prefetch_dag_payload_data(node.payload(), node.metadata().timestamp());
 
         self.dag.write().add_validated_node(node)
     }

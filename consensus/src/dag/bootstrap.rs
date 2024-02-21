@@ -640,6 +640,7 @@ impl DagBootstrapper {
             dag_store.clone(),
             payload_store.clone(),
             payload_requester,
+            self.payload_manager.clone(),
         ));
 
         let chain_health: Arc<dyn TChainHealth> = ChainHealthBackoff::new(
@@ -812,7 +813,7 @@ pub(super) fn bootstrap_dag_for_test(
     let (_base_state, handler, fetch_service, payload_fetch_service) = bootstraper.full_bootstrap();
 
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
-    let (payload_link_tx, mut payload_link_rx) = mpsc::unbounded_channel();
+    let (_payload_link_tx, mut payload_link_rx) = mpsc::unbounded_channel();
 
     let dh_handle = tokio::spawn(async move {
         let mut dag_rpc_rx = dag_rpc_rx;

@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    dag_store::DagStore,
-    health::HealthBackoff,
-    payload::{DagPayloadManager, TDagPayloadResolver},
-    NodeMessage,
+    dag_store::DagStore, health::HealthBackoff, payload::TDagPayloadResolver, NodeMessage,
 };
 use crate::{
     dag::{
@@ -20,7 +17,6 @@ use crate::{
         types::{NodeCertificate, Vote},
         NodeId,
     },
-    payload_manager::PayloadManager,
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure};

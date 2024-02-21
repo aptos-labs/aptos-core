@@ -15,7 +15,7 @@ pub(super) const TEST_DAG_WINDOW: u64 = 5;
 pub(super) struct MockPayloadManager {}
 
 impl TPayloadManager for MockPayloadManager {
-    fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
+    fn prefetch_dag_payload_data(&self, _payload: &DagPayload, _timestamp: u64) {}
 }
 
 pub(crate) fn new_certified_node(
