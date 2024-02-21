@@ -31,3 +31,4 @@ serde_json = "1.0.64"
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive", "arbitrary", "move-core-types/fuzzing"]
+testing = []
