@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 /// "`output_dir/file_index.move`"
 ///
 /// Paths can be absolute or relative - it doesn't matter. The function will handle it by
-/// canonicalizing the path. Returned path is always relative to the package directory root.
+/// canonicalizing the path. The returned path is always relative to the package directory root.
 ///
 /// # Arguments
 ///
