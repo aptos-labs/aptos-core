@@ -47,6 +47,7 @@ use futures::{
 use futures_channel::mpsc::unbounded;
 use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
+use aptos_types::on_chain_config::OnChainConsensusConfig;
 
 #[async_trait::async_trait]
 pub trait TExecutionClient: Send + Sync {
@@ -56,6 +57,7 @@ pub trait TExecutionClient: Send + Sync {
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<PayloadManager>,
+        onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         features: &Features,
         rand_config: Option<RandConfig>,
@@ -274,6 +276,7 @@ impl TExecutionClient for ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<PayloadManager>,
+        onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
         features: &Features,
         rand_config: Option<RandConfig>,
@@ -290,13 +293,14 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
+        let randomness_enabled = onchain_consensus_config.is_vtxn_enabled() && features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
         self.execution_proxy.new_epoch(
             &epoch_state,
             payload_manager,
             transaction_shuffler,
             block_executor_onchain_config,
             transaction_deduper,
-            features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
+            randomness_enabled,
         );
 
         maybe_rand_msg_tx
@@ -453,6 +457,7 @@ impl TExecutionClient for DummyExecutionClient {
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<PayloadManager>,
+        _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
         _features: &Features,
         _rand_config: Option<RandConfig>,
