@@ -103,6 +103,7 @@ pub enum FeatureFlag {
     ConcurrentFungibleAssets,
     RefundableBytes,
     ObjectCodeDeployment,
+    MaxObjectNestingCheck,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -264,6 +265,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::RefundableBytes => AptosFeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::ObjectCodeDeployment => AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT,
+            FeatureFlag::MaxObjectNestingCheck => AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK,
         }
     }
 }
@@ -348,6 +350,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
             AptosFeatureFlag::REFUNDABLE_BYTES => FeatureFlag::RefundableBytes,
             AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT => FeatureFlag::ObjectCodeDeployment,
+            AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK => FeatureFlag::MaxObjectNestingCheck,
         }
     }
 }

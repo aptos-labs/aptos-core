@@ -95,6 +95,8 @@ return true.
 -  [Function `get_concurrent_fungible_assets_feature`](#0x1_features_get_concurrent_fungible_assets_feature)
 -  [Function `concurrent_fungible_assets_enabled`](#0x1_features_concurrent_fungible_assets_enabled)
 -  [Function `is_object_code_deployment_enabled`](#0x1_features_is_object_code_deployment_enabled)
+-  [Function `get_max_object_nesting_check_feature`](#0x1_features_get_max_object_nesting_check_feature)
+-  [Function `max_object_nesting_check_enabled`](#0x1_features_max_object_nesting_check_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -414,6 +416,16 @@ Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH">LIMIT_MAX_IDENTIFIER_LENGTH</a>: u64 = 38;
+</code></pre>
+
+
+
+<a id="0x1_features_MAX_OBJECT_NESTING_CHECK"></a>
+
+Whether checking the maximum object nesting is enabled.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a>: u64 = 53;
 </code></pre>
 
 
@@ -2134,6 +2146,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_object_code_deployment_enabled">is_object_code_deployment_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_max_object_nesting_check_feature"></a>
+
+## Function `get_max_object_nesting_check_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_max_object_nesting_check_feature">get_max_object_nesting_check_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_max_object_nesting_check_feature">get_max_object_nesting_check_feature</a>(): u64 { <a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_max_object_nesting_check_enabled"></a>
+
+## Function `max_object_nesting_check_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_max_object_nesting_check_enabled">max_object_nesting_check_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_max_object_nesting_check_enabled">max_object_nesting_check_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a>)
 }
 </code></pre>
 
