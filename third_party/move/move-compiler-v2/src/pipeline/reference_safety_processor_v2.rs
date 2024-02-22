@@ -9,7 +9,8 @@
 //! borrow relation. For example, if `s` is the memory location of a struct, then
 //! `&s.f` is represented by a node which is derived from `s`, and those two nodes are
 //! connected by an edge labeled with `.f`. In the below example, we have `&s.g` stored
-//! in `r1` and `&s.f` stored in `r2`:
+//! in `r1` and `&s.f` stored in `r2` (edges in the graph should be read as arrows pointing
+//! downwards):
 //!
 //! ```ignore
 //!              s
@@ -165,7 +166,8 @@ enum MemoryLocation {
     Derived,
 }
 
-/// Represents an edge in the borrow graph.
+/// Represents an edge in the borrow graph. The source of the edge is implicit in the ownership
+/// of the edge by a LifetimeNode through its children field
 #[derive(PartialOrd, Ord, PartialEq, Eq, Clone, Debug)]
 struct BorrowEdge {
     /// The kind of borrow edge.
@@ -186,7 +188,7 @@ enum BorrowEdgeKind {
     /// Borrows a field from a reference.
     BorrowField(bool, FieldId),
     /// Calls an operation, where the incoming references are used to derive outgoing references. Since every
-    /// call outcome can be different, they are is distinguished by code offset -- two call edges are never the
+    /// call outcome can be different, they are distinguished by code offset -- two call edges are never the
     /// same.
     Call(bool, Operation, CodeOffset),
 }
@@ -212,7 +214,7 @@ impl LifetimeLabel {
         LifetimeLabel(((code_offset as u64) << 8) | (qualifier as u64))
     }
 
-    /// Creates a globally unique label from a counter. These are disjoint as those
+    /// Creates a globally unique label from a counter. These are disjoint from those
     /// from code labels.
     fn new_from_counter(count: u32) -> LifetimeLabel {
         // code offset = 16 bits, qualifier 8 bits
@@ -285,10 +287,9 @@ impl AbstractDomain for LifetimeState {
 
 impl LifetimeState {
     /// Joins two maps with labels in their range. For overlapping keys pointing to different labels,
-    /// the nodes behind the labels in the graph are joined, and the label in the other graph is
-    /// replaced by the given one in the `renaming` parameter.
-    ///
-    /// This function extends an active label renamings resulting from incrementally joining nodes.
+    /// the nodes behind the labels in the graph are joined, and the label in the `other_map` is
+    /// replaced by the given one in `map`. This functions remembers (but does not yet apply)
+    /// the replaced labels in the `renaming` map.
     fn join_label_map<A: Clone + Ord>(
         &mut self,
         map: &mut BTreeMap<A, LifetimeLabel>,
@@ -368,6 +369,9 @@ impl LifetimeState {
             .collect();
     }
 
+    /// Checks, at or above debug level, that
+    /// - for any nodes `v, u` in the borrow graph, `v` is has parent/child `u` iff `u` has child/parent `v`
+    /// - all labels in the label maps are in the graph
     fn check_graph_consistency(&self) {
         if log_enabled!(Level::Debug) {
             self.debug_print("before check");
@@ -559,7 +563,6 @@ impl LifetimeState {
     }
 
     /// Gets the label associated with a global.
-    #[allow(unused)]
     fn label_for_global(&self, global: &QualifiedInstId<StructId>) -> Option<&LifetimeLabel> {
         self.global_to_label_map.get(global)
     }
@@ -652,21 +655,6 @@ impl LifetimeState {
             }
         }
         self.check_graph_consistency()
-    }
-
-    /// Returns a reduced lifetime state which only keeps the specified labels.
-    /// The reduced state is used to determine borrow consistency in the context
-    /// of code referring to those labels.
-    #[allow(unused)]
-    fn reduced_state(&self, included: impl Fn(&LifetimeLabel) -> bool) -> LifetimeState {
-        let mut new = self.clone();
-        for (t, l) in &self.temp_to_label_map {
-            if !included(l) {
-                new.release_ref(*t)
-            }
-        }
-        // TODO: globals
-        new
     }
 
     /// Replaces a reference in a temporary, as result of an assignment. The current
@@ -969,7 +957,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// If we walk this graph now from the root to the leaves, we can determine safety by directly comparing
     /// hyper edge siblings.
     fn check_borrow_safety(&mut self, temps: &BTreeSet<TempIndex>) {
-        let leaves = self
+        let filtered_leaves = self
             .state
             .leaves()
             .into_iter()
@@ -984,8 +972,8 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             .collect::<BTreeMap<_, _>>();
         // Initialize root hyper nodes
         let mut hyper_nodes: BTreeSet<BTreeSet<LifetimeLabel>> = BTreeSet::new();
-        for leaf in leaves.keys() {
-            for root in self.state.roots(leaf) {
+        for filtered_leaf in filtered_leaves.keys() {
+            for root in self.state.roots(filtered_leaf) {
                 hyper_nodes.insert(iter::once(root).collect());
             }
         }
@@ -1003,7 +991,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                         if e1 == e2 || !edges_reported.insert([*e1, *e2].into_iter().collect()) {
                             continue;
                         }
-                        self.diverging_edge_error(hyper.first().unwrap(), e1, e2, &leaves)
+                        self.diverging_edge_error(hyper.first().unwrap(), e1, e2, &filtered_leaves)
                     }
                 }
             }
@@ -1015,7 +1003,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     let target = edge.target;
                     targets.insert(target);
                     if edge.kind.is_mut() {
-                        if let Some(temps) = leaves.get(&target) {
+                        if let Some(temps) = filtered_leaves.get(&target) {
                             let mut inter =
                                 temps.intersection(temps).cloned().collect::<BTreeSet<_>>();
                             if !inter.is_empty() {
@@ -1804,7 +1792,7 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
         )?;
         writeln!(
             f,
-            "temp_to_label: {{{}}}",
+            "locals: {{{}}}",
             temp_to_label_map
                 .iter()
                 .map(|(temp, label)| format!(
@@ -1816,7 +1804,7 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
         )?;
         writeln!(
             f,
-            "global_to_label: {{{}}}",
+            "globals: {{{}}}",
             global_to_label_map
                 .iter()
                 .map(|(str, label)| format!("{}={}", self.0.global_env().display(str), label))
