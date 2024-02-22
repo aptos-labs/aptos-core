@@ -1346,7 +1346,7 @@ module aptos_framework::account {
         let (_new_sk, new_pk) = ed25519::generate_keys();
         let new_pk_unvalidated = ed25519::public_key_to_unvalidated(&new_pk);
         let new_auth_key = ed25519::unvalidated_public_key_to_authentication_key(&new_pk_unvalidated);
-        let new_addr = from_bcs::to_address(new_auth_key);
+        let _new_addr = from_bcs::to_address(new_auth_key);
 
         rotate_authentication_key_call(&alice, new_auth_key);
         assert!(borrow_global<Account>(alice_addr).authentication_key == new_auth_key, 0);
