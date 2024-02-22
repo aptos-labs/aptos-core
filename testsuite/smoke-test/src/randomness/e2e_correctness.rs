@@ -53,7 +53,7 @@ async fn randomness_correctness() {
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs * 2))
         .await
-        .expect("Epoch 2 taking too long to arrive!");
+        .expect("Epoch 3 taking too long to arrive!");
 
     info!("Verify DKG correctness for epoch 3.");
     let dkg_session = get_on_chain_resource::<DKGState>(&rest_client).await;
