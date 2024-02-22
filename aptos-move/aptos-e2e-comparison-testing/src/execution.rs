@@ -369,7 +369,7 @@ impl Execution {
     ) {
         match (res_1, res_2) {
             (Err(e1), Err(e2)) => {
-                if e1 != e2 {
+                if e1.message() != e2.message() {
                     self.output_result_str(format!("error is different at {}", cur_version));
                     self.output_result_str(format!("error {} is raised from V1", e1));
                     self.output_result_str(format!("error {} is raised from V2", e2));
