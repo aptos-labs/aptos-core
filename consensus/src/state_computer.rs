@@ -76,7 +76,7 @@ impl LogicalTime {
 }
 
 #[derive(Clone)]
-struct ExecutionProxyInner {
+struct MutableState {
     validators: Arc<[AccountAddress]>,
     payload_manager: Arc<PayloadManager>,
     transaction_shuffler: Arc<dyn TransactionShuffler>,
@@ -94,7 +94,7 @@ pub struct ExecutionProxy {
     write_mutex: AsyncMutex<LogicalTime>,
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
-    inner: RwLock<Option<ExecutionProxyInner>>,
+    state: RwLock<Option<MutableState>>,
     randomness_enabled: AtomicBool,
 }
 
@@ -131,7 +131,7 @@ impl ExecutionProxy {
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
             randomness_enabled: AtomicBool::new(false),
-            inner: RwLock::new(None),
+            state: RwLock::new(None),
         }
     }
 
@@ -180,14 +180,14 @@ impl StateComputer for ExecutionProxy {
             parent_id = parent_block_id,
             "Executing block",
         );
-        let ExecutionProxyInner {
+        let MutableState {
             validators,
             payload_manager,
             transaction_shuffler,
             block_executor_onchain_config,
             transaction_deduper,
         } = self
-            .inner
+            .state
             .read()
             .as_ref()
             .cloned()
@@ -260,11 +260,16 @@ impl StateComputer for ExecutionProxy {
         );
         let block_timestamp = finality_proof.commit_info().timestamp_usecs();
 
-        let ExecutionProxyInner {
+        let MutableState {
             payload_manager,
             validators,
             ..
-        } = self.inner.read().as_ref().cloned().expect("");
+        } = self
+            .state
+            .read()
+            .as_ref()
+            .cloned()
+            .expect("must be set within an epoch");
         for block in blocks {
             block_ids.push(block.id());
 
@@ -327,7 +332,7 @@ impl StateComputer for ExecutionProxy {
         // This is to update QuorumStore with the latest known commit in the system,
         // so it can set batches expiration accordingly.
         // Might be none if called in the recovery path, or between epoch stop and start.
-        if let Some(inner) = self.inner.read().as_ref() {
+        if let Some(inner) = self.state.read().as_ref() {
             inner
                 .payload_manager
                 .notify_commit(block_timestamp, Vec::new());
@@ -366,7 +371,7 @@ impl StateComputer for ExecutionProxy {
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
     ) {
-        *self.inner.write() = Some(ExecutionProxyInner {
+        *self.state.write() = Some(MutableState {
             validators: epoch_state
                 .verifier
                 .get_ordered_account_addresses_iter()
@@ -384,7 +389,7 @@ impl StateComputer for ExecutionProxy {
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
     // on the next epoch.
     fn end_epoch(&self) {
-        self.inner.write().take();
+        self.state.write().take();
     }
 }
 
