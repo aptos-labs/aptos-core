@@ -721,8 +721,8 @@ fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
     mempool_config.capacity = 3_000_000;
     mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
     mempool_config.capacity_per_user = 100_000;
-    mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
-    mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
+    // mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
+    // mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
 }
 
 fn state_sync_config_execute_transactions(state_sync_config: &mut StateSyncConfig) {
@@ -791,28 +791,30 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
 fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_txns = 30000;
-    config.consensus.max_receiving_block_txns = 40000;
-    config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
-    config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
+    config.consensus.max_sending_block_txns = 1900 * 6;
+    config.consensus.max_receiving_block_txns = 1900 * 6 * 2;
+    config.consensus.max_sending_block_bytes = 3 * 1024 * 1024 * 6;
+    config.consensus.max_receiving_block_bytes = 3 * 1024 * 1024 * 6 * 2;
+    // TODO: are there reasonable backpressure values to use?
     config.consensus.pipeline_backpressure = vec![];
     config.consensus.chain_health_backoff = vec![];
 
+    // TODO: can we actually reasonably turn on quorum store backpressure?
     config
         .consensus
         .quorum_store
         .back_pressure
-        .backlog_txn_limit_count = 200000;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_per_validator_batch_limit_count = 50;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .dynamic_min_txn_per_s = 2000;
+        .backlog_txn_limit_count = 35_000 * 3;
+    // config
+    //     .consensus
+    //     .quorum_store
+    //     .back_pressure
+    //     .backlog_per_validator_batch_limit_count = 50;
+    // config
+    //     .consensus
+    //     .quorum_store
+    //     .back_pressure
+    //     .dynamic_min_txn_per_s = 2000;
     config
         .consensus
         .quorum_store
@@ -1836,15 +1838,16 @@ fn realistic_env_max_load_test(
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // THE MOST COMMONLY USED TUNE-ABLES:
-    const USE_CRAZY_MACHINES: bool = false;
+    const USE_CRAZY_MACHINES: bool = true;
     const ENABLE_VFNS: bool = true;
-    const VALIDATOR_COUNT: usize = 12;
+    const VALIDATOR_COUNT: usize = 100;
+    const VFN_COUNT: usize = 10;
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 500_000,
+            mempool_backlog: 35_000 * 6,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
@@ -1853,18 +1856,19 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
             // consensus and quorum store configs copied from the consensus-only suite
             optimize_for_maximum_throughput(config);
 
-            // Other consensus / Quroum store configs
-            config
-                .consensus
-                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
-            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
+            // Other consensus / Quorum store configs
+            // config
+            //     .consensus
+            //     .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
+            // config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
             config.consensus.quorum_store_pull_timeout_ms = 200;
 
             // Experimental storage optimizations
             config.storage.rocksdb_configs.enable_storage_sharding = true;
 
             // Experimental delayed QC aggregation
-            config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
+            // TODO: remove for regular runs too
+            config.consensus.qc_aggregator_type = QcAggregatorType::NoDelay;
 
             // Increase the concurrency level
             if USE_CRAZY_MACHINES {
@@ -1882,8 +1886,20 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
-                    config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    // TODO: after tuning these values, add them to the default_for_genesis on this branch
+                    config_v4.block_gas_limit_type = BlockGasLimitType::ComplexLimitV1 {
+                        effective_block_gas_limit: 20000 * 6,
+                        execution_gas_effective_multiplier: 1,
+                        io_gas_effective_multiplier: 1,
+                        conflict_penalty_window: 6,
+                        use_granular_resource_group_conflicts: false,
+                        use_module_publishing_block_conflict: true,
+                        block_output_limit: Some(3 * 1024 * 1024 * 6),
+                        include_user_txn_size_in_block_output: true,
+                        add_block_limit_outcome_onchain: false,
+                    };
                     config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
+                        // TODO: will this matter?
                         sender_conflict_window_size: 256,
                         module_conflict_window_size: 2,
                         entry_fun_conflict_window_size: 3,
@@ -1896,7 +1912,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
     if ENABLE_VFNS {
         forge_config = forge_config
-            .with_initial_fullnode_count(VALIDATOR_COUNT)
+            .with_initial_fullnode_count(VFN_COUNT)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
                 optimize_state_sync_for_throughput(config);
@@ -1922,7 +1938,8 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 memory_gib: Some(200),
             })
             .with_success_criteria(
-                SuccessCriteria::new(25000)
+                // TODO: tune this
+                SuccessCriteria::new(12000)
                     .add_no_restarts()
                     /* This test runs at high load, so we need more catchup time */
                     .add_wait_for_catchup_s(120),
