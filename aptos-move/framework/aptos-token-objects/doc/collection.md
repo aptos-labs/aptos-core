@@ -31,8 +31,8 @@ require adding the field original_name.
 -  [Resource `ConcurrentSupply`](#0x4_collection_ConcurrentSupply)
 -  [Struct `BurnEvent`](#0x4_collection_BurnEvent)
 -  [Struct `MintEvent`](#0x4_collection_MintEvent)
--  [Struct `BurnEventV2`](#0x4_collection_BurnEventV2)
--  [Struct `MintEventV2`](#0x4_collection_MintEventV2)
+-  [Struct `Burn`](#0x4_collection_Burn)
+-  [Struct `Mint`](#0x4_collection_Mint)
 -  [Struct `ConcurrentBurnEvent`](#0x4_collection_ConcurrentBurnEvent)
 -  [Struct `ConcurrentMintEvent`](#0x4_collection_ConcurrentMintEvent)
 -  [Constants](#@Constants_0)
@@ -386,14 +386,14 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 </details>
 
-<a id="0x4_collection_BurnEventV2"></a>
+<a id="0x4_collection_Burn"></a>
 
-## Struct `BurnEventV2`
+## Struct `Burn`
 
 
 
 <pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="collection.md#0x4_collection_BurnEventV2">BurnEventV2</a> <b>has</b> drop, store
+<b>struct</b> <a href="collection.md#0x4_collection_Burn">Burn</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -432,14 +432,14 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 </details>
 
-<a id="0x4_collection_MintEventV2"></a>
+<a id="0x4_collection_Mint"></a>
 
-## Struct `MintEventV2`
+## Struct `Mint`
 
 
 
 <pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="collection.md#0x4_collection_MintEventV2">MintEventV2</a> <b>has</b> drop, store
+<b>struct</b> <a href="collection.md#0x4_collection_Mint">Mint</a> <b>has</b> drop, store
 </code></pre>
 
 
@@ -491,19 +491,19 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 <dl>
 <dt>
-<code>collection_addr: <b>address</b></code>
+<code>_1: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>index: u64</code>
+<code>_2: u64</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code><a href="token.md#0x4_token">token</a>: <b>address</b></code>
+<code>_3: <b>address</b></code>
 </dt>
 <dd>
 
@@ -532,19 +532,19 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 <dl>
 <dt>
-<code>collection_addr: <b>address</b></code>
+<code>_1: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>index: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;</code>
+<code>_2: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code><a href="token.md#0x4_token">token</a>: <b>address</b></code>
+<code>_3: <b>address</b></code>
 </dt>
 <dd>
 
@@ -1061,7 +1061,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
         );
         <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_add">aggregator_v2::add</a>(&<b>mut</b> supply.total_minted, 1);
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="collection.md#0x4_collection_MintEventV2">MintEventV2</a> {
+            <a href="collection.md#0x4_collection_Mint">Mint</a> {
                 collection_addr,
                 index: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_snapshot">aggregator_v2::snapshot</a>(&supply.total_minted),
                 <a href="token.md#0x4_token">token</a>,
@@ -1076,7 +1076,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
             supply.current_supply &lt;= supply.max_supply,
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="collection.md#0x4_collection_ECOLLECTION_SUPPLY_EXCEEDED">ECOLLECTION_SUPPLY_EXCEEDED</a>),
         );
-        /// TODO[agg_v2](cleanup): Update <b>to</b> <a href="collection.md#0x4_collection_MintEventV2">MintEventV2</a> in the future release
+        /// TODO[agg_v2](cleanup): Update <b>to</b> <a href="collection.md#0x4_collection_Mint">Mint</a> in the future release
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(&<b>mut</b> supply.mint_events,
             <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
                 index: supply.total_minted,
@@ -1088,7 +1088,7 @@ Called by token on mint to increment supply if there's an appropriate Supply str
         <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr);
         supply.current_supply = supply.current_supply + 1;
         supply.total_minted = supply.total_minted + 1;
-        /// TODO[agg_v2](cleanup): Update <b>to</b> <a href="collection.md#0x4_collection_MintEventV2">MintEventV2</a> in the future release
+        /// TODO[agg_v2](cleanup): Update <b>to</b> <a href="collection.md#0x4_collection_Mint">Mint</a> in the future release
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> supply.mint_events,
             <a href="collection.md#0x4_collection_MintEvent">MintEvent</a> {
@@ -1135,7 +1135,7 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
         <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_sub">aggregator_v2::sub</a>(&<b>mut</b> supply.current_supply, 1);
 
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="collection.md#0x4_collection_BurnEventV2">BurnEventV2</a> {
+            <a href="collection.md#0x4_collection_Burn">Burn</a> {
                 collection_addr,
                 index: *<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&index),
                 <a href="token.md#0x4_token">token</a>,
@@ -1145,7 +1145,7 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_addr)) {
         <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_FixedSupply">FixedSupply</a>&gt;(collection_addr);
         supply.current_supply = supply.current_supply - 1;
-        /// TODO[agg_v2](cleanup): Update <b>to</b> <a href="collection.md#0x4_collection_BurnEventV2">BurnEventV2</a> in the future release
+        /// TODO[agg_v2](cleanup): Update <b>to</b> <a href="collection.md#0x4_collection_Burn">Burn</a> in the future release
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> supply.burn_events,
             <a href="collection.md#0x4_collection_BurnEvent">BurnEvent</a> {
@@ -1156,7 +1156,7 @@ Called by token on burn to decrement supply if there's an appropriate Supply str
     } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr)) {
         <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="collection.md#0x4_collection_UnlimitedSupply">UnlimitedSupply</a>&gt;(collection_addr);
         supply.current_supply = supply.current_supply - 1;
-        /// TODO[agg_v2](cleanup): Update <b>to</b> <a href="collection.md#0x4_collection_BurnEventV2">BurnEventV2</a> in the future release
+        /// TODO[agg_v2](cleanup): Update <b>to</b> <a href="collection.md#0x4_collection_Burn">Burn</a> in the future release
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>(
             &<b>mut</b> supply.burn_events,
             <a href="collection.md#0x4_collection_BurnEvent">BurnEvent</a> {
