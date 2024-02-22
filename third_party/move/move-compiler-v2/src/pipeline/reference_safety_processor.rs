@@ -112,6 +112,8 @@ use std::{
     iter,
 };
 
+const DEBUG: bool = false;
+
 // ===============================================================================
 // Memory Safety Analysis
 
@@ -414,7 +416,7 @@ impl LifetimeState {
     }
 
     fn debug_print(&self, header: &str) {
-        if log_enabled!(Level::Debug) {
+        if DEBUG && log_enabled!(Level::Debug) {
             let mut header = header.to_owned();
             for (l, n) in self.graph.iter() {
                 debug!(
@@ -1552,7 +1554,6 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                 .filter(|t| !step.alive.before.contains_key(t)),
         ) {
             if !after_set.contains(released) && step.is_ref(*released) {
-                debug!("releasing $t{}", released);
                 step.state.release_ref(*released)
             }
         }
