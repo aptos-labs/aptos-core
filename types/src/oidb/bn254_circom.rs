@@ -20,13 +20,13 @@ pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
 
 /// This will do the proper subgroup membership checks.
-pub(crate) fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine> {
+pub fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine> {
     let g1_affine = G1Bytes::new_unchecked(x, y)?.deserialize_into_affine()?;
     Ok(g1_affine)
 }
 
 /// This will do the proper subgroup membership checks.
-pub(crate) fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<G2Affine> {
+pub fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<G2Affine> {
     let g2_affine = G2Bytes::new_unchecked(x, y)?.as_affine()?;
     Ok(g2_affine)
 }
