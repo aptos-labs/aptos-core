@@ -201,17 +201,20 @@ module aptos_framework::delegation_pool {
     /// Changing operator commission rate in delegation pool is not supported.
     const ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED: u64 = 22;
 
+    /// Enabling ownership lookup for delegation pools is not supported.
+    const EPOOL_OWNERSHIP_LOOKUP_NOT_SUPPORTED: u64 = 23;
+
     /// Cannot enable ownership lookup as the supplied address is not the owner of the delegation pool.
-    const EOWNERSHIP_LOOKUP_POOL_MISMATCH: u64 = 23;
+    const EOWNERSHIP_LOOKUP_POOL_MISMATCH: u64 = 24;
 
     /// Cannot add/reactivate stake unless being allowlisted by the pool owner.
-    const EDELEGATOR_NOT_ALLOWLISTED: u64 = 24;
+    const EDELEGATOR_NOT_ALLOWLISTED: u64 = 25;
 
     /// Cannot evict an allowlisted delegator, should remove them from the allowlist first.
-    const ECANNOT_EVICT_ALLOWLISTED_DELEGATOR: u64 = 25;
+    const ECANNOT_EVICT_ALLOWLISTED_DELEGATOR: u64 = 26;
 
     /// Cannot unlock the accumulated active stake of NULL_SHAREHOLDER(0x0).
-    const ECANNOT_UNLOCK_NULL_SHAREHOLDER: u64 = 26;
+    const ECANNOT_UNLOCK_NULL_SHAREHOLDER: u64 = 27;
 
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -716,7 +719,7 @@ module aptos_framework::delegation_pool {
         owner: &signer,
         operator_commission_percentage: u64,
         delegation_pool_creation_seed: vector<u8>,
-    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolOwnership {
         assert!(features::delegation_pools_enabled(), error::invalid_state(EDELEGATION_POOLS_DISABLED));
         let owner_address = signer::address_of(owner);
         assert!(!owner_cap_exists(owner_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
@@ -756,11 +759,14 @@ module aptos_framework::delegation_pool {
 
         // save delegation pool ownership and resource account address (inner stake pool address) on `owner`
         move_to(owner, DelegationPoolOwnership { pool_address });
-        move_to(&stake_pool_signer, OwnerOfDelegationPool { owner_address });
 
         // All delegation pool enable partial governace voting by default once the feature flag is enabled.
         if (features::partial_governance_voting_enabled() && features::delegation_pool_partial_governance_voting_enabled()) {
             enable_partial_governance_voting(pool_address);
+        };
+
+        if (features::delegation_pool_ownership_lookup_enabled()) {
+            enable_ownership_lookup(pool_address, owner_address);
         }
     }
 
@@ -807,6 +813,10 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         owner_address: address
     ) acquires DelegationPoolOwnership, DelegationPool {
+        assert!(
+            features::delegation_pool_ownership_lookup_enabled(),
+            error::invalid_state(EPOOL_OWNERSHIP_LOOKUP_NOT_SUPPORTED)
+        );
         assert!(
             pool_address == get_owned_pool_address(owner_address),
             error::invalid_argument(EOWNERSHIP_LOOKUP_POOL_MISMATCH)
@@ -2061,7 +2071,7 @@ module aptos_framework::delegation_pool {
     public entry fun test_delegation_pools_disabled(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolOwnership {
         initialize_for_test(aptos_framework);
         features::change_feature_flags(aptos_framework, vector[], vector[DELEGATION_POOLS]);
 
@@ -2116,7 +2126,7 @@ module aptos_framework::delegation_pool {
     public entry fun test_already_owns_delegation_pool(
         aptos_framework: &signer,
         validator: &signer,
-    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolOwnership {
         initialize_for_test(aptos_framework);
         initialize_delegation_pool(validator, 0, x"00");
         initialize_delegation_pool(validator, 0, x"01");

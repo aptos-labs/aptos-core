@@ -1,14 +1,14 @@
+/// This module implements a detached allowlist of delegators that are accepted into one's delegation pool.
+/// Any account can edit their owned allowlist, but a delegation pool will only use the allowlist defined
+/// under its owner's account.
 module aptos_framework::delegation_pool_allowlist {
 
     use std::error;
     use std::features;
     use std::signer;
     use std::vector;
-    use aptos_std::smart_table;
-    use aptos_std::smart_table::SmartTable;
+    use aptos_std::smart_table::{Self, SmartTable};
     use aptos_framework::event;
-
-    friend aptos_framework::delegation_pool;
 
     /// Delegators allowlisting is not supported.
     const EDELEGATORS_ALLOWLISTING_NOT_SUPPORTED: u64 = 1;
@@ -17,6 +17,7 @@ module aptos_framework::delegation_pool_allowlist {
     const EDELEGATORS_ALLOWLISTING_NOT_ENABLED: u64 = 2;
 
     /// Tracks a delegation pool's allowlist of delegators.
+    /// A delegation pool will use the allowlist defind under its owner's account.
     /// If allowlisting is enabled, existing delegators are not implicitly allowlisted and they can be individually
     /// evicted later by the pool owner.
     struct DelegationPoolAllowlisting has key {
@@ -46,7 +47,7 @@ module aptos_framework::delegation_pool_allowlist {
     }
 
     #[view]
-    /// Return whether allowlisting is enabled for the provided delegation pool.
+    /// Return whether allowlisting is enabled for the provided delegation pool owner.
     public fun allowlisting_enabled(owner_address: address): bool {
         exists<DelegationPoolAllowlisting>(owner_address)
     }
@@ -54,7 +55,7 @@ module aptos_framework::delegation_pool_allowlist {
     #[view]
     /// Return whether the provided delegator is allowlisted.
     /// A delegator is allowlisted if:
-    /// - allowlisting is disabled on the pool
+    /// - allowlisting is disabled on the delegation pool's owner
     /// - delegator is part of the allowlist
     public fun delegator_allowlisted(
         owner_address: address,
@@ -70,7 +71,7 @@ module aptos_framework::delegation_pool_allowlist {
     }
 
     #[view]
-    /// Return allowlist or revert if allowlisting is not enabled for the provided delegation pool.
+    /// Return allowlist or revert if allowlisting is not enabled for the provided owner account.
     public fun get_delegators_allowlist(
         owner_address: address,
     ): vector<address> acquires DelegationPoolAllowlisting {
@@ -131,7 +132,7 @@ module aptos_framework::delegation_pool_allowlist {
         event::emit(AllowlistDelegator { owner_address, delegator_address });
     }
 
-    /// Remove a delegator from the allowlist as the pool owner, but do not unlock their stake.
+    /// Remove a delegator from the allowlist as the pool owner.
     public entry fun remove_delegator_from_allowlist(
         owner: &signer,
         delegator_address: address,
@@ -146,7 +147,7 @@ module aptos_framework::delegation_pool_allowlist {
         event::emit(RemoveDelegatorFromAllowlist { owner_address, delegator_address });
     }
 
-    public fun assert_allowlisting_enabled(owner_address: address) {
+    fun assert_allowlisting_enabled(owner_address: address) {
         assert!(allowlisting_enabled(owner_address), error::invalid_state(EDELEGATORS_ALLOWLISTING_NOT_ENABLED));
     }
 

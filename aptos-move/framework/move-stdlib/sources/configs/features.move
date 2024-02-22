@@ -392,9 +392,19 @@ module std::features {
         is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
     }
 
+    /// Whether ownership lookup for delegation pools is supported.
+    /// Lifetime: transient
+    const DELEGATION_POOL_OWNERSHIP_LOOKUP: u64 = 51;
+
+    public fun get_delegation_pool_ownership_lookup_feature(): u64 { DELEGATION_POOL_OWNERSHIP_LOOKUP }
+
+    public fun delegation_pool_ownership_lookup_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOL_OWNERSHIP_LOOKUP)
+    }
+
     /// Whether delegators allowlisting for delegation pools is supported.
     /// Lifetime: transient
-    const DELEGATION_POOL_ALLOWLISTING: u64 = 51;
+    const DELEGATION_POOL_ALLOWLISTING: u64 = 52;
 
     public fun get_delegation_pool_allowlisting_feature(): u64 { DELEGATION_POOL_ALLOWLISTING }
 
