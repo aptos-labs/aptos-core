@@ -168,3 +168,12 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
+  - name: step_14_enable_max_object_nesting_check
+    metadata:
+      title: "Max Object Nesting Check"
+      description: "Enable the max object nesting check, preventing running out of gas due to ownership cycles."
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - max_object_nesting_check
