@@ -57,17 +57,17 @@ impl Configuration {
     ///
     /// # Errors
     ///
-    /// Returns an error if the file type is not supported. or configuration has invalid format.
+    /// Returns an error if the file type is unsupported or the configuration has an invalid format.
     ///
     /// # Returns
     ///
     /// * `Configuration` - The configuration read from the file.
-    pub fn from_file(file_path: &Path) -> anyhow::Result<Configuration> {
-        let file_type = Configuration::get_file_type(file_path)?;
+    pub fn from_file(config_path: &Path) -> anyhow::Result<Configuration> {
+        let file_type = Configuration::get_file_type(config_path)?;
         debug!("Reading configuration from file type: {:?}", file_type);
         match file_type {
-            FileType::JSON => Configuration::from_json_file(file_path),
-            FileType::TOML => Configuration::from_toml_file(file_path),
+            FileType::JSON => Configuration::from_json_file(config_path),
+            FileType::TOML => Configuration::from_toml_file(config_path),
         }
     }
 
@@ -75,7 +75,7 @@ impl Configuration {
     ///
     /// # Errors
     ///
-    /// Returns an error if the file has invalid format.
+    /// Returns an error if the file has an invalid format.
     ///
     /// # Returns
     ///
@@ -90,7 +90,7 @@ impl Configuration {
     ///
     /// # Errors
     ///
-    /// Returns an error if the file has invalid format.
+    /// Returns an error if the file has an invalid format.
     ///
     /// # Returns
     ///

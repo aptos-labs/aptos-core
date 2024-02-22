@@ -126,27 +126,29 @@ tests like:
 ```
 
 You should see different results for different modules as it depends on the
-quality of the specifications. Some modules like `Sum` has good specifications
-and all mutants are killed, while others like `Operators` may lack some tests.
+quality of the specifications. Some modules, like `Sum`, have good 
+specifications and all mutants are killed, while some others, like `Operators`
+may not and some mutants are still alive.
 
 You can also try the Move Prover testsuite available in the
 `third_party/move/move-prover/tests/sources/` directory.
 
-To check some real-world examples, you can use the following places:
+To check some real-world examples, apply the `spec-test` tool to these packages:
 - `aptos-move/framework/move-stdlib`
 - `aptos-move/framework/aptos-stdlib`
 
-You should see the results of the tests for the whole stdlib packages. There
-can be some modules which have better specifications quality (more mutants
-killed) and some which have worse quality (fewer mutants killed). It is also
-possible that some modules have no mutants killed at all which can be a sign
-that there are no specifications at all, or they are not tight enough.
+You should see the results of the tests for both stdlib packages. There
+can be some modules with better specification quality (more mutants
+killed) and some with worse quality (fewer mutants killed). Modules
+can have no mutants killed at all, which then can indicate:
+- the module has no specifications at all,
+- the module has poor specifications, which are not tight enough.
 
 It's recommended to generate a report in a JSON format and analyze it to see
-which mutants are not killed and what are the differences between the original
-and modified code. This can help to improve the specifications and make them
-more tight and correct or it may indicate that some specifications some
-mutation operators are not applicable well to that kind of code.
+which mutants are not killed and what the differences are between the original
+and modified code. This can help improve the specifications to make them
+more tight and correct, or it may indicate that some specifications of
+mutation operators do not apply well to that kind of code.
 
 ## Command-line options
 
