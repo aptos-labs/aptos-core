@@ -2373,6 +2373,7 @@ dependencies = [
  "once_cell",
  "prometheus",
  "prost 0.12.3",
+ "rand 0.7.3",
  "redis",
  "redis-test",
  "ripemd",

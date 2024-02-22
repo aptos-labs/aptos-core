@@ -13,6 +13,8 @@ use anyhow::{ensure, Context};
 use aptos_protos::transaction::v1::Transaction;
 use mini_moka::sync::Cache;
 use redis::{AsyncCommands, RedisResult};
+use rand::Rng;
+use tokio::time::sleep;
 
 // Configurations for cache.
 // Cache entries that are present.
@@ -348,6 +350,8 @@ impl<T: redis::aio::ConnectionLike + Send + Clone> CacheOperator<T> {
                 // This is constructed from cache fetch + in-memory cache.
                 let mut encoded_transactions_with_versions: Vec<(u64, Vec<u8>)> = vec![];
                 if let Some(cache) = self.read_through_cache.as_ref() {
+                    let random_number = rand::thread_rng().gen_range(1, 11);
+                    sleep(std::time::Duration::from_millis(random_number)).await;
                     for version in versions {
                         let cache_key = CacheEntry::build_key(version, self.storage_format);
                         if let Some(data) = cache.get(&cache_key) {

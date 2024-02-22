@@ -32,6 +32,7 @@ mini-moka = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
 prost = { workspace = true }
+rand = { workspace = true }
 redis = { workspace = true }
 redis-test = { workspace = true }
 ripemd = { workspace = true }
