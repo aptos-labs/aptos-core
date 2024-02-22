@@ -18,7 +18,7 @@ const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
 // In previewnet, use the block size
 // const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
-const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
+// const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
 
 // The maximum number of concurrent requests to send
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
@@ -193,8 +193,9 @@ impl Default for StorageServiceConfig {
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_period_ms: 30_000, // 30 seconds
-            max_transaction_chunk_size: MAX_SENDING_BLOCK_TXNS, // In previewnet, use the block size
-            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
+            // In previewnet, use the block size
+            max_transaction_chunk_size: MAX_SENDING_BLOCK_TXNS,
+            max_transaction_output_chunk_size: MAX_SENDING_BLOCK_TXNS,
             min_time_to_ignore_peers_secs: 300, // 5 minutes
             request_moderator_refresh_interval_ms: 1000, // 1 second
             storage_summary_refresh_interval_ms: 100, // Optimal for <= 10 blocks per second
@@ -439,8 +440,9 @@ impl Default for AptosDataClientConfig {
             max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_lag_secs: 30, // 30 seconds
-            max_transaction_chunk_size: MAX_SENDING_BLOCK_TXNS, // In previewnet, use the block size
-            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
+            // In previewnet, use the block size
+            max_transaction_chunk_size: MAX_SENDING_BLOCK_TXNS,
+            max_transaction_output_chunk_size: MAX_SENDING_BLOCK_TXNS,
             optimistic_fetch_timeout_ms: 5000,        // 5 seconds
             response_timeout_ms: 10_000,              // 10 seconds
             subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
