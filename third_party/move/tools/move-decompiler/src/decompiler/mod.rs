@@ -24,7 +24,7 @@ use move_stackless_bytecode::{
     reaching_def_analysis::ReachingDefProcessor,
 };
 
-use model::demove_livevar_analysis::LiveVarAnalysisProcessor;
+use model::livevar_analysis::LiveVarAnalysisProcessor;
 
 use self::reconstruct::code_unit::SourceCodeUnit;
 pub use self::reconstruct::OptimizerSettings;

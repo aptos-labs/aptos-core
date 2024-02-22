@@ -42,15 +42,6 @@ pub struct LiveVarInfoAtCodeOffset {
 #[derive(Default, Clone)]
 pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
-impl LiveVarAnnotation {
-    pub fn get_live_var_info_at(
-        &self,
-        code_offset: CodeOffset,
-    ) -> Option<&LiveVarInfoAtCodeOffset> {
-        self.0.get(&code_offset)
-    }
-}
-
 pub struct LiveVarAnalysisProcessor {
     /// Whether the processor should attach `LiveVarAnnotation` to the function data.
     annotate: bool,
