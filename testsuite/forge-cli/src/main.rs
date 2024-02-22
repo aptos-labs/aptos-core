@@ -798,6 +798,11 @@ fn quorum_store_backlog_txn_limit_count(
         .quorum_store
         .back_pressure
         .backlog_txn_limit_count = (target_tps as f64 * vn_latency) as u64;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_max_txn_per_s = 4000;
 }
 
 fn optimize_for_maximum_throughput(
