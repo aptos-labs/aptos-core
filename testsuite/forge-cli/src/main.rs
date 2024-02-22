@@ -717,12 +717,10 @@ fn wrap_with_realistic_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwor
     )
 }
 
-fn mempool_config_practically_non_expiring(mempool_config: &mut MempoolConfig) {
+fn mempool_config_practically_huge(mempool_config: &mut MempoolConfig) {
     mempool_config.capacity = 3_000_000;
     mempool_config.capacity_bytes = (3_u64 * 1024 * 1024 * 1024) as usize;
     mempool_config.capacity_per_user = 100_000;
-    mempool_config.system_transaction_timeout_secs = 5 * 60 * 60;
-    mempool_config.system_transaction_gc_interval_ms = 5 * 60 * 60_000;
 }
 
 fn state_sync_config_execute_transactions(state_sync_config: &mut StateSyncConfig) {
@@ -806,7 +804,7 @@ fn optimize_for_maximum_throughput(
     max_txns_per_block: usize,
     vn_latency: f64,
 ) {
-    mempool_config_practically_non_expiring(&mut config.mempool);
+    mempool_config_practically_huge(&mut config.mempool);
 
     config.consensus.max_sending_block_txns = max_txns_per_block as u64;
     config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
@@ -1843,15 +1841,15 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // the actual throughput to be able to have reasonable queueing but also so throughput
     // will improve as performance improves.
     // Overestimate: causes mempool and/or batch queueing. Underestimate: not enough txns in blocks.
-    const TARGET_TPS: usize = 15_000;
+    const TARGET_TPS: usize = 14_000 * 3;
     // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
     // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
-    const MAX_TXNS_PER_BLOCK: usize = 3500;
+    const MAX_TXNS_PER_BLOCK: usize = 1900 * 3;
     // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
     // This is validator latency, minus mempool queueing time.
     const VN_LATENCY_S: f64 = 2.5;
     // Overestimate: causes mempool queueing. Underestimate: not enough txns incoming.
-    const VFN_LATENCY_S: f64 = 4.0;
+    const VFN_LATENCY_S: f64 = 6.0;
 
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
@@ -1887,7 +1885,18 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                     unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
-                    config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    // TODO: after tuning these values, add them to the default_for_genesis on this branch
+                    config_v4.block_gas_limit_type = BlockGasLimitType::ComplexLimitV1 {
+                        effective_block_gas_limit: 20_000 * 3,
+                        execution_gas_effective_multiplier: 1,
+                        io_gas_effective_multiplier: 1,
+                        conflict_penalty_window: 6,
+                        use_granular_resource_group_conflicts: false,
+                        use_module_publishing_block_conflict: true,
+                        block_output_limit: Some(3 * 1024 * 1024 * 3),
+                        include_user_txn_size_in_block_output: true,
+                        add_block_limit_outcome_onchain: false,
+                    };
                     config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
                         sender_conflict_window_size: 256,
                         module_conflict_window_size: 2,
