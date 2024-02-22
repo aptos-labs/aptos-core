@@ -99,8 +99,7 @@ pub fn run_spec_test(
         .enumerate()
     {
         info!(
-            "Proving mutant {} out of {}",
-            index,
+            "Proving mutant {index} out of {}",
             report.get_mutants().len()
         );
 

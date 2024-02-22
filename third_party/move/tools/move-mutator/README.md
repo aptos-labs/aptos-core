@@ -57,7 +57,7 @@ There is a possibility of enabling logging only for specific modules. Please
 refer to the [env_logger](https://docs.rs/env_logger/latest/env_logger/) documentation for more details.
 
 There are also good tests in the Move Prover repository that can be used to
-check the tool. To run them, run:
+check the tool. To run them, execute:
 ```
 ./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/arithm.move
 ./target/release/aptos move mutate -m third_party/move/move-prover/tests/sources/functional/bitwise_operators.move
