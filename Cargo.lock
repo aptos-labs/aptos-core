@@ -4134,6 +4134,7 @@ dependencies = [
  "aptos-crypto",
  "aptos-crypto-derive",
  "aptos-experimental-runtimes",
+ "aptos-global-constants",
  "ark-bn254",
  "ark-ff",
  "ark-groth16",

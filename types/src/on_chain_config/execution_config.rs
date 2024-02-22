@@ -5,6 +5,7 @@ use crate::{
     block_executor::config::BlockExecutorConfigFromOnchain, on_chain_config::OnChainConfig,
 };
 use anyhow::{format_err, Result};
+use aptos_global_constants::PREVIEWNET_EXECUTION_MULTIPLIER;
 use serde::{Deserialize, Serialize};
 
 /// The on-chain execution config, in order to be able to add fields, we use enum to wrap the actual struct.
@@ -75,15 +76,14 @@ impl OnChainExecutionConfig {
                 module_conflict_window_size: 2,
                 entry_fun_conflict_window_size: 3,
             },
-            // TODO: increase block gas limit
             block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
-                effective_block_gas_limit: 20000,
+                effective_block_gas_limit: 20000 * PREVIEWNET_EXECUTION_MULTIPLIER as u64,
                 execution_gas_effective_multiplier: 1,
                 io_gas_effective_multiplier: 1,
                 conflict_penalty_window: 6,
                 use_granular_resource_group_conflicts: false,
                 use_module_publishing_block_conflict: true,
-                block_output_limit: Some(3 * 1024 * 1024),
+                block_output_limit: Some(3 * 1024 * 1024 * PREVIEWNET_EXECUTION_MULTIPLIER as u64),
                 include_user_txn_size_in_block_output: true,
                 add_block_limit_outcome_onchain: false,
             },

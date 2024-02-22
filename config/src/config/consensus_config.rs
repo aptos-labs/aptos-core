@@ -6,13 +6,13 @@ use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
     QuorumStoreConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
+use aptos_global_constants::PREVIEWNET_EXECUTION_MULTIPLIER;
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-// TODO: increase max sending block txns
-pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 2500;
+pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 1900 * PREVIEWNET_EXECUTION_MULTIPLIER as u64;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]

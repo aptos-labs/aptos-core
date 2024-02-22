@@ -4,7 +4,7 @@
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
 };
-use aptos_global_constants::DEFAULT_BUCKETS;
+use aptos_global_constants::{DEFAULT_BUCKETS, PREVIEWNET_EXECUTION_MULTIPLIER};
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -27,10 +27,9 @@ pub struct QuorumStoreBackPressureConfig {
 impl Default for QuorumStoreBackPressureConfig {
     fn default() -> QuorumStoreBackPressureConfig {
         QuorumStoreBackPressureConfig {
-            // TODO: increase quorum store backpressure
             // QS will be backpressured if the remaining total txns is more than this number
             // Roughly, target TPS * commit latency seconds
-            backlog_txn_limit_count: 8000 * 2,
+            backlog_txn_limit_count: 35_000 * PREVIEWNET_EXECUTION_MULTIPLIER as u64,
             // QS will create batches at the max rate until this number is reached
             backlog_per_validator_batch_limit_count: 4,
             decrease_duration_ms: 1000,
