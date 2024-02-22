@@ -116,7 +116,6 @@ pub struct ExecutionProxyClient {
     consensus_config: ConsensusConfig,
     execution_proxy: Arc<ExecutionProxy>,
     author: Author,
-    epoch_state: Option<Arc<EpochState>>,
     self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     bounded_executor: BoundedExecutor,
@@ -139,7 +138,6 @@ impl ExecutionProxyClient {
             consensus_config,
             execution_proxy,
             author,
-            epoch_state: None,
             self_sender,
             network_sender,
             bounded_executor,
@@ -189,7 +187,7 @@ impl ExecutionProxyClient {
 
             let rand_manager = RandManager::<Share, AugmentedData>::new(
                 self.author,
-                self.epoch_state.clone().unwrap(),
+                epoch_state.clone(),
                 signer,
                 rand_config,
                 rand_ready_block_tx,
