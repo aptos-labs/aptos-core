@@ -765,7 +765,7 @@ module aptos_framework::delegation_pool {
             enable_partial_governance_voting(pool_address);
         };
 
-        if (features::delegation_pool_ownership_lookup_enabled()) {
+        if (features::delegation_pool_allowlisting_enabled()) {
             enable_ownership_lookup(pool_address, owner_address);
         }
     }
@@ -814,7 +814,7 @@ module aptos_framework::delegation_pool {
         owner_address: address
     ) acquires DelegationPoolOwnership, DelegationPool {
         assert!(
-            features::delegation_pool_ownership_lookup_enabled(),
+            features::delegation_pool_allowlisting_enabled(),
             error::invalid_state(EPOOL_OWNERSHIP_LOOKUP_NOT_SUPPORTED)
         );
         assert!(

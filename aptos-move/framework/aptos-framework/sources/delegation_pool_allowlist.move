@@ -17,10 +17,10 @@ module aptos_framework::delegation_pool_allowlist {
     const EDELEGATORS_ALLOWLISTING_NOT_ENABLED: u64 = 2;
 
     /// Tracks a delegation pool's allowlist of delegators.
-    /// A delegation pool will use the allowlist defind under its owner's account.
+    /// A delegation pool will only use the allowlist defined under its owner's account.
     /// If allowlisting is enabled, existing delegators are not implicitly allowlisted and they can be individually
     /// evicted later by the pool owner.
-    struct DelegationPoolAllowlisting has key {
+    struct DelegationPoolAllowlisting has key, store {
         allowlist: SmartTable<address, bool>,
     }
 
