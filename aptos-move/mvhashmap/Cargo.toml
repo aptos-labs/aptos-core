@@ -27,6 +27,7 @@ dashmap = { workspace = true }
 derivative = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]

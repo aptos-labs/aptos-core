@@ -229,7 +229,7 @@ impl<'env> Generator<'env> {
             self.error(
                 id,
                 format!("cannot assign tuple type `{}` to single variable (use `(a, b, ..) = ..` instead)",
-                        ty.display(&self.env().get_type_display_ctx()))
+                        ty.display(&self.func_env.get_type_display_ctx()))
             )
         }
         self.new_temp(ty)
@@ -379,7 +379,7 @@ impl<'env> Generator<'env> {
                         format!(
                             "expected `&mut` but found `{}`",
                             self.temp_type(lhs_temp)
-                                .display(&self.env().get_type_display_ctx()),
+                                .display(&self.func_env.get_type_display_ctx()),
                         ),
                     );
                 }
@@ -588,12 +588,15 @@ impl<'env> Generator<'env> {
             {
                 let err_loc = self.env().get_node_loc(id);
                 let mut reasons: Vec<(Loc, String)> = Vec::new();
-                let reason_msg = format!("Invalid call to {}.", op.display(self.env(), id));
+                let reason_msg = format!(
+                    "Invalid call to {}.",
+                    op.display_with_fun_env(self.env(), &self.func_env, id)
+                );
                 reasons.push((err_loc.clone(), reason_msg.clone()));
                 let err_msg  = format!(
                             "Expected a struct type. Global storage operations are restricted to struct types declared in the current module. \
                             Found: '{}'",
-                            self.env().get_node_instantiation(id)[0].display(&self.env().get_type_display_ctx())
+                            self.env().get_node_instantiation(id)[0].display(&self.func_env.get_type_display_ctx())
                 );
                 self.env()
                     .diag_with_labels(Severity::Error, &err_loc, &err_msg, reasons)
@@ -1067,7 +1070,7 @@ impl<'env> Generator<'env> {
                 format!(
                     "expected `&mut` but found `{}`",
                     self.temp_type(oper_temp)
-                        .display(&self.env().get_type_display_ctx())
+                        .display(&self.func_env.get_type_display_ctx())
                 ),
             )
         }

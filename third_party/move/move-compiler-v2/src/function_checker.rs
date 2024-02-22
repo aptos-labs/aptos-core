@@ -121,7 +121,7 @@ pub fn check_access_and_use(env: &mut GlobalEnv, before_inlining: bool) {
                                     // Only public functions are visible from scripts.
                                     generic_error(
                                         env,
-                                        "a script",
+                                        "a script ",
                                         "it is not public",
                                         sites,
                                         &callee_func,

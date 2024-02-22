@@ -131,7 +131,11 @@ pub enum EntryFunctionCall {
         cap_update_table: Vec<u8>,
     },
 
-    /// Entry function-only rotation key function that allows the signer update their authentication_key.
+    /// Private entry function for key rotation that allows the signer to update their authentication key.
+    /// Note that this does not update the `OriginatingAddress` table because the `new_auth_key` is not "verified": it
+    /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+    /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+    /// the format expected in `rotate_authentication_key`.
     AccountRotateAuthenticationKeyCall {
         new_auth_key: Vec<u8>,
     },
@@ -1676,7 +1680,11 @@ pub fn account_rotate_authentication_key(
     ))
 }
 
-/// Entry function-only rotation key function that allows the signer update their authentication_key.
+/// Private entry function for key rotation that allows the signer to update their authentication key.
+/// Note that this does not update the `OriginatingAddress` table because the `new_auth_key` is not "verified": it
+/// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+/// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+/// the format expected in `rotate_authentication_key`.
 pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(

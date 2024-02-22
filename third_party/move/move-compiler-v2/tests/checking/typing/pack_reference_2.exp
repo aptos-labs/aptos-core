@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected `u64` but found `bool` (from assignment or declaration context)
+  ┌─ tests/checking/typing/pack_reference_2.move:7:9
+  │
+7 │         x = false
+  │         ^

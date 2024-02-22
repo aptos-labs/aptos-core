@@ -7,8 +7,8 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
-    test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
+    pipeline::{buffer_manager::OrderedBlocks, execution_client::DummyExecutionClient},
+    test_utils::{consensus_runtime, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -74,7 +74,7 @@ impl DagBootstrapUnit {
         let payload_client = Arc::new(MockPayloadManager::new(None));
         let payload_manager = Arc::new(PayloadManager::DirectMempool);
 
-        let state_computer = Arc::new(EmptyStateComputer {});
+        let execution_client = Arc::new(DummyExecutionClient);
 
         let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) =
             bootstrap_dag_for_test(
@@ -88,7 +88,7 @@ impl DagBootstrapUnit {
                 time_service,
                 payload_manager,
                 payload_client,
-                state_computer,
+                execution_client,
             );
 
         (

@@ -5,7 +5,7 @@
 use anyhow::bail;
 use ark_ff::PrimeField;
 use once_cell::sync::Lazy;
-// TODO(zkid): Figure out the right library for Poseidon.
+// TODO(oidb): Figure out the right library for Poseidon.
 use poseidon_ark::Poseidon;
 
 /// The maximum number of input scalars that can be hashed using the Poseidon-BN254 hash function

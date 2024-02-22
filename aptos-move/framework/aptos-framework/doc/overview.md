@@ -39,6 +39,7 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::multisig_account`](multisig_account.md#0x1_multisig_account)
 -  [`0x1::object`](object.md#0x1_object)
 -  [`0x1::object_code_deployment`](object_code_deployment.md#0x1_object_code_deployment)
+-  [`0x1::openid_account`](openid_account.md#0x1_openid_account)
 -  [`0x1::optional_aggregator`](optional_aggregator.md#0x1_optional_aggregator)
 -  [`0x1::primary_fungible_store`](primary_fungible_store.md#0x1_primary_fungible_store)
 -  [`0x1::reconfiguration`](reconfiguration.md#0x1_reconfiguration)
@@ -58,7 +59,6 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::version`](version.md#0x1_version)
 -  [`0x1::vesting`](vesting.md#0x1_vesting)
 -  [`0x1::voting`](voting.md#0x1_voting)
--  [`0x1::zkid`](zkid.md#0x1_zkid)
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

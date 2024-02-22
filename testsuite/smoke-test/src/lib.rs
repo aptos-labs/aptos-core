@@ -29,6 +29,8 @@ mod jwks;
 #[cfg(test)]
 mod network;
 #[cfg(test)]
+mod oidb;
+#[cfg(test)]
 mod rest_api;
 #[cfg(test)]
 mod rosetta;
@@ -46,8 +48,6 @@ mod txn_broadcast;
 mod txn_emitter;
 #[cfg(test)]
 mod upgrade;
-#[cfg(test)]
-mod zkid;
 
 #[cfg(test)]
 mod smoke_test_environment;

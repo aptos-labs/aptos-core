@@ -18,7 +18,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_consensus_notifications::ConsensusNotificationSender;
-use aptos_consensus_types::{block::Block, common::Round, executed_block::ExecutedBlock};
+use aptos_consensus_types::{block::Block, common::Round, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{BlockExecutorTrait, ExecutorResult, StateComputeResult};
 use aptos_infallible::Mutex;
@@ -55,13 +55,6 @@ pub struct PipelineExecutionResult {
 impl PipelineExecutionResult {
     pub fn new(input_txns: Vec<SignedTransaction>, result: StateComputeResult) -> Self {
         Self { input_txns, result }
-    }
-
-    pub fn new_dummy() -> Self {
-        Self {
-            input_txns: vec![],
-            result: StateComputeResult::new_dummy(),
-        }
     }
 }
 
@@ -144,7 +137,7 @@ impl ExecutionProxy {
         }
     }
 
-    pub fn transactions_to_commit(&self, executed_block: &ExecutedBlock) -> Vec<Transaction> {
+    pub fn transactions_to_commit(&self, executed_block: &PipelinedBlock) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
         if executed_block.is_reconfiguration_suffix() {
             return vec![];
@@ -242,7 +235,7 @@ impl StateComputer for ExecutionProxy {
     /// Send a successful commit. A future is fulfilled when the state is finalized.
     async fn commit(
         &self,
-        blocks: &[Arc<ExecutedBlock>],
+        blocks: &[Arc<PipelinedBlock>],
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()> {
@@ -491,7 +484,7 @@ async fn test_commit_sync_race() {
         }
     }
 
-    let callback = Box::new(move |_a: &[Arc<ExecutedBlock>], _b: LedgerInfoWithSignatures| {});
+    let callback = Box::new(move |_a: &[Arc<PipelinedBlock>], _b: LedgerInfoWithSignatures| {});
     let recorded_commit = Arc::new(RecordedCommit {
         time: Mutex::new(LogicalTime::new(0, 0)),
     });
