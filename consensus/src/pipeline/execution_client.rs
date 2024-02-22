@@ -374,7 +374,10 @@ impl TExecutionClient for ExecutionProxyClient {
     }
 
     async fn end_epoch(&self) {
-        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = self.handle.write().reset();
+        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
+            let mut handle = self.handle.write();
+            handle.reset()
+        };
 
         if let Some(mut tx) = reset_tx_to_rand_manager {
             let (ack_tx, ack_rx) = oneshot::channel();
