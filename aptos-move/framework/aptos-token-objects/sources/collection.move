@@ -126,7 +126,7 @@ module aptos_token_objects::collection {
 
     #[event]
     struct Burn has drop, store {
-        collection_addr: address,
+        collection: address,
         index: u64,
         token: address,
         previous_owner: address,
@@ -134,7 +134,7 @@ module aptos_token_objects::collection {
 
     #[event]
     struct Mint has drop, store {
-        collection_addr: address,
+        collection: address,
         index: AggregatorSnapshot<u64>,
         token: address,
     }
@@ -389,7 +389,7 @@ module aptos_token_objects::collection {
             aggregator_v2::add(&mut supply.total_minted, 1);
             event::emit(
                 Mint {
-                    collection_addr,
+                    collection: collection_addr,
                     index: aggregator_v2::snapshot(&supply.total_minted),
                     token,
                 },
@@ -403,7 +403,7 @@ module aptos_token_objects::collection {
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
             );
-            /// TODO[agg_v2](cleanup): Update to Mint in the future release
+            // TODO[agg_v2](cleanup): Update to Mint in the future release
             event::emit_event(&mut supply.mint_events,
                 MintEvent {
                     index: supply.total_minted,
@@ -415,7 +415,7 @@ module aptos_token_objects::collection {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
             supply.total_minted = supply.total_minted + 1;
-            /// TODO[agg_v2](cleanup): Update to Mint in the future release
+            // TODO[agg_v2](cleanup): Update to Mint in the future release
             event::emit_event(
                 &mut supply.mint_events,
                 MintEvent {
@@ -443,7 +443,7 @@ module aptos_token_objects::collection {
 
             event::emit(
                 Burn {
-                    collection_addr,
+                    collection: collection_addr,
                     index: *option::borrow(&index),
                     token,
                     previous_owner,
@@ -452,7 +452,7 @@ module aptos_token_objects::collection {
         } else if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
-            /// TODO[agg_v2](cleanup): Update to Burn in the future release
+            // TODO[agg_v2](cleanup): Update to Burn in the future release
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {
@@ -463,7 +463,7 @@ module aptos_token_objects::collection {
         } else if (exists<UnlimitedSupply>(collection_addr)) {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
-            /// TODO[agg_v2](cleanup): Update to Burn in the future release
+            // TODO[agg_v2](cleanup): Update to Burn in the future release
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {
@@ -626,7 +626,7 @@ module aptos_token_objects::collection {
         let cid = increment_supply(&collection, creator_address);
         assert!(count(collection) == option::some(1), 0);
         assert!(event::counter(&borrow_global<UnlimitedSupply>(collection_address).mint_events) == 1, 0);
-        decrement_supply(&collection, creator_address, cid);
+        decrement_supply(&collection, creator_address, cid, creator_address);
         assert!(count(collection) == option::some(0), 0);
         assert!(event::counter(&borrow_global<UnlimitedSupply>(collection_address).burn_events) == 1, 0);
     }
@@ -642,7 +642,41 @@ module aptos_token_objects::collection {
         let cid = increment_supply(&collection, creator_address);
         assert!(count(collection) == option::some(1), 0);
         assert!(event::counter(&borrow_global<FixedSupply>(collection_address).mint_events) == 1, 0);
-        decrement_supply(&collection, creator_address, cid);
+        decrement_supply(&collection, creator_address, cid, creator_address);
+        assert!(count(collection) == option::some(0), 0);
+        assert!(event::counter(&borrow_global<FixedSupply>(collection_address).burn_events) == 1, 0);
+    }
+
+    #[test(fx = @aptos_framework, creator = @0x123)]
+    fun test_create_mint_burn_for_concurrent(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let feature = features::get_concurrent_token_v2_feature();
+        let agg_feature = features::get_aggregator_v2_api_feature();
+        let auid_feature = features::get_auids();
+        let module_event_feature = features::get_module_event_feature();
+        features::change_feature_flags(fx, vector[feature, auid_feature, module_event_feature, agg_feature], vector[]);
+
+        let creator_address = signer::address_of(creator);
+        let name = string::utf8(b"collection name");
+        create_fixed_collection(creator, string::utf8(b""), 1, name, option::none(), string::utf8(b""));
+        let collection_address = create_collection_address(&creator_address, &name);
+        let collection = object::address_to_object<Collection>(collection_address);
+        assert!(count(collection) == option::some(0), 0);
+        let cid = increment_supply(&collection, creator_address);
+        event::was_event_emitted<Mint>(&Mint {
+            collection: collection_address,
+            index: aggregator_v2::create_snapshot(0),
+            token: creator_address,
+        });
+        assert!(cid == option::some(0), 0);
+        assert!(count(collection) == option::some(1), 0);
+        assert!(event::counter(&borrow_global<FixedSupply>(collection_address).mint_events) == 1, 0);
+        decrement_supply(&collection, creator_address, cid, creator_address);
+        event::was_event_emitted<Burn>(&Burn {
+            collection: collection_address,
+            index: 0,
+            token: creator_address,
+            previous_owner: creator_address,
+        });
         assert!(count(collection) == option::some(0), 0);
         assert!(event::counter(&borrow_global<FixedSupply>(collection_address).burn_events) == 1, 0);
     }

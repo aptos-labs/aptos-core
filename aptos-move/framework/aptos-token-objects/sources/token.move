@@ -792,12 +792,20 @@ module aptos_token_objects::token {
         let token_1_name = name(object::object_from_constructor_ref<Token>(&token_1_ref));
         debug::print(&token_1_name);
         assert!(token_1_name == std::string::utf8(b"token name1"), 1);
+        assert!(vector::length(&event::emitted_events<collection::MintEvent>()) == 1, 0);
 
         features::change_feature_flags(fx, vector[feature, agg_feature], vector[]);
         collection::upgrade_to_concurrent(&extend_ref);
 
         let token_2_ref = create_numbered_token_helper(creator, collection_name, token_name);
         assert!(name(object::object_from_constructor_ref<Token>(&token_2_ref)) == std::string::utf8(b"token name2"), 1);
+        assert!(vector::length(&event::emitted_events<collection::Mint>()) == 1, 0);
+
+        let burn_ref = generate_burn_ref(&token_2_ref);
+        let token_addr = object::address_from_constructor_ref(&token_2_ref);
+        assert!(exists<Token>(token_addr), 0);
+        burn(burn_ref);
+        assert!(vector::length(&event::emitted_events<collection::Burn>()) == 1, 0);
     }
 
     #[test_only]
