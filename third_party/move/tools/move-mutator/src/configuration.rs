@@ -125,7 +125,7 @@ pub struct FileConfiguration {
     /// The path to the Move source.
     pub file: PathBuf,
     /// Indicates if the mutants should be verified.
-    pub verify_mutants: Option<bool>,
+    pub verify_mutants: bool,
     /// Names of the mutation operators to use. If not provided, all operators will be used.
     pub mutation_operators: Option<MutationConfig>,
     /// Mutate only the functions with the given names.
@@ -163,6 +163,7 @@ mod tests {
         let toml_content = r#"
             [project]
             move_sources = ["/path/to/move/source"]
+            mutate_modules = {"Selected" = ["module1", "module2"]}
             [mutation]
             operators = ["operator1", "operator2"]
             categories = ["category1", "category2"]
@@ -179,8 +180,19 @@ mod tests {
             vec![Path::new("/path/to/move/source")]
         );
         assert_eq!(
+            config.project.mutate_modules,
+            ModuleFilter::Selected(vec!["module1".to_owned(), "module2".to_owned()])
+        );
+        assert_eq!(
             config.mutation.unwrap().operators,
             vec!["operator1", "operator2"]
+        );
+        assert_eq!(config.individual.len(), 1);
+        assert_eq!(config.individual[0].file, PathBuf::from("/path/to/file"));
+        assert_eq!(config.individual[0].verify_mutants, true);
+        assert_eq!(
+            config.individual[0].include_functions,
+            IncludeFunctions::All
         );
     }
 
@@ -307,7 +319,7 @@ mod tests {
         let file_path = PathBuf::from("/path/to/file");
         let file_config = FileConfiguration {
             file: file_path.clone(),
-            verify_mutants: Some(true),
+            verify_mutants: true,
             mutation_operators: None,
             include_functions: IncludeFunctions::All,
         };

@@ -206,6 +206,7 @@ Sample configuration file:
 ```toml
 [project]
 move_sources = ["/path/to/move/source"]
+mutate_modules = {"Selected" = ["module1", "module2"]}      # Alternative: mutate_modules = "All"
 [mutation]
 operators = ["operator1", "operator2"]
 categories = ["category1", "category2"]
@@ -336,6 +337,11 @@ statement in the source code that wouldn't affect the compilation process.
 
 Currently, it's used to delete `move_to` expressions to check if moving
 resources is verified properly.
+
+### Binary operator argument swap
+
+This mutation operator swaps the arguments of binary operators. For example,
+the `a - b` expression can be replaced with the `b - a` expression.
 
 ## Extending the Move mutator tool
 
