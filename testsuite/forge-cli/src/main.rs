@@ -786,16 +786,17 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         )
 }
 
-fn quorum_store_backlog_txn_limit_count(
-    config: &mut NodeConfig,
-    target_tps: usize,
-    vn_latency: f64,
-) {
+fn quorum_store_backpressure(config: &mut NodeConfig, target_tps: usize, vn_latency: f64) {
     config
         .consensus
         .quorum_store
         .back_pressure
         .backlog_txn_limit_count = (target_tps as f64 * vn_latency) as u64;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_max_txn_per_s = 4000;
 }
 
 fn optimize_for_maximum_throughput(
@@ -813,7 +814,7 @@ fn optimize_for_maximum_throughput(
     config.consensus.pipeline_backpressure = vec![];
     config.consensus.chain_health_backoff = vec![];
 
-    quorum_store_backlog_txn_limit_count(config, target_tps, vn_latency);
+    quorum_store_backpressure(config, target_tps, vn_latency);
 
     config.consensus.quorum_store.sender_max_batch_txns = 500;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
