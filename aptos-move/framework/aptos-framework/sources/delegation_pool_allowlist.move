@@ -16,9 +16,6 @@ module aptos_framework::delegation_pool_allowlist {
     /// Delegators allowlisting should be enabled to perform this operation.
     const EDELEGATORS_ALLOWLISTING_NOT_ENABLED: u64 = 2;
 
-    /// Delegators allowlisting should be enabled to perform this operation.
-    const EDELEGATION_POOL_ALLOWLIST_ALREADY_EXISTS: u64 = 3;
-
     /// Tracks a delegation pool's allowlist of delegators.
     /// If allowlisting is enabled, existing delegators are not implicitly allowlisted and they can be individually
     /// evicted later by the pool owner.

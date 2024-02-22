@@ -247,7 +247,7 @@ module aptos_framework::delegation_pool {
     }
 
     /// Tracks ownership of a delegation pool in order to directly access owner's address.
-    struct OwnerOfDelegationPool  has key, store {
+    struct OwnerOfDelegationPool has key, store {
         owner_address: address,
     }
 
@@ -756,6 +756,7 @@ module aptos_framework::delegation_pool {
 
         // save delegation pool ownership and resource account address (inner stake pool address) on `owner`
         move_to(owner, DelegationPoolOwnership { pool_address });
+        move_to(&stake_pool_signer, OwnerOfDelegationPool { owner_address });
 
         // All delegation pool enable partial governace voting by default once the feature flag is enabled.
         if (features::partial_governance_voting_enabled() && features::delegation_pool_partial_governance_voting_enabled()) {
@@ -802,7 +803,7 @@ module aptos_framework::delegation_pool {
     }
 
     /// Enable ownership lookup in order to access owner's address directly from the delegation pool.
-    public entry fun enable_ownership_direct_lookup(
+    public entry fun enable_ownership_lookup(
         pool_address: address,
         owner_address: address
     ) acquires DelegationPoolOwnership, DelegationPool {
@@ -1270,7 +1271,7 @@ module aptos_framework::delegation_pool {
         let owner_address = signer::address_of(owner);
         let pool_address = get_owned_pool_address(owner_address);
         // link delegation pool to owner's allowlist firstly
-        enable_ownership_direct_lookup(pool_address, owner_address);
+        enable_ownership_lookup(pool_address, owner_address);
 
         assert!(
             !delegator_allowlisted(pool_address, delegator_address),
@@ -1938,9 +1939,6 @@ module aptos_framework::delegation_pool {
     const COMMISSION_CHANGE_DELEGATION_POOL: u64 = 42;
 
     #[test_only]
-    const DELEGATION_POOL_ALLOWLISTING: u64 = 51;
-
-    #[test_only]
     public fun end_aptos_epoch() {
         stake::end_epoch(); // additionally forwards EPOCH_DURATION seconds
         reconfiguration::reconfigure_for_test_custom();
@@ -1997,11 +1995,7 @@ module aptos_framework::delegation_pool {
             voting_power_increase_limit,
         );
         reconfiguration::initialize_for_test(aptos_framework);
-        features::change_feature_flags(
-            aptos_framework,
-            vector[DELEGATION_POOLS, MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE, COMMISSION_CHANGE_DELEGATION_POOL, DELEGATION_POOL_ALLOWLISTING],
-            vector[]
-        );
+        features::change_feature_flags(aptos_framework, vector[DELEGATION_POOLS, MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE, COMMISSION_CHANGE_DELEGATION_POOL], vector[]);
     }
 
     #[test_only]
