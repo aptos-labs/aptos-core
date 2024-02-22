@@ -37,7 +37,7 @@ use aptos_network::{application::interface::NetworkClient, protocols::network::E
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{FeatureFlag, Features, OnChainExecutionConfig},
+    on_chain_config::{FeatureFlag, Features, OnChainConsensusConfig, OnChainExecutionConfig},
 };
 use fail::fail_point;
 use futures::{
@@ -47,7 +47,6 @@ use futures::{
 use futures_channel::mpsc::unbounded;
 use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
-use aptos_types::on_chain_config::OnChainConsensusConfig;
 
 #[async_trait::async_trait]
 pub trait TExecutionClient: Send + Sync {
@@ -293,7 +292,8 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
-        let randomness_enabled = onchain_consensus_config.is_vtxn_enabled() && features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
+        let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
+            && features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
         self.execution_proxy.new_epoch(
             &epoch_state,
             payload_manager,

@@ -24,14 +24,13 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{Features, OnChainExecutionConfig},
+    on_chain_config::{Features, OnChainConsensusConfig, OnChainExecutionConfig},
     transaction::SignedTransaction,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
 use move_core_types::account_address::AccountAddress;
 use std::{collections::HashMap, sync::Arc};
-use aptos_types::on_chain_config::OnChainConsensusConfig;
 
 pub struct MockExecutionClient {
     state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
