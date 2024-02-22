@@ -369,6 +369,8 @@ module aptos_token_objects::collection {
                 },
             );
             option::some(supply.total_minted)
+        } else if (exists<ConcurrentSupply>(collection_addr)) {
+            abort error::invalid_argument(ECONCURRENT_NOT_ENABLED)
         } else {
             option::none()
         }
@@ -661,24 +663,22 @@ module aptos_token_objects::collection {
         let collection_address = create_collection_address(&creator_address, &name);
         let collection = object::address_to_object<Collection>(collection_address);
         assert!(count(collection) == option::some(0), 0);
-        let cid = increment_supply(&collection, creator_address);
+        let cid = increment_concurrent_supply(&collection, creator_address);
         event::was_event_emitted<Mint>(&Mint {
             collection: collection_address,
             index: aggregator_v2::create_snapshot(0),
             token: creator_address,
         });
-        assert!(cid == option::some(0), 0);
+        assert!(cid == option::some(aggregator_v2::create_snapshot(1)), 1);
         assert!(count(collection) == option::some(1), 0);
-        assert!(event::counter(&borrow_global<FixedSupply>(collection_address).mint_events) == 1, 0);
-        decrement_supply(&collection, creator_address, cid, creator_address);
+        decrement_supply(&collection, creator_address, option::some(1), creator_address);
         event::was_event_emitted<Burn>(&Burn {
             collection: collection_address,
-            index: 0,
+            index: 1,
             token: creator_address,
             previous_owner: creator_address,
         });
         assert!(count(collection) == option::some(0), 0);
-        assert!(event::counter(&borrow_global<FixedSupply>(collection_address).burn_events) == 1, 0);
     }
 
     #[test(creator = @0x123, trader = @0x456)]

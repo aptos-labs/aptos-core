@@ -792,7 +792,6 @@ module aptos_token_objects::token {
         let token_1_name = name(object::object_from_constructor_ref<Token>(&token_1_ref));
         debug::print(&token_1_name);
         assert!(token_1_name == std::string::utf8(b"token name1"), 1);
-        assert!(vector::length(&event::emitted_events<collection::MintEvent>()) == 1, 0);
 
         features::change_feature_flags(fx, vector[feature, agg_feature], vector[]);
         collection::upgrade_to_concurrent(&extend_ref);
