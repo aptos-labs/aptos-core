@@ -292,6 +292,12 @@ impl TExecutionClient for ExecutionProxyClient {
             block.set_insertion_time();
         }
 
+        debug!(
+            epoch = blocks[0].epoch(),
+            round = blocks[0].round(),
+            "Sending ordered blocks to execution client."
+        );
+
         if execute_tx
             .unwrap()
             .send(OrderedBlocks {
