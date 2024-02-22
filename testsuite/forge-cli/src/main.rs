@@ -1833,7 +1833,9 @@ fn realistic_env_max_load_test(
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // THE MOST COMMONLY USED TUNE-ABLES:
+    // Note: update CRAZY_MACHINES_MULTIPLIER if you change USE_CRAZY_MACHINES
     const USE_CRAZY_MACHINES: bool = true;
+    const CRAZY_MACHINES_MULTIPLIER: usize = 4;
     const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 100;
     const VFN_COUNT: usize = 10;
@@ -1842,13 +1844,14 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // the actual throughput to be able to have reasonable queueing but also so throughput
     // will improve as performance improves.
     // Overestimate: causes mempool and/or batch queueing. Underestimate: not enough txns in blocks.
-    const TARGET_TPS: usize = 14_000 * 3;
-    // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
+    const TARGET_TPS: usize = 14_000 * CRAZY_MACHINES_MULTIPLIER;
     // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
-    const MAX_TXNS_PER_BLOCK: usize = 1900 * 3;
-    // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
+    // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
+    const MAX_TXNS_PER_BLOCK: usize = 1900 * CRAZY_MACHINES_MULTIPLIER;
     // This is validator latency, minus mempool queueing time.
+    // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
     const VN_LATENCY_S: f64 = 2.5;
+    // The end-to-end latency on the VFN
     // Overestimate: causes mempool queueing. Underestimate: not enough txns incoming.
     const VFN_LATENCY_S: f64 = 6.0;
 
@@ -1888,13 +1891,13 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 OnChainExecutionConfig::V4(config_v4) => {
                     // TODO: after tuning these values, add them to the default_for_genesis on this branch
                     config_v4.block_gas_limit_type = BlockGasLimitType::ComplexLimitV1 {
-                        effective_block_gas_limit: 20_000 * 3,
+                        effective_block_gas_limit: 20_000 * CRAZY_MACHINES_MULTIPLIER as u64,
                         execution_gas_effective_multiplier: 1,
                         io_gas_effective_multiplier: 1,
                         conflict_penalty_window: 6,
                         use_granular_resource_group_conflicts: false,
                         use_module_publishing_block_conflict: true,
-                        block_output_limit: Some(3 * 1024 * 1024 * 3),
+                        block_output_limit: Some(3 * 1024 * 1024 * CRAZY_MACHINES_MULTIPLIER as u64),
                         include_user_txn_size_in_block_output: true,
                         add_block_limit_outcome_onchain: false,
                     };
@@ -1937,7 +1940,7 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 memory_gib: Some(200),
             })
             .with_success_criteria(
-                SuccessCriteria::new(25000)
+                SuccessCriteria::new(12000 * CRAZY_MACHINES_MULTIPLIER)
                     .add_no_restarts()
                     /* This test runs at high load, so we need more catchup time */
                     .add_wait_for_catchup_s(120),
