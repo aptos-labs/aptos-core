@@ -1679,7 +1679,6 @@ impl AptosVM {
         let args = serialize_values(
             &block_metadata.get_prologue_move_args(account_config::reserved_vm_address()),
         );
-        debug!(epoch = epoch, round = round, "Running BlockMetadata txn.");
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
@@ -1692,7 +1691,6 @@ impl AptosVM {
             .or_else(|e| {
                 expect_only_successful_execution(e, BLOCK_PROLOGUE.as_str(), log_context)
             })?;
-        debug!(epoch = epoch, round = round, "BlockMetadata txn finished.");
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = get_transaction_output(
@@ -1701,7 +1699,6 @@ impl AptosVM {
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
-        debug!(epoch = epoch, round = round, "BlockMetadata txn result ok.");
         Ok((VMStatus::Executed, output))
     }
 
@@ -1757,7 +1754,6 @@ impl AptosVM {
                 .as_move_value(),
         ];
 
-        debug!(epoch = epoch, round = round, "Running BlockMetadataExt txn.");
         session
             .execute_function_bypass_visibility(
                 &BLOCK_MODULE,
@@ -1770,7 +1766,6 @@ impl AptosVM {
             .or_else(|e| {
                 expect_only_successful_execution(e, BLOCK_PROLOGUE_EXT.as_str(), log_context)
             })?;
-        debug!(epoch = epoch, round = round, "BlockMetadataExt txn finished.");
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let output = get_transaction_output(
@@ -1779,7 +1774,6 @@ impl AptosVM {
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
-        debug!(epoch = epoch, round = round, "BlockMetadataExt txn result ok.");
         Ok((VMStatus::Executed, output))
     }
 

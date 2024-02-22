@@ -1025,10 +1025,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         });
-        debug!(
-            epoch = epoch_state.epoch,
-            "EpochManager::star_new_epoch() starting."
-        );
 
         self.epoch_state = Some(epoch_state.clone());
 
