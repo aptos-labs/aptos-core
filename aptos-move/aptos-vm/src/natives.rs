@@ -10,10 +10,7 @@ use aptos_aggregator::{
     types::{DelayedFieldsSpeculativeError, PanicOr},
 };
 #[cfg(feature = "testing")]
-use aptos_aggregator::{
-    resolver::TDelayedFieldView,
-    types::{DelayedFieldID, DelayedFieldValue},
-};
+use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
@@ -40,6 +37,8 @@ use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunctionTable;
+#[cfg(feature = "testing")]
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 #[cfg(feature = "testing")]
 use std::{
     collections::{BTreeMap, HashSet},

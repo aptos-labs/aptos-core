@@ -86,15 +86,17 @@ return true.
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
 -  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
 -  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
--  [Function `get_zkid_feature`](#0x1_features_get_zkid_feature)
--  [Function `zkid_feature_enabled`](#0x1_features_zkid_feature_enabled)
--  [Function `get_zkid_zkless_feature`](#0x1_features_get_zkid_zkless_feature)
--  [Function `zkid_zkless_feature_enabled`](#0x1_features_zkid_zkless_feature_enabled)
+-  [Function `get_oidb_feature`](#0x1_features_get_oidb_feature)
+-  [Function `oidb_feature_enabled`](#0x1_features_oidb_feature_enabled)
+-  [Function `get_oidb_zkless_feature`](#0x1_features_get_oidb_zkless_feature)
+-  [Function `oidb_zkless_feature_enabled`](#0x1_features_oidb_zkless_feature_enabled)
 -  [Function `get_jwk_consensus_feature`](#0x1_features_get_jwk_consensus_feature)
 -  [Function `jwk_consensus_enabled`](#0x1_features_jwk_consensus_enabled)
 -  [Function `get_concurrent_fungible_assets_feature`](#0x1_features_get_concurrent_fungible_assets_feature)
 -  [Function `concurrent_fungible_assets_enabled`](#0x1_features_concurrent_fungible_assets_enabled)
 -  [Function `is_object_code_deployment_enabled`](#0x1_features_is_object_code_deployment_enabled)
+-  [Function `get_max_object_nesting_check_feature`](#0x1_features_get_max_object_nesting_check_feature)
+-  [Function `max_object_nesting_check_enabled`](#0x1_features_max_object_nesting_check_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -418,6 +420,16 @@ Lifetime: permanent
 
 
 
+<a id="0x1_features_MAX_OBJECT_NESTING_CHECK"></a>
+
+Whether checking the maximum object nesting is enabled.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a>: u64 = 53;
+</code></pre>
+
+
+
 <a id="0x1_features_MODULE_EVENT"></a>
 
 Whether emit function in <code>event.<b>move</b></code> are enabled for module events.
@@ -458,6 +470,30 @@ Whether deploying to objects is enabled.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>: u64 = 52;
+</code></pre>
+
+
+
+<a id="0x1_features_OIDB_SIGNATURE"></a>
+
+Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_OIDB_SIGNATURE">OIDB_SIGNATURE</a>: u64 = 46;
+</code></pre>
+
+
+
+<a id="0x1_features_OIDB_ZKLESS_SIGNATURE"></a>
+
+Whether the ZK-less mode of the OIDB feature is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_OIDB_ZKLESS_SIGNATURE">OIDB_ZKLESS_SIGNATURE</a>: u64 = 47;
 </code></pre>
 
 
@@ -627,30 +663,6 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_VM_BINARY_FORMAT_V7">VM_BINARY_FORMAT_V7</a>: u64 = 40;
-</code></pre>
-
-
-
-<a id="0x1_features_ZK_ID_SIGNATURES"></a>
-
-Whether the zkID feature is enabled, possibly with the ZK-less verification mode.
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a>: u64 = 46;
-</code></pre>
-
-
-
-<a id="0x1_features_ZK_ID_ZKLESS_SIGNATURE"></a>
-
-Whether the ZK-less mode of the zkID feature is enabled.
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a>: u64 = 47;
 </code></pre>
 
 
@@ -1932,13 +1944,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_zkid_feature"></a>
+<a id="0x1_features_get_oidb_feature"></a>
 
-## Function `get_zkid_feature`
+## Function `get_oidb_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_feature">get_zkid_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_oidb_feature">get_oidb_feature</a>(): u64
 </code></pre>
 
 
@@ -1947,20 +1959,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_feature">get_zkid_feature</a>(): u64 { <a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_oidb_feature">get_oidb_feature</a>(): u64 { <a href="features.md#0x1_features_OIDB_SIGNATURE">OIDB_SIGNATURE</a> }
 </code></pre>
 
 
 
 </details>
 
-<a id="0x1_features_zkid_feature_enabled"></a>
+<a id="0x1_features_oidb_feature_enabled"></a>
 
-## Function `zkid_feature_enabled`
+## Function `oidb_feature_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_feature_enabled">zkid_feature_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_oidb_feature_enabled">oidb_feature_enabled</a>(): bool
 </code></pre>
 
 
@@ -1969,8 +1981,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_feature_enabled">zkid_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ZK_ID_SIGNATURES">ZK_ID_SIGNATURES</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_oidb_feature_enabled">oidb_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OIDB_SIGNATURE">OIDB_SIGNATURE</a>)
 }
 </code></pre>
 
@@ -1978,13 +1990,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_zkid_zkless_feature"></a>
+<a id="0x1_features_get_oidb_zkless_feature"></a>
 
-## Function `get_zkid_zkless_feature`
+## Function `get_oidb_zkless_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_zkless_feature">get_zkid_zkless_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_oidb_zkless_feature">get_oidb_zkless_feature</a>(): u64
 </code></pre>
 
 
@@ -1993,20 +2005,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_zkid_zkless_feature">get_zkid_zkless_feature</a>(): u64 { <a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_oidb_zkless_feature">get_oidb_zkless_feature</a>(): u64 { <a href="features.md#0x1_features_OIDB_ZKLESS_SIGNATURE">OIDB_ZKLESS_SIGNATURE</a> }
 </code></pre>
 
 
 
 </details>
 
-<a id="0x1_features_zkid_zkless_feature_enabled"></a>
+<a id="0x1_features_oidb_zkless_feature_enabled"></a>
 
-## Function `zkid_zkless_feature_enabled`
+## Function `oidb_zkless_feature_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_zkless_feature_enabled">zkid_zkless_feature_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_oidb_zkless_feature_enabled">oidb_zkless_feature_enabled</a>(): bool
 </code></pre>
 
 
@@ -2015,8 +2027,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_zkid_zkless_feature_enabled">zkid_zkless_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ZK_ID_ZKLESS_SIGNATURE">ZK_ID_ZKLESS_SIGNATURE</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_oidb_zkless_feature_enabled">oidb_zkless_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OIDB_ZKLESS_SIGNATURE">OIDB_ZKLESS_SIGNATURE</a>)
 }
 </code></pre>
 
@@ -2134,6 +2146,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_object_code_deployment_enabled">is_object_code_deployment_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_max_object_nesting_check_feature"></a>
+
+## Function `get_max_object_nesting_check_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_max_object_nesting_check_feature">get_max_object_nesting_check_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_max_object_nesting_check_feature">get_max_object_nesting_check_feature</a>(): u64 { <a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_max_object_nesting_check_enabled"></a>
+
+## Function `max_object_nesting_check_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_max_object_nesting_check_enabled">max_object_nesting_check_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_max_object_nesting_check_enabled">max_object_nesting_check_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a>)
 }
 </code></pre>
 

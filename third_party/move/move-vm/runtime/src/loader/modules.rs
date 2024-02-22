@@ -272,6 +272,7 @@ impl Module {
 
         let mut create = || {
             let mut struct_idxs = vec![];
+            let mut struct_names = vec![];
             // validate the correctness of struct handle references.
             for struct_handle in module.struct_handles() {
                 let struct_name = module.identifier_at(struct_handle.name);
@@ -283,10 +284,12 @@ impl Module {
                         .get_struct_type_by_identifier(struct_name, &module_id)?
                         .check_compatibility(struct_handle)?;
                 }
-                struct_idxs.push(name_cache.insert_or_get(StructIdentifier {
+                let name = StructIdentifier {
                     module: module_id,
                     name: struct_name.to_owned(),
-                }));
+                };
+                struct_idxs.push(name_cache.insert_or_get(name.clone()));
+                struct_names.push(name)
             }
 
             // Build signature table
@@ -327,7 +330,13 @@ impl Module {
 
             for (idx, func) in module.function_defs().iter().enumerate() {
                 let findex = FunctionDefinitionIndex(idx as TableIndex);
-                let function = Function::new(natives, findex, &module, signature_table.as_slice());
+                let function = Function::new(
+                    natives,
+                    findex,
+                    &module,
+                    signature_table.as_slice(),
+                    &struct_names,
+                )?;
 
                 function_map.insert(function.name.to_owned(), idx);
                 function_defs.push(Arc::new(function));

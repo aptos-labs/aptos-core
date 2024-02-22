@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    access_control::AccessControlState,
     data_cache::TransactionDataCache,
     loader::{Function, Loader, ModuleStorageAdapter, Resolver},
     native_extensions::NativeContextExtensions,
@@ -13,8 +14,8 @@ use fail::fail_point;
 use move_binary_format::{
     errors::*,
     file_format::{
-        Ability, AbilitySet, Bytecode, FieldInstantiationIndex, FunctionHandleIndex,
-        FunctionInstantiationIndex, SignatureIndex, StructDefInstantiationIndex,
+        Ability, AbilitySet, AccessKind, Bytecode, FieldInstantiationIndex, FunctionHandleIndex,
+        FunctionInstantiationIndex, LocalIndex, SignatureIndex, StructDefInstantiationIndex,
     },
 };
 use move_core_types::{
@@ -26,7 +27,10 @@ use move_core_types::{
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
-    loaded_data::runtime_types::Type,
+    loaded_data::{
+        runtime_access_specifier::{AccessInstance, AccessSpecifierEnv, AddressSpecifierFunction},
+        runtime_types::Type,
+    },
     natives::function::NativeResult,
     values::{
         self, GlobalValue, IntegerValue, Locals, Reference, Struct, StructRef, VMValueCast, Value,
@@ -59,6 +63,8 @@ pub(crate) struct Interpreter {
     call_stack: CallStack,
     /// Whether to perform a paranoid type safety checks at runtime.
     paranoid_type_checks: bool,
+    /// The access control state.
+    access_control: AccessControlState,
 }
 
 struct TypeWithLoader<'a, 'b> {
@@ -89,6 +95,7 @@ impl Interpreter {
             operand_stack: Stack::new(),
             call_stack: CallStack::new(),
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
+            access_control: AccessControlState::default(),
         }
         .execute_main(
             loader,
@@ -135,6 +142,10 @@ impl Interpreter {
         let mut current_frame = self
             .make_new_frame(gas_meter, loader, module_store, function, ty_args, locals)
             .map_err(|err| self.set_location(err))?;
+        // Access control for the new frame.
+        self.access_control
+            .enter_function(&current_frame, current_frame.function.as_ref())
+            .map_err(|e| self.set_location(e))?;
         loop {
             let resolver = current_frame.resolver(loader, module_store);
             let exit_code =
@@ -154,12 +165,20 @@ impl Interpreter {
                         .charge_drop_frame(non_ref_vals.iter())
                         .map_err(|e| self.set_location(e))?;
 
+                    self.access_control
+                        .exit_function(current_frame.function.as_ref())
+                        .map_err(|e| self.set_location(e))?;
+
                     if let Some(frame) = self.call_stack.pop() {
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
                     } else {
                         // end of execution. `self` should no longer be used afterward
+                        // Clean up access control
+                        self.access_control
+                            .exit_function(current_frame.function.as_ref())
+                            .map_err(|e| self.set_location(e))?;
                         return Ok(self.operand_stack.value);
                     }
                 },
@@ -207,6 +226,12 @@ impl Interpreter {
                         .make_call_frame(gas_meter, loader, module_store, func, vec![])
                         .map_err(|e| self.set_location(e))
                         .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
+
+                    // Access control for the new frame.
+                    self.access_control
+                        .enter_function(&frame, frame.function.as_ref())
+                        .map_err(|e| self.set_location(e))?;
+
                     self.call_stack.push(current_frame).map_err(|frame| {
                         let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
                         let err = set_err_info!(frame, err);
@@ -258,6 +283,12 @@ impl Interpreter {
                         .make_call_frame(gas_meter, loader, module_store, func, ty_args)
                         .map_err(|e| self.set_location(e))
                         .map_err(|err| self.maybe_core_dump(err, &current_frame))?;
+
+                    // Access control for the new frame.
+                    self.access_control
+                        .enter_function(&frame, frame.function.as_ref())
+                        .map_err(|e| self.set_location(e))?;
+
                     self.call_stack.push(current_frame).map_err(|frame| {
                         let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
                         let err = set_err_info!(frame, err);
@@ -599,9 +630,43 @@ impl Interpreter {
             TypeWithLoader { ty, loader },
             res.is_ok(),
         )?;
+        self.check_access(
+            loader,
+            if is_mut {
+                AccessKind::Writes
+            } else {
+                AccessKind::Reads
+            },
+            ty,
+            addr,
+        )?;
         self.operand_stack.push(res.map_err(|err| {
             err.with_message(format!("Failed to borrow global resource from {:?}", addr))
         })?)?;
+        Ok(())
+    }
+
+    fn check_access(
+        &self,
+        loader: &Loader,
+        kind: AccessKind,
+        ty: &Type,
+        addr: AccountAddress,
+    ) -> PartialVMResult<()> {
+        let (struct_idx, instance) = match ty {
+            Type::Struct { idx, .. } => (*idx, [].as_slice()),
+            Type::StructInstantiation { idx, ty_args, .. } => (*idx, ty_args.as_slice()),
+            _ => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("inconsistent type".to_owned()),
+                )
+            },
+        };
+        let struct_name = &*loader.name_cache.idx_to_identifier(struct_idx);
+        if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
+            self.access_control.check_access(access)?
+        }
         Ok(())
     }
 
@@ -619,6 +684,7 @@ impl Interpreter {
         let gv = Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?;
         let exists = gv.exists()?;
         gas_meter.charge_exists(is_generic, TypeWithLoader { ty, loader }, exists)?;
+        self.check_access(loader, AccessKind::Reads, ty, addr)?;
         self.operand_stack.push(Value::bool(exists))?;
         Ok(())
     }
@@ -644,6 +710,7 @@ impl Interpreter {
                         TypeWithLoader { ty, loader },
                         Some(&resource),
                     )?;
+                    self.check_access(loader, AccessKind::Writes, ty, addr)?;
                     resource
                 },
                 Err(err) => {
@@ -681,6 +748,7 @@ impl Interpreter {
                     gv.view().unwrap(),
                     true,
                 )?;
+                self.check_access(loader, AccessKind::Writes, ty, addr)?;
                 Ok(())
             },
             Err((err, resource)) => {
@@ -898,6 +966,7 @@ impl Interpreter {
 // TODO Determine stack size limits based on gas limit
 const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
+pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
 /// The operand stack.
 struct Stack {
@@ -1246,6 +1315,16 @@ impl FrameTypeCache {
             Ok((ty, ty_count))
         })?;
         Ok((ty, *ty_count))
+    }
+}
+
+impl AccessSpecifierEnv for Frame {
+    fn eval_address_specifier_function(
+        &self,
+        fun: AddressSpecifierFunction,
+        local: LocalIndex,
+    ) -> PartialVMResult<AccountAddress> {
+        fun.eval(self.locals.copy_loc(local as usize)?)
     }
 }
 

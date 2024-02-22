@@ -8,7 +8,6 @@ use aptos_aggregator::{
     delayed_field_extension::DelayedFieldData,
     delta_change_set::DeltaOp,
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
-    types::DelayedFieldID,
 };
 use aptos_types::{
     delayed_fields::PanicError,
@@ -16,6 +15,7 @@ use aptos_types::{
 };
 use better_any::{Tid, TidAble};
 use move_core_types::value::MoveTypeLayout;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashSet},

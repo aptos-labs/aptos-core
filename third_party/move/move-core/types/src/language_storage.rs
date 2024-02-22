@@ -208,14 +208,14 @@ impl ResourceKey {
 }
 
 /// Represents the initial key into global storage where we first index by the address, and then
-/// the struct tag
+/// the struct tag. The struct fields are public to support pattern matching.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct ModuleId {
-    address: AccountAddress,
-    name: Identifier,
+    pub address: AccountAddress,
+    pub name: Identifier,
 }
 
 impl From<ModuleId> for (AccountAddress, Identifier) {

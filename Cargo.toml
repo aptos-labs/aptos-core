@@ -526,6 +526,7 @@ event-listener = "2.5.3"
 fail = "0.5.0"
 ff = "0.13"
 field_count = "0.1.1"
+fixed = "1.25.1"
 flate2 = "1.0.24"
 futures = "0.3.29"
 futures-channel = "0.3.29"
@@ -640,6 +641,7 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
+rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"

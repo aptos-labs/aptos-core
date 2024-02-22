@@ -4,10 +4,10 @@
 
 use crate::{
     account_address::AccountAddress,
+    oidb::{OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
-    zkid::{ZkIdPublicKey, ZkIdSignature, ZkpOrOpenIdSig},
 };
 use anyhow::{bail, ensure, Error, Result};
 use aptos_crypto::{
@@ -969,8 +969,8 @@ pub enum AnySignature {
     WebAuthn {
         signature: PartialAuthenticatorAssertionResponse,
     },
-    ZkId {
-        signature: ZkIdSignature,
+    OIDB {
+        signature: OidbSignature,
     },
 }
 
@@ -987,8 +987,8 @@ impl AnySignature {
         Self::WebAuthn { signature }
     }
 
-    pub fn zkid(signature: ZkIdSignature) -> Self {
-        Self::ZkId { signature }
+    pub fn oidb(signature: OidbSignature) -> Self {
+        Self::OIDB { signature }
     }
 
     pub fn verify<T: Serialize + CryptoHash>(
@@ -1004,10 +1004,11 @@ impl AnySignature {
                 signature.verify(message, public_key)
             },
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
-            (Self::ZkId { signature }, AnyPublicKey::ZkId { public_key: _ }) => {
+            (Self::OIDB { signature }, AnyPublicKey::OIDB { public_key: _ }) => {
+                // TODO(oidb): Batch-verify these two signatures
                 match &signature.sig {
                     ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-                        proof.verify_non_malleability_sig(&signature.ephemeral_pubkey)?
+                        proof.verify_non_malleability_sig(&signature.ephemeral_pubkey)?;
                     },
                     ZkpOrOpenIdSig::OpenIdSig(_) => {},
                 }
@@ -1038,8 +1039,8 @@ pub enum AnyPublicKey {
     Secp256r1Ecdsa {
         public_key: secp256r1_ecdsa::PublicKey,
     },
-    ZkId {
-        public_key: ZkIdPublicKey,
+    OIDB {
+        public_key: OidbPublicKey,
     },
 }
 
@@ -1056,8 +1057,8 @@ impl AnyPublicKey {
         Self::Secp256r1Ecdsa { public_key }
     }
 
-    pub fn zkid(public_key: ZkIdPublicKey) -> Self {
-        Self::ZkId { public_key }
+    pub fn oidb(public_key: OidbPublicKey) -> Self {
+        Self::OIDB { public_key }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -1124,9 +1125,10 @@ impl TryFrom<&[u8]> for EphemeralPublicKey {
 mod tests {
     use super::*;
     use crate::{
-        bn254_circom::{G1Bytes, G2Bytes},
+        oidb::test_utils::{
+            get_sample_esk, get_sample_oidb_groth16_sig_and_pk, get_sample_oidb_openid_sig_and_pk,
+        },
         transaction::{webauthn::AssertionSignature, SignedTransaction},
-        zkid::{Configuration, Groth16Zkp, IdCommitment, OpenIdSig, Pepper, SignedGroth16Zkp},
     };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
@@ -1664,176 +1666,97 @@ mod tests {
     }
 
     #[test]
-    fn test_zkid_oidc_sig_fails_with_bad_ephemeral_signature() {
-        let pepper = Pepper::from_number(76);
-        let idc =
-            IdCommitment::new_from_preimage(&pepper, "s6BhdRkqt3", "sub", "248289761001").unwrap();
-        let sender_zkid_public_key = ZkIdPublicKey {
-            iss: "https://server.example.com".to_owned(),
-            idc,
-        };
-        let sender_any_public_key = AnyPublicKey::zkid(sender_zkid_public_key);
-        let sender_auth_key = AuthenticationKey::any_key(sender_any_public_key.clone());
-        let sender_addr = sender_auth_key.account_address();
-
-        let esk = Ed25519PrivateKey::generate_for_testing();
-        let epk = EphemeralPublicKey::ed25519(esk.public_key());
-
-        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
+    fn test_oidb_openid_txn() {
+        let esk = get_sample_esk();
+        let (mut oidb_sig, oidb_pk) = get_sample_oidb_openid_sig_and_pk();
+        let sender_addr =
+            AuthenticationKey::any_key(AnyPublicKey::oidb(oidb_pk.clone())).account_address();
+        let mut raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
             sender_addr,
             0,
-            &esk,
-            esk.public_key(),
             None,
-            0,
-            0,
             None,
-        )
-        .into_raw_transaction();
-        let ephemeral_sig = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
-
-        let bad_esk = Ed25519PrivateKey::generate(&mut thread_rng()); // Wrong private key!
-        let bad_ephemeral_sig = EphemeralSignature::ed25519(bad_esk.sign(&raw_txn).unwrap());
-
-        let openid_signature = OpenIdSig {
-            jwt_sig: "jwt_sig is verified in the prologue".to_string(),
-            jwt_payload: "JWT payload is now verified in prologue too".to_string(),
-            uid_key: "sub".to_string(),
-            epk_blinder: vec![0u8; OpenIdSig::EPK_BLINDER_NUM_BYTES],
-            pepper,
-            idc_aud_val: None,
-        };
-
-        let signed_txn = build_signature(
-            &sender_any_public_key,
-            &raw_txn,
-            &openid_signature,
-            &epk,
-            &ephemeral_sig,
+            None,
+            None,
         );
-        let badly_signed_txn = build_signature(
-            &sender_any_public_key,
-            &raw_txn,
-            &openid_signature,
-            &epk,
-            &bad_ephemeral_sig,
-        );
+        oidb_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
-        assert!(signed_txn.verify_signature().is_ok());
-        assert!(badly_signed_txn.verify_signature().is_err());
-    }
+        let single_key_auth =
+            SingleKeyAuthenticator::new(AnyPublicKey::oidb(oidb_pk), AnySignature::oidb(oidb_sig));
+        let account_auth = AccountAuthenticator::single_key(single_key_auth);
+        let signed_txn =
+            SignedTransaction::new_single_sender(raw_txn.clone(), account_auth.clone());
+        signed_txn.verify_signature().unwrap();
 
-    fn build_signature(
-        sender_any_public_key: &AnyPublicKey,
-        raw_txn: &RawTransaction,
-        oidc_sig: &OpenIdSig,
-        epk: &EphemeralPublicKey,
-        eph_sig: &EphemeralSignature,
-    ) -> SignedTransaction {
-        let exp_timestamp_secs = 100000000000; // does not matter
-        let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::OpenIdSig(oidc_sig.clone()),
-            // {"alg":"RS256","typ":"JWT"}
-            jwt_header: "JWT header is verified during prologue too".to_owned(),
-            exp_timestamp_secs,
-            ephemeral_pubkey: epk.clone(),
-            ephemeral_signature: eph_sig.clone(),
-        };
-
-        let account_auth = AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-            sender_any_public_key.clone(),
-            AnySignature::zkid(zk_sig),
-        ));
-        SignedTransaction::new_single_sender(raw_txn.clone(), account_auth)
-    }
-
-    /// TODO(zkid): Redundancy; a similar test case is in types/src/zkid.rs
-    #[test]
-    fn test_zkid_groth16_proof_verification() {
-        let a = G1Bytes::new_unchecked(
-            "20534193224874816823038374805971256353897254359389549519579800571198905682623",
-            "3128047629776327625062258700337193014005673411952335683536865294076478098678",
-        )
-        .unwrap();
-        let b = G2Bytes::new_unchecked(
-            [
-                "11831059544281359959902363827760224027191828999098259913907764686593049260801",
-                "14933419822301565783764657928814181728459886670248956535955133596731082875810",
-            ],
-            [
-                "16616167200367085072660100259194052934821478809307596510515652443339946625933",
-                "1103855954970567341442645156173756328940907403537523212700521414512165362008",
-            ],
-        )
-        .unwrap();
-        let c = G1Bytes::new_unchecked(
-            "296457556259014920933232985275282694032456344171046224944953719399946325676",
-            "10314488872240559867545387237625153841351761679810222583912967187658678987385",
-        )
-        .unwrap();
-        let proof = Groth16Zkp::new(a, b, c);
-
-        let sender = Ed25519PrivateKey::generate_for_testing();
-        let sender_pub = sender.public_key();
-        let sender_auth_key = AuthenticationKey::ed25519(&sender_pub);
-        let sender_addr = sender_auth_key.account_address();
-        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_transaction(
-            sender_addr,
-            0,
-            &sender,
-            sender.public_key(),
-            None,
-            0,
-            0,
-            None,
-        )
-        .into_raw_transaction();
-
-        let sender_sig = sender.sign(&raw_txn).unwrap();
-
-        let epk = EphemeralPublicKey::ed25519(sender.public_key());
-        let es = EphemeralSignature::ed25519(sender_sig);
-
-        let proof_sig = sender.sign(&proof).unwrap();
-        let ephem_proof_sig = EphemeralSignature::ed25519(proof_sig);
-        ephem_proof_sig.verify(&proof, &epk).unwrap();
-        let config = Configuration::new_for_devnet_and_testing();
-        let zk_sig = ZkIdSignature {
-            sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
-                proof: proof.clone(),
-                non_malleability_signature: ephem_proof_sig,
-                extra_field: "\"family_name\":\"Straka\",".to_string(),
-                exp_horizon_secs: config.max_exp_horizon_secs,
-                override_aud_val: None,
-                training_wheels_signature: Some(EphemeralSignature::ed25519(
-                    Ed25519Signature::dummy_signature(),
-                )),
-            }),
-            jwt_header: "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0".to_owned(),
-            exp_timestamp_secs: 1900255944,
-            ephemeral_pubkey: epk,
-            ephemeral_signature: es,
-        };
-
-        let pepper = Pepper::from_number(76);
-        let addr_seed = IdCommitment::new_from_preimage(
-            &pepper,
-            "407408718192.apps.googleusercontent.com",
-            "sub",
-            "113990307082899718775",
-        )
-        .unwrap();
-
-        let zk_pk = ZkIdPublicKey {
-            iss: "https://accounts.google.com".to_owned(),
-            idc: addr_seed,
-        };
-
-        let sk_auth =
-            SingleKeyAuthenticator::new(AnyPublicKey::zkid(zk_pk), AnySignature::zkid(zk_sig));
-        let account_auth = AccountAuthenticator::single_key(sk_auth);
+        // Badly-signed TXN
+        raw_txn.expiration_timestamp_secs += 1;
         let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
-        let verification_result = signed_txn.verify_signature();
-        verification_result.unwrap();
+        assert!(signed_txn.verify_signature().is_err());
+    }
+
+    /// TODO(oidb): Redundancy; a similar test case is in types/src/oidb/
+    #[test]
+    fn test_oidb_groth16_txn() {
+        let esk = get_sample_esk();
+        let (mut oidb_sig, oidb_pk) = get_sample_oidb_groth16_sig_and_pk();
+        let sender_addr =
+            AuthenticationKey::any_key(AnyPublicKey::oidb(oidb_pk.clone())).account_address();
+        let mut raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
+            sender_addr,
+            0,
+            None,
+            None,
+            None,
+            None,
+        );
+        oidb_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+
+        let single_key_auth =
+            SingleKeyAuthenticator::new(AnyPublicKey::oidb(oidb_pk), AnySignature::oidb(oidb_sig));
+        let account_auth = AccountAuthenticator::single_key(single_key_auth);
+        let signed_txn =
+            SignedTransaction::new_single_sender(raw_txn.clone(), account_auth.clone());
+
+        signed_txn.verify_signature().unwrap();
+
+        // Badly-signed TXN
+        raw_txn.expiration_timestamp_secs += 1;
+        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+        assert!(signed_txn.verify_signature().is_err());
+    }
+
+    #[test]
+    fn test_oidb_groth16_txn_fails_non_malleability_check() {
+        let esk = get_sample_esk();
+        let (mut oidb_sig, oidb_pk) = get_sample_oidb_groth16_sig_and_pk();
+        let sender_addr =
+            AuthenticationKey::any_key(AnyPublicKey::oidb(oidb_pk.clone())).account_address();
+        let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
+            sender_addr,
+            0,
+            None,
+            None,
+            None,
+            None,
+        );
+        oidb_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+
+        let tw_sk = Ed25519PrivateKey::generate(&mut thread_rng());
+        // Bad non-malleability signature
+        match &mut oidb_sig.sig {
+            ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+                // bad signature using the TW SK rather than the ESK
+                proof.non_malleability_signature =
+                    EphemeralSignature::ed25519(tw_sk.sign(&proof.proof).unwrap());
+            },
+            ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
+        }
+
+        let single_key_auth =
+            SingleKeyAuthenticator::new(AnyPublicKey::oidb(oidb_pk), AnySignature::oidb(oidb_sig));
+        let account_auth = AccountAuthenticator::single_key(single_key_auth);
+        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+
+        assert!(signed_txn.verify_signature().is_err());
     }
 }

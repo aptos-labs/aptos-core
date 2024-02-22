@@ -21,7 +21,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, pipeline::commit_decision::CommitDecision,
+    common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
@@ -67,7 +67,7 @@ pub struct ResetRequest {
 }
 
 pub struct OrderedBlocks {
-    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_blocks: Vec<PipelinedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }
@@ -328,14 +328,14 @@ impl BufferManager {
     /// Pop the prefix of buffer items until (including) target_block_id
     /// Send persist request.
     async fn advance_head(&mut self, target_block_id: HashValue) {
-        let mut blocks_to_persist: Vec<Arc<ExecutedBlock>> = vec![];
+        let mut blocks_to_persist: Vec<Arc<PipelinedBlock>> = vec![];
 
         while let Some(item) = self.buffer.pop_front() {
             blocks_to_persist.extend(
                 item.get_blocks()
                     .iter()
                     .map(|eb| Arc::new(eb.clone()))
-                    .collect::<Vec<Arc<ExecutedBlock>>>(),
+                    .collect::<Vec<Arc<PipelinedBlock>>>(),
             );
             if self.signing_root == Some(item.block_id()) {
                 self.signing_root = None;
@@ -347,6 +347,8 @@ impl BufferManager {
                 let aggregated_item = item.unwrap_aggregated();
                 let block = aggregated_item.executed_blocks.last().unwrap().block();
                 observe_block(block.timestamp_usecs(), BlockStage::COMMIT_CERTIFIED);
+                // TODO: As all the validators broadcast commit votes directly to all other validators,
+                // the proposer do not have to broadcast commit decision again. Remove this if block.
                 // if we're the proposer for the block, we're responsible to broadcast the commit decision.
                 if block.author() == Some(self.author) {
                     let commit_decision = CommitMessage::Decision(CommitDecision::new(
@@ -515,27 +517,11 @@ impl BufferManager {
                 // we have found the buffer item
                 let mut signed_item = item.advance_to_signed(self.author, signature);
                 let signed_item_mut = signed_item.unwrap_signed_mut();
-                let maybe_proposer = signed_item_mut
-                    .executed_blocks
-                    .last()
-                    .unwrap()
-                    .block()
-                    .author();
                 let commit_vote = signed_item_mut.commit_vote.clone();
-
-                if let Some(proposer) = maybe_proposer {
-                    let sender = self.commit_msg_tx.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = sender.send_commit_vote(commit_vote, proposer).await {
-                            warn!("Failed to send commit vote {:?}", e);
-                        }
-                    });
-                } else {
-                    let commit_vote = CommitMessage::Vote(commit_vote);
-                    signed_item_mut
-                        .rb_handle
-                        .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
-                }
+                let commit_vote = CommitMessage::Vote(commit_vote);
+                signed_item_mut
+                    .rb_handle
+                    .replace((Instant::now(), self.do_reliable_broadcast(commit_vote)));
                 self.buffer.set(&current_cursor, signed_item);
             } else {
                 self.buffer.set(&current_cursor, item);

@@ -249,7 +249,7 @@ pub type AccessSpecifier = Spanned<AccessSpecifier_>;
 /// An address specifier specifies the address at which a resource is accessed.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressSpecifier_ {
-    /// Represents that now address was specicied, as in `Resource`
+    /// Represents that no address was specified, as in `Resource`
     Empty,
     /// Represents that the specified address is a wildcard, as in `Resource(*)`.
     Any,

@@ -188,7 +188,7 @@ pub struct RoundManager {
     proposer_election: UnequivocalProposerElection,
     proposal_generator: ProposalGenerator,
     safety_rules: Arc<Mutex<MetricsSafetyRules>>,
-    network: NetworkSender,
+    network: Arc<NetworkSender>,
     storage: Arc<dyn PersistentLivenessStorage>,
     onchain_config: OnChainConsensusConfig,
     vtxn_config: ValidatorTxnConfig,
@@ -205,7 +205,7 @@ impl RoundManager {
         proposer_election: Arc<dyn ProposerElection + Send + Sync>,
         proposal_generator: ProposalGenerator,
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
-        network: NetworkSender,
+        network: Arc<NetworkSender>,
         storage: Arc<dyn PersistentLivenessStorage>,
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
@@ -237,10 +237,6 @@ impl RoundManager {
             local_config,
             features,
         }
-    }
-
-    fn decoupled_execution(&self) -> bool {
-        self.onchain_config.decoupled_execution()
     }
 
     // TODO: Evaluate if creating a block retriever is slow and cache this if needed.
@@ -295,7 +291,6 @@ impl RoundManager {
             self.log_collected_vote_stats(&new_round_event);
             self.round_state.setup_leader_timeout();
             let proposal_msg = self.generate_proposal(new_round_event).await?;
-            let mut network = self.network.clone();
             #[cfg(feature = "failpoints")]
             {
                 if self.check_whether_to_inject_reconfiguration_error() {
@@ -303,7 +298,7 @@ impl RoundManager {
                         .await?;
                 }
             }
-            network.broadcast_proposal(proposal_msg).await;
+            self.network.broadcast_proposal(proposal_msg).await;
             counters::PROPOSALS_COUNT.inc();
         }
         Ok(())
@@ -384,7 +379,7 @@ impl RoundManager {
     ) -> anyhow::Result<ProposalMsg> {
         // Proposal generator will ensure that at most one proposal is generated per round
         let sync_info = self.block_store.sync_info();
-        let mut sender = self.network.clone();
+        let sender = self.network.clone();
         let callback = async move {
             sender.broadcast_sync_info(sync_info).await;
         }
@@ -555,16 +550,12 @@ impl RoundManager {
     }
 
     fn sync_only(&self) -> bool {
-        if self.decoupled_execution() {
-            let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
-            counters::OP_COUNTERS
-                .gauge("sync_only")
-                .set(sync_or_not as i64);
+        let sync_or_not = self.local_config.sync_only || self.block_store.vote_back_pressure();
+        counters::OP_COUNTERS
+            .gauge("sync_only")
+            .set(sync_or_not as i64);
 
-            sync_or_not
-        } else {
-            self.local_config.sync_only
-        }
+        sync_or_not
     }
 
     /// The replica broadcasts a "timeout vote message", which includes the round signature, which
@@ -742,7 +733,7 @@ impl RoundManager {
         );
 
         observe_block(proposal.timestamp_usecs(), BlockStage::SYNCED);
-        if self.decoupled_execution() && self.block_store.vote_back_pressure() {
+        if self.block_store.vote_back_pressure() {
             counters::CONSENSUS_WITHOLD_VOTE_BACKPRESSURE_TRIGGERED.observe(1.0);
             // In case of back pressure, we delay processing proposal. This is done by resending the
             // same proposal to self after some time. Even if processing proposal is delayed, we add
@@ -754,7 +745,7 @@ impl RoundManager {
             // tries to add the same block again, which is okay as `execute_and_insert_block` call
             // is idempotent.
             self.block_store
-                .execute_and_insert_block(proposal.clone())
+                .insert_ordered_block(proposal.clone())
                 .await
                 .context("[RoundManager] Failed to execute_and_insert the block")?;
             self.resend_verified_proposal_to_self(
@@ -786,7 +777,7 @@ impl RoundManager {
             while start.elapsed() < Duration::from_millis(timeout_ms) {
                 if !block_store.vote_back_pressure() {
                     if let Err(e) = self_sender.push(author, event) {
-                        error!("Failed to send event to round manager {:?}", e);
+                        warn!("Failed to send event to round manager {:?}", e);
                     }
                     break;
                 }
@@ -825,7 +816,7 @@ impl RoundManager {
     async fn execute_and_vote(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
         let executed_block = self
             .block_store
-            .execute_and_insert_block(proposed_block)
+            .insert_ordered_block(proposed_block)
             .await
             .context("[RoundManager] Failed to execute_and_insert the block")?;
 
@@ -841,7 +832,7 @@ impl RoundManager {
             "[RoundManager] sync_only flag is set, stop voting"
         );
 
-        let vote_proposal = executed_block.vote_proposal(self.decoupled_execution());
+        let vote_proposal = executed_block.vote_proposal();
         let vote_result = self.safety_rules.lock().construct_and_sign_vote_two_chain(
             &vote_proposal,
             self.block_store.highest_2chain_timeout_cert().as_deref(),
@@ -1168,7 +1159,6 @@ impl RoundManager {
                 .collect();
             half_peers.truncate(half_peers.len() / 2);
             self.network
-                .clone()
                 .send_proposal(proposal_msg.clone(), half_peers)
                 .await;
             Err(anyhow::anyhow!("Injected error in reconfiguration suffix"))

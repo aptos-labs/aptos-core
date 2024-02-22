@@ -348,65 +348,81 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Finalizes types in this translator, producing errors if some could not be inferred
     /// and remained incomplete.
     pub fn finalize_types(&mut self) {
-        for i in self.node_counter_start..self.parent.parent.env.next_free_node_number() {
-            let node_id = NodeId::new(i);
+        if !self.had_errors {
+            let mut reported_types = BTreeSet::new();
+            let mut reported_vars = BTreeSet::new();
+            for i in self.node_counter_start..self.parent.parent.env.next_free_node_number() {
+                let node_id = NodeId::new(i);
 
-            if let Some(ty) = self.get_node_type_opt(node_id) {
-                let ty = self.finalize_type(node_id, &ty);
-                self.update_node_type(node_id, ty);
-            }
-            if let Some(inst) = self.get_node_instantiation_opt(node_id) {
-                let inst = inst
-                    .iter()
-                    .map(|ty| self.finalize_type(node_id, ty))
-                    .collect_vec();
-                self.update_node_instantiation(node_id, inst);
+                if let Some(ty) = self.get_node_type_opt(node_id) {
+                    let ty =
+                        self.finalize_type(node_id, &ty, &mut reported_types, &mut reported_vars);
+                    self.update_node_type(node_id, ty);
+                }
+                if let Some(inst) = self.get_node_instantiation_opt(node_id) {
+                    let inst = inst
+                        .iter()
+                        .map(|ty| {
+                            self.finalize_type(node_id, ty, &mut reported_types, &mut reported_vars)
+                        })
+                        .collect_vec();
+                    self.update_node_instantiation(node_id, inst);
+                }
             }
         }
     }
 
     /// Finalize the the given type, producing an error if it is not complete, or if
     /// invalid type instantiations are found.
-    fn finalize_type(&mut self, node_id: NodeId, ty: &Type) -> Type {
+    fn finalize_type(
+        &mut self,
+        node_id: NodeId,
+        ty: &Type,
+        reported_types: &mut BTreeSet<Type>,
+        reported_vars: &mut BTreeSet<u32>,
+    ) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
-        // Report error only if there are no other errors in this builder,
-        // to avoid noisy followup errors.
-        if !self.had_errors {
-            let loc = self.parent.parent.env.get_node_loc(node_id);
-            let mut incomplete = false;
-            let mut visitor = |t: &Type| {
-                use Type::*;
-                match t {
-                    Var(_) => {
+        let loc = self.parent.parent.env.get_node_loc(node_id);
+        let mut incomplete = false;
+        let mut visitor = |t: &Type| {
+            use Type::*;
+            match t {
+                Var(id) => {
+                    if !reported_vars.contains(id) {
                         incomplete = true;
-                    },
-                    Struct(_, _, inst) => {
-                        for i in inst {
-                            self.check_valid_instantiation(&loc, i)
+                        reported_vars.insert(*id);
+                    }
+                },
+                Struct(_, _, inst) => {
+                    for i in inst {
+                        if !reported_types.contains(i) && !self.check_valid_instantiation(&loc, i) {
+                            reported_types.insert(i.clone());
                         }
-                    },
-                    Vector(t) => self.check_valid_instantiation(&loc, t),
-                    _ => {},
-                }
-            };
-            ty.visit(&mut visitor);
-
-            if incomplete {
-                // This type could not be fully inferred.
-                self.error(
-                    &loc,
-                    &format!(
-                        "unable to infer type: `{}`",
-                        ty.display(&self.type_display_context())
-                    ),
-                );
+                    }
+                },
+                Vector(t) => {
+                    if !reported_types.contains(t) && !self.check_valid_instantiation(&loc, t) {
+                        reported_types.insert(*t.clone());
+                    }
+                },
+                _ => {},
             }
+        };
+        ty.visit(&mut visitor);
+        if incomplete {
+            self.error(
+                &loc,
+                &format!(
+                    "unable to infer type: `{}`",
+                    ty.display(&self.type_display_context())
+                ),
+            );
         }
         ty
     }
 
     /// Check whether the given type is allowed as a type instantiation.
-    fn check_valid_instantiation(&mut self, loc: &Loc, ty: &Type) {
+    fn check_valid_instantiation(&mut self, loc: &Loc, ty: &Type) -> bool {
         use Type::*;
         if !matches!(
             ty,
@@ -417,8 +433,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &format!(
                     "invalid type instantiation `{}`: only structs, vectors, and primitive types allowed",
                     ty.display(&self.type_display_context()))
-            )
+            );
+            return false;
         }
+        true
     }
 
     /// Constructs a type display context used to visualize types in error messages.
@@ -1153,7 +1171,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let loc = self.to_loc(loc);
                 let elem_ty = if let Some(tys) = ty_opt {
                     if tys.len() != 1 {
-                        self.error(&loc, "wrong number of type arguments");
+                        self.error(
+                            &loc,
+                            &format!(
+                                "wrong number of type arguments (expected 1, got {})",
+                                tys.len()
+                            ),
+                        );
                         Type::Error
                     } else {
                         self.translate_type(&tys[0])
@@ -1688,6 +1712,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 };
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 if name.value.as_str() == "_" {
+                    let specialized_expected_type = self.subs.specialize(expected_type);
+                    if let Type::Tuple(tys) = specialized_expected_type {
+                        if tys.len() != 1 {
+                            self.error(loc, &format!("expected {} item(s), found 1", tys.len(),));
+                            return self.new_error_pat(loc);
+                        }
+                    }
                     Pattern::Wildcard(id)
                 } else {
                     let name = self.symbol_pool().make(&name.value);

@@ -32,8 +32,7 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::PayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
-    state_replication::StateComputer,
+    pipeline::{buffer_manager::OrderedBlocks, execution_client::TExecutionClient},
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{
@@ -205,7 +204,7 @@ impl SyncMode {
         let sync_manager = DagStateSynchronizer::new(
             bootstrapper.epoch_state.clone(),
             bootstrapper.time_service.clone(),
-            bootstrapper.state_computer.clone(),
+            bootstrapper.execution_client.clone(),
             bootstrapper.storage.clone(),
             bootstrapper.payload_manager.clone(),
             bootstrapper
@@ -331,8 +330,8 @@ pub struct DagBootstrapper {
     time_service: aptos_time_service::TimeService,
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
-    state_computer: Arc<dyn StateComputer>,
     ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+    execution_client: Arc<dyn TExecutionClient>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
     executor: BoundedExecutor,
@@ -354,8 +353,8 @@ impl DagBootstrapper {
         time_service: aptos_time_service::TimeService,
         payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
-        state_computer: Arc<dyn StateComputer>,
         ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+        execution_client: Arc<dyn TExecutionClient>,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
         executor: BoundedExecutor,
@@ -374,8 +373,8 @@ impl DagBootstrapper {
             time_service,
             payload_manager,
             payload_client,
-            state_computer,
             ordered_nodes_tx,
+            execution_client,
             quorum_store_enabled,
             vtxn_config,
             executor,
@@ -711,7 +710,7 @@ pub(super) fn bootstrap_dag_for_test(
     time_service: aptos_time_service::TimeService,
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
-    state_computer: Arc<dyn StateComputer>,
+    execution_client: Arc<dyn TExecutionClient>,
 ) -> (
     JoinHandle<SyncOutcome>,
     JoinHandle<()>,
@@ -734,8 +733,8 @@ pub(super) fn bootstrap_dag_for_test(
         time_service,
         payload_manager,
         payload_client,
-        state_computer,
         ordered_nodes_tx,
+        execution_client,
         false,
         ValidatorTxnConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
