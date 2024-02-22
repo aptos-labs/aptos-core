@@ -166,6 +166,7 @@ fn optimize_variables_declaration(
             }
         }
     }
+
     fn apply_variable_declaration(
         unit: &DecompiledCodeUnitRef,
         should_declare: &HashSet<usize>,

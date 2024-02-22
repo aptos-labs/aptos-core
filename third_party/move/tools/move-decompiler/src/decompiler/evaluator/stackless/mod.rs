@@ -182,14 +182,17 @@ impl ExprNodeOperation {
             },
         }
     }
+
     pub fn to_node(&self) -> ExprNodeRef {
         Rc::new(RefCell::new(ExprNode {
             operation: self.copy(),
         }))
     }
+
     pub fn to_expr(&self) -> Expr {
         Expr::new(self.to_node())
     }
+
     fn typeparams_to_source(types: &Vec<Type>, naming: &Naming) -> String {
         if types.is_empty() {
             String::new()
@@ -204,6 +207,7 @@ impl ExprNodeOperation {
             )
         }
     }
+
     fn const_to_source(val: &Constant) -> Result<String, anyhow::Error> {
         match val {
             Constant::Bool(v) => Ok(format!("{}", v)),
@@ -258,6 +262,7 @@ impl ExprNodeOperation {
             )),
         }
     }
+
     pub fn to_source_decl(&self, naming: &Naming) -> Result<String, anyhow::Error> {
         match self {
             ExprNodeOperation::StructPack(name, args, types) => {
@@ -283,10 +288,12 @@ impl ExprNodeOperation {
             _ => self.to_source(naming),
         }
     }
+
     pub fn to_source(&self, naming: &Naming) -> Result<String, anyhow::Error> {
         let ctx = ToSourceCtx::default();
         self.to_source_with_ctx(naming, &ctx)
     }
+
     fn to_source_with_ctx(
         &self,
         naming: &Naming,
