@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 
 use crate::utils::{
-    filter::EventFilter, filter_editor::spawn_filter_editor, stream::spawn_stream, EventModel,
+    filter::EventFilter, filter_editor::spawn_filter_editor, stream::spawn_stream,
+    EventStreamMessage,
 };
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use futures::stream::StreamExt;
@@ -24,7 +25,7 @@ pub struct EventFilterConfig {
 
 #[derive(Clone)]
 pub struct FilterContext {
-    pub channel: broadcast::Sender<EventModel>,
+    pub channel: broadcast::Sender<EventStreamMessage>,
     pub websocket_alive_duration: u64,
 }
 
@@ -81,7 +82,7 @@ impl RunnableConfig for EventFilterConfig {
         let broadcast_tx_write = broadcast_tx.clone();
         tokio::spawn(async move {
             let url =
-                Url::parse("ws://localhost:8081/stream").expect("Failed to parse WebSocket URL");
+                Url::parse("ws://localhost:12345/stream").expect("Failed to parse WebSocket URL");
 
             let (ws_stream, _) = connect_async(url)
                 .await
@@ -93,7 +94,10 @@ impl RunnableConfig for EventFilterConfig {
                 match message {
                     Ok(msg) => {
                         broadcast_tx_write
-                            .send(serde_json::from_str::<EventModel>(&msg.to_string()).unwrap())
+                            .send(
+                                serde_json::from_str::<EventStreamMessage>(&msg.to_string())
+                                    .unwrap(),
+                            )
                             .unwrap();
                     },
                     Err(e) => {

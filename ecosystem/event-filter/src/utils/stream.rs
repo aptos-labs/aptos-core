@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::utils::{filter::EventFilter, EventModel};
+use crate::utils::{filter::EventFilter, metrics::E2E_LATENCY_IN_SECS, EventStreamMessage};
 use futures::{stream::SplitSink, SinkExt};
 use std::{sync::Arc, time::Duration};
 use tokio::{
@@ -13,7 +13,7 @@ use warp::filters::ws::{Message, WebSocket};
 pub struct Stream {
     tx: SplitSink<WebSocket, Message>,
     filter: Arc<Mutex<EventFilter>>,
-    channel: broadcast::Receiver<EventModel>,
+    channel: broadcast::Receiver<EventStreamMessage>,
     websocket_alive_duration: u64,
 }
 
@@ -21,7 +21,7 @@ impl Stream {
     pub fn new(
         tx: SplitSink<WebSocket, Message>,
         filter: Arc<Mutex<EventFilter>>,
-        channel: broadcast::Receiver<EventModel>,
+        channel: broadcast::Receiver<EventStreamMessage>,
         websocket_alive_duration: u64,
     ) -> Self {
         info!("Received WebSocket connection");
@@ -51,6 +51,12 @@ impl Stream {
 
                     let filter = self.filter.lock().await;
                     if filter.accounts.contains(&event.account_address) || filter.types.contains(&event.type_) {
+                        E2E_LATENCY_IN_SECS.set({
+                            use chrono::TimeZone;
+                            let transaction_timestamp = chrono::Utc.from_utc_datetime(&event.transaction_timestamp);
+                            let transaction_timestamp = std::time::SystemTime::from(transaction_timestamp);
+                            std::time::SystemTime::now().duration_since(transaction_timestamp).unwrap_or_default().as_secs_f64()
+                        });
                         self.tx
                             .send(warp::ws::Message::text(serde_json::to_string(&event).unwrap_or_default()))
                             .await
@@ -68,7 +74,7 @@ impl Stream {
 pub async fn spawn_stream(
     tx: SplitSink<WebSocket, Message>,
     filter: Arc<Mutex<EventFilter>>,
-    channel: broadcast::Receiver<EventModel>,
+    channel: broadcast::Receiver<EventStreamMessage>,
     websocket_alive_duration: u64,
 ) {
     let mut stream = Stream::new(tx, filter, channel, websocket_alive_duration);

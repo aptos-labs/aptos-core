@@ -697,6 +697,7 @@ tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
+tokio-tungstenite = "0.21.0"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
 tonic = { version = "0.10.2", features = [
@@ -707,7 +708,6 @@ tonic = { version = "0.10.2", features = [
     "codegen",
 ] }
 tonic-reflection = "0.10.2"
-tokio-tungstenite = "0.21.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",

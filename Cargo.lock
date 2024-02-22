@@ -1352,6 +1352,7 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-runtimes",
  "async-trait",
+ "chrono",
  "clap 4.4.14",
  "futures",
  "once_cell",
