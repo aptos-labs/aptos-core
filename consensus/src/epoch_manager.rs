@@ -4,16 +4,16 @@
 
 use crate::{
     block_storage::{
+        tracing::{observe_block, BlockStage},
         BlockStore,
-        tracing::{BlockStage, observe_block},
     },
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
-    error::{DbError, error_kind},
+    error::{error_kind, DbError},
     liveness::{
         cached_proposer_election::CachedProposerElection,
         leader_reputation::{
-            AptosDBBackend, extract_epoch_to_proposers, LeaderReputation,
+            extract_epoch_to_proposers, AptosDBBackend, LeaderReputation,
             ProposerAndVoterHeuristic, ReputationHeuristic,
         },
         proposal_generator::{
@@ -28,15 +28,12 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest,
-        IncomingDAGRequest,
-        IncomingRandGenRequest,
-        IncomingRpcRequest,
-        NetworkReceivers, NetworkSender,
+        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingDAGRequest,
+        IncomingRandGenRequest, IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_client::{
-        mixed::MixedPayloadClient, PayloadClient, user::quorum_store_client::QuorumStoreClient,
+        mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
     },
     payload_manager::PayloadManager,
     persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
@@ -54,7 +51,7 @@ use crate::{
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
     util::time_service::TimeService,
 };
-use anyhow::{anyhow, bail, Context, ensure};
+use anyhow::{anyhow, bail, ensure, Context};
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
@@ -66,7 +63,7 @@ use aptos_consensus_types::{
     epoch_retrieval::EpochRetrievalRequest,
 };
 use aptos_dkg::{
-    pvss::{Player, traits::Transcript},
+    pvss::{traits::Transcript, Player},
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_event_notifications::ReconfigNotificationListener;
@@ -79,27 +76,27 @@ use aptos_safety_rules::SafetyRulesManager;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
     account_address::AccountAddress,
-    dkg::{DefaultDKG, DKGState, DKGTrait, real_dkg::maybe_dk_from_bls_sk},
+    dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
+        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
         OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
-    randomness::{RandKeys, WVUF, WvufPP},
+    randomness::{RandKeys, WvufPP, WVUF},
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
 use futures::{
     channel::{
         mpsc,
-        mpsc::{Sender, unbounded, UnboundedSender},
+        mpsc::{unbounded, Sender, UnboundedSender},
         oneshot,
     },
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
-use rand::{prelude::StdRng, SeedableRng, thread_rng};
+use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -108,7 +105,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_types::on_chain_config::FeatureFlag;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -341,9 +337,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     LeaderReputationType::ProposerAndVoter(proposer_and_voter_config)
                     | LeaderReputationType::ProposerAndVoterV2(proposer_and_voter_config) => {
                         let proposer_window_size = proposers.len()
-                            *proposer_and_voter_config.proposer_window_num_validators_multiplier;
+                            * proposer_and_voter_config.proposer_window_num_validators_multiplier;
                         let voter_window_size = proposers.len()
-                            *proposer_and_voter_config.voter_window_num_validators_multiplier;
+                            * proposer_and_voter_config.voter_window_num_validators_multiplier;
                         let heuristic: Box<dyn ReputationHeuristic> =
                             Box::new(ProposerAndVoterHeuristic::new(
                                 self.author,
@@ -820,7 +816,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let safety_rules_container = Arc::new(Mutex::new(safety_rules));
 
-        self.rand_manager_msg_tx = self.execution_client
+        self.rand_manager_msg_tx = self
+            .execution_client
             .start_epoch(
                 epoch_state.clone(),
                 safety_rules_container.clone(),
@@ -1027,7 +1024,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         });
-        debug!(epoch = epoch_state.epoch, "EpochManager::star_new_epoch() starting.");
+        debug!(
+            epoch = epoch_state.epoch,
+            "EpochManager::star_new_epoch() starting."
+        );
 
         self.epoch_state = Some(epoch_state.clone());
 
@@ -1185,7 +1185,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "decoupled execution must be enabled"
         );
 
-        self.rand_manager_msg_tx = self.execution_client
+        self.rand_manager_msg_tx = self
+            .execution_client
             .start_epoch(
                 epoch_state.clone(),
                 commit_signer,
