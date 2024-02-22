@@ -28,6 +28,7 @@ base64 = { workspace = true }
 clap = { workspace = true }
 cloud-storage = { workspace = true }
 futures = { workspace = true }
+hyper = { workspace = true }
 once_cell = { workspace = true }
 prost = { workspace = true }
 redis = { workspace = true }

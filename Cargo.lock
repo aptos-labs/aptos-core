@@ -2147,6 +2147,7 @@ dependencies = [
  "clap 4.4.14",
  "cloud-storage",
  "futures",
+ "hyper",
  "once_cell",
  "prost 0.12.3",
  "redis",
