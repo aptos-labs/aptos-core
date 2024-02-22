@@ -34,13 +34,7 @@ use aptos_types::{
 };
 use fail::fail_point;
 use futures::{future::BoxFuture, SinkExt, StreamExt};
-use std::{
-    boxed::Box,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{boxed::Box, sync::Arc};
 use tokio::sync::Mutex as AsyncMutex;
 
 pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecutionResult>>;
@@ -82,6 +76,7 @@ struct MutableState {
     transaction_shuffler: Arc<dyn TransactionShuffler>,
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
+    is_randomness_enabled: bool,
 }
 
 /// Basic communication with the Execution module;
@@ -95,7 +90,6 @@ pub struct ExecutionProxy {
     transaction_filter: Arc<TransactionFilter>,
     execution_pipeline: ExecutionPipeline,
     state: RwLock<Option<MutableState>>,
-    randomness_enabled: AtomicBool,
 }
 
 impl ExecutionProxy {
@@ -130,7 +124,6 @@ impl ExecutionProxy {
             write_mutex: AsyncMutex::new(LogicalTime::new(0, 0)),
             transaction_filter: Arc::new(txn_filter),
             execution_pipeline,
-            randomness_enabled: AtomicBool::new(false),
             state: RwLock::new(None),
         }
     }
@@ -139,6 +132,7 @@ impl ExecutionProxy {
         &self,
         executed_block: &PipelinedBlock,
         validators: &[AccountAddress],
+        randomness_enabled: bool,
     ) -> Vec<Transaction> {
         // reconfiguration suffix don't execute
         if executed_block.is_reconfiguration_suffix() {
@@ -147,7 +141,7 @@ impl ExecutionProxy {
 
         let user_txns = executed_block.input_transactions().clone();
         let validator_txns = executed_block.validator_txns().cloned().unwrap_or_default();
-        let metadata = if self.randomness_enabled.load(Ordering::SeqCst) {
+        let metadata = if randomness_enabled {
             executed_block
                 .block()
                 .new_metadata_with_randomness(validators, executed_block.randomness().cloned())
@@ -186,6 +180,7 @@ impl StateComputer for ExecutionProxy {
             transaction_shuffler,
             block_executor_onchain_config,
             transaction_deduper,
+            is_randomness_enabled,
         } = self
             .state
             .read()
@@ -204,7 +199,7 @@ impl StateComputer for ExecutionProxy {
         let block_executor_onchain_config = block_executor_onchain_config.clone();
 
         let timestamp = block.timestamp_usecs();
-        let metadata = if self.randomness_enabled.load(Ordering::SeqCst) {
+        let metadata = if is_randomness_enabled {
             block.new_metadata_with_randomness(&validators, randomness)
         } else {
             block.new_block_metadata(&validators).into()
@@ -263,6 +258,7 @@ impl StateComputer for ExecutionProxy {
         let MutableState {
             payload_manager,
             validators,
+            is_randomness_enabled,
             ..
         } = self
             .state
@@ -277,7 +273,7 @@ impl StateComputer for ExecutionProxy {
                 payloads.push(payload.clone());
             }
 
-            txns.extend(self.transactions_to_commit(block, &validators));
+            txns.extend(self.transactions_to_commit(block, &validators, is_randomness_enabled));
             subscribable_txn_events.extend(block.subscribable_events());
         }
 
@@ -381,9 +377,8 @@ impl StateComputer for ExecutionProxy {
             transaction_shuffler,
             block_executor_onchain_config,
             transaction_deduper,
+            is_randomness_enabled: randomness_enabled,
         });
-        self.randomness_enabled
-            .store(randomness_enabled, Ordering::SeqCst);
     }
 
     // Clears the epoch-specific state. Only a sync_to call is expected before calling new_epoch
