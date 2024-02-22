@@ -653,7 +653,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         self.rand_manager_msg_tx = None;
 
         // Shutdown the previous buffer manager, to release the SafetyRule client
+        debug!(epoch = self.epoch_state.as_ref().map(|es|es.epoch), "EpochManager::shutdown_current_processor() checkpoint 1");
         self.execution_client.end_epoch().await;
+        debug!(epoch = self.epoch_state.as_ref().map(|es|es.epoch), "EpochManager::shutdown_current_processor() checkpoint 2");
 
         // Shutdown the block retrieval task by dropping the sender
         self.block_retrieval_tx = None;
