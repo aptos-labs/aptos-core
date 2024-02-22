@@ -14,6 +14,7 @@ use std::path::Path;
 use crate::mutant::Mutant;
 use crate::operator::MutationOp;
 use crate::operators::binary::Binary;
+use crate::operators::binary_swap::BinarySwap;
 use crate::operators::break_continue::BreakContinue;
 use crate::operators::delete_stmt::DeleteStmt;
 use crate::operators::ifelse::IfElse;
@@ -251,11 +252,15 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
         ast::UnannotatedExp_::BinopExp(left, binop, _type, right) => {
             // Parse left and right side of the operator as they are expressions and may contain
             // another things to mutate.
-            let mut mutants = parse_expression_and_find_mutants(*left)?;
-            mutants.extend(parse_expression_and_find_mutants(*right)?);
+            let mut mutants = parse_expression_and_find_mutants(*left.clone())?;
+            mutants.extend(parse_expression_and_find_mutants(*right.clone())?);
 
             // Add the mutation operator to the list of mutants.
             mutants.push(Mutant::new(MutationOp::BinaryOp(Binary::new(binop)), None));
+            mutants.push(Mutant::new(
+                MutationOp::BinarySwap(BinarySwap::new(binop, *left, *right)),
+                None,
+            ));
 
             trace!("Found possible mutation in BinaryExp {binop:?}");
 
