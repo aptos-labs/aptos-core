@@ -5,5 +5,5 @@
 mod builtins;
 mod exp_builder;
 mod macros;
-pub(crate) mod model_builder;
-pub(crate) mod module_builder;
+pub mod model_builder;
+pub mod module_builder;

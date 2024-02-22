@@ -10725,6 +10725,7 @@ dependencies = [
  "anyhow",
  "aptos-framework",
  "clap 3.2.25",
+ "codespan",
  "datatest-stable",
  "itertools 0.10.5",
  "move-binary-format",

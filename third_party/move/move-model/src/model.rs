@@ -511,7 +511,7 @@ pub struct GlobalEnv {
     /// start position of the associated language item in the source.
     pub(crate) doc_comments: BTreeMap<FileId, BTreeMap<ByteIndex, String>>,
     /// A mapping from file hash to file name and associated FileId.
-    pub(crate) file_hash_map: BTreeMap<FileHash, (String, FileId)>,
+    pub file_hash_map: BTreeMap<FileHash, (String, FileId)>,
     /// Reverse of the above mapping, mapping FileId to hash.
     pub(crate) reverse_file_hash_map: BTreeMap<FileId, FileHash>,
     /// A mapping from file id to associated alias map.
@@ -2254,66 +2254,66 @@ impl GlobalEnv {
 #[derive(Debug)]
 pub struct ModuleData {
     /// Module name.
-    pub(crate) name: ModuleName,
+    pub name: ModuleName,
 
     /// Id of this module in the global env.
-    pub(crate) id: ModuleId,
+    pub id: ModuleId,
 
     /// Attributes attached to this module.
-    pub(crate) attributes: Vec<Attribute>,
+    pub attributes: Vec<Attribute>,
 
     /// Use declarations
-    pub(crate) use_decls: Vec<UseDecl>,
+    pub use_decls: Vec<UseDecl>,
 
     /// Friend declarations
-    pub(crate) friend_decls: Vec<FriendDecl>,
+    pub friend_decls: Vec<FriendDecl>,
 
     /// Module byte code, if available.
-    pub(crate) compiled_module: Option<CompiledModule>,
+    pub compiled_module: Option<CompiledModule>,
 
     /// Module source location information for bytecode, if a bytecode module is attached.
-    pub(crate) source_map: Option<SourceMap>,
+    pub source_map: Option<SourceMap>,
 
     /// Named constant data
-    pub(crate) named_constants: BTreeMap<NamedConstantId, NamedConstantData>,
+    pub named_constants: BTreeMap<NamedConstantId, NamedConstantData>,
 
     /// Struct data.
-    pub(crate) struct_data: BTreeMap<StructId, StructData>,
+    pub struct_data: BTreeMap<StructId, StructData>,
 
     /// Mapping from struct definition index to id in above map.
-    pub(crate) struct_idx_to_id: BTreeMap<StructDefinitionIndex, StructId>,
+    pub struct_idx_to_id: BTreeMap<StructDefinitionIndex, StructId>,
 
     /// Function data.
-    pub(crate) function_data: BTreeMap<FunId, FunctionData>,
+    pub function_data: BTreeMap<FunId, FunctionData>,
 
     /// Mapping from function definition index to id in above map. This map is empty if not
     /// bytecode module is attached.
-    pub(crate) function_idx_to_id: BTreeMap<FunctionDefinitionIndex, FunId>,
+    pub function_idx_to_id: BTreeMap<FunctionDefinitionIndex, FunId>,
 
     /// Specification variables, in SpecVarId order.
-    pub(crate) spec_vars: BTreeMap<SpecVarId, SpecVarDecl>,
+    pub spec_vars: BTreeMap<SpecVarId, SpecVarDecl>,
 
     /// Specification functions, in SpecFunId order.
-    pub(crate) spec_funs: BTreeMap<SpecFunId, SpecFunDecl>,
+    pub spec_funs: BTreeMap<SpecFunId, SpecFunDecl>,
 
     /// Module level specification.
-    pub(crate) module_spec: Spec,
+    pub module_spec: Spec,
 
     /// The location of this module.
-    pub(crate) loc: Loc,
+    pub loc: Loc,
 
     /// A list of spec block infos, for documentation generation.
-    pub(crate) spec_block_infos: Vec<SpecBlockInfo>,
+    pub spec_block_infos: Vec<SpecBlockInfo>,
 
     /// Holds the set of modules used by this one. This excludes usage from specifications.
-    pub(crate) used_modules: BTreeSet<ModuleId>,
+    pub used_modules: BTreeSet<ModuleId>,
 
     /// Holds the set of modules used by this one, including specification constructs.
     /// Computed lazily.
-    pub(crate) used_modules_including_specs: RefCell<Option<BTreeSet<ModuleId>>>,
+    pub used_modules_including_specs: RefCell<Option<BTreeSet<ModuleId>>>,
 
     /// Holds the set of modules declared as friend.
-    pub(crate) friend_modules: BTreeSet<ModuleId>,
+    pub friend_modules: BTreeSet<ModuleId>,
 }
 
 
@@ -2973,32 +2973,32 @@ impl<'env> ModuleEnv<'env> {
 #[derive(Debug)]
 pub struct StructData {
     /// The name of this struct.
-    pub(crate) name: Symbol,
+    pub name: Symbol,
 
     /// The location of this struct.
-    pub(crate) loc: Loc,
+    pub loc: Loc,
 
     /// The definition index of this structure in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
-    pub(crate) def_idx: Option<StructDefinitionIndex>,
+    pub def_idx: Option<StructDefinitionIndex>,
 
     /// Attributes attached to this struct.
-    pub(crate) attributes: Vec<Attribute>,
+    pub attributes: Vec<Attribute>,
 
     /// Type parameters of this struct.
-    pub(crate) type_params: Vec<TypeParameter>,
+    pub type_params: Vec<TypeParameter>,
 
     /// Abilities of this struct.
-    pub(crate) abilities: AbilitySet,
+    pub abilities: AbilitySet,
 
     /// If this is a struct generated for a specification variable, the variable id.
-    pub(crate) spec_var_opt: Option<SpecVarId>,
+    pub spec_var_opt: Option<SpecVarId>,
 
     /// Field definitions.
-    pub(crate) field_data: BTreeMap<FieldId, FieldData>,
+    pub field_data: BTreeMap<FieldId, FieldData>,
 
     /// Associated specification.
-    pub(crate) spec: Spec,
+    pub spec: Spec,
 }
 
 #[derive(Debug, Clone)]
@@ -3453,58 +3453,58 @@ impl EqIgnoringLoc for Parameter {
 #[derive(Debug)]
 pub struct FunctionData {
     /// Name of this function.
-    pub(crate) name: Symbol,
+    pub name: Symbol,
 
     /// Location of this function.
-    pub(crate) loc: Loc,
+    pub loc: Loc,
 
     /// The definition index of this function in its bytecode module, if a bytecode module
     /// is attached to the parent module data.
-    pub(crate) def_idx: Option<FunctionDefinitionIndex>,
+    pub def_idx: Option<FunctionDefinitionIndex>,
 
     /// The handle index of this function in its module, if a bytecode module
     /// is attached to the parent module data.
-    pub(crate) handle_idx: Option<FunctionHandleIndex>,
+    pub handle_idx: Option<FunctionHandleIndex>,
 
     /// Visibility of this function (private, friend, or public)
-    pub(crate) visibility: Visibility,
+    pub visibility: Visibility,
 
     /// Whether this is a native function
-    pub(crate) is_native: bool,
+    pub is_native: bool,
 
     /// The kind of the function.
-    pub(crate) kind: FunctionKind,
+    pub kind: FunctionKind,
 
     /// Attributes attached to this function.
-    pub(crate) attributes: Vec<Attribute>,
+    pub attributes: Vec<Attribute>,
 
     /// Type parameters.
-    pub(crate) type_params: Vec<TypeParameter>,
+    pub type_params: Vec<TypeParameter>,
 
     /// Parameters
-    pub(crate) params: Vec<Parameter>,
+    pub params: Vec<Parameter>,
 
     /// Result type of the function, uses `Type::Tuple` for multiple values.
-    pub(crate) result_type: Type,
+    pub result_type: Type,
 
     /// Access specifiers.
-    pub(crate) access_specifiers: Option<Vec<AccessSpecifier>>,
+    pub access_specifiers: Option<Vec<AccessSpecifier>>,
 
     /// Specification associated with this function.
-    pub(crate) spec: RefCell<Spec>,
+    pub spec: RefCell<Spec>,
 
     /// Optional definition associated with this function. The definition is available if
     /// the model is build with option `ModelBuilderOptions::compile_via_model`.
-    pub(crate) def: Option<Exp>,
+    pub def: Option<Exp>,
 
     /// A cache for the called functions.
-    pub(crate) called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
+    pub called_funs: Option<BTreeSet<QualifiedId<FunId>>>,
 
     /// A cache for the calling functions.
-    pub(crate) calling_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+    pub calling_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 
     /// A cache for the transitive closure of the called functions.
-    pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+    pub transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
 /// Kind of a function,

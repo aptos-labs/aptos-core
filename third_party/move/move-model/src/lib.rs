@@ -47,10 +47,9 @@ use std::{
 };
 
 pub mod ast;
-mod builder;
+pub mod builder;
 pub mod code_writer;
 pub mod constant_folder;
-pub mod demove_helper;  // decompiler
 pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod intrinsics;
@@ -828,7 +827,7 @@ pub fn parse_addresses_from_options(
         .collect()
 }
 
-fn expansion_script_to_module(script: E::Script) -> E::ModuleDefinition {
+pub fn expansion_script_to_module(script: E::Script) -> E::ModuleDefinition {
     let E::Script {
         package_name,
         attributes,

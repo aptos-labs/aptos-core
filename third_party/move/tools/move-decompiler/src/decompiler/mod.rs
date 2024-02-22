@@ -405,7 +405,7 @@ impl<'a> Decompiler<'a> {
         let naming = Naming::new();
 
         let program = bin_to_compiler_translator::create_program(&self.binaries, &naming).unwrap();
-        move_model::demove_helper::run_stackless_compiler(&mut self.env, program);
+        model::demove_helper::run_stackless_compiler(&mut self.env, program);
 
         // all module must be populated before decompiling
         for binary in &self.binaries {

@@ -37,7 +37,7 @@ use std::collections::{BTreeMap, BTreeSet};
 /// are extended with each module translated. Each table is a mapping from fully qualified names
 /// (module names plus item name in the module) to the entity.
 #[derive(Debug)]
-pub(crate) struct ModelBuilder<'env> {
+pub struct ModelBuilder<'env> {
     /// The global environment we are building.
     pub env: &'env mut GlobalEnv,
     /// A symbol table for specification functions. Because of overloading, and entry can
