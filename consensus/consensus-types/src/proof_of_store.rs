@@ -212,7 +212,7 @@ impl SignedBatchInfo {
         &self,
         sender: PeerId,
         max_batch_expiry_gap_usecs: u64,
-        _validator: &ValidatorVerifier,
+        validator: &ValidatorVerifier,
     ) -> anyhow::Result<()> {
         if sender != self.signer {
             bail!("Sender {} mismatch signer {}", sender, self.signer);
@@ -230,8 +230,7 @@ impl SignedBatchInfo {
             );
         }
 
-        // Ok(validator.verify(self.signer, &self.info, &self.signature)?)
-        Ok(())
+        Ok(validator.verify(self.signer, &self.info, &self.signature)?)
     }
 
     pub fn signature(self) -> bls12381::Signature {
