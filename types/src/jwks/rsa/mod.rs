@@ -59,7 +59,7 @@ impl RSA_JWK {
     }
 
     // TODO(oidb): Move this to aptos-crypto so other services can use this
-    pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
+    pub fn poseidon_hash_of_modulus(&self) -> Result<ark_bn254::Fr> {
         let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
         // The circuit only supports RSA256
         if modulus.len() != Self::RSA_MODULUS_BYTES {

@@ -186,7 +186,7 @@ pub fn get_public_inputs_hash(
             config.max_jwt_header_b64_bytes as usize,
         )?;
 
-        let jwk_hash = jwk.to_poseidon_scalar()?;
+        let jwk_hash = jwk.poseidon_hash_of_modulus()?;
 
         // Add the hash of the value of the `iss` field
         let iss_field_hash = poseidon_bn254::pad_and_hash_string(
