@@ -5,8 +5,6 @@ module aptos_framework::block {
     use std::vector;
     use std::option;
     use std::option::Option;
-    use std::string::utf8;
-    use aptos_std::debug;
     use aptos_framework::randomness;
 
     use aptos_framework::account;
@@ -174,7 +172,6 @@ module aptos_framework::block {
         let epoch_interval = block_prologue_common(&vm, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
         randomness::on_new_block(&vm, epoch, round, option::none());
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
-            debug::print(&utf8(b"epoch time out"));
             reconfiguration::reconfigure();
         };
     }

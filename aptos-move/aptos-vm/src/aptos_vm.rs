@@ -1671,6 +1671,7 @@ impl AptosVM {
                 None,
             ))
         });
+
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata));
 
@@ -1772,6 +1773,7 @@ impl AptosVM {
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
+
         Ok((VMStatus::Executed, output))
     }
 
