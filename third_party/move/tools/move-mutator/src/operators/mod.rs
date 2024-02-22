@@ -1,4 +1,5 @@
 pub(crate) mod binary;
+pub(crate) mod binary_swap;
 pub(crate) mod break_continue;
 pub(crate) mod delete_stmt;
 pub(crate) mod ifelse;

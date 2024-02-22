@@ -1,4 +1,5 @@
 use crate::operators::binary::Binary;
+use crate::operators::binary_swap::BinarySwap;
 use crate::operators::break_continue::BreakContinue;
 use crate::operators::delete_stmt::DeleteStmt;
 use crate::operators::ifelse::IfElse;
@@ -61,6 +62,7 @@ pub enum MutationOp {
     Literal(Literal),
     IfElse(IfElse),
     DeleteStmt(DeleteStmt),
+    BinarySwap(BinarySwap),
 }
 
 impl MutationOperator for MutationOp {
@@ -74,6 +76,7 @@ impl MutationOperator for MutationOp {
             MutationOp::Literal(literal) => literal.apply(source),
             MutationOp::IfElse(if_else) => if_else.apply(source),
             MutationOp::DeleteStmt(delete_stmt) => delete_stmt.apply(source),
+            MutationOp::BinarySwap(binary_swap) => binary_swap.apply(source),
         }
     }
 
@@ -85,6 +88,7 @@ impl MutationOperator for MutationOp {
             MutationOp::Literal(literal) => literal.get_file_hash(),
             MutationOp::IfElse(if_else) => if_else.get_file_hash(),
             MutationOp::DeleteStmt(delete_stmt) => delete_stmt.get_file_hash(),
+            MutationOp::BinarySwap(binary_swap) => binary_swap.get_file_hash(),
         }
     }
 
@@ -96,6 +100,7 @@ impl MutationOperator for MutationOp {
             MutationOp::Literal(literal) => literal.name(),
             MutationOp::IfElse(if_else) => if_else.name(),
             MutationOp::DeleteStmt(delete_stmt) => delete_stmt.name(),
+            MutationOp::BinarySwap(binary_swap) => binary_swap.name(),
         }
     }
 }
@@ -109,6 +114,7 @@ impl fmt::Display for MutationOp {
             MutationOp::Literal(literal) => write!(f, "{literal}"),
             MutationOp::IfElse(if_else) => write!(f, "{if_else}"),
             MutationOp::DeleteStmt(delete_stmt) => write!(f, "{delete_stmt}"),
+            MutationOp::BinarySwap(binary_swap) => write!(f, "{binary_swap}"),
         }
     }
 }
