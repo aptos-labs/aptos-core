@@ -139,6 +139,7 @@ members = [
     "network/framework",
     "network/memsocket",
     "network/netcore",
+    "oidb/pepper/common", "oidb/pepper/example-client-rust", "oidb/pepper/service",
     "peer-monitoring-service/client",
     "peer-monitoring-service/server",
     "peer-monitoring-service/types",
@@ -384,6 +385,8 @@ aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
+aptos-oidb-pepper-common = { path = "oidb/pepper/common" }
+aptos-oidb-pepper-service = { path = "oidb/pepper/service" }
 aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "protos/rust" }
@@ -441,6 +444,7 @@ aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 # Please do not add any test features here: they should be declared by the individual crate.
 nalgebra = "0.32"
 float-cmp = "0.9.0"
+aes-gcm = "0.10.3"
 again = "0.1.2"
 anyhow = "1.0.71"
 anstyle = "1.0.1"
@@ -565,6 +569,7 @@ jemallocator = { version = "0.5.0", features = [
 jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
+jwt = "0.16.0"
 lazy_static = "1.4.0"
 libc = "0.2.147"
 libfuzzer-sys = "0.4.6"
