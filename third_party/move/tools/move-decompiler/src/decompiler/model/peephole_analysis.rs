@@ -4,7 +4,7 @@
 
 use move_model::model::FunctionEnv;
 
-use crate::{
+use move_stackless_bytecode::{
     function_target::FunctionData,
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::{Bytecode, Operation},
