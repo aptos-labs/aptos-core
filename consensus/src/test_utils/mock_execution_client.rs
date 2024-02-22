@@ -4,16 +4,18 @@
 
 use crate::{
     error::StateSyncError,
-    network::IncomingCommitRequest,
+    network::{IncomingCommitRequest, IncomingRandGenRequest},
     payload_manager::PayloadManager,
     pipeline::{
         buffer_manager::OrderedBlocks, execution_client::TExecutionClient,
         signing_phase::CommitSignerProvider,
     },
+    rand::rand_gen::types::RandConfig,
     state_replication::StateComputerCommitCallBackType,
     test_utils::mock_storage::MockStorage,
 };
 use anyhow::{format_err, Result};
+use aptos_channels::aptos_channel;
 use aptos_consensus_types::{common::Payload, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
@@ -22,16 +24,13 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{Features, OnChainExecutionConfig},
+    on_chain_config::{Features, OnChainConsensusConfig, OnChainExecutionConfig},
     transaction::SignedTransaction,
 };
 use futures::{channel::mpsc, SinkExt};
 use futures_channel::mpsc::UnboundedSender;
 use move_core_types::account_address::AccountAddress;
 use std::{collections::HashMap, sync::Arc};
-use aptos_channels::aptos_channel;
-use crate::network::IncomingRandGenRequest;
-use crate::rand::rand_gen::types::RandConfig;
 
 pub struct MockExecutionClient {
     state_sync_client: mpsc::UnboundedSender<Vec<SignedTransaction>>,
@@ -95,6 +94,7 @@ impl TExecutionClient for MockExecutionClient {
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<PayloadManager>,
+        _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
         _features: &Features,
         _rand_config: Option<RandConfig>,

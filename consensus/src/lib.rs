@@ -64,7 +64,10 @@ mod txn_hash_and_authenticator_deduper;
 
 use aptos_config::config::SecureBackend;
 use aptos_consensus_types::common::Author;
+use aptos_global_constants::CONSENSUS_KEY;
 use aptos_metrics_core::IntGauge;
+use aptos_secure_storage::{KVStorage, Storage};
+use aptos_types::validator_signer::ValidatorSigner;
 pub use consensusdb::create_checkpoint;
 /// Required by the smoke tests
 pub use consensusdb::CONSENSUS_DB_NAME;
@@ -72,10 +75,6 @@ pub use quorum_store::quorum_store_db::QUORUM_STORE_DB_NAME;
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;
 use std::sync::Arc;
-use aptos_global_constants::CONSENSUS_KEY;
-use aptos_secure_storage::Storage;
-use aptos_types::validator_signer::ValidatorSigner;
-use aptos_secure_storage::KVStorage;
 
 struct IntGaugeGuard {
     gauge: IntGauge,
