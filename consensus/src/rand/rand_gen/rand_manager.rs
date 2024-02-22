@@ -335,7 +335,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 }
                 Some(reset) = reset_rx.next() => {
                     debug!("RandManager received a reset.");
-                    while incoming_blocks.try_next().is_ok() {}
+                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
                     debug!("RandManager cleared blocks.");
                     self.process_reset(reset);
                     debug!("RandManager processed reset.");
