@@ -250,6 +250,7 @@ impl TExecutionClient for ExecutionProxyClient {
         features: &Features,
         rand_config: Option<RandConfig>,
     ) -> Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>> {
+        debug!(epoch = epoch_state.epoch, "ExecutionProxyClient::start_epoch() starting.");
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(commit_signer_provider, epoch_state.clone(), rand_config);
 
         let transaction_shuffler =
@@ -267,6 +268,7 @@ impl TExecutionClient for ExecutionProxyClient {
             features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
         );
 
+        debug!(epoch = epoch_state.epoch, "ExecutionProxyClient::start_epoch() finishing.");
         maybe_rand_msg_tx
     }
 

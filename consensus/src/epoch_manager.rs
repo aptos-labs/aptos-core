@@ -624,6 +624,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     async fn shutdown_current_processor(&mut self) {
+        debug!(epoch = self.epoch_state.as_ref().map(|es|es.epoch), "EpochManager::shutdown_current_processor() starting.");
         if let Some(close_tx) = self.round_manager_close_tx.take() {
             // Release the previous RoundManager, especially the SafetyRule client
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -666,6 +667,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .expect("Could not send shutdown indicator to QuorumStore");
             ack_rx.await.expect("Failed to stop QuorumStore");
         }
+        debug!(epoch = self.epoch_state.as_ref().map(|es|es.epoch), "EpochManager::shutdown_current_processor() finishing.");
     }
 
     async fn start_recovery_manager(
@@ -1030,6 +1032,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch: payload.epoch(),
             verifier: (&validator_set).into(),
         });
+        debug!(epoch = epoch_state.epoch, "EpochManager::star_new_epoch() starting.");
 
         self.epoch_state = Some(epoch_state.clone());
 
