@@ -905,3 +905,21 @@ pub static EPOCH_MANAGER_ISSUES_DETAILS: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static PROPOSED_VTXN_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_proposed_vtxn_count",
+        "Number of validator transactions proposed",
+        &["proposer"]
+    )
+    .unwrap()
+});
+
+pub static PROPOSED_VTXN_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_proposed_vtxn_bytes",
+        "The total size in bytes of validator transactions proposed",
+        &["proposer"]
+    )
+    .unwrap()
+});
