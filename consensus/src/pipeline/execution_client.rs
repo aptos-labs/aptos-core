@@ -374,10 +374,12 @@ impl TExecutionClient for ExecutionProxyClient {
     }
 
     async fn end_epoch(&self) {
+        debug!("ExecutionProxyClient::end_epoch() starting.");
         let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
             let mut handle = self.handle.write();
             handle.reset()
         };
+        debug!("ExecutionProxyClient::end_epoch() txs obtained.");
 
         if let Some(mut tx) = reset_tx_to_rand_manager {
             let (ack_tx, ack_rx) = oneshot::channel();
@@ -392,6 +394,8 @@ impl TExecutionClient for ExecutionProxyClient {
                 .expect("[EpochManager] Fail to drop rand manager");
         }
 
+        debug!("ExecutionProxyClient::end_epoch() rand manager closed.");
+
         if let Some(mut tx) = reset_tx_to_buffer_manager {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
@@ -404,7 +408,11 @@ impl TExecutionClient for ExecutionProxyClient {
                 .await
                 .expect("[EpochManager] Fail to drop buffer manager");
         }
+
+        debug!("ExecutionProxyClient::end_epoch() buffer manager closed.");
+
         self.execution_proxy.end_epoch();
+        debug!("ExecutionProxyClient::end_epoch() proxy ended.");
     }
 }
 
