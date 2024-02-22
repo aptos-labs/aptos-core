@@ -48,7 +48,7 @@ impl Command {
         println!("Chain ID: {}", chain_id.id());
         println!("Network: {}", network);
 
-        let endpoint = format!("https://{}.aptoslabs.com/v1", network);
+        let endpoint = format!("https://api.{}.aptoslabs.com/v1", network);
         let debugger = AptosDebugger::rest_client(Client::new(Url::parse(&endpoint)?))?;
         let version = debugger
             .get_version_by_account_sequence(txn.sender(), txn.sequence_number())

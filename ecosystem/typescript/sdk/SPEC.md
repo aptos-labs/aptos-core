@@ -68,7 +68,7 @@ We do not use the fourth **`won't`** level in this specification.
 
 - [ ] **2.1** The SDK **must** interact directly with the Aptos REST API.
   - [ ] **2.1.1** The SDK **must** support pagination with optional `start` and `limit` parameters to the REST API request.
-  - [ ] **2.1.2** The SDK **should** implement a client that adheres to the OpenAPI spec https://fullnode.mainnet.aptoslabs.com/v1/spec#/.
+  - [ ] **2.1.2** The SDK **should** implement a client that adheres to the OpenAPI spec https://api.mainnet.aptoslabs.com/v1/spec#/.
 - [ ] **2.2** The SDK **should** interact directly with the Aptos Indexer API.
   - [ ] **2.2.1** The SDK **must** support pagination with optional `offset` and `limit` parameters to Indexer API request.
   - [ ] **2.2.2** The SDK **must** validate the account address when interacting with the Indexer API.

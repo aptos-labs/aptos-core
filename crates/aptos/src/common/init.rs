@@ -126,17 +126,17 @@ impl CliCommand<()> for InitTool {
         match network {
             Network::Mainnet => {
                 profile_config.rest_url =
-                    Some("https://fullnode.mainnet.aptoslabs.com".to_string());
+                    Some("https://api.mainnet.aptoslabs.com".to_string());
                 profile_config.faucet_url = None;
             },
             Network::Testnet => {
                 profile_config.rest_url =
-                    Some("https://fullnode.testnet.aptoslabs.com".to_string());
+                    Some("https://api.testnet.aptoslabs.com".to_string());
                 profile_config.faucet_url =
                     Some("https://faucet.testnet.aptoslabs.com".to_string());
             },
             Network::Devnet => {
-                profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
+                profile_config.rest_url = Some("https://api.devnet.aptoslabs.com".to_string());
                 profile_config.faucet_url = Some("https://faucet.devnet.aptoslabs.com".to_string());
             },
             Network::Local => {

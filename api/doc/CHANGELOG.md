@@ -20,12 +20,12 @@ N/A
 
 Example A (deprecated endpoint):
 ```
-$ curl https://fullnode.devnet.aptoslabs.com/v1/events/0x02000000000000000000000000000000000000000000000000000000000000000000000000000001
+$ curl https://api.devnet.aptoslabs.com/v1/events/0x02000000000000000000000000000000000000000000000000000000000000000000000000000001
 ```
 
 Example B (new endpoint):
 ```
-$ curl https://fullnode.devnet.aptoslabs.com/v1/accounts/0x1/events/2
+$ curl https://api.devnet.aptoslabs.com/v1/accounts/0x1/events/2
 ```
 
 Output A (prior to this release):

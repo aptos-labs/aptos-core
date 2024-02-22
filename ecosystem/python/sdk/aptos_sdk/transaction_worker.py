@@ -202,7 +202,7 @@ class Test(unittest.IsolatedAsyncioTestCase):
         )
         submit_txn_patcher.start()
 
-        rest_client = RestClient("https://fullnode.devnet.aptoslabs.com/v1")
+        rest_client = RestClient("https://api.devnet.aptoslabs.com/v1")
         txn_queue = TransactionQueue(rest_client)
         txn_worker = TransactionWorker(Account.generate(), rest_client, txn_queue.next)
         txn_worker.start()

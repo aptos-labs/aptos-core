@@ -2,7 +2,7 @@
 
 TEMP="$(mktemp)"
 
-curl https://fullnode.devnet.aptoslabs.com/v1 > "$TEMP"
+curl https://api.devnet.aptoslabs.com/v1 > "$TEMP"
 
 COMMIT="$(jq -r .git_hash "$TEMP")"
 CHAIN_ID="$(jq -r .chain_id "$TEMP")"
