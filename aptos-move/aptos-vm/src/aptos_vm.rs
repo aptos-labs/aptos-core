@@ -1671,8 +1671,6 @@ impl AptosVM {
                 None,
             ))
         });
-        let epoch = block_metadata.epoch();
-        let round = block_metadata.round();
         let mut gas_meter = UnmeteredGasMeter;
         let mut session = self.new_session(resolver, SessionId::block_meta(&block_metadata));
 
