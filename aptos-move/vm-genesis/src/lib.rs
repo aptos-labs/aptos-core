@@ -460,6 +460,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         FeatureFlag::JWK_CONSENSUS,
         FeatureFlag::REFUNDABLE_BYTES,
         FeatureFlag::OBJECT_CODE_DEPLOYMENT,
+        FeatureFlag::MAX_OBJECT_NESTING_CHECK,
     ]
 }
 

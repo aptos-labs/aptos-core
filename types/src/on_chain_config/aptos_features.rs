@@ -60,6 +60,7 @@ pub enum FeatureFlag {
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
     OBJECT_CODE_DEPLOYMENT = 52,
+    MAX_OBJECT_NESTING_CHECK = 53,
 }
 
 /// Representation of features on chain as a bitset.

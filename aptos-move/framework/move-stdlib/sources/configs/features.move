@@ -394,8 +394,18 @@ module std::features {
 
     /// Whether deploying to objects is enabled.
     const OBJECT_CODE_DEPLOYMENT: u64 = 52;
+
     public fun is_object_code_deployment_enabled(): bool acquires Features {
         is_enabled(OBJECT_CODE_DEPLOYMENT)
+    }
+
+    /// Whether checking the maximum object nesting is enabled.
+    const MAX_OBJECT_NESTING_CHECK: u64 = 53;
+
+    public fun get_max_object_nesting_check_feature(): u64 { MAX_OBJECT_NESTING_CHECK }
+
+    public fun max_object_nesting_check_enabled(): bool acquires Features {
+        is_enabled(MAX_OBJECT_NESTING_CHECK)
     }
 
     // ============================================================================================
