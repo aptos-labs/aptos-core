@@ -22,7 +22,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
-use aptos_logger::{debug, error, info, spawn_named, warn};
+use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
@@ -334,11 +334,8 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     self.process_incoming_blocks(blocks);
                 }
                 Some(reset) = reset_rx.next() => {
-                    debug!("RandManager received a reset.");
                     while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
-                    debug!("RandManager cleared blocks.");
                     self.process_reset(reset);
-                    debug!("RandManager processed reset.");
                 }
                 Some(randomness) = self.decision_rx.next()  => {
                     self.process_randomness(randomness);
