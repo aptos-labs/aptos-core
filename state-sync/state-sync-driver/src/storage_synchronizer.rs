@@ -96,7 +96,7 @@ pub trait StorageSynchronizerInterface {
     ///
     /// Note: this requires that `initialize_state_synchronizer` has been
     /// called.
-    fn save_state_values(
+    async fn save_state_values(
         &mut self,
         notification_id: NotificationId,
         state_value_chunk_with_proof: StateValueChunkWithProof,
@@ -403,17 +403,20 @@ impl<
         load_pending_data_chunks(self.pending_data_chunks.clone()) > 0
     }
 
-    fn save_state_values(
+    async fn save_state_values(
         &mut self,
         notification_id: NotificationId,
         state_value_chunk_with_proof: StateValueChunkWithProof,
     ) -> Result<(), Error> {
+        // Get the snapshot notifier and create the storage data chunk
         let state_snapshot_notifier = self.state_snapshot_notifier.as_mut().ok_or_else(|| {
             Error::UnexpectedError("The state snapshot receiver has not been initialized!".into())
         })?;
         let storage_data_chunk =
             StorageDataChunk::States(notification_id, state_value_chunk_with_proof);
-        if let Err(error) = state_snapshot_notifier.try_send(storage_data_chunk) {
+
+        // Notify the snapshot receiver of the storage data chunk
+        if let Err(error) = state_snapshot_notifier.send(storage_data_chunk).await {
             Err(Error::UnexpectedError(format!(
                 "Failed to send storage data chunk to state snapshot listener: {:?}",
                 error

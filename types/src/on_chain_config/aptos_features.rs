@@ -53,13 +53,14 @@ pub enum FeatureFlag {
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
     RECONFIGURE_WITH_DKG = 45,
-    ZK_ID_SIGNATURES = 46,
-    ZK_ID_ZKLESS_SIGNATURE = 47,
+    OIDB_SIGNATURE = 46,
+    OIDB_ZKLESS_SIGNATURE = 47,
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
     OBJECT_CODE_DEPLOYMENT = 52,
+    MAX_OBJECT_NESTING_CHECK = 53,
 }
 
 /// Representation of features on chain as a bitset.
@@ -176,20 +177,20 @@ impl Features {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET)
     }
 
-    /// Whether the zkID feature is enabled, specifically the ZK path with ZKP-based signatures.
-    /// The ZK-less path is controlled via a different `FeatureFlag::ZK_ID_ZKLESS_SIGNATURE` flag.
-    pub fn is_zkid_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ZK_ID_SIGNATURES)
+    /// Whether the OIDB feature is enabled, specifically the ZK path with ZKP-based signatures.
+    /// The ZK-less path is controlled via a different `FeatureFlag::OIDB_ZKLESS_SIGNATURE` flag.
+    pub fn is_oidb_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::OIDB_SIGNATURE)
     }
 
-    /// If `FeatureFlag::ZK_ID_SIGNATURES` is enabled, this feature additionally allows for a "ZK-less
+    /// If `FeatureFlag::OIDB_SIGNATURE` is enabled, this feature additionally allows for a "ZK-less
     /// path" where the blockchain can verify OpenID signatures directly. This ZK-less mode exists
     /// for two reasons. First, it gives as a simpler way to test the feature. Second, it acts as a
     /// safety precaution in case of emergency (e.g., if the ZK-based signatures must be temporarily
     /// turned off due to a zeroday exploit, the ZK-less path will still allow users to transact,
     /// but without privacy).
-    pub fn is_zkid_zkless_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ZK_ID_ZKLESS_SIGNATURE)
+    pub fn is_oidb_zkless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::OIDB_ZKLESS_SIGNATURE)
     }
 
     pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {

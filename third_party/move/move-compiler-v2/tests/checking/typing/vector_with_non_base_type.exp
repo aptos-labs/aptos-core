@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:4:17
+  │
+4 │         let v = vector<&u64>[];
+  │                 ^^^^^^
+
+error: invalid type instantiation `&mut u64`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:5:17
+  │
+5 │         let v = vector<&mut u64>[];
+  │                 ^^^^^^
+
+error: invalid type instantiation `()`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:6:17
+  │
+6 │         let v = vector<()>[];
+  │                 ^^^^^^
+
+error: invalid type instantiation `(u64, bool)`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:7:17
+  │
+7 │         let v = vector<(u64, bool)>[];
+  │                 ^^^^^^

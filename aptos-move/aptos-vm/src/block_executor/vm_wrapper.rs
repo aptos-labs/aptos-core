@@ -64,23 +64,12 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
             .vm
             .execute_single_transaction(txn, &resolver, &log_context)
         {
-            Ok((vm_status, vm_output, sender)) => {
+            Ok((vm_status, vm_output)) => {
                 if vm_output.status().is_discarded() {
-                    match sender {
-                        Some(s) => speculative_trace!(
-                            &log_context,
-                            format!(
-                                "Transaction discarded, sender: {}, error: {:?}",
-                                s, vm_status
-                            ),
-                        ),
-                        None => {
-                            speculative_trace!(
-                                &log_context,
-                                format!("Transaction malformed, error: {:?}", vm_status),
-                            )
-                        },
-                    };
+                    speculative_trace!(
+                        &log_context,
+                        format!("Transaction discarded, status: {:?}", vm_status),
+                    );
                 }
                 if vm_status.status_code() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
                     ExecutionStatus::SpeculativeExecutionAbortError(

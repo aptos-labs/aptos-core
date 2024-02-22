@@ -334,7 +334,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                     self.process_incoming_blocks(blocks);
                 }
                 Some(reset) = reset_rx.next() => {
-                    while incoming_blocks.try_next().is_ok() {}
+                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
                     self.process_reset(reset);
                 }
                 Some(randomness) = self.decision_rx.next()  => {

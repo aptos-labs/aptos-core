@@ -136,7 +136,7 @@ impl Default for StateSyncDriverConfig {
             max_connection_deadline_secs: 10,
             max_consecutive_stream_notifications: 10,
             max_num_stream_timeouts: 12,
-            max_pending_data_chunks: 100,
+            max_pending_data_chunks: 50,
             max_pending_mempool_notifications: 100,
             max_stream_wait_time_ms: 5000,
             num_versions_to_skip_snapshot_sync: 100_000_000, // At 5k TPS, this allows a node to fail for about 6 hours.
@@ -204,6 +204,9 @@ impl Default for StorageServiceConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DataStreamingServiceConfig {
+    /// The dynamic prefetching config for the data streaming service
+    pub dynamic_prefetching: DynamicPrefetchingConfig,
+
     /// Whether or not to enable data subscription streaming.
     pub enable_subscription_streaming: bool,
 
@@ -216,9 +219,7 @@ pub struct DataStreamingServiceConfig {
     /// Maximum number of concurrent data client requests (per stream) for state keys/values.
     pub max_concurrent_state_requests: u64,
 
-    /// Maximum channel sizes for each data stream listener. If messages are not
-    /// consumed, they will be dropped (oldest messages first). The remaining
-    /// messages will be retrieved using FIFO ordering.
+    /// Maximum channel sizes for each data stream listener (per stream).
     pub max_data_stream_channel_sizes: u64,
 
     /// Maximum number of notification ID to response context mappings held in
@@ -248,17 +249,57 @@ pub struct DataStreamingServiceConfig {
 impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
+            dynamic_prefetching: DynamicPrefetchingConfig::default(),
             enable_subscription_streaming: false,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
-            max_data_stream_channel_sizes: 300,
+            max_data_stream_channel_sizes: 50,
             max_notification_id_mappings: 300,
             max_num_consecutive_subscriptions: 40, // At ~4 blocks per second, this should last 10 seconds
             max_pending_requests: 50,
             max_request_retry: 5,
             max_subscription_stream_lag_secs: 15, // 15 seconds
             progress_check_interval_ms: 50,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct DynamicPrefetchingConfig {
+    /// Whether or not to enable dynamic prefetching
+    pub enable_dynamic_prefetching: bool,
+
+    /// The initial number of concurrent prefetching requests
+    pub initial_prefetching_value: u64,
+
+    /// The maximum number of concurrent prefetching requests
+    pub max_prefetching_value: u64,
+
+    /// The minimum number of concurrent prefetching requests
+    pub min_prefetching_value: u64,
+
+    /// The amount by which to increase the concurrent prefetching value (i.e., on a successful response)
+    pub prefetching_value_increase: u64,
+
+    /// The amount by which to decrease the concurrent prefetching value (i.e., on a timeout)
+    pub prefetching_value_decrease: u64,
+
+    /// The duration by which to freeze the prefetching value on a timeout
+    pub timeout_freeze_duration_secs: u64,
+}
+
+impl Default for DynamicPrefetchingConfig {
+    fn default() -> Self {
+        Self {
+            enable_dynamic_prefetching: true,
+            initial_prefetching_value: 3,
+            max_prefetching_value: 30,
+            min_prefetching_value: 3,
+            prefetching_value_increase: 1,
+            prefetching_value_decrease: 2,
+            timeout_freeze_duration_secs: 30,
         }
     }
 }

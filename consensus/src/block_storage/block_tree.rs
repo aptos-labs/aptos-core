@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_consensus_types::{
-    executed_block::ExecutedBlock, quorum_cert::QuorumCert,
+    pipelined_block::PipelinedBlock, quorum_cert::QuorumCert,
     timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::HashValue;
@@ -22,24 +22,24 @@ use std::{
     sync::Arc,
 };
 
-/// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::executed_block::ExecutedBlock)
+/// This structure is a wrapper of [`ExecutedBlock`](aptos_consensus_types::pipelined_block::PipelinedBlock)
 /// that adds `children` field to know the parent-child relationship between blocks.
 struct LinkableBlock {
     /// Executed block that has raw block data and execution output.
-    executed_block: Arc<ExecutedBlock>,
+    executed_block: Arc<PipelinedBlock>,
     /// The set of children for cascading pruning. Note: a block may have multiple children.
     children: HashSet<HashValue>,
 }
 
 impl LinkableBlock {
-    pub fn new(block: ExecutedBlock) -> Self {
+    pub fn new(block: PipelinedBlock) -> Self {
         Self {
             executed_block: Arc::new(block),
             children: HashSet::new(),
         }
     }
 
-    pub fn executed_block(&self) -> &Arc<ExecutedBlock> {
+    pub fn executed_block(&self) -> &Arc<PipelinedBlock> {
         &self.executed_block
     }
 
@@ -93,7 +93,7 @@ pub struct BlockTree {
 
 impl BlockTree {
     pub(super) fn new(
-        root: ExecutedBlock,
+        root: PipelinedBlock,
         root_quorum_cert: QuorumCert,
         root_ordered_cert: QuorumCert,
         root_commit_cert: QuorumCert,
@@ -173,22 +173,22 @@ impl BlockTree {
         self.id_to_block.contains_key(block_id)
     }
 
-    pub(super) fn get_block(&self, block_id: &HashValue) -> Option<Arc<ExecutedBlock>> {
+    pub(super) fn get_block(&self, block_id: &HashValue) -> Option<Arc<PipelinedBlock>> {
         self.get_linkable_block(block_id)
             .map(|lb| Arc::clone(lb.executed_block()))
     }
 
-    pub(super) fn ordered_root(&self) -> Arc<ExecutedBlock> {
+    pub(super) fn ordered_root(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.ordered_root_id)
             .expect("Root must exist")
     }
 
-    pub(super) fn commit_root(&self) -> Arc<ExecutedBlock> {
+    pub(super) fn commit_root(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.commit_root_id)
             .expect("Commit root must exist")
     }
 
-    pub(super) fn highest_certified_block(&self) -> Arc<ExecutedBlock> {
+    pub(super) fn highest_certified_block(&self) -> Arc<PipelinedBlock> {
         self.get_block(&self.highest_certified_block_id)
             .expect("Highest cerfified block must exist")
     }
@@ -223,8 +223,8 @@ impl BlockTree {
 
     pub(super) fn insert_block(
         &mut self,
-        block: ExecutedBlock,
-    ) -> anyhow::Result<Arc<ExecutedBlock>> {
+        block: PipelinedBlock,
+    ) -> anyhow::Result<Arc<PipelinedBlock>> {
         let block_id = block.id();
         if let Some(existing_block) = self.get_block(&block_id) {
             debug!("Already had block {:?} for id {:?} when trying to add another block {:?} for the same id",
@@ -371,7 +371,7 @@ impl BlockTree {
         block_id: HashValue,
         root_id: HashValue,
         root_round: u64,
-    ) -> Option<Vec<Arc<ExecutedBlock>>> {
+    ) -> Option<Vec<Arc<PipelinedBlock>>> {
         let mut res = vec![];
         let mut cur_block_id = block_id;
         loop {
@@ -398,14 +398,14 @@ impl BlockTree {
     pub(super) fn path_from_ordered_root(
         &self,
         block_id: HashValue,
-    ) -> Option<Vec<Arc<ExecutedBlock>>> {
+    ) -> Option<Vec<Arc<PipelinedBlock>>> {
         self.path_from_root_to_block(block_id, self.ordered_root_id, self.ordered_root().round())
     }
 
     pub(super) fn path_from_commit_root(
         &self,
         block_id: HashValue,
-    ) -> Option<Vec<Arc<ExecutedBlock>>> {
+    ) -> Option<Vec<Arc<PipelinedBlock>>> {
         self.path_from_root_to_block(block_id, self.commit_root_id, self.commit_root().round())
     }
 
@@ -417,7 +417,7 @@ impl BlockTree {
     pub fn commit_callback(
         &mut self,
         storage: Arc<dyn PersistentLivenessStorage>,
-        blocks_to_commit: &[Arc<ExecutedBlock>],
+        blocks_to_commit: &[Arc<PipelinedBlock>],
         finality_proof: QuorumCert,
         commit_decision: LedgerInfoWithSignatures,
     ) {

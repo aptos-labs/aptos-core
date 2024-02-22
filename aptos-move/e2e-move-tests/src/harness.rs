@@ -413,7 +413,7 @@ impl MoveHarness {
         account: &Account,
         package: &BuiltPackage,
         mut patch_metadata: impl FnMut(&mut PackageMetadata),
-        publisher_ref: AccountAddress,
+        code_object: AccountAddress,
     ) -> SignedTransaction {
         let code = package.extract_code();
         let mut metadata = package
@@ -425,7 +425,7 @@ impl MoveHarness {
             aptos_stdlib::object_code_deployment_upgrade(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 code,
-                publisher_ref,
+                code_object,
             ),
         )
     }
@@ -452,7 +452,7 @@ impl MoveHarness {
         path: &Path,
         options: BuildOptions,
         patch_metadata: impl FnMut(&mut PackageMetadata),
-        publisher_ref: AccountAddress,
+        code_object: AccountAddress,
     ) -> SignedTransaction {
         let package =
             build_package(path.to_owned(), options).expect("building package must succeed");
@@ -460,7 +460,7 @@ impl MoveHarness {
             account,
             &package,
             patch_metadata,
-            publisher_ref,
+            code_object,
         )
     }
 
@@ -532,10 +532,10 @@ impl MoveHarness {
         account: &Account,
         path: &Path,
         options: BuildOptions,
-        publisher_ref: AccountAddress,
+        code_object: AccountAddress,
     ) -> TransactionStatus {
         let txn =
-            self.create_object_code_upgrade_package(account, path, options, |_| {}, publisher_ref);
+            self.create_object_code_upgrade_package(account, path, options, |_| {}, code_object);
         self.run(txn)
     }
 

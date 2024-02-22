@@ -12,7 +12,10 @@ use move_binary_format::{
     file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type};
+use move_vm_types::loaded_data::{
+    runtime_access_specifier::AccessSpecifier,
+    runtime_types::{StructIdentifier, Type},
+};
 use std::{collections::BTreeMap, sync::Arc};
 
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
@@ -145,6 +148,7 @@ impl Script {
             return_types: return_tys.clone(),
             local_types: local_tys,
             parameter_types: parameter_tys.clone(),
+            access_specifier: AccessSpecifier::Any,
         });
 
         let mut single_signature_token_map = BTreeMap::new();

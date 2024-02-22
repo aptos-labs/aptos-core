@@ -10,7 +10,6 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, DeltaOp},
-    types::DelayedFieldID,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -26,6 +25,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     value::MoveTypeLayout,
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct MockChangeSetChecker;
