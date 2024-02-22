@@ -29,7 +29,7 @@ use crate::{
     monitor,
     network::{
         IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest,
-        IncomingCommitRequest, IncomingDAGRequest,
+        IncomingDAGRequest,
         IncomingRandGenRequest,
         IncomingRpcRequest,
         NetworkReceivers, NetworkSender,
@@ -47,9 +47,8 @@ use crate::{
         quorum_store_db::QuorumStoreStorage,
     },
     rand::rand_gen::{
-        rand_manager::RandManager,
         storage::interface::RandStorage,
-        types::{AugmentedData, RandConfig, Share},
+        types::{AugmentedData, RandConfig},
     },
     recovery_manager::RecoveryManager,
     round_manager::{RoundManager, UnverifiedEvent, VerifiedEvent},
@@ -60,7 +59,6 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{
     ConsensusConfig, DagConsensusConfig, ExecutionConfig, NodeConfig, QcAggregatorType,
-    SecureBackend,
 };
 use aptos_consensus_types::{
     common::{Author, Round},
@@ -89,7 +87,6 @@ use aptos_types::{
         OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
     },
     randomness::{RandKeys, WVUF, WvufPP},
-    validator_signer::ValidatorSigner,
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
 use fail::fail_point;
@@ -829,7 +826,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 safety_rules_container.clone(),
                 payload_manager.clone(),
                 &onchain_execution_config,
-                &features,
+                features,
                 rand_config,
             )
             .await;
@@ -1194,7 +1191,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 commit_signer,
                 payload_manager.clone(),
                 &on_chain_execution_config,
-                &features,
+                features,
                 rand_config,
             )
             .await;
