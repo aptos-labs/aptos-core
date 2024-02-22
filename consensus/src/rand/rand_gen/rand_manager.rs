@@ -22,7 +22,7 @@ use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
-use aptos_logger::{error, info, spawn_named, warn};
+use aptos_logger::{debug, error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
