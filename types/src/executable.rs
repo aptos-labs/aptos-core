@@ -7,8 +7,8 @@ use crate::{
 };
 use aptos_crypto::HashValue;
 
-#[derive(PartialEq, Eq, Debug)]
-pub enum ExecutableDescriptor {
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum ModuleDescriptor {
     /// Possibly speculative, based on code published during the block.
     Published(HashValue),
 

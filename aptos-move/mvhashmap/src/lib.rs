@@ -15,7 +15,6 @@ use std::{fmt::Debug, hash::Hash};
 
 pub mod types;
 pub mod unsync_map;
-mod utils;
 pub mod versioned_data;
 pub mod versioned_delayed_fields;
 pub mod versioned_group_data;

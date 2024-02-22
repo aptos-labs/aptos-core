@@ -44,6 +44,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
+use move_vm_runtime::ModuleStorage;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -59,28 +60,29 @@ fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VM
 /// epilogue. The latter needs to see the state view as if the change set is applied on top of
 /// the base state view, and this struct implements that.
 #[ouroboros::self_referencing]
-pub struct RespawnedSession<'r, 'l>
-where
-    'l: 'r,
-{
+pub struct RespawnedSession<'r> {
     executor_view: ExecutorViewWithChangeSet<'r>,
     #[borrows(executor_view)]
     #[covariant]
     resolver: StorageAdapter<'this, ExecutorViewWithChangeSet<'r>>,
     #[borrows(resolver)]
     #[not_covariant]
-    session: Option<SessionExt<'this, 'l>>,
+    session: Option<SessionExt<'this, 'r>>,
     pub storage_refund: Fee,
 }
 
-impl<'r, 'l> RespawnedSession<'r, 'l> {
-    pub fn spawn(
+impl<'r> RespawnedSession<'r> {
+    pub fn spawn<'l>(
         vm: &'l AptosVM,
         session_id: SessionId,
         base: &'r impl AptosMoveResolver,
+        maybe_module_storage: Option<&'r dyn ModuleStorage>,
         previous_session_change_set: VMChangeSet,
         storage_refund: Fee,
-    ) -> Result<Self, VMStatus> {
+    ) -> Result<Self, VMStatus>
+    where
+        'l: 'r,
+    {
         let executor_view = ExecutorViewWithChangeSet::new(
             base.as_executor_view(),
             base.as_resource_group_view(),
@@ -90,7 +92,9 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         Ok(RespawnedSessionBuilder {
             executor_view,
             resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
-            session_builder: |resolver| Some(vm.new_session(resolver, None, session_id)),
+            session_builder: |resolver| {
+                Some(vm.new_session(resolver, maybe_module_storage, session_id))
+            },
             storage_refund,
         }
         .build())

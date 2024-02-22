@@ -1,15 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    types::{GroupReadResult, MVModulesOutput, UnsyncGroupError, ValueWithLayout},
-    utils::module_hash,
-};
+use crate::types::{GroupReadResult, UnsyncGroupError, ValueWithLayout};
 use aptos_aggregator::types::{code_invariant_error, DelayedFieldValue};
-use aptos_crypto::hash::HashValue;
+use aptos_logger::error;
 use aptos_types::{
     delayed_fields::PanicError,
-    executable::{Executable, ExecutableDescriptor, ModulePath},
+    executable::{Executable, ModulePath},
     write_set::TransactionWrite,
 };
 use aptos_vm_types::resource_group_adapter::group_size_as_sum;
@@ -32,11 +29,8 @@ pub struct UnsyncMap<
     // Only use Arc to provide unified interfaces with the MVHashMap / concurrent setting. This
     // simplifies the trait-based integration for executable caching. TODO: better representation.
     resource_map: RefCell<HashMap<K, ValueWithLayout<V>>>,
-    // Optional hash can store the hash of the module to avoid re-computations.
-    module_map: RefCell<HashMap<K, (Arc<V>, Option<HashValue>)>>,
+    module_map: RefCell<HashMap<K, (Arc<V>, Option<X>)>>,
     group_cache: RefCell<HashMap<K, RefCell<HashMap<T, ValueWithLayout<V>>>>>,
-    executable_cache: RefCell<HashMap<HashValue, Arc<X>>>,
-    executable_bytes: RefCell<usize>,
     delayed_field_map: RefCell<HashMap<I, DelayedFieldValue>>,
 }
 
@@ -53,8 +47,6 @@ impl<
             resource_map: RefCell::new(HashMap::new()),
             module_map: RefCell::new(HashMap::new()),
             group_cache: RefCell::new(HashMap::new()),
-            executable_cache: RefCell::new(HashMap::new()),
-            executable_bytes: RefCell::new(0),
             delayed_field_map: RefCell::new(HashMap::new()),
         }
     }
@@ -208,24 +200,28 @@ impl<
     }
 
     pub fn fetch_module_data(&self, key: &K) -> Option<Arc<V>> {
+        debug_assert!(
+            key.module_path().is_some(),
+            "Using module interfaces for non-module"
+        );
+
         self.module_map
             .borrow()
             .get(key)
             .map(|entry| entry.0.clone())
     }
 
-    pub fn fetch_module(&self, key: &K) -> Option<MVModulesOutput<V, X>> {
-        use MVModulesOutput::*;
-        debug_assert!(key.module_path().is_some());
+    pub fn fetch_executable(&self, key: &K) -> Option<X> {
+        debug_assert!(
+            key.module_path().is_some(),
+            "Using module interfaces for non-module"
+        );
 
-        self.module_map.borrow_mut().get_mut(key).map(|entry| {
-            let hash = entry.1.get_or_insert(module_hash(entry.0.as_ref()));
-
-            self.executable_cache.borrow().get(hash).map_or_else(
-                || Module((entry.0.clone(), *hash)),
-                |x| Executable((x.clone(), ExecutableDescriptor::Published(*hash))),
-            )
-        })
+        self.module_map
+            .borrow()
+            .get(key)
+            .map(|entry| entry.1.clone())
+            .flatten()
     }
 
     pub fn fetch_delayed_field(&self, id: &I) -> Option<DelayedFieldValue> {
@@ -244,31 +240,22 @@ impl<
             .insert(key, (Arc::new(value), None));
     }
 
-    pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
-        self.resource_map.borrow_mut().insert(key, value);
-    }
-
-    /// We return false if the executable was already stored, as this isn't supposed to happen
-    /// during sequential execution (and the caller may choose to e.g. log a message).
-    /// Versioned modules storage does not cache executables at storage version, hence directly
-    /// the descriptor hash in ExecutableDescriptor::Published is provided.
-    pub fn store_executable(&self, descriptor_hash: HashValue, executable: X) -> bool {
-        let size = executable.size_bytes();
+    pub fn store_executable(&self, key: &K, executable: X) {
         if self
-            .executable_cache
+            .module_map
             .borrow_mut()
-            .insert(descriptor_hash, Arc::new(executable))
+            .get_mut(key)
+            .expect("Module must exist to store executable")
+            .1
+            .replace(executable)
             .is_some()
         {
-            *self.executable_bytes.borrow_mut() += size;
-            true
-        } else {
-            false
+            error!("Wrong Use: Executable already stored in UnsyncMap");
         }
     }
 
-    pub fn executable_size(&self) -> usize {
-        *self.executable_bytes.borrow()
+    pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
+        self.resource_map.borrow_mut().insert(key, value);
     }
 
     pub fn write_delayed_field(&self, id: I, value: DelayedFieldValue) {

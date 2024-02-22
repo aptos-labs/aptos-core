@@ -693,7 +693,10 @@ impl Loader {
                             .module_at(module_id)
                             .map(|m| m.module.immediate_dependencies())
                     })
-                    .ok_or_else(|| PartialVMError::new(StatusCode::MISSING_DEPENDENCY))
+                    .ok_or_else(|| {
+                        panic!("A");
+                        PartialVMError::new(StatusCode::MISSING_DEPENDENCY)
+                    })
             },
             |module_id| {
                 if bundle_unverified.contains(module_id) {
@@ -712,7 +715,10 @@ impl Loader {
                                 .module_at(module_id)
                                 .map(|m| m.module.immediate_friends())
                         })
-                        .ok_or_else(|| PartialVMError::new(StatusCode::MISSING_DEPENDENCY))
+                        .ok_or_else(|| {
+                            panic!("B");
+                            PartialVMError::new(StatusCode::MISSING_DEPENDENCY)
+                        })
                 }
             },
         )

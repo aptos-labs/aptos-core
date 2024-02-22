@@ -5,7 +5,7 @@
 pub(crate) mod vm_wrapper;
 
 use crate::{
-    block_executor::vm_wrapper::AptosExecutorTask,
+    block_executor::vm_wrapper::{AptosExecutorTask, TEST_CACHE},
     counters::{BLOCK_EXECUTOR_CONCURRENCY, BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS},
 };
 use aptos_aggregator::{
@@ -403,6 +403,8 @@ impl BlockAptosVM {
         config: BlockExecutorConfig,
         transaction_commit_listener: Option<L>,
     ) -> Result<BlockOutput<TransactionOutput>, VMStatus> {
+        TEST_CACHE.clear();
+
         let _timer = BLOCK_EXECUTOR_EXECUTE_BLOCK_SECONDS.start_timer();
         let num_txns = signature_verified_block.len();
         if state_view.id() != StateViewId::Miscellaneous {

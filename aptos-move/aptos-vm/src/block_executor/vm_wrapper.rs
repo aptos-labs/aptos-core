@@ -17,12 +17,14 @@ use aptos_types::{
 };
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::resolver::{AptosExecutable, ExecutorView, ResourceGroupView};
+use dashmap::DashMap;
 use fail::fail_point;
 use move_core_types::{
     language_storage::ModuleId,
     vm_status::{StatusCode, VMStatus},
 };
 use move_vm_runtime::{Module, ModuleStorage};
+use once_cell::sync::Lazy;
 use std::sync::Arc;
 
 pub(crate) struct AptosExecutorTask<'a, S> {
@@ -34,6 +36,8 @@ struct AptosModuleStorage<'a> {
     view: &'a dyn ExecutorView,
 }
 
+pub(crate) static TEST_CACHE: Lazy<DashMap<StateKey, Arc<Module>>> = Lazy::new(|| DashMap::new());
+
 impl ModuleStorage for AptosModuleStorage<'_> {
     fn store_module(&self, module_id: &ModuleId, executable: Module) -> Arc<Module> {
         let state_key = StateKey::access_path(AccessPath::from(module_id));
@@ -41,17 +45,19 @@ impl ModuleStorage for AptosModuleStorage<'_> {
         let executable_module = Arc::new(executable);
         let ret = executable_module.clone();
 
-        self.view
-            .store_executable(&state_key, AptosExecutable { executable_module });
+        TEST_CACHE.insert(state_key.clone(), ret.clone());
+        // self.view
+        //     .store_executable(&state_key, AptosExecutable { executable_module });
 
         ret
     }
 
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
         let state_key = StateKey::access_path(AccessPath::from(module_id));
-        self.view
-            .fetch_executable(&state_key)
-            .map(|AptosExecutable { executable_module }| executable_module)
+        Some(TEST_CACHE.get(&state_key)?.clone())
+        // self.view
+        //     .fetch_executable(&state_key)
+        //     .map(|AptosExecutable { executable_module }| executable_module)
     }
 }
 
@@ -92,17 +98,25 @@ impl<'a, S: 'a + StateView + Sync> ExecutorTask for AptosExecutorTask<'a, S> {
         let resolver = self
             .vm
             .as_move_resolver_with_group_view(executor_with_group_view);
-        let _module_storage = AptosModuleStorage {
+        let module_storage = AptosModuleStorage {
             view: executor_with_group_view,
         };
-        let maybe_module_storage = None;
-        // TODO: enable with:
-        // let maybe_module_storage = Some(module_storage);
-        match self
-            .vm
-            .execute_single_transaction(txn, &resolver, maybe_module_storage, &log_context)
-        {
+        match self.vm.execute_single_transaction(
+            txn,
+            &resolver,
+            Some(&module_storage),
+            // None,
+            &log_context,
+        ) {
             Ok((vm_status, vm_output, sender)) => {
+                vm_output
+                    .change_set()
+                    .module_write_set()
+                    .keys()
+                    .for_each(|k| {
+                        TEST_CACHE.remove(&k);
+                    });
+
                 if vm_output.status().is_discarded() {
                     match sender {
                         Some(s) => speculative_trace!(

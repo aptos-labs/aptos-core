@@ -5,15 +5,8 @@
 use aptos_types::delayed_fields::PanicError;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum ParallelBlockExecutionError {
-    // The same module access path for module was both read & written during speculative executions.
-    // This may trigger a race due to the Move-VM loader cache implementation, and mitigation requires
-    // aborting the parallel execution pipeline and falling back to the sequential execution.
-    // TODO: provide proper multi-versioning for code (like data) for the cache.
-    ModulePathReadWriteError,
-    /// unrecoverable VM error
-    FatalVMError,
-}
+// unrecoverable VM error
+pub(crate) struct FatalVMError;
 
 // This is separate error because we need to match the error variant to provide a specialized
 // fallback logic if a resource group serialization error occurs.

@@ -25,7 +25,7 @@ use aptos_aggregator::{
     types::{code_invariant_error, expect_ok, PanicOr},
 };
 use aptos_drop_helper::DEFAULT_DROPPER;
-use aptos_logger::{debug, error, info};
+use aptos_logger::{error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
     unsync_map::UnsyncMap,
@@ -99,12 +99,12 @@ where
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
         signature_verified_block: &[T],
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         executor: &E,
         base_view: &S,
         latest_view: ParallelState<T, E::Executable>,
-    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<bool, PanicOr<FatalVMError>> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
         let txn = &signature_verified_block[idx_to_execute as usize];
 
@@ -287,20 +287,13 @@ where
             versioned_cache.delayed_fields().remove(&id, idx_to_execute);
         }
 
-        if !last_input_output.record(idx_to_execute, read_set, result, resource_write_set) {
-            // Module R/W is an expected fallback behavior, no alert is required.
-            debug!("[Execution] At txn {}, Module read & write", idx_to_execute);
-
-            return Err(PanicOr::Or(
-                ParallelBlockExecutionError::ModulePathReadWriteError,
-            ));
-        }
+        last_input_output.record(idx_to_execute, read_set, result, resource_write_set);
         Ok(updates_outside)
     }
 
     fn validate(
         idx_to_validate: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
     ) -> Result<bool, PanicError> {
         let _timer = TASK_VALIDATE_SECONDS.start_timer();
@@ -321,16 +314,16 @@ where
         // (i.e. not re-execute unless some other part of the validation fails or
         // until commit, but mark as estimates).
 
-        // TODO: validate modules when there is no r/w fallback.
         Ok(
             read_set.validate_data_reads(versioned_cache.data(), idx_to_validate)
-                && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate),
+                && read_set.validate_group_reads(versioned_cache.group_data(), idx_to_validate)
+                && read_set.validate_module_reads(versioned_cache.modules(), idx_to_validate),
         )
     }
 
     fn update_transaction_on_abort(
         txn_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
     ) {
         counters::SPECULATIVE_ABORT_COUNT.inc();
@@ -365,7 +358,7 @@ where
         incarnation: Incarnation,
         valid: bool,
         validation_wave: Wave,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         scheduler: &Scheduler,
     ) -> SchedulerTask {
@@ -388,7 +381,7 @@ where
     fn validate_commit_ready(
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
     ) -> Result<bool, PanicError> {
         let read_set = last_input_output
             .read_set(txn_idx)
@@ -431,14 +424,14 @@ where
         scheduler: &Scheduler,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         scheduler_task: &mut SchedulerTask,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         base_view: &S,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
         block: &[T],
-    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<(), PanicOr<FatalVMError>> {
         let mut block_limit_processor = shared_commit_state.acquire();
 
         while let Some((txn_idx, incarnation)) = scheduler.try_commit() {
@@ -584,7 +577,7 @@ where
 
     fn materialize_aggregator_v1_delta_writes(
         txn_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         base_view: &S,
     ) -> Vec<(T::Key, WriteOp)> {
@@ -641,7 +634,7 @@ where
         scheduler: &Scheduler,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
         base_view: &S,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
     ) -> Result<(), PanicError> {
@@ -722,7 +715,7 @@ where
         &self,
         executor_arguments: &E::Argument,
         block: &[T],
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error, E::Executable>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, E::Executable, T::Identifier>,
         scheduler: &Scheduler,
         // TODO: should not need to pass base view.
@@ -731,7 +724,7 @@ where
         shared_counter: &AtomicU32,
         shared_commit_state: &ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
         final_results: &ExplicitSyncWrapper<Vec<E::Output>>,
-    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<(), PanicOr<FatalVMError>> {
         // Make executor for each task. TODO: fast concurrent executor.
         let init_timer = VM_INIT_SECONDS.start_timer();
         let executor = E::init(*executor_arguments);
@@ -893,8 +886,7 @@ where
                         &final_results,
                     ) {
                         // If there are multiple errors, they all get logged:
-                        // ModulePathReadWriteError and FatalVMErrorvariant is logged at construction,
-                        // and below we log CodeInvariantErrors.
+                        // FatalVMError is logged at construction, and below we log CodeInvariantErrors.
                         if let PanicOr::CodeInvariantError(err_msg) = err {
                             alert!("[BlockSTM] worker loop: CodeInvariantError({:?})", err_msg);
                         }
@@ -1013,9 +1005,6 @@ where
             num_txns,
         );
 
-        let last_input_output: TxnLastInputOutput<T, E::Output, E::Error> =
-            TxnLastInputOutput::new(num_txns as TxnIndex);
-
         for (idx, txn) in signature_verified_block.iter().enumerate() {
             let latest_view = LatestView::<T, S, E::Executable>::new(
                 base_view,
@@ -1091,13 +1080,6 @@ where
                                 output.get_write_summary(),
                             )
                         });
-
-                    if last_input_output.check_and_append_module_rw_conflict(
-                        sequential_reads.module_reads.iter(),
-                        output.module_write_set().keys(),
-                    ) {
-                        block_limit_processor.process_module_rw_conflict();
-                    }
 
                     block_limit_processor.accumulate_fee_statement(
                         fee_statement,

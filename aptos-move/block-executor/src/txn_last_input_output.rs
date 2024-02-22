@@ -3,7 +3,7 @@
 
 use crate::{
     captured_reads::CapturedReads,
-    errors::ParallelBlockExecutionError,
+    errors::FatalVMError,
     explicit_sync_wrapper::ExplicitSyncWrapper,
     task::{ExecutionStatus, TransactionOutput},
     types::{InputOutputKey, ReadWriteSummary},
@@ -12,22 +12,19 @@ use aptos_aggregator::types::code_invariant_error;
 use aptos_logger::error;
 use aptos_mvhashmap::types::{TxnIndex, ValueWithLayout};
 use aptos_types::{
-    delayed_fields::PanicError, fee_statement::FeeStatement,
+    delayed_fields::PanicError, executable::Executable, fee_statement::FeeStatement,
     state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::WriteOp,
 };
 use arc_swap::ArcSwapOption;
 use crossbeam::utils::CachePadded;
-use dashmap::DashSet;
 use move_core_types::value::MoveTypeLayout;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     fmt::Debug,
     iter::{empty, Iterator},
     sync::Arc,
 };
-
-type TxnInput<T> = CapturedReads<T>;
 
 macro_rules! forward_on_success_or_skip_rest {
     ($self:ident, $txn_idx:ident, $f:ident) => {{
@@ -49,8 +46,13 @@ pub(crate) enum KeyKind {
     Group,
 }
 
-pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug> {
-    inputs: Vec<CachePadded<ArcSwapOption<TxnInput<T>>>>, // txn_idx -> input.
+pub struct TxnLastInputOutput<
+    T: Transaction,
+    O: TransactionOutput<Txn = T>,
+    E: Debug,
+    X: Executable,
+> {
+    inputs: Vec<CachePadded<ArcSwapOption<CapturedReads<T, X>>>>, // txn_idx -> input.
     // Set once when the group outputs are committed sequentially, to be processed later by
     // concurrent materialization / output preparation.
     finalized_groups: Vec<
@@ -67,16 +69,10 @@ pub struct TxnLastInputOutput<T: Transaction, O: TransactionOutput<Txn = T>, E: 
     arced_resource_writes: Vec<
         CachePadded<ExplicitSyncWrapper<Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>>>,
     >,
-
-    // Record all writes and reads to access paths corresponding to modules (code) in any
-    // (speculative) executions. Used to avoid a potential race with module publishing and
-    // Move-VM loader cache - see 'record' function comment for more information.
-    module_writes: DashSet<T::Key>,
-    module_reads: DashSet<T::Key>,
 }
 
-impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
-    TxnLastInputOutput<T, O, E>
+impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone, X: Executable>
+    TxnLastInputOutput<T, O, E, X>
 {
     pub fn new(num_txns: TxnIndex) -> Self {
         Self {
@@ -92,79 +88,22 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
             finalized_groups: (0..num_txns)
                 .map(|_| CachePadded::new(ExplicitSyncWrapper::<Vec<_>>::new(vec![])))
                 .collect(),
-            module_writes: DashSet::new(),
-            module_reads: DashSet::new(),
         }
     }
 
-    fn append_and_check<'a>(
-        paths: impl Iterator<Item = &'a T::Key>,
-        set_to_append: &DashSet<T::Key>,
-        set_to_check: &DashSet<T::Key>,
-    ) -> bool {
-        for path in paths {
-            // Standard flags, first show, then look.
-            set_to_append.insert(path.clone());
-
-            if set_to_check.contains(path) {
-                return true;
-            }
-        }
-        false
-    }
-
-    /// Returns false on an error - if a module path that was read was previously written to, and vice versa.
-    /// Since parallel executor is instantiated per block, any module that is in the Move-VM loader
-    /// cache must previously be read and would be recorded in the 'module_reads' set. Any module
-    /// that is written (published or re-published) goes through transaction output write-set and
-    /// gets recorded in the 'module_writes' set. If these sets have an intersection, it is currently
-    /// possible that Move-VM loader cache loads a module and incorrectly uses it for another
-    /// transaction (e.g. a smaller transaction, or if the speculative execution of the publishing
-    /// transaction later aborts). The intersection is guaranteed to be found because we first
-    /// record the paths then check the other set (flags principle), and in this case we return an
-    /// error that ensures a fallback to a correct sequential execution.
-    /// When the sets do not have an intersection, it is impossible for the race to occur as any
-    /// module in the loader cache may not be published by a transaction in the ongoing block.
     pub(crate) fn record(
         &self,
         txn_idx: TxnIndex,
-        input: CapturedReads<T>,
+        input: CapturedReads<T, X>,
         output: ExecutionStatus<O, E>,
         arced_resource_writes: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
-    ) -> bool {
-        let written_modules = match &output {
-            ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                output.module_write_set()
-            },
-            ExecutionStatus::Abort(_)
-            | ExecutionStatus::SpeculativeExecutionAbortError(_)
-            | ExecutionStatus::DelayedFieldsCodeInvariantError(_) => BTreeMap::new(),
-        };
-
-        if self
-            .check_and_append_module_rw_conflict(input.module_reads.iter(), written_modules.keys())
-        {
-            return false;
-        }
-
+    ) {
         *self.arced_resource_writes[txn_idx as usize].acquire() = arced_resource_writes;
         self.inputs[txn_idx as usize].store(Some(Arc::new(input)));
         self.outputs[txn_idx as usize].store(Some(Arc::new(output)));
-
-        true
     }
 
-    pub(crate) fn check_and_append_module_rw_conflict<'a>(
-        &self,
-        module_reads_keys: impl Iterator<Item = &'a T::Key>,
-        module_writes_keys: impl Iterator<Item = &'a T::Key>,
-    ) -> bool {
-        // Check if adding new read & write modules leads to intersections.
-        Self::append_and_check(module_reads_keys, &self.module_reads, &self.module_writes)
-            || Self::append_and_check(module_writes_keys, &self.module_writes, &self.module_reads)
-    }
-
-    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T>>> {
+    pub(crate) fn read_set(&self, txn_idx: TxnIndex) -> Option<Arc<CapturedReads<T, X>>> {
         self.inputs[txn_idx as usize].load_full()
     }
 
@@ -206,17 +145,14 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         )
     }
 
-    pub(crate) fn check_fatal_vm_error(
-        &self,
-        txn_idx: TxnIndex,
-    ) -> Result<(), ParallelBlockExecutionError> {
+    pub(crate) fn check_fatal_vm_error(&self, txn_idx: TxnIndex) -> Result<(), FatalVMError> {
         if let Some(status) = self.outputs[txn_idx as usize].load_full() {
             if let ExecutionStatus::Abort(err) = status.as_ref() {
                 error!(
                     "FatalVMError from parallel execution {:?} at txn {}",
                     err, txn_idx
                 );
-                return Err(ParallelBlockExecutionError::FatalVMError);
+                return Err(FatalVMError);
             }
         }
         Ok(())

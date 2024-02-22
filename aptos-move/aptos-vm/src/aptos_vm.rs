@@ -589,6 +589,7 @@ impl AptosVM {
                 self,
                 session_id,
                 resolver,
+                maybe_module_storage,
                 change_set,
                 ZERO_STORAGE_REFUND.into(),
             )?;
@@ -710,6 +711,7 @@ impl AptosVM {
     fn execute_script_or_entry_function(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -780,6 +782,7 @@ impl AptosVM {
             let respawned_session = self.charge_change_set_and_respawn_session(
                 session,
                 resolver,
+                maybe_module_storage,
                 gas_meter,
                 change_set_configs,
                 txn_data,
@@ -823,17 +826,28 @@ impl AptosVM {
         &'l self,
         session: SessionExt,
         resolver: &'r impl AptosMoveResolver,
+        maybe_module_storage: Option<&'r dyn ModuleStorage>,
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         txn_data: &TransactionMetadata,
-    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
+    ) -> Result<RespawnedSession<'r>, VMStatus>
+    where
+        'l: 'r,
+    {
         let mut change_set = session.finish(change_set_configs)?;
         let storage_refund =
             self.charge_change_set(&mut change_set, gas_meter, txn_data, resolver)?;
 
         // TODO[agg_v1](fix): Charge for aggregator writes
         let session_id = SessionId::epilogue_meta(txn_data);
-        RespawnedSession::spawn(self, session_id, resolver, change_set, storage_refund)
+        RespawnedSession::spawn(
+            self,
+            session_id,
+            resolver,
+            maybe_module_storage,
+            change_set,
+            storage_refund,
+        )
     }
 
     fn simulate_multisig_transaction(
@@ -841,6 +855,7 @@ impl AptosVM {
         multisig: &Multisig,
         mut session: SessionExt,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         gas_meter: &mut impl AptosGasMeter,
@@ -867,6 +882,7 @@ impl AptosVM {
                             let respawned_session = self.charge_change_set_and_respawn_session(
                                 session,
                                 resolver,
+                                maybe_module_storage,
                                 gas_meter,
                                 change_set_configs,
                                 txn_data,
@@ -896,6 +912,7 @@ impl AptosVM {
     fn execute_multisig_transaction(
         &self,
         resolver: &impl AptosMoveResolver,
+        maybe_module_storage: Option<&dyn ModuleStorage>,
         mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
@@ -997,6 +1014,7 @@ impl AptosVM {
             };
             self.failure_multisig_payload_cleanup(
                 resolver,
+                maybe_module_storage,
                 execution_error,
                 txn_data,
                 cleanup_args,
@@ -1004,6 +1022,7 @@ impl AptosVM {
         } else {
             self.success_multisig_payload_cleanup(
                 resolver,
+                maybe_module_storage,
                 session,
                 gas_meter,
                 txn_data,
@@ -1048,18 +1067,23 @@ impl AptosVM {
     fn success_multisig_payload_cleanup<'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
+        maybe_module_storage: Option<&'r dyn ModuleStorage>,
         session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         txn_data: &TransactionMetadata,
         cleanup_args: Vec<Vec<u8>>,
         change_set_configs: &ChangeSetConfigs,
-    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
+    ) -> Result<RespawnedSession<'r>, VMStatus>
+    where
+        'l: 'r,
+    {
         // Charge gas for write set before we do cleanup. This ensures we don't charge gas for
         // cleanup write set changes, which is consistent with outer-level success cleanup
         // flow. We also wouldn't need to worry that we run out of gas when doing cleanup.
         let mut respawned_session = self.charge_change_set_and_respawn_session(
             session,
             resolver,
+            maybe_module_storage,
             gas_meter,
             change_set_configs,
             txn_data,
@@ -1081,16 +1105,21 @@ impl AptosVM {
     fn failure_multisig_payload_cleanup<'r, 'l>(
         &'l self,
         resolver: &'r impl AptosMoveResolver,
+        maybe_module_storage: Option<&'r dyn ModuleStorage>,
         execution_error: VMStatus,
         txn_data: &TransactionMetadata,
         mut cleanup_args: Vec<Vec<u8>>,
-    ) -> Result<RespawnedSession<'r, 'l>, VMStatus> {
+    ) -> Result<RespawnedSession<'r>, VMStatus>
+    where
+        'l: 'r,
+    {
         // Start a fresh session for running cleanup that does not contain any changes from
         // the inner function call earlier (since it failed).
         let mut respawned_session = RespawnedSession::spawn(
             self,
             SessionId::epilogue_meta(txn_data),
             resolver,
+            maybe_module_storage,
             VMChangeSet::empty(),
             0.into(),
         )?;
@@ -1490,6 +1519,7 @@ impl AptosVM {
             | payload @ TransactionPayload::EntryFunction(_) => self
                 .execute_script_or_entry_function(
                     resolver,
+                    maybe_module_storage,
                     session,
                     gas_meter,
                     &txn_data,
@@ -1504,6 +1534,7 @@ impl AptosVM {
                         payload,
                         session,
                         resolver,
+                        maybe_module_storage,
                         &txn_data,
                         log_context,
                         gas_meter,
@@ -1513,6 +1544,7 @@ impl AptosVM {
                 } else {
                     self.execute_multisig_transaction(
                         resolver,
+                        maybe_module_storage,
                         session,
                         gas_meter,
                         &txn_data,

@@ -12,7 +12,8 @@ pub fn run_and_assert_universe(
     mut universe: DependencyGraph,
     additional_txns: Vec<LoaderTransactionGen>,
 ) {
-    let mut executor = FakeExecutor::from_head_genesis().set_parallel();
+    let mut executor = FakeExecutor::from_head_genesis();
+    // .set_parallel();
 
     universe.setup(&mut executor);
     universe.caculate_expected_values();

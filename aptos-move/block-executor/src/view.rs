@@ -28,8 +28,8 @@ use aptos_logger::error;
 use aptos_mvhashmap::{
     types::{
         GroupReadResult, MVDataError, MVDataOutput, MVDelayedFieldsError, MVGroupError,
-        MVModulesError, MVModulesOutput, StorageVersion, TxnIndex, UnknownOrLayout,
-        UnsyncGroupError, ValueWithLayout,
+        MVModulesError, StorageVersion, TxnIndex, UnknownOrLayout, UnsyncGroupError,
+        ValueWithLayout,
     },
     unsync_map::UnsyncMap,
     versioned_delayed_fields::TVersionedDelayedFieldView,
@@ -160,11 +160,11 @@ pub(crate) struct ParallelState<'a, T: Transaction, X: ExecutableBound> {
     scheduler: &'a Scheduler,
     start_counter: u32,
     counter: &'a AtomicU32,
-    captured_reads: RefCell<CapturedReads<T>>,
+    captured_reads: RefCell<CapturedReads<T, X>>,
 }
 
-fn get_delayed_field_value_impl<T: Transaction>(
-    captured_reads: &RefCell<CapturedReads<T>>,
+fn get_delayed_field_value_impl<T: Transaction, X: ExecutableBound>(
+    captured_reads: &RefCell<CapturedReads<T, X>>,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
     wait_for: &dyn TWaitForDependency,
     id: &T::Identifier,
@@ -261,11 +261,14 @@ fn compute_delayed_field_try_add_delta_outcome_from_history(
         true
     };
 
-    Ok((result, DelayedFieldRead::HistoryBounded {
-        restriction: history,
-        max_value,
-        inner_aggregator_value: base_aggregator_value,
-    }))
+    Ok((
+        result,
+        DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value,
+            inner_aggregator_value: base_aggregator_value,
+        },
+    ))
 }
 
 fn compute_delayed_field_try_add_delta_outcome_first_time(
@@ -293,16 +296,19 @@ fn compute_delayed_field_try_add_delta_outcome_first_time(
         true
     };
 
-    Ok((result, DelayedFieldRead::HistoryBounded {
-        restriction: history,
-        max_value,
-        inner_aggregator_value: base_aggregator_value,
-    }))
+    Ok((
+        result,
+        DelayedFieldRead::HistoryBounded {
+            restriction: history,
+            max_value,
+            inner_aggregator_value: base_aggregator_value,
+        },
+    ))
 }
 // TODO[agg_v2](cleanup): see about the split with CapturedReads,
 // and whether anything should be moved there.
-fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
-    captured_reads: &RefCell<CapturedReads<T>>,
+fn delayed_field_try_add_delta_outcome_impl<T: Transaction, X: ExecutableBound>(
+    captured_reads: &RefCell<CapturedReads<T, X>>,
     versioned_delayed_fields: &dyn TVersionedDelayedFieldView<T::Identifier>,
     wait_for: &dyn TWaitForDependency,
     id: &T::Identifier,
@@ -459,19 +465,74 @@ impl<'a, T: Transaction, X: ExecutableBound> ParallelState<'a, T, X> {
             .set_base_value(id, base_value)
     }
 
-    // TODO: Actually fill in the logic to record fetched executables, etc.
     fn fetch_module(
         &self,
-        key: &T::Key,
+        state_key: &T::Key,
         txn_idx: TxnIndex,
-    ) -> anyhow::Result<MVModulesOutput<T::Value, X>, MVModulesError> {
-        // Record for the R/W path intersection fallback for modules.
-        self.captured_reads
-            .borrow_mut()
-            .module_reads
-            .push(key.clone());
+    ) -> PartialVMResult<Option<Arc<T::Value>>> {
+        if let Some(v) = self.captured_reads.borrow().module_data(state_key) {
+            return Ok(Some(v));
+        }
 
-        self.versioned_map.modules().fetch_module(key, txn_idx)
+        loop {
+            match self
+                .versioned_map
+                .modules()
+                .fetch_module(state_key, txn_idx)
+            {
+                Ok((module, descriptor)) => {
+                    self.captured_reads.borrow_mut().capture_module_read(
+                        state_key.clone(),
+                        descriptor,
+                        module.clone(),
+                        None,
+                    );
+                    return Ok(Some(module));
+                },
+                Err(MVModulesError::Dependency(dep_idx)) => {
+                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
+                        return Err(PartialVMError::new(
+                            StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
+                        )
+                        .with_message("Interrupted as block execution was halted".to_string()));
+                    }
+                },
+                Err(MVModulesError::NotFound) => {
+                    return Ok(None);
+                },
+            }
+        }
+    }
+
+    fn store_executable(&self, state_key: &T::Key, executable: X) {
+        let descriptor = self
+            .captured_reads
+            .borrow()
+            .module_descriptor(&state_key)
+            .expect("Module must have been read to store corresponding executable");
+
+        self.versioned_map
+            .modules()
+            .store_executable(&state_key, descriptor, executable);
+    }
+
+    fn fetch_executable(&self, state_key: &T::Key, txn_idx: TxnIndex) -> Option<X> {
+        if let Some(executable) = self.captured_reads.borrow().executable(state_key) {
+            return Some(executable);
+        }
+
+        self.versioned_map
+            .modules()
+            .fetch_executable(state_key, txn_idx)
+            .map(|(executable, module, descriptor)| {
+                self.captured_reads.borrow_mut().capture_module_read(
+                    state_key.clone(),
+                    descriptor,
+                    module,
+                    Some(executable.clone()),
+                );
+                executable
+            })
     }
 
     fn read_group_size(
@@ -974,7 +1035,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> Latest
     }
 
     /// Drains the parallel captured reads.
-    pub(crate) fn take_parallel_reads(&self) -> CapturedReads<T> {
+    pub(crate) fn take_parallel_reads(&self) -> CapturedReads<T, X> {
         match &self.latest_view {
             ViewState::Sync(state) => state.captured_reads.take(),
             ViewState::Unsync(_) => {
@@ -1538,19 +1599,18 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> TModul
 
         match &self.latest_view {
             ViewState::Sync(state) => {
-                use MVModulesError::*;
-                use MVModulesOutput::*;
+                let mut ret = state.fetch_module(state_key, self.txn_idx)?;
 
-                match state.fetch_module(state_key, self.txn_idx) {
-                    Ok(Executable(_)) => unreachable!("Versioned executable not implemented"),
-                    Ok(Module((v, _))) => Ok(v.as_state_value()),
-                    Err(Dependency(_)) => {
-                        // Return anything (e.g. module does not exist) to avoid waiting,
-                        // because parallel execution will fall back to sequential anyway.
-                        Ok(None)
-                    },
-                    Err(NotFound) => self.get_raw_base_value(state_key),
+                if ret.is_none() {
+                    state.versioned_map.modules().store_base_module(
+                        state_key.clone(),
+                        TransactionWrite::from_state_value(self.get_raw_base_value(state_key)?),
+                    );
+
+                    ret = state.fetch_module(state_key, self.txn_idx)?;
                 }
+
+                Ok(ret.expect("base value must be recorded").as_state_value())
             },
             ViewState::Unsync(state) => {
                 state
@@ -1559,19 +1619,51 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: ExecutableBound> TModul
                     .module_reads
                     .insert(state_key.clone());
                 state.unsync_map.fetch_module_data(state_key).map_or_else(
-                    || self.get_raw_base_value(state_key),
+                    || {
+                        let ret = self.get_raw_base_value(state_key);
+
+                        if let Ok(base_value) = &ret {
+                            // Record the base module in UnsyncMap - needed so executable can be
+                            // associated with it.
+                            state.unsync_map.write_module(
+                                state_key.clone(),
+                                TransactionWrite::from_state_value(base_value.clone()),
+                            );
+                        }
+
+                        ret
+                    },
                     |v| Ok(v.as_state_value()),
                 )
             },
         }
     }
 
-    fn store_executable(&self, _state_key: &Self::Key, _executable: Self::Executable) {
-        todo!("Implement in later commit");
+    fn store_executable(&self, state_key: &Self::Key, executable: Self::Executable) {
+        debug_assert!(
+            state_key.module_path().is_some(),
+            "Storing Executable at StateKey {:?} that is not a module path",
+            state_key,
+        );
+
+        match &self.latest_view {
+            ViewState::Sync(state) => state.store_executable(state_key, executable),
+            ViewState::Unsync(state) => state.unsync_map.store_executable(state_key, executable),
+        }
     }
 
-    fn fetch_executable(&self, _state_key: &Self::Key) -> Option<Self::Executable> {
-        todo!("Implement in later commit");
+    fn fetch_executable(&self, state_key: &Self::Key) -> Option<Self::Executable> {
+        debug_assert!(
+            state_key.module_path().is_some(),
+            "Fetching Executable at StateKey {:?} that is not a module path",
+            state_key,
+        );
+
+        match &self.latest_view {
+            // TODO: when executables are stored cross-block, consider them here.
+            ViewState::Sync(state) => state.fetch_executable(state_key, self.txn_idx),
+            ViewState::Unsync(state) => state.unsync_map.fetch_executable(state_key),
+        }
     }
 }
 

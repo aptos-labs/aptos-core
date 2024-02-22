@@ -18,12 +18,17 @@ use aptos_mvhashmap::{
     versioned_data::VersionedData,
     versioned_delayed_fields::TVersionedDelayedFieldView,
     versioned_group_data::VersionedGroupData,
+    versioned_modules::VersionedModules,
 };
 use aptos_types::{
-    delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
-    transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
+    delayed_fields::PanicError,
+    executable::{Executable, ModuleDescriptor},
+    state_store::state_value::StateValueMetadata,
+    transaction::BlockExecutableTransaction as Transaction,
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
+use claims::assert_some;
 use derivative::Derivative;
 use move_core_types::value::MoveTypeLayout;
 use std::{
@@ -286,6 +291,12 @@ impl DelayedFieldRead {
     }
 }
 
+struct ModuleRead<V: TransactionWrite, X: Executable> {
+    descriptor: ModuleDescriptor,
+    module_data: Arc<V>,
+    maybe_executable: Option<X>,
+}
+
 /// Serves as a "read-set" of a transaction execution, and provides APIs for capturing reads,
 /// resolving new reads based on already captured reads when possible, and for validation.
 ///
@@ -295,12 +306,10 @@ impl DelayedFieldRead {
 /// read that has a kind <= already captured read (for that key / tag).
 #[derive(Derivative)]
 #[derivative(Default(bound = "", new = "true"))]
-pub(crate) struct CapturedReads<T: Transaction> {
+pub(crate) struct CapturedReads<T: Transaction, X: Executable> {
     data_reads: HashMap<T::Key, DataRead<T::Value>>,
     group_reads: HashMap<T::Key, GroupRead<T>>,
-    // Currently, we record paths for triggering module R/W fallback.
-    // TODO: implement a general functionality once the fallback is removed.
-    pub(crate) module_reads: Vec<T::Key>,
+    module_reads: HashMap<T::Key, ModuleRead<T::Value, X>>,
 
     delayed_field_reads: HashMap<T::Identifier, DelayedFieldRead>,
 
@@ -323,7 +332,7 @@ enum UpdateResult {
     Inconsistency(String),
 }
 
-impl<T: Transaction> CapturedReads<T> {
+impl<T: Transaction, X: Executable> CapturedReads<T, X> {
     // Return an iterator over the captured reads.
     pub(crate) fn get_read_values_with_delayed_fields(
         &self,
@@ -451,6 +460,57 @@ impl<T: Transaction> CapturedReads<T> {
         }
     }
 
+    pub(crate) fn capture_module_read(
+        &mut self,
+        state_key: T::Key,
+        descriptor: ModuleDescriptor,
+        module_data: Arc<T::Value>,
+        maybe_executable: Option<X>,
+    ) {
+        match self.module_reads.entry(state_key) {
+            Vacant(v) => {
+                v.insert(ModuleRead {
+                    descriptor,
+                    module_data,
+                    maybe_executable,
+                });
+            },
+            Occupied(mut v) => {
+                // Already captured, should be possible only if capturing executable.
+                assert_some!(
+                    &maybe_executable,
+                    "Updating already captured module w.o. executable"
+                );
+                assert_eq!(
+                    v.get().descriptor,
+                    descriptor,
+                    "Captured module descriptors must be consistent"
+                );
+                // Executable is captured when it is compiled and stored, which should
+                // not happen here for the same executable twice.
+                assert!(
+                    v.get().maybe_executable.is_none(),
+                    "Updating executable twice"
+                );
+                v.get_mut().maybe_executable = maybe_executable;
+            },
+        }
+    }
+
+    pub(crate) fn module_descriptor(&self, key: &T::Key) -> Option<ModuleDescriptor> {
+        self.module_reads.get(key).map(|r| r.descriptor.clone())
+    }
+
+    pub(crate) fn module_data(&self, key: &T::Key) -> Option<Arc<T::Value>> {
+        self.module_reads.get(key).map(|r| r.module_data.clone())
+    }
+
+    pub(crate) fn executable(&self, key: &T::Key) -> Option<X> {
+        self.module_reads
+            .get(key)
+            .and_then(|r| r.maybe_executable.clone())
+    }
+
     // If maybe_tag is provided, then we check the group, otherwise, normal reads.
     pub(crate) fn get_by_kind(
         &self,
@@ -547,6 +607,22 @@ impl<T: Transaction> CapturedReads<T> {
 
     pub(crate) fn is_incorrect_use(&self) -> bool {
         self.incorrect_use
+    }
+
+    pub(crate) fn validate_module_reads(
+        &self,
+        module_map: &VersionedModules<T::Key, T::Value, X>,
+        idx_to_validate: TxnIndex,
+    ) -> bool {
+        if self.speculative_failure {
+            return false;
+        }
+
+        self.module_reads.iter().all(|(k, r)| {
+            module_map
+                .fetch_module(k, idx_to_validate)
+                .is_ok_and(|(_, descriptor)| descriptor == r.descriptor)
+        })
     }
 
     pub(crate) fn validate_data_reads(
@@ -694,7 +770,7 @@ impl<T: Transaction> CapturedReads<T> {
             }
         }
 
-        for key in &self.module_reads {
+        for (key, _) in &self.module_reads {
             ret.insert(InputOutputKey::Resource(key.clone()));
         }
 
