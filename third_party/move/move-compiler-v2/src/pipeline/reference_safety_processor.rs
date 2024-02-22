@@ -1453,6 +1453,35 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
+    /// Process a FreezeRef instruction.
+    fn freeze_ref(
+        &self,
+        state: &mut LifetimeState,
+        code_offset: CodeOffset,
+        dest: TempIndex,
+        src: TempIndex,
+    ) {
+        // Since our graph doesn't have any skip (epsilon) edges, we model freeze by cloning all incoming
+        // edges and marking them is immutable. This effectively 'undoes' the previous mutable borrow(s), at
+        // least that is how it looks to the borrow logic. The original edges will eventually go out of scope
+        // when src does.
+        let label = state
+            .label_for_local(src)
+            .expect("label for reference")
+            .clone();
+        let redirected = state.make_local(dest, code_offset, 0);
+        for (parent, mut edge) in state
+            .parent_edges(&label)
+            .map(|(p, e)| (p, e.clone()))
+            .collect::<Vec<_>>()
+        // need to mutate state
+        {
+            edge.target = redirected.clone();
+            edge.is_mut = false;
+            state.add_edge(&parent, edge)
+        }
+    }
+
     /// Process a MoveFrom instruction.
     fn move_from(&mut self, dest: TempIndex, resource: &QualifiedInstId<StructId>, src: TempIndex) {
         self.check_read_local(src, ReadMode::Argument);
@@ -1618,6 +1647,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                     },
                     ReadRef => step.read_ref(dests[0], srcs[0]),
                     WriteRef => step.write_ref(srcs[0], srcs[1]),
+                    FreezeRef => self.freeze_ref(state, code_offset, dests[0], srcs[0]),
                     MoveFrom(mid, sid, inst) => {
                         step.move_from(dests[0], &mid.qualified_inst(*sid, inst.clone()), srcs[0])
                     },

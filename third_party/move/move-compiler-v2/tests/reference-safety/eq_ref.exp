@@ -1,0 +1,9 @@
+
+Diagnostics:
+error: cannot mutably borrow local `x` since other references exists
+   ┌─ tests/reference-safety/eq_ref.move:16:19
+   │
+16 │         &mut x == &mut x; // error expected, will be fixed with new reference safety
+   │         ------    ^^^^^^ mutable borrow attempted here
+   │         │
+   │         previous local borrow
