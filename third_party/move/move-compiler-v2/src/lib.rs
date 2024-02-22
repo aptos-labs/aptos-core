@@ -18,6 +18,7 @@ use crate::pipeline::{
     exit_state_analysis::ExitStateAnalysisProcessor, explicit_drop::ExplicitDrop,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
+    split_critical_edges_processor::SplitCriticalEdgesProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
     unreachable_code_analysis::UnreachableCodeProcessor,
     unreachable_code_remover::UnreachableCodeRemover,
@@ -207,6 +208,9 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
     let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let mut pipeline = FunctionTargetPipeline::default();
+    if options.experiment_on(Experiment::SPLIT_CRITICAL_EDGES) {
+        pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
+    }
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
     }

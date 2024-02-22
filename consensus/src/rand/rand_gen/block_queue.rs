@@ -5,7 +5,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     pipeline::buffer_manager::OrderedBlocks,
 };
-use aptos_consensus_types::{common::Round, executed_block::ExecutedBlock};
+use aptos_consensus_types::{common::Round, pipelined_block::PipelinedBlock};
 use aptos_logger::info;
 use aptos_reliable_broadcast::DropGuard;
 use aptos_types::randomness::{RandMetadata, Randomness};
@@ -75,11 +75,11 @@ impl QueueItem {
         }
     }
 
-    fn blocks(&self) -> &[ExecutedBlock] {
+    fn blocks(&self) -> &[PipelinedBlock] {
         &self.ordered_blocks.ordered_blocks
     }
 
-    fn blocks_mut(&mut self) -> &mut [ExecutedBlock] {
+    fn blocks_mut(&mut self) -> &mut [PipelinedBlock] {
         &mut self.ordered_blocks.ordered_blocks
     }
 }

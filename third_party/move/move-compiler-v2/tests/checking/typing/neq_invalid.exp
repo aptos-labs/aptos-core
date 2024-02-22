@@ -42,6 +42,18 @@ error: unable to infer type: `M::G0<?4>`
 26 │         G0{} != G0{};
    │         ^^^^
 
+error: unable to infer type: `M::G1<?10>`
+   ┌─ tests/checking/typing/neq_invalid.move:27:9
+   │
+27 │         G1{} != G1{};
+   │         ^^^^
+
+error: unable to infer type: `M::G2<?16>`
+   ┌─ tests/checking/typing/neq_invalid.move:28:9
+   │
+28 │         G2{} != G2{};
+   │         ^^^^
+
 error: invalid call of `!=`: tuples have different arity (3 != 2) for argument 2
    ┌─ tests/checking/typing/neq_invalid.move:34:22
    │

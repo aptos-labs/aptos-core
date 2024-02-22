@@ -96,13 +96,14 @@ pub enum FeatureFlag {
     Bn254Structures,
     WebAuthnSignature,
     ReconfigureWithDkg,
-    ZkIdSignature,
-    ZkIdZkLessSignature,
+    OidbSignature,
+    OidbZkLessSignature,
     RemoveDetailedError,
     JwkConsensus,
     ConcurrentFungibleAssets,
     RefundableBytes,
     ObjectCodeDeployment,
+    MaxObjectNestingCheck,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -257,13 +258,14 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::Bn254Structures => AptosFeatureFlag::BN254_STRUCTURES,
             FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
             FeatureFlag::ReconfigureWithDkg => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
-            FeatureFlag::ZkIdSignature => AptosFeatureFlag::ZK_ID_SIGNATURES,
-            FeatureFlag::ZkIdZkLessSignature => AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
+            FeatureFlag::OidbSignature => AptosFeatureFlag::OIDB_SIGNATURE,
+            FeatureFlag::OidbZkLessSignature => AptosFeatureFlag::OIDB_ZKLESS_SIGNATURE,
             FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::JwkConsensus => AptosFeatureFlag::JWK_CONSENSUS,
             FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::RefundableBytes => AptosFeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::ObjectCodeDeployment => AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT,
+            FeatureFlag::MaxObjectNestingCheck => AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK,
         }
     }
 }
@@ -341,13 +343,14 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::Bn254Structures,
             AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
             AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDkg,
-            AptosFeatureFlag::ZK_ID_SIGNATURES => FeatureFlag::ZkIdSignature,
-            AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE => FeatureFlag::ZkIdZkLessSignature,
+            AptosFeatureFlag::OIDB_SIGNATURE => FeatureFlag::OidbSignature,
+            AptosFeatureFlag::OIDB_ZKLESS_SIGNATURE => FeatureFlag::OidbZkLessSignature,
             AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
             AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JwkConsensus,
             AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
             AptosFeatureFlag::REFUNDABLE_BYTES => FeatureFlag::RefundableBytes,
             AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT => FeatureFlag::ObjectCodeDeployment,
+            AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK => FeatureFlag::MaxObjectNestingCheck,
         }
     }
 }

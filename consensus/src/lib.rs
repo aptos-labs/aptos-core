@@ -62,6 +62,8 @@ mod transaction_filter;
 mod transaction_shuffler;
 mod txn_hash_and_authenticator_deduper;
 
+use aptos_config::config::SecureBackend;
+use aptos_consensus_types::common::Author;
 use aptos_metrics_core::IntGauge;
 pub use consensusdb::create_checkpoint;
 /// Required by the smoke tests
@@ -69,6 +71,11 @@ pub use consensusdb::CONSENSUS_DB_NAME;
 pub use quorum_store::quorum_store_db::QUORUM_STORE_DB_NAME;
 #[cfg(feature = "fuzzing")]
 pub use round_manager::round_manager_fuzzing;
+use std::sync::Arc;
+use aptos_global_constants::CONSENSUS_KEY;
+use aptos_secure_storage::Storage;
+use aptos_types::validator_signer::ValidatorSigner;
+use aptos_secure_storage::KVStorage;
 
 struct IntGaugeGuard {
     gauge: IntGauge,
@@ -98,4 +105,16 @@ macro_rules! monitor {
         let _guard = IntGaugeGuard::new(OP_COUNTERS.gauge(concat!($name, "_running")));
         $fn
     }};
+}
+
+fn new_signer_from_storage(author: Author, backend: &SecureBackend) -> Arc<ValidatorSigner> {
+    let storage: Storage = backend.into();
+    if let Err(error) = storage.available() {
+        panic!("Storage is not available: {:?}", error);
+    }
+    let private_key = storage
+        .get(CONSENSUS_KEY)
+        .map(|v| v.value)
+        .expect("Unable to get private key");
+    Arc::new(ValidatorSigner::new(author, private_key))
 }
