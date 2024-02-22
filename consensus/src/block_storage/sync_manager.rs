@@ -74,22 +74,22 @@ impl BlockStore {
         NeedFetchResult::NeedFetch
     }
 
+    pub async fn add_commit_cert(&self, sync_info: &SyncInfo, retriever: BlockRetriever) {
+        self.sync_to_highest_commit_cert(
+            sync_info.highest_commit_cert().ledger_info(),
+            &retriever.network,
+        )
+        .await;
+    }
+
     /// Fetches dependencies for given sync_info.quorum_cert
     /// If gap is large, performs state sync using sync_to_highest_ordered_cert
     /// Inserts sync_info.quorum_cert into block store as the last step
-    pub async fn add_certs(
+    pub async fn add_non_commit_certs(
         &self,
         sync_info: &SyncInfo,
         mut retriever: BlockRetriever,
-        sync_commit_certs: bool,
     ) -> anyhow::Result<()> {
-        if sync_commit_certs {
-            self.sync_to_highest_commit_cert(
-                sync_info.highest_commit_cert().ledger_info(),
-                &retriever.network,
-            )
-            .await;
-        }
         self.sync_to_highest_ordered_cert(
             sync_info.highest_ordered_cert().clone(),
             sync_info.highest_commit_cert().clone(),
