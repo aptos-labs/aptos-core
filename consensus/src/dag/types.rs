@@ -11,6 +11,7 @@ use crate::{
     network_interface::ConsensusMsg,
 };
 use anyhow::{bail, ensure};
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
     bls12381::Signature,
@@ -993,5 +994,16 @@ impl DagSnapshotBitmask {
 
     pub fn len(&self) -> usize {
         self.bitmask.len()
+    }
+
+    pub fn bitvec(&self, round: Round) -> Option<BitVec> {
+        let round_idx = match round.checked_sub(self.first_round) {
+            Some(idx) => idx as usize,
+            None => return None,
+        };
+        match self.bitmask.get(round_idx) {
+            Some(bitvec) => Some(bitvec.into()),
+            None => None,
+        }
     }
 }

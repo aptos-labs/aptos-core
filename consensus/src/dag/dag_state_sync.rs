@@ -12,7 +12,7 @@ use crate::{
     dag::DAGMessage, network::IncomingDAGRequest, payload_manager::TPayloadManager,
     pipeline::execution_client::TExecutionClient,
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, error};
@@ -249,7 +249,7 @@ impl DagStateSynchronizer {
             Ok(_) => {},
             Err(err) => {
                 error!("error fetching nodes {}", err);
-                return Err(err);
+                bail!(err)
             },
         }
 
