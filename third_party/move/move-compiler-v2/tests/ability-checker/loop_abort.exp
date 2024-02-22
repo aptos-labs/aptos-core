@@ -157,7 +157,7 @@ fun Test::test2($t0: bool) {
  13: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun Test::test0() {
@@ -166,50 +166,50 @@ fun Test::test0() {
      var $t2: bool
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   0: $t2 := false
      # live vars: $t2
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   1: $t1 := pack Test::Impotent($t2)
      # live vars: $t1
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2}
      #
   2: $t0 := move($t1)
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   3: label L0
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   4: goto 3
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   5: label L1
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   6: return ()
@@ -224,99 +224,99 @@ fun Test::test1() {
      var $t3: bool
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   0: $t2 := false
      # live vars: $t2
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   1: $t1 := pack Test::Impotent($t2)
      # live vars: $t1
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2}
      #
   2: $t0 := move($t1)
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   3: label L0
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   4: $t3 := true
      # live vars: $t3
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   5: if ($t3) goto 6 else goto 8
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   6: label L2
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   7: goto 10
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   8: label L3
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
   9: goto 12
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
  10: label L4
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
  11: goto 3
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
  12: label L1
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t1,$t2}
      #
  13: return ()
@@ -331,99 +331,99 @@ fun Test::test2($t0: bool) {
      var $t4: u64
      # live vars: $t0
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   0: $t3 := false
      # live vars: $t0, $t3
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   1: $t2 := pack Test::Impotent($t3)
      # live vars: $t0, $t2
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t3}
      #
   2: $t1 := move($t2)
      # live vars: $t0
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2,$t3}
      #
   3: if ($t0) goto 4 else goto 9
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2,$t3}
      #
   4: label L0
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2,$t3}
      #
   5: label L3
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2,$t3}
      #
   6: goto 5
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   7: label L4
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   8: goto 12
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2,$t3}
      #
   9: label L1
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2,$t3}
      #
  10: $t4 := 42
      # live vars: $t4
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2,$t3}
      #
  11: abort($t4)
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
  12: label L2
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
  13: return ()

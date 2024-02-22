@@ -9,7 +9,7 @@ pub mod flow_insensitive_checkers;
 pub mod function_checker;
 pub mod inliner;
 pub mod logging;
-mod options;
+pub mod options;
 pub mod pipeline;
 
 use crate::pipeline::{

@@ -104,29 +104,29 @@ fun assign::assign_struct($t0: &mut assign::S) {
   5: return ()
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun assign::assign_field($t0: &mut assign::S, $t1: u64) {
      var $t2: &mut u64
      # live vars: $t0, $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
      # moved: {}
      #
   0: $t2 := borrow_field<assign::S>.f($t0)
      # live vars: $t1, $t2
-     # graph: {L0=local($t0)[borrow_field(true) -> L1],L1=local($t2)[]}
-     # local_to_label: {$t0=L0,$t2=L1}
-     # global_to_label: {}
+     # graph: {@1=derived[],@1000000=external[borrow(true) -> @2000000],@2000000=derived[borrow_field(true) -> @1]}
+     # locals: {$t2=@1}
+     # globals: {}
      # moved: {}
      #
   1: write_ref($t2, $t1)
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   2: return ()
@@ -137,23 +137,23 @@ fun assign::assign_field($t0: &mut assign::S, $t1: u64) {
 fun assign::assign_int($t0: &mut u64) {
      var $t1: u64
      # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
      # moved: {}
      #
   0: $t1 := 42
      # live vars: $t0, $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
      # moved: {}
      #
   1: write_ref($t0, $t1)
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   2: return ()
@@ -166,29 +166,29 @@ fun assign::assign_pattern($t0: assign::S, $t1: u64, $t2: u64): u64 {
      var $t4: assign::T
      # live vars: $t0
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {}
      #
   0: ($t1, $t4) := unpack assign::S($t0)
      # live vars: $t1, $t4
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t0}
      #
   1: $t2 := unpack assign::T($t4)
      # live vars: $t1, $t2
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t0,$t4}
      #
   2: $t3 := +($t1, $t2)
      # live vars: $t3
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t0,$t1,$t2,$t4}
      #
   3: return $t3
@@ -202,44 +202,44 @@ fun assign::assign_struct($t0: &mut assign::S) {
      var $t3: assign::T
      var $t4: u64
      # live vars: $t0
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
      # moved: {}
      #
   0: $t2 := 42
      # live vars: $t0, $t2
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
      # moved: {}
      #
   1: $t4 := 42
      # live vars: $t0, $t2, $t4
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
      # moved: {}
      #
   2: $t3 := pack assign::T($t4)
      # live vars: $t0, $t2, $t3
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
      # moved: {$t4}
      #
   3: $t1 := pack assign::S($t2, $t3)
      # live vars: $t0, $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
      # moved: {$t2,$t3,$t4}
      #
   4: write_ref($t0, $t1)
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t2,$t3,$t4}
      #
   5: return ()
