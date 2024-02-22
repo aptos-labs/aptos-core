@@ -491,14 +491,15 @@ impl RoundManager {
         let local_sync_info = self.block_store.sync_info();
         if sync_info.has_newer_commit_certificates(&local_sync_info) {
             info!(
-                self.new_log(LogEvent::ReceiveNewCertificate)
+                self.new_log(LogEvent::ReceiveNewCommitCertificate)
                     .remote_peer(author),
                 "Local state {}, remote state {}", local_sync_info, sync_info
             );
 
             let highest_commit_round = sync_info.highest_commit_round();
-            if self.pending_highest_commit_round.is_none()
-                || highest_commit_round > self.pending_highest_commit_round.unwrap()
+            if self
+                .pending_highest_commit_round
+                .map_or(true, |round| round < highest_commit_round)
             {
                 // Some information in SyncInfo is ahead of what we have locally.
                 // First verify the SyncInfo (didn't verify it in the yet).
@@ -528,20 +529,19 @@ impl RoundManager {
         &mut self,
         sync_info: &SyncInfo,
         author: Author,
-        sync_info_verified: bool,
+        is_sync_info_verified: bool,
     ) -> anyhow::Result<()> {
         let local_sync_info = self.block_store.sync_info();
         if sync_info.has_newer_non_commit_certificates(&local_sync_info) {
-            // TODO: Duplicate info message. Check if it is necessary.
             info!(
-                self.new_log(LogEvent::ReceiveNewCertificate)
+                self.new_log(LogEvent::ReceiveNewNonCommitCertificate)
                     .remote_peer(author),
                 "Local state {}, remote state {}", local_sync_info, sync_info
             );
 
             // Some information in SyncInfo is ahead of what we have locally.
             // First verify the SyncInfo (didn't verify it in the yet).
-            if !sync_info_verified {
+            if !is_sync_info_verified {
                 sync_info
                     .verify(&self.epoch_state().verifier)
                     .map_err(|e| {
@@ -582,8 +582,8 @@ impl RoundManager {
         if message_round < self.round_state.current_round() {
             return Ok(false);
         }
-        let sync_info_verified = self.sync_up_commit_certs(sync_info, author).await?;
-        self.sync_up_non_commit_certs(sync_info, author, sync_info_verified)
+        let is_sync_info_verified = self.sync_up_commit_certs(sync_info, author).await?;
+        self.sync_up_non_commit_certs(sync_info, author, is_sync_info_verified)
             .await?;
         ensure!(
             message_round == self.round_state.current_round(),
