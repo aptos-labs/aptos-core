@@ -15,7 +15,7 @@ use crate::{
         types::{CertifiedNodeMessage, RemoteFetchRequest},
         CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, TDAGNetworkSender,
     },
-    test_utils::EmptyStateComputer,
+    pipeline::execution_client::DummyExecutionClient,
 };
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
@@ -112,13 +112,13 @@ impl OrderedNotifier for MockNotifier {
 
 fn setup(epoch_state: Arc<EpochState>, storage: Arc<dyn DAGStorage>) -> DagStateSynchronizer {
     let time_service = TimeService::mock();
-    let state_computer = Arc::new(EmptyStateComputer {});
+    let execution_client = Arc::new(DummyExecutionClient {});
     let payload_manager = Arc::new(MockPayloadManager {});
 
     DagStateSynchronizer::new(
         epoch_state,
         time_service,
-        state_computer,
+        execution_client,
         storage,
         payload_manager,
         TEST_DAG_WINDOW as Round,

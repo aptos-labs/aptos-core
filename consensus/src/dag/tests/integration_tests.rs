@@ -7,8 +7,8 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, DIRECT_SEND, RPC},
     network_tests::{NetworkPlayground, TwinId},
     payload_manager::PayloadManager,
-    pipeline::buffer_manager::OrderedBlocks,
-    test_utils::{consensus_runtime, EmptyStateComputer, MockPayloadManager, MockStorage},
+    pipeline::{buffer_manager::OrderedBlocks, execution_client::DummyExecutionClient},
+    test_utils::{consensus_runtime, MockPayloadManager, MockStorage},
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
@@ -45,8 +45,9 @@ struct DagBootstrapUnit {
     nh_task_handle: JoinHandle<SyncOutcome>,
     df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
-    network_events:
-        Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
+    network_events: Box<
+        Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
+    >,
 }
 
 impl DagBootstrapUnit {
@@ -58,7 +59,10 @@ impl DagBootstrapUnit {
         network: NetworkSender,
         time_service: TimeService,
         network_events: Box<
-            Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>,
+            Select<
+                NetworkEvents<ConsensusMsg>,
+                aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
+            >,
         >,
         all_signers: Vec<ValidatorSigner>,
     ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
@@ -74,7 +78,7 @@ impl DagBootstrapUnit {
         let payload_client = Arc::new(MockPayloadManager::new(None));
         let payload_manager = Arc::new(PayloadManager::DirectMempool);
 
-        let state_computer = Arc::new(EmptyStateComputer {});
+        let execution_client = Arc::new(DummyExecutionClient);
 
         let (nh_abort_handle, df_abort_handle, dag_rpc_tx, ordered_nodes_rx) =
             bootstrap_dag_for_test(
@@ -88,7 +92,7 @@ impl DagBootstrapUnit {
                 time_service,
                 payload_manager,
                 payload_client,
-                state_computer,
+                execution_client,
             );
 
         (
@@ -133,7 +137,9 @@ fn create_network(
     validators: ValidatorVerifier,
 ) -> (
     NetworkSender,
-    Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
+    Box<
+        Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
+    >,
 ) {
     let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -153,7 +159,7 @@ fn create_network(
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
 
-    let (self_sender, self_receiver) = aptos_channels::new_test(1000);
+    let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
 
     let twin_id = TwinId { id, author };

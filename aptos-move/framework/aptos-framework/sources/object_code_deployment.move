@@ -10,7 +10,7 @@
 /// 1. Create a new object with the address derived from the publisher address and the object seed.
 /// 2. Publish the module passed in the function via `metadata_serialized` and `code` to the newly created object.
 /// 3. Emits 'Publish' event with the address of the newly created object.
-/// 4. Create a `PublisherRef` which stores the extend ref of the newly created object.
+/// 4. Create a `ManagingRefs` which stores the extend ref of the newly created object.
 /// Note: This is needed to upgrade the code as the signer must be generated to upgrade the existing code in an object.
 ///
 /// Upgrading modules flow:
@@ -51,8 +51,8 @@ module aptos_framework::object_code_deployment {
     const OBJECT_CODE_DEPLOYMENT_DOMAIN_SEPARATOR: vector<u8> = b"aptos_framework::object_code_deployment";
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
-    /// Object which contains the code deployed, along with the extend ref to upgrade the code.
-    struct PublisherRef has key {
+    /// Internal struct, attached to the object, that holds Refs we need to manage the code deployment (i.e. upgrades).
+    struct ManagingRefs has key {
         /// We need to keep the extend ref to be able to generate the signer to upgrade existing code.
         extend_ref: ExtendRef,
     }
@@ -97,7 +97,7 @@ module aptos_framework::object_code_deployment {
 
         event::emit(Publish { object_address: signer::address_of(code_signer), });
 
-        move_to(code_signer, PublisherRef {
+        move_to(code_signer, ManagingRefs {
             extend_ref: object::generate_extend_ref(constructor_ref),
         });
     }
@@ -118,8 +118,8 @@ module aptos_framework::object_code_deployment {
         publisher: &signer,
         metadata_serialized: vector<u8>,
         code: vector<vector<u8>>,
-        code_object: Object<PublisherRef>,
-    ) acquires PublisherRef {
+        code_object: Object<PackageRegistry>,
+    ) acquires ManagingRefs {
         let publisher_address = signer::address_of(publisher);
         assert!(
             object::is_owner(code_object, publisher_address),
@@ -127,9 +127,9 @@ module aptos_framework::object_code_deployment {
         );
 
         let code_object_address = object::object_address(&code_object);
-        assert!(exists<PublisherRef>(code_object_address), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
+        assert!(exists<ManagingRefs>(code_object_address), error::not_found(ECODE_OBJECT_DOES_NOT_EXIST));
 
-        let extend_ref = &borrow_global<PublisherRef>(code_object_address).extend_ref;
+        let extend_ref = &borrow_global<ManagingRefs>(code_object_address).extend_ref;
         let code_signer = &object::generate_signer_for_extending(extend_ref);
         code::publish_package_txn(code_signer, metadata_serialized, code);
 

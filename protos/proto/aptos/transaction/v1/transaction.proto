@@ -451,7 +451,7 @@ message AnyPublicKey {
     TYPE_ED25519 = 1;
     TYPE_SECP256K1_ECDSA = 2;
     TYPE_SECP256R1_ECDSA = 3;
-    TYPE_ZKID = 4;
+    TYPE_OIDB = 4;
   }
 
   Type type = 1;
@@ -464,7 +464,7 @@ message AnySignature {
     TYPE_ED25519 = 1;
     TYPE_SECP256K1_ECDSA = 2;
     TYPE_WEBAUTHN = 3;
-    TYPE_ZKID = 4;
+    TYPE_OIDB = 4;
   }
 
   Type type = 1;
@@ -478,7 +478,7 @@ message AnySignature {
     Ed25519 ed25519 = 3;
     Secp256k1Ecdsa secp256k1_ecdsa = 4;
     WebAuthn webauthn = 5;
-    ZkId zkid = 6;
+    Oidb oidb = 6;
   }
 }
 
@@ -494,7 +494,7 @@ message WebAuthn {
   bytes signature = 1;
 }
 
-message ZkId {
+message Oidb {
   bytes signature = 1;
 }
 

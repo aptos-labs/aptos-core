@@ -3,9 +3,9 @@
 
 use crate::on_chain_config::OnChainConfig;
 use serde::{Deserialize, Serialize};
-
+use strum_macros::FromRepr;
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -53,13 +53,14 @@ pub enum FeatureFlag {
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
     RECONFIGURE_WITH_DKG = 45,
-    ZK_ID_SIGNATURES = 46,
-    ZK_ID_ZKLESS_SIGNATURE = 47,
+    OIDB_SIGNATURE = 46,
+    OIDB_ZKLESS_SIGNATURE = 47,
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
     REFUNDABLE_BYTES = 51,
     OBJECT_CODE_DEPLOYMENT = 52,
+    MAX_OBJECT_NESTING_CHECK = 53,
 }
 
 /// Representation of features on chain as a bitset.
@@ -115,6 +116,17 @@ impl Features {
         self.features[byte_index] &= !bit_mask;
     }
 
+    pub fn into_flag_vec(self) -> Vec<FeatureFlag> {
+        let Self { features } = self;
+        features
+            .into_iter()
+            .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
+            .enumerate()
+            .filter(|(_feature_idx, enabled)| *enabled)
+            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .collect()
+    }
+
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
         let val = flag as u64;
         let byte_index = (val / 8) as usize;
@@ -165,20 +177,20 @@ impl Features {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET)
     }
 
-    /// Whether the zkID feature is enabled, specifically the ZK path with ZKP-based signatures.
-    /// The ZK-less path is controlled via a different `FeatureFlag::ZK_ID_ZKLESS_SIGNATURE` flag.
-    pub fn is_zkid_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ZK_ID_SIGNATURES)
+    /// Whether the OIDB feature is enabled, specifically the ZK path with ZKP-based signatures.
+    /// The ZK-less path is controlled via a different `FeatureFlag::OIDB_ZKLESS_SIGNATURE` flag.
+    pub fn is_oidb_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::OIDB_SIGNATURE)
     }
 
-    /// If `FeatureFlag::ZK_ID_SIGNATURES` is enabled, this feature additionally allows for a "ZK-less
+    /// If `FeatureFlag::OIDB_SIGNATURE` is enabled, this feature additionally allows for a "ZK-less
     /// path" where the blockchain can verify OpenID signatures directly. This ZK-less mode exists
     /// for two reasons. First, it gives as a simpler way to test the feature. Second, it acts as a
     /// safety precaution in case of emergency (e.g., if the ZK-based signatures must be temporarily
     /// turned off due to a zeroday exploit, the ZK-less path will still allow users to transact,
     /// but without privacy).
-    pub fn is_zkid_zkless_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ZK_ID_ZKLESS_SIGNATURE)
+    pub fn is_oidb_zkless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::OIDB_ZKLESS_SIGNATURE)
     }
 
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {

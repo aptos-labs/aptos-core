@@ -160,6 +160,8 @@ impl NetworkHandler {
                             Ok(certified_node) => {
                                 if let Err(e) = dag_driver_clone.process(certified_node).await {
                                     warn!(error = ?e, "error processing certified node fetch notification");
+                                } else {
+                                    dag_driver_clone.try_order_all();
                                 }
                             },
                             Err(e) => {

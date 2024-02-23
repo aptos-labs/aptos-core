@@ -1,5 +1,5 @@
 {
-  "resource_version": 296,
+  "resource_version": 385,
   "metadata": {
     "version": 3,
     "sources": [
@@ -1404,6 +1404,32 @@
           },
           {
             "table": {
+              "name": "delegated_staking_pool_balances",
+              "schema": "public"
+            },
+            "select_permissions": [
+              {
+                "role": "anonymous",
+                "permission": {
+                  "columns": [
+                    "active_table_handle",
+                    "inactive_table_handle",
+                    "operator_commission_percentage",
+                    "staking_pool_address",
+                    "total_coins",
+                    "total_shares",
+                    "transaction_version"
+                  ],
+                  "filter": {},
+                  "limit": 100,
+                  "allow_aggregations": true
+                },
+                "comment": ""
+              }
+            ]
+          },
+          {
+            "table": {
               "name": "delegated_staking_pools",
               "schema": "public"
             },
@@ -1698,6 +1724,7 @@
                 "permission": {
                   "columns": [
                     "last_success_version",
+                    "last_transaction_timestamp",
                     "last_updated",
                     "processor"
                   ],
@@ -2070,13 +2097,6 @@
               "from_env": "INDEXER_V2_POSTGRES_URL"
             },
             "isolation_level": "read-committed",
-            "pool_settings": {
-              "connection_lifetime": 600,
-              "idle_timeout": 180,
-              "max_connections": 100,
-              "total_max_connections": 1500,
-              "pool_timeout": 120
-            },
             "use_prepared_statements": false
           }
         }
@@ -2089,7 +2109,7 @@
           "queries": [
             {
               "name": "Latest Processor Status",
-              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n  }\n}"
+              "query": "query LatestProcessorStatus {\n  processor_status {\n    processor\n    last_updated\n    last_success_version\n    last_transaction_timestamp\n  }\n}"
             }
           ]
         }

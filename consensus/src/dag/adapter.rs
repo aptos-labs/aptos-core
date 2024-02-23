@@ -19,7 +19,7 @@ use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
-    executed_block::ExecutedBlock,
+    pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -165,13 +165,12 @@ impl OrderedNotifier for OrderedNotifierAdapter {
 
         NUM_NODES_PER_BLOCK.observe(ordered_nodes.len() as f64);
         let rounds_between = {
-            let anchor_node = ordered_nodes.first().map_or(0, |node| node.round());
-            let lowest_round_node = ordered_nodes.last().map_or(0, |node| node.round());
-            anchor_node.saturating_sub(lowest_round_node)
+            let lowest_round_node = ordered_nodes.first().map_or(0, |node| node.round());
+            round.saturating_sub(lowest_round_node)
         };
         NUM_ROUNDS_PER_BLOCK.observe((rounds_between + 1) as f64);
 
-        let block = ExecutedBlock::new(
+        let block = PipelinedBlock::new(
             Block::new_for_dag(
                 epoch,
                 round,
@@ -196,7 +195,6 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             .write()
             .insert(block_info.round(), Instant::now());
         let block_created_ts = self.block_ordered_ts.clone();
-
         let blocks_to_send = OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
@@ -204,7 +202,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 AggregateSignature::empty(),
             ),
             callback: Box::new(
-                move |committed_blocks: &[Arc<ExecutedBlock>],
+                move |committed_blocks: &[Arc<PipelinedBlock>],
                       commit_decision: LedgerInfoWithSignatures| {
                     block_created_ts
                         .write()

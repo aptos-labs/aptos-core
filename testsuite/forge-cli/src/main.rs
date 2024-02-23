@@ -7,7 +7,7 @@
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
     BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NetbenchConfig,
-    NodeConfig, QcAggregatorType, StateSyncConfig,
+    NodeConfig, StateSyncConfig,
 };
 use aptos_forge::{
     args::TransactionTypeArg,
@@ -774,7 +774,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            optimize_for_maximum_throughput(config);
+            optimize_for_maximum_throughput(config, 20_000, 4_500, 3.0);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -788,47 +788,50 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         )
 }
 
-fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
+fn quorum_store_backlog_txn_limit_count(
+    config: &mut NodeConfig,
+    target_tps: usize,
+    vn_latency: f64,
+) {
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .backlog_txn_limit_count = (target_tps as f64 * vn_latency) as u64;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_max_txn_per_s = 4000;
+}
+
+fn optimize_for_maximum_throughput(
+    config: &mut NodeConfig,
+    target_tps: usize,
+    max_txns_per_block: usize,
+    vn_latency: f64,
+) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config.consensus.max_sending_block_txns = 30000;
-    config.consensus.max_receiving_block_txns = 40000;
+    config.consensus.max_sending_block_txns = max_txns_per_block as u64;
+    config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
     config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
     config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
     config.consensus.pipeline_backpressure = vec![];
     config.consensus.chain_health_backoff = vec![];
 
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_txn_limit_count = 200000;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_per_validator_batch_limit_count = 50;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .dynamic_min_txn_per_s = 2000;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .dynamic_max_txn_per_s = 8000;
+    quorum_store_backlog_txn_limit_count(config, target_tps, vn_latency);
 
-    config.consensus.quorum_store.sender_max_batch_txns = 1000;
+    config.consensus.quorum_store.sender_max_batch_txns = 500;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
     config.consensus.quorum_store.sender_max_num_batches = 100;
     config.consensus.quorum_store.sender_max_total_txns = 4000;
     config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
     config.consensus.quorum_store.receiver_max_batch_txns = 1000;
-    config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
-    config.consensus.quorum_store.receiver_max_num_batches = 100;
-    config.consensus.quorum_store.receiver_max_total_txns = 4000;
-    config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_batch_bytes = 8 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_num_batches = 200;
+    config.consensus.quorum_store.receiver_max_total_txns = 8000;
+    config.consensus.quorum_store.receiver_max_total_bytes = 16 * 1024 * 1024;
 }
 
 fn large_db_simple_test() -> ForgeConfig {
@@ -1840,31 +1843,37 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 12;
 
+    // Config is based on these values. The target TPS should be a slight overestimate of
+    // the actual throughput to be able to have reasonable queueing but also so throughput
+    // will improve as performance improves.
+    // Overestimate: causes mempool and/or batch queueing. Underestimate: not enough txns in blocks.
+    const TARGET_TPS: usize = 15_000;
+    // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
+    // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
+    const MAX_TXNS_PER_BLOCK: usize = 3500;
+    // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
+    // This is validator latency, minus mempool queueing time.
+    const VN_LATENCY_S: f64 = 2.5;
+    // Overestimate: causes mempool queueing. Underestimate: not enough txns incoming.
+    const VFN_LATENCY_S: f64 = 4.0;
+
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 500_000,
+            mempool_backlog: (TARGET_TPS as f64 * VFN_LATENCY_S) as usize,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
             optimize_state_sync_for_throughput(config);
 
-            // consensus and quorum store configs copied from the consensus-only suite
-            optimize_for_maximum_throughput(config);
+            optimize_for_maximum_throughput(config, TARGET_TPS, MAX_TXNS_PER_BLOCK, VN_LATENCY_S);
 
             // Other consensus / Quroum store configs
-            config
-                .consensus
-                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
-            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
             config.consensus.quorum_store_pull_timeout_ms = 200;
 
             // Experimental storage optimizations
             config.storage.rocksdb_configs.enable_storage_sharding = true;
-
-            // Experimental delayed QC aggregation
-            config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
 
             // Increase the concurrency level
             if USE_CRAZY_MACHINES {
