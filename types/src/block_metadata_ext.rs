@@ -103,13 +103,6 @@ impl BlockMetadataExt {
             BlockMetadataExt::V1(obj) => obj.round,
         }
     }
-
-    pub fn randomness(&self) -> &Option<Randomness> {
-        match self {
-            BlockMetadataExt::V0(_) => unreachable!(),
-            BlockMetadataExt::V1(obj) => &obj.randomness,
-        }
-    }
 }
 
 impl From<BlockMetadata> for BlockMetadataExt {
