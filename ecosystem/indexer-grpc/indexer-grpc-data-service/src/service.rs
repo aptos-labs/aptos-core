@@ -229,7 +229,7 @@ async fn get_data_with_tasks(
                 if num_tasks >= MAX_FETCH_TASKS_PER_REQUEST {
                     // Limit the max tasks to MAX_FETCH_TASKS_PER_REQUEST
                     MAX_FETCH_TASKS_PER_REQUEST
-                } else if num_tasks <= 0 {
+                } else if num_tasks < 1 {
                     // Limit the min tasks to 1
                     1
                 } else {
