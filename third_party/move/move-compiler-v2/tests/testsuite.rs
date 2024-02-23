@@ -16,7 +16,6 @@ use move_compiler_v2::{
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
-       
     },
     run_bytecode_verifier, run_file_format_gen, Options,
 };
@@ -286,7 +285,7 @@ impl TestConfig {
             }));
             pipeline.add_processor(Box::new(VariableCoalescing {}));
             Self {
-                type_check_only: false,
+                stop_before_generating_bytecode: false,
                 dump_ast: false,
                 pipeline,
                 generate_file_format: false,

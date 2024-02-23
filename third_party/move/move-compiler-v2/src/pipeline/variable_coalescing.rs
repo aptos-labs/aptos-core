@@ -3,6 +3,7 @@
 
 //! This module implements a transformation that reuses locals of the same type when
 //! possible.
+//!
 //! prerequisite: livevar annotation is available by performing liveness analysis.
 //! side effect: this transformation removes all pre-existing annotations.
 //!
@@ -33,43 +34,36 @@ use move_stackless_bytecode::{
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
     stackless_bytecode::Bytecode,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    ops::RangeInclusive,
+};
 
-/// The live interval of a local (inclusive).
-/// Note that two live intervals i1: [b1, x] and i2: [x, e2] are *not* considered to overlap
-/// even though the code offset `x` is in both intervals.
-struct LiveInterval {
-    begin: CodeOffset,
-    end: CodeOffset,
-}
+/// The live interval of a local.
+/// Note that two live intervals i1: b1..=x and i2: x..=e2 are not considered to overlap
+/// even though the code offset `x` is included in both intervals.
+struct LiveInterval(RangeInclusive<CodeOffset>);
 
 impl LiveInterval {
     /// Create a new live interval that only has the given offset.
     fn new(offset: CodeOffset) -> Self {
-        Self {
-            begin: offset,
-            end: offset,
-        }
+        Self(offset..=offset)
     }
 
     /// Include the given offset in the live interval, expanding the interval as necessary.
     fn include(&mut self, offset: CodeOffset) {
-        self.begin = std::cmp::min(self.begin, offset);
-        self.end = std::cmp::max(self.end, offset);
+        use std::cmp::{max, min};
+        self.0 = min(*self.0.start(), offset)..=max(*self.0.end(), offset);
     }
 }
 
 /// Live interval event of a local, used for sorting.
 enum LiveIntervalEvent {
-    Begin(
-        /* which local? */ TempIndex,
-        /* live interval begins */ CodeOffset,
-        /* live interval length */ usize, // used for tie-breaking
-    ),
-    End(
-        /* which local? */ TempIndex,
-        /* live interval ends */ CodeOffset,
-    ),
+    /// `Begin(local, start, len)` indicates `local` is first defined at `start` and
+    /// has a live interval of length `len` (used for tie-breaking).
+    Begin(TempIndex, CodeOffset, usize),
+    /// `End(local, end)` indicates `local` is last used at `end`.
+    End(TempIndex, CodeOffset),
 }
 
 impl LiveIntervalEvent {
@@ -119,39 +113,37 @@ impl VariableCoalescing {
     }
 
     /// Compute the sorted live interval events of locals in the given function target.
-    /// See implementation comments for the sorting order.
+    ///
+    /// The sort order is as follows (in order of precedence):
+    /// 1. events with lower code offsets come first
+    /// 2. `End` comes before `Begin`
+    /// 3. two `End` events are ordered by local index (arbitrary but deterministic)
+    /// 4. two `Begin` events are ordered by the length[**] of their live intervals (shorter comes first),
+    ///    and then by local index (arbitrary but deterministic).
+    ///
+    /// [**] The intention behind ordering by lengths is to remap a local with shorter interval first,
+    /// so that it can be reused by other locals sooner.
     fn sorted_live_interval_events(target: &FunctionTarget) -> Vec<LiveIntervalEvent> {
         let live_intervals = Self::live_intervals(target);
         let mut live_interval_events = vec![];
         for (local, interval) in live_intervals.into_iter().enumerate() {
-            if let Some(interval) = interval {
+            if let Some(LiveInterval(range)) = interval {
                 live_interval_events.push(LiveIntervalEvent::Begin(
                     local as TempIndex,
-                    interval.begin,
-                    (interval.end - interval.begin) as usize,
+                    *range.start(),
+                    range.len(),
                 ));
-                live_interval_events.push(LiveIntervalEvent::End(local as TempIndex, interval.end));
+                live_interval_events.push(LiveIntervalEvent::End(local as TempIndex, *range.end()));
             }
         }
         live_interval_events.sort_by(|a, b| {
             use LiveIntervalEvent::*;
             match (a, b) {
-                // Sort events based on their code offsets (lower offset comes first).
                 _ if a.offset() < b.offset() => std::cmp::Ordering::Less,
                 _ if a.offset() > b.offset() => std::cmp::Ordering::Greater,
-                // If two events occur at the same offset, `End` comes before `Before`.
-                // This allows locals in `End` to be possibly remapped to locals in `Begin`
-                // at the same code offset.
                 (End(..), Begin(..)) => std::cmp::Ordering::Less,
                 (Begin(..), End(..)) => std::cmp::Ordering::Greater,
-                // If two locals `End` at the same offset, then we arbitrarily (but deterministically)
-                // use the local index to break the tie.
                 (End(local_a, _), End(local_b, _)) => local_a.cmp(local_b),
-                // If two locals `Begin` at the same offset, then we use the length of their live
-                // intervals to break the tie. The idea behind this heuristic is that remapping a
-                // local with shorter interval might make it available for remapping to other locals
-                // sooner. If the intervals are of the same length, we arbitrarily (but deterministically)
-                // use the local index to break the tie.
                 (Begin(local_a, _, length_a), Begin(local_b, _, length_b)) => {
                     length_a.cmp(length_b).then_with(|| local_a.cmp(local_b))
                 },
@@ -163,13 +155,11 @@ impl VariableCoalescing {
     /// Compute the coalesceable locals of the given function target.
     /// The result is a map, where for each mapping from local `t` to its coalesceable local `u`,
     /// we can safely replace all occurrences of `t` with `u`.
+    ///
     /// This safety property follows from:
     ///   - `t` and `u` are of the same type
-    ///   - either the live intervals of `t` and `u` do not overlap, in which case, they do not interfere
+    ///   - the live intervals of `t` and `u` do not overlap, in which case, they do not interfere
     ///     with each others computations,
-    ///   - or `t` becomes live for the first time at the same code offset as `u` is last seen alive
-    ///     (i.e., `u` is one of the sources and `t` is one of the destinations at the code offset), in
-    ///     which case, we can safely reuse `u` in place of `t`.
     fn coalesceable_locals(target: &FunctionTarget) -> BTreeMap<TempIndex, TempIndex> {
         let sorted_events = Self::sorted_live_interval_events(target);
         // Map local `t` to its coalesceable local `u`, where the replacement `t` -> `u` is safe.
