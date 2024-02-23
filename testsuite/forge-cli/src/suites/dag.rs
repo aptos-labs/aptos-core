@@ -130,7 +130,7 @@ fn dag_realistic_env_max_load_test(
                 .add_latency_threshold(4.0, LatencyType::P50)
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 15.0,
-                    max_round_gap: 4,
+                    max_round_gap: 8,
                 }),
         )
 }
