@@ -4,7 +4,7 @@
 
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
-    QuorumStoreConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
+    QuorumStoreConfig, SafetyRulesConfig,
 };
 use aptos_global_constants::PREVIEWNET_EXECUTION_MULTIPLIER;
 use aptos_types::chain_id::ChainId;
@@ -234,6 +234,8 @@ impl Default for ConsensusConfig {
                 },
             ],
             window_for_chain_health: 100,
+            // TODO: chain health backoff should also support max_txns_from_block_to_execute.
+            // TODO: until then, block sizes don't change
             chain_health_backoff: vec![
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 80,
@@ -243,21 +245,21 @@ impl Default for ConsensusConfig {
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 77,
-                    max_sending_block_txns_override: 2000,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_txns_override: 10000,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 75,
-                    max_sending_block_txns_override: 1000,
+                    max_sending_block_txns_override: 10000,
                     // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
-                    max_sending_block_txns_override: 500,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_txns_override: 10000,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
                 ChainHealthBackoffValues {
@@ -266,8 +268,8 @@ impl Default for ConsensusConfig {
                     // meaning that most aggressively we limit to ~500 TPS
                     // For transactions that are more expensive than that, we should
                     // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 250,
-                    max_sending_block_bytes_override: 1024 * 1024 + BATCH_PADDING_BYTES as u64,
+                    max_sending_block_txns_override: 10000,
+                    max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backoff_proposal_delay_ms: 300,
                 },
             ],
