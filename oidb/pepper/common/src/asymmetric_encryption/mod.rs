@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
 use rand_core::{CryptoRng, RngCore};
 
@@ -8,6 +10,7 @@ pub trait AsymmetricEncryption {
     /// Generate a key pair. Return `(private_key, public_key)`.
     fn key_gen<R: CryptoRng + RngCore>(rng: &mut R) -> (Vec<u8>, Vec<u8>);
 
+    /// TODO: adjust the dependencies so they can share a RNG.
     fn enc<R1: CryptoRng + RngCore, R2: AeadCryptoRng + AeadRngCore>(
         rng: &mut R1,
         aead_rng: &mut R2,

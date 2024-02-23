@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::asymmetric_encryption::AsymmetricEncryption;
 use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
 use anyhow::bail;
@@ -66,6 +68,7 @@ pub struct EncryptionPubKey {
 }
 
 impl EncryptionPubKey {
+    /// TODO: adjust the dependencies so they can share a RNG.
     pub fn encrypt<R1: CryptoRng + RngCore, R2: AeadCryptoRng + AeadRngCore>(
         &self,
         main_rng: &mut R1,

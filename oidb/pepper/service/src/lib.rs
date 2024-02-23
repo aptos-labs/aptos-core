@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::vuf_keys::VUF_SCHEME0_SK;
 use anyhow::{anyhow, bail, ensure};
 use aptos_oidb_pepper_common::{
@@ -19,6 +21,7 @@ pub type KeyID = String;
 
 /// The core processing logic of this pepper service.
 pub async fn process(request: PepperRequest) -> anyhow::Result<String> {
+    /// TODO: adjust the dependencies so they can share a RNG.
     let mut rng = thread_rng();
     let mut aead_rng = aes_gcm::aead::OsRng;
     let PepperRequest {
