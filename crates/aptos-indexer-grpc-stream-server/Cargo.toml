@@ -15,5 +15,5 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 hyper = { workspace = true}
-tonic = { workspace = true }
 tonic-reflection = { workspace = true }
+tonic = { workspace = true }
