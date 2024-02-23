@@ -7,3 +7,6 @@ AptosFramework = { local = "../../framework/aptos-framework" }
 
 [addresses]
 common_account = "_"
+
+[dev-addresses]
+common_account = "0xbeef"
