@@ -6,6 +6,7 @@ use super::{
     observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
 };
 use crate::{
+    block_storage::tracing::{observe_block, BlockStage},
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
     counters::update_counters_for_committed_blocks,
     dag::{
@@ -195,6 +196,9 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             .write()
             .insert(block_info.round(), Instant::now());
         let block_created_ts = self.block_ordered_ts.clone();
+
+        observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
+
         let blocks_to_send = OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
