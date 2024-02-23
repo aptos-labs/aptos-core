@@ -180,6 +180,28 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(20)
         .add_network_test(DagOnChainEnableTest {})
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
+            // Need to update if the default changes
+            match &mut on_chain_execution_config {
+                    OnChainExecutionConfig::Missing
+                    | OnChainExecutionConfig::V1(_)
+                    | OnChainExecutionConfig::V2(_)
+                    | OnChainExecutionConfig::V3(_) => {
+                        unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
+                    }
+                    OnChainExecutionConfig::V4(config_v4) => {
+                        config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                        config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
+                            sender_conflict_window_size: 256,
+                            module_conflict_window_size: 2,
+                            entry_fun_conflict_window_size: 3,
+                        };
+                    }
+            }
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
+        }))
         .with_success_criteria(
             SuccessCriteria::new(1000)
                 .add_no_restarts()
