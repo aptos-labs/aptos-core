@@ -1,15 +1,13 @@
 // Copyright © Aptos Foundation
 
-use crate::{
-    changing_working_quorum_test_helper, wrap_with_realistic_env, TestCommand,
-    SYSTEM_12_CORES_10GB_THRESHOLD,
-};
+use crate::{changing_working_quorum_test_helper, wrap_with_realistic_env, TestCommand};
 use aptos_forge::{
     success_criteria::{LatencyType, StateProgressThreshold, SuccessCriteria},
     EmitJobMode, EmitJobRequest, ForgeConfig,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig
+    BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig,
+    OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig,
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -79,6 +77,12 @@ fn dag_realistic_env_max_load_test(
                 },
             ),
         }))
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.max_sending_block_txns = 4000;
+            config.consensus.max_sending_block_bytes = 6 * 1024 * 1024;
+            config.consensus.max_receiving_block_txns = 10000;
+            config.consensus.max_receiving_block_bytes = 7 * 1024 * 1024;
+        }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
@@ -88,7 +92,7 @@ fn dag_realistic_env_max_load_test(
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
             };
-            
+
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
 
@@ -157,22 +161,29 @@ fn dag_changing_working_quorum_test() -> ForgeConfig {
         },
     );
 
-    base_config.with_genesis_helm_config_fn(Arc::new(move |helm_values| {
-        helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();
-        helm_values["genesis"]["validator"]["num_validators_with_larger_stake"] =
-            num_large_validators.into();
+    base_config
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.max_sending_block_txns = 4000;
+            config.consensus.max_sending_block_bytes = 6 * 1024 * 1024;
+            config.consensus.max_receiving_block_txns = 10000;
+            config.consensus.max_receiving_block_bytes = 7 * 1024 * 1024;
+        }))
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            helm_values["chain"]["epoch_duration_secs"] = epoch_duration.into();
+            helm_values["genesis"]["validator"]["num_validators_with_larger_stake"] =
+                num_large_validators.into();
 
-        let onchain_consensus_config = OnChainConsensusConfig::V3 {
-            alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
-            vtxn: ValidatorTxnConfig::default_for_genesis(),
-        };
+            let onchain_consensus_config = OnChainConsensusConfig::V3 {
+                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                vtxn: ValidatorTxnConfig::default_for_genesis(),
+            };
 
-        helm_values["chain"]["on_chain_consensus_config"] =
-            serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
-        helm_values["chain"]["on_chain_execution_config"] =
-            serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
-                .expect("must serialize");
-    }))
+            helm_values["chain"]["on_chain_consensus_config"] =
+                serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
+            helm_values["chain"]["on_chain_execution_config"] =
+                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
+                    .expect("must serialize");
+        }))
 }
 
 fn dag_reconfig_enable_test() -> ForgeConfig {
@@ -180,6 +191,12 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(20)
         .add_network_test(DagOnChainEnableTest {})
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.max_sending_block_txns = 4000;
+            config.consensus.max_sending_block_bytes = 6 * 1024 * 1024;
+            config.consensus.max_receiving_block_txns = 10000;
+            config.consensus.max_receiving_block_bytes = 7 * 1024 * 1024;
+        }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
             // Need to update if the default changes

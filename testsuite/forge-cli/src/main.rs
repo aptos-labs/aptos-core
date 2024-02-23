@@ -275,8 +275,7 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
     let duration = Duration::from_secs(args.duration_secs as u64);
-    // let suite_name: &str = args.suite.as_ref();
-    let suite_name = "dag_changing_working_quorum_test";
+    let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
     match args.cli_cmd {
