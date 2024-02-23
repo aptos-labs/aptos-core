@@ -740,11 +740,14 @@ pub enum StatusCode {
     // be re-executed.
     // Should never be committed on chain
     SPECULATIVE_EXECUTION_ABORT_ERROR = 2024,
+    ACCESS_CONTROL_INVARIANT_VIOLATION = 2025,
 
     // Reserved error code for future use
-    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2025,
-    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2026,
-    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2027,
+    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2026,
+    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2027,
+    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2028,
+    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2029,
+    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2030,
 
     // Errors that can arise from binary decoding (deserialization)
     // Deserialization Errors: 3000-3999
@@ -804,11 +807,16 @@ pub enum StatusCode {
     IO_LIMIT_REACHED = 4031,
     STORAGE_LIMIT_REACHED = 4032,
     TYPE_TAG_LIMIT_EXCEEDED = 4033,
-    // Reserved error code for future use
-    RESERVED_RUNTIME_ERROR_2 = 4034,
-    RESERVED_RUNTIME_ERROR_3 = 4035,
-    RESERVED_RUNTIME_ERROR_4 = 4036,
-    RESERVED_RUNTIME_ERROR_5 = 4037,
+    // A resource was accessed in a way which is not permitted by the active access control
+    // specifier.
+    ACCESS_DENIED = 4034,
+    // The stack of access control specifier has overflowed.
+    ACCESS_STACK_LIMIT_EXCEEDED = 4035,
+    // Reserved error code for future use. Always keep this buffer of well-defined new codes.
+    RESERVED_RUNTIME_ERROR_1 = 4036,
+    RESERVED_RUNTIME_ERROR_2 = 4037,
+    RESERVED_RUNTIME_ERROR_3 = 4038,
+    RESERVED_RUNTIME_ERROR_4 = 4039,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

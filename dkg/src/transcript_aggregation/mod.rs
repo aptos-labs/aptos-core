@@ -76,8 +76,7 @@ impl<S: DKGTrait> BroadcastStatus<DKGMessage> for Arc<TranscriptAggregationState
         // All checks passed. Aggregating.
         trx_aggregator.contributors.insert(metadata.author);
         if let Some(agg_trx) = trx_aggregator.trx.as_mut() {
-            let acc = std::mem::take(agg_trx);
-            *agg_trx = S::aggregate_transcripts(&self.dkg_pub_params, vec![acc, transcript]);
+            S::aggregate_transcripts(&self.dkg_pub_params, agg_trx, transcript);
         } else {
             trx_aggregator.trx = Some(transcript);
         }

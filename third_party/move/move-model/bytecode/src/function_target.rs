@@ -275,6 +275,14 @@ impl<'env> FunctionTarget<'env> {
         }
     }
 
+    /// Returns a name for a local if it is printable
+    pub fn get_local_name_opt(&self, temp: TempIndex) -> Option<String> {
+        self.data
+            .local_names
+            .get(&temp)
+            .map(|sym| sym.display(self.global_env().symbol_pool()).to_string())
+    }
+
     /// Gets the type of the local at index. This must use an index in the range as determined by
     /// `get_local_count`.
     pub fn get_local_type(&self, idx: usize) -> &Type {

@@ -267,6 +267,9 @@ impl NetworkSender {
         msg: ConsensusMsg,
         timeout_duration: Duration,
     ) -> anyhow::Result<ConsensusMsg> {
+        fail_point!("consensus::send::any", |_| {
+            Err(anyhow::anyhow!("Injected error in send_rpc"))
+        });
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
@@ -295,11 +298,12 @@ impl NetworkSender {
     /// The future is fulfilled as soon as the message is put into the mpsc channel to network
     /// internal (to provide back pressure), it does not indicate the message is delivered or sent
     /// out.
-    async fn broadcast(&mut self, msg: ConsensusMsg) {
+    async fn broadcast(&self, msg: ConsensusMsg) {
         fail_point!("consensus::send::any", |_| ());
         // Directly send the message to ourself without going through network.
         let self_msg = Event::Message(self.author, msg.clone());
-        if let Err(err) = self.self_sender.send(self_msg).await {
+        let mut self_sender = self.self_sender.clone();
+        if let Err(err) = self_sender.send(self_msg).await {
             error!("Error broadcasting to self: {:?}", err);
         }
 
@@ -369,25 +373,25 @@ impl NetworkSender {
         }
     }
 
-    pub async fn broadcast_proposal(&mut self, proposal_msg: ProposalMsg) {
+    pub async fn broadcast_proposal(&self, proposal_msg: ProposalMsg) {
         fail_point!("consensus::send::broadcast_proposal", |_| ());
         let msg = ConsensusMsg::ProposalMsg(Box::new(proposal_msg));
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_sync_info(&mut self, sync_info_msg: SyncInfo) {
+    pub async fn broadcast_sync_info(&self, sync_info_msg: SyncInfo) {
         fail_point!("consensus::send::broadcast_sync_info", |_| ());
         let msg = ConsensusMsg::SyncInfo(Box::new(sync_info_msg));
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_timeout_vote(&mut self, timeout_vote_msg: VoteMsg) {
+    pub async fn broadcast_timeout_vote(&self, timeout_vote_msg: VoteMsg) {
         fail_point!("consensus::send::broadcast_timeout_vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(timeout_vote_msg));
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_epoch_change(&mut self, epoch_change_proof: EpochChangeProof) {
+    pub async fn broadcast_epoch_change(&self, epoch_change_proof: EpochChangeProof) {
         fail_point!("consensus::send::broadcast_epoch_change", |_| ());
         let msg = ConsensusMsg::EpochChangeProof(Box::new(epoch_change_proof));
         self.broadcast(msg).await

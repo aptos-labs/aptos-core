@@ -42,6 +42,7 @@ use std::{
     sync::Arc,
 };
 
+mod access_specifier_loader;
 mod function;
 mod modules;
 mod script;
