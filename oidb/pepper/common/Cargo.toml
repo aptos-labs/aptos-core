@@ -15,6 +15,8 @@ rust-version = { workspace = true }
 [dependencies]
 aes-gcm = { workspace = true }
 anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }

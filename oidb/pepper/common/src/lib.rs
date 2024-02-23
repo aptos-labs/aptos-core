@@ -22,15 +22,14 @@ pub fn sha3_256(input: &[u8]) -> Vec<u8> {
 }
 
 /// The spec of a request to this pepper service.
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PepperRequest {
+    pub schema_version: Option<String>,
     pub jwt: String,
     /// If specified, generate pepper for `jwk.payload.iss, jwk.payload.sub, overriding_aud`.
     /// Otherwise, generate pepper for `jwk.payload.iss, jwk.payload.sub, jwk.payload.aud`.
     pub overriding_aud: Option<String>,
-
-    pub ephem_pub_key_hexlified: String,
-    pub enc_pub_key: EncryptionPubKey,
+    pub epk_serialized_hexlified: String,
     pub expiry_time_sec: u64,
     pub blinder_hexlified: String,
     pub uid_key: Option<String>,
@@ -45,7 +44,8 @@ pub struct SimplePepperRequest {
 /// The spec of a response from this pepper service.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PepperResponse {
-    OK { pepper_encrypted_hexlified: String },
+    Raw { pepper_hexlified: String },
+    Encrypted { pepper_encrypted_hexlified: String },
     Error(String),
 }
 

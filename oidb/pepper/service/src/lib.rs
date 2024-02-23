@@ -5,11 +5,10 @@ use anyhow::{anyhow, bail, ensure};
 use aptos_oidb_pepper_common::{
     jwt::Claims, nonce_derivation, nonce_derivation::NonceDerivationScheme,
     pepper_pre_image_derivation, pepper_pre_image_derivation::PepperPreImageDerivation, vuf,
-    vuf::VUF, PepperRequest, SimplePepperRequest,
+    vuf::VUF, PepperRequest, PepperResponse, SimplePepperRequest,
 };
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use once_cell::sync::Lazy;
-use rand::thread_rng;
 use std::collections::HashSet;
 
 pub mod about;
@@ -20,19 +19,29 @@ pub type Issuer = String;
 pub type KeyID = String;
 
 /// The core processing logic of this pepper service.
-pub async fn process(request: PepperRequest) -> anyhow::Result<String> {
-    /// TODO: adjust the dependencies so they can share a RNG.
-    let mut rng = thread_rng();
-    let mut aead_rng = aes_gcm::aead::OsRng;
+pub async fn process(request: PepperRequest) -> PepperResponse {
+    match request.schema_version.as_deref() {
+        None | Some("0.1.0") => match process_inner(request) {
+            Ok(hexlified) => PepperResponse::Raw {
+                pepper_hexlified: hexlified,
+            },
+            Err(e) => PepperResponse::Error(e.to_string()),
+        },
+        _ => PepperResponse::Error("Unsupported schema version".to_string()),
+    }
+}
+
+fn process_inner(request: PepperRequest) -> anyhow::Result<String> {
     let PepperRequest {
         jwt,
         overriding_aud,
-        ephem_pub_key_hexlified,
-        enc_pub_key,
+        epk_serialized_hexlified,
         expiry_time_sec,
         blinder_hexlified,
         uid_key,
+        ..
     } = request;
+
     let claims = aptos_oidb_pepper_common::jwt::parse(jwt.as_str()).map_err(|e| {
         anyhow!("aptos_oidb_pepper_service::process() failed with jwt decoding error: {e}")
     })?;
@@ -57,8 +66,8 @@ pub async fn process(request: PepperRequest) -> anyhow::Result<String> {
     let blinder = hex::decode(blinder_hexlified).map_err(|e| {
         anyhow!("aptos_oidb_pepper_service::process() failed with blinder hex decoding error: {e}")
     })?;
-    let epk = hex::decode(ephem_pub_key_hexlified).map_err(|e| {
-        anyhow!("aptos_oidb_pepper_service::process() failed with ephem pub key hex decoding error: {e}")
+    let epk = hex::decode(epk_serialized_hexlified).map_err(|e| {
+        anyhow!("aptos_oidb_pepper_service::process() failed with epk hex decoding error: {e}")
     })?;
     let nonce_pre_image = nonce_derivation::scheme1::PreImage {
         epk,
@@ -113,9 +122,9 @@ pub async fn process(request: PepperRequest) -> anyhow::Result<String> {
         vuf_proof.is_empty(),
         "aptos_oidb_pepper_service::process() failed internal proof error"
     );
-    let pepper_encrypted = enc_pub_key.encrypt(&mut rng, &mut aead_rng, pepper.as_slice())?;
-    let pepper_encrypted_hexlified = hex::encode(pepper_encrypted);
-    Ok(pepper_encrypted_hexlified)
+    let pepper_hexlified = hex::encode(pepper);
+    //TODO: encrypt the pepper
+    Ok(pepper_hexlified)
 }
 
 pub async fn process_unencrypted(request: SimplePepperRequest) -> anyhow::Result<String> {

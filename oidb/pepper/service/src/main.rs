@@ -1,6 +1,6 @@
-use aptos_oidb_pepper_common::{
-    PepperRequest, PepperResponse, SimplePepperRequest, UnencryptedPepperResponse,
-};
+// Copyright © Aptos Foundation
+
+use aptos_oidb_pepper_common::{PepperRequest, SimplePepperRequest, UnencryptedPepperResponse};
 use aptos_oidb_pepper_service::{
     about::ABOUT_JSON,
     jwk,
@@ -47,12 +47,7 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             let body = req.into_body();
             let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
             let request = serde_json::from_slice::<PepperRequest>(&body_bytes).unwrap();
-            let response = match aptos_oidb_pepper_service::process(request).await {
-                Ok(pepper_encrypted_hexlified) => PepperResponse::OK {
-                    pepper_encrypted_hexlified,
-                },
-                Err(e) => PepperResponse::Error(e.to_string()),
-            };
+            let response = aptos_oidb_pepper_service::process(request).await;
             let json = serde_json::to_string_pretty(&response).unwrap();
             hyper::Response::builder()
                 .status(StatusCode::OK)

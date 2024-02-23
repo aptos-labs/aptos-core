@@ -1,3 +1,9 @@
+// Copyright © Aptos Foundation
+
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    Uniform,
+};
 use aptos_oidb_pepper_common::{
     asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption},
     jwt, nonce_derivation,
@@ -6,8 +12,9 @@ use aptos_oidb_pepper_common::{
     pepper_pre_image_derivation::PepperPreImageDerivation,
     vuf,
     vuf::VUF,
-    EncryptionPubKey, PepperRequest, PepperResponse, VUFVerificationKey,
+    PepperRequest, PepperResponse, VUFVerificationKey,
 };
+use aptos_types::transaction::authenticator::EphemeralPublicKey;
 use rand::thread_rng;
 use std::{fs, io::stdin};
 
@@ -110,15 +117,18 @@ async fn main() {
     let expiry_time_sec = 2000000000;
     println!("expiry_time_sec={}", expiry_time_sec);
 
-    let epk: [u8; 34] = [
-        0, 32, 208, 74, 178, 50, 116, 43, 180, 171, 58, 19, 104, 189, 70, 21, 228, 230, 208, 34,
-        74, 183, 26, 1, 107, 175, 133, 32, 163, 50, 201, 119, 135, 55,
-    ];
+    let esk = Ed25519PrivateKey::generate(&mut rng);
+    let epk = EphemeralPublicKey::ed25519(Ed25519PublicKey::from(&esk));
+    // let epk_serialized_hexlified
+    // let epk: [u8; 34] = [
+    //     0, 32, 208, 74, 178, 50, 116, 43, 180, 171, 58, 19, 104, 189, 70, 21, 228, 230, 208, 34,
+    //     74, 183, 26, 1, 107, 175, 133, 32, 163, 50, 201, 119, 135, 55,
+    // ];
 
     println!();
     println!("Action 5: compute a nonce as a hash of the EPK, the blinder and the expiry time.");
     let nonce_pre_image = nonce_derivation::scheme1::PreImage {
-        epk: epk.to_vec(),
+        epk: epk.to_bytes(),
         expiry_time_sec,
         blinder: blinder.to_vec(),
     };
@@ -138,13 +148,10 @@ async fn main() {
     };
 
     let pepper_request = PepperRequest {
+        schema_version: None,
         jwt: jwt.clone(),
         overriding_aud: None,
-        ephem_pub_key_hexlified: hex::encode(epk),
-        enc_pub_key: EncryptionPubKey {
-            scheme_name: Scheme::scheme_name(),
-            payload_hexlified: hex::encode(pk),
-        },
+        epk_serialized_hexlified: hex::encode(epk.to_bytes()),
         expiry_time_sec,
         blinder_hexlified: hex::encode(blinder),
         uid_key: None,
@@ -162,14 +169,10 @@ async fn main() {
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse::OK {
-        pepper_encrypted_hexlified,
-    } = pepper_response
-    else {
+    let PepperResponse::Raw { pepper_hexlified } = pepper_response else {
         panic!()
     };
-    let pepper_encrypted = hex::decode(pepper_encrypted_hexlified).unwrap();
-    let pepper_bytes = Scheme::dec(sk.as_slice(), pepper_encrypted.as_slice()).unwrap();
+    let pepper_bytes = hex::decode(pepper_hexlified).unwrap();
     println!();
     println!("Decrypt the pepper using the ephemeral private key.");
     println!("pepper_bytes={:?}", pepper_bytes);
