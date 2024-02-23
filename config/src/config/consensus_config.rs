@@ -170,7 +170,7 @@ impl Default for ConsensusConfig {
             // increase uncontrollably, and we know when to go to state sync.
             // Considering block gas limit and pipeline backpressure should keep number of blocks
             // in the pipline very low, we can keep this limit pretty low, too.
-            vote_back_pressure_limit: 7,
+            vote_back_pressure_limit: 20,
             pipeline_backpressure: vec![
                 // PipelineBackpressureValues {
                 //     // pipeline_latency looks how long has the oldest block still in pipeline
