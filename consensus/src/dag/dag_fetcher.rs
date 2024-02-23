@@ -191,7 +191,7 @@ impl DagFetcherService {
         let remote_request = {
             let dag_reader = self.dag.read();
             ensure!(
-                node.round() > dag_reader.lowest_incomplete_round(),
+                node.round() >= dag_reader.lowest_incomplete_round(),
                 "Already synced beyond requested round {}, lowest incomplete round {}",
                 node.round(),
                 dag_reader.lowest_incomplete_round()
