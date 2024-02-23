@@ -225,7 +225,7 @@ async fn get_data_with_tasks(
         Ok(CacheCoverageStatus::CacheEvicted) => match transactions_count {
             None => MAX_FETCH_TASKS_PER_REQUEST,
             Some(transactions_count) => (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK)
-                .max(MAX_FETCH_TASKS_PER_REQUEST),
+                .min(MAX_FETCH_TASKS_PER_REQUEST),
         },
         Err(_) => {
             error!("[Data Service] Failed to get cache coverage status.");
