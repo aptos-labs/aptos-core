@@ -60,8 +60,8 @@ pub async fn create_swarm(num_nodes: usize, max_block_txns: u64) -> LocalSwarm {
     swarm
 }
 
-struct ActiveTrafficGuard {
-    finish_traffic: Arc<AtomicBool>,
+pub struct ActiveTrafficGuard {
+    pub finish_traffic: Arc<AtomicBool>,
 }
 
 impl Drop for ActiveTrafficGuard {
@@ -70,7 +70,11 @@ impl Drop for ActiveTrafficGuard {
     }
 }
 
-async fn start_traffic(num_accounts: usize, tps: f32, swarm: &mut dyn Swarm) -> ActiveTrafficGuard {
+pub async fn start_traffic(
+    num_accounts: usize,
+    tps: f32,
+    swarm: &mut dyn Swarm,
+) -> ActiveTrafficGuard {
     let validator_clients = swarm.get_all_nodes_clients_with_names();
 
     let finish = Arc::new(AtomicBool::new(false));

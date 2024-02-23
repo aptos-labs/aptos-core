@@ -258,6 +258,7 @@ impl ExecutionProxyClient {
             epoch_state,
             self.bounded_executor.clone(),
         );
+
         tokio::spawn(execution_schedule_phase.start());
         tokio::spawn(execution_wait_phase.start());
         tokio::spawn(signing_phase.start());

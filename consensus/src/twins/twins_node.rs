@@ -148,6 +148,7 @@ impl SMRNode {
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());
+
         let epoch_mgr = EpochManager::new(
             &config,
             time_service,

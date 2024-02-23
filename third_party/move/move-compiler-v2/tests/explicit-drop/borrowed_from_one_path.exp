@@ -76,7 +76,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
  15: return $t2
 }
 
-============ after MemorySafetyProcessor: ================
+============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
 fun m::f($t0: u8, $t1: &vector<u64>): u64 {
@@ -90,114 +90,114 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
      var $t9: &u64
      var $t10: u64
      # live vars: $t0, $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # locals: {$t1=@2000000}
+     # globals: {}
      # moved: {}
      #
   0: $t6 := 0
      # live vars: $t0, $t1, $t6
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # locals: {$t1=@2000000}
+     # globals: {}
      # moved: {}
      #
   1: $t5 := ==($t0, $t6)
      # live vars: $t1, $t5
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # locals: {$t1=@2000000}
+     # globals: {}
      # moved: {$t0,$t6}
      #
   2: if ($t5) goto 3 else goto 8
      # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # locals: {$t1=@2000000}
+     # globals: {}
      # moved: {$t0,$t6}
      #
   3: label L0
      # live vars:
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t0,$t6}
      #
   4: $t8 := 0x1
      # live vars: $t8
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t0,$t6}
      #
   5: $t7 := borrow_global<m::R>($t8)
      # live vars: $t7
-     # graph: {L1280=global<m::R>[borrow_global(false) -> L1281],L1281=local($t7)[]}
-     # local_to_label: {$t7=L1281}
-     # global_to_label: {m::R=L1280}
+     # graph: {@500=global<m::R>[borrow_global(false) -> @501],@501=derived[]}
+     # locals: {$t7=@501}
+     # globals: {m::R=@500}
      # moved: {$t0,$t6}
      #
   6: $t4 := borrow_field<m::R>.data($t7)
      # live vars: $t4
-     # graph: {L1280=global<m::R>[borrow_global(false) -> L1281],L1281=local($t7)[borrow_field(false) -> L1537],L1537=local($t4)[]}
-     # local_to_label: {$t4=L1537,$t7=L1281}
-     # global_to_label: {m::R=L1280}
+     # graph: {@500=global<m::R>[borrow_global(false) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[]}
+     # locals: {$t4=@601}
+     # globals: {m::R=@500}
      # moved: {$t0,$t6}
      #
   7: goto 10
      # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # locals: {$t1=@2000000}
+     # globals: {}
      # moved: {$t0,$t6}
      #
   8: label L1
      # live vars: $t1
-     # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # graph: {@1000000=external[borrow(false) -> @2000000],@2000000=derived[]}
+     # locals: {$t1=@2000000}
+     # globals: {}
      # moved: {$t0,$t6}
      #
   9: $t4 := move($t1)
      # live vars: $t4
-     # graph: {L1280=global<m::R>[borrow_global(false) -> L1281],L1281=local($t7)[borrow_field(false) -> L1537],L1537=local($t4)[skip -> L1537::L2305],L2304=local($t1)[skip -> L2305],L2305=local($t4)[skip -> L1537::L2305],L1537::L2305=local($t4)[]}
-     # local_to_label: {$t1=L2304,$t4=L1537::L2305,$t7=L1281}
-     # global_to_label: {m::R=L1280}
+     # graph: {@500=global<m::R>[borrow_global(false) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # locals: {$t4=@601}
+     # globals: {m::R=@500}
      # moved: {$t0,$t1,$t6}
      #
  10: label L2
      # live vars: $t4
-     # graph: {L1280=global<m::R>[borrow_global(false) -> L1281],L1281=local($t7)[borrow_field(false) -> L1537],L1537=local($t4)[skip -> L1537::L2305],L2304=local($t1)[skip -> L2305],L2305=local($t4)[skip -> L1537::L2305],L1537::L2305=local($t4)[]}
-     # local_to_label: {$t1=L2304,$t4=L1537::L2305,$t7=L1281}
-     # global_to_label: {m::R=L1280}
+     # graph: {@500=global<m::R>[borrow_global(false) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # locals: {$t4=@601}
+     # globals: {m::R=@500}
      # moved: {$t0,$t1,$t6}
      #
  11: $t3 := move($t4)
      # live vars: $t3
-     # graph: {L1280=global<m::R>[borrow_global(false) -> L1281],L1281=local($t7)[borrow_field(false) -> L1537],L1537=local($t4)[skip -> L1537::L2305],L2304=local($t1)[skip -> L2305],L2305=local($t4)[skip -> L1537::L2305],L2817=local($t3)[],L1537::L2305=local($t4)[skip -> L2817]}
-     # local_to_label: {$t1=L2304,$t3=L2817,$t4=L1537::L2305,$t7=L1281}
-     # global_to_label: {m::R=L1280}
+     # graph: {@500=global<m::R>[borrow_global(false) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # locals: {$t3=@601}
+     # globals: {m::R=@500}
      # moved: {$t0,$t1,$t4,$t6}
      #
  12: $t10 := 0
      # live vars: $t3, $t10
-     # graph: {L1280=global<m::R>[borrow_global(false) -> L1281],L1281=local($t7)[borrow_field(false) -> L1537],L1537=local($t4)[skip -> L1537::L2305],L2304=local($t1)[skip -> L2305],L2305=local($t4)[skip -> L1537::L2305],L2817=local($t3)[],L1537::L2305=local($t4)[skip -> L2817]}
-     # local_to_label: {$t1=L2304,$t3=L2817,$t4=L1537::L2305,$t7=L1281}
-     # global_to_label: {m::R=L1280}
+     # graph: {@500=global<m::R>[borrow_global(false) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[],@1000000=external[borrow(false) -> @601]}
+     # locals: {$t3=@601}
+     # globals: {m::R=@500}
      # moved: {$t0,$t1,$t4,$t6}
      #
  13: $t9 := vector::borrow<u64>($t3, $t10)
      # live vars: $t9
-     # graph: {L1280=global<m::R>[borrow_global(false) -> L1281],L1281=local($t7)[borrow_field(false) -> L1537],L1537=local($t4)[skip -> L1537::L2305],L2304=local($t1)[skip -> L2305],L2305=local($t4)[skip -> L1537::L2305],L2817=local($t3)[call(false) -> L3328],L3328=local($t9)[],L1537::L2305=local($t4)[skip -> L2817]}
-     # local_to_label: {$t1=L2304,$t3=L2817,$t4=L1537::L2305,$t7=L1281,$t9=L3328}
-     # global_to_label: {m::R=L1280}
+     # graph: {@500=global<m::R>[borrow_global(false) -> @501],@501=derived[borrow_field(false) -> @601],@601=derived[call(false) -> @D00],@D00=derived[],@1000000=external[borrow(false) -> @601]}
+     # locals: {$t9=@D00}
+     # globals: {m::R=@500}
      # moved: {$t0,$t1,$t3,$t4,$t6,$t10}
      #
  14: $t2 := read_ref($t9)
      # live vars: $t2
      # graph: {}
-     # local_to_label: {}
-     # global_to_label: {}
+     # locals: {}
+     # globals: {}
      # moved: {$t0,$t1,$t3,$t4,$t6,$t10}
      #
  15: return $t2

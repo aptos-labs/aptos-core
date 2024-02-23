@@ -375,20 +375,26 @@ impl InMemDag {
     }
 
     pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
-        let lowest_round = self.lowest_incomplete_round();
-
+        let from_round = if self.is_empty() {
+            self.lowest_round()
+        } else {
+            target_round
+                .saturating_sub(self.window_size)
+                .max(self.lowest_incomplete_round())
+                .max(self.lowest_round())
+        };
         let mut bitmask: Vec<_> = self
             .nodes_by_round
-            .range(lowest_round..=target_round)
+            .range(from_round..=target_round)
             .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
             .collect();
 
         bitmask.resize(
-            (target_round - lowest_round + 1) as usize,
+            (target_round - from_round + 1) as usize,
             vec![false; self.author_to_index.len()],
         );
 
-        DagSnapshotBitmask::new(lowest_round, bitmask)
+        DagSnapshotBitmask::new(from_round, bitmask)
     }
 
     pub(super) fn prune(&mut self) -> BTreeMap<u64, Vec<Option<NodeStatus>>> {

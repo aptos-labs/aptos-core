@@ -1773,7 +1773,6 @@ impl AptosVM {
             ExecutionStatus::Success,
             &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?.change_set_configs,
         )?;
-
         Ok((VMStatus::Executed, output))
     }
 
