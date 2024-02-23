@@ -160,7 +160,7 @@ impl RawData for RawDataServerWrapper {
             SERVICE_TYPE,
             IndexerGrpcStep::DataServiceNewRequestReceived,
             Some(current_version as i64),
-            None,
+            transactions_count.map(|v| (v as i64 + current_version as i64 - 1)),
             None,
             None,
             None,
