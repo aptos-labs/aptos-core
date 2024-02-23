@@ -148,7 +148,10 @@ impl IndexReader {
     pub fn _load_all_versions(&mut self) {
         loop {
             let next_val = self.get_next_version();
-            if let Some(val) = next_val {
+            if next_val.is_err() {
+                continue;
+            }
+            if let Some(val) = next_val.unwrap() {
                 self._version_cache.push(val);
             } else {
                 break;
@@ -156,19 +159,27 @@ impl IndexReader {
         }
     }
 
-    pub fn get_next_version(&mut self) -> Option<u64> {
+    pub fn get_next_version(&mut self) -> Result<Option<u64>, ()> {
         let mut cur_idx = String::new();
         let num_bytes = self.index_reader.read_line(&mut cur_idx).unwrap();
         if num_bytes == 0 {
-            return None;
+            return Ok(None);
         }
-        Some(cur_idx.trim().parse().unwrap())
+        let indx = cur_idx.trim().parse();
+        if indx.is_ok() {
+            Ok(indx.ok())
+        } else {
+            Err(())
+        }
     }
 
     pub fn get_next_version_ge(&mut self, version: u64) -> Option<u64> {
         loop {
             let next_val = self.get_next_version();
-            if let Some(val) = next_val {
+            if next_val.is_err() {
+                continue;
+            }
+            if let Some(val) = next_val.unwrap() {
                 if val >= version {
                     return Some(val);
                 }

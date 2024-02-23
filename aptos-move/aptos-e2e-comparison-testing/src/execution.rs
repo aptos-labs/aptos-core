@@ -154,10 +154,16 @@ impl Execution {
                     cur_version
                 ));
             }
-            if let Some(ver) = index_reader.get_next_version() {
-                cur_version = ver;
-            } else {
-                break;
+            let mut ver_res = index_reader.get_next_version();
+            while ver_res.is_err() {
+                ver_res = index_reader.get_next_version();
+            }
+            if ver_res.is_ok() {
+                if let Some(ver) = ver_res.unwrap() {
+                    cur_version = ver;
+                } else {
+                    break;
+                }
             }
             i += 1;
         }
@@ -370,24 +376,33 @@ impl Execution {
         match (res_1, res_2) {
             (Err(e1), Err(e2)) => {
                 if e1.message() != e2.message() {
-                    self.output_result_str(format!("error is different at {}", cur_version));
-                    self.output_result_str(format!("error {} is raised from V1", e1));
-                    self.output_result_str(format!("error {} is raised from V2", e2));
+                    self.output_result_str(format!(
+                        "error is different at version:{}",
+                        cur_version
+                    ));
+                    // self.output_result_str(format!("error {} is raised from V1", e1));
+                    // self.output_result_str(format!("error {} is raised from V2", e2));
                 }
             },
-            (Err(e), Ok(res)) => {
-                self.output_result_str(format!("error {} is raised from V1 at {}", e, cur_version));
+            (Err(_), Ok(_)) => {
                 self.output_result_str(format!(
-                    "output from V2 at version:{}\nwrite set:{:?}\n events:{:?}\n",
-                    cur_version, res.0, res.1
+                    "V1 returns error while V2 does not at version:{}",
+                    cur_version
                 ));
+                // self.output_result_str(format!(
+                //     "output from V2 at version:{}\nwrite set:{:?}\n events:{:?}\n",
+                //     cur_version, res.0, res.1
+                // ));
             },
-            (Ok(res), Err(e)) => {
-                self.output_result_str(format!("error {} is raised from V2 at {}", e, cur_version));
+            (Ok(_), Err(_)) => {
                 self.output_result_str(format!(
-                    "output from V1 at version:{}\nwrite set:{:?}\n events:{:?}\n",
-                    cur_version, res.0, res.1
+                    "V2 returns error while V1 does not at version:{}",
+                    cur_version
                 ));
+                // self.output_result_str(format!(
+                //     "output from V1 at version:{}\nwrite set:{:?}\n events:{:?}\n",
+                //     cur_version, res.0, res.1
+                // ));
             },
             (Ok(res_1), Ok(res_2)) => {
                 // compare events
@@ -396,17 +411,17 @@ impl Execution {
                     let event_2 = &res_2.1[idx];
                     if event_1 != event_2 {
                         self.output_result_str(format!(
-                            "event is different at version {}",
+                            "event is different at version:{}",
                             cur_version
                         ));
-                        self.output_result_str(format!(
-                            "event raised from V1: {} at index:{}",
-                            event_1, idx
-                        ));
-                        self.output_result_str(format!(
-                            "event raised from V2: {} at index:{}",
-                            event_2, idx
-                        ));
+                        // self.output_result_str(format!(
+                        //     "event raised from V1: {} at index:{}",
+                        //     event_1, idx
+                        // ));
+                        // self.output_result_str(format!(
+                        //     "event raised from V2: {} at index:{}",
+                        //     event_2, idx
+                        // ));
                     }
                 }
                 // compare write set
@@ -417,31 +432,31 @@ impl Execution {
                     let write_set_2 = res_2_write_set_vec[0];
                     if write_set_1.0 != write_set_2.0 {
                         self.output_result_str(format!(
-                            "write set key is different at version {}",
-                            cur_version
+                            "write set key is different at version:{}, index:{}",
+                            cur_version, idx
                         ));
-                        self.output_result_str(format!(
-                            "state key at V1: {:?} at index:{}",
-                            write_set_1.0, idx
-                        ));
-                        self.output_result_str(format!(
-                            "state key at V2: {:?} at index:{}",
-                            write_set_2.0, idx
-                        ));
+                        // self.output_result_str(format!(
+                        //     "state key at V1: {:?} at index:{}",
+                        //     write_set_1.0, idx
+                        // ));
+                        // self.output_result_str(format!(
+                        //     "state key at V2: {:?} at index:{}",
+                        //     write_set_2.0, idx
+                        // ));
                     }
                     if write_set_1.1 != write_set_2.1 {
                         self.output_result_str(format!(
-                            "write set value is different at version {}",
-                            cur_version
+                            "write set value is different at version:{}, index:{}",
+                            cur_version, idx
                         ));
-                        self.output_result_str(format!(
-                            "state value at V1: {:?} at index {}",
-                            write_set_1.1, idx
-                        ));
-                        self.output_result_str(format!(
-                            "state value at V2: {:?} at index {}",
-                            write_set_2.1, idx
-                        ));
+                        // self.output_result_str(format!(
+                        //     "state value at V1: {:?} at index {}",
+                        //     write_set_1.1, idx
+                        // ));
+                        // self.output_result_str(format!(
+                        //     "state value at V2: {:?} at index {}",
+                        //     write_set_2.1, idx
+                        // ));
                     }
                 }
             },
