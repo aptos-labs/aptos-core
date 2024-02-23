@@ -98,6 +98,10 @@ impl Worker {
         if let Some(blacklist) = &self.config.uri_blacklist {
             if blacklist.iter().any(|uri| self.asset_uri.contains(uri)) {
                 self.log_info("Found match in URI skip list, skipping parse");
+                self.model.set_do_not_parse(true);
+                if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
+                    self.log_error("Commit to Postgres failed", &e);
+                }
                 SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
                 return Ok(());
             }
@@ -262,6 +266,7 @@ impl Worker {
                     .map(|value| format!("{}{}", self.config.cdn_prefix, value))
                     .ok();
                 self.model.set_cdn_image_uri(cdn_image_uri);
+                self.model.reset_json_parser_retry_count();
             }
 
             // Commit model to Postgres
@@ -363,9 +368,9 @@ impl Worker {
 
         self.model
             .set_last_transaction_version(self.last_transaction_version as i64);
-        if self.model.get_json_parser_retry_count() > MAX_NUM_PARSE_RETRIES
-            || self.model.get_image_optimizer_retry_count() > MAX_NUM_PARSE_RETRIES
-            || self.model.get_animation_optimizer_retry_count() > MAX_NUM_PARSE_RETRIES
+        if self.model.get_json_parser_retry_count() >= MAX_NUM_PARSE_RETRIES
+            || self.model.get_image_optimizer_retry_count() >= MAX_NUM_PARSE_RETRIES
+            || self.model.get_animation_optimizer_retry_count() >= MAX_NUM_PARSE_RETRIES
         {
             self.log_info("Retry count exceeded, marking as do_not_parse");
             self.model.set_do_not_parse(true);
