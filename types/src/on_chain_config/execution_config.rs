@@ -76,10 +76,10 @@ impl OnChainExecutionConfig {
                 entry_fun_conflict_window_size: 3,
             },
             block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
-                effective_block_gas_limit: 20000,
+                effective_block_gas_limit: 30000,
                 execution_gas_effective_multiplier: 1,
                 io_gas_effective_multiplier: 1,
-                conflict_penalty_window: 6,
+                conflict_penalty_window: 9,
                 use_granular_resource_group_conflicts: false,
                 use_module_publishing_block_conflict: true,
                 block_output_limit: Some(3 * 1024 * 1024),
