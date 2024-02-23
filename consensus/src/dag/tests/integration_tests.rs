@@ -46,7 +46,7 @@ struct DagBootstrapUnit {
     df_task_handle: JoinHandle<()>,
     dag_rpc_tx: aptos_channel::Sender<Author, IncomingDAGRequest>,
     network_events:
-        Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
+        Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>>,
 }
 
 impl DagBootstrapUnit {
@@ -58,7 +58,7 @@ impl DagBootstrapUnit {
         network: NetworkSender,
         time_service: TimeService,
         network_events: Box<
-            Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>,
+            Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>,
         >,
         all_signers: Vec<ValidatorSigner>,
     ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
@@ -133,7 +133,7 @@ fn create_network(
     validators: ValidatorVerifier,
 ) -> (
     NetworkSender,
-    Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::Receiver<Event<ConsensusMsg>>>>,
+    Box<Select<NetworkEvents<ConsensusMsg>, aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>>>,
 ) {
     let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
     let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
@@ -153,7 +153,7 @@ fn create_network(
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let network_events = NetworkEvents::new(consensus_rx, conn_status_rx, None);
 
-    let (self_sender, self_receiver) = aptos_channels::new_test(1000);
+    let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
 
     let twin_id = TwinId { id, author };

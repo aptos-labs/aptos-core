@@ -150,7 +150,7 @@ fn create_node_for_fuzzing() -> RoundManager {
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
 
-    let (self_sender, _self_receiver) = aptos_channels::new_test(8);
+    let (self_sender, _self_receiver) = aptos_channels::new_unbounded_test();
 
     let epoch_state = Arc::new(EpochState {
         epoch: 1,
