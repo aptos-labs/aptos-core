@@ -27,7 +27,7 @@ use std::{mem::Discriminant, process, sync::Arc};
 /// for processing the events carrying sync info and use the info to retrieve blocks from peers
 pub struct RecoveryManager {
     epoch_state: Arc<EpochState>,
-    network: Arc<NetworkSender>,
+    network: NetworkSender,
     storage: Arc<dyn PersistentLivenessStorage>,
     execution_client: Arc<dyn TExecutionClient>,
     last_committed_round: Round,
@@ -38,7 +38,7 @@ pub struct RecoveryManager {
 impl RecoveryManager {
     pub fn new(
         epoch_state: Arc<EpochState>,
-        network: Arc<NetworkSender>,
+        network: NetworkSender,
         storage: Arc<dyn PersistentLivenessStorage>,
         execution_client: Arc<dyn TExecutionClient>,
         last_committed_round: Round,

@@ -244,12 +244,7 @@ impl NodeSetup {
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
         let (self_sender, self_receiver) = aptos_channels::new_test(1000);
-        let network = Arc::new(NetworkSender::new(
-            author,
-            consensus_network_client,
-            self_sender,
-            validators,
-        ));
+        let network = NetworkSender::new(author, consensus_network_client, self_sender, validators);
 
         let all_network_events = Box::new(select(network_events, self_receiver));
 

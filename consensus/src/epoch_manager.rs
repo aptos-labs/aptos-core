@@ -596,7 +596,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         ledger_data: LedgerRecoveryData,
         onchain_consensus_config: OnChainConsensusConfig,
         epoch_state: Arc<EpochState>,
-        network_sender: Arc<NetworkSender>,
+        network_sender: NetworkSender,
     ) {
         let (recovery_manager_tx, recovery_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -646,7 +646,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
                 self.storage.aptos_db().clone(),
-                network_sender,
+                network_sender.clone(),
                 epoch_state.verifier.clone(),
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
@@ -701,7 +701,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         onchain_execution_config: OnChainExecutionConfig,
-        network_sender: Arc<NetworkSender>,
+        network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
         features: Features,
@@ -954,7 +954,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     epoch_state,
                     consensus_config,
                     execution_config,
-                    Arc::new(network_sender),
+                    network_sender,
                     payload_client,
                     payload_manager,
                     features,
@@ -967,7 +967,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     ledger_data,
                     consensus_config,
                     epoch_state,
-                    Arc::new(network_sender),
+                    network_sender,
                 )
                 .await
             },
