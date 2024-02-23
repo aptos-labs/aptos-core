@@ -795,6 +795,30 @@ impl RoundManager {
         });
     }
 
+    #[cfg(test)]
+    pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
+        let proposal_round = proposal.round();
+        let vote = self
+            .execute_and_vote(proposal)
+            .await
+            .context("[RoundManager] Process proposal")?;
+
+        let recipient = self
+            .proposer_election
+            .get_valid_proposer(proposal_round + 1);
+
+        info!(
+            self.new_log(LogEvent::Vote).remote_peer(recipient),
+            "{}", vote
+        );
+
+        self.round_state.record_vote(vote.clone());
+        let vote_msg = VoteMsg::new(vote, self.block_store.sync_info());
+        self.network.send_vote(vote_msg, vec![recipient]).await;
+        Ok(())
+    }
+
+    #[cfg(not(test))]
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let vote = self
             .execute_and_vote(proposal)
@@ -879,6 +903,53 @@ impl RoundManager {
         Ok(())
     }
 
+    #[cfg(test)]
+    /// Add a vote to the pending votes.
+    /// If a new QC / TC is formed then
+    /// 1) fetch missing dependencies if required, and then
+    /// 2) call process_certificates(), which will start a new round in return.
+    async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
+        let round = vote.vote_data().proposed().round();
+
+        info!(
+            self.new_log(LogEvent::ReceiveVote)
+                .remote_peer(vote.author()),
+            vote = %vote,
+            vote_epoch = vote.vote_data().proposed().epoch(),
+            vote_round = vote.vote_data().proposed().round(),
+            vote_id = vote.vote_data().proposed().id(),
+            vote_state = vote.vote_data().proposed().executed_state_id(),
+            is_timeout = vote.is_timeout(),
+        );
+
+        if !vote.is_timeout() {
+            // Unlike timeout votes regular votes are sent to the leaders of the next round only.
+            let next_round = round + 1;
+            ensure!(
+                self.proposer_election
+                    .is_valid_proposer(self.proposal_generator.author(), next_round),
+                "[RoundManager] Received {}, but I am not a valid proposer for round {}, ignore.",
+                vote,
+                next_round
+            );
+        }
+        let block_id = vote.vote_data().proposed().id();
+        // Check if the block already had a QC
+        if self
+            .block_store
+            .get_quorum_cert_for_block(block_id)
+            .is_some()
+        {
+            return Ok(());
+        }
+        let vote_reception_result = self
+            .round_state
+            .insert_vote(vote, &self.epoch_state.verifier);
+        self.process_vote_reception_result(vote, vote_reception_result)
+            .await
+    }
+
+    #[cfg(not(test))]
     /// Add a vote to the pending votes.
     /// If a new QC / TC is formed then
     /// 1) fetch missing dependencies if required, and then
