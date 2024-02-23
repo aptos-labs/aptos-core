@@ -114,6 +114,9 @@ impl BranchExtractor {
                 }
             }
         }
+        if let Exp_::Block(b) = &e.value {
+            self.collect_seq(b);
+        }
     }
 
     fn collect_seq_item(&mut self, s: &SequenceItem) {
@@ -220,10 +223,16 @@ impl BranchExtractor {
             if else_loc.start() == else_start_pos {
                 let mut has_added = cur_line.len() as u32 + else_loc.end() - else_loc.start()
                     > config.max_width() as u32;
+                tracing::debug!(
+                    "need_new_line_after_else --> next_else_end_loc = {:?}, cur_else_end_loc = {:?}",
+                    self
+                    .get_loc_range(self.com_if_else.else_loc_vec[else_loc_idx + 1]),
+                    self.get_loc_range(*else_loc)
+                );
                 if !has_added && else_loc_idx + 1 < self.com_if_else.else_loc_vec.len() {
                     has_added = self
                         .get_loc_range(self.com_if_else.else_loc_vec[else_loc_idx + 1])
-                        .start
+                        .end
                         .line
                         == self.get_loc_range(*else_loc).end.line;
                 }

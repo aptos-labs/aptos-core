@@ -377,15 +377,18 @@ pub(crate) fn need_space(current: &TokenTree, next: Option<&TokenTree>) -> bool 
                 result = true;
             }
 
-            if let Some(content) = current.simple_str() {
-                if content.contains("aborts_if") || content.contains("ensures") {
-                    result = true;
-                }
-            }
-
             if next_tok == Tok::Exclaim {
                 result = matches!(TokType::from(get_start_tok(current)), TokType::Alphabet)
                     || Tok::RParen == get_end_tok(current);
+            }
+
+            if let Some(content) = current.simple_str() {
+                if content == "aborts_if" || content == "ensures" {
+                    result = true;
+                }
+                if content == "assert" && next_tok == Tok::Exclaim {
+                    result = false;
+                }
             }
 
             if Tok::RParen == get_end_tok(current) && next_tok == Tok::LParen {

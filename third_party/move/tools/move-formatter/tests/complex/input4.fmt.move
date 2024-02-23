@@ -57,7 +57,7 @@ module oracle::oracle {
 
     fun assert_feed_adapter(feed: address, adapter: u8) {
         if (adapter == ADAPTER_SWITCHBOARD) {
-            assert !(
+            assert!(
                 switchboard_aggregator::exist(feed),
                 error::not_found(E_BAD_FEED)
             );
@@ -73,7 +73,7 @@ module oracle::oracle {
         adapter: u8
     )
         acquires OracleStore {
-        assert !(
+        assert!(
             address_of(oracle) == @oracle,
             error::unauthenticated(E_BAD_SIGNER)
         );
@@ -134,15 +134,15 @@ module oracle::oracle {
 
     fun decimal_to_u64(decimal: SwitchboardDecimal): u64 {
         let (value, dec, neg) = switchboard_math::unpack(decimal);
-        assert !(
+        assert!(
             !neg,
             error::out_of_range(E_BAD_PRICE)
         );
-        assert !(
+        assert!(
             dec <= 9,
             error::out_of_range(E_BAD_PRICE)
         );
-        assert !(
+        assert!(
             value > 0,
             error::out_of_range(E_BAD_PRICE)
         );

@@ -579,7 +579,7 @@ module econia::incentives {
         // Get current tier number.
         let current_tier = integrator_fee_store_ref.tier;
         // Assert actually attempting to upgrade to new tier.
-        assert !(
+        assert!(
             new_tier > current_tier,
             E_NOT_AN_UPGRADE
         );
@@ -588,7 +588,7 @@ module econia::incentives {
         // Get cumulative activation fee for new tier.
         let new_tier_fee = get_tier_activation_fee(new_tier);
         // Assert new tier fee is greater than current tier fee.
-        assert !(
+        assert!(
             new_tier_fee > current_tier_fee,
             E_TIER_COST_NOT_INCREASE
         );
@@ -619,9 +619,9 @@ module econia::incentives {
         // Borrow immutable reference to integrator fee store tiers
         // vector.
         let integrator_fee_store_tiers_ref = &borrow_global<IncentiveParameters>(@econia).
-        integrator_fee_store_tiers;
+            integrator_fee_store_tiers;
         // Assert provided 0-indexed tier number is within range.
-        assert !(
+        assert!(
             (tier as u64) < vector::length(integrator_fee_store_tiers_ref),
             E_INVALID_TIER
         );
@@ -685,7 +685,7 @@ module econia::incentives {
         // Borrow immutable reference to integrator fee store tiers
         // vector.
         let integrator_fee_store_tiers_ref = &borrow_global<IncentiveParameters>(@econia).
-        integrator_fee_store_tiers;
+            integrator_fee_store_tiers;
         // Return its vector length
         vector::length(integrator_fee_store_tiers_ref)
     }
@@ -713,9 +713,9 @@ module econia::incentives {
         // Borrow immutable reference to integrator fee store tiers
         // vector.
         let integrator_fee_store_tiers_ref = &borrow_global<IncentiveParameters>(@econia).
-        integrator_fee_store_tiers;
+            integrator_fee_store_tiers;
         // Assert provided 0-indexed tier number is within range.
-        assert !(
+        assert!(
             (tier as u64) < vector::length(integrator_fee_store_tiers_ref),
             E_INVALID_TIER
         );
@@ -741,9 +741,9 @@ module econia::incentives {
         // Borrow immutable reference to integrator fee store tiers
         // vector.
         let integrator_fee_store_tiers_ref = &borrow_global<IncentiveParameters>(@econia).
-        integrator_fee_store_tiers;
+            integrator_fee_store_tiers;
         // Assert provided 0-indexed tier number is within range.
-        assert !(
+        assert!(
             (tier as u64) < vector::length(integrator_fee_store_tiers_ref),
             E_INVALID_TIER
         );
@@ -867,7 +867,7 @@ module econia::incentives {
     /// * `test_verify_utility_coin_type()`
     public fun verify_utility_coin_type<T>()
         acquires IncentiveParameters {
-        assert !(
+        assert!(
             is_utility_coin_type<T>(),
             E_INVALID_UTILITY_COIN_TYPE
         );
@@ -1057,7 +1057,7 @@ module econia::incentives {
     )
         acquires EconiaFeeStore {
         withdraw_econia_fees_to_coin_store_internal<QuoteCoinType>(econia, market_id, true,
-            0);
+                0);
     }
 
     /// Wrapped call to `withdraw_econia_fees_to_coin_store_internal()`,
@@ -1609,7 +1609,7 @@ module econia::incentives {
         // Verify utility coin type.
         verify_utility_coin_type<UtilityCoinType>();
         // Assert sufficient utility coins provided.
-        assert !(
+        assert!(
             coin::value(&coins) >= min_amount,
             E_NOT_ENOUGH_UTILITY_COINS
         );
@@ -1701,7 +1701,7 @@ module econia::incentives {
     /// * `test_init_utility_coin_store_not_coin()`
     fun init_utility_coin_store<CoinType>(fee_account: &signer) {
         // Assert coin type corresponds to initialized coin.
-        assert !(
+        assert!(
             coin::is_coin_initialized<CoinType>(),
             E_NOT_COIN
         );
@@ -1740,7 +1740,7 @@ module econia::incentives {
         // Get value of target coins.
         let target_value = coin::value(target_coins);
         // Assert merge does not overflow a u64.
-        assert !(
+        assert!(
             (amount as u128) + (target_value as u128) <= (HI_64 as u128),
             error_code
         );
@@ -1819,7 +1819,7 @@ module econia::incentives {
             let n_new_tiers = vector::length(integrator_fee_store_tiers_ref);
             // Assert new parameter set indicates at least as many fee
             // store tiers as the set from before the upgrade.
-            assert !(
+            assert!(
                 n_new_tiers >= n_old_tiers,
                 E_FEWER_TIERS
             );
@@ -1932,7 +1932,7 @@ module econia::incentives {
             // Borrow immutable reference to fields for given tier.
             let tier_fields_ref = vector::borrow(integrator_fee_store_tiers_ref, i);
             // Assert containing vector is correct length.
-            assert !(
+            assert!(
                 vector::length(tier_fields_ref) == N_TIER_FIELDS,
                 E_TIER_FIELDS_WRONG_LENGTH
             );
@@ -1943,13 +1943,13 @@ module econia::incentives {
             );
             // Assert indicated fee share divisor is less than divisor
             // from last tier.
-            assert !(
+            assert!(
                 *fee_share_divisor_ref < divisor_last,
                 E_FEE_SHARE_DIVISOR_TOO_BIG
             );
             // Assert indicated fee share divisor is greater than or
             // equal to taker fee divisor.
-            assert !(
+            assert!(
                 *fee_share_divisor_ref >= taker_fee_divisor,
                 E_FEE_SHARE_DIVISOR_TOO_SMALL
             );
@@ -1960,13 +1960,13 @@ module econia::incentives {
             );
             if (i == 0) { // If parsing parameters for first tier:
                 // Assert activation fee is 0.
-                assert !(
+                assert!(
                     *tier_activation_fee_ref == 0,
                     E_FIRST_TIER_ACTIVATION_FEE_NONZERO
                 );
             } else { // If parameters for tier that is not first:
                 // Assert activation fee greater than that of last tier.
-                assert !(
+                assert!(
                     *tier_activation_fee_ref > activation_fee_last,
                     E_ACTIVATION_FEE_TOO_SMALL
                 );
@@ -1977,12 +1977,12 @@ module econia::incentives {
                 WITHDRAWAL_FEE_INDEX
             );
             // Assert withdrawal fee is less than that of last tier.
-            assert !(
+            assert!(
                 *withdrawal_fee_ref < withdrawal_fee_last,
                 E_WITHDRAWAL_FEE_TOO_BIG
             );
             // Assert withdrawal fee meets minimum threshold.
-            assert !(
+            assert!(
                 *withdrawal_fee_ref >= MIN_FEE,
                 E_WITHDRAWAL_FEE_TOO_SMALL
             );
@@ -2056,37 +2056,37 @@ module econia::incentives {
         integrator_fee_store_tiers_ref: &vector<vector<u64>>
     ) {
         // Assert signer is from Econia account.
-        assert !(
+        assert!(
             address_of(econia) == @econia,
             E_NOT_ECONIA
         );
         // Assert market registration fee meets minimum threshold.
-        assert !(
+        assert!(
             market_registration_fee >= MIN_FEE,
             E_MARKET_REGISTRATION_FEE_LESS_THAN_MIN
         );
         // Assert underwriter registration fee meets minimum threshold.
-        assert !(
+        assert!(
             underwriter_registration_fee >= MIN_FEE,
             E_UNDERWRITER_REGISTRATION_FEE_LESS_THAN_MIN
         );
         // Assert custodian registration fee meets minimum threshold.
-        assert !(
+        assert!(
             custodian_registration_fee >= MIN_FEE,
             E_CUSTODIAN_REGISTRATION_FEE_LESS_THAN_MIN
         );
         // Assert taker fee divisor is meets minimum threshold.
-        assert !(
+        assert!(
             taker_fee_divisor >= MIN_DIVISOR,
             E_TAKER_DIVISOR_LESS_THAN_MIN
         );
         // Assert integrator fee store parameters vector not empty.
-        assert !(
+        assert!(
             !vector::is_empty(integrator_fee_store_tiers_ref),
             E_EMPTY_FEE_STORE_TIERS
         );
         // Assert integrator fee store parameters vector not too long.
-        assert !(
+        assert!(
             vector::length(integrator_fee_store_tiers_ref) <= MAX_INTEGRATOR_FEE_STORE_TIERS,
             E_TOO_MANY_TIERS
         );
@@ -2108,7 +2108,7 @@ module econia::incentives {
     ): coin::Coin<QuoteCoinType>
         acquires EconiaFeeStore {
         // Assert account is Econia.
-        assert !(
+        assert!(
             address_of(account) == @econia,
             E_NOT_ECONIA
         );
@@ -2170,7 +2170,7 @@ module econia::incentives {
     ): coin::Coin<UtilityCoinType>
         acquires UtilityCoinStore {
         // Assert account is Econia.
-        assert !(
+        assert!(
             address_of(account) == @econia,
             E_NOT_ECONIA
         );
@@ -2381,7 +2381,7 @@ module econia::incentives {
             max_quote_delta_user
         );
         // Assert calculated amount.
-        assert !(
+        assert!(
             max_quote_match == max_quote_match_expected,
             0
         );
@@ -2397,7 +2397,7 @@ module econia::incentives {
             max_quote_delta_user
         );
         // Assert calculated amount.
-        assert !(
+        assert!(
             max_quote_match == max_quote_match_expected,
             0
         );
@@ -2419,7 +2419,7 @@ module econia::incentives {
             max_quote_delta_user
         );
         // Assert calculated amount.
-        assert !(max_quote_match == HI_64, 0);
+        assert!(max_quote_match == HI_64, 0);
         // Calculate max quote match value for one more than critical
         // amount.
         max_quote_match = calculate_max_quote_match(
@@ -2428,11 +2428,11 @@ module econia::incentives {
             max_quote_delta_user + 1
         );
         // Assert corrected amount.
-        assert !(max_quote_match == HI_64, 0);
+        assert!(max_quote_match == HI_64, 0);
         // Calculate max quote match value for highest possible input.
         max_quote_match = calculate_max_quote_match(direction, taker_fee_divisor, HI_64);
         // Assert corrected amount.
-        assert !(max_quote_match == HI_64, 0);
+        assert!(max_quote_match == HI_64, 0);
         // Calculate max quote match value for one less than critical
         // amount.
         max_quote_match = calculate_max_quote_match(
@@ -2445,12 +2445,12 @@ module econia::incentives {
             (taker_fee_divisor as u128) * ((max_quote_delta_user - 1) as u128)
         ) / ((taker_fee_divisor - 1) as u128);
         // Assert expected return below max possible u64.
-        assert !(
+        assert!(
             max_quote_match_expected <(HI_64 as u128),
             0
         );
         // Assert expected return.
-        assert !(
+        assert!(
             max_quote_match == (max_quote_match_expected as u64),
             0
         );
@@ -2476,9 +2476,9 @@ module econia::incentives {
             assets::mint_test(custodian_registration_fee)
         );
         // Assert total amount.
-        assert !(
+        assert!(
             get_utility_coin_store_balance_test() == MARKET_REGISTRATION_FEE + UNDERWRITER_REGISTRATION_FEE
-            + CUSTODIAN_REGISTRATION_FEE,
+                + CUSTODIAN_REGISTRATION_FEE,
             0
         );
     }
@@ -2502,11 +2502,11 @@ module econia::incentives {
         deposit_utility_coins(assets::mint_test<UC>(100));
         // Withdraw some utility coins.
         let coins = withdraw_utility_coins<UC>(econia, 40);
-        assert !(coin::value(&coins) == 40, 0); // Assert value.
+        assert!(coin::value(&coins) == 40, 0); // Assert value.
         assets::burn(coins); // Burn coins
         // Withdraw all utility coins
         coins = withdraw_utility_coins_all<UC>(econia);
-        assert !(coin::value(&coins) == 60, 0); // Assert value.
+        assert!(coin::value(&coins) == 60, 0); // Assert value.
         assets::burn(coins); // Burn coins
     }
 
@@ -2603,109 +2603,109 @@ module econia::incentives {
         init_module(econia); // Initialize incentives.
         // Assert state.
         verify_utility_coin_type<AptosCoin>();
-        assert !(!is_utility_coin_type<QC>(), 0);
-        assert !(
+        assert!(!is_utility_coin_type<QC>(), 0);
+        assert!(
             get_market_registration_fee() == MARKET_REGISTRATION_FEE,
             0
         );
-        assert !(
+        assert!(
             get_underwriter_registration_fee() == UNDERWRITER_REGISTRATION_FEE,
             0
         );
-        assert !(
+        assert!(
             get_custodian_registration_fee() == CUSTODIAN_REGISTRATION_FEE,
             0
         );
-        assert !(
+        assert!(
             get_taker_fee_divisor() == TAKER_FEE_DIVISOR,
             0
         );
-        assert !(get_n_fee_store_tiers() == 7, 0);
-        assert !(
+        assert!(get_n_fee_store_tiers() == 7, 0);
+        assert!(
             get_fee_share_divisor((0 as u8)) == FEE_SHARE_DIVISOR_0,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((1 as u8)) == FEE_SHARE_DIVISOR_1,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((2 as u8)) == FEE_SHARE_DIVISOR_2,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((3 as u8)) == FEE_SHARE_DIVISOR_3,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((4 as u8)) == FEE_SHARE_DIVISOR_4,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((5 as u8)) == FEE_SHARE_DIVISOR_5,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((6 as u8)) == FEE_SHARE_DIVISOR_6,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((0 as u8)) == TIER_ACTIVATION_FEE_0,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((1 as u8)) == TIER_ACTIVATION_FEE_1,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((2 as u8)) == TIER_ACTIVATION_FEE_2,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((3 as u8)) == TIER_ACTIVATION_FEE_3,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((4 as u8)) == TIER_ACTIVATION_FEE_4,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((5 as u8)) == TIER_ACTIVATION_FEE_5,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((6 as u8)) == TIER_ACTIVATION_FEE_6,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((0 as u8)) == WITHDRAWAL_FEE_0,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((1 as u8)) == WITHDRAWAL_FEE_1,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((2 as u8)) == WITHDRAWAL_FEE_2,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((3 as u8)) == WITHDRAWAL_FEE_3,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((4 as u8)) == WITHDRAWAL_FEE_4,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((5 as u8)) == WITHDRAWAL_FEE_5,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((6 as u8)) == WITHDRAWAL_FEE_6,
             0
         );
-        assert !(
+        assert!(
             exists<UtilityCoinStore<AptosCoin>>(resource_account::get_address()),
             0
         );
@@ -2784,108 +2784,108 @@ module econia::incentives {
         );
         // Assert state.
         verify_utility_coin_type<QC>();
-        assert !(!is_utility_coin_type<UC>(), 0);
-        assert !(
+        assert!(!is_utility_coin_type<UC>(), 0);
+        assert!(
             get_market_registration_fee() == market_registration_fee,
             0
         );
-        assert !(
+        assert!(
             get_underwriter_registration_fee() == underwriter_registration_fee,
             0
         );
-        assert !(
+        assert!(
             get_custodian_registration_fee() == custodian_registration_fee,
             0
         );
-        assert !(
+        assert!(
             get_taker_fee_divisor() == taker_fee_divisor,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((0 as u8)) == fee_share_divisor_0,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((1 as u8)) == fee_share_divisor_1,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((2 as u8)) == fee_share_divisor_2,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((3 as u8)) == fee_share_divisor_3,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((4 as u8)) == fee_share_divisor_4,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((5 as u8)) == fee_share_divisor_5,
             0
         );
-        assert !(
+        assert!(
             get_fee_share_divisor((6 as u8)) == fee_share_divisor_6,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((0 as u8)) == tier_activation_fee_0,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((1 as u8)) == tier_activation_fee_1,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((2 as u8)) == tier_activation_fee_2,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((3 as u8)) == tier_activation_fee_3,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((4 as u8)) == tier_activation_fee_4,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((5 as u8)) == tier_activation_fee_5,
             0
         );
-        assert !(
+        assert!(
             get_tier_activation_fee((6 as u8)) == tier_activation_fee_6,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((0 as u8)) == withdrawal_fee_0,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((1 as u8)) == withdrawal_fee_1,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((2 as u8)) == withdrawal_fee_2,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((3 as u8)) == withdrawal_fee_3,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((4 as u8)) == withdrawal_fee_4,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((5 as u8)) == withdrawal_fee_5,
             0
         );
-        assert !(
+        assert!(
             get_tier_withdrawal_fee((6 as u8)) == withdrawal_fee_6,
             0
         );
-        assert !(
+        assert!(
             exists<UtilityCoinStore<QC>>(resource_account::get_address()),
             0
         );
@@ -2903,7 +2903,7 @@ module econia::incentives {
         // Verify can call re-init for when already initialized.
         init_utility_coin_store<QC>(&fee_account);
         // Assert a utility coin store exists under fee account.
-        assert !(
+        assert!(
             exists<UtilityCoinStore<QC>>(address_of(&fee_account)),
             0
         );
@@ -2923,7 +2923,7 @@ module econia::incentives {
     fun test_range_check_coin_merge() {
         let target_coins = assets::mint_test<QC>(HI_64); // Mint coins.
         // Attempt invalid invocation.
-        range_check_coin_merge(1,&target_coins, 12345);
+        range_check_coin_merge(1, &target_coins, 12345);
         assets::burn(target_coins); // Burn target coins.
     }
 
@@ -2985,16 +2985,16 @@ module econia::incentives {
             assets::mint_test(get_tier_activation_fee(tier_1))
         );
         // Assert tiers.
-        assert !(
+        assert!(
             get_integrator_fee_store_tier_test<QC>(@user, market_id_0) == tier_0,
             0
         );
-        assert !(
+        assert!(
             get_integrator_fee_store_tier_test<QC>(@user, market_id_1) == tier_1,
             0
         );
         // Assert utility coins deposited.
-        assert !(
+        assert!(
             get_utility_coin_store_balance_test() == utility_coin_balance_0,
             0
         );
@@ -3009,14 +3009,14 @@ module econia::incentives {
             quote_coins
         );
         // Assert fee amount.
-        assert !(taker_fees == taker_fees_0, 0);
+        assert!(taker_fees == taker_fees_0, 0);
         // Destroy empty coins, asserting that all taker fees assessed.
         coin::destroy_zero(quote_coins);
-        assert !(
+        assert!(
             get_econia_fee_store_balance_test<QC>(market_id_0) == econia_fees_0,
             0
         ); // Assert Econia fee share.
-        assert !(
+        assert!(
             get_integrator_fee_store_balance_test<QC>(@user, market_id_0) == integrator_fees_0,
             0
         ); // Assert integrator fee share.
@@ -3031,10 +3031,10 @@ module econia::incentives {
             quote_coins
         );
         // Assert fee amount.
-        assert !(taker_fees == econia_fees_1, 0);
+        assert!(taker_fees == econia_fees_1, 0);
         // Destroy empty coins, asserting that all taker fees assessed.
         coin::destroy_zero(quote_coins);
-        assert !(
+        assert!(
             get_econia_fee_store_balance_test<QC>(market_id_1) == econia_fees_1,
             0
         ); // Assert Econia fee share.
@@ -3049,10 +3049,10 @@ module econia::incentives {
             quote_coins
         );
         // Assert fee amount.
-        assert !(taker_fees == econia_fees_2, 0);
+        assert!(taker_fees == econia_fees_2, 0);
         // Destroy empty coins, asserting that all taker fees assessed.
         coin::destroy_zero(quote_coins);
-        assert !(
+        assert!(
             get_econia_fee_store_balance_test<QC>(market_id_2) == econia_fees_2,
             0
         ); // Assert Econia fee share.
@@ -3068,24 +3068,24 @@ module econia::incentives {
         // Have integrator withdraw all fees for market ID 0.
         withdraw_integrator_fees_via_coinstores<QC, UC>(integrator, market_id_0);
         // Assert integrator got all coins.
-        assert !(
+        assert!(
             coin::balance<QC>(@user) == integrator_fees_0,
             0
         );
         // Assert utility coins deposited.
-        assert !(
+        assert!(
             get_utility_coin_store_balance_test() == utility_coin_balance_1,
             0
         );
         // Have Econia withdraw 1 coin for market ID 0.
         quote_coins = withdraw_econia_fees<QC>(econia, market_id_0, 1);
         // Assert 1 coin withdrawn.
-        assert !(coin::value(&quote_coins) == 1, 0);
+        assert!(coin::value(&quote_coins) == 1, 0);
         assets::burn(quote_coins); // Burn coins.
         // Have Econia withdraw all coins for market ID 0.
         quote_coins = withdraw_econia_fees_all<QC>(econia, market_id_0);
         // Assert remaining coins withdrawn.
-        assert !(
+        assert!(
             coin::value(&quote_coins) == econia_fees_0 - 1,
             0
         );
@@ -3093,12 +3093,12 @@ module econia::incentives {
         // Have Econia withdraw 1 utility coin.
         let utility_coins = withdraw_utility_coins<UC>(econia, 1);
         // Assert 1 coin withdrawn.
-        assert !(coin::value(&utility_coins) == 1, 0);
+        assert!(coin::value(&utility_coins) == 1, 0);
         assets::burn(utility_coins); // Burn coins.
         // Have Econia withdraw all utility coins.
         utility_coins = withdraw_utility_coins_all<UC>(econia);
         // Assert remaining coins withdrawn.
-        assert !(
+        assert!(
             coin::value(&utility_coins) == utility_coin_balance_1 - 1,
             0
         );
@@ -3112,7 +3112,7 @@ module econia::incentives {
         // Have integrator withdraw fees for market ID 0
         withdraw_integrator_fees_via_coinstores<QC, UC>(integrator, market_id_0);
         // Assert integrator quote coin balance unchanged.
-        assert !(
+        assert!(
             coin::balance<QC>(@user) == integrator_fees_0,
             0
         );
@@ -3479,7 +3479,7 @@ module econia::incentives {
             assets::mint_test(fee_start)
         );
         // Assert start tier.
-        assert !(
+        assert!(
             get_integrator_fee_store_tier_test<QC>(@user, market_id) == tier_start,
             0
         );
@@ -3498,12 +3498,12 @@ module econia::incentives {
         );
         // Assert fees assessed for cumulative amount required to
         // activate to upgrade tier.
-        assert !(
+        assert!(
             get_utility_coin_store_balance_test() == fee_upgrade,
             0
         );
         // Assert upgrade tier.
-        assert !(
+        assert!(
             get_integrator_fee_store_tier_test<QC>(@user, market_id) == tier_upgrade,
             0
         );
@@ -3557,11 +3557,11 @@ module econia::incentives {
         // Withdraw 1 coin, registering coin store.
         withdraw_utility_coins_to_coin_store<UC>(&econia, 1);
         // Assert coin store balance.
-        assert !(coin::balance<UC>(@econia) == 1, 0);
+        assert!(coin::balance<UC>(@econia) == 1, 0);
         // Withdraw remaining coins.
         withdraw_utility_coins_all_to_coin_store<UC>(&econia,);
         // Assert coin store balance.
-        assert !(
+        assert!(
             coin::balance<UC>(@econia) == utility_coin_amount,
             0
         );
@@ -3584,11 +3584,11 @@ module econia::incentives {
         // Withdraw 1 coin, registering coin store.
         withdraw_econia_fees_to_coin_store<QC>(&econia, market_id, 1);
         // Assert coin store balance.
-        assert !(coin::balance<QC>(@econia) == 1, 0);
+        assert!(coin::balance<QC>(@econia) == 1, 0);
         // Withdraw remaining coins.
         withdraw_econia_fees_all_to_coin_store<QC>(&econia, market_id);
         // Assert coin store balance.
-        assert !(
+        assert!(
             coin::balance<QC>(@econia) == fee_coin_amount,
             0
         );

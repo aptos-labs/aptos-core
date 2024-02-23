@@ -724,17 +724,21 @@ impl Format {
 
             // added in 20240115
             // updated in 20240124
-            if Tok::RBrace != *tok {
+            // updated in 20240222: remove condition `if Tok::RBrace != *tok `
+            {
                 let tok_end_pos = *pos + content.len() as u32;
                 let mut nested_branch_depth = self
                     .syntax_extractor
                     .branch_extractor
                     .added_new_line_after_branch(tok_end_pos);
-                tracing::debug!(
-                    "nested_branch_depth[{:?}] = [{:?}]",
-                    content,
-                    nested_branch_depth
-                );
+
+                if nested_branch_depth > 0 {
+                    tracing::debug!(
+                        "nested_branch_depth[{:?}] = [{:?}]",
+                        content,
+                        nested_branch_depth
+                    );
+                }
                 while nested_branch_depth > 0 {
                     self.dec_depth();
                     nested_branch_depth -= 1;
@@ -777,7 +781,6 @@ impl Format {
                 );
 
                 if matches!(*tok,
-                    | Tok::Period
                     | Tok::Equal
                     | Tok::EqualEqual
                     | Tok::EqualEqualGreater

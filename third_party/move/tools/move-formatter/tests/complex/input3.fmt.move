@@ -1,7 +1,7 @@
 module TestFunFormat {
     fun init_utility_coin_store<CoinType>(fee_account: &signer) {
         // Assert coin type corresponds to initialized coin.
-        assert !(
+        assert!(
             coin::is_coin_initialized<CoinType>(),
             E_NOT_COIN
         );
