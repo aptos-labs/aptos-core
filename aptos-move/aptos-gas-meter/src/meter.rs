@@ -12,6 +12,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes},
+    identifier::IdentStr,
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
@@ -471,9 +472,14 @@ where
     }
 
     #[inline]
-    fn charge_dependency(&mut self, module_id: &ModuleId, size: NumBytes) -> PartialVMResult<()> {
+    fn charge_dependency(
+        &mut self,
+        addr: &AccountAddress,
+        _name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
         // TODO: How about 0xA550C18?
-        if self.feature_version() >= 14 && !module_id.address().is_special() {
+        if self.feature_version() >= 14 && !addr.is_special() {
             self.algebra
                 .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
             self.algebra.count_dependency(size)?;

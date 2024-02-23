@@ -18,7 +18,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_types::{
@@ -470,12 +470,17 @@ where
         res
     }
 
-    fn charge_dependency(&mut self, module_id: &ModuleId, size: NumBytes) -> PartialVMResult<()> {
-        let (cost, res) = self.delegate_charge(|base| base.charge_dependency(module_id, size));
+    fn charge_dependency(
+        &mut self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_dependency(addr, name, size));
 
         if !cost.is_zero() {
             self.dependencies.push(Dependency {
-                id: module_id.clone(),
+                id: ModuleId::new(*addr, name.to_owned()),
                 size,
                 cost,
             });
