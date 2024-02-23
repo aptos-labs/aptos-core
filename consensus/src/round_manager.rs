@@ -89,10 +89,10 @@ impl UnverifiedEvent {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
-                    p.verify(validator, quorum_store_enabled)?;
-                    counters::VERIFY_MSG
-                        .with_label_values(&["proposal"])
-                        .observe(start_time.elapsed().as_secs_f64());
+                    // p.verify(validator, quorum_store_enabled)?;
+                    // counters::VERIFY_MSG
+                    //     .with_label_values(&["proposal"])
+                    //     .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::ProposalMsg(p)
             },
