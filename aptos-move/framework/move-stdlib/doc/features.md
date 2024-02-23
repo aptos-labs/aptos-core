@@ -97,6 +97,8 @@ return true.
 -  [Function `is_object_code_deployment_enabled`](#0x1_features_is_object_code_deployment_enabled)
 -  [Function `get_max_object_nesting_check_feature`](#0x1_features_get_max_object_nesting_check_feature)
 -  [Function `max_object_nesting_check_enabled`](#0x1_features_max_object_nesting_check_enabled)
+-  [Function `get_delegation_pool_allowlisting_feature`](#0x1_features_get_delegation_pool_allowlisting_feature)
+-  [Function `delegation_pool_allowlisting_enabled`](#0x1_features_delegation_pool_allowlisting_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
@@ -334,6 +336,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOLS">DELEGATION_POOLS</a>: u64 = 11;
+</code></pre>
+
+
+
+<a id="0x1_features_DELEGATION_POOL_ALLOWLISTING"></a>
+
+Whether delegators allowlisting for delegation pools is supported.
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>: u64 = 54;
 </code></pre>
 
 
@@ -2192,6 +2205,52 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_max_object_nesting_check_enabled">max_object_nesting_check_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_delegation_pool_allowlisting_feature"></a>
+
+## Function `get_delegation_pool_allowlisting_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64 { <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_delegation_pool_allowlisting_enabled"></a>
+
+## Function `delegation_pool_allowlisting_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>)
 }
 </code></pre>
 
