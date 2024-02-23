@@ -62,7 +62,8 @@ pub fn start_consensus(
 
     let (timeout_sender, timeout_receiver) =
         aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
-    let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
+    let (self_sender, self_receiver) =
+        aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
 

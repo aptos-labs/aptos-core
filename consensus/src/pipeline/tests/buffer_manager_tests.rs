@@ -64,7 +64,7 @@ pub fn prepare_buffer_manager(
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
-    aptos_channels::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     PipelinePhase<ExecutionSchedulePhase>,
     PipelinePhase<ExecutionWaitPhase>,
     PipelinePhase<SigningPhase>,
@@ -113,7 +113,7 @@ pub fn prepare_buffer_manager(
     );
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
 
-    let (self_loop_tx, self_loop_rx) = aptos_channels::new_test(1000);
+    let (self_loop_tx, self_loop_rx) = aptos_channels::new_unbounded_test();
     let network = NetworkSender::new(
         author,
         consensus_network_client,
@@ -179,7 +179,7 @@ pub fn launch_buffer_manager() -> (
     Sender<OrderedBlocks>,
     Sender<ResetRequest>,
     aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
-    aptos_channels::Receiver<Event<ConsensusMsg>>,
+    aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     HashValue,
     Runtime,
     Vec<ValidatorSigner>,
