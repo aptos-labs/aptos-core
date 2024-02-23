@@ -185,6 +185,10 @@ pub struct RoundManager {
     epoch_state: Arc<EpochState>,
     block_store: Arc<BlockStore>,
     round_state: RoundState,
+    // The highest round for which the round manager has received a commit vote during
+    // sync_up and sent a message to the buffer manager. When another sync_up request is
+    // to be processed for a smaller round, a duplicate message to the buffer manager is not sent.
+    pending_highest_commit_round: Option<Round>,
     proposer_election: UnequivocalProposerElection,
     proposal_generator: ProposalGenerator,
     safety_rules: Arc<Mutex<MetricsSafetyRules>>,
@@ -226,6 +230,7 @@ impl RoundManager {
             epoch_state,
             block_store,
             round_state,
+            pending_highest_commit_round: None,
             proposer_election: UnequivocalProposerElection::new(proposer_election),
             proposal_generator,
             safety_rules,
@@ -476,31 +481,83 @@ impl RoundManager {
             .await
     }
 
-    /// Sync to the sync info sending from peer if it has newer certificates.
-    async fn sync_up(&mut self, sync_info: &SyncInfo, author: Author) -> anyhow::Result<()> {
+    /// Sync to the sync info sending from peer if it has newer commit certificates.
+    /// The result indicates if the sync info has been verified during the execution.
+    async fn sync_up_commit_certs(
+        &mut self,
+        sync_info: &SyncInfo,
+        author: Author,
+    ) -> anyhow::Result<bool> {
         let local_sync_info = self.block_store.sync_info();
-        if sync_info.has_newer_certificates(&local_sync_info) {
+        if sync_info.has_newer_commit_certificates(&local_sync_info) {
             info!(
-                self.new_log(LogEvent::ReceiveNewCertificate)
+                self.new_log(LogEvent::ReceiveNewCommitCertificate)
                     .remote_peer(author),
                 "Local state {}, remote state {}", local_sync_info, sync_info
             );
+
+            let highest_commit_round = sync_info.highest_commit_round();
+            if self
+                .pending_highest_commit_round
+                .map_or(true, |round| round < highest_commit_round)
+            {
+                // Some information in SyncInfo is ahead of what we have locally.
+                // First verify the SyncInfo (didn't verify it in the yet).
+                sync_info
+                    .verify(&self.epoch_state().verifier)
+                    .map_err(|e| {
+                        error!(
+                            SecurityEvent::InvalidSyncInfoMsg,
+                            sync_info = sync_info,
+                            remote_peer = author,
+                            error = ?e,
+                        );
+                        VerifyError::from(e)
+                    })?;
+                self.pending_highest_commit_round = Some(highest_commit_round);
+                self.block_store
+                    .add_commit_cert(sync_info, self.create_block_retriever(author))
+                    .await;
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Sync to the sync info sending from peer if it has newer certificates.
+    async fn sync_up_non_commit_certs(
+        &mut self,
+        sync_info: &SyncInfo,
+        author: Author,
+        is_sync_info_verified: bool,
+    ) -> anyhow::Result<()> {
+        let local_sync_info = self.block_store.sync_info();
+        if sync_info.has_newer_non_commit_certificates(&local_sync_info) {
+            info!(
+                self.new_log(LogEvent::ReceiveNewNonCommitCertificate)
+                    .remote_peer(author),
+                "Local state {}, remote state {}", local_sync_info, sync_info
+            );
+
             // Some information in SyncInfo is ahead of what we have locally.
             // First verify the SyncInfo (didn't verify it in the yet).
-            sync_info
-                .verify(&self.epoch_state().verifier)
-                .map_err(|e| {
-                    error!(
-                        SecurityEvent::InvalidSyncInfoMsg,
-                        sync_info = sync_info,
-                        remote_peer = author,
-                        error = ?e,
-                    );
-                    VerifyError::from(e)
-                })?;
+            if !is_sync_info_verified {
+                sync_info
+                    .verify(&self.epoch_state().verifier)
+                    .map_err(|e| {
+                        error!(
+                            SecurityEvent::InvalidSyncInfoMsg,
+                            sync_info = sync_info,
+                            remote_peer = author,
+                            error = ?e,
+                        );
+                        VerifyError::from(e)
+                    })?;
+            }
+
             let result = self
                 .block_store
-                .add_certs(sync_info, self.create_block_retriever(author))
+                .add_non_commit_certs(sync_info, self.create_block_retriever(author))
                 .await;
             self.process_certificates().await?;
             result
@@ -525,7 +582,9 @@ impl RoundManager {
         if message_round < self.round_state.current_round() {
             return Ok(false);
         }
-        self.sync_up(sync_info, author).await?;
+        let is_sync_info_verified = self.sync_up_commit_certs(sync_info, author).await?;
+        self.sync_up_non_commit_certs(sync_info, author, is_sync_info_verified)
+            .await?;
         ensure!(
             message_round == self.round_state.current_round(),
             "After sync, round {} doesn't match local {}",
