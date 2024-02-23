@@ -23,6 +23,12 @@ use tonic::{
 
 pub const SERVER_NAME: &str = "idxdatasvc";
 
+pub const FILE_DESCRIPTOR_SETS: &[&[u8]] = &[
+    INDEXER_V1_FILE_DESCRIPTOR_SET,
+    TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
+    UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
+];
+
 // Default max response channel size.
 const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
 
@@ -162,11 +168,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 grpc_address = listen_address.to_string().as_str(),
                 "[data service] starting gRPC server with non-TLS."
             );
-            let router = grpc_server_builder.build_router(None, &[
-                INDEXER_V1_FILE_DESCRIPTOR_SET,
-                TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
-                UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
-            ]);
+            let router = grpc_server_builder.build_router(None, FILE_DESCRIPTOR_SETS);
             tasks.push(tokio::spawn(async move {
                 router
                     .serve(listen_address)
@@ -183,14 +185,8 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 grpc_address = listen_address.to_string().as_str(),
                 "[Data Service] Starting gRPC server with TLS."
             );
-            let router = grpc_server_builder.build_router(
-                Some(tonic::transport::ServerTlsConfig::new().identity(identity)),
-                &[
-                    INDEXER_V1_FILE_DESCRIPTOR_SET,
-                    TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
-                    UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
-                ],
-            );
+            let tls_config = tonic::transport::ServerTlsConfig::new().identity(identity);
+            let router = grpc_server_builder.build_router(Some(tls_config), FILE_DESCRIPTOR_SETS);
             tasks.push(tokio::spawn(async move {
                 router
                     .serve(listen_address)
