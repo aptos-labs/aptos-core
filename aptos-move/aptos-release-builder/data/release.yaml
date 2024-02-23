@@ -43,8 +43,8 @@ proposals:
             transaction_shuffler_type:
               fairness:
                 sender_conflict_window_size: 32
-                module_conflict_window_size: 2
-                entry_fun_conflict_window_size: 3
+                module_conflict_window_size: 1
+                entry_fun_conflict_window_size: 2
             block_gas_limit_type:
               complex_limit_v1:
                 effective_block_gas_limit: 20000
@@ -168,3 +168,12 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
+  - name: step_14_enable_max_object_nesting_check
+    metadata:
+      title: "Max Object Nesting Check"
+      description: "Enable the max object nesting check, preventing running out of gas due to ownership cycles."
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - max_object_nesting_check

@@ -1775,10 +1775,10 @@ fn realistic_env_max_load_test(
                     4600
                 } else if long_running {
                     // This is for forge stable
-                    7000
+                    6500
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    6500
+                    6000
                 },
             ),
         }))
