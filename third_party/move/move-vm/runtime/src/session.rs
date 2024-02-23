@@ -450,13 +450,13 @@ impl<'r, 'l> Session<'r, 'l> {
             .ok()
     }
 
-    pub fn check_dependencies_and_charge_gas<I>(
+    pub fn check_dependencies_and_charge_gas<'a, I>(
         &mut self,
         gas_meter: &mut impl GasMeter,
         ids: I,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = ModuleId>,
+        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
         I::IntoIter: DoubleEndedIterator,
     {
         self.move_vm

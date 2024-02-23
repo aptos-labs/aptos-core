@@ -11,6 +11,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+typed-arena = "2.0.2"
 better_any = "0.1.1"
 bytes = "1.4.0"
 fail = "0.4.0"
@@ -24,6 +25,7 @@ sha3 = "0.9.1"
 smallbitvec = "2.5.1"
 tracing = "0.1.26"
 triomphe = "0.1.9"
+hashbrown = "0.14.3"
 
 move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 move-core-types = { path = "../../move-core/types" }

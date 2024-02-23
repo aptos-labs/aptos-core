@@ -242,6 +242,37 @@ impl ModuleId {
         key.append(&mut bcs::to_bytes(self).unwrap());
         key
     }
+
+    pub fn module_id_ref(&self) -> ModuleIdRef {
+        ModuleIdRef {
+            address: &self.address,
+            name: self.name.as_ident_str(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
+pub struct ModuleIdRef<'a> {
+    address: &'a AccountAddress,
+    name: &'a IdentStr,
+}
+
+impl<'a> ModuleIdRef<'a> {
+    pub fn new(address: &'a AccountAddress, name: &'a IdentStr) -> Self {
+        Self { address, name }
+    }
+}
+
+impl<'a> hashbrown::Equivalent<ModuleIdRef<'a>> for ModuleId {
+    fn equivalent(&self, other: &ModuleIdRef<'a>) -> bool {
+        &self.address == other.address && self.name.as_ident_str() == other.name
+    }
+}
+
+impl<'a> hashbrown::Equivalent<ModuleId> for ModuleIdRef<'a> {
+    fn equivalent(&self, other: &ModuleId) -> bool {
+        self.address == &other.address && self.name == other.name.as_ident_str()
+    }
 }
 
 impl Display for ModuleId {
@@ -313,10 +344,18 @@ impl From<StructTag> for TypeTag {
 mod tests {
     use super::TypeTag;
     use crate::{
-        account_address::AccountAddress, identifier::Identifier, language_storage::StructTag,
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, StructTag},
         safe_serialize::MAX_TYPE_TAG_NESTING,
     };
-    use std::mem;
+    use hashbrown::Equivalent;
+    use proptest::prelude::*;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+        mem,
+    };
 
     #[test]
     fn test_type_tag_serde() {
@@ -391,5 +430,28 @@ mod tests {
             name: Identifier::new("a").unwrap(),
             type_params: vec![type_param],
         }))
+    }
+
+    proptest! {
+        #[test]
+        fn module_id_ref_equivalence(module_id in any::<ModuleId>()) {
+            let module_id_ref = module_id.module_id_ref();
+
+            assert!(module_id.equivalent(&module_id_ref));
+            assert!(module_id_ref.equivalent(&module_id));
+        }
+
+        #[test]
+        fn module_id_ref_hash_equivalence(module_id in any::<ModuleId>()) {
+            fn calculate_hash<T: Hash>(t: &T) -> u64 {
+                let mut s = DefaultHasher::new();
+                t.hash(&mut s);
+                s.finish()
+            }
+
+            let module_id_ref = module_id.module_id_ref();
+
+            assert_eq!(calculate_hash(&module_id), calculate_hash(&module_id_ref))
+        }
     }
 }

@@ -6,6 +6,7 @@ use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
     native_functions::NativeFunctions, session::LoadedFunctionInstantiation,
 };
+use hashbrown::{Equivalent, HashMap};
 use lazy_static::lazy_static;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -24,7 +25,7 @@ use move_core_types::{
     gas_algebra::{NumBytes, NumTypeNodes},
     ident_str,
     identifier::IdentStr,
-    language_storage::{ModuleId, StructTag, TypeTag},
+    language_storage::{ModuleId, ModuleIdRef, StructTag, TypeTag},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -37,10 +38,11 @@ use move_vm_types::{
 use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use sha3::{Digest, Sha3_256};
 use std::{
-    collections::{btree_map, BTreeMap, BTreeSet, HashMap},
+    collections::{btree_map, BTreeMap, BTreeSet},
     hash::Hash,
     sync::Arc,
 };
+use typed_arena::Arena;
 
 mod access_specifier_loader;
 mod function;
@@ -60,6 +62,9 @@ type ScriptHash = [u8; 32];
 // Access to this cache is always under a `RwLock`.
 #[derive(Clone)]
 pub(crate) struct BinaryCache<K, V> {
+    // Notice that we are using the HashMap implementation from the hashbrown crate, not the
+    // one from std, as it allows alternative key representations to be used for lookup,
+    // making certain optimizations possible.
     id_map: HashMap<K, usize>,
     binaries: Vec<Arc<V>>,
 }
@@ -84,7 +89,10 @@ where
             .expect("BinaryCache: last() after push() impossible failure")
     }
 
-    fn get(&self, key: &K) -> Option<&Arc<V>> {
+    fn get<Q>(&self, key: &Q) -> Option<&Arc<V>>
+    where
+        Q: Hash + Eq + Equivalent<K>,
+    {
         let index = self.id_map.get(key)?;
         self.binaries.get(*index)
     }
@@ -261,7 +269,7 @@ impl Loader {
             module_store,
             data_store,
             gas_meter,
-            script.immediate_dependencies(),
+            script.immediate_dependencies_iter(),
         )?;
 
         Ok(())
@@ -822,8 +830,12 @@ impl Loader {
     /// This will result in the shallow-loading of the modules -- they will be read from the
     /// storage as bytes and then deserialized, but NOT converted into the runtime representation.
     ///
+    /// It should also be noted that this is implemented in a way that avoids the cloning of
+    /// `ModuleId`, a.k.a. heap allocations, as much as possible, which is critical for
+    /// performance.
+    ///
     /// TODO: Revisit the order of traversal. Consider switching to alphabetical order.
-    pub(crate) fn check_dependencies_and_charge_gas<I>(
+    pub(crate) fn check_dependencies_and_charge_gas<'a, I>(
         &self,
         module_store: &ModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
@@ -831,42 +843,61 @@ impl Loader {
         ids: I,
     ) -> VMResult<()>
     where
-        I: IntoIterator<Item = ModuleId>,
+        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
         I::IntoIter: DoubleEndedIterator,
     {
-        let mut visited = BTreeSet::new();
+        // Initialize the work list (stack) and the map of visited modules.
         let mut stack = ids
             .into_iter()
             .rev()
-            .map(|id| (id, true))
+            .map(|(addr, name)| (addr, name, true))
             .collect::<Vec<_>>();
+        let mut visited: BTreeMap<(&AccountAddress, &IdentStr), ()> = stack
+            .iter()
+            .map(|&(addr, name, _)| ((addr, name), ()))
+            .collect();
 
-        while let Some((id, allow_loading_failure)) = stack.pop() {
-            if !visited.insert(id.clone()) {
-                continue;
-            }
+        let modules = Arena::with_capacity(512);
 
-            let (module, size) = match module_store.module_at(&id) {
+        while let Some((addr, name, allow_loading_failure)) = stack.pop() {
+            // Load and deserialize the module only if it has not been cached by the loader.
+            // Otherwise this will cause a significant regression in performance.
+            let (module, size) = match module_store.module_at_by_ref(&ModuleIdRef::new(addr, name))
+            {
                 Some(module) => (module.module.clone(), module.size),
                 None => {
-                    let (module, size, _) = data_store
-                        .load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
+                    let (module, size, _) = data_store.load_compiled_module_to_cache(
+                        ModuleId::new(*addr, name.to_owned()),
+                        allow_loading_failure,
+                    )?;
                     (module, size)
                 },
             };
 
-            gas_meter
-                .charge_dependency(&id, NumBytes::new(size as u64))
-                .map_err(|err| err.finish(Location::Module(id.clone())))?;
+            // Extend the lifetime of the module to the remainder of the function body
+            // by storing it in an arena.
+            //
+            // This is needed because we need to store references derived from it in the
+            // work list.
+            let module = modules.alloc(module);
 
-            stack.extend(
-                module
-                    .immediate_dependencies()
-                    .into_iter()
-                    .chain(module.immediate_friends())
-                    .map(|id| (id, false))
-                    .rev(),
-            );
+            gas_meter
+                .charge_dependency(addr, name, NumBytes::new(size as u64))
+                .map_err(|err| {
+                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
+                })?;
+
+            // Explore all dependencies and friends that have been visited yet.
+            for (addr, name) in module
+                .immediate_dependencies_iter()
+                .chain(module.immediate_friends_iter())
+                .rev()
+            {
+                if let btree_map::Entry::Vacant(entry) = visited.entry((addr, name)) {
+                    entry.insert(());
+                    stack.push((addr, name, false));
+                }
+            }
         }
 
         Ok(())

@@ -689,7 +689,11 @@ impl AptosVM {
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
         if self.gas_feature_version >= 14 {
-            session.check_dependencies_and_charge_gas(gas_meter, [entry_fn.module().clone()])?;
+            let module_id = entry_fn.module();
+            session.check_dependencies_and_charge_gas(gas_meter, [(
+                module_id.address(),
+                module_id.name(),
+            )])?;
         }
 
         let function =
@@ -1012,7 +1016,11 @@ impl AptosVM {
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
         if self.gas_feature_version >= 14 {
-            session.check_dependencies_and_charge_gas(gas_meter, [payload.module().clone()])?;
+            let module_id = payload.module();
+            session.check_dependencies_and_charge_gas(gas_meter, [(
+                module_id.address(),
+                module_id.name(),
+            )])?;
         }
 
         // If txn args are not valid, we'd still consider the transaction as executed but
@@ -1194,9 +1202,11 @@ impl AptosVM {
             if self.gas_feature_version >= 14 {
                 // Charge all modules in the bundle that is about to be published.
                 for (module, blob) in modules.iter().zip(bundle.iter()) {
+                    let module_id = &module.self_id();
                     gas_meter
                         .charge_dependency(
-                            &module.self_id(),
+                            module_id.address(),
+                            module_id.name(),
                             NumBytes::new(blob.code().len() as u64),
                         )
                         .map_err(|err| err.finish(Location::Undefined))?;
@@ -1208,7 +1218,7 @@ impl AptosVM {
                 // been published yet.
                 let module_ids_in_bundle = modules
                     .iter()
-                    .map(|module| module.self_id())
+                    .map(|module| (module.self_addr(), module.self_name()))
                     .collect::<BTreeSet<_>>();
 
                 session.check_dependencies_and_charge_gas(
@@ -1217,11 +1227,10 @@ impl AptosVM {
                         .iter()
                         .flat_map(|module| {
                             module
-                                .immediate_dependencies()
-                                .into_iter()
-                                .chain(module.immediate_friends())
+                                .immediate_dependencies_iter()
+                                .chain(module.immediate_friends_iter())
                         })
-                        .filter(|module_id| !module_ids_in_bundle.contains(module_id)),
+                        .filter(|addr_and_name| !module_ids_in_bundle.contains(addr_and_name)),
                 )?;
 
                 // TODO: Revisit the order of traversal. Consider switching to alphabetical order.
