@@ -172,7 +172,7 @@ CODE_PERF_VERSION = "v4"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=8)
+    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
 )
 
 if os.environ.get("DETAILED"):
@@ -180,12 +180,12 @@ if os.environ.get("DETAILED"):
 else:
     EXECUTION_ONLY_NUMBER_OF_THREADS = []
 
-if os.environ.get("RELEASE_BUILD"):
-    BUILD_FLAG = "--release"
-    BUILD_FOLDER = "target/release"
-else:
-    BUILD_FLAG = "--profile performance"
-    BUILD_FOLDER = "target/performance"
+# if os.environ.get("RELEASE_BUILD"):
+BUILD_FLAG = "--release"
+BUILD_FOLDER = "target/release"
+# else:
+#     BUILD_FLAG = "--profile performance"
+#     BUILD_FOLDER = "target/performance"
 
 if os.environ.get("PROD_DB_FLAGS"):
     DB_CONFIG_FLAGS = ""
