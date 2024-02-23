@@ -66,6 +66,7 @@ impl Report {
             writeln!(file, "Mutant path: {}", entry.mutant_path.display())?;
             writeln!(file, "Original file: {}", entry.original_file.display())?;
             writeln!(file, "Module name: {}", entry.module_name)?;
+            writeln!(file, "Function name: {}", entry.function_name)?;
             writeln!(file, "Mutations:")?;
             for modification in &entry.mutations {
                 writeln!(file, "  Operator: {}", modification.operator_name)?;
@@ -178,6 +179,8 @@ pub struct MutationReport {
     original_file: PathBuf,
     /// The name of the module that the mutation is in.
     module_name: String,
+    /// The function name that the mutation is in.
+    function_name: String,
     /// The modifications that were applied to the file.
     mutations: Vec<Mutation>,
     /// The diff between the original and mutated file.
@@ -192,6 +195,7 @@ impl MutationReport {
         mutant_path: &Path,
         original_file: &Path,
         module_name: &str,
+        function_name: &str,
         mutated_source: &str,
         original_source: &str,
     ) -> Self {
@@ -199,7 +203,8 @@ impl MutationReport {
         Self {
             mutant_path: mutant_path.to_path_buf(),
             original_file: original_file.to_path_buf(),
-            module_name: module_name.to_string(),
+            module_name: module_name.to_owned(),
+            function_name: function_name.to_owned(),
             mutations: vec![],
             diff: patch.to_string(),
         }
@@ -227,6 +232,12 @@ impl MutationReport {
     #[must_use]
     pub fn get_module_name(&self) -> &str {
         &self.module_name
+    }
+
+    /// Return the function name.
+    #[must_use]
+    pub fn get_function_name(&self) -> &str {
+        &self.function_name
     }
 
     /// Return the diff.
@@ -258,6 +269,7 @@ mod tests {
             Path::new("file"),
             Path::new("original_file"),
             "module",
+            "function",
             "\n",
             "diff\n",
         );
@@ -266,7 +278,7 @@ mod tests {
         report.add_entry(report_entry.clone());
         assert_eq!(
             report.to_json().unwrap(),
-            "{\n  \"mutants\": [\n    {\n      \"mutant_path\": \"file\",\n      \"original_file\": \"original_file\",\n      \"module_name\": \"module\",\n      \"mutations\": [\n        {\n          \"changed_place\": {\n            \"start\": 0,\n            \"end\": 10\n          },\n          \"operator_name\": \"operator\",\n          \"old_value\": \"old\",\n          \"new_value\": \"new\"\n        }\n      ],\n      \"diff\": \"--- original\\n+++ modified\\n@@ -1 +1 @@\\n-diff\\n+\\n\"\n    }\n  ]\n}"
+            "{\n  \"mutants\": [\n    {\n      \"mutant_path\": \"file\",\n      \"original_file\": \"original_file\",\n      \"module_name\": \"module\",\n      \"function_name\": \"function\",\n      \"mutations\": [\n        {\n          \"changed_place\": {\n            \"start\": 0,\n            \"end\": 10\n          },\n          \"operator_name\": \"operator\",\n          \"old_value\": \"old\",\n          \"new_value\": \"new\"\n        }\n      ],\n      \"diff\": \"--- original\\n+++ modified\\n@@ -1 +1 @@\\n-diff\\n+\\n\"\n    }\n  ]\n}"
         );
     }
 
@@ -305,6 +317,7 @@ mod tests {
             Path::new("file"),
             Path::new("original_file"),
             "module",
+            "function",
             "\n",
             "diff\n",
         );
@@ -320,6 +333,7 @@ mod tests {
         assert!(contents.contains("Mutant path: file"));
         assert!(contents.contains("Original file: original_file"));
         assert!(contents.contains("Module name: module"));
+        assert!(contents.contains("Function name: function"));
         assert!(contents.contains("Mutations:"));
         assert!(contents.contains("Operator: operator"));
         assert!(contents.contains("Old value: old"));

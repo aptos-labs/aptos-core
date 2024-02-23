@@ -22,15 +22,15 @@ impl Report {
 
     /// Increments the number of mutants tested for the given path.
     /// If the path is not in the report, it adds it with the number of mutants tested set to 1.
-    pub fn increment_mutants_tested(&mut self, path: &Path, module_name: &str) {
-        self.increment_stat(path, module_name, |stat| stat.tested += 1);
+    pub fn increment_mutants_tested(&mut self, path: &Path, module_func: &str) {
+        self.increment_stat(path, module_func, |stat| stat.tested += 1);
     }
 
     /// Increments the number of mutants killed for the given path.
     /// If the path is not in the report, it adds it with the number of mutants tested set to 0 and killed
     /// count set to 1.
-    pub fn increment_mutants_killed(&mut self, path: &Path, module_name: &str) {
-        self.increment_stat(path, module_name, |stat| stat.killed += 1);
+    pub fn increment_mutants_killed(&mut self, path: &Path, module_func: &str) {
+        self.increment_stat(path, module_func, |stat| stat.killed += 1);
     }
 
     /// Returns the number of mutants tested.
@@ -44,16 +44,16 @@ impl Report {
     }
 
     /// Add a diff for a not killed mutant.
-    pub fn add_mutants_alive_diff(&mut self, path: &Path, module_name: &str, diff: &str) {
+    pub fn add_mutants_alive_diff(&mut self, path: &Path, module_func: &str, diff: &str) {
         let entry = self
             .files
             .entry(path.to_path_buf())
-            .or_insert(vec![MutantStats::new(module_name)]);
+            .or_insert(vec![MutantStats::new(module_func)]);
 
-        if let Some(stat) = entry.iter_mut().find(|s| s.module == module_name) {
+        if let Some(stat) = entry.iter_mut().find(|s| s.module_func == module_func) {
             stat.mutants_alive_diffs.push(diff.to_owned());
         } else {
-            let mut new_entry = MutantStats::new(module_name);
+            let mut new_entry = MutantStats::new(module_func);
             new_entry.mutants_alive_diffs.push(diff.to_owned());
             entry.push(new_entry);
         }
@@ -80,7 +80,7 @@ impl Report {
                 };
 
                 builder.push_record([
-                    format!("{}::{}", path.to_string_lossy(), stat.module.clone()),
+                    format!("{}::{}", path.to_string_lossy(), stat.module_func.clone()),
                     stat.tested.to_string(),
                     stat.killed.to_string(),
                     format!("{percentage:.2}%"),
@@ -94,19 +94,20 @@ impl Report {
     }
 
     // Internal function to increment the chosen stat.
-    fn increment_stat<F>(&mut self, path: &Path, module_name: &str, mut increment: F)
+    fn increment_stat<F>(&mut self, path: &Path, module_func: &str, mut increment: F)
     where
         F: FnMut(&mut MutantStats),
     {
         let entry = self
             .files
             .entry(path.to_path_buf())
-            .or_insert(vec![MutantStats::new(module_name)]);
+            .or_insert(vec![MutantStats::new(module_func)]);
 
-        match entry.iter_mut().find(|s| s.module == module_name) {
+        match entry.iter_mut().find(|s| s.module_func == module_func) {
             Some(stat) => increment(stat),
             None => {
-                entry.push(MutantStats::new(module_name));
+                entry.push(MutantStats::new(module_func));
+                increment(entry.last_mut().unwrap());
             },
         }
     }
@@ -133,8 +134,8 @@ impl Report {
 /// It contains the number of mutants tested and killed.
 #[derive(Default, Debug, Serialize)]
 pub struct MutantStats {
-    /// Module name.
-    pub module: String,
+    /// Module::function where mutant resides.
+    pub module_func: String,
     /// The number of mutants tested.
     pub tested: u32,
     /// The number of mutants killed.
@@ -145,9 +146,9 @@ pub struct MutantStats {
 
 impl MutantStats {
     /// Creates a new entry with the given number of mutants tested and killed.
-    pub fn new(module: &str) -> Self {
+    pub fn new(module_func: &str) -> Self {
         Self {
-            module: module.to_string(),
+            module_func: module_func.to_string(),
             tested: 0,
             killed: 0,
             mutants_alive_diffs: vec![],
@@ -173,7 +174,7 @@ mod tests {
         let module_name = "new_module";
         report.increment_mutants_tested(&path, module_name);
         let entry = report.entries().get(&path).unwrap();
-        assert!(entry.iter().any(|s| s.module == module_name));
+        assert!(entry.iter().any(|s| s.module_func == module_name));
     }
 
     #[test]
@@ -183,7 +184,7 @@ mod tests {
         let module_name = "new_module";
         report.increment_mutants_killed(&path, module_name);
         let entry = report.entries().get(&path).unwrap();
-        assert!(entry.iter().any(|s| s.module == module_name));
+        assert!(entry.iter().any(|s| s.module_func == module_name));
     }
 
     #[test]
@@ -194,8 +195,9 @@ mod tests {
         report.increment_mutants_tested(&path, module_name);
         report.increment_mutants_tested(&path, module_name);
         let entry = report.entries().get(&path).unwrap();
-        let stat = entry.iter().find(|s| s.module == module_name).unwrap();
+        let stat = entry.iter().find(|s| s.module_func == module_name).unwrap();
         assert_eq!(stat.tested, 2);
+        assert_eq!(stat.killed, 0);
     }
 
     #[test]
@@ -206,8 +208,9 @@ mod tests {
         report.increment_mutants_killed(&path, module_name);
         report.increment_mutants_killed(&path, module_name);
         let entry = report.entries().get(&path).unwrap();
-        let stat = entry.iter().find(|s| s.module == module_name).unwrap();
+        let stat = entry.iter().find(|s| s.module_func == module_name).unwrap();
         assert_eq!(stat.killed, 2);
+        assert_eq!(stat.tested, 0);
     }
 
     #[test]
@@ -244,7 +247,7 @@ mod tests {
         let entry = report.entries().get(&path).unwrap();
         assert!(entry
             .iter()
-            .any(|s| s.module == module_name && s.mutants_alive_diffs.contains(&diff.to_owned())));
+            .any(|s| s.module_func == module_name && s.mutants_alive_diffs.contains(&diff.to_owned())));
     }
 
     #[test]
@@ -257,7 +260,7 @@ mod tests {
         report.add_mutants_alive_diff(&path, module_name, diff1);
         report.add_mutants_alive_diff(&path, module_name, diff2);
         let entry = report.entries().get(&path).unwrap();
-        let stat = entry.iter().find(|s| s.module == module_name).unwrap();
+        let stat = entry.iter().find(|s| s.module_func == module_name).unwrap();
         assert_eq!(stat.mutants_alive_diffs, vec![diff1, diff2]);
     }
 }
