@@ -409,7 +409,7 @@ impl NetworkSender {
             .map(|_| ())
     }
 
-    pub async fn broadcast_vote(&mut self, vote_msg: VoteMsg) {
+    pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
         self.broadcast(msg).await
