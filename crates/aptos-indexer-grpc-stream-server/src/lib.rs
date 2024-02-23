@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use tonic::{
     service::{interceptor::InterceptedService, Interceptor},
     transport::{server::Router, NamedService, Server},
