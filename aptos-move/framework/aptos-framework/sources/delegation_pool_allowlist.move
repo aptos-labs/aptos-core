@@ -7,7 +7,9 @@ module aptos_framework::delegation_pool_allowlist {
     use std::features;
     use std::signer;
     use std::vector;
+
     use aptos_std::smart_table::{Self, SmartTable};
+
     use aptos_framework::event;
 
     /// Delegators allowlisting is not supported.
@@ -78,10 +80,8 @@ module aptos_framework::delegation_pool_allowlist {
         assert_allowlisting_enabled(owner_address);
 
         let allowlist = vector[];
-        smart_table::for_each_ref(freeze(borrow_mut_delegators_allowlist(owner_address)), |delegator, included| {
-            if (*included) {
-                vector::push_back(&mut allowlist, *delegator);
-            }
+        smart_table::for_each_ref(freeze(borrow_mut_delegators_allowlist(owner_address)), |delegator, _included| {
+            vector::push_back(&mut allowlist, *delegator);
         });
         allowlist
     }
@@ -155,5 +155,138 @@ module aptos_framework::delegation_pool_allowlist {
         owner_address: address
     ): &mut SmartTable<address, bool> acquires DelegationPoolAllowlisting {
         &mut borrow_global_mut<DelegationPoolAllowlisting>(owner_address).allowlist
+    }
+
+    #[test_only]
+    public fun enable_delegation_pool_allowlisting_feature(aptos_framework: &signer) {
+        features::change_feature_flags(
+            aptos_framework,
+            vector[features::get_delegation_pool_allowlisting_feature()],
+            vector[]
+        );
+    }
+
+    #[test(owner = @0x123)]
+    #[expected_failure(abort_code = 0x30001, location = Self)]
+    public entry fun test_delegators_allowlisting_not_supported(
+        owner: &signer,
+    ) {
+        enable_delegators_allowlisting(owner);
+    }
+
+    #[test(aptos_framework = @aptos_framework, owner = @0x123)]
+    #[expected_failure(abort_code = 0x30002, location = Self)]
+    public entry fun test_disable_delegators_allowlisting_failure_1(
+        aptos_framework: &signer,
+        owner: &signer,
+    ) acquires DelegationPoolAllowlisting {
+        enable_delegation_pool_allowlisting_feature(aptos_framework);
+        let owner_address = signer::address_of(owner);
+
+        assert!(!allowlisting_enabled(owner_address), 0);
+        disable_delegators_allowlisting(owner);
+    }
+
+    #[test(aptos_framework = @aptos_framework, owner = @0x123, delegator = @0x234)]
+    #[expected_failure(abort_code = 0x30002, location = Self)]
+    public entry fun test_allowlist_delegator_failure_1(
+        aptos_framework: &signer,
+        owner: &signer,
+        delegator: &signer,
+    ) acquires DelegationPoolAllowlisting {
+        enable_delegation_pool_allowlisting_feature(aptos_framework);
+        let owner_address = signer::address_of(owner);
+
+        assert!(!allowlisting_enabled(owner_address), 0);
+        allowlist_delegator(owner, signer::address_of(delegator));
+    }
+
+    #[test(aptos_framework = @aptos_framework, owner = @0x123, delegator = @0x234)]
+    #[expected_failure(abort_code = 0x30002, location = Self)]
+    public entry fun test_remove_delegator_from_allowlist_failure_1(
+        aptos_framework: &signer,
+        owner: &signer,
+        delegator: &signer,
+    ) acquires DelegationPoolAllowlisting {
+        enable_delegation_pool_allowlisting_feature(aptos_framework);
+        let owner_address = signer::address_of(owner);
+
+        assert!(!allowlisting_enabled(owner_address), 0);
+        remove_delegator_from_allowlist(owner, signer::address_of(delegator));
+    }
+
+    #[test(aptos_framework = @aptos_framework, owner = @0x123, delegator_1 = @0x234, delegator_2 = @0x345)]
+    public entry fun test_delegation_pool_allowlisting_e2e(
+        aptos_framework: &signer,
+        owner: &signer,
+        delegator_1: &signer,
+        delegator_2: &signer,
+    ) acquires DelegationPoolAllowlisting {
+        enable_delegation_pool_allowlisting_feature(aptos_framework);
+        let owner_address = signer::address_of(owner);
+        let delegator_1_address = signer::address_of(delegator_1);
+        let delegator_2_address = signer::address_of(delegator_2);
+
+        assert!(!allowlisting_enabled(owner_address), 0);
+        // any address is allowlisted if allowlist not created
+        assert!(delegator_allowlisted(owner_address, delegator_1_address), 0);
+        assert!(delegator_allowlisted(owner_address, delegator_2_address), 0);
+
+        enable_delegators_allowlisting(owner);
+        // no address is allowlisted when allowlist is empty
+        assert!(!delegator_allowlisted(owner_address, delegator_1_address), 0);
+        assert!(!delegator_allowlisted(owner_address, delegator_2_address), 0);
+        let allowlist = &get_delegators_allowlist(owner_address);
+        assert!(vector::length(allowlist) == 0, 0);
+
+        allowlist_delegator(owner, delegator_1_address);
+        assert!(delegator_allowlisted(owner_address, delegator_1_address), 0);
+        assert!(!delegator_allowlisted(owner_address, delegator_2_address), 0);
+        allowlist = &get_delegators_allowlist(owner_address);
+        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_1_address), 0);
+
+        allowlist_delegator(owner, delegator_2_address);
+        assert!(delegator_allowlisted(owner_address, delegator_1_address), 0);
+        assert!(delegator_allowlisted(owner_address, delegator_2_address), 0);
+        allowlist = &get_delegators_allowlist(owner_address);
+        assert!(vector::length(allowlist) == 2 &&
+            vector::contains(allowlist, &delegator_1_address) &&
+            vector::contains(allowlist, &delegator_2_address),
+            0
+        );
+
+        remove_delegator_from_allowlist(owner, delegator_2_address);
+        assert!(delegator_allowlisted(owner_address, delegator_1_address), 0);
+        assert!(!delegator_allowlisted(owner_address, delegator_2_address), 0);
+        allowlist = &get_delegators_allowlist(owner_address);
+        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_1_address), 0);
+
+        // destroy the allowlist constructed so far
+        disable_delegators_allowlisting(owner);
+        assert!(!allowlisting_enabled(owner_address), 0);
+        assert!(delegator_allowlisted(owner_address, delegator_1_address), 0);
+        assert!(delegator_allowlisted(owner_address, delegator_2_address), 0);
+
+        enable_delegators_allowlisting(owner);
+        assert!(!delegator_allowlisted(owner_address, delegator_1_address), 0);
+        assert!(!delegator_allowlisted(owner_address, delegator_2_address), 0);
+
+        allowlist_delegator(owner, delegator_2_address);
+        assert!(!delegator_allowlisted(owner_address, delegator_1_address), 0);
+        assert!(delegator_allowlisted(owner_address, delegator_2_address), 0);
+        allowlist = &get_delegators_allowlist(owner_address);
+        assert!(vector::length(allowlist) == 1 && vector::contains(allowlist, &delegator_2_address), 0);
+
+        // allowlist does not ever have duplicates
+        allowlist_delegator(owner, delegator_2_address);
+        assert!(vector::length(&get_delegators_allowlist(owner_address)) == 1, 0);
+
+        // no override of existing allowlist when enabling allowlisting again
+        enable_delegators_allowlisting(owner);
+        assert!(vector::length(&get_delegators_allowlist(owner_address)) == 1, 0);
+
+        // nothing changes when trying to remove an inexistent delegator
+        remove_delegator_from_allowlist(owner, delegator_1_address);
+        assert!(vector::length(&get_delegators_allowlist(owner_address)) == 1, 0);
     }
 }
