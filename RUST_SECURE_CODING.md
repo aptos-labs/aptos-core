@@ -158,10 +158,10 @@ Most memory leaks result in general product reliability problems. If an attacker
 
 Aptos contains harnesses for fuzzing crash-prone code like deserializers, using [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) through [`cargo fuzz`](https://rust-fuzz.github.io/book/cargo-fuzz.html). For more examples, see the `testsuite/fuzzer` directory where find detailed README.md.
 
-## References
-
-- ANSSI's Secure Rust Guidelines: https://anssi-fr.github.io/rust-guide/
-
 ## Conclusion
 
 These guidelines are a crucial element for anyone contributing to Aptos, reflecting our commitment to a security-first approach. By adhering to these guidelines, Aptos contributors play a vital role in maintaining the security and robustness of the Aptos network. As we work towards automating the enforcement of these standards, following these practices will help maintain and improve the overall integrity and resilience of the Aptos ecosystem. This ongoing effort ensures that Aptos continues to set a high bar for security and reliability.
+
+## References
+
+- ANSSI's Secure Rust Guidelines: https://anssi-fr.github.io/rust-guide/
