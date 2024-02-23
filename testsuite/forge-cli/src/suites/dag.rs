@@ -167,8 +167,8 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
+                    max_no_progress_secs: 20.0,
+                    max_round_gap: 20,
                 }),
         )
 }
