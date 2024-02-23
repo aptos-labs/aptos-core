@@ -93,7 +93,7 @@ Implement the `Drop` trait selectively, only when necessary for specific destruc
 In a Rust secure development, the implementation of the `std::ops::Drop` trait
 must not panic.
 
-> Do not rely on `Drop` trait in security material treatment after the use, use [zeroize](https://docs.rs/zeroize/latest/zeroize/#) to explicit destroy security material, e.g. private keys.
+Do not rely on `Drop` trait in security material treatment after the use, use [zeroize](https://docs.rs/zeroize/latest/zeroize/#) to explicit destroy security material, e.g. private keys.
 
 ### Send and Sync Traits
 
@@ -107,7 +107,7 @@ In the majority of scenarios, manual implementation is unnecessary. In Rust, nea
 Ensure the implementation of standard comparison traits respects documented invariants.
 In the context of implementing standard comparison traits (like Eq, PartialEq, Ord, PartialOrd in Rust), respecting documented invariants means that the implementation of these traits should adhere to the properties and expectations defined by those invariants. For instance, if an invariant states that an object's identity is determined by certain fields, comparisons (equality, greater than, less than, etc.) must only consider those fields and ignore others. This ensures consistency, predictability, and correctness in how objects are compared, sorted, or considered equal within the Aptos Core.
 
-> The ANSSI resource extensively covers the matter [References](#references).
+The ANSSI resource extensively covers the matter [References](#references).
 
 ### Enums
 
@@ -150,15 +150,13 @@ Use [zeroize](https://docs.rs/zeroize/latest/zeroize/#) for zeroing memory conta
 
 Avoid using `std::mem::forget` in secure development, or any other function that leaks the memory.
 
-> Reference cycles can also cause memory leakage [[Rustbook: leak]](https://doc.rust-lang.org/book/ch15-06-reference-cycles.html?highlight=leak#reference-cycles-can-leak-memory).
+Reference cycles can also cause memory leakage [[Rustbook: leak]](https://doc.rust-lang.org/book/ch15-06-reference-cycles.html?highlight=leak#reference-cycles-can-leak-memory).
 
 Most memory leaks result in general product reliability problems. If an attacker can intentionally trigger a memory leak, the attacker might be able to launch a denial-of-service attack (by crashing or hanging the program).
 
 ### Fuzzing
 
 Aptos contains harnesses for fuzzing crash-prone code like deserializers, using [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) through [`cargo fuzz`](https://rust-fuzz.github.io/book/cargo-fuzz.html). For more examples, see the `testsuite/fuzzer` directory where find detailed README.md.
-
-## Appendix
 
 ## References
 
