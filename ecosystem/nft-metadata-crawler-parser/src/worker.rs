@@ -7,10 +7,6 @@ use crate::{
         nft_metadata_crawler_uris_query::NFTMetadataCrawlerURIsQuery,
     },
     utils::{
-        constants::{
-            DEFAULT_IMAGE_QUALITY, DEFAULT_MAX_FILE_SIZE_BYTES, DEFAULT_MAX_IMAGE_DIMENSIONS,
-            MAX_NUM_PARSE_RETRIES,
-        },
         counters::{
             DUPLICATE_ASSET_URI_COUNT, DUPLICATE_RAW_ANIMATION_URI_COUNT,
             DUPLICATE_RAW_IMAGE_URI_COUNT, OPTIMIZE_IMAGE_TYPE_COUNT, PARSER_SUCCESSES_COUNT,
@@ -94,17 +90,9 @@ impl Worker {
             self.model = pm.into();
         }
 
-        // Skip if asset_uri contains any of the uris in URI_SKIP_LIST
-        if let Some(blacklist) = &self.config.uri_blacklist {
-            if blacklist.iter().any(|uri| self.asset_uri.contains(uri)) {
-                self.log_info("Found match in URI skip list, skipping parse");
-                self.model.set_do_not_parse(true);
-                if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
-                    self.log_error("Commit to Postgres failed", &e);
-                }
-                SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
-                return Ok(());
-            }
+        // Check asset_uri against the URI blacklist
+        if self.is_blacklisted_uri(&self.asset_uri.clone()) {
+            return Ok(());
         }
 
         // Skip if asset_uri is not a valid URI
@@ -134,19 +122,15 @@ impl Worker {
 
             // Parse JSON for raw_image_uri and raw_animation_uri
             self.log_info("Starting JSON parsing");
-            let (raw_image_uri, raw_animation_uri, json) = JSONParser::parse(
-                json_uri,
-                self.config
-                    .max_file_size_bytes
-                    .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
-            )
-            .await
-            .unwrap_or_else(|e| {
-                // Increment retry count if JSON parsing fails
-                self.log_warn("JSON parsing failed", Some(&e));
-                self.model.increment_json_parser_retry_count();
-                (None, None, Value::Null)
-            });
+            let (raw_image_uri, raw_animation_uri, json) =
+                JSONParser::parse(json_uri, self.config.max_file_size_bytes)
+                    .await
+                    .unwrap_or_else(|e| {
+                        // Increment retry count if JSON parsing fails
+                        self.log_warn("JSON parsing failed", Some(&e));
+                        self.model.increment_json_parser_retry_count();
+                        (None, None, Value::Null)
+                    });
 
             self.model.set_raw_image_uri(raw_image_uri);
             self.model.set_raw_animation_uri(raw_animation_uri);
@@ -209,6 +193,12 @@ impl Worker {
                 .model
                 .get_raw_image_uri()
                 .unwrap_or(self.model.get_asset_uri());
+
+            // Check raw_image_uri against the URI blacklist
+            if self.is_blacklisted_uri(&raw_image_uri) {
+                return Ok(());
+            }
+
             let img_uri = URIParser::parse(
                 &self.config.ipfs_prefix,
                 &raw_image_uri,
@@ -227,13 +217,9 @@ impl Worker {
                 .inc();
             let (image, format) = ImageOptimizer::optimize(
                 &img_uri,
-                self.config
-                    .max_file_size_bytes
-                    .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
-                self.config.image_quality.unwrap_or(DEFAULT_IMAGE_QUALITY),
-                self.config
-                    .max_image_dimensions
-                    .unwrap_or(DEFAULT_MAX_IMAGE_DIMENSIONS),
+                self.config.max_file_size_bytes,
+                self.config.image_quality,
+                self.config.max_image_dimensions,
             )
             .await
             .unwrap_or_else(|e| {
@@ -321,13 +307,9 @@ impl Worker {
                 .inc();
             let (animation, format) = ImageOptimizer::optimize(
                 &animation_uri,
-                self.config
-                    .max_file_size_bytes
-                    .unwrap_or(DEFAULT_MAX_FILE_SIZE_BYTES),
-                self.config.image_quality.unwrap_or(DEFAULT_IMAGE_QUALITY),
-                self.config
-                    .max_image_dimensions
-                    .unwrap_or(DEFAULT_MAX_IMAGE_DIMENSIONS),
+                self.config.max_file_size_bytes,
+                self.config.image_quality,
+                self.config.max_image_dimensions,
             )
             .await
             .unwrap_or_else(|e| {
@@ -368,9 +350,9 @@ impl Worker {
 
         self.model
             .set_last_transaction_version(self.last_transaction_version as i64);
-        if self.model.get_json_parser_retry_count() >= MAX_NUM_PARSE_RETRIES
-            || self.model.get_image_optimizer_retry_count() >= MAX_NUM_PARSE_RETRIES
-            || self.model.get_animation_optimizer_retry_count() >= MAX_NUM_PARSE_RETRIES
+        if self.model.get_json_parser_retry_count() >= self.config.max_num_parse_retries
+            || self.model.get_image_optimizer_retry_count() >= self.config.max_num_parse_retries
+            || self.model.get_animation_optimizer_retry_count() >= self.config.max_num_parse_retries
         {
             self.log_info("Retry count exceeded, marking as do_not_parse");
             self.model.set_do_not_parse(true);
@@ -381,6 +363,24 @@ impl Worker {
 
         PARSER_SUCCESSES_COUNT.inc();
         Ok(())
+    }
+
+    fn is_blacklisted_uri(&mut self, uri: &str) -> bool {
+        if self
+            .config
+            .uri_blacklist
+            .iter()
+            .any(|blacklist_uri| uri.contains(blacklist_uri))
+        {
+            self.log_info("Found match in URI blacklist, marking as do_not_parse");
+            self.model.set_do_not_parse(true);
+            if let Err(e) = upsert_uris(&mut self.conn, &self.model) {
+                self.log_error("Commit to Postgres failed", &e);
+            }
+            SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
+            return true;
+        }
+        false
     }
 
     fn log_info(&self, message: &str) {
