@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 pub const BATCH_PADDING_BYTES: usize = 160;
-const DEFAULT_MAX_NUM_BATCHES: usize = 20;
+const DEFAULT_MAX_NUM_BATCHES: usize = 100;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -36,7 +36,7 @@ impl Default for QuorumStoreBackPressureConfig {
             increase_duration_ms: 1000,
             decrease_fraction: 0.5,
             dynamic_min_txn_per_s: 160,
-            dynamic_max_txn_per_s: 8000,
+            dynamic_max_txn_per_s: 4000,
         }
     }
 }
@@ -81,20 +81,17 @@ impl Default for QuorumStoreConfig {
             batch_generation_poll_interval_ms: 25,
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
-            sender_max_batch_txns: 250,
-            // TODO: on next release, remove BATCH_PADDING_BYTES
-            sender_max_batch_bytes: 1024 * 1024 - BATCH_PADDING_BYTES,
+            // In previewnet, these are bumped up
+            sender_max_batch_txns: 500,
+            sender_max_batch_bytes: 4 * 1024 * 1024,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,
-            sender_max_total_txns: 2000,
-            // TODO: on next release, remove DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES
-            sender_max_total_bytes: 4 * 1024 * 1024 - DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
-            receiver_max_batch_txns: 250,
-            receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
-            receiver_max_num_batches: 20,
-            receiver_max_total_txns: 2000,
-            receiver_max_total_bytes: 4 * 1024 * 1024
-                + DEFAULT_MAX_NUM_BATCHES
-                + BATCH_PADDING_BYTES,
+            sender_max_total_txns: 4000,
+            sender_max_total_bytes: 8 * 1024 * 1024,
+            receiver_max_batch_txns: 1000,
+            receiver_max_batch_bytes: 8 * 1024 * 1024,
+            receiver_max_num_batches: 200,
+            receiver_max_total_txns: 8000,
+            receiver_max_total_bytes: 16 * 1024 * 1024,
             batch_request_num_peers: 5,
             batch_request_retry_limit: 10,
             batch_request_retry_interval_ms: 1000,
