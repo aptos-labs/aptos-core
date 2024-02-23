@@ -38,7 +38,7 @@ impl ConsensusAlgorithmConfig {
                 quorum_store_enabled,
                 ..
             } => *quorum_store_enabled,
-            ConsensusAlgorithmConfig::DAG(_) => false,
+            ConsensusAlgorithmConfig::DAG(_) => true,
         }
     }
 

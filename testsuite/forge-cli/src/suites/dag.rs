@@ -9,8 +9,7 @@ use aptos_forge::{
     EmitJobMode, EmitJobRequest, ForgeConfig,
 };
 use aptos_sdk::types::on_chain_config::{
-    ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, OnChainExecutionConfig,
-    ValidatorTxnConfig,
+    BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -33,7 +32,7 @@ fn get_dag_on_realistic_env_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "dag_realistic_env_max_load" => dag_realistic_env_max_load_test(duration, test_cmd, 7, 7),
+        "dag_realistic_env_max_load" => dag_realistic_env_max_load_test(duration, test_cmd, 20, 0),
         "dag_changing_working_quorum_test" => dag_changing_working_quorum_test(),
         "dag_reconfig_enable_test" => dag_reconfig_enable_test(),
         _ => return None, // The test name does not match a dag realistic-env test
@@ -65,7 +64,7 @@ fn dag_realistic_env_max_load_test(
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 30000,
+                    mempool_backlog: 50000,
                 })
                 .init_gas_price_multiplier(20),
             inner_success_criteria: SuccessCriteria::new(
@@ -81,19 +80,38 @@ fn dag_realistic_env_max_load_test(
             ),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            // Have single epoch change in land blocking, and a few on long-running
+            helm_values["chain"]["epoch_duration_secs"] =
+                (if long_running { 600 } else { 300 }).into();
+
             let onchain_consensus_config = OnChainConsensusConfig::V3 {
                 alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
             };
-
-            // Have single epoch change in land blocking, and a few on long-running
-            helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
+            
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(onchain_consensus_config).expect("must serialize");
+
+            let mut on_chain_execution_config = OnChainExecutionConfig::default_for_genesis();
+            // Need to update if the default changes
+            match &mut on_chain_execution_config {
+                OnChainExecutionConfig::Missing
+                | OnChainExecutionConfig::V1(_)
+                | OnChainExecutionConfig::V2(_)
+                | OnChainExecutionConfig::V3(_) => {
+                    unreachable!("Unexpected on-chain execution config type, if OnChainExecutionConfig::default_for_genesis() has been updated, this test must be updated too.")
+                }
+                OnChainExecutionConfig::V4(config_v4) => {
+                    config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
+                        sender_conflict_window_size: 256,
+                        module_conflict_window_size: 2,
+                        entry_fun_conflict_window_size: 3,
+                    };
+                }
+            }
             helm_values["chain"]["on_chain_execution_config"] =
-                serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
-                    .expect("must serialize");
+                serde_yaml::to_value(on_chain_execution_config).expect("must serialize");
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
