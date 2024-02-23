@@ -172,66 +172,66 @@ impl Default for ConsensusConfig {
             // in the pipline very low, we can keep this limit pretty low, too.
             vote_back_pressure_limit: 7,
             pipeline_backpressure: vec![
-                PipelineBackpressureValues {
-                    // pipeline_latency looks how long has the oldest block still in pipeline
-                    // been in the pipeline.
-                    // Block enters the pipeline after consensus orders it, and leaves the
-                    // pipeline once quorum on execution result among validators has been reached
-                    // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 1000,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 100,
-                    max_txns_from_block_to_execute: None,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1100,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 200,
-                    max_txns_from_block_to_execute: None,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1400,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 300,
-                    max_txns_from_block_to_execute: None,
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1700,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 400,
-                    max_txns_from_block_to_execute: Some(1000),
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2000,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(600),
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2300,
-                    max_sending_block_txns_override: 10000,
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(400),
-                },
-                PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 2600,
-                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~500 TPS
-                    // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency.
-                    // We cannot reduce this further currently, as it needs to be larger than batch size.
-                    max_sending_block_txns_override: 10000,
-                    // stop reducing size, so 1MB transactions can still go through
-                    max_sending_block_bytes_override: 5 * 1024 * 1024,
-                    backpressure_proposal_delay_ms: 500,
-                    max_txns_from_block_to_execute: Some(250),
-                },
+                // PipelineBackpressureValues {
+                //     // pipeline_latency looks how long has the oldest block still in pipeline
+                //     // been in the pipeline.
+                //     // Block enters the pipeline after consensus orders it, and leaves the
+                //     // pipeline once quorum on execution result among validators has been reached
+                //     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
+                //     back_pressure_pipeline_latency_limit_ms: 1000,
+                //     max_sending_block_txns_override: 10000,
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 100,
+                //     max_txns_from_block_to_execute: None,
+                // },
+                // PipelineBackpressureValues {
+                //     back_pressure_pipeline_latency_limit_ms: 1100,
+                //     max_sending_block_txns_override: 10000,
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 200,
+                //     max_txns_from_block_to_execute: None,
+                // },
+                // PipelineBackpressureValues {
+                //     back_pressure_pipeline_latency_limit_ms: 1400,
+                //     max_sending_block_txns_override: 10000,
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 300,
+                //     max_txns_from_block_to_execute: None,
+                // },
+                // PipelineBackpressureValues {
+                //     back_pressure_pipeline_latency_limit_ms: 1700,
+                //     max_sending_block_txns_override: 10000,
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 400,
+                //     max_txns_from_block_to_execute: Some(1000),
+                // },
+                // PipelineBackpressureValues {
+                //     back_pressure_pipeline_latency_limit_ms: 2000,
+                //     max_sending_block_txns_override: 10000,
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 500,
+                //     max_txns_from_block_to_execute: Some(600),
+                // },
+                // PipelineBackpressureValues {
+                //     back_pressure_pipeline_latency_limit_ms: 2300,
+                //     max_sending_block_txns_override: 10000,
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 500,
+                //     max_txns_from_block_to_execute: Some(400),
+                // },
+                // PipelineBackpressureValues {
+                //     back_pressure_pipeline_latency_limit_ms: 2600,
+                //     // in practice, latencies and delay make it such that ~2 blocks/s is max,
+                //     // meaning that most aggressively we limit to ~500 TPS
+                //     // For transactions that are more expensive than that, we should
+                //     // instead rely on max gas per block to limit latency.
+                //     // We cannot reduce this further currently, as it needs to be larger than batch size.
+                //     max_sending_block_txns_override: 10000,
+                //     // stop reducing size, so 1MB transactions can still go through
+                //     max_sending_block_bytes_override: 5 * 1024 * 1024,
+                //     backpressure_proposal_delay_ms: 500,
+                //     max_txns_from_block_to_execute: Some(250),
+                // },
             ],
             window_for_chain_health: 100,
             // TODO: chain health backoff should also support max_txns_from_block_to_execute.
