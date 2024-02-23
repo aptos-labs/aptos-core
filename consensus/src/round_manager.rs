@@ -804,14 +804,21 @@ impl RoundManager {
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
         let proposal_round = proposal.round();
+        let start_time = Instant::now();
         let vote = self
             .execute_and_vote(proposal)
             .await
             .context("[RoundManager] Process proposal")?;
+        counters::EXPERIMENTAL
+            .with_label_values(&["execute_and_vote"])
+            .observe(start_time.elapsed().as_secs_f64());
 
         let recipient = self
             .proposer_election
             .get_valid_proposer(proposal_round + 1);
+        counters::EXPERIMENTAL
+            .with_label_values(&["get_valid_proposer"])
+            .observe(start_time.elapsed().as_secs_f64());
 
         info!(
             self.new_log(LogEvent::Vote).remote_peer(recipient),
@@ -819,8 +826,14 @@ impl RoundManager {
         );
 
         self.round_state.record_vote(vote.clone());
+        counters::EXPERIMENTAL
+            .with_label_values(&["record_vote"])
+            .observe(start_time.elapsed().as_secs_f64());
         let vote_msg = VoteMsg::new(vote, self.block_store.sync_info());
         self.network.send_vote(vote_msg, vec![recipient]).await;
+        counters::EXPERIMENTAL
+            .with_label_values(&["send_vote"])
+            .observe(start_time.elapsed().as_secs_f64());
         Ok(())
     }
 
@@ -830,11 +843,15 @@ impl RoundManager {
     /// * save the updated state to consensus DB
     /// * return a VoteMsg with the LedgerInfo to be committed in case the vote gathers QC.
     async fn execute_and_vote(&mut self, proposed_block: Block) -> anyhow::Result<Vote> {
+        let start_time = Instant::now();
         let executed_block = self
             .block_store
             .insert_ordered_block(proposed_block)
             .await
             .context("[RoundManager] Failed to execute_and_insert the block")?;
+        counters::EXPERIMENTAL
+            .with_label_values(&["insert_ordered_block"])
+            .observe(start_time.elapsed().as_secs_f64());
 
         // Short circuit if already voted.
         ensure!(
@@ -853,6 +870,10 @@ impl RoundManager {
             &vote_proposal,
             self.block_store.highest_2chain_timeout_cert().as_deref(),
         );
+        counters::EXPERIMENTAL
+            .with_label_values(&["construct_and_sign_vote_two_chain"])
+            .observe(start_time.elapsed().as_secs_f64());
+
         let vote = vote_result.context(format!(
             "[RoundManager] SafetyRules Rejected {}",
             executed_block.block()

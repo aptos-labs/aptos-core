@@ -651,6 +651,16 @@ pub static VERIFY_MSG: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static EXPERIMENTAL: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_experimental",
+        "Experimental timers",
+        &["phase"],
+        VERIFY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 ///////////////////
 // CHANNEL COUNTERS
 ///////////////////
