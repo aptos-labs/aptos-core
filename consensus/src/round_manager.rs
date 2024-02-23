@@ -807,24 +807,15 @@ impl RoundManager {
     }
 
     pub async fn process_verified_proposal(&mut self, proposal: Block) -> anyhow::Result<()> {
-        let proposal_round = proposal.round();
         let vote = self
             .execute_and_vote(proposal)
             .await
             .context("[RoundManager] Process proposal")?;
-
-        let recipient = self
-            .proposer_election
-            .get_valid_proposer(proposal_round + 1);
-
-        info!(
-            self.new_log(LogEvent::Vote).remote_peer(recipient),
-            "{}", vote
-        );
+        info!(self.new_log(LogEvent::Vote), "{}", vote);
 
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote, self.block_store.sync_info());
-        self.network.send_vote(vote_msg, vec![recipient]).await;
+        self.network.broadcast_vote(vote_msg).await;
         Ok(())
     }
 
@@ -904,8 +895,6 @@ impl RoundManager {
     /// 1) fetch missing dependencies if required, and then
     /// 2) call process_certificates(), which will start a new round in return.
     async fn process_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
-        let round = vote.vote_data().proposed().round();
-
         info!(
             self.new_log(LogEvent::ReceiveVote)
                 .remote_peer(vote.author()),
@@ -917,17 +906,6 @@ impl RoundManager {
             is_timeout = vote.is_timeout(),
         );
 
-        if !vote.is_timeout() {
-            // Unlike timeout votes regular votes are sent to the leaders of the next round only.
-            let next_round = round + 1;
-            ensure!(
-                self.proposer_election
-                    .is_valid_proposer(self.proposal_generator.author(), next_round),
-                "[RoundManager] Received {}, but I am not a valid proposer for round {}, ignore.",
-                vote,
-                next_round
-            );
-        }
         let block_id = vote.vote_data().proposed().id();
         // Check if the block already had a QC
         if self
