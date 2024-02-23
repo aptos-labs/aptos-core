@@ -2136,6 +2136,7 @@ dependencies = [
  "anyhow",
  "aptos-indexer-grpc-data-access",
  "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-stream-server",
  "aptos-indexer-grpc-utils",
  "aptos-logger",
  "aptos-metrics-core",
@@ -2147,7 +2148,6 @@ dependencies = [
  "clap 4.4.14",
  "cloud-storage",
  "futures",
- "hyper",
  "once_cell",
  "prost 0.12.3",
  "redis",
@@ -2309,6 +2309,16 @@ dependencies = [
  "tracing",
  "tracing-subscriber 0.3.18",
  "warp",
+]
+
+[[package]]
+name = "aptos-indexer-grpc-stream-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hyper",
+ "tonic 0.10.2",
+ "tonic-reflection",
 ]
 
 [[package]]

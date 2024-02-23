@@ -1,7 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{service::RawDataServerWrapper, utils::GrpcServerBuilder};
+use crate::service::RawDataServerWrapper;
+use aptos_indexer_grpc_server_framework::GrpcServerBuilder;
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
 use aptos_indexer_grpc_utils::{
