@@ -160,7 +160,7 @@ Aptos contains harnesses for fuzzing crash-prone code like deserializers, using 
 
 ## Appendix
 
-#### References
+## References
 
 - ANSSI's Secure Rust Guidelines: https://anssi-fr.github.io/rust-guide/
 
