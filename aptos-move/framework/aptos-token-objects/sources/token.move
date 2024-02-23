@@ -78,8 +78,8 @@ module aptos_token_objects::token {
     #[deprecated]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct ConcurrentTokenIdentifiers has key {
-        _1: AggregatorSnapshot<u64>,
-        _2: AggregatorSnapshot<String>,
+        index: AggregatorSnapshot<u64>,
+        name: AggregatorSnapshot<String>,
     }
 
     /// This enables burning an NFT, if possible, it will also delete the object. Note, the data

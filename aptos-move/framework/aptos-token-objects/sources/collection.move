@@ -143,18 +143,18 @@ module aptos_token_objects::collection {
     #[deprecated]
     #[event]
     struct ConcurrentBurnEvent has drop, store {
-        _1: address,
-        _2: u64,
-        _3: address,
+        collection_addr: address,
+        index: u64,
+        token: address,
     }
 
     // DEPRECATED, NEVER USED
     #[deprecated]
     #[event]
     struct ConcurrentMintEvent has drop, store {
-        _1: address,
-        _2: AggregatorSnapshot<u64>,
-        _3: address,
+        collection_addr: address,
+        index: AggregatorSnapshot<u64>,
+        token: address,
     }
 
     /// Creates a fixed-sized collection, or a collection that supports a fixed amount of tokens.

@@ -491,19 +491,19 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 <dl>
 <dt>
-<code>_1: <b>address</b></code>
+<code>collection_addr: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>_2: u64</code>
+<code>index: u64</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>_3: <b>address</b></code>
+<code><a href="token.md#0x4_token">token</a>: <b>address</b></code>
 </dt>
 <dd>
 
@@ -532,19 +532,19 @@ If max_value is not set to U64_MAX, this ensures that a limited number of tokens
 
 <dl>
 <dt>
-<code>_1: <b>address</b></code>
+<code>collection_addr: <b>address</b></code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>_2: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;</code>
+<code>index: <a href="../../aptos-framework/doc/aggregator_v2.md#0x1_aggregator_v2_AggregatorSnapshot">aggregator_v2::AggregatorSnapshot</a>&lt;u64&gt;</code>
 </dt>
 <dd>
 
 </dd>
 <dt>
-<code>_3: <b>address</b></code>
+<code><a href="token.md#0x4_token">token</a>: <b>address</b></code>
 </dt>
 <dd>
 
@@ -1022,6 +1022,8 @@ increment_concurrent_supply cannot be used until AGGREGATOR_API_V2 is enabled.
             },
         );
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(supply.total_minted)
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="collection.md#0x4_collection_ConcurrentSupply">ConcurrentSupply</a>&gt;(collection_addr)) {
+        <b>abort</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="collection.md#0x4_collection_ECONCURRENT_NOT_ENABLED">ECONCURRENT_NOT_ENABLED</a>)
     } <b>else</b> {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }
