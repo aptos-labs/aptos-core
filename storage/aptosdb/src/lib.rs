@@ -34,7 +34,7 @@ mod ledger_db;
 mod lru_node_cache;
 mod pruner;
 mod state_kv_db;
-mod state_merkle_db;
+pub mod state_merkle_db;
 mod state_store;
 mod transaction_store;
 mod versioned_node_cache;

@@ -73,7 +73,7 @@
 pub mod ancestors;
 mod dropper;
 mod metrics;
-mod node;
+pub mod node;
 #[cfg(test)]
 mod sparse_merkle_test;
 #[cfg(any(test, feature = "bench", feature = "fuzzing"))]
@@ -96,7 +96,7 @@ use aptos_infallible::Mutex;
 use aptos_metrics_core::IntGaugeHelper;
 use aptos_types::{
     nibble::{nibble_path::NibblePath, Nibble},
-    proof::SparseMerkleProofExt,
+    proof::{definition::NodeInProof, SparseMerkleLeafNode, SparseMerkleProofExt},
     state_store::state_storage_usage::StateStorageUsage,
 };
 use std::{
@@ -259,7 +259,7 @@ where
         self.inner.root().hash()
     }
 
-    fn generation(&self) -> u64 {
+    pub fn generation(&self) -> u64 {
         self.inner.generation
     }
 
@@ -421,8 +421,73 @@ where
             .map(FrozenSparseMerkleTree::unfreeze)
     }
 
+    pub fn batch_update_with_merge(
+        &self,
+        updates: Vec<(HashValue, Option<&V>)>,
+        proof_reader: &impl ProofRead,
+    ) -> Result<Self, UpdateError> {
+        self.clone()
+            .freeze(self)
+            .batch_update_with_merge(updates, StateStorageUsage::Untracked, proof_reader)
+            .map(FrozenSparseMerkleTree::unfreeze)
+    }
+
     pub fn get(&self, key: HashValue) -> StateStoreStatus<V> {
         self.clone().freeze(self).get(key)
+    }
+
+    // remove the leaf node matching leaf_key and keep rolling back if there is only one child
+    // return the proof of the removed leaf node
+    pub fn remove_leaf_node(
+        &self,
+        leaf_key: HashValue,
+    ) -> Result<SparseMerkleProofExt, UpdateError> {
+        let mut node = self.root_weak();
+        let mut siblings = vec![];
+        let mut to_drop_ancestors = vec![];
+        for depth in 0..HashValue::LENGTH_IN_BITS {
+            match node {
+                SubTree::Empty => return Err(UpdateError::MissingProof),
+                SubTree::NonEmpty { hash: _, root } => {
+                    let root_arc = root.get_if_in_mem().ok_or(UpdateError::MissingProof)?;
+                    match root_arc.inner() {
+                        NodeInner::Internal(internal_node) => {
+                            let right = leaf_key.bit(depth);
+                            node = if right {
+                                // add left sibling to proof, if sibling is already evicted
+                                // if evict the same key twice, the proof here will be incorrect
+                                siblings.push(NodeInProof::Other(internal_node.left.hash()));
+                                internal_node.right.weak()
+                            } else {
+                                siblings.push(NodeInProof::Other(internal_node.left.hash()));
+                                internal_node.left.weak()
+                            };
+                            to_drop_ancestors.push(node.weak());
+                        },
+                        NodeInner::Leaf(leaf_node) => {
+                            if leaf_node.key == leaf_key {
+                                // drop starting from the immediate ancestor of the leaf node
+                                drop(
+                                    to_drop_ancestors
+                                        .pop()
+                                        .expect("to_drop_ancestors is not empty"),
+                                );
+                                return Ok(SparseMerkleProofExt::new(
+                                    Some(SparseMerkleLeafNode::new(
+                                        leaf_node.key,
+                                        leaf_node.value.hash,
+                                    )),
+                                    siblings,
+                                ));
+                            } else {
+                                return Err(UpdateError::MissingProof);
+                            }
+                        },
+                    }
+                },
+            }
+        }
+        Err(UpdateError::MissingProof)
     }
 }
 
@@ -517,6 +582,35 @@ where
         } else {
             let current_root = self.smt.root_weak();
             let root = SubTreeUpdater::update(
+                current_root,
+                &kvs[..],
+                proof_reader,
+                self.smt.inner.generation + 1,
+            )?;
+            Ok(self.spawn(root, usage))
+        }
+    }
+
+    pub fn batch_update_with_merge(
+        &self,
+        updates: Vec<(HashValue, Option<&V>)>,
+        usage: StateStorageUsage,
+        proof_reader: &impl ProofRead,
+    ) -> Result<Self, UpdateError> {
+        let kvs = updates
+            .into_iter()
+            .collect::<BTreeMap<_, _>>()
+            .into_iter()
+            .collect::<Vec<_>>();
+
+        if kvs.is_empty() {
+            if !usage.is_untracked() {
+                assert_eq!(self.smt.inner.usage, usage);
+            }
+            Ok(self.clone())
+        } else {
+            let current_root = self.smt.root_weak();
+            let root = SubTreeUpdater::inplace_update(
                 current_root,
                 &kvs[..],
                 proof_reader,

@@ -65,7 +65,7 @@ pub struct StateMerkleDb {
 }
 
 impl StateMerkleDb {
-    pub(crate) fn new(
+    pub fn new(
         db_paths: &StorageDirPaths,
         rocksdb_configs: RocksdbConfigs,
         readonly: bool,
@@ -111,7 +111,7 @@ impl StateMerkleDb {
         )
     }
 
-    pub(crate) fn commit(
+    pub fn commit(
         &self,
         version: Version,
         top_levels_batch: SchemaBatch,
@@ -514,7 +514,7 @@ impl StateMerkleDb {
         Ok((root_hash, batch))
     }
 
-    pub(crate) fn get_shard_persisted_versions(
+    pub fn get_shard_persisted_versions(
         &self,
         root_persisted_version: Option<Version>,
     ) -> Result<[Option<Version>; NUM_STATE_SHARDS]> {

@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+anyhow = {workspace = true}
 aptos-crypto = { workspace = true }
 aptos-drop-helper = { workspace = true }
 aptos-experimental-runtimes = { workspace = true }

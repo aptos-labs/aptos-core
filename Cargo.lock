@@ -1048,7 +1048,7 @@ dependencies = [
  "futures",
  "itertools 0.12.1",
  "maplit",
- "mockall",
+ "mockall 0.11.4",
  "ordered-float 3.9.2",
  "rand 0.8.5",
  "serde",
@@ -1477,6 +1477,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-active-state-set"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-db",
+ "aptos-experimental-runtimes",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-profiler",
+ "aptos-schemadb",
+ "aptos-scratchpad",
+ "aptos-storage-interface",
+ "aptos-types",
+ "bcs 0.1.4",
+ "bytes",
+ "dashmap",
+ "fail 0.5.1",
+ "jemallocator",
+ "mockall 0.10.2",
+ "once_cell",
+ "rand 0.7.3",
+ "rayon",
+ "serde",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-experimental-layered-map"
 version = "0.1.0"
 dependencies = [
@@ -1787,7 +1820,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.4.14",
- "float-cmp",
+ "float-cmp 0.9.0",
  "move-binary-format",
  "move-core-types",
  "move-ir-compiler",
@@ -3070,7 +3103,7 @@ dependencies = [
  "claims",
  "futures",
  "maplit",
- "mockall",
+ "mockall 0.11.4",
  "once_cell",
  "rand 0.7.3",
  "serde",
@@ -3374,6 +3407,7 @@ dependencies = [
 name = "aptos-scratchpad"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-crypto",
  "aptos-drop-helper",
  "aptos-experimental-runtimes",
@@ -3538,7 +3572,7 @@ dependencies = [
  "bcs 0.1.4",
  "claims",
  "futures",
- "mockall",
+ "mockall 0.11.4",
  "move-core-types",
  "ntest",
  "once_cell",
@@ -3628,7 +3662,7 @@ dependencies = [
  "futures",
  "maplit",
  "mini-moka",
- "mockall",
+ "mockall 0.11.4",
  "once_cell",
  "rand 0.7.3",
  "serde",
@@ -6953,6 +6987,12 @@ checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 
 [[package]]
 name = "downcast"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
+
+[[package]]
+name = "downcast"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1435fa1053d8b2fbbe9be7e97eca7f33d37b28409959813daefc1446a14247f1"
@@ -7750,6 +7790,15 @@ dependencies = [
 
 [[package]]
 name = "float-cmp"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1267f4ac4f343772758f7b1bdcbe767c218bbab93bb432acbf5162bbf85a6c4"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "float-cmp"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
@@ -7821,6 +7870,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "fragile"
+version = "1.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7464c5c4a3f014d9b2ec4073650e5c06596f385060af740fc45ad5a19f959e8"
+dependencies = [
+ "fragile 2.0.0",
 ]
 
 [[package]]
@@ -10130,17 +10188,44 @@ checksum = "c9be0862c1b3f26a88803c4a49de6889c10e608b3ee9344e6ef5b45fb37ad3d1"
 
 [[package]]
 name = "mockall"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ab571328afa78ae322493cacca3efac6a0f2e0a67305b4df31fd439ef129ac0"
+dependencies = [
+ "cfg-if",
+ "downcast 0.10.0",
+ "fragile 1.2.2",
+ "lazy_static",
+ "mockall_derive 0.10.2",
+ "predicates 1.0.8",
+ "predicates-tree",
+]
+
+[[package]]
+name = "mockall"
 version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c84490118f2ee2d74570d114f3d0493cbf02790df303d2707606c3e14e07c96"
 dependencies = [
  "cfg-if",
- "downcast",
- "fragile",
+ "downcast 0.11.0",
+ "fragile 2.0.0",
  "lazy_static",
- "mockall_derive",
- "predicates",
+ "mockall_derive 0.11.4",
+ "predicates 2.1.5",
  "predicates-tree",
+]
+
+[[package]]
+name = "mockall_derive"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7e25b214433f669161f414959594216d8e6ba83b6679d3db96899c0b4639033"
+dependencies = [
+ "cfg-if",
+ "proc-macro2 1.0.76",
+ "quote 1.0.35",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -11836,7 +11921,7 @@ dependencies = [
  "async-trait",
  "coset",
  "log",
- "mockall",
+ "mockall 0.11.4",
  "p256",
  "passkey-types",
  "rand 0.8.5",
@@ -12512,12 +12597,25 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "predicates"
+version = "1.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f49cfaf7fdaa3bfacc6fa3e7054e65148878354a5cfddcf661df4c851f8021df"
+dependencies = [
+ "difference",
+ "float-cmp 0.8.0",
+ "normalize-line-endings",
+ "predicates-core",
+ "regex",
+]
+
+[[package]]
+name = "predicates"
 version = "2.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59230a63c37f3e18569bdb90e4a89cbf5bf8b06fea0b84e65ea10cc4df47addd"
 dependencies = [
  "difflib",
- "float-cmp",
+ "float-cmp 0.9.0",
  "itertools 0.10.5",
  "normalize-line-endings",
  "predicates-core",

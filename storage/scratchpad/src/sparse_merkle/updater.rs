@@ -95,6 +95,29 @@ impl<V: Clone + CryptoHash + Send + Sync + 'static> InMemSubTreeInfo<V> {
             _ => InMemSubTreeInfo::create_internal(left, right, generation),
         }
     }
+
+    // create a new InmemSubTreeInfo as wrapper for inplace-updated subtree
+    fn inplace_combine(left: Self, right: Self, generation: u64, parent: &mut Self) -> Self {
+        match (&left, &right) {
+            (Self::Empty, Self::Empty) => Self::Empty,
+            (Self::Leaf { .. }, Self::Empty) => left,
+            (Self::Empty, Self::Leaf { .. }) => right,
+            _ => match parent {
+                Self::Internal {
+                    node: _,
+                    ref mut subtree,
+                } => {
+                    let left_sub = left.into_subtree();
+                    let right_sub = right.into_subtree();
+                    subtree
+                        .update_internal_node(left_sub, right_sub, generation)
+                        .unwrap();
+                    parent.clone()
+                },
+                _ => InMemSubTreeInfo::create_internal(left, right, generation),
+            },
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -294,10 +317,26 @@ impl<'a, V: Send + Sync + 'static + Clone + CryptoHash> SubTreeUpdater<'a, V> {
             updates,
             generation,
         };
-        Ok(updater.run(proof_reader)?.into_subtree())
+        Ok(updater.run(proof_reader, false)?.into_subtree())
     }
 
-    fn run(self, proof_reader: &impl ProofRead) -> Result<InMemSubTreeInfo<V>> {
+    // we resue exisiting internal and leaf nodes for updates
+    pub(crate) fn inplace_update(
+        root: InMemSubTree<V>,
+        updates: &'a [(HashValue, Option<&'a V>)],
+        proof_reader: &'a impl ProofRead,
+        generation: u64,
+    ) -> Result<InMemSubTree<V>> {
+        let updater = Self {
+            depth: 0,
+            info: SubTreeInfo::from_in_mem(&root, generation),
+            updates,
+            generation,
+        };
+        Ok(updater.run(proof_reader, true)?.into_subtree())
+    }
+
+    fn run(self, proof_reader: &impl ProofRead, inplace: bool) -> Result<InMemSubTreeInfo<V>> {
         // Limit total tasks that are potentially sent to other threads.
         const MAX_PARALLELIZABLE_DEPTH: usize = 8;
         // No point to introduce Rayon overhead if work is small.
@@ -305,6 +344,7 @@ impl<'a, V: Send + Sync + 'static + Clone + CryptoHash> SubTreeUpdater<'a, V> {
 
         let generation = self.generation;
         let depth = self.depth;
+        let mut parent = self.info.clone().materialize(generation);
         match self.maybe_end_recursion()? {
             MaybeEndRecursion::End(ended) => Ok(ended),
             MaybeEndRecursion::Continue(myself) => {
@@ -313,14 +353,27 @@ impl<'a, V: Send + Sync + 'static + Clone + CryptoHash> SubTreeUpdater<'a, V> {
                     && left.updates.len() >= MIN_PARALLELIZABLE_SIZE
                     && right.updates.len() >= MIN_PARALLELIZABLE_SIZE
                 {
-                    THREAD_MANAGER
-                        .get_exe_cpu_pool()
-                        .join(|| left.run(proof_reader), || right.run(proof_reader))
+                    THREAD_MANAGER.get_exe_cpu_pool().join(
+                        || left.run(proof_reader, inplace),
+                        || right.run(proof_reader, inplace),
+                    )
                 } else {
-                    (left.run(proof_reader), right.run(proof_reader))
+                    (
+                        left.run(proof_reader, inplace),
+                        right.run(proof_reader, inplace),
+                    )
                 };
-
-                Ok(InMemSubTreeInfo::combine(left_ret?, right_ret?, generation))
+                // TODO(bowu): we should update self.info here instead of creating new internal nodes
+                if !inplace {
+                    Ok(InMemSubTreeInfo::combine(left_ret?, right_ret?, generation))
+                } else {
+                    Ok(InMemSubTreeInfo::inplace_combine(
+                        left_ret?,
+                        right_ret?,
+                        generation,
+                        &mut parent,
+                    ))
+                }
             },
         }
     }
