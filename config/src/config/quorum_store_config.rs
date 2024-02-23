@@ -88,7 +88,7 @@ impl Default for QuorumStoreConfig {
             sender_max_total_txns: 4000,
             sender_max_total_bytes: 8 * 1024 * 1024,
             receiver_max_batch_txns: 1000,
-            receiver_max_batch_bytes: 8 * 1024 * 1024,
+            receiver_max_batch_bytes: 5 * 1024 * 1024,
             receiver_max_num_batches: 200,
             receiver_max_total_txns: 8000,
             receiver_max_total_bytes: 16 * 1024 * 1024,
