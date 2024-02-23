@@ -111,7 +111,11 @@ pub fn run_spec_test(
             .unwrap_or(elem.original_file_path());
         let outdir_prove = outdir.join("prove");
 
-        spec_report.increment_mutants_tested(original_file, elem.get_module_name());
+        let mut qname = elem.get_module_name().to_owned();
+        qname.push_str("::");
+        qname.push_str(elem.get_function_name());
+
+        spec_report.increment_mutants_tested(original_file, qname.as_str());
 
         let _ = fs::remove_dir_all(&outdir_prove);
         move_mutator::compiler::copy_dir_all(&package_path, &outdir_prove)?;
@@ -136,12 +140,12 @@ pub fn run_spec_test(
 
         if let Err(e) = result {
             trace!("Mutant killed! Prover failed with error: {e}");
-            spec_report.increment_mutants_killed(original_file, elem.get_module_name());
+            spec_report.increment_mutants_killed(original_file, qname.as_str());
         } else {
             trace!("Mutant hasn't been killed!");
             spec_report.add_mutants_alive_diff(
                 original_file,
-                elem.get_module_name(),
+                qname.as_str(),
                 elem.get_diff(),
             );
         }

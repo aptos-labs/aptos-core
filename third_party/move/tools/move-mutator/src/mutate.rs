@@ -184,7 +184,7 @@ fn traverse_function(
     files: &FilesSourceText,
 ) -> anyhow::Result<Vec<Mutant>> {
     let function_name = extract_function_name(&function);
-    let (_, function) = function;
+    let (fname, function) = function;
     let (filename, _) = files.get(&function.body.loc.file_hash()).unwrap(); // File must exist inside the hashmap so it's safe to unwrap.
 
     // Check if function is included in individual configuration.
@@ -198,10 +198,17 @@ fn traverse_function(
     }
 
     trace!("Traversing function {}", &function_name);
-    match function.body.value {
+    let mut result = match function.body.value {
         FunctionBody_::Defined(elem) => traverse_sequence(elem),
         FunctionBody_::Native => Ok(vec![]),
+    };
+
+    if let Ok(result) = &mut result {
+        // Set the function name for all the mutants.
+        result.iter_mut().for_each(|m| m.set_function_name(fname));
     }
+
+    result
 }
 
 /// Traverses a sequence and returns a list of mutants.
@@ -256,11 +263,10 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             mutants.extend(parse_expression_and_find_mutants(*right.clone())?);
 
             // Add the mutation operator to the list of mutants.
-            mutants.push(Mutant::new(MutationOp::BinaryOp(Binary::new(binop)), None));
-            mutants.push(Mutant::new(
-                MutationOp::BinarySwap(BinarySwap::new(binop, *left, *right)),
-                None,
-            ));
+            mutants.push(Mutant::new(MutationOp::BinaryOp(Binary::new(binop))));
+            mutants.push(Mutant::new(MutationOp::BinarySwap(BinarySwap::new(
+                binop, *left, *right,
+            ))));
 
             trace!("Found possible mutation in BinaryExp {binop:?}");
 
@@ -271,7 +277,7 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             let mut mutants = parse_expression_and_find_mutants(*exp)?;
 
             // Add the mutation operator to the list of mutants.
-            mutants.push(Mutant::new(MutationOp::UnaryOp(Unary::new(unop)), None));
+            mutants.push(Mutant::new(MutationOp::UnaryOp(Unary::new(unop))));
 
             trace!("Found possible mutation in UnaryExp {unop:?}");
 
@@ -307,23 +313,21 @@ fn parse_expression_and_find_mutants(exp: Exp) -> anyhow::Result<Vec<Mutant>> {
             let mut mutants = parse_expression_and_find_mutants(*exp1)?;
             mutants.extend(parse_expression_and_find_mutants(*exp2)?);
             mutants.extend(parse_expression_and_find_mutants(*exp3)?);
-            mutants.push(Mutant::new(MutationOp::IfElse(IfElse::new(exp)), None));
+            mutants.push(Mutant::new(MutationOp::IfElse(IfElse::new(exp))));
             Ok(mutants)
         },
         ast::UnannotatedExp_::Break | ast::UnannotatedExp_::Continue => Ok(vec![Mutant::new(
             MutationOp::BreakContinue(BreakContinue::new(exp)),
-            None,
         )]),
         ast::UnannotatedExp_::Value(val) => {
-            let mutants = vec![Mutant::new(MutationOp::Literal(Literal::new(val)), None)];
+            let mutants = vec![Mutant::new(MutationOp::Literal(Literal::new(val)))];
             Ok(mutants)
         },
         ast::UnannotatedExp_::Builtin(_, expr) => {
             let mut mutants = parse_expression_and_find_mutants(*expr)?;
-            mutants.push(Mutant::new(
-                MutationOp::DeleteStmt(DeleteStmt::new(exp.clone())),
-                None,
-            ));
+            mutants.push(Mutant::new(MutationOp::DeleteStmt(DeleteStmt::new(
+                exp.clone(),
+            ))));
             Ok(mutants)
         },
         ast::UnannotatedExp_::Abort(exp)
