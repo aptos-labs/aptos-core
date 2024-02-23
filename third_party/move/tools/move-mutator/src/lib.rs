@@ -91,8 +91,9 @@ pub fn run_move_mutator(
             //TODO: currently we are downsampling the mutants after they are generated. This is not
             // ideal as we are generating all mutants and then removing some of them.
             if let Some(percentage) = mutator_configuration.project.downsampling_ratio_percentage {
-                let to_keep =
-                    mutated_sources.len().saturating_sub((mutated_sources.len() * percentage).div_ceil(100));
+                let to_keep = mutated_sources
+                    .len()
+                    .saturating_sub((mutated_sources.len() * percentage).div_ceil(100));
                 assert!(
                     to_keep <= mutated_sources.len(),
                     "Invalid downsampling ratio"
@@ -148,6 +149,10 @@ pub fn run_move_mutator(
                     mutant_path.as_path(),
                     path,
                     mod_name.as_str(),
+                    mutant
+                        .get_function_name()
+                        .map_or_else(|| "".to_string(), |f| f.to_string())
+                        .as_str(),
                     &mutated.mutated_source,
                     &source,
                 );
