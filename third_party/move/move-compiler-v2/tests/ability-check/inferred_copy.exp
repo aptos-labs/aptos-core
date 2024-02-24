@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot move local `r` since it is still used
+error: cannot move local `r` since it is still in use
    ┌─ tests/ability-check/inferred_copy.move:33:17
    │
 33 │         let y = move r;

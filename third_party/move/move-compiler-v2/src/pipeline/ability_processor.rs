@@ -330,7 +330,7 @@ impl<'a> Transformer<'a> {
     fn check_implicit_copy(&self, code_offset: CodeOffset, id: AttrId, src: TempIndex) {
         self.check_copy(id, src, || {
             (
-                "copy needed here because value is still used".to_string(),
+                "copy needed here because value is still in use".to_string(),
                 self.make_hints_from_usage(code_offset, src),
             )
         });
@@ -388,7 +388,7 @@ impl<'a> Transformer<'a> {
             self.error_with_hints(
                 target.get_bytecode_loc(id),
                 format!(
-                    "cannot move {} since it is still used",
+                    "cannot move {} since it is still in use",
                     target.get_local_name_for_error_message(temp)
                 ),
                 "attempted to move here",

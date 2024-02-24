@@ -60,7 +60,7 @@ error: local `x` of type `ability::Impotent` does not have the `copy` ability
 27 │         (x, x);
    │          ^  - used here
    │          │
-   │          copy needed here because value is still used
+   │          copy needed here because value is still in use
 
 error: value of type `ability::Impotent` does not have the `drop` ability
    ┌─ tests/ability-check/ability_violation.move:27:4

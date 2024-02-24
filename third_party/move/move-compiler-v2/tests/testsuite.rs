@@ -212,7 +212,7 @@ impl TestConfig {
                 dump_annotated_targets: false,
                 dump_for_only_some_stages: None,
             }
-        } else if path.contains("/ability-instrument/") {
+        } else if path.contains("/ability-transform/") {
             // Difference to above is that we dump targets
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
