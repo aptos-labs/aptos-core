@@ -6,7 +6,7 @@ error: cannot use `bool` with an operator which expects a value of type `integer
 8 │         false >= true;
   │         ^^^^^
 
-error: cannot use `bool` with an operator which expects a value of type `integer & integer`
+error: cannot use `bool` with an operator which expects a value of type `integer`
   ┌─ tests/checking/typing/binary_geq_invalid.move:9:14
   │
 9 │         1 >= false;
@@ -48,7 +48,7 @@ error: cannot use `bool` with an operator which expects a value of type `integer
 15 │         0 >= 1 >= 2;
    │         ^^^^^^
 
-error: cannot use `bool` with an operator which expects a value of type `integer & integer`
+error: cannot use `bool` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_geq_invalid.move:16:15
    │
 16 │         (1 >= false) && (@0x0 >= 0);
@@ -66,7 +66,7 @@ error: cannot use `()` with an operator which expects a value of type `integer`
 17 │         () >= ();
    │         ^^
 
-error: cannot use `()` with an operator which expects a value of type `integer & integer`
+error: cannot use `()` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_geq_invalid.move:18:14
    │
 18 │         1 >= ();

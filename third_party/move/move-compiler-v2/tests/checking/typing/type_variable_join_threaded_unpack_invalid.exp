@@ -5,3 +5,11 @@ error: cannot return `integer` from a function with result type `bool`
    │
 34 │         f1
    │         ^^
+
+error: type `R` is missing required ability `drop`
+   ┌─ tests/checking/typing/type_variable_join_threaded_unpack_invalid.move:40:47
+   │
+40 │         Container::put(&mut v, Box { f1: R{}, f2 });
+   │                                               ^^
+   │
+   = required by declaration of local `f2`

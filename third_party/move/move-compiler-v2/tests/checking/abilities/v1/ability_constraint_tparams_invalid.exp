@@ -1,0 +1,227 @@
+
+Diagnostics:
+error: type `TnoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:21:9
+   │
+ 7 │     fun c<T: copy>() {}
+   │           - declaration of type parameter `T`
+   ·
+21 │         c<TnoC>();
+   │         ^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `c`
+
+error: type `Cup<TnoK>` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:22:9
+   │
+ 7 │     fun c<T: copy>() {}
+   │           - declaration of type parameter `T`
+   ·
+22 │         c<Cup<TnoK>>();
+   │         ^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `c`
+
+error: type `TnoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:23:9
+   │
+ 7 │     fun c<T: copy>() {}
+   │           - declaration of type parameter `T`
+   ·
+23 │         c<Box<TnoC>>();
+   │         ^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T` of function `c`
+
+error: type `TnoK` is missing required ability `key`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:24:9
+   │
+ 8 │     fun k<T: key>() {}
+   │           - declaration of type parameter `T`
+   ·
+24 │         k<TnoK>();
+   │         ^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `k`
+
+error: type `Cup<TnoC>` is missing required ability `key`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:25:9
+   │
+ 8 │     fun k<T: key>() {}
+   │           - declaration of type parameter `T`
+   ·
+25 │         k<Cup<TnoC>>();
+   │         ^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `k`
+
+error: type `Cup<TnoC>` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:26:9
+   │
+ 8 │     fun k<T: key>() {}
+   │           - declaration of type parameter `T`
+   ·
+26 │         k<Box<Cup<TnoC>>>();
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T` of function `k`
+
+error: type `TnoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:27:9
+   │
+ 9 │     fun cds<T: copy + drop + store>() {}
+   │             - declaration of type parameter `T`
+   ·
+27 │         cds<TnoC>();
+   │         ^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `cds`
+
+error: type `Cup<TnoC>` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:28:9
+   │
+ 9 │     fun cds<T: copy + drop + store>() {}
+   │             - declaration of type parameter `T`
+   ·
+28 │         cds<Cup<TnoC>>();
+   │         ^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `cds`
+
+error: type `Cup<TnoK>` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:29:9
+   │
+ 9 │     fun cds<T: copy + drop + store>() {}
+   │             - declaration of type parameter `T`
+   ·
+29 │         cds<Cup<TnoK>>();
+   │         ^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `cds`
+
+error: type `TnoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:30:9
+   │
+ 9 │     fun cds<T: copy + drop + store>() {}
+   │             - declaration of type parameter `T`
+   ·
+30 │         cds<Pair<u64, TnoC>>();
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `Pair`
+   = required by instantiating type parameter `T` of function `cds`
+
+error: type `TnoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:31:21
+   │
+11 │     struct Sc<phantom T: copy> {}
+   │                       - declaration of type parameter `T`
+   ·
+31 │         let Sc {} = Sc<TnoC> {};
+   │                     ^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Sc`
+
+error: type `Cup<TnoK>` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:32:21
+   │
+11 │     struct Sc<phantom T: copy> {}
+   │                       - declaration of type parameter `T`
+   ·
+32 │         let Sc {} = Sc<Cup<TnoK>> {};
+   │                     ^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Sc`
+
+error: type `TnoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:33:21
+   │
+11 │     struct Sc<phantom T: copy> {}
+   │                       - declaration of type parameter `T`
+   ·
+33 │         let Sc {} = Sc<Box<TnoC>> {};
+   │                     ^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T` of struct `Sc`
+
+error: type `TnoK` is missing required ability `key`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:34:21
+   │
+12 │     struct Sk<phantom T: key> {}
+   │                       - declaration of type parameter `T`
+   ·
+34 │         let Sk {} = Sk<TnoK> {};
+   │                     ^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Sk`
+
+error: type `Cup<TnoC>` is missing required ability `key`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:35:21
+   │
+12 │     struct Sk<phantom T: key> {}
+   │                       - declaration of type parameter `T`
+   ·
+35 │         let Sk {} = Sk<Cup<TnoC>> {};
+   │                     ^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Sk`
+
+error: type `Cup<TnoC>` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:36:21
+   │
+12 │     struct Sk<phantom T: key> {}
+   │                       - declaration of type parameter `T`
+   ·
+36 │         let Sk {} = Sk<Box<Cup<TnoC>>> {};
+   │                     ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `T` of struct `Sk`
+
+error: type `TnoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:37:23
+   │
+13 │     struct Scds<phantom T: copy + drop + store> {}
+   │                         - declaration of type parameter `T`
+   ·
+37 │         let Scds {} = Scds<TnoC> {};
+   │                       ^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Scds`
+
+error: type `Cup<TnoC>` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:38:23
+   │
+13 │     struct Scds<phantom T: copy + drop + store> {}
+   │                         - declaration of type parameter `T`
+   ·
+38 │         let Scds {} = Scds<Cup<TnoC>> {};
+   │                       ^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Scds`
+
+error: type `Cup<TnoK>` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:39:23
+   │
+13 │     struct Scds<phantom T: copy + drop + store> {}
+   │                         - declaration of type parameter `T`
+   ·
+39 │         let Scds {} = Scds<Cup<TnoK>> {};
+   │                       ^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `Scds`
+
+error: type `TnoC` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/ability_constraint_tparams_invalid.move:40:23
+   │
+13 │     struct Scds<phantom T: copy + drop + store> {}
+   │                         - declaration of type parameter `T`
+   ·
+40 │         let Scds {} = Scds<Pair<u64, TnoC>> {};
+   │                       ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `Pair`
+   = required by instantiating type parameter `T` of struct `Scds`

@@ -632,7 +632,7 @@ impl Ability {
         }
     }
 
-    /// Returns an interator that iterates over all abilities.
+    /// Returns an iterator that iterates over all abilities.
     pub fn all() -> impl ExactSizeIterator<Item = Ability> {
         use Ability::*;
 
@@ -667,6 +667,8 @@ impl AbilitySet {
     );
     /// The empty ability set
     pub const EMPTY: Self = Self(0);
+    /// Abilities for `Functions`
+    pub const FUNCTIONS: AbilitySet = Self(Ability::Drop as u8);
     /// Abilities for `Bool`, `U8`, `U64`, `U128`, and `Address`
     pub const PRIMITIVES: AbilitySet =
         Self((Ability::Copy as u8) | (Ability::Drop as u8) | (Ability::Store as u8));
@@ -680,6 +682,14 @@ impl AbilitySet {
 
     pub fn singleton(ability: Ability) -> Self {
         Self(ability as u8)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = Ability> + '_ {
+        Ability::all().filter(|a| self.has_ability(*a))
     }
 
     pub fn has_ability(self, ability: Ability) -> bool {
@@ -812,15 +822,11 @@ impl AbilitySet {
 
 impl fmt::Display for AbilitySet {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let v = Ability::all().filter_map(|a| {
-            if self.has_ability(a) {
-                Some(a.to_string())
-            } else {
-                None
-            }
-        });
         f.write_str(
-            &v.reduce(|l, r| format!("{} & {}", l, r))
+            &self
+                .iter()
+                .map(|a| a.to_string())
+                .reduce(|l, r| format!("{} + {}", l, r))
                 .unwrap_or_default(),
         )
     }

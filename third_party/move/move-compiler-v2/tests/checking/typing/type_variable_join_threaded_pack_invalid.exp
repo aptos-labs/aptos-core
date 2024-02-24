@@ -5,3 +5,19 @@ error: cannot return `Box<integer>` from a function with result type `Box<bool>`
    │
 42 │         b
    │         ^
+
+error: type `Box<R>` is missing required ability `drop`
+   ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:49:32
+   │
+49 │         Container::put(&mut v, Box {f1: R{}, f2: R{}});
+   │                                ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by declaration of local `x`
+
+error: type `Box<R>` is missing required ability `drop`
+   ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:50:9
+   │
+50 │         b
+   │         ^
+   │
+   = required by declaration of local `x`
