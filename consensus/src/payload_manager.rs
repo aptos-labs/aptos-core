@@ -53,6 +53,7 @@ impl PayloadManager {
                 block_timestamp
             );
             if block_timestamp <= pos.expiration() {
+                // TODO: have to make the call to get_batch itself async
                 receivers.push((*pos.digest(), batch_reader.get_batch(pos)));
             } else {
                 debug!("QSE: skipped expired pos {}", pos.digest());
