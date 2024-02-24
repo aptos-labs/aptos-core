@@ -8,8 +8,8 @@ use crate::{
     ast::{ModuleName, QualifiedSymbol},
     builder::pluralize,
     model::{
-        GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId, TypeParameter,
-        TypeParameterKind,
+        FunId, GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId,
+        TypeParameter, TypeParameterKind,
     },
     symbol::Symbol,
 };
@@ -100,7 +100,7 @@ pub enum PrimitiveType {
 }
 
 /// A type substitution.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Substitution {
     /// Assignment of types to variables.
     subs: BTreeMap<u32, Type>,
@@ -119,6 +119,10 @@ pub enum Constraint {
     /// The type variable must be instantiated with a struct which has the given fields with
     /// types.
     SomeStruct(BTreeMap<Symbol, Type>),
+    /// The type variable must be instantiated with a type for which a receiver function with the given
+    /// signature exists: the name, the optional type arguments, the argument types, and the
+    /// result type.
+    SomeReceiverFunction(Symbol, Option<Vec<Type>>, Vec<(Loc, Type)>, Type),
     /// The type variable must be instantiated with a type which has the given ability
     HasAbility(Ability),
     /// The type variable defaults to the given type if no other binding is found. This is
@@ -147,14 +151,17 @@ impl Constraint {
     /// Returns true if the constraint should be propagated over references, such that if we
     /// have `&t`, the constraint should be forwarded to `t`.
     pub fn propagate_over_reference(&self) -> bool {
-        matches!(self, Constraint::SomeStruct(..))
+        matches!(
+            self,
+            Constraint::SomeStruct(..) | Constraint::SomeReceiverFunction(..)
+        )
     }
 
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
     /// Otherwise, returns true if `self` absorbs the `other` constraint (and waives the `other`).
     pub fn join(
         &mut self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         subs: &mut Substitution,
         loc: &Loc,
         other: &Constraint,
@@ -192,6 +199,52 @@ impl Constraint {
                 }
                 Ok(true)
             },
+            (
+                Constraint::SomeReceiverFunction(name1, generics1, args1, result1),
+                Constraint::SomeReceiverFunction(name2, generics2, args2, result2),
+            ) => {
+                if name1 == name2 {
+                    if let (Some(gens1), Some(gens2)) = (generics1, generics2) {
+                        if gens1.len() == gens2.len() {
+                            subs.unify_vec(
+                                context,
+                                Variance::NoVariance,
+                                WideningOrder::Join,
+                                None,
+                                gens1,
+                                gens2,
+                            )?;
+                        }
+                    }
+                    subs.unify_vec(
+                        context,
+                        Variance::NoVariance,
+                        WideningOrder::Join,
+                        None,
+                        &args1.iter().map(|(_, ty)| ty.clone()).collect_vec(),
+                        &args2.iter().map(|(_, ty)| ty.clone()).collect_vec(),
+                    )?;
+                    subs.unify(
+                        context,
+                        Variance::NoVariance,
+                        WideningOrder::Join,
+                        result1,
+                        result2,
+                    )?;
+                    Ok(true)
+                } else {
+                    Err(TypeUnificationError::ConstraintsIncompatible(
+                        loc.clone(),
+                        self.clone(),
+                        other.clone(),
+                    ))
+                }
+            },
+            (Constraint::SomeReceiverFunction(..), _)
+            | (_, Constraint::SomeReceiverFunction(..)) => {
+                // Receiver function constraints accumulate with other constraints
+                Ok(false)
+            },
             (Constraint::HasAbility(_), _) | (_, Constraint::HasAbility(_)) => Ok(false),
             (Constraint::WithDefault(_), _) | (_, Constraint::WithDefault(_)) => Ok(false),
             (_, _) => Err(TypeUnificationError::ConstraintsIncompatible(
@@ -203,6 +256,10 @@ impl Constraint {
     }
 
     pub fn display(&self, display_context: &TypeDisplayContext) -> String {
+        fn fmt_types<'a>(ctx: &TypeDisplayContext, tys: impl Iterator<Item = &'a Type>) -> String {
+            tys.map(|ty| ty.display(ctx)).join(",")
+        }
+        let pool = display_context.env.symbol_pool();
         match self {
             Constraint::SomeNumber(options) => {
                 let all_ints = PrimitiveType::all_int_types()
@@ -225,8 +282,21 @@ impl Constraint {
                     "struct{{{}}}",
                     field_map
                         .keys()
-                        .map(|s| s.display(display_context.env.symbol_pool()).to_string())
+                        .map(|s| s.display(pool).to_string())
                         .join(",")
+                )
+            },
+            Constraint::SomeReceiverFunction(name, inst, args, result) => {
+                format!(
+                    "fun self.{}{}({}):{}",
+                    name.display(pool),
+                    if let Some(inst) = inst {
+                        format!("<{}>", fmt_types(display_context, inst.iter()))
+                    } else {
+                        "".to_owned()
+                    },
+                    fmt_types(display_context, args.iter().map(|(_, ty)| ty)),
+                    result.display(display_context)
                 )
             },
             Constraint::HasAbility(ability) => {
@@ -968,8 +1038,40 @@ pub trait UnificationContext {
     /// Get the field map for a struct, with field types instantiated.
     fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type>;
 
+    /// For a given type, return a receiver style function of the given name, if available.
+    /// If the function is generic it will be instantiated with fresh type variables.
+    fn get_receiver_function(
+        &mut self,
+        _ty: &Type,
+        _name: Symbol,
+    ) -> Option<ReceiverFunctionInstance>;
+
     /// Get the abilities of the type.
-    fn get_type_abilities(&self, ty: &Type) -> AbilitySet;
+    fn type_abilities(&self, ty: &Type) -> AbilitySet;
+}
+
+/// Information returned about an instantiated function
+#[derive(Debug, Clone)]
+pub struct ReceiverFunctionInstance {
+    /// Qualified id
+    pub id: QualifiedId<FunId>,
+    /// Type instantiation of the function
+    pub type_inst: Vec<Type>,
+    /// Types of the arguments, instantiated
+    pub arg_types: Vec<Type>,
+    /// Result type, instantiated
+    pub result_type: Type,
+}
+
+impl ReceiverFunctionInstance {
+    /// Given the actual argument type, determine whether it needs to be borrowed to be passed
+    /// to this function. Returns the reference kind if so.
+    pub fn receiver_needs_borrow(&self, actual_arg_type: &Type) -> Option<ReferenceKind> {
+        match &self.arg_types[0] {
+            Type::Reference(kind, _) if !actual_arg_type.is_reference() => Some(*kind),
+            _ => None,
+        }
+    }
 }
 
 /// A struct representing an empty unification context.
@@ -980,52 +1082,23 @@ impl UnificationContext for NoUnificationContext {
         BTreeMap::new()
     }
 
-    fn get_type_abilities(&self, _ty: &Type) -> AbilitySet {
+    fn get_receiver_function(
+        &mut self,
+        _ty: &Type,
+        _name: Symbol,
+    ) -> Option<ReceiverFunctionInstance> {
+        None
+    }
+
+    fn type_abilities(&self, _ty: &Type) -> AbilitySet {
         AbilitySet::ALL
-    }
-}
-
-/// A struct representing a cached unification context.
-#[derive(Debug)]
-pub struct CachedUnificationContext(
-    pub BTreeMap<QualifiedId<StructId>, (BTreeMap<Symbol, Type>, AbilitySet)>,
-);
-
-impl UnificationContext for CachedUnificationContext {
-    fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
-        self.0
-            .get(&id.to_qualified_id())
-            .map(|(field_map, _)| {
-                field_map
-                    .iter()
-                    .map(|(n, ty)| (*n, ty.instantiate(&id.inst)))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
-    fn get_type_abilities(&self, ty: &Type) -> AbilitySet {
-        // TODO(#12437): this currently does not do ability inference, which should be fixed
-        //   once the new type unification context lands.
-        match ty {
-            Type::Struct(mid, sid, _) => self
-                .0
-                .get(&mid.qualified(*sid))
-                .map(|(_, abilities)| *abilities)
-                .unwrap_or_else(|| AbilitySet::ALL),
-            Type::TypeParameter(_) => AbilitySet::ALL,
-            _ => AbilitySet::PRIMITIVES,
-        }
     }
 }
 
 impl Substitution {
     /// Creates a new substitution.
     pub fn new() -> Self {
-        Self {
-            subs: BTreeMap::new(),
-            constraints: BTreeMap::new(),
-        }
+        Self::default()
     }
 
     /// Add a constraint to the variable. This tries to first join the constraint with existing
@@ -1033,7 +1106,7 @@ impl Substitution {
     /// `SomeNumber({u16})`. A TypeUnificationError is returned if the constraints are incompatible.
     pub fn add_constraint(
         &mut self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         var: u32,
         loc: Loc,
         order: WideningOrder,
@@ -1086,7 +1159,7 @@ impl Substitution {
     /// errors.
     pub fn bind(
         &mut self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         var: u32,
         variance: Variance,
         order: WideningOrder,
@@ -1129,7 +1202,7 @@ impl Substitution {
     /// they can be decided based on the top-level type term.
     pub fn eval_constraint(
         &mut self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         loc: &Loc,
         ty: &Type,
         variance: Variance,
@@ -1186,8 +1259,50 @@ impl Substitution {
                     }
                     Ok(())
                 },
+                (Constraint::SomeReceiverFunction(name, ty_args, args, result), ty) => {
+                    if let Some(receiver) = context.get_receiver_function(ty, *name) {
+                        let mut args = args.clone();
+                        let borrow_kind = receiver.receiver_needs_borrow(&args[0].1);
+                        if let Some(ref_kind) = borrow_kind {
+                            // Wrap a reference around the arg type to reflect it will be automatically borrowed
+                            let (loc, arg_type) = args.remove(0);
+                            args.insert(0, (loc, Type::Reference(ref_kind, Box::new(arg_type))));
+                        }
+                        if let Some(ty_args) = ty_args {
+                            // The call has explicit type parameters (`x.f<T>()`), check them.
+                            self.unify_vec(
+                                context,
+                                variance,
+                                WideningOrder::Join,
+                                None,
+                                ty_args,
+                                &receiver.type_inst,
+                            )?;
+                        }
+                        self.unify_vec(
+                            context,
+                            variance,
+                            WideningOrder::LeftToRight,
+                            // Pass in locations of arguments for better locations of unification errors
+                            Some(&args.iter().map(|(loc, _)| loc.clone()).collect_vec()),
+                            &args.iter().map(|(_, ty)| ty.clone()).collect_vec(),
+                            &receiver.arg_types,
+                        )?;
+                        // Result is contra-variant, hence RightToLeft
+                        self.unify(
+                            context,
+                            variance,
+                            WideningOrder::RightToLeft,
+                            result,
+                            &receiver.result_type,
+                        )?;
+                        Ok(())
+                    } else {
+                        constraint_unsatisfied_error()
+                    }
+                },
                 (Constraint::HasAbility(ability), ty) => {
-                    if context.get_type_abilities(ty).has_ability(*ability) {
+                    if context.type_abilities(ty).has_ability(*ability) {
                         Ok(())
                     } else {
                         constraint_unsatisfied_error()
@@ -1270,7 +1385,7 @@ impl Substitution {
     /// this.
     pub fn unify(
         &mut self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
         t1: &Type,
@@ -1365,7 +1480,7 @@ impl Substitution {
                     // variance type will be effective for the elements of tuples,
                     // which are treated similar as expression lists in function calls, and allow
                     // e.g. reference type conversions.
-                    context, variance, order, ts1, ts2,
+                    context, variance, order, None, ts1, ts2,
                 )?));
             },
             (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
@@ -1387,7 +1502,7 @@ impl Substitution {
                     return Ok(Type::Struct(
                         *m1,
                         *s1,
-                        self.unify_vec(context, variance, order, ts1, ts2)?,
+                        self.unify_vec(context, variance, order, None, ts1, ts2)?,
                     ));
                 }
             },
@@ -1430,7 +1545,7 @@ impl Substitution {
     /// so this may make create more noise than benefit.
     pub fn unify_and_lift_critical_pair(
         &mut self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
         t1: &Type,
@@ -1462,20 +1577,33 @@ impl Substitution {
     }
 
     /// Helper to unify two type vectors.
-    fn unify_vec(
+    pub fn unify_vec(
         &mut self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
+        locs: Option<&[Loc]>,
         ts1: &[Type],
         ts2: &[Type],
     ) -> Result<Vec<Type>, TypeUnificationError> {
-        if ts1.len() != ts2.len() {
-            return Err(TypeUnificationError::ArityMismatch(ts1.len(), ts2.len()));
+        let ts1n = ts1.len();
+        let ts2n = ts2.len();
+        if ts1n != ts2n {
+            let (given, expected) =
+                if matches!(order, WideningOrder::LeftToRight | WideningOrder::Join) {
+                    (ts1n, ts2n)
+                } else {
+                    (ts2n, ts1n)
+                };
+            return Err(TypeUnificationError::ArityMismatch(given, expected));
         }
         let mut rs = vec![];
         for i in 0..ts1.len() {
-            rs.push(self.unify(context, variance, order, &ts1[i], &ts2[i])?);
+            let mut res = self.unify(context, variance, order, &ts1[i], &ts2[i]);
+            if let Some(locs) = locs {
+                res = res.map_err(|e| e.redirect(locs[i].clone()))
+            }
+            rs.push(res?);
         }
         Ok(rs)
     }
@@ -1484,7 +1612,7 @@ impl Substitution {
     /// was performed, None if not.
     fn try_substitute_or_assign(
         &mut self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         variance: Variance,
         order: WideningOrder,
         t1: &Type,
@@ -1536,12 +1664,6 @@ impl Substitution {
                 false
             }
         })
-    }
-}
-
-impl Default for Substitution {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -1690,7 +1812,7 @@ impl TypeUnificationAdapter {
     /// unify the LHS and RHS respectively. If the LHS and RHS cannot unify, None is returned.
     pub fn unify(
         self,
-        context: &impl UnificationContext,
+        context: &mut impl UnificationContext,
         variance: Variance,
         shallow_subst: bool,
     ) -> Option<(BTreeMap<u16, Type>, BTreeMap<u16, Type>)> {
@@ -1699,6 +1821,7 @@ impl TypeUnificationAdapter {
             context,
             variance,
             WideningOrder::LeftToRight,
+            None,
             &self.types_adapted_lhs,
             &self.types_adapted_rhs,
         ) {
@@ -1978,6 +2101,13 @@ impl TypeUnificationError {
                 Constraint::SomeStruct(field_map) => {
                     Self::message_for_struct(unification_context, display_context, field_map, ty)
                 },
+                Constraint::SomeReceiverFunction(name, ..) => {
+                    format!(
+                        "undeclared receiver function `{}` for type `{}`",
+                        name.display(display_context.env.symbol_pool()),
+                        ty.display(display_context)
+                    )
+                },
                 Constraint::HasAbility(ability) => format!(
                     "type `{}` does not have expected ability `{}`",
                     ty.display(display_context),
@@ -2116,7 +2246,7 @@ impl TypeInstantiationDerivation {
                     treat_lhs_type_param_as_var_after_index,
                     treat_rhs_type_param_as_var_after_index,
                 );
-                let rel = adapter.unify(&NoUnificationContext, Variance::SpecVariance, false);
+                let rel = adapter.unify(&mut NoUnificationContext, Variance::SpecVariance, false);
                 if let Some((subst_lhs, subst_rhs)) = rel {
                     let subst = if target_lhs { subst_lhs } else { subst_rhs };
                     for (param_idx, inst_ty) in subst.into_iter() {

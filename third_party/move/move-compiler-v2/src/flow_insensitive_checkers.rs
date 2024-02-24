@@ -11,6 +11,7 @@ use move_model::{
     ast::{ExpData, TempIndex, VisitorPosition},
     model::{GlobalEnv, Loc, NodeId, Parameter},
     symbol::Symbol,
+    well_known,
 };
 use std::{collections::BTreeSet, iter::Iterator};
 
@@ -168,7 +169,12 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
 
     fn check_symbol_usage(&mut self, loc: &Loc, sym: &Symbol, kind: &str) {
         let symbol_pool = self.env.symbol_pool();
-        if !symbol_pool.symbol_starts_with_underscore(*sym) && !self.seen_uses.contains(sym) {
+        let receiver_param_name = symbol_pool.make(well_known::RECEIVER_PARAM_NAME);
+        if !symbol_pool.symbol_starts_with_underscore(*sym)
+            && !self.seen_uses.contains(sym)
+            // The `self` parameter is exempted from the check
+            && (sym != &receiver_param_name || kind != "parameter")
+        {
             let msg = format!(
                 "Unused {} `{}`. Consider removing or prefixing with an underscore: `_{}`",
                 kind,

@@ -1,0 +1,43 @@
+
+Diagnostics:
+error: undeclared receiver function `receiver_wrongly_spelled` for type `S<u64>`
+   ┌─ tests/checking/receiver/call_errors.move:16:9
+   │
+16 │         s.receiver_wrongly_spelled(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected 2 items but found 3
+   ┌─ tests/checking/receiver/call_errors.move:17:9
+   │
+17 │         s.receiver(x, x);
+   │         ^^^^^^^^^^^^^^^^
+
+error: expected 2 items but found 3
+   ┌─ tests/checking/receiver/call_errors.move:18:9
+   │
+18 │         s.receiver_ref_mut(x, x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected 2 items but found 1
+   ┌─ tests/checking/receiver/call_errors.move:19:9
+   │
+19 │         s.receiver();
+   │         ^^^^^^^^^^^^
+
+error: expected `u64` but found a value of type `u8`
+   ┌─ tests/checking/receiver/call_errors.move:20:28
+   │
+20 │         s.receiver_ref_mut(1u8);
+   │                            ^^^
+
+error: expected `u8` but found a value of type `u64`
+   ┌─ tests/checking/receiver/call_errors.move:21:9
+   │
+21 │         s.receiver_ref_mut::<u8>(1);
+   │         ^
+
+error: expected 1 items but found 2
+   ┌─ tests/checking/receiver/call_errors.move:22:9
+   │
+22 │         s.receiver_ref_mut::<u8, u8>(1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
