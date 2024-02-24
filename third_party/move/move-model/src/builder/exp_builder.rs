@@ -22,6 +22,9 @@ use crate::{
         Constraint, ErrorMessageContext, PrimitiveType, ReceiverFunctionInstance, ReferenceKind,
         Substitution, Type, Type::Tuple, TypeDisplayContext, TypeUnificationError,
         UnificationContext, Variance, WideningOrder, BOOL_TYPE,
+        Constraint, ErrorMessageContext, PrimitiveType, ReceiverFunctionInstance, ReferenceKind,
+        Substitution, Type, Type::Tuple, TypeDisplayContext, TypeUnificationError, UnificationContext, Variance,
+        WideningOrder, BOOL_TYPE,
     },
 };
 use codespan_reporting::diagnostic::Severity;
@@ -1708,7 +1711,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     return RewriteResult::Unchanged(e);
                 }
                 let exp_data: ExpData = e.into();
-                if let ExpData::Call(id, Operation::NoOp, args) = exp_data {
+                if let ExpData::Call(id, Operation::NoOp, mut args) = exp_data {
                     if let Some(info) = self.placeholder_map.get(&id) {
                         let loc = self.get_node_loc(id);
                         match info {
@@ -1789,6 +1792,90 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                         &result_type,
                                         &receiver_arg_ty,
                                         inst,
+                                    )
+                                } else {
+                                    // Error reported
+                                    RewriteResult::Rewritten(self.new_error_exp().into_exp())
+                                }
+                            },
+                            ExpPlaceholder::ReceiverCallInfo {
+                                name,
+                                arg_types,
+                                result_type,
+                            } => {
+                                // Clone info to avoid borrowing conflicts
+                                let (name, mut arg_types, result_type) =
+                                    (*name, arg_types.clone(), result_type.clone());
+                                let receiver_arg_ty = self.subs.specialize(
+                                    arg_types
+                                        .first()
+                                        .expect("receiver has at least one argument"),
+                                );
+                                if let Some(inst) =
+                                    self.get_receiver_function(&receiver_arg_ty, name)
+                                {
+                                    let receiver_param_type =
+                                        inst.arg_types.first().expect("argument").clone();
+                                    // Determine whether an automatic borrow needs to be inserted and its kind.
+                                    let borrow_kind_opt =
+                                        inst.receiver_needs_borrow(&receiver_arg_ty);
+                                    if !inst.type_inst.is_empty() {
+                                        // We need to annotate the instantiation of the function at the node.
+                                        // To obtain it, unification needs to be run again.
+                                        // If unification fails, errors will have been already reported, so
+                                        // we can ignore the result.
+                                        let mut subs = self.subs.clone();
+                                        if let Some(ref_kind) = &borrow_kind_opt {
+                                            // Need to wrap reference around argument type
+                                            let ty = &mut arg_types[0];
+                                            *ty = Type::Reference(*ref_kind, Box::new(ty.clone()));
+                                        }
+                                        let _ = subs.unify_vec(
+                                            self,
+                                            self.type_variance(),
+                                            WideningOrder::LeftToRight,
+                                            None,
+                                            &arg_types,
+                                            &inst.arg_types,
+                                        );
+                                        let _ = subs.unify(
+                                            self,
+                                            self.type_variance(),
+                                            WideningOrder::RightToLeft,
+                                            &result_type,
+                                            &inst.result_type,
+                                        );
+                                        // `type.inst` is now unified with the actual types.
+                                        self.env().set_node_instantiation(
+                                            id,
+                                            inst.type_inst
+                                                .iter()
+                                                .map(|t| subs.specialize_with_defaults(t))
+                                                .collect(),
+                                        )
+                                    }
+                                    // Inject borrow operation if required.
+                                    if let Some(ref_kind) = borrow_kind_opt {
+                                        let borrow_id = self
+                                            .new_node_id_with_type_loc(&receiver_param_type, &loc);
+                                        let arg = args.remove(0);
+                                        args.insert(
+                                            0,
+                                            ExpData::Call(
+                                                borrow_id,
+                                                Operation::Borrow(ref_kind),
+                                                vec![arg],
+                                            )
+                                            .into_exp(),
+                                        );
+                                    }
+                                    RewriteResult::RewrittenAndDescend(
+                                        ExpData::Call(
+                                            id,
+                                            Operation::MoveFunction(inst.id.module_id, inst.id.id),
+                                            args,
+                                        )
+                                        .into_exp(),
                                     )
                                 } else {
                                     // Error reported
@@ -3463,6 +3550,24 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if let Err(e) = self.add_constraint(loc, ty, WideningOrder::LeftToRight, c) {
             self.report_unification_error(loc, e, error_context)
         }
+    }
+
+    /// Add a single constraint
+    fn add_constraint(
+        &mut self,
+        loc: &Loc,
+        ty: &Type,
+        order: WideningOrder,
+        c: Constraint,
+    ) -> Result<(), TypeUnificationError> {
+        // We need to pass `self` as an implementer of the UnificationContext trait. Need to move `subs` out
+        // of `self to avoid borrowing conflict.
+        let mut subs = mem::take(&mut self.subs);
+        let ty = subs.specialize(ty);
+        let variance = self.type_variance();
+        let result = subs.eval_constraint(self, loc, &ty, variance, order, c);
+        self.subs = subs;
+        result
     }
 
     /// Add a single constraint
