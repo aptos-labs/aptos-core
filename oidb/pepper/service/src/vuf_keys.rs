@@ -1,10 +1,12 @@
 // Copyright © Aptos Foundation
 
+use aptos_oidb_pepper_common::{
+    vuf::{scheme0::Scheme0, VUF},
+    VUFVerificationKey,
+};
 use ark_ec::CurveGroup;
-use aptos_oidb_pepper_common::{vuf, vuf::VUF, VUFVerificationKey};
-use once_cell::sync::Lazy;
-use aptos_oidb_pepper_common::vuf::scheme0::Scheme0;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use once_cell::sync::Lazy;
 
 pub struct VufScheme0Sk {
     pub sk_bytes: Vec<u8>,

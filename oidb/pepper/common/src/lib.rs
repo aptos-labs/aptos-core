@@ -10,8 +10,6 @@ use serde::{Deserialize, Serialize};
 pub mod asymmetric_encryption;
 pub mod elgamal;
 pub mod jwt;
-
-pub mod nonce_derivation;
 pub mod vuf;
 
 pub fn sha3_256(input: &[u8]) -> Vec<u8> {
@@ -46,12 +44,14 @@ pub enum PepperResponse {
     V1(PepperResponseV1),
 }
 
+/// The response to `PepperRequestV0`, which contains the calculated pepper (hexlified) or a processing error.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PepperResponseV0 {
     Ok { pepper_hexlified: String },
     Error(String),
 }
 
+/// The response to `PepperRequestV1`, which contains the calculated pepper (encrypted then hexlified) or a processing error.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PepperResponseV1 {
     OK { pepper_encrypted_hexlified: String },
@@ -96,7 +96,7 @@ impl EncryptionPubKey {
 /// Its BCS serialization will be VUF input.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PepperInput {
-    V0(PepperInputV0)
+    V0(PepperInputV0),
 }
 
 #[derive(Debug, Deserialize, Serialize)]

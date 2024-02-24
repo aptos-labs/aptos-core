@@ -61,7 +61,12 @@ impl VUF for Scheme0 {
         Ok((output_bytes, vec![]))
     }
 
-    fn verify(pk_g2: &G2Projective, input: &[u8], output: &[u8], proof: &[u8]) -> anyhow::Result<()> {
+    fn verify(
+        pk_g2: &G2Projective,
+        input: &[u8],
+        output: &[u8],
+        proof: &[u8],
+    ) -> anyhow::Result<()> {
         ensure!(
             proof.is_empty(),
             "vuf::scheme0::verify failed with proof deserialization error"
@@ -72,8 +77,11 @@ impl VUF for Scheme0 {
         })?;
         ensure!(
             Fq12::ONE
-                == Bls12_381::multi_pairing([-output_g1, input_g1], [G2Affine::generator(), pk_g2.clone().into_affine()])
-                    .0,
+                == Bls12_381::multi_pairing([-output_g1, input_g1], [
+                    G2Affine::generator(),
+                    (*pk_g2).into_affine()
+                ])
+                .0,
             "vuf::scheme0::verify failed with final check failure"
         );
         Ok(())

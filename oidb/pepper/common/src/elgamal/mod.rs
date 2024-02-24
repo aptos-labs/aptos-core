@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use rand_core::{CryptoRng, RngCore};
 use std::fmt::Debug;
 
@@ -17,8 +19,7 @@ pub trait ElGamalFriendlyGroup {
 }
 
 pub mod curve25519;
-
-// pub mod bls12381g1;
+pub mod bls12381g1;
 
 /// Return a key pair  `(private_key, public_key)` for El Gamal encryption over BLS12-381 G1.
 pub fn key_gen<G: ElGamalFriendlyGroup, R: CryptoRng + RngCore>(

@@ -4,11 +4,20 @@ use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
     Uniform,
 };
-use aptos_oidb_pepper_common::{asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption}, jwt, nonce_derivation, nonce_derivation::NonceDerivationScheme, vuf, vuf::VUF, PepperRequest, PepperResponse, VUFVerificationKey, PepperResponseV0, PepperRequestV0, PepperInput, PepperInputV0};
-use aptos_types::transaction::authenticator::EphemeralPublicKey;
+use aptos_oidb_pepper_common::{
+    asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption},
+    jwt, vuf,
+    vuf::VUF,
+    PepperInput, PepperInputV0, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0,
+    VUFVerificationKey,
+};
+use aptos_types::{
+    oidb::{Configuration, OpenIdSig},
+    transaction::authenticator::EphemeralPublicKey,
+};
+use ark_serialize::CanonicalDeserialize;
 use rand::thread_rng;
 use std::{fs, io::stdin};
-use ark_serialize::CanonicalDeserialize;
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJFVVRhSE9HdDcwRTNxbk9QMUJibnUzbE03QjR5TTdzaHZTb1NvdXF1VVJ3IiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9.CEgO4S7hRgASaINsGST5Ygtl_CY-mUn2GaQ6d7q9q1eGz1MjW0o0yusJQDU6Hi1nDfXlNSvCF2SgD9ayG3uDGC5-18H0AWo2QgyZ2rC_OUa36RCTmhdo-i_H8xmwPxa3yHZZsGC-gJy_vVX-rfMLIh-JgdIFFIzGVPN75MwXLP3bYUaB9Lw52g50rf_006Qg5ubkZ70I13vGUTVbRVWanQIN69naFqHreLCjVsGsEBVBoUtexZw6Ulr8s0VajBpcTUqlMvbvqMfQ33NXaBQYvu3YZivpkus8rcG_eAMrFbYFY9AZF7AaW2HUaYo5QjzMQDsIA1lpnAcOW3GzWvb0vw";
 
@@ -89,7 +98,10 @@ async fn main() {
     } = response;
     assert_eq!("Scheme0", scheme_name.as_str());
     let vuf_pk_bytes = hex::decode(payload_hexlified).unwrap();
-    let vuf_pk : ark_bls12_381::G2Projective = ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk_bytes.as_slice()).unwrap().into();
+    let vuf_pk: ark_bls12_381::G2Projective =
+        ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk_bytes.as_slice())
+            .unwrap()
+            .into();
 
     println!();
     println!(
@@ -114,14 +126,14 @@ async fn main() {
     let epk = EphemeralPublicKey::ed25519(Ed25519PublicKey::from(&esk));
 
     println!();
-    println!("Action 5: compute a nonce as a hash of the EPK, the blinder and the expiry time.");
-    let nonce_pre_image = nonce_derivation::scheme1::PreImage {
-        epk: epk.to_bytes(),
+    println!("Action 5: compute nonce.");
+    let nonce_str = OpenIdSig::reconstruct_oauth_nonce(
+        blinder.as_slice(),
         expiry_time_sec,
-        blinder: blinder.to_vec(),
-    };
-    let nonce = nonce_derivation::scheme1::Scheme::derive_nonce(&nonce_pre_image);
-    let nonce_str = hex::encode(nonce);
+        &epk,
+        &Configuration::new_for_devnet(),
+    )
+    .unwrap();
     println!("nonce_string={}", nonce_str);
     println!();
     println!("Action 6: request a JWT with this nonce. Below are generated example that uses Google OAuth 2.0 Playground:");
@@ -135,7 +147,7 @@ async fn main() {
         Err(_) => jwt_or_path,
     };
 
-    let pepper_request = PepperRequest::V0 (PepperRequestV0 {
+    let pepper_request = PepperRequest::V0(PepperRequestV0 {
         jwt: jwt.clone(),
         overriding_aud: None,
         epk_serialized_hexlified: hex::encode(epk.to_bytes()),

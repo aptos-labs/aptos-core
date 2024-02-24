@@ -2,7 +2,14 @@
 
 use crate::vuf_keys::VUF_SCHEME0_SK;
 use anyhow::{anyhow, bail, ensure};
-use aptos_oidb_pepper_common::{jwt::Claims, nonce_derivation, nonce_derivation::NonceDerivationScheme, vuf, vuf::VUF, PepperRequest, PepperResponse, PepperRequestV0, PepperResponseV0, PepperInput, PepperInputV0};
+use aptos_oidb_pepper_common::{
+    jwt::Claims, vuf, vuf::VUF, PepperInput, PepperInputV0, PepperRequest, PepperRequestV0,
+    PepperResponse, PepperResponseV0,
+};
+use aptos_types::{
+    oidb::{Configuration, OpenIdSig},
+    transaction::authenticator::EphemeralPublicKey,
+};
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
@@ -23,7 +30,7 @@ pub async fn process(request: PepperRequest) -> PepperResponse {
                 Err(e) => PepperResponseV0::Error(e.to_string()),
             };
             PepperResponse::V0(response)
-        }
+        },
     }
 }
 
@@ -37,9 +44,8 @@ fn process_v0(request: PepperRequestV0) -> anyhow::Result<String> {
         uid_key,
     } = request;
 
-    let claims = aptos_oidb_pepper_common::jwt::parse(jwt.as_str()).map_err(|e| {
-        anyhow!("aptos_oidb_pepper_service::process() failed with jwt decoding error: {e}")
-    })?;
+    let claims = aptos_oidb_pepper_common::jwt::parse(jwt.as_str())
+        .map_err(|e| anyhow!("JWT decoding error: {e}"))?;
 
     let actual_uid_key = if let Some(uid_key) = uid_key.as_ref() {
         uid_key
@@ -48,39 +54,40 @@ fn process_v0(request: PepperRequestV0) -> anyhow::Result<String> {
     };
 
     let uid_val = if actual_uid_key == "email" {
-        claims.claims.email.clone().ok_or_else(||anyhow!("aptos_oidb_pepper_service::process() failed with `email` required but not found in jwt"))?
+        claims
+            .claims
+            .email
+            .clone()
+            .ok_or_else(|| anyhow!("`email` required but not found in jwt"))?
     } else if actual_uid_key == "sub" {
         claims.claims.sub.clone()
     } else {
-        bail!(
-            "aptos_oidb_pepper_service::process() failed with unsupported uid key: {}",
-            actual_uid_key
-        )
+        bail!("unsupported uid key: {}", actual_uid_key)
     };
 
-    let blinder = hex::decode(blinder_hexlified).map_err(|e| {
-        anyhow!("aptos_oidb_pepper_service::process() failed with blinder hex decoding error: {e}")
-    })?;
-    let epk = hex::decode(epk_serialized_hexlified).map_err(|e| {
-        anyhow!("aptos_oidb_pepper_service::process() failed with epk hex decoding error: {e}")
-    })?;
-    // TODO: OpenIdSig::reconstruct_oauth_nonce. Hardcode the config for now.
-    let nonce_pre_image = nonce_derivation::scheme1::PreImage {
-        epk,
+    let blinder = hex::decode(blinder_hexlified)
+        .map_err(|e| anyhow!("blinder unhexlification error: {e}"))?;
+    let epk_bytes = hex::decode(epk_serialized_hexlified)
+        .map_err(|e| anyhow!("epk unhexlification error: {e}"))?;
+    let epk = bcs::from_bytes::<EphemeralPublicKey>(&epk_bytes)
+        .map_err(|e| anyhow!("epk bcs deserialization error: {e}"))?;
+    let recalculated_nonce = OpenIdSig::reconstruct_oauth_nonce(
+        blinder.as_slice(),
         expiry_time_sec,
-        blinder,
-    };
-    let recalculated_nonce = nonce_derivation::scheme1::Scheme::derive_nonce(&nonce_pre_image);
+        &epk,
+        &Configuration::new_for_devnet(),
+    )
+    .map_err(|e| anyhow!("nonce reconstruction error: {e}"))?;
 
     ensure!(
-        claims.claims.nonce == hex::encode(recalculated_nonce),
-        "aptos_oidb_pepper_service::process() failed with nonce mismatch"
+        claims.claims.nonce == recalculated_nonce,
+        "with nonce mismatch"
     );
 
     let key_id = claims
         .header
         .kid
-        .ok_or_else(|| anyhow!("aptos_oidb_pepper_service::process() failed with missing kid"))?;
+        .ok_or_else(|| anyhow!("missing kid in JWT"))?;
 
     let sig_vrfy_key = jwk::cached_decoding_key(&claims.claims.iss, &key_id)?;
     let validation_with_sig_vrfy = Validation::new(RS256);
@@ -89,9 +96,7 @@ fn process_v0(request: PepperRequestV0) -> anyhow::Result<String> {
         sig_vrfy_key.as_ref(),
         &validation_with_sig_vrfy,
     ) // Signature verification happens here.
-    .map_err(|e| {
-        anyhow!("aptos_oidb_pepper_service::process() failed with jwt decoding error 2: {e}")
-    })?;
+    .map_err(|e| anyhow!("JWT signature verification failed: {e}"))?;
 
     // Decide the client_id in the input.
     let actual_aud = if ACCOUNT_DISCOVERY_CLIENTS.contains(&claims.claims.aud) {
@@ -104,7 +109,7 @@ fn process_v0(request: PepperRequestV0) -> anyhow::Result<String> {
         &claims.claims.aud
     };
 
-    let input = PepperInput::V0( PepperInputV0 {
+    let input = PepperInput::V0(PepperInputV0 {
         iss: claims.claims.iss.clone(),
         uid_key: actual_uid_key.to_owned(),
         uid_val,
@@ -112,12 +117,8 @@ fn process_v0(request: PepperRequestV0) -> anyhow::Result<String> {
     });
     let input_bytes = bcs::to_bytes(&input).unwrap();
     let (pepper, vuf_proof) = vuf::scheme0::Scheme0::eval(&VUF_SCHEME0_SK, &input_bytes)?;
-    ensure!(
-        vuf_proof.is_empty(),
-        "aptos_oidb_pepper_service::process() failed internal proof error"
-    );
+    ensure!(vuf_proof.is_empty(), "internal proof error");
     let pepper_hexlified = hex::encode(pepper);
-    //TODO: encrypt the pepper
     Ok(pepper_hexlified)
 }
 

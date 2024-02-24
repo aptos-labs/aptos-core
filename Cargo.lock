@@ -3200,6 +3200,7 @@ dependencies = [
 name = "aptos-oidb-pepper-example-client-rust"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aptos-crypto",
  "aptos-oidb-pepper-common",
  "aptos-types",
@@ -3220,6 +3221,7 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "aptos-oidb-pepper-common",
+ "aptos-types",
  "ark-bls12-381",
  "ark-ec",
  "ark-serialize",

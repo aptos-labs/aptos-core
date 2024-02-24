@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_oidb_pepper_common::{PepperRequest};
+use aptos_oidb_pepper_common::{PepperRequest, PepperResponse};
 use aptos_oidb_pepper_service::{
     about::ABOUT_JSON,
     jwk,
@@ -46,8 +46,13 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
         (&Method::POST, "/") => {
             let body = req.into_body();
             let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
-            let request = serde_json::from_slice::<PepperRequest>(&body_bytes).unwrap();
-            let response = aptos_oidb_pepper_service::process(request).await;
+            let request = serde_json::from_slice::<PepperRequest>(&body_bytes);
+            let response = match request {
+                Ok(req) => aptos_oidb_pepper_service::process(req).await,
+                Err(e) => {
+                    PepperResponse::Error(format!("PepperRequest deserialization error: {e}"))
+                },
+            };
             let json = serde_json::to_string_pretty(&response).unwrap();
             hyper::Response::builder()
                 .status(StatusCode::OK)
