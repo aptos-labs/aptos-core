@@ -14,7 +14,7 @@ use move_binary_format::{
 };
 use move_decompiler::decompiler::{Decompiler, OptimizerSettings};
 #[derive(Debug, Parser)]
-#[clap(author, version, about)]
+#[clap(version, about = "Decompile Move bytecode back to source code. By verichains.io", name = "revela")]
 struct Args {
     /// Treat input file as a script (default is to treat file as a module)
     #[clap(short = 's', long = "script")]

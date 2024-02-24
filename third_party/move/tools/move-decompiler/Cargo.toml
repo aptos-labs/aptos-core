@@ -1,6 +1,6 @@
 [package]
 name = "move-decompiler"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Verichains"]
 description = "Decompile Move bytecode files (.mv files)"
 license = "Apache-2.0"
