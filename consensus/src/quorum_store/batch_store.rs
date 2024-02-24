@@ -427,8 +427,15 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
         let batch_requester = self.batch_requester.clone();
         tokio::spawn(async move {
             if let Ok(mut value) = batch_store.get_batch_from_local(proof.digest()) {
-                tx.send(Ok(value.take_payload().expect("Must have payload")))
-                    .unwrap();
+                if tx
+                    .send(Ok(value.take_payload().expect("Must have payload")))
+                    .is_err()
+                {
+                    debug!(
+                        "Receiver of local batch not available for digest {}",
+                        proof.digest()
+                    )
+                };
             } else {
                 // Quorum store metrics
                 counters::MISSED_BATCHES_COUNT.inc();
