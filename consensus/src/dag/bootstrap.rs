@@ -41,7 +41,7 @@ use aptos_channels::{
 };
 use aptos_config::config::DagConsensusConfig;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
@@ -70,7 +70,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 #[derive(Clone)]
 struct BootstrapBaseState {
     dag_store: Arc<DagStore>,
-    order_rule: OrderRule,
+    order_rule: Arc<Mutex<OrderRule>>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ordered_notifier: Arc<OrderedNotifierAdapter>,
     commit_history: Arc<dyn CommitHistory>,
@@ -515,7 +515,7 @@ impl DagBootstrapper {
             ledger_info_provider.clone(),
         ));
 
-        let order_rule = OrderRule::new(
+        let order_rule = Arc::new(Mutex::new(OrderRule::new(
             self.epoch_state.clone(),
             commit_round + 1,
             dag.clone(),
@@ -523,7 +523,7 @@ impl DagBootstrapper {
             ordered_notifier.clone(),
             self.onchain_config.dag_ordering_causal_history_window as Round,
             commit_events,
-        );
+        )));
 
         BootstrapBaseState {
             dag_store: dag,
@@ -625,6 +625,7 @@ impl DagBootstrapper {
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag_store.clone(),
+            order_rule.clone(),
             self.signer.clone(),
             self.epoch_state.clone(),
             self.storage.clone(),

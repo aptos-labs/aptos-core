@@ -82,14 +82,14 @@ impl StateSyncTrigger {
     pub(super) async fn check(&self, node: CertifiedNodeMessage) -> anyhow::Result<SyncOutcome> {
         let ledger_info_with_sigs = node.ledger_info();
 
+        self.notify_commit_proof(ledger_info_with_sigs).await;
+
         if !self.need_sync_for_ledger_info(ledger_info_with_sigs) {
             return Ok(SyncOutcome::Synced(Some(node)));
         }
 
         // Only verify the certificate if we need to sync
         self.verify_ledger_info(ledger_info_with_sigs)?;
-
-        self.notify_commit_proof(ledger_info_with_sigs).await;
 
         if ledger_info_with_sigs.ledger_info().ends_epoch() {
             self.proof_notifier
