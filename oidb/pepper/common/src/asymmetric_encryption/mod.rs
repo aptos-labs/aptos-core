@@ -21,13 +21,6 @@ pub trait AsymmetricEncryption {
     fn dec(sk: &[u8], ciphertext: &[u8]) -> anyhow::Result<Vec<u8>>;
 }
 
-// /// An asymmetric encryption which:
-// /// - uses AES-256-GCM to encrypt the original variable-length input, where the symmetric key is freshly sampled;
-// /// - uses ElGamal over BLS12-381 G1 to encrypt the symmetric key.
-// ///
-// /// TODO: better name?
-// pub mod scheme0;
-
 /// An asymmetric encryption which:
 /// - uses AES-256-GCM to encrypt the original variable-length input, where the symmetric key is freshly sampled;
 /// - uses ElGamal over the group that supports ED25519 signatures to encrypt the symmetric key.
