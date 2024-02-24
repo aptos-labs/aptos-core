@@ -16,7 +16,7 @@ use aptos_validator_transaction_pool::{TxnGuard, VTxnPoolState};
 use futures_channel::oneshot;
 use futures_util::{future::AbortHandle, FutureExt, StreamExt};
 use move_core_types::account_address::AccountAddress;
-use rand::thread_rng;
+use rand::{prelude::StdRng, thread_rng, SeedableRng};
 use std::sync::Arc;
 
 #[allow(dead_code)]
@@ -207,12 +207,12 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         self.state = match &self.state {
             InnerState::NotStarted => {
                 let public_params = DKG::new_public_params(dkg_session_metadata);
-                let mut rng = thread_rng();
-                let input_secret = if cfg!(feature = "smoke-test") {
-                    DKG::generate_predictable_input_secret_for_testing(self.dealer_sk.as_ref())
+                let mut rng = if cfg!(feature = "smoke-test") {
+                    StdRng::from_seed(self.my_addr.into_bytes())
                 } else {
-                    DKG::InputSecret::generate(&mut rng)
+                    StdRng::from_rng(thread_rng()).unwrap()
                 };
+                let input_secret = DKG::InputSecret::generate(&mut rng);
 
                 let trx = DKG::generate_transcript(
                     &mut rng,
