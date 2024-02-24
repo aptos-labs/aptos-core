@@ -183,49 +183,63 @@ impl DagDriver {
             debug!(error=?e, "cannot enter round");
             return;
         }
-        debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
-        counters::CURRENT_ROUND.set(new_round as i64);
 
-        let strong_links = self
-            .dag
-            .read()
-            .get_strong_links_for_round(new_round - 1, &self.epoch_state.verifier)
-            .unwrap_or_else(|| {
-                assert_eq!(new_round, 1, "Only expect empty strong links for round 1");
-                vec![]
-            });
-
-        let (sys_payload_filter, payload_filter) = if strong_links.is_empty() {
-            (
-                vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
-                PayloadFilter::Empty,
-            )
-        } else {
+        let (strong_links, sys_payload_filter, payload_filter) = {
             let dag_reader = self.dag.read();
-            let highest_commit_round = self
-                .ledger_info_provider
-                .get_highest_committed_anchor_round();
 
-            let nodes = dag_reader
-                .reachable(
-                    strong_links.iter().map(|node| node.metadata()),
-                    Some(highest_commit_round.saturating_sub(self.window_size_config)),
-                    |_| true,
+            let highest_strong_links_round =
+                dag_reader.highest_strong_links_round(&self.epoch_state.verifier);
+            if new_round.saturating_sub(highest_strong_links_round) == 0 {
+                debug!(
+                    new_round = new_round,
+                    highest_strong_link_round = highest_strong_links_round,
+                    "new round too stale to enter"
+                );
+                return;
+            }
+
+            debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
+            counters::CURRENT_ROUND.set(new_round as i64);
+
+            let strong_links = dag_reader
+                .get_strong_links_for_round(new_round - 1, &self.epoch_state.verifier)
+                .unwrap_or_else(|| {
+                    assert_eq!(new_round, 1, "Only expect empty strong links for round 1");
+                    vec![]
+                });
+
+            if strong_links.is_empty() {
+                (
+                    strong_links,
+                    vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
+                    PayloadFilter::Empty,
                 )
-                .map(|node_status| node_status.as_node())
-                .collect::<Vec<_>>();
+            } else {
+                let highest_commit_round = self
+                    .ledger_info_provider
+                    .get_highest_committed_anchor_round();
 
-            let payload_filter =
-                PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
-            let validator_txn_hashes = nodes
-                .iter()
-                .flat_map(|node| node.validator_txns())
-                .map(|txn| txn.hash());
-            let validator_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
-                HashSet::from_iter(validator_txn_hashes),
-            );
+                let nodes = dag_reader
+                    .reachable(
+                        strong_links.iter().map(|node| node.metadata()),
+                        Some(highest_commit_round.saturating_sub(self.window_size_config)),
+                        |_| true,
+                    )
+                    .map(|node_status| node_status.as_node())
+                    .collect::<Vec<_>>();
 
-            (validator_payload_filter, payload_filter)
+                let payload_filter =
+                    PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
+                let validator_txn_hashes = nodes
+                    .iter()
+                    .flat_map(|node| node.validator_txns())
+                    .map(|txn| txn.hash());
+                let validator_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
+                    HashSet::from_iter(validator_txn_hashes),
+                );
+
+                (strong_links, validator_payload_filter, payload_filter)
+            }
         };
 
         let (max_txns, max_size_bytes) = self
@@ -327,6 +341,8 @@ impl DagDriver {
             debug!("Finish reliable broadcast for round {}", round);
         };
         tokio::spawn(Abortable::new(task, abort_registration));
+        // TODO: a bounded vec queue can hold more than window rounds, but we want to limit
+        // by number of rounds.
         if let Some((_handle, prev_round_timestamp)) = self
             .rb_handles
             .lock()

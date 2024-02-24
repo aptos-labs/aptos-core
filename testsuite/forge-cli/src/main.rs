@@ -30,7 +30,6 @@ use aptos_sdk::{
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
-    dag_onchain_enable_test::DagOnChainEnableTest,
     forge_setup_test::ForgeSetupTest,
     framework_upgrade::FrameworkUpgrade,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
@@ -74,8 +73,11 @@ use std::{
     thread,
     time::Duration,
 };
+use suites::dag::get_dag_test;
 use tokio::{runtime::Runtime, select};
 use url::Url;
+
+mod suites;
 
 // Useful constants
 const KILOBYTE: usize = 1000;
@@ -518,6 +520,8 @@ fn get_test_suite(
         return Ok(test_suite);
     } else if let Some(test_suite) = get_state_sync_test(test_name) {
         return Ok(test_suite);
+    } else if let Some(test_suite) = get_dag_test(test_name, duration, test_cmd) {
+        return Ok(test_suite);
     }
 
     // Otherwise, check the test name against the ungrouped test suites
@@ -554,7 +558,6 @@ fn get_test_suite(
         "consensus_only_realistic_env_max_tps" => run_consensus_only_realistic_env_max_tps(),
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
-        "dag_reconfig_enable_test" => dag_reconfig_enable_test(),
         "gather_metrics" => gather_metrics(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
@@ -2003,7 +2006,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig {
         )
 }
 
-fn changing_working_quorum_test_helper(
+pub fn changing_working_quorum_test_helper(
     num_validators: usize,
     epoch_duration: usize,
     target_tps: usize,
@@ -2157,23 +2160,6 @@ fn quorum_store_reconfig_enable_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(20)
         .add_network_test(QuorumStoreOnChainEnableTest {})
-        .with_success_criteria(
-            SuccessCriteria::new(5000)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(240)
-                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
-        )
-}
-
-fn dag_reconfig_enable_test() -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(20)
-        .add_network_test(DagOnChainEnableTest {})
         .with_success_criteria(
             SuccessCriteria::new(5000)
                 .add_no_restarts()
