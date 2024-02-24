@@ -73,7 +73,9 @@ impl<'a> Instrumenter<'a> {
     }
 
     fn instrument(&mut self, code_offset: CodeOffset, bytecode: Bytecode) {
-        if bytecode.is_branch() || matches!(bytecode, Bytecode::Call(_, _, Operation::Drop, _, _)) {
+        if bytecode.is_branching()
+            || matches!(bytecode, Bytecode::Call(_, _, Operation::Drop, _, _))
+        {
             // Add memory instrumentation before instruction.
             self.memory_instrumentation(code_offset, &bytecode);
             self.builder.emit(bytecode);

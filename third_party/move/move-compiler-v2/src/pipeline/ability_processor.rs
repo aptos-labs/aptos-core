@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! The ability processor checks conformance to Move's ability system as well as instruments
-//! the bytecode with ability related operations of copy and drop.
+//! The ability processor checks conformance to Move's ability system as well as transforms
+//! the bytecode inserting ability related operations of copy and drop.
 //!
-//! The instrumentation does the following:
+//! The transformation does the following:
 //!
 //! - It infers the `AssignKind` in the assign statement. This will be `Move` if
 //!   the source is not used after the assignment and is not borrowed. It will
@@ -14,7 +14,7 @@
 //! - It inserts a `Drop` instruction for values which go out of scope and are not
 //!   consumed by any call and no longer borrowed.
 //!
-//! For the checking part, consider the instrumentation to have happened,
+//! For the checking part, consider the transformation to have happened,
 //! then:
 //!
 //! - Every copied value must have the `copy` ability
@@ -105,14 +105,14 @@ impl FunctionTargetProcessor for AbilityProcessor {
                 after.clone()
             });
 
-        // Run instrumenter
-        let mut instrumenter = Instrumenter {
+        // Run transformation
+        let mut transformer = Transformer {
             builder,
             live_var,
             copy_drop,
         };
-        instrumenter.run(code);
-        instrumenter.builder.data
+        transformer.run(code);
+        transformer.builder.data
     }
 
     fn name(&self) -> String {
@@ -213,10 +213,10 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
 }
 
 // =================================================================================================
-// Instrumenter
+// Transformation
 
 /// Represents run for one function.
-struct Instrumenter<'a> {
+struct Transformer<'a> {
     /// A function data builder which owns the `FunctionData` which is worked on.
     builder: FunctionDataBuilder<'a>,
     /// The live-var information for the function.
@@ -225,18 +225,18 @@ struct Instrumenter<'a> {
     copy_drop: BTreeMap<CodeOffset, CopyDropState>,
 }
 
-impl<'a> Instrumenter<'a> {
+impl<'a> Transformer<'a> {
     fn run(&mut self, code: Vec<Bytecode>) {
         for (offset, bc) in code.into_iter().enumerate() {
-            self.instrument_bytecode(offset as CodeOffset, bc)
+            self.transform_bytecode(offset as CodeOffset, bc)
         }
     }
 
-    /// Instruments and checks a bytecode. See the file documentation for an overview
+    /// Transforms and checks a bytecode. See the file documentation for an overview
     /// of what this function does.
-    fn instrument_bytecode(&mut self, code_offset: CodeOffset, bc: Bytecode) {
+    fn transform_bytecode(&mut self, code_offset: CodeOffset, bc: Bytecode) {
         use Bytecode::*;
-        // Instrument and check bytecode
+        // Transform and check bytecode
         match bc.clone() {
             Assign(id, dst, src, kind) => match kind {
                 AssignKind::Inferred => {
@@ -326,7 +326,7 @@ impl<'a> Instrumenter<'a> {
 // ---------------------------------------------------------------------------------------------------------
 // Copy and Move
 
-impl<'a> Instrumenter<'a> {
+impl<'a> Transformer<'a> {
     fn check_implicit_copy(&self, code_offset: CodeOffset, id: AttrId, src: TempIndex) {
         self.check_copy(id, src, || {
             (
@@ -401,7 +401,7 @@ impl<'a> Instrumenter<'a> {
 // ---------------------------------------------------------------------------------------------------------
 // Drop
 
-impl<'a> Instrumenter<'a> {
+impl<'a> Transformer<'a> {
     /// Add implicit drops at the given code offset.
     fn add_implicit_drops(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         // No drop after terminators
@@ -449,7 +449,7 @@ impl<'a> Instrumenter<'a> {
 
 // TODO(#12036): this functionality should be moved to the frontend
 
-impl<'a> Instrumenter<'a> {
+impl<'a> Transformer<'a> {
     /// Check whether a function has a valid type instantiation.
     fn check_fun_inst(&self, id: AttrId, mid: ModuleId, fid: FunId, inst: &[Type]) {
         let ty_params = self.builder.fun_env.get_type_parameters();
@@ -543,7 +543,7 @@ impl<'a> Instrumenter<'a> {
 /// at the arrow to the location), the 2nd vector is a list of location-based additional hints.
 type Description = (String, Vec<(Loc, String)>);
 
-impl<'a> Instrumenter<'a> {
+impl<'a> Transformer<'a> {
     /// Checks whether the type as the ability and if not reports an error. An optional temp is
     /// provided in the case the type is associated with a value. A function to describe
     /// the reason and possible a list of hints is provided as well.
