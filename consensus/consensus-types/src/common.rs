@@ -285,9 +285,11 @@ impl Payload {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
-                for proof in proof_with_status.proofs.iter() {
-                    proof.verify(validator)?;
-                }
+                proof_with_status
+                    .proofs
+                    .par_iter()
+                    .with_min_len(4)
+                    .try_for_each(|proof| proof.verify(validator))?;
                 Ok(())
             },
             (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
