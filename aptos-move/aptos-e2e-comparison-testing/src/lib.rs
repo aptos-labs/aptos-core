@@ -343,6 +343,7 @@ pub async fn prepare_aptos_packages(path: PathBuf) {
 struct CompilationCache {
     compiled_package_map: HashMap<PackageInfo, CompiledPackage>,
     failed_packages: HashSet<PackageInfo>,
+    failed_packages_v2: HashSet<PackageInfo>,
     compiled_package_cache_v1: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     compiled_package_cache_v2: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
 }

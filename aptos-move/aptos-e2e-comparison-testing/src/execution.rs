@@ -3,8 +3,8 @@
 
 use crate::{
     check_aptos_packages_availability, compile_aptos_packages, compile_package,
-    data_state_view::DataStateView, generate_compiled_blob, is_aptos_package, DataManager,
-    IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS,
+    data_state_view::DataStateView, generate_compiled_blob, is_aptos_package, CompilationCache,
+    DataManager, IndexReader, PackageInfo, TxnIndex, APTOS_COMMONS,
 };
 use anyhow::Result;
 use aptos_framework::APTOS_PACKAGES;
@@ -111,15 +111,20 @@ impl Execution {
             return Err(anyhow::Error::msg("aptos packages are missing"));
         }
 
-        let mut compiled_package_cache: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>> =
-            HashMap::new();
-        let mut compiled_package_cache_v2: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>> =
-            HashMap::new();
+        let mut compiled_cache = CompilationCache::default();
         if self.execution_mode.is_v1_or_compare() {
-            compile_aptos_packages(&aptos_commons_path, &mut compiled_package_cache, false)?;
+            compile_aptos_packages(
+                &aptos_commons_path,
+                &mut compiled_cache.compiled_package_cache_v1,
+                false,
+            )?;
         }
         if self.execution_mode.is_v2_or_compare() {
-            compile_aptos_packages(&aptos_commons_path, &mut compiled_package_cache_v2, true)?;
+            compile_aptos_packages(
+                &aptos_commons_path,
+                &mut compiled_cache.compiled_package_cache_v2,
+                true,
+            )?;
         }
 
         // prepare data
@@ -142,12 +147,7 @@ impl Execution {
         let mut cur_version = ver.unwrap();
         let mut i = 0;
         while i < num_txns_to_execute {
-            let res = self.execute_one_txn(
-                cur_version,
-                &data_manager,
-                &mut compiled_package_cache,
-                &mut compiled_package_cache_v2,
-            );
+            let res = self.execute_one_txn(cur_version, &data_manager, &mut compiled_cache);
             if res.is_err() {
                 self.output_result_str(format!(
                     "execution at version:{} failed, skip to the next txn",
@@ -173,8 +173,7 @@ impl Execution {
     fn compile_code(
         &self,
         txn_idx: &TxnIndex,
-        compiled_package_cache: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
-        compiled_package_cache_v2: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+        compiled_cache: &mut CompilationCache,
     ) -> Result<()> {
         if !txn_idx.package_info.is_compilable() {
             return Err(anyhow::Error::msg("not compilable"));
@@ -187,28 +186,52 @@ impl Execution {
         let mut v1_failed = false;
         let mut v2_failed = false;
         if self.execution_mode.is_v1_or_compare()
-            && !compiled_package_cache.contains_key(&package_info)
+            && !compiled_cache
+                .compiled_package_cache_v1
+                .contains_key(&package_info)
         {
-            let compiled_res_v1 = compile_package(
-                package_dir.clone(),
-                &package_info,
-                Some(CompilerVersion::V1),
-            );
-            if let Ok(compiled_res) = compiled_res_v1 {
-                generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache);
-            } else {
+            if compiled_cache.failed_packages.contains(&package_info) {
                 v1_failed = true;
+            } else {
+                let compiled_res_v1 = compile_package(
+                    package_dir.clone(),
+                    &package_info,
+                    Some(CompilerVersion::V1),
+                );
+                if let Ok(compiled_res) = compiled_res_v1 {
+                    generate_compiled_blob(
+                        &package_info,
+                        &compiled_res,
+                        &mut compiled_cache.compiled_package_cache_v1,
+                    );
+                } else {
+                    v1_failed = true;
+                    compiled_cache.failed_packages.insert(package_info.clone());
+                }
             }
         }
         if self.execution_mode.is_v2_or_compare()
-            && !compiled_package_cache_v2.contains_key(&package_info)
+            && !compiled_cache
+                .compiled_package_cache_v2
+                .contains_key(&package_info)
         {
-            let compiled_res_v2 =
-                compile_package(package_dir, &package_info, Some(CompilerVersion::V2));
-            if let Ok(compiled_res) = compiled_res_v2 {
-                generate_compiled_blob(&package_info, &compiled_res, compiled_package_cache_v2);
-            } else {
+            if compiled_cache.failed_packages_v2.contains(&package_info) {
                 v2_failed = true;
+            } else {
+                let compiled_res_v2 =
+                    compile_package(package_dir, &package_info, Some(CompilerVersion::V2));
+                if let Ok(compiled_res) = compiled_res_v2 {
+                    generate_compiled_blob(
+                        &package_info,
+                        &compiled_res,
+                        &mut compiled_cache.compiled_package_cache_v2,
+                    );
+                } else {
+                    v2_failed = true;
+                    compiled_cache
+                        .failed_packages_v2
+                        .insert(package_info.clone());
+                }
             }
         }
         if v1_failed || v2_failed {
@@ -228,16 +251,14 @@ impl Execution {
         &self,
         cur_version: Version,
         data_manager: &DataManager,
-        compiled_package_cache: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
-        compiled_package_cache_v2: &mut HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
+        compiled_cache: &mut CompilationCache,
     ) -> Result<()> {
         if let Some(txn_idx) = data_manager.get_txn_index(cur_version) {
             // compile the code if the source code is available
             if txn_idx.package_info.is_compilable()
                 && !is_aptos_package(&txn_idx.package_info.package_name)
             {
-                let compiled_result =
-                    self.compile_code(&txn_idx, compiled_package_cache, compiled_package_cache_v2);
+                let compiled_result = self.compile_code(&txn_idx, compiled_cache);
                 if compiled_result.is_err() {
                     self.output_result_str(format!(
                         "compilation failed for the package:{} at version:{}",
@@ -253,8 +274,8 @@ impl Execution {
                 cur_version,
                 state,
                 &txn_idx,
-                compiled_package_cache,
-                compiled_package_cache_v2,
+                &compiled_cache.compiled_package_cache_v1,
+                &compiled_cache.compiled_package_cache_v2,
                 None,
             );
         }
@@ -294,19 +315,19 @@ impl Execution {
             );
             self.print_mismatches(cur_version, &res_main_opt.unwrap(), &res_other_opt.unwrap());
         } else {
-            let res = res_main_opt.unwrap();
-            if let Ok(res_ok) = res {
-                self.output_result_str(format!(
-                    "version:{}\nwrite set:{:?}\n events:{:?}\n",
-                    cur_version, res_ok.0, res_ok.1
-                ));
-            } else {
-                self.output_result_str(format!(
-                    "execution error {} at version: {}, error",
-                    res.unwrap_err(),
-                    cur_version
-                ));
-            }
+            // let res = res_main_opt.unwrap();
+            // if let Ok(res_ok) = res {
+            //     self.output_result_str(format!(
+            //         "version:{}\nwrite set:{:?}\n events:{:?}\n",
+            //         cur_version, res_ok.0, res_ok.1
+            //     ));
+            // } else {
+            //     self.output_result_str(format!(
+            //         "execution error {} at version: {}, error",
+            //         res.unwrap_err(),
+            //         cur_version
+            //     ));
+            // }
         }
     }
 
