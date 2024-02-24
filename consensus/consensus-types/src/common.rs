@@ -288,6 +288,7 @@ impl Payload {
                 proof_with_status
                     .proofs
                     .par_iter()
+                    .with_min_len(5)
                     .try_for_each(|proof| proof.verify(validator))?;
                 Ok(())
             },
