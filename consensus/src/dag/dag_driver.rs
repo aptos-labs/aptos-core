@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff};
+use super::{dag_store::DagStore, health::HealthBackoff, types::NodeCertificate};
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
@@ -52,7 +52,7 @@ pub(crate) struct DagDriver {
     time_service: TimeService,
     rb_handles: Mutex<BoundedVecDeque<(DropGuard, u64)>>,
     storage: Arc<dyn DAGStorage>,
-    order_rule: Mutex<OrderRule>,
+    order_rule: Arc<Mutex<OrderRule>>,
     fetch_requester: Arc<dyn TFetchRequester>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     round_state: RoundState,
@@ -72,7 +72,7 @@ impl DagDriver {
         reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         time_service: TimeService,
         storage: Arc<dyn DAGStorage>,
-        order_rule: OrderRule,
+        order_rule: Arc<Mutex<OrderRule>>,
         fetch_requester: Arc<dyn TFetchRequester>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         round_state: RoundState,
@@ -96,7 +96,7 @@ impl DagDriver {
             time_service,
             rb_handles: Mutex::new(BoundedVecDeque::new(window_size_config as usize)),
             storage,
-            order_rule: Mutex::new(order_rule),
+            order_rule,
             fetch_requester,
             ledger_info_provider,
             round_state,
@@ -129,43 +129,34 @@ impl DagDriver {
     }
 
     fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
-        let (highest_strong_link_round, strong_links) = {
-            {
-                let dag_reader = self.dag.read();
-
-                // Ensure the window hasn't moved, so we don't request fetch unnecessarily.
-                ensure!(node.round() >= dag_reader.lowest_round(), "stale node");
-
-                if !dag_reader.all_exists(node.parents_metadata()) {
-                    if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
-                        error!("request to fetch failed: {}", err);
-                    }
-                    bail!(DagDriverError::MissingParents);
-                }
-            }
-
-            // Note on concurrency: it is possible that a prune operation kicks in here and
-            // moves the window forward making the `node` stale, but we guarantee that the
-            // order rule only visits `window` length rounds, so having node around should
-            // be fine. Any stale node inserted due to this race will be cleaned up with
-            // the next prune operation.
-
-            self.dag.add_node(node)?;
-
+        {
             let dag_reader = self.dag.read();
-            let highest_strong_links_round =
-                dag_reader.highest_strong_links_round(&self.epoch_state.verifier);
-            (
-                highest_strong_links_round,
-                // unwrap is for round 0
-                dag_reader
-                    .get_strong_links_for_round(
-                        highest_strong_links_round,
-                        &self.epoch_state.verifier,
-                    )
-                    .unwrap_or_default(),
-            )
-        };
+
+            // Ensure the window hasn't moved, so we don't request fetch unnecessarily.
+            ensure!(node.round() >= dag_reader.lowest_round(), "stale node");
+
+            if !dag_reader.all_exists(node.parents_metadata()) {
+                if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
+                    error!("request to fetch failed: {}", err);
+                }
+                bail!(DagDriverError::MissingParents);
+            }
+        }
+
+        // Note on concurrency: it is possible that a prune operation kicks in here and
+        // moves the window forward making the `node` stale, but we guarantee that the
+        // order rule only visits `window` length rounds, so having node around should
+        // be fine. Any stale node inserted due to this race will be cleaned up with
+        // the next prune operation.
+
+        self.dag.add_node(node)?;
+
+        self.check_new_round();
+        Ok(())
+    }
+
+    fn check_new_round(&self) {
+        let (highest_strong_link_round, strong_links) = self.get_highest_strong_links_round();
 
         let minimum_delay = self
             .health_backoff
@@ -175,7 +166,19 @@ impl DagDriver {
             strong_links,
             minimum_delay,
         );
-        Ok(())
+    }
+
+    fn get_highest_strong_links_round(&self) -> (Round, Vec<NodeCertificate>) {
+        let dag_reader = self.dag.read();
+        let highest_strong_links_round =
+            dag_reader.highest_strong_links_round(&self.epoch_state.verifier);
+        (
+            highest_strong_links_round,
+            // unwrap is for round 0
+            dag_reader
+                .get_strong_links_for_round(highest_strong_links_round, &self.epoch_state.verifier)
+                .unwrap_or_default(),
+        )
     }
 
     pub async fn enter_new_round(&self, new_round: Round) {
@@ -353,8 +356,9 @@ impl DagDriver {
         }
     }
 
-    pub fn try_order_all(&self) {
+    pub fn fetch_callback(&self) {
         self.order_rule.lock().process_all();
+        self.check_new_round();
     }
 }
 
