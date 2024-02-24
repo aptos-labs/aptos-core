@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::vuf::VUF;
 use anyhow::{anyhow, ensure};
 use ark_bls12_381::{Bls12_381, Fq12, Fr, G1Affine, G2Affine, G2Projective};
@@ -13,11 +15,11 @@ use ark_std::{
 };
 use std::ops::Mul;
 
-pub struct Scheme {}
+pub struct Scheme0 {}
 
 pub static DST: &[u8] = b"APTOS_OIDB_VUF_SCHEME0_DST";
 
-impl Scheme {
+impl Scheme0 {
     fn hash_to_g1(input: &[u8]) -> G1Affine {
         let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
             Projective<ark_bls12_381::g1::Config>,
@@ -29,41 +31,27 @@ impl Scheme {
     }
 }
 
-impl VUF for Scheme {
+impl VUF for Scheme0 {
+    type PrivateKey = Fr;
+    type PublicKey = G2Projective;
+
     fn scheme_name() -> String {
         "Scheme0".to_string()
     }
 
-    fn setup<R: CryptoRng + RngCore>(rng: &mut R) -> (Vec<u8>, Vec<u8>) {
+    fn setup<R: CryptoRng + RngCore>(rng: &mut R) -> (Self::PrivateKey, Self::PublicKey) {
         let sk = Fr::rand(rng);
         let pk = G2Affine::generator() * sk;
-        let mut sk_bytes = vec![];
-        let mut pk_bytes = vec![];
-        sk.serialize_compressed(&mut sk_bytes).unwrap_or_default();
-        pk.serialize_compressed(&mut pk_bytes).unwrap_or_default();
-        (sk_bytes, pk_bytes)
+        (sk, pk)
     }
 
-    fn pk_from_sk(sk: &[u8]) -> anyhow::Result<Vec<u8>> {
-        let sk_scalar = Fr::deserialize_compressed(sk).map_err(|e| {
-            anyhow!("vuf::scheme0::pk_from_sk failed with sk deserialization error: {e}")
-        })?;
-        let pk_g2 = G2Projective::generator() * sk_scalar;
-        let mut buf = vec![];
-        pk_g2
-            .into_affine()
-            .serialize_compressed(&mut buf)
-            .map_err(|e| {
-                anyhow!("vuf::scheme0::pk_from_sk failed with pk serialization error: {e}")
-            })?;
-        Ok(buf)
+    fn pk_from_sk(sk: &Fr) -> anyhow::Result<G2Projective> {
+        Ok(G2Projective::generator() * sk)
     }
 
-    fn eval(sk: &[u8], input: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
-        let sk_scalar = Fr::deserialize_uncompressed(sk)
-            .map_err(|e| anyhow!("vuf::scheme0::eval failed with ok deserialization error: {e}"))?;
+    fn eval(sk: &Fr, input: &[u8]) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
         let input_g1 = Self::hash_to_g1(input);
-        let output_g1 = input_g1.mul(sk_scalar).into_affine();
+        let output_g1 = input_g1.mul(sk).into_affine();
         let mut output_bytes = vec![];
         output_g1
             .serialize_compressed(&mut output_bytes)
@@ -73,21 +61,18 @@ impl VUF for Scheme {
         Ok((output_bytes, vec![]))
     }
 
-    fn verify(pk: &[u8], input: &[u8], output: &[u8], proof: &[u8]) -> anyhow::Result<()> {
+    fn verify(pk_g2: &G2Projective, input: &[u8], output: &[u8], proof: &[u8]) -> anyhow::Result<()> {
         ensure!(
             proof.is_empty(),
             "vuf::scheme0::verify failed with proof deserialization error"
         );
         let input_g1 = Self::hash_to_g1(input);
-        let pk_g2 = G2Affine::deserialize_compressed(pk).map_err(|e| {
-            anyhow!("vuf::scheme0::verify failed with pk deserialization error: {e}")
-        })?;
         let output_g1 = G1Affine::deserialize_compressed(output).map_err(|e| {
             anyhow!("vuf::scheme0::verify failed with output deserialization error: {e}")
         })?;
         ensure!(
             Fq12::ONE
-                == Bls12_381::multi_pairing([-output_g1, input_g1], [G2Affine::generator(), pk_g2])
+                == Bls12_381::multi_pairing([-output_g1, input_g1], [G2Affine::generator(), pk_g2.clone().into_affine()])
                     .0,
             "vuf::scheme0::verify failed with final check failure"
         );
@@ -97,17 +82,17 @@ impl VUF for Scheme {
 
 #[cfg(test)]
 mod tests {
-    use crate::vuf::{scheme0::Scheme, VUF};
+    use crate::vuf::{scheme0::Scheme0, VUF};
 
     #[test]
     fn gen_eval_verify() {
         let mut rng = ark_std::rand::thread_rng();
-        let (sk, pk) = Scheme::setup(&mut rng);
-        let pk_another = Scheme::pk_from_sk(&sk).unwrap();
+        let (sk, pk) = Scheme0::setup(&mut rng);
+        let pk_another = Scheme0::pk_from_sk(&sk).unwrap();
         assert_eq!(pk_another, pk);
         let input: &[u8] = b"hello world again and again and again and again and again and again";
-        let (output, proof) = Scheme::eval(&sk, input).unwrap();
-        Scheme::verify(&pk, input, &output, &proof).unwrap();
+        let (output, proof) = Scheme0::eval(&sk, input).unwrap();
+        Scheme0::verify(&pk, input, &output, &proof).unwrap();
         println!("output={:?}", output);
     }
 }

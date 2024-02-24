@@ -16,6 +16,9 @@ rust-version = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-oidb-pepper-common = { workspace = true }
 aptos-types = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-serialize = { workspace = true }
+bcs = { workspace = true }
 hex = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }

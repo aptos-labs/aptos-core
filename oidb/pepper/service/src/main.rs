@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use aptos_oidb_pepper_common::{PepperRequest, SimplePepperRequest, UnencryptedPepperResponse};
+use aptos_oidb_pepper_common::{PepperRequest};
 use aptos_oidb_pepper_service::{
     about::ABOUT_JSON,
     jwk,
@@ -48,25 +48,6 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
             let request = serde_json::from_slice::<PepperRequest>(&body_bytes).unwrap();
             let response = aptos_oidb_pepper_service::process(request).await;
-            let json = serde_json::to_string_pretty(&response).unwrap();
-            hyper::Response::builder()
-                .status(StatusCode::OK)
-                .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
-                .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
-                .header(ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
-                .header(ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type, Authorization")
-                .header(CONTENT_TYPE, "application/json")
-                .body(Body::from(json))
-                .expect("Response should build")
-        },
-        (&Method::POST, "/unencrypted") => {
-            let body = req.into_body();
-            let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
-            let request = serde_json::from_slice::<SimplePepperRequest>(&body_bytes).unwrap();
-            let response = match aptos_oidb_pepper_service::process_unencrypted(request).await {
-                Ok(pepper_hexlified) => UnencryptedPepperResponse::OK { pepper_hexlified },
-                Err(e) => UnencryptedPepperResponse::Error(e.to_string()),
-            };
             let json = serde_json::to_string_pretty(&response).unwrap();
             hyper::Response::builder()
                 .status(StatusCode::OK)

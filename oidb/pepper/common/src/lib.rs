@@ -12,7 +12,6 @@ pub mod elgamal;
 pub mod jwt;
 
 pub mod nonce_derivation;
-pub mod pepper_pre_image_derivation;
 pub mod vuf;
 
 pub fn sha3_256(input: &[u8]) -> Vec<u8> {
@@ -21,10 +20,14 @@ pub fn sha3_256(input: &[u8]) -> Vec<u8> {
     hasher.finalize().to_vec()
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub enum PepperRequest {
+    V0(PepperRequestV0),
+}
+
 /// The spec of a request to this pepper service.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PepperRequest {
-    pub schema_version: Option<String>,
+pub struct PepperRequestV0 {
     pub jwt: String,
     /// If specified, generate pepper for `jwk.payload.iss, jwk.payload.sub, overriding_aud`.
     /// Otherwise, generate pepper for `jwk.payload.iss, jwk.payload.sub, jwk.payload.aud`.
@@ -35,23 +38,23 @@ pub struct PepperRequest {
     pub uid_key: Option<String>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct SimplePepperRequest {
-    pub jwt: String,
-    pub uid_key: Option<String>,
-}
-
 /// The spec of a response from this pepper service.
 #[derive(Debug, Deserialize, Serialize)]
 pub enum PepperResponse {
-    Raw { pepper_hexlified: String },
-    Encrypted { pepper_encrypted_hexlified: String },
+    Error(String),
+    V0(PepperResponseV0),
+    V1(PepperResponseV1),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum PepperResponseV0 {
+    Ok { pepper_hexlified: String },
     Error(String),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub enum UnencryptedPepperResponse {
-    OK { pepper_hexlified: String },
+pub enum PepperResponseV1 {
+    OK { pepper_encrypted_hexlified: String },
     Error(String),
 }
 
@@ -87,4 +90,19 @@ impl EncryptionPubKey {
             _ => bail!("EncryptionPubKey::encrypt failed with unknown scheme"),
         }
     }
+}
+
+/// Derived from `PepperRequest`.
+/// Its BCS serialization will be VUF input.
+#[derive(Debug, Deserialize, Serialize)]
+pub enum PepperInput {
+    V0(PepperInputV0)
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PepperInputV0 {
+    pub iss: String,
+    pub uid_key: String,
+    pub uid_val: String,
+    pub aud: String,
 }
