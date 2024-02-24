@@ -111,8 +111,9 @@ impl Block {
             None => 0,
             Some(payload) => match payload {
                 Payload::InQuorumStore(pos) => pos.proofs.len(),
-                Payload::DirectMempool(_txns) => 0,
+                Payload::DirectMempool(txns) => txns.len(),
                 Payload::InQuorumStoreWithLimit(pos) => pos.proof_with_data.proofs.len(),
+                Payload::DAG(bundle) => bundle.len(),
             },
         }
     }
