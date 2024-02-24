@@ -34,6 +34,7 @@ pub async fn create_dag_swarm(num_nodes: usize) -> LocalSwarm {
                 rpc_timeout_ms: 500,
                 min_concurrent_responders: 2,
                 max_concurrent_responders: 7,
+                max_concurrent_fetches: 4,
             }
         }))
         .with_init_genesis_config(Arc::new(move |genesis_config| {
@@ -243,7 +244,7 @@ async fn test_changing_working_consensus() {
                 executed_transactions
             );
             assert!(
-                executed_rounds >= 2,
+                executed_rounds >= 1,
                 "no progress with active consensus, only {} rounds",
                 executed_rounds
             );

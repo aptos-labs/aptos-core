@@ -141,6 +141,7 @@ pub struct DagFetcherService {
     >,
     futures:
         FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<LocalFetchRequest>> + Send>>>,
+    max_concurrent_fetches: usize,
 }
 
 impl DagFetcherService {
@@ -162,6 +163,7 @@ impl DagFetcherService {
         let ordered_authors = epoch_state.verifier.get_ordered_account_addresses();
         (
             Self {
+                max_concurrent_fetches: config.max_concurrent_fetches,
                 inner: Arc::new(DagFetcher::new(epoch_state, network, time_service, config)),
                 dag,
                 request_rx,
@@ -189,7 +191,7 @@ impl DagFetcherService {
                     }
                 },
                 // TODO: Configure concurrency
-                Some(local_request) = self.request_rx.recv(), if self.futures.len() < 10 => {
+                Some(local_request) = self.request_rx.recv(), if self.futures.len() < self.max_concurrent_fetches => {
                     match self.fetch(local_request.node(), local_request.responders(&self.ordered_authors)) {
                         Ok(fut) => {
                             self.futures.push(async move {

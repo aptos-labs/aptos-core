@@ -997,13 +997,7 @@ impl DagSnapshotBitmask {
     }
 
     pub fn bitvec(&self, round: Round) -> Option<BitVec> {
-        let round_idx = match round.checked_sub(self.first_round) {
-            Some(idx) => idx as usize,
-            None => return None,
-        };
-        match self.bitmask.get(round_idx) {
-            Some(bitvec) => Some(bitvec.into()),
-            None => None,
-        }
+        let round_idx = round.checked_sub(self.first_round)? as usize;
+        self.bitmask.get(round_idx).map(|bitvec| bitvec.into())
     }
 }
