@@ -72,8 +72,8 @@ impl OnChainExecutionConfig {
         OnChainExecutionConfig::V4(ExecutionConfigV4 {
             transaction_shuffler_type: TransactionShufflerType::Fairness {
                 sender_conflict_window_size: 32,
-                module_conflict_window_size: 2,
-                entry_fun_conflict_window_size: 3,
+                module_conflict_window_size: 1,
+                entry_fun_conflict_window_size: 2,
             },
             block_gas_limit_type: BlockGasLimitType::ComplexLimitV1 {
                 effective_block_gas_limit: 30000,
@@ -82,7 +82,7 @@ impl OnChainExecutionConfig {
                 conflict_penalty_window: 9,
                 use_granular_resource_group_conflicts: false,
                 use_module_publishing_block_conflict: true,
-                block_output_limit: Some(3 * 1024 * 1024),
+                block_output_limit: Some(5 * 1024 * 1024),
                 include_user_txn_size_in_block_output: true,
                 add_block_limit_outcome_onchain: false,
             },
