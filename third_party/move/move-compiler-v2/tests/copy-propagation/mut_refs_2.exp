@@ -30,7 +30,7 @@ error: local `p` of type `m::S` does not have the `copy` ability
    ┌─ tests/copy-propagation/mut_refs_2.move:10:13
    │
 10 │         let q = p;
-   │             ^ copy needed here because value is still used
+   │             ^ copy needed here because value is still in use
 11 │         let ref = &mut p.a;
    │                        - used here
 
