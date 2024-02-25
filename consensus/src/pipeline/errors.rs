@@ -15,4 +15,6 @@ pub enum Error {
     VerificationError,
     #[error("Reset host dropped")]
     ResetDropped,
+    #[error("Rand Reset host dropped")]
+    RandResetDropped,
 }
