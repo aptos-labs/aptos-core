@@ -1,17 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::rand::rand_gen::{
-    network_messages::RandMessage,
-    rand_store::RandStore,
-    types::{
-        AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck,
-        RandConfig, RandShare, RequestShare, Share,
+use crate::{
+    logging::{LogEvent, LogSchema},
+    rand::rand_gen::{
+        network_messages::RandMessage,
+        rand_store::RandStore,
+        types::{
+            AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig,
+            RandShare, RequestShare, TAugmentedData, TShare,
+        },
     },
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
+use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState, randomness::RandMetadata,
@@ -34,7 +38,7 @@ impl<D> AugDataCertBuilder<D> {
     }
 }
 
-impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
+impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
     for Arc<AugDataCertBuilder<D>>
 {
     type Aggregated = CertifiedAugData<D>;
@@ -42,10 +46,15 @@ impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<
     type Response = AugDataSignature;
 
     fn add(&self, peer: Author, ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
+        debug!(
+            "[RandManager] AugDataCertBuilder::add: BEGIN: peer={}",
+            peer
+        );
         ack.verify(peer, &self.epoch_state.verifier, &self.aug_data)?;
+        debug!("[RandManager] AugDataCertBuilder::add: ack verified");
         let mut parital_signatures_guard = self.partial_signatures.lock();
         parital_signatures_guard.add_signature(peer, ack.into_signature());
-        Ok(self
+        let qc_aug_data = self
             .epoch_state
             .verifier
             .check_voting_power(parital_signatures_guard.signatures().keys(), true)
@@ -57,7 +66,12 @@ impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<
                     .aggregate_signatures(&parital_signatures_guard)
                     .expect("Signature aggregation should succeed");
                 CertifiedAugData::new(self.aug_data.clone(), aggregated_signature)
-            }))
+            });
+        debug!(
+            "[RandManager] AugDataCertBuilder::add: END: qc_aug_data.is_some()={}",
+            qc_aug_data.is_some()
+        );
+        Ok(qc_aug_data)
     }
 }
 
@@ -73,7 +87,7 @@ impl CertifiedAugDataAckState {
     }
 }
 
-impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
+impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
     for Arc<CertifiedAugDataAckState>
 {
     type Aggregated = ();
@@ -116,7 +130,7 @@ impl<S> ShareAggregateState<S> {
     }
 }
 
-impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
+impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<S, D>>
     for Arc<ShareAggregateState<S>>
 {
     type Aggregated = ();
@@ -132,6 +146,11 @@ impl<S: Share, D: AugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessage<
             share.metadata()
         );
         share.verify(&self.rand_config)?;
+        info!(LogSchema::new(LogEvent::ReceiveReactiveRandShare)
+            .author(self.rand_config.author)
+            .epoch(share.epoch())
+            .round(share.metadata().round())
+            .remote_peer(*share.author()));
         let mut store = self.rand_store.lock();
         let aggregated = if store.add_share(share)? {
             Some(())

@@ -4,14 +4,12 @@
 #[cfg(test)]
 mod test_utils;
 
-mod block_queue;
-mod network_messages;
-mod rand_store;
-mod types;
+pub mod block_queue;
+pub mod network_messages;
+pub mod rand_store;
+pub mod types;
 
-mod aug_data_store;
-mod rand_manager;
-mod reliable_broadcast_state;
-mod storage;
-
-pub use network_messages::RandGenMessage;
+pub mod aug_data_store;
+pub mod rand_manager;
+pub mod reliable_broadcast_state;
+pub mod storage;
