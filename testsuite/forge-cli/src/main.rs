@@ -805,7 +805,12 @@ fn quorum_store_backlog_txn_limit_count(
         .consensus
         .quorum_store
         .back_pressure
-        .backlog_txn_limit_count = (target_tps as f64 * vn_latency) as u64;
+        .backlog_txn_limit_count = 60_000;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_min_txn_per_s = 100;
     config
         .consensus
         .quorum_store
