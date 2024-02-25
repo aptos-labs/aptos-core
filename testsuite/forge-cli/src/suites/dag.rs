@@ -263,7 +263,7 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
             mempool_backlog: 1_000_000,
-        }))
+        }).txn_expiration_time_secs(600))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
             optimize_state_sync_for_throughput(config);
