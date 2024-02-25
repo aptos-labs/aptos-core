@@ -23,6 +23,8 @@ pub struct NativeTransactionContext {
     auid_counter: u64,
     script_hash: Vec<u8>,
     chain_id: u8,
+    /// True if the current TXN's payload was an entry function marked as either public(friend) or private
+    is_friend_or_private_entry_func: bool,
 }
 
 impl NativeTransactionContext {
@@ -34,11 +36,20 @@ impl NativeTransactionContext {
             auid_counter: 0,
             script_hash,
             chain_id,
+            is_friend_or_private_entry_func: false,
         }
     }
 
     pub fn chain_id(&self) -> u8 {
         self.chain_id
+    }
+
+    pub fn set_is_friend_or_private_entry_func(&mut self) {
+        self.is_friend_or_private_entry_func = true;
+    }
+
+    pub fn get_is_friend_or_private_entry_func(&self) -> bool {
+        self.is_friend_or_private_entry_func
     }
 }
 

@@ -66,6 +66,17 @@ spec aptos_framework::version {
         ensures global<SetVersionCapability>(@aptos_framework) == SetVersionCapability {};
     }
 
+    spec set_for_next_epoch(account: &signer, major: u64) {
+        aborts_if !exists<SetVersionCapability>(signer::address_of(account));
+        aborts_if !exists<Version>(@aptos_framework);
+        aborts_if global<Version>(@aptos_framework).major >= major;
+        aborts_if !exists<config_buffer::PendingConfigs>(@aptos_framework);
+    }
+
+    spec on_new_epoch() {
+        include config_buffer::OnNewEpochAbortsIf<Version>;
+    }
+
     /// This module turns on `aborts_if_is_strict`, so need to add spec for test function `initialize_for_test`.
     spec initialize_for_test {
         // Don't verify test functions.

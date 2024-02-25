@@ -24,15 +24,17 @@ pub fn generate_version_upgrade_proposal(
             if is_testnet && next_execution_hash.is_empty() {
                 emitln!(
                     writer,
-                    "version::set_version(framework_signer, {});",
+                    "version::set_for_next_epoch(framework_signer, {});",
                     version.major,
                 );
+                emitln!(writer, "aptos_governance::reconfigure(framework_signer);");
             } else {
                 emitln!(
                     writer,
-                    "version::set_version(&framework_signer, {});",
+                    "version::set_for_next_epoch(&framework_signer, {});",
                     version.major,
                 );
+                emitln!(writer, "aptos_governance::reconfigure(&framework_signer);");
             }
         },
     );

@@ -21,7 +21,10 @@ use crate::{
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
-use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
+use aptos_framework::{
+    natives::{code::PublishRequest, transaction_context::NativeTransactionContext},
+    RuntimeModuleMetadataV1,
+};
 use aptos_gas_algebra::{Gas, GasQuantity, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
@@ -699,6 +702,18 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
     ) -> Result<SerializedReturnValues, VMStatus> {
+        let is_friend_or_private = session.load_function_def_is_friend_or_private(
+            entry_fn.module(),
+            entry_fn.function(),
+            entry_fn.ty_args(),
+        )?;
+        if is_friend_or_private {
+            let txn_context = session
+                .get_native_extensions()
+                .get_mut::<NativeTransactionContext>();
+            txn_context.set_is_friend_or_private_entry_func();
+        }
+
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
