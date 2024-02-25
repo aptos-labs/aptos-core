@@ -7,6 +7,7 @@ use aptos_oidb_pepper_common::{
 use ark_ec::CurveGroup;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use once_cell::sync::Lazy;
+use ark_ff::PrimeField;
 
 pub struct VufScheme0Sk {
     pub sk_bytes: Vec<u8>,
@@ -16,7 +17,7 @@ pub static VUF_SCHEME0_SK: Lazy<ark_bls12_381::Fr> = Lazy::new(|| {
     let vuf_key_hex =
         std::env::var("VRF_KEY_HEX").expect("VRF_KEY_HEX is required for pepper calculation");
     let sk_bytes = hex::decode(vuf_key_hex).expect("vrf_key_hex should be a valid hex string");
-    ark_bls12_381::Fr::deserialize_compressed(sk_bytes.as_slice()).unwrap()
+    ark_bls12_381::Fr::from_be_bytes_mod_order(sk_bytes.as_slice())
 });
 
 pub static VUF_VERIFICATION_KEY_JSON: Lazy<String> = Lazy::new(|| {

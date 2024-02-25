@@ -3,7 +3,7 @@
 use crate::vuf_keys::VUF_SCHEME0_SK;
 use anyhow::{anyhow, bail, ensure};
 use aptos_oidb_pepper_common::{
-    jwt::Claims, vuf, vuf::VUF, PepperInput, PepperInputV0, PepperRequest, PepperRequestV0,
+    jwt::Claims, vuf, vuf::VUF, PepperInput, PepperRequest, PepperRequestV0,
     PepperResponse, PepperResponseV0,
 };
 use aptos_types::{
@@ -109,12 +109,12 @@ fn process_v0(request: PepperRequestV0) -> anyhow::Result<String> {
         &claims.claims.aud
     };
 
-    let input = PepperInput::V0(PepperInputV0 {
+    let input = PepperInput {
         iss: claims.claims.iss.clone(),
         uid_key: actual_uid_key.to_owned(),
         uid_val,
         aud: actual_aud.clone(),
-    });
+    };
     let input_bytes = bcs::to_bytes(&input).unwrap();
     let (pepper, vuf_proof) = vuf::scheme0::Scheme0::eval(&VUF_SCHEME0_SK, &input_bytes)?;
     ensure!(vuf_proof.is_empty(), "internal proof error");

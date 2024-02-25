@@ -92,17 +92,10 @@ impl EncryptionPubKey {
     }
 }
 
-/// Derived from `PepperRequest`.
-/// Its BCS serialization will be VUF input.
 #[derive(Debug, Deserialize, Serialize)]
-pub enum PepperInput {
-    V0(PepperInputV0),
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub struct PepperInputV0 {
+pub struct PepperInput {
     pub iss: String,
-    pub uid_key: String,
-    pub uid_val: String,
     pub aud: String,
+    pub uid_val: String,
+    pub uid_key: String,
 }

@@ -3224,6 +3224,7 @@ dependencies = [
  "aptos-types",
  "ark-bls12-381",
  "ark-ec",
+ "ark-ff",
  "ark-serialize",
  "bcs 0.1.4",
  "byteorder",

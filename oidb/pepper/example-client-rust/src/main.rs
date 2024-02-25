@@ -8,7 +8,7 @@ use aptos_oidb_pepper_common::{
     asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption},
     jwt, vuf,
     vuf::VUF,
-    PepperInput, PepperInputV0, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0,
+    PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0,
     VUFVerificationKey,
 };
 use aptos_types::{
@@ -178,12 +178,12 @@ async fn main() {
     let claims = jwt::parse(jwt.as_str()).unwrap();
     println!();
     println!("Verify the pepper against the server's verification key and part of the JWT.");
-    let pepper_input = PepperInput::V0(PepperInputV0 {
+    let pepper_input = PepperInput {
         iss: claims.claims.iss.clone(),
         uid_key: "sub".to_string(),
         uid_val: claims.claims.sub.clone(),
         aud: claims.claims.aud.clone(),
-    });
+    };
     let pepper_input_bytes = bcs::to_bytes(&pepper_input).unwrap();
     vuf::scheme0::Scheme0::verify(&vuf_pk, &pepper_input_bytes, &pepper_bytes, &[]).unwrap();
     println!();
