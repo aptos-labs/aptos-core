@@ -249,10 +249,10 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // the actual throughput to be able to have reasonable queueing but also so throughput
     // will improve as performance improves.
     // Overestimate: causes mempool and/or batch queueing. Underestimate: not enough txns in blocks.
-    const TARGET_TPS: usize = 15_000 * 15;
+    const TARGET_TPS: usize = 15_000;
     // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
     // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
-    const MAX_TXNS_PER_BLOCK: usize = 20000;
+    const MAX_TXNS_PER_BLOCK: usize = 20_000;
     // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
     // This is validator latency, minus mempool queueing time.
     const VN_LATENCY_S: f64 = 2.5;
@@ -263,7 +263,7 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: (TARGET_TPS as f64 * VFN_LATENCY_S) as usize,
+            mempool_backlog: 1_000_000,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
