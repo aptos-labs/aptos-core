@@ -17,7 +17,7 @@ use crate::{
     monitor,
     network::{IncomingDAGRequest, RpcResponder},
 };
-use aptos_bounded_executor::{concurrent_map, BoundedExecutor};
+use aptos_bounded_executor::{BoundedExecutor, ConcurrentStream};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, error, warn};
@@ -85,10 +85,8 @@ impl NetworkHandler {
         } = self;
 
         // TODO: feed in the executor based on verification Runtime
-        let mut verified_msg_stream = concurrent_map(
-            dag_rpc_rx,
-            executor.clone(),
-            move |rpc_request: IncomingDAGRequest| {
+        let mut verified_msg_stream =
+            dag_rpc_rx.concurrent_map(executor.clone(), move |rpc_request: IncomingDAGRequest| {
                 let epoch_state = epoch_state.clone();
                 async move {
                     let epoch = rpc_request.req.epoch();
@@ -104,8 +102,7 @@ impl NetworkHandler {
                         });
                     (result, epoch, rpc_request.sender, rpc_request.responder)
                 }
-            },
-        );
+            });
 
         let dag_driver_clone = dag_driver.clone();
         let node_receiver_clone = node_receiver.clone();
@@ -113,6 +110,8 @@ impl NetworkHandler {
             while let Some(new_round) = new_round_event.recv().await {
                 monitor!("dag_on_new_round_event", {
                     dag_driver_clone.enter_new_round(new_round).await;
+                });
+                monitor!("dag_node_receiver_gc", {
                     node_receiver_clone.gc();
                 });
             }
@@ -123,7 +122,7 @@ impl NetworkHandler {
         // A separate executor to ensure the message verification sender (above) and receiver (below) are
         // not blocking each other.
         // TODO: make this configurable
-        let executor = BoundedExecutor::new(8, Handle::current());
+        let executor = BoundedExecutor::new(200, Handle::current());
         loop {
             select! {
                 Some((msg, epoch, author, responder)) = verified_msg_stream.next() => {

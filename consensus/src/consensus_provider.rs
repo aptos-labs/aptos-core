@@ -65,7 +65,7 @@ pub fn start_consensus(
     let (self_sender, self_receiver) =
         aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
-    let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
+    let bounded_executor = BoundedExecutor::new(32, runtime.handle().clone());
 
     let execution_client = Arc::new(ExecutionProxyClient::new(
         Arc::new(execution_proxy),
