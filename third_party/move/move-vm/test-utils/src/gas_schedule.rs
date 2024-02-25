@@ -513,6 +513,7 @@ impl<'b> GasMeter for GasStatus<'b> {
 
     fn charge_dependency(
         &mut self,
+        _is_new: bool,
         _addr: &AccountAddress,
         _name: &IdentStr,
         _size: NumBytes,

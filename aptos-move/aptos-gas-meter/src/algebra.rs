@@ -240,17 +240,15 @@ impl GasAlgebra for StandardGasAlgebra {
     }
 
     fn count_dependency(&mut self, size: NumBytes) -> PartialVMResult<()> {
-        if self.feature_version >= 14 {
+        if self.feature_version >= 15 {
             self.num_dependencies += 1.into();
             self.total_dependency_size += size;
 
             if self.num_dependencies > self.vm_gas_params.txn.max_num_dependencies {
-                return Err(PartialVMError::new(StatusCode::TOO_MANY_DEPENDENCIES));
+                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
             }
             if self.total_dependency_size > self.vm_gas_params.txn.max_total_dependency_size {
-                return Err(PartialVMError::new(
-                    StatusCode::TOTAL_DEPENDENCY_SIZE_TOO_BIG,
-                ));
+                return Err(PartialVMError::new(StatusCode::DEPENDENCY_LIMIT_REACHED));
             }
         }
         Ok(())

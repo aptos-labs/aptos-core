@@ -243,35 +243,20 @@ impl ModuleId {
         key
     }
 
-    pub fn module_id_ref(&self) -> ModuleIdRef {
-        ModuleIdRef {
-            address: &self.address,
-            name: self.name.as_ident_str(),
-        }
+    pub fn as_refs(&self) -> (&AccountAddress, &IdentStr) {
+        (&self.address, self.name.as_ident_str())
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
-pub struct ModuleIdRef<'a> {
-    address: &'a AccountAddress,
-    name: &'a IdentStr,
-}
-
-impl<'a> ModuleIdRef<'a> {
-    pub fn new(address: &'a AccountAddress, name: &'a IdentStr) -> Self {
-        Self { address, name }
+impl<'a> hashbrown::Equivalent<(&'a AccountAddress, &'a IdentStr)> for ModuleId {
+    fn equivalent(&self, other: &(&'a AccountAddress, &'a IdentStr)) -> bool {
+        &self.address == other.0 && self.name.as_ident_str() == other.1
     }
 }
 
-impl<'a> hashbrown::Equivalent<ModuleIdRef<'a>> for ModuleId {
-    fn equivalent(&self, other: &ModuleIdRef<'a>) -> bool {
-        &self.address == other.address && self.name.as_ident_str() == other.name
-    }
-}
-
-impl<'a> hashbrown::Equivalent<ModuleId> for ModuleIdRef<'a> {
+impl<'a> hashbrown::Equivalent<ModuleId> for (&'a AccountAddress, &'a IdentStr) {
     fn equivalent(&self, other: &ModuleId) -> bool {
-        self.address == &other.address && self.name == other.name.as_ident_str()
+        self.0 == &other.address && self.1 == other.name.as_ident_str()
     }
 }
 
@@ -435,7 +420,7 @@ mod tests {
     proptest! {
         #[test]
         fn module_id_ref_equivalence(module_id in any::<ModuleId>()) {
-            let module_id_ref = module_id.module_id_ref();
+            let module_id_ref = module_id.as_refs();
 
             assert!(module_id.equivalent(&module_id_ref));
             assert!(module_id_ref.equivalent(&module_id));
@@ -449,7 +434,7 @@ mod tests {
                 s.finish()
             }
 
-            let module_id_ref = module_id.module_id_ref();
+            let module_id_ref = module_id.as_refs();
 
             assert_eq!(calculate_hash(&module_id), calculate_hash(&module_id_ref))
         }

@@ -60,15 +60,12 @@ fn load_module_impl(
             return Ok(blob.clone());
         }
     }
-    match remote.get_module(module_id)? {
-        Some(bytes) => Ok(bytes),
-        None => Err(
-            PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!(
-                "Linker Error: Cannot find {:?} in data cache",
-                module_id
-            )),
-        ),
-    }
+    remote.get_module(module_id)?.ok_or_else(|| {
+        PartialVMError::new(StatusCode::LINKER_ERROR).with_message(format!(
+            "Linker Error: Cannot find {:?} in data cache",
+            module_id
+        ))
+    })
 }
 
 /// Transaction data cache. Keep updates within a transaction so they can all be published at

@@ -303,6 +303,7 @@ pub trait GasMeter {
 
     fn charge_dependency(
         &mut self,
+        is_new: bool,
         addr: &AccountAddress,
         name: &IdentStr,
         size: NumBytes,
@@ -545,6 +546,7 @@ impl GasMeter for UnmeteredGasMeter {
 
     fn charge_dependency(
         &mut self,
+        _is_new: bool,
         _addr: &AccountAddress,
         _name: &IdentStr,
         _size: NumBytes,

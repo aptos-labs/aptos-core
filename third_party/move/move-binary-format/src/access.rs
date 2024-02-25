@@ -216,7 +216,7 @@ pub trait ModuleAccess: Sync {
     fn immediate_friends_iter(
         &self,
     ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
-        self.module_handles().iter().map(|handle| {
+        self.friend_decls().iter().map(|handle| {
             let addr = self.address_identifier_at(handle.address);
             let name = self.identifier_at(handle.name);
             (addr, name)

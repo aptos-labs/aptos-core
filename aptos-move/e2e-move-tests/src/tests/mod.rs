@@ -12,6 +12,7 @@ mod chain_id;
 mod code_publishing;
 mod common;
 mod constructor_args;
+mod dependencies;
 mod error_map;
 mod fee_payer;
 mod fungible_asset;

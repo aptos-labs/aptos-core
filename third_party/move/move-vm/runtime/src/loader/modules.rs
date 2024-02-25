@@ -22,8 +22,9 @@ use move_binary_format::{
     },
 };
 use move_core_types::{
+    account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
-    language_storage::{ModuleId, ModuleIdRef},
+    language_storage::ModuleId,
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::runtime_types::{
@@ -44,7 +45,7 @@ use std::{
 pub trait ModuleStorage {
     fn store_module(&self, module_id: &ModuleId, binary: Module) -> Arc<Module>;
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>>;
-    fn fetch_module_by_ref(&self, module_id_ref: &ModuleIdRef) -> Option<Arc<Module>>;
+    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>>;
 }
 
 pub(crate) struct ModuleCache(RwLock<BinaryCache<ModuleId, Module>>);
@@ -74,8 +75,8 @@ impl ModuleStorage for ModuleCache {
         self.0.read().get(module_id).map(Arc::clone)
     }
 
-    fn fetch_module_by_ref(&self, module_id_ref: &ModuleIdRef) -> Option<Arc<Module>> {
-        self.0.read().get(module_id_ref).map(Arc::clone)
+    fn fetch_module_by_ref(&self, addr: &AccountAddress, name: &IdentStr) -> Option<Arc<Module>> {
+        self.0.read().get(&(addr, name)).map(Arc::clone)
     }
 }
 
@@ -94,8 +95,12 @@ impl ModuleStorageAdapter {
         self.modules.fetch_module(id)
     }
 
-    pub(crate) fn module_at_by_ref(&self, id: &ModuleIdRef) -> Option<Arc<Module>> {
-        self.modules.fetch_module_by_ref(id)
+    pub(crate) fn module_at_by_ref(
+        &self,
+        addr: &AccountAddress,
+        name: &IdentStr,
+    ) -> Option<Arc<Module>> {
+        self.modules.fetch_module_by_ref(addr, name)
     }
 
     pub(crate) fn insert(
