@@ -84,7 +84,7 @@ pub enum KnownAttributeKind {
     ResourceGroup = 2,
     ResourceGroupMember = 3,
     Event = 4,
-    UsesRandomness = 5,
+    Unbiasable = 5,
 }
 
 impl KnownAttribute {
@@ -149,15 +149,15 @@ impl KnownAttribute {
         self.kind == KnownAttributeKind::Event as u8
     }
 
-    pub fn uses_randomness() -> Self {
+    pub fn unbiasable() -> Self {
         Self {
-            kind: KnownAttributeKind::UsesRandomness as u8,
+            kind: KnownAttributeKind::Unbiasable as u8,
             args: vec![],
         }
     }
 
-    pub fn is_uses_randomness(&self) -> bool {
-        self.kind == KnownAttributeKind::UsesRandomness as u8
+    pub fn is_unbiasable(&self) -> bool {
+        self.kind == KnownAttributeKind::Unbiasable as u8
     }
 }
 
@@ -345,13 +345,13 @@ pub struct AttributeValidationError {
     pub attribute: u8,
 }
 
-pub fn is_valid_function_which_uses_randomness(
+pub fn is_valid_unbiasable_function(
     functions: &BTreeMap<Identifier, Function>,
     fun: &str,
 ) -> Result<(), AttributeValidationError> {
     if let Ok(ident_fun) = Identifier::new(fun) {
         if let Some(f) = functions.get(&ident_fun) {
-            if f.is_entry {
+            if f.is_entry && !f.visibility.is_public() {
                 return Ok(());
             }
         }
@@ -359,7 +359,7 @@ pub fn is_valid_function_which_uses_randomness(
 
     Err(AttributeValidationError {
         key: fun.to_string(),
-        attribute: KnownAttributeKind::UsesRandomness as u8,
+        attribute: KnownAttributeKind::Unbiasable as u8,
     })
 }
 
@@ -448,8 +448,8 @@ pub fn verify_module_metadata(
         for attr in attrs {
             if attr.is_view_function() {
                 is_valid_view_function(&functions, fun)?;
-            } else if attr.is_uses_randomness() {
-                is_valid_function_which_uses_randomness(&functions, fun)?;
+            } else if attr.is_unbiasable() {
+                is_valid_unbiasable_function(&functions, fun)?;
             } else {
                 return Err(AttributeValidationError {
                     key: fun.clone(),

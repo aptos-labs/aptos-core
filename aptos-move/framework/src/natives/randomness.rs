@@ -1,6 +1,5 @@
 // Copyright © Aptos Foundation
 
-use crate::natives::transaction_context::NativeTransactionContext;
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
@@ -10,18 +9,23 @@ use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
-const E_NON_ANNOTATED_RANDOMNESS_ENTRY_FUNCTION: u64 = 2;
+const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
 
-/// A txn-local counter that increments each time a random 32-byte blob is requested.
 #[derive(Tid, Default)]
 pub struct RandomnessContext {
-    txn_local_state: Vec<u8>, //   8-byte counter
+    // A txn-local 8-byte counter that increments each time a random 32-byte
+    // blob is requested.
+    txn_local_state: Vec<u8>,
+    // True if the current transaction's payload was a public(friend) or
+    // private entry function, which also had `#[unbiasable]` annotation.
+    unbiasable: bool,
 }
 
 impl RandomnessContext {
     pub fn new() -> Self {
         Self {
             txn_local_state: vec![0; 8],
+            unbiasable: false,
         }
     }
 
@@ -35,6 +39,14 @@ impl RandomnessContext {
             }
         }
     }
+
+    pub fn mark_unbiasable(&mut self) {
+        self.unbiasable = true;
+    }
+
+    pub fn is_unbiasable(&self) -> bool {
+        self.unbiasable
+    }
 }
 
 pub fn fetch_and_increment_txn_counter(
@@ -42,33 +54,34 @@ pub fn fetch_and_increment_txn_counter(
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    // Because we need to run a special transaction prologue to pre-charge maximum
-    // amount of gas, we require all callers to have an annotation that they use
-    // randomness. This property is only checked at runtime here.
-    let txn_ctx = context.extensions().get::<NativeTransactionContext>();
-    if !txn_ctx.get_uses_randomness() {
+    let ctx = context.extensions_mut().get_mut::<RandomnessContext>();
+    if !ctx.is_unbiasable() {
         return Err(SafeNativeError::Abort {
-            abort_code: E_NON_ANNOTATED_RANDOMNESS_ENTRY_FUNCTION,
+            abort_code: E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT,
         });
     }
 
     // TODO: charge gas?
-    let rand_ctx = context.extensions_mut().get_mut::<RandomnessContext>();
-    let ret = rand_ctx.txn_local_state.to_vec();
-    rand_ctx.increment();
+    let ret = ctx.txn_local_state.to_vec();
+    ctx.increment();
     Ok(smallvec![Value::vector_u8(ret)])
 }
 
-pub fn is_safe_call(
+pub fn is_unbiasable(
     context: &mut SafeNativeContext,
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    let ctx = context.extensions().get::<NativeTransactionContext>();
+    // Because we need to run a special transaction prologue to pre-charge maximum
+    // amount of gas, we require all callers to have an annotation that the entry
+    // function call is unbiasable. This property is only checked at runtime here.
+    let is_unbiasable = context
+        .extensions()
+        .get::<RandomnessContext>()
+        .is_unbiasable();
+
     // TODO: charge gas?
-    Ok(smallvec![Value::bool(
-        ctx.get_is_friend_or_private_entry_func()
-    )])
+    Ok(smallvec![Value::bool(is_unbiasable)])
 }
 
 pub fn make_all(
@@ -79,7 +92,7 @@ pub fn make_all(
             "fetch_and_increment_txn_counter",
             fetch_and_increment_txn_counter as RawSafeNative,
         ),
-        ("is_safe_call", is_safe_call),
+        ("is_unbiasable", is_unbiasable),
     ];
 
     builder.make_named_natives(natives)

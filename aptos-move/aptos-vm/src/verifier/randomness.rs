@@ -8,8 +8,8 @@ use move_binary_format::{
     CompiledModule,
 };
 
-/// Returns true if function has an annotation that it uses randomness.
-pub(crate) fn does_entry_function_use_randomness(
+/// Returns true if function has an annotation that it is unbiasable.
+pub(crate) fn is_entry_function_unbiasable(
     session: &mut SessionExt,
     entry_fn: &EntryFunction,
 ) -> VMResult<bool> {
@@ -25,7 +25,7 @@ pub(crate) fn does_entry_function_use_randomness(
         Ok(metadata
             .fun_attributes
             .get(entry_fn.function().as_str())
-            .map(|attrs| attrs.iter().any(|attr| attr.is_uses_randomness()))
+            .map(|attrs| attrs.iter().any(|attr| attr.is_unbiasable()))
             .unwrap_or(false))
     } else {
         Ok(false)

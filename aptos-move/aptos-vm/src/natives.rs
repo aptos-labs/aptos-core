@@ -227,10 +227,11 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
 
     exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
     exts.add(NativeCodeContext::default());
-    let mut txn_context = NativeTransactionContext::new(vec![1], vec![1], ChainId::test().id());
-    txn_context.set_uses_randomness();
-    txn_context.set_is_friend_or_private_entry_func();
-    exts.add(txn_context); // We use the testing environment chain ID here
+    exts.add(NativeTransactionContext::new(
+        vec![1],
+        vec![1],
+        ChainId::test().id(),
+    ));
     exts.add(NativeAggregatorContext::new(
         [0; 32],
         &*DUMMY_RESOLVER,
@@ -239,5 +240,8 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
-    exts.add(RandomnessContext::new());
+
+    let mut randomness_ctx = RandomnessContext::new();
+    randomness_ctx.mark_unbiasable();
+    exts.add(randomness_ctx);
 }

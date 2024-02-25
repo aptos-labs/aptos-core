@@ -1,5 +1,5 @@
 [package]
-name = "randomness_invalid_test"
+name = "randomness_invalid_test_public_entry"
 version = "0.0.0"
 
 [dependencies]

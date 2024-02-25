@@ -1,6 +1,6 @@
 module 0x1::invalid {
-    #[uses_randomness]
-    public fun foo() {
+    #[unbiasable]
+    public entry fun foo() {
         // Do nothing.
     }
 }

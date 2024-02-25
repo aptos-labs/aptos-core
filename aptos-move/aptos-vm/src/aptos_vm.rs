@@ -18,14 +18,14 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation, verifier,
-    verifier::uses_randomness::does_entry_function_use_randomness,
+    verifier::randomness::is_entry_function_unbiasable,
     zkid_validation, VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::{
-    natives::{code::PublishRequest, transaction_context::NativeTransactionContext},
+    natives::{code::PublishRequest, randomness::RandomnessContext},
     RuntimeModuleMetadataV1,
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
@@ -738,25 +738,18 @@ impl AptosVM {
                 module_id.name(),
             )])?;
         }
-
-        let uses_randomness = does_entry_function_use_randomness(session, script_fn)?;
-        if uses_randomness {
-            let txn_context = session
-                .get_native_extensions()
-                .get_mut::<NativeTransactionContext>();
-            txn_context.set_uses_randomness();
-        }
-
+    
         let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
             script_fn.module(),
             script_fn.function(),
             script_fn.ty_args(),
         )?;
-        if is_friend_or_private {
+
+        if is_friend_or_private && is_entry_function_unbiasable(session, script_fn)? {
             let txn_context = session
                 .get_native_extensions()
-                .get_mut::<NativeTransactionContext>();
-            txn_context.set_is_friend_or_private_entry_func();
+                .get_mut::<RandomnessContext>();
+            txn_context.mark_unbiasable();
         }
 
         let struct_constructors = self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);

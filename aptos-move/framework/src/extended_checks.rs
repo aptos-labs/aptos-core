@@ -41,7 +41,7 @@ const RESOURCE_GROUP: &str = "resource_group";
 const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
 const RESOURCE_GROUP_NAME: &str = "group";
 const RESOURCE_GROUP_SCOPE: &str = "scope";
-const USES_RANDOMNESS_ATTRIBUTE: &str = "uses_randomness";
+const UNBIASABLE_ATTRIBUTE: &str = "unbiasable";
 const VIEW_FUN_ATTRIBUTE: &str = "view";
 
 // top-level attribute names, only.
@@ -52,7 +52,7 @@ pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
         RESOURCE_GROUP_MEMBER,
         VIEW_FUN_ATTRIBUTE,
         EVENT_STRUCT_ATTRIBUTE,
-        USES_RANDOMNESS_ATTRIBUTE,
+        UNBIASABLE_ATTRIBUTE,
     ];
 
     fn extended_attribute_names() -> BTreeSet<String> {
@@ -116,7 +116,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);
                 self.check_entry_functions(module);
-                self.check_and_record_functions_using_randomness(module);
+                self.check_and_record_unbiasabale_entry_functions(module);
                 self.check_and_record_events(module);
                 self.check_init_module(module);
                 self.build_error_map(module)
@@ -455,24 +455,23 @@ impl<'a> ExtendedChecker<'a> {
 }
 
 // ----------------------------------------------------------------------------------
-// Uses Randomness
+// Unbiasable entry functions
 
 impl<'a> ExtendedChecker<'a> {
-    fn check_and_record_functions_using_randomness(&mut self, module: &ModuleEnv) {
+    fn check_and_record_unbiasabale_entry_functions(&mut self, module: &ModuleEnv) {
         for ref fun in module.get_functions() {
-            if !self.has_attribute(fun, USES_RANDOMNESS_ATTRIBUTE) {
+            if !self.has_attribute(fun, UNBIASABLE_ATTRIBUTE) {
                 continue;
             }
 
-            // Only entry functions can have this annotation.
-            if !fun.is_entry() {
+            if !fun.is_entry() || fun.visibility().is_public() {
                 self.env.error(
                     &fun.get_id_loc(),
-                    "only entry functions can have #[uses_randomness] annotation",
+                    "only private or public(friend) entry functions can have #[unbiasable] attribute",
                 )
             }
 
-            // Record functions which use randomness.
+            // Record functions which are unbiasable.
             let module_id = self.get_runtime_module_id(module);
             self.output
                 .entry(module_id)
@@ -480,7 +479,7 @@ impl<'a> ExtendedChecker<'a> {
                 .fun_attributes
                 .entry(fun.get_simple_name_string().to_string())
                 .or_default()
-                .push(KnownAttribute::uses_randomness());
+                .push(KnownAttribute::unbiasable());
         }
     }
 }
