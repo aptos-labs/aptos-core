@@ -814,8 +814,21 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    /// Updates the major version to a larger version.
-    /// This can be called by on chain governance.
+    /// Used in on-chain governances to update the major version for the next epoch.
+    /// Example usage:
+    /// ```
+    /// aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);
+    /// aptos_framework::aptos_governance::reconfigure(&framework_signer);
+    /// ```
+    VersionSetForNextEpoch {
+        major: u64,
+    },
+
+    /// Deprecated by `set_for_next_epoch()`.
+    ///
+    /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+    ///
+    /// TODO: update all the tests that reference this function, then disable this function.
     VersionSetVersion {
         major: u64,
     },
@@ -1404,6 +1417,7 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
+            VersionSetForNextEpoch { major } => version_set_for_next_epoch(major),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
             VestingDistribute { contract_address } => vesting_distribute(contract_address),
@@ -3748,8 +3762,32 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
-/// Updates the major version to a larger version.
-/// This can be called by on chain governance.
+/// Used in on-chain governances to update the major version for the next epoch.
+/// Example usage:
+/// ```
+/// aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);
+/// aptos_framework::aptos_governance::reconfigure(&framework_signer);
+/// ```
+pub fn version_set_for_next_epoch(major: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("version").to_owned(),
+        ),
+        ident_str!("set_for_next_epoch").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&major).unwrap()],
+    ))
+}
+
+/// Deprecated by `set_for_next_epoch()`.
+///
+/// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+///
+/// TODO: update all the tests that reference this function, then disable this function.
 pub fn version_set_version(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -5407,6 +5445,16 @@ mod decoder {
         }
     }
 
+    pub fn version_set_for_next_epoch(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VersionSetForNextEpoch {
+                major: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn version_set_version(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetVersion {
@@ -6039,6 +6087,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_proxy_set_voter".to_string(),
             Box::new(decoder::staking_proxy_set_voter),
+        );
+        map.insert(
+            "version_set_for_next_epoch".to_string(),
+            Box::new(decoder::version_set_for_next_epoch),
         );
         map.insert(
             "version_set_version".to_string(),
