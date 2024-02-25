@@ -193,7 +193,14 @@ impl WriteTransient {
 
 impl Dependency {
     fn to_erased(&self) -> Node<InternalGas> {
-        Node::new(format!("{}", Render(&self.id)), self.cost)
+        Node::new(
+            format!(
+                "{}{}",
+                Render(&self.id),
+                if self.is_new { " (new)" } else { "" }
+            ),
+            self.cost,
+        )
     }
 }
 

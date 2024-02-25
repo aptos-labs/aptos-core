@@ -31,18 +31,18 @@ fn collect_all_with_cycle_detection<F: Fn(&ModuleId) -> PartialVMResult<Vec<Modu
         target_module_id: &ModuleId,
         cursor_module_id: &ModuleId,
         immediate_nexts: &F,
-        visited_modules: &mut BTreeSet<ModuleId>,
+        traversal_context: &mut BTreeSet<ModuleId>,
     ) -> PartialVMResult<bool> {
         if cursor_module_id == target_module_id {
             return Ok(true);
         }
-        if visited_modules.insert(cursor_module_id.clone()) {
+        if traversal_context.insert(cursor_module_id.clone()) {
             for next in immediate_nexts(cursor_module_id)? {
                 if collect_all_with_cycle_detection_recursive(
                     target_module_id,
                     &next,
                     immediate_nexts,
-                    visited_modules,
+                    traversal_context,
                 )? {
                     return Ok(true);
                 }
@@ -51,18 +51,18 @@ fn collect_all_with_cycle_detection<F: Fn(&ModuleId) -> PartialVMResult<Vec<Modu
         Ok(false)
     }
 
-    let mut visited_modules = BTreeSet::new();
+    let mut traversal_context = BTreeSet::new();
     for item in items_to_explore {
         if collect_all_with_cycle_detection_recursive(
             target_module_id,
             item,
             immediate_nexts,
-            &mut visited_modules,
+            &mut traversal_context,
         )? {
             return Err(PartialVMError::new(error_on_cycle));
         }
     }
-    Ok(visited_modules)
+    Ok(traversal_context)
 }
 
 pub fn verify_module<D, F>(module: &CompiledModule, imm_deps: D, imm_friends: F) -> VMResult<()>

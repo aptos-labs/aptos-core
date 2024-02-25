@@ -250,11 +250,15 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     };
 
     // Extract the module/script closure
-    let mut visited_modules = BTreeSet::new();
+    let mut traversal_context = BTreeSet::new();
     for (_, mident, mdef) in &expansion_ast.modules {
         let src_file_hash = mdef.loc.file_hash();
         if !dep_files.contains(&src_file_hash) {
-            collect_related_modules_recursive(mident, &expansion_ast.modules, &mut visited_modules);
+            collect_related_modules_recursive(
+                mident,
+                &expansion_ast.modules,
+                &mut traversal_context,
+            );
         }
     }
     for sdef in expansion_ast.scripts.values() {
@@ -264,7 +268,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
                 collect_related_modules_recursive(
                     mident,
                     &expansion_ast.modules,
-                    &mut visited_modules,
+                    &mut traversal_context,
                 );
             }
         }
@@ -274,7 +278,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            visited_modules.contains(&mident.value).then(|| {
+            traversal_context.contains(&mident.value).then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
@@ -484,15 +488,15 @@ fn check_and_update_friend_info(mut builder: ModelBuilder) {
 fn collect_related_modules_recursive<'a>(
     mident: &'a ModuleIdent_,
     modules: &'a UniqueMap<ModuleIdent, E::ModuleDefinition>,
-    visited_modules: &mut BTreeSet<ModuleIdent_>,
+    traversal_context: &mut BTreeSet<ModuleIdent_>,
 ) {
-    if visited_modules.contains(mident) {
+    if traversal_context.contains(mident) {
         return;
     }
     let mdef = modules.get_(mident).unwrap();
-    visited_modules.insert(*mident);
+    traversal_context.insert(*mident);
     for (_, next_mident, _) in &mdef.immediate_neighbors {
-        collect_related_modules_recursive(next_mident, modules, visited_modules);
+        collect_related_modules_recursive(next_mident, modules, traversal_context);
     }
 }
 

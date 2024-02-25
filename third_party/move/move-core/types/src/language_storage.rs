@@ -251,6 +251,11 @@ impl ModuleId {
     }
 }
 
+/// Alternative representation of `ModuleId` that consists of one reference to the address and
+/// another reference to the name.
+///
+/// This can be used to avoid creating new `ModuleId`s (and thus heap allocation) in certain
+/// scenarios.
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub struct ModuleIdRef<'a> {
     address: &'a AccountAddress,

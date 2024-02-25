@@ -164,7 +164,7 @@ where
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
 
-        fn charge_dependency(&mut self, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
+        fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
     }
 
     #[inline]

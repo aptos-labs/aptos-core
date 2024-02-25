@@ -474,6 +474,7 @@ where
     #[inline]
     fn charge_dependency(
         &mut self,
+        _is_new: bool,
         addr: &AccountAddress,
         _name: &IdentStr,
         size: NumBytes,
