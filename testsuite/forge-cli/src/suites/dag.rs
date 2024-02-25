@@ -30,7 +30,7 @@ fn get_dag_on_realistic_env_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "dag_realistic_env_max_load" => dag_realistic_env_max_load_test(duration, test_cmd, 20, 0),
+        "dag_realistic_env_max_load" => dag_realistic_env_max_load_test(duration, test_cmd, 100, 0),
         "dag_changing_working_quorum_test" => dag_changing_working_quorum_test(),
         "dag_reconfig_enable_test" => dag_reconfig_enable_test(),
         _ => return None, // The test name does not match a dag realistic-env test
