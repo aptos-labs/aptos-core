@@ -805,7 +805,7 @@ fn quorum_store_backlog_txn_limit_count(
         .consensus
         .quorum_store
         .back_pressure
-        .backlog_txn_limit_count = 60_000;
+        .backlog_txn_limit_count = 20_000;
     config
         .consensus
         .quorum_store
