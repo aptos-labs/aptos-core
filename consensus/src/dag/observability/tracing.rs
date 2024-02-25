@@ -17,7 +17,8 @@ pub enum NodeStage {
 
 #[derive(strum_macros::AsRefStr)]
 pub enum RoundStage {
-    NodeBroadcasted,
+    NodeBroadcastedQuorum,
+    NodeBroadcastedAll,
     CertifiedNodeBroadcasted,
     StrongLinkReceived,
     Finished,
