@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: expected `Test::X` but found `Test::T`
+  ┌─ tests/checking/typing/v1-commands/unpack_wrong_type.move:6:9
+  │
+6 │         X { b: _ } = t;
+  │         ^^^^^^^^^^

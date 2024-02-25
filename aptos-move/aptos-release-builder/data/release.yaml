@@ -151,16 +151,16 @@ proposals:
       - FeatureFlag:
           enabled:
             - jwk_consensus
-  - name: step_12_enable_zkid
+  - name: step_12_enable_oidb
     metadata:
       title: "AIP-61: OpenID blockchain (OIDB) accounts"
-      description: "Enable validation of zkID transactions, allowing users to transact using their Web2 accounts"
+      description: "Enable validation of OIDB transactions, allowing users to transact using their Web2 accounts"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/297"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - zk_id_signature
+            - oidb_signature
   - name: step_13_start_watching_google_jwks
     metadata:
       title: "Start JWK consensus for Google"

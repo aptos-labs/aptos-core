@@ -26,4 +26,7 @@ impl Experiment {
     /// A flag which allows to turn off safety checks, like reference safety.
     /// Retention: permanent.
     pub const NO_SAFETY: &'static str = "no-safety";
+    /// A flag which allows to turn on the critical edge splitting pass.
+    /// Retention: temporary. This should be removed after the pass can be tested.
+    pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
 }

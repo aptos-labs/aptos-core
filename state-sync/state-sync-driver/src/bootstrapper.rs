@@ -1030,6 +1030,7 @@ impl<
         if let Err(error) = self
             .storage_synchronizer
             .save_state_values(notification_id, state_value_chunk_with_proof)
+            .await
         {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
                 notification_id,

@@ -81,9 +81,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.7.7"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a824f2aa7e75a0c98c5a504fceb80649e9c35265d44525b5f94de4771a395cd"
+checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
 dependencies = [
  "getrandom 0.2.11",
  "once_cell",
@@ -92,9 +92,9 @@ dependencies = [
 
 [[package]]
 name = "ahash"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c3a9648d43b9cd48db467b3f87fdd6e146bcc88ab0180006cef2179fe11d01"
+checksum = "42cd52102d3df161c77a887b608d7a4897d7cc112886a9537b738a887a03aaff"
 dependencies = [
  "cfg-if",
  "getrandom 0.2.11",
@@ -2287,6 +2287,7 @@ name = "aptos-indexer-grpc-server-framework"
 version = "1.0.0"
 dependencies = [
  "anyhow",
+ "aptos-admin-service",
  "aptos-metrics-core",
  "aptos-runtimes",
  "async-trait",
@@ -2772,7 +2773,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
 dependencies = [
  "chrono",
 ]
@@ -2795,6 +2796,7 @@ dependencies = [
  "derivative",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "proptest",
  "proptest-derive 0.4.0",
  "rayon",
@@ -3071,6 +3073,7 @@ dependencies = [
  "hex",
  "jemallocator",
  "maplit",
+ "num_cpus",
  "rand 0.7.3",
  "rayon",
  "rstack-self",
@@ -3283,8 +3286,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-protos"
-version = "1.1.2"
-source = "git+https://github.com/aptos-labs/aptos-core.git?rev=af0dcea7144225a709e4f595e58f8026b99e901c#af0dcea7144225a709e4f595e58f8026b99e901c"
+version = "1.3.0"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -3297,6 +3299,7 @@ dependencies = [
 [[package]]
 name = "aptos-protos"
 version = "1.3.0"
+source = "git+https://github.com/aptos-labs/aptos-core.git?rev=5d1cefad0ea0d37fb08e9aec7847080745c83f9c#5d1cefad0ea0d37fb08e9aec7847080745c83f9c"
 dependencies = [
  "futures-core",
  "pbjson",
@@ -4133,6 +4136,7 @@ dependencies = [
  "aptos-bitvec",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-dkg",
  "aptos-experimental-runtimes",
  "ark-bn254",
  "ark-ff",
@@ -4148,6 +4152,7 @@ dependencies = [
  "claims",
  "coset",
  "derivative",
+ "fixed",
  "hex",
  "itertools 0.10.5",
  "jsonwebtoken 8.3.0",
@@ -4399,6 +4404,7 @@ dependencies = [
  "either",
  "move-binary-format",
  "move-core-types",
+ "move-vm-types",
  "rand 0.7.3",
  "serde",
  "test-case",
@@ -5157,6 +5163,12 @@ dependencies = [
  "axum 0.5.17",
  "tokio",
 ]
+
+[[package]]
+name = "az"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
 
 [[package]]
 name = "backoff"
@@ -7853,6 +7865,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fcfdc7a0362c9f4444381a9e697c79d435fe65b52a37466fc2c1184cee9edc6"
 
 [[package]]
+name = "fixed"
+version = "1.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e29e5681dc8556fb9df1409e95eae050e12e8776394313da3546dcb8cf390c73"
+dependencies = [
+ "az",
+ "bytemuck",
+ "half 2.2.1",
+ "typenum",
+]
+
+[[package]]
 name = "fixed-hash"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8576,7 +8600,7 @@ version = "0.17.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "114a100a9aa9f4c468a7b9e96626cdab267bb652660d8408e8f6d56d4c310edd"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "camino",
  "cargo_metadata 0.18.1",
  "cfg-if",
@@ -8696,7 +8720,7 @@ version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 dependencies = [
- "ahash 0.7.7",
+ "ahash 0.7.8",
 ]
 
 [[package]]
@@ -8705,7 +8729,7 @@ version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a3c133739dddd0d2990f9a4bdf8eb4b21ef50e4851ca85ab661199821d510e"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
 ]
 
 [[package]]
@@ -8714,7 +8738,7 @@ version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "allocator-api2",
 ]
 
@@ -9327,7 +9351,7 @@ version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "321f0f839cd44a4686e9504b0a62b4d69a50b62072144c71c68f5873c167b8d9"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "clap 4.4.14",
  "crossbeam-channel",
  "crossbeam-utils",
@@ -9371,7 +9395,7 @@ version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ab388864246d58a276e60e7569a833d9cc4cd75c66e5ca77c177dad38e59996"
 dependencies = [
- "ahash 0.7.7",
+ "ahash 0.7.8",
  "dashmap",
  "hashbrown 0.12.3",
  "once_cell",
@@ -11377,6 +11401,7 @@ dependencies = [
  "bcs 0.1.4",
  "claims",
  "derivative",
+ "itertools 0.10.5",
  "move-binary-format",
  "move-core-types",
  "once_cell",
@@ -12977,12 +13002,12 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
 dependencies = [
- "ahash 0.8.7",
+ "ahash 0.8.8",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2)",
- "aptos-protos 1.1.2",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c)",
+ "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=5d1cefad0ea0d37fb08e9aec7847080745c83f9c)",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -14586,7 +14611,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=9936ec73cef251fb01fd2c47412e064cad3975c2#9936ec73cef251fb01fd2c47412e064cad3975c2"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -15,7 +15,6 @@ use aptos_aggregator::{
     bounded_math::SignedU128,
     delayed_change::{DelayedApplyChange, DelayedChange},
     delta_change_set::DeltaWithMax,
-    types::DelayedFieldID,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -34,6 +33,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
 
 /// Testcases:
