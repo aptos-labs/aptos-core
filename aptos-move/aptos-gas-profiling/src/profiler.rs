@@ -472,14 +472,17 @@ where
 
     fn charge_dependency(
         &mut self,
+        is_new: bool,
         addr: &AccountAddress,
         name: &IdentStr,
         size: NumBytes,
     ) -> PartialVMResult<()> {
-        let (cost, res) = self.delegate_charge(|base| base.charge_dependency(addr, name, size));
+        let (cost, res) =
+            self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
 
         if !cost.is_zero() {
             self.dependencies.push(Dependency {
+                is_new,
                 id: ModuleId::new(*addr, name.to_owned()),
                 size,
                 cost,

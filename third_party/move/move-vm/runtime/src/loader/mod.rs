@@ -4,9 +4,10 @@
 
 use crate::{
     config::VMConfig, data_cache::TransactionDataCache, logging::expect_no_verification_errors,
-    native_functions::NativeFunctions, session::LoadedFunctionInstantiation,
+    module_traversal::TraversalContext, native_functions::NativeFunctions,
+    session::LoadedFunctionInstantiation,
 };
-use hashbrown::{Equivalent, HashMap};
+use hashbrown::Equivalent;
 use lazy_static::lazy_static;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
@@ -25,7 +26,7 @@ use move_core_types::{
     gas_algebra::{NumBytes, NumTypeNodes},
     ident_str,
     identifier::IdentStr,
-    language_storage::{ModuleId, ModuleIdRef, StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -65,7 +66,7 @@ pub(crate) struct BinaryCache<K, V> {
     // Notice that we are using the HashMap implementation from the hashbrown crate, not the
     // one from std, as it allows alternative key representations to be used for lookup,
     // making certain optimizations possible.
-    id_map: HashMap<K, usize>,
+    id_map: hashbrown::HashMap<K, usize>,
     binaries: Vec<Arc<V>>,
 }
 
@@ -75,7 +76,7 @@ where
 {
     fn new() -> Self {
         Self {
-            id_map: HashMap::new(),
+            id_map: hashbrown::HashMap::new(),
             binaries: vec![],
         }
     }
@@ -256,6 +257,7 @@ impl Loader {
         module_store: &ModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         script_blob: &[u8],
     ) -> VMResult<()> {
         let mut sha3_256 = Sha3_256::new();
@@ -263,12 +265,15 @@ impl Loader {
         let hash_value: [u8; 32] = sha3_256.finalize().into();
 
         let script = data_store.load_compiled_script_to_cache(script_blob, hash_value)?;
+        let script = traversal_context.referenced_scripts.alloc(script);
 
-        // TODO(Gas): the script it self?
+        // TODO(Gas): Should we charge dependency gas for the script itself?
         self.check_dependencies_and_charge_gas(
             module_store,
             data_store,
             gas_meter,
+            &mut traversal_context.visited,
+            traversal_context.referenced_modules,
             script.immediate_dependencies_iter(),
         )?;
 
@@ -820,12 +825,12 @@ impl Loader {
     }
 
     /// Traverses the whole transitive closure of dependencies, starting from the specified
-    /// modules and perform gas metering.
+    /// modules and performs gas metering.
     ///
     /// The traversal follows a depth-first order, with the module itself being visited first,
     /// followed by its dependencies, and finally its friends.
-    /// Changing this order without a valid reason may affect the gas semantics and must be
-    /// avoided.
+    /// DO NOT CHANGE THE ORDER unless you have a good reason, or otherwise this could introduce
+    /// a breaking change to the gas semantics.
     ///
     /// This will result in the shallow-loading of the modules -- they will be read from the
     /// storage as bytes and then deserialized, but NOT converted into the runtime representation.
@@ -840,6 +845,8 @@ impl Loader {
         module_store: &ModuleStorageAdapter,
         data_store: &mut TransactionDataCache,
         gas_meter: &mut impl GasMeter,
+        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
+        referenced_modules: &'a Arena<Arc<CompiledModule>>,
         ids: I,
     ) -> VMResult<()>
     where
@@ -847,23 +854,21 @@ impl Loader {
         I::IntoIter: DoubleEndedIterator,
     {
         // Initialize the work list (stack) and the map of visited modules.
-        let mut stack = ids
-            .into_iter()
-            .rev()
-            .map(|(addr, name)| (addr, name, true))
-            .collect::<Vec<_>>();
-        let mut visited: BTreeMap<(&AccountAddress, &IdentStr), ()> = stack
-            .iter()
-            .map(|&(addr, name, _)| ((addr, name), ()))
-            .collect();
+        //
+        // TODO: Determine the reserved capacity based on the max number of dependencies allowed.
+        let mut stack = Vec::with_capacity(512);
 
-        let modules = Arena::with_capacity(512);
+        for (addr, name) in ids.into_iter().rev() {
+            // TODO: Allow the check of special addresses to be customized.
+            if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
+                stack.push((addr, name, true));
+            }
+        }
 
         while let Some((addr, name, allow_loading_failure)) = stack.pop() {
             // Load and deserialize the module only if it has not been cached by the loader.
             // Otherwise this will cause a significant regression in performance.
-            let (module, size) = match module_store.module_at_by_ref(&ModuleIdRef::new(addr, name))
-            {
+            let (module, size) = match module_store.module_at_by_ref(addr, name) {
                 Some(module) => (module.module.clone(), module.size),
                 None => {
                     let (module, size, _) = data_store.load_compiled_module_to_cache(
@@ -879,10 +884,10 @@ impl Loader {
             //
             // This is needed because we need to store references derived from it in the
             // work list.
-            let module = modules.alloc(module);
+            let module = referenced_modules.alloc(module);
 
             gas_meter
-                .charge_dependency(addr, name, NumBytes::new(size as u64))
+                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
                 .map_err(|err| {
                     err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
                 })?;
@@ -893,11 +898,53 @@ impl Loader {
                 .chain(module.immediate_friends_iter())
                 .rev()
             {
-                if let btree_map::Entry::Vacant(entry) = visited.entry((addr, name)) {
-                    entry.insert(());
+                // TODO: Allow the check of special addresses to be customized.
+                if !addr.is_special() && visited.insert((addr, name), ()).is_none() {
                     stack.push((addr, name, false));
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    /// Similar to `check_dependencies_and_charge_gas`, except that this does not recurse
+    /// into transitive dependencies and allows non-existent modules.
+    pub(crate) fn check_dependencies_and_charge_gas_non_recursive_optional<'a, I>(
+        &self,
+        module_store: &ModuleStorageAdapter,
+        data_store: &mut TransactionDataCache,
+        gas_meter: &mut impl GasMeter,
+        visited: &mut BTreeMap<(&'a AccountAddress, &'a IdentStr), ()>,
+        ids: I,
+    ) -> VMResult<()>
+    where
+        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+    {
+        for (addr, name) in ids.into_iter() {
+            // TODO: Allow the check of special addresses to be customized.
+            if !addr.is_special() && visited.insert((addr, name), ()).is_some() {
+                continue;
+            }
+
+            // Load and deserialize the module only if it has not been cached by the loader.
+            // Otherwise this will cause a significant regression in performance.
+            let size = match module_store.module_at_by_ref(addr, name) {
+                Some(module) => module.size,
+                None => match data_store
+                    .load_compiled_module_to_cache(ModuleId::new(*addr, name.to_owned()), true)
+                {
+                    Ok((_module, size, _hash)) => size,
+                    Err(err) if err.major_status() == StatusCode::LINKER_ERROR => continue,
+                    Err(err) => return Err(err),
+                },
+            };
+
+            gas_meter
+                .charge_dependency(false, addr, name, NumBytes::new(size as u64))
+                .map_err(|err| {
+                    err.finish(Location::Module(ModuleId::new(*addr, name.to_owned())))
+                })?;
         }
 
         Ok(())
@@ -956,11 +1003,11 @@ impl Loader {
         id: &ModuleId,
         data_store: &mut TransactionDataCache,
         allow_loading_failure: bool,
-    ) -> VMResult<(usize, Arc<CompiledModule>)> {
+    ) -> VMResult<(Arc<CompiledModule>, usize)> {
         let (module, size, hash_value) =
             data_store.load_compiled_module_to_cache(id.clone(), allow_loading_failure)?;
 
-        fail::fail_point!("verifier-failpoint-2", |_| { Ok((size, module.clone())) });
+        fail::fail_point!("verifier-failpoint-2", |_| { Ok((module.clone(), size)) });
 
         if self.vm_config.paranoid_type_checks && &module.self_id() != id {
             return Err(
@@ -980,7 +1027,7 @@ impl Loader {
 
         self.check_natives(&module)
             .map_err(expect_no_verification_errors)?;
-        Ok((size, module))
+        Ok((module, size))
     }
 
     // Everything in `load_and_verify_module` and also recursively load and verify all the
@@ -1003,7 +1050,7 @@ impl Loader {
         }
 
         // module self-check
-        let (size, module) =
+        let (module, size) =
             self.load_and_verify_module(id, data_store, allow_module_loading_failure)?;
         visited.insert(id.clone());
         friends_discovered.extend(module.immediate_friends());
@@ -1040,14 +1087,6 @@ impl Loader {
         allow_dependency_loading_failure: bool,
         dependencies_depth: usize,
     ) -> VMResult<()> {
-        if let Some(max_dependency_depth) = self.vm_config.verifier.max_dependency_depth {
-            if dependencies_depth > max_dependency_depth {
-                return Err(
-                    PartialVMError::new(StatusCode::MAX_DEPENDENCY_DEPTH_REACHED)
-                        .finish(Location::Undefined),
-                );
-            }
-        }
         // all immediate dependencies of the module being verified should be in one of the locations
         // - the verified portion of the bundle (e.g., verified before this module)
         // - the code cache (i.e., loaded already)
@@ -1145,14 +1184,6 @@ impl Loader {
         allow_friend_loading_failure: bool,
         dependencies_depth: usize,
     ) -> VMResult<()> {
-        if let Some(max_dependency_depth) = self.vm_config.verifier.max_dependency_depth {
-            if dependencies_depth > max_dependency_depth {
-                return Err(
-                    PartialVMError::new(StatusCode::MAX_DEPENDENCY_DEPTH_REACHED)
-                        .finish(Location::Undefined),
-                );
-            }
-        }
         // for each new module discovered in the frontier, load them fully and expand the frontier.
         // apply three filters to the new friend modules discovered
         // - `!locked_cache.has_module(mid)`
@@ -1680,15 +1711,15 @@ impl StructInfoCache {
 
 #[derive(Clone)]
 pub(crate) struct TypeCache {
-    structs: HashMap<StructIdentifier, HashMap<Vec<Type>, StructInfoCache>>,
-    depth_formula: HashMap<StructIdentifier, DepthFormula>,
+    structs: hashbrown::HashMap<StructIdentifier, hashbrown::HashMap<Vec<Type>, StructInfoCache>>,
+    depth_formula: hashbrown::HashMap<StructIdentifier, DepthFormula>,
 }
 
 impl TypeCache {
     fn new() -> Self {
         Self {
-            structs: HashMap::new(),
-            depth_formula: HashMap::new(),
+            structs: hashbrown::HashMap::new(),
+            depth_formula: hashbrown::HashMap::new(),
         }
     }
 }

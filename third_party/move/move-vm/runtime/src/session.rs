@@ -6,6 +6,7 @@ use crate::{
     config::VMConfig,
     data_cache::TransactionDataCache,
     loader::{LoadedFunction, ModuleStorageAdapter},
+    module_traversal::TraversalContext,
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
 };
@@ -453,6 +454,7 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn check_dependencies_and_charge_gas<'a, I>(
         &mut self,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext<'a>,
         ids: I,
     ) -> VMResult<()>
     where
@@ -466,6 +468,29 @@ impl<'r, 'l> Session<'r, 'l> {
                 &self.module_store,
                 &mut self.data_cache,
                 gas_meter,
+                &mut traversal_context.visited,
+                traversal_context.referenced_modules,
+                ids,
+            )
+    }
+
+    pub fn check_dependencies_and_charge_gas_non_recursive_optional<'a, I>(
+        &mut self,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext<'a>,
+        ids: I,
+    ) -> VMResult<()>
+    where
+        I: IntoIterator<Item = (&'a AccountAddress, &'a IdentStr)>,
+    {
+        self.move_vm
+            .runtime
+            .loader()
+            .check_dependencies_and_charge_gas_non_recursive_optional(
+                &self.module_store,
+                &mut self.data_cache,
+                gas_meter,
+                &mut traversal_context.visited,
                 ids,
             )
     }
@@ -473,6 +498,7 @@ impl<'r, 'l> Session<'r, 'l> {
     pub fn check_script_dependencies_and_check_gas(
         &mut self,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         script: impl Borrow<[u8]>,
     ) -> VMResult<()> {
         self.move_vm
@@ -482,6 +508,7 @@ impl<'r, 'l> Session<'r, 'l> {
                 &self.module_store,
                 &mut self.data_cache,
                 gas_meter,
+                traversal_context,
                 script.borrow(),
             )
     }
