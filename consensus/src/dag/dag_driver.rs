@@ -313,7 +313,7 @@ impl DagDriver {
         let node_broadcast = async move {
             debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
 
-            defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
+            defer!( observe_round(timestamp, RoundStage::NodeBroadcastedAll); );
             rb.broadcast(node, signature_builder).await
         };
         let certified_broadcast = async move {
@@ -321,6 +321,7 @@ impl DagDriver {
                 error!("channel closed before receiving ceritifcate");
                 return;
             };
+            observe_round(timestamp, RoundStage::NodeBroadcastedQuorum);
 
             debug!(
                 LogSchema::new(LogEvent::BroadcastCertifiedNode),
