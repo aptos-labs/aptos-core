@@ -810,7 +810,7 @@ fn quorum_store_backlog_txn_limit_count(
         .consensus
         .quorum_store
         .back_pressure
-        .dynamic_max_txn_per_s = 4000;
+        .dynamic_max_txn_per_s = 200;
 }
 
 fn optimize_for_maximum_throughput(
@@ -830,15 +830,15 @@ fn optimize_for_maximum_throughput(
 
     quorum_store_backlog_txn_limit_count(config, target_tps, vn_latency);
 
-    config.consensus.quorum_store.sender_max_batch_txns = 200;
+    config.consensus.quorum_store.sender_max_batch_txns = 300;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
-    config.consensus.quorum_store.sender_max_num_batches = 200;
-    config.consensus.quorum_store.sender_max_total_txns = 4000;
+    config.consensus.quorum_store.sender_max_num_batches = 5;
+    config.consensus.quorum_store.sender_max_total_txns = 500;
     config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
-    config.consensus.quorum_store.receiver_max_batch_txns = 1000;
+    config.consensus.quorum_store.receiver_max_batch_txns = 400;
     config.consensus.quorum_store.receiver_max_batch_bytes = 8 * 1024 * 1024;
-    config.consensus.quorum_store.receiver_max_num_batches = 200;
-    config.consensus.quorum_store.receiver_max_total_txns = 8000;
+    config.consensus.quorum_store.receiver_max_num_batches = 10;
+    config.consensus.quorum_store.receiver_max_total_txns = 1000;
     config.consensus.quorum_store.receiver_max_total_bytes = 16 * 1024 * 1024;
 }
 
