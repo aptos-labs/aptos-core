@@ -15,6 +15,7 @@ use crate::{
         types::{Node, NodeCertificate, Vote},
         NodeId,
     },
+    monitor,
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure};
@@ -109,7 +110,16 @@ impl NodeBroadcastHandler {
                     .map(|(author, _)| NodeId::new(self.epoch_state.epoch, *r, *author))
             })
             .collect();
-        self.storage.delete_votes(to_delete)
+        //TODO: limit spawn?
+        let storage = self.storage.clone();
+        tokio::task::spawn_blocking(move || {
+            monitor!("dag_votes_gc", {
+                if let Err(e) = storage.delete_votes(to_delete) {
+                    error!("Error deleting votes: {:?}", e);
+                }
+            });
+        });
+        Ok(())
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
