@@ -8,7 +8,7 @@ use aptos_oidb_pepper_common::{
     asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption},
     jwt, vuf,
     vuf::VUF,
-    PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0,
+    PepperInput, PepperRequestWrapper, PepperRequestV0, PepperResponse, PepperResponseV0,
     VUFVerificationKey,
 };
 use aptos_types::{
@@ -119,8 +119,8 @@ async fn main() {
 
     println!();
     println!("Action 4: decide an expiry unix time.");
-    let expiry_time_sec = 2000000000;
-    println!("expiry_time_sec={}", expiry_time_sec);
+    let epk_expiry_time_secs = 2000000000;
+    println!("expiry_time_sec={}", epk_expiry_time_secs);
 
     let esk = Ed25519PrivateKey::generate(&mut rng);
     let epk = EphemeralPublicKey::ed25519(Ed25519PublicKey::from(&esk));
@@ -129,7 +129,7 @@ async fn main() {
     println!("Action 5: compute nonce.");
     let nonce_str = OpenIdSig::reconstruct_oauth_nonce(
         blinder.as_slice(),
-        expiry_time_sec,
+        epk_expiry_time_secs,
         &epk,
         &Configuration::new_for_devnet(),
     )
@@ -147,12 +147,12 @@ async fn main() {
         Err(_) => jwt_or_path,
     };
 
-    let pepper_request = PepperRequest::V0(PepperRequestV0 {
+    let pepper_request = PepperRequestWrapper::V0(PepperRequestV0 {
         jwt: jwt.clone(),
         overriding_aud: None,
-        epk_serialized_hexlified: hex::encode(epk.to_bytes()),
-        expiry_time_sec,
-        blinder_hexlified: hex::encode(blinder),
+        epk_hex_string: hex::encode(epk.to_bytes()),
+        epk_expiry_time_secs,
+        epk_blinder_hex_string: hex::encode(blinder),
         uid_key: None,
     });
     println!();

@@ -3,7 +3,7 @@
 use crate::vuf_keys::VUF_SCHEME0_SK;
 use anyhow::{anyhow, bail, ensure};
 use aptos_oidb_pepper_common::{
-    jwt::Claims, vuf, vuf::VUF, PepperInput, PepperRequest, PepperRequestV0,
+    jwt::Claims, vuf, vuf::VUF, PepperInput, PepperRequest,
     PepperResponse, PepperResponseV0,
 };
 use aptos_types::{
@@ -23,24 +23,20 @@ pub type KeyID = String;
 
 /// The core processing logic of this pepper service.
 pub async fn process(request: PepperRequest) -> PepperResponse {
-    match request {
-        PepperRequest::V0(req) => {
-            let response = match process_v0(req) {
-                Ok(pepper_hexlified) => PepperResponseV0::Ok { pepper_hexlified },
-                Err(e) => PepperResponseV0::Error(e.to_string()),
-            };
-            PepperResponse::V0(response)
-        },
-    }
+    let response = match process_v0(request) {
+        Ok(pepper_hexlified) => PepperResponseV0::Ok { pepper_hexlified },
+        Err(e) => PepperResponseV0::Error(e.to_string()),
+    };
+    PepperResponse::V0(response)
 }
 
-fn process_v0(request: PepperRequestV0) -> anyhow::Result<String> {
-    let PepperRequestV0 {
-        jwt,
+fn process_v0(request: PepperRequest) -> anyhow::Result<String> {
+    let PepperRequest {
+        jwt_b64: jwt,
         overriding_aud,
-        epk_serialized_hexlified,
-        expiry_time_sec,
-        blinder_hexlified,
+        epk_hex_string,
+        epk_expiry_time_secs,
+        epk_blinder_hex_string,
         uid_key,
     } = request;
 
@@ -65,15 +61,15 @@ fn process_v0(request: PepperRequestV0) -> anyhow::Result<String> {
         bail!("unsupported uid key: {}", actual_uid_key)
     };
 
-    let blinder = hex::decode(blinder_hexlified)
+    let blinder = hex::decode(epk_blinder_hex_string)
         .map_err(|e| anyhow!("blinder unhexlification error: {e}"))?;
-    let epk_bytes = hex::decode(epk_serialized_hexlified)
+    let epk_bytes = hex::decode(epk_hex_string)
         .map_err(|e| anyhow!("epk unhexlification error: {e}"))?;
     let epk = bcs::from_bytes::<EphemeralPublicKey>(&epk_bytes)
         .map_err(|e| anyhow!("epk bcs deserialization error: {e}"))?;
     let recalculated_nonce = OpenIdSig::reconstruct_oauth_nonce(
         blinder.as_slice(),
-        expiry_time_sec,
+        epk_expiry_time_secs,
         &epk,
         &Configuration::new_for_devnet(),
     )
