@@ -46,6 +46,12 @@ module aptos_std::math128 {
         (((a as u256) * (b as u256) / (c as u256)) as u128)
     }
 
+    /// Returns a * b / c going through u256 to prevent intermediate overflow, omitting assert to
+    /// enable 100% code coverage in safe scenarios where divisor is known to be nonzero.
+    public inline fun mul_div_unchecked(a: u128, b: u128, c: u128): u128 {
+        (((a as u256) * (b as u256) / (c as u256)) as u128)
+    }
+
     /// Return x clamped to the interval [lower, upper].
     public fun clamp(x: u128, lower: u128, upper: u128): u128 {
         min(upper, max(lower, x))
@@ -236,8 +242,10 @@ module aptos_std::math128 {
     public entry fun test_mul_div() {
         let tmp: u128 = 1<<127;
         assert!(mul_div(tmp,tmp,tmp) == tmp, 0);
+        assert!(mul_div_unchecked(tmp,tmp,tmp) == tmp, 0);
 
         assert!(mul_div(tmp,5,5) == tmp, 0);
+        assert!(mul_div_unchecked(tmp,5,5) == tmp, 0);
         // Note that ordering other way is imprecise.
         assert!((tmp / 5) * 5 != tmp, 0);
     }
