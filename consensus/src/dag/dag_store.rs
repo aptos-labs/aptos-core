@@ -10,6 +10,7 @@ use crate::{
         storage::DAGStorage,
         types::{CertifiedNode, NodeCertificate},
     },
+    monitor,
     payload_manager::TPayloadManager,
 };
 use anyhow::{anyhow, ensure};
@@ -532,9 +533,15 @@ impl DagStore {
                 .flat_map(|(_, round_ref)| round_ref.iter().flatten())
                 .map(|node_status| *node_status.as_node().metadata().digest())
                 .collect();
-            if let Err(e) = self.storage.delete_certified_nodes(digests) {
-                error!("Error deleting expired nodes: {:?}", e);
-            }
+            let storage = self.storage.clone();
+            // TODO: limit spawns?
+            tokio::task::spawn_blocking(move || {
+                monitor!("dag_commit_callback_gc", {
+                    if let Err(e) = storage.delete_certified_nodes(digests) {
+                        error!("Error deleting expired nodes: {:?}", e);
+                    }
+                });
+            });
         }
     }
 }
