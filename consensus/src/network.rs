@@ -22,7 +22,7 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
-    pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
+    pipeline::commit_decision::CommitDecision,
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
@@ -397,18 +397,6 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn send_commit_vote(
-        &self,
-        commit_vote: CommitVote,
-        recipient: Author,
-    ) -> anyhow::Result<()> {
-        fail_point!("consensus::send::commit_vote", |_| Ok(()));
-        let msg = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Vote(commit_vote)));
-        self.send_rpc(recipient, msg, Duration::from_millis(500))
-            .await
-            .map(|_| ())
-    }
-
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
     /// we believe could serve as proposers in the next round). The recipients on the receiving
     /// end are going to be notified about a new vote in the vote queue.
@@ -417,6 +405,12 @@ impl NetworkSender {
     /// internal(to provide back pressure), it does not indicate the message is delivered or sent
     /// out. It does not give indication about when the message is delivered to the recipients,
     /// as well as there is no indication about the network failures.
+    pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
+        fail_point!("consensus::send::vote", |_| ());
+        let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
+    }
+
     pub async fn send_vote(&self, vote_msg: VoteMsg, recipients: Vec<Author>) {
         fail_point!("consensus::send::vote", |_| ());
         let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));

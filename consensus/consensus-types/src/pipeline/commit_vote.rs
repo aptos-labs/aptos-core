@@ -95,6 +95,7 @@ impl CommitVote {
         validator
             .verify(self.author(), &self.ledger_info, &self.signature)
             .context("Failed to verify Commit Vote")
+        // Ok(())
     }
 
     pub fn commit_info(&self) -> &BlockInfo {
