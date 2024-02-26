@@ -1,25 +1,19 @@
 // Copyright © Aptos Foundation
 
-use aptos_crypto::{
-    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
-    Uniform,
-};
+use aptos_crypto::
+    ed25519::Ed25519PublicKey
+;
 use aptos_oidb_pepper_common::{
-    asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption},
-    jwt, vuf,
-    vuf::VUF,
-    PepperInput, PepperRequestWrapper, PepperRequestV0, PepperResponse, PepperResponseV0,
-    VUFVerificationKey,
+    asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption}, jwt, vrf::{self, VRF}, PepperInput, PepperRequest, PepperResponse, VRFVerificationKey
 };
 use aptos_types::{
-    oidb::{Configuration, OpenIdSig},
+    oidb::{Configuration, OpenIdSig, test_utils::get_sample_esk},
     transaction::authenticator::EphemeralPublicKey,
 };
 use ark_serialize::CanonicalDeserialize;
-use rand::thread_rng;
 use std::{fs, io::stdin};
 
-const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3RfandrIiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhdWQiOiJ0ZXN0X2NsaWVudF9pZCIsInN1YiI6InRlc3RfYWNjb3VudCIsImVtYWlsIjoidGVzdEBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwibm9uY2UiOiJFVVRhSE9HdDcwRTNxbk9QMUJibnUzbE03QjR5TTdzaHZTb1NvdXF1VVJ3IiwibmJmIjoxNzAyODA4OTM2LCJpYXQiOjE3MDQ5MDkyMzYsImV4cCI6MTcwNzgxMjgzNiwianRpIjoiZjEwYWZiZjBlN2JiOTcyZWI4ZmE2M2YwMjQ5YjBhMzRhMjMxZmM0MCJ9.CEgO4S7hRgASaINsGST5Ygtl_CY-mUn2GaQ6d7q9q1eGz1MjW0o0yusJQDU6Hi1nDfXlNSvCF2SgD9ayG3uDGC5-18H0AWo2QgyZ2rC_OUa36RCTmhdo-i_H8xmwPxa3yHZZsGC-gJy_vVX-rfMLIh-JgdIFFIzGVPN75MwXLP3bYUaB9Lw52g50rf_006Qg5ubkZ70I13vGUTVbRVWanQIN69naFqHreLCjVsGsEBVBoUtexZw6Ulr8s0VajBpcTUqlMvbvqMfQ33NXaBQYvu3YZivpkus8rcG_eAMrFbYFY9AZF7AaW2HUaYo5QjzMQDsIA1lpnAcOW3GzWvb0vw";
+const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
 
 fn read_line_from_stdin() -> String {
     let mut line = String::new();
@@ -67,24 +61,23 @@ fn get_jwt_or_path() -> String {
 
 #[tokio::main]
 async fn main() {
-    let mut rng = thread_rng();
     println!();
     println!("Starting an interaction with aptos-oidb-pepper-service.");
     let url = get_pepper_service_url();
     println!();
-    let vuf_vrfy_key_url = format!("{url}/vuf-pub-key");
+    let vrf_vrfy_key_url = format!("{url}/vrf-pub-key");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
-        vuf_vrfy_key_url
+        vrf_vrfy_key_url
     );
     let client = reqwest::Client::new();
     let response = client
-        .get(vuf_vrfy_key_url)
+        .get(vrf_vrfy_key_url)
         .send()
         .await
         .unwrap()
-        .json::<VUFVerificationKey>()
+        .json::<VRFVerificationKey>()
         .await
         .unwrap();
     println!();
@@ -92,14 +85,14 @@ async fn main() {
         "response_json={}",
         serde_json::to_string_pretty(&response).unwrap()
     );
-    let VUFVerificationKey {
+    let VRFVerificationKey {
         scheme_name,
-        payload_hexlified,
+        vrf_public_key_hex_string,
     } = response;
     assert_eq!("Scheme0", scheme_name.as_str());
-    let vuf_pk_bytes = hex::decode(payload_hexlified).unwrap();
-    let vuf_pk: ark_bls12_381::G2Projective =
-        ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk_bytes.as_slice())
+    let vrf_pk_bytes = hex::decode(vrf_public_key_hex_string).unwrap();
+    let vrf_pk: ark_bls12_381::G2Projective =
+        ark_bls12_381::G2Affine::deserialize_compressed(vrf_pk_bytes.as_slice())
             .unwrap()
             .into();
 
@@ -108,9 +101,6 @@ async fn main() {
         "Action 2: generate a {} ephemeral key pair.",
         Scheme::scheme_name()
     );
-    let (sk, pk) = Scheme::key_gen(&mut rng);
-    println!("esk_hexlified={}", hex::encode(&sk));
-    println!("epk_hexlified={}", hex::encode(&pk));
 
     println!();
     println!("Action 3: generate some random bytes as a blinder.");
@@ -122,8 +112,10 @@ async fn main() {
     let epk_expiry_time_secs = 2000000000;
     println!("expiry_time_sec={}", epk_expiry_time_secs);
 
-    let esk = Ed25519PrivateKey::generate(&mut rng);
+    let esk = get_sample_esk();
     let epk = EphemeralPublicKey::ed25519(Ed25519PublicKey::from(&esk));
+    println!("esk_hexlified={}", hex::encode(esk.to_bytes()));
+    println!("epk_hexlified={}", hex::encode(epk.to_bytes()));
 
     println!();
     println!("Action 5: compute nonce.");
@@ -147,14 +139,14 @@ async fn main() {
         Err(_) => jwt_or_path,
     };
 
-    let pepper_request = PepperRequestWrapper::V0(PepperRequestV0 {
-        jwt: jwt.clone(),
+    let pepper_request = PepperRequest {
+        jwt_b64: jwt.clone(),
         overriding_aud: None,
         epk_hex_string: hex::encode(epk.to_bytes()),
         epk_expiry_time_secs,
         epk_blinder_hex_string: hex::encode(blinder),
         uid_key: None,
-    });
+    };
     println!();
     println!(
         "Request pepper with a POST to {} and the body being {}",
@@ -168,10 +160,8 @@ async fn main() {
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse::V0(PepperResponseV0::Ok { pepper_hexlified }) = pepper_response else {
-        panic!()
-    };
-    let pepper_bytes = hex::decode(pepper_hexlified).unwrap();
+    let PepperResponse{ pepper_key_hex_string, pepper_hex_string } = pepper_response;
+    let pepper_bytes = hex::decode(pepper_key_hex_string).unwrap();
     println!();
     println!("Decrypt the pepper using the ephemeral private key.");
     println!("pepper_bytes={:?}", pepper_bytes);
@@ -185,7 +175,7 @@ async fn main() {
         aud: claims.claims.aud.clone(),
     };
     let pepper_input_bytes = bcs::to_bytes(&pepper_input).unwrap();
-    vuf::scheme0::Scheme0::verify(&vuf_pk, &pepper_input_bytes, &pepper_bytes, &[]).unwrap();
+    vrf::scheme0::Scheme0::verify(&vrf_pk, &pepper_input_bytes, &pepper_bytes, &[]).unwrap();
     println!();
     println!("Pepper verification succeeded!");
 }

@@ -4,7 +4,7 @@ use anyhow::Result;
 use ark_std::rand::{CryptoRng, RngCore};
 
 /// Implement this to define a VUF (verifiable unpredictable function).
-pub trait VUF {
+pub trait VRF {
     type PrivateKey;
     type PublicKey;
 
@@ -20,7 +20,7 @@ pub trait VUF {
     fn verify(pk: &Self::PublicKey, input: &[u8], output: &[u8], proof: &[u8]) -> Result<()>;
 }
 
-/// a BLS VUF where:
+/// a BLS VRF where:
 /// - The underlying curve is BLS12-381.
 /// - Input/output is in G1 and public key is in G2.
 ///

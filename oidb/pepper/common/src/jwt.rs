@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use anyhow::anyhow;
 use jsonwebtoken::{DecodingKey, TokenData, Validation};
 use once_cell::sync::Lazy;
@@ -32,5 +34,6 @@ static DUMMY_DECODING_KEY: Lazy<DecodingKey> = Lazy::new(|| DecodingKey::from_se
 static VALIDATION_CONFIG_NO_SIG_VRFY: Lazy<Validation> = Lazy::new(|| {
     let mut config = Validation::default();
     config.insecure_disable_signature_validation();
+    config.validate_exp = false;
     config
 });

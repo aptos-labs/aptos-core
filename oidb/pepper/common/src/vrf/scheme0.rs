@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::vuf::VUF;
+use crate::vrf::VRF;
 use anyhow::{anyhow, ensure};
 use ark_bls12_381::{Bls12_381, Fq12, Fr, G1Affine, G2Affine, G2Projective};
 use ark_ec::{
@@ -31,7 +31,7 @@ impl Scheme0 {
     }
 }
 
-impl VUF for Scheme0 {
+impl VRF for Scheme0 {
     type PrivateKey = Fr;
     type PublicKey = G2Projective;
 
@@ -90,7 +90,7 @@ impl VUF for Scheme0 {
 
 #[cfg(test)]
 mod tests {
-    use crate::vuf::{scheme0::Scheme0, VUF};
+    use crate::vuf::{scheme0::Scheme0, VRF};
 
     #[test]
     fn gen_eval_verify() {

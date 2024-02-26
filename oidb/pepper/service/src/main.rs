@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 
-use aptos_oidb_pepper_common::{PepperRequest, PepperResponse};
+use aptos_oidb_pepper_common::PepperRequest;
 use aptos_oidb_pepper_service::{
     about::ABOUT_JSON,
     jwk,
-    vuf_keys::{VUF_SCHEME0_SK, VUF_VERIFICATION_KEY_JSON},
+    vrf_keys::{VRF_SCHEME0_SK, VRF_VERIFICATION_KEY_JSON},
 };
 use hyper::{
     header::{
@@ -34,23 +34,36 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(ABOUT_JSON.as_str()))
             .expect("Response should build"),
-        (&Method::GET, "/vuf-pub-key") => hyper::Response::builder()
+        (&Method::GET, "/vrf-pub-key") => hyper::Response::builder()
             .status(StatusCode::OK)
             .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
             .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
             .header(ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
             .header(ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type, Authorization")
             .header(CONTENT_TYPE, "application/json")
-            .body(Body::from(VUF_VERIFICATION_KEY_JSON.as_str()))
+            .body(Body::from(VRF_VERIFICATION_KEY_JSON.as_str()))
             .expect("Response should build"),
         (&Method::POST, "/") => {
             let body = req.into_body();
             let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
             let request = serde_json::from_slice::<PepperRequest>(&body_bytes);
             let response = match request {
-                Ok(req) => aptos_oidb_pepper_service::process(req).await,
+                Ok(req) => {
+                    match aptos_oidb_pepper_service::process(req) {
+                        Ok(pepper_response) => pepper_response,
+                        Err(e) => {
+                            return Ok(hyper::Response::builder()
+                                .status(400)
+                                .body(Body::from(e.to_string()))
+                                .unwrap());
+                        }
+                    }
+                },
                 Err(e) => {
-                    PepperResponse::Error(format!("PepperRequest deserialization error: {e}"))
+                    return Ok(hyper::Response::builder()
+                        .status(400)
+                        .body(Body::from(e.to_string()))
+                        .unwrap());
                 },
             };
             let json = serde_json::to_string_pretty(&response).unwrap();
@@ -84,7 +97,7 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
 #[tokio::main]
 async fn main() {
     // Trigger private key loading.
-    let _ = VUF_SCHEME0_SK.deref();
+    let _ = VRF_SCHEME0_SK.deref();
 
     env_logger::Builder::new()
         .filter(None, LevelFilter::Info)

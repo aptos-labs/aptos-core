@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub mod asymmetric_encryption;
 pub mod elgamal;
 pub mod jwt;
-pub mod vuf;
+pub mod vrf;
 
 pub fn sha3_256(input: &[u8]) -> Vec<u8> {
     let mut hasher = sha3::Sha3_256::new();
@@ -31,19 +31,11 @@ pub struct PepperRequest {
     pub uid_key: Option<String>,
 }
 
-/// The spec of a response from this pepper service.
-#[derive(Debug, Deserialize, Serialize)]
-pub enum PepperResponse {
-    Error(String),
-    V0(PepperResponseV0),
-    V1(PepperResponseV1),
-}
-
 /// The response to `PepperRequestV0`, which contains the calculated pepper (hexlified) or a processing error.
 #[derive(Debug, Deserialize, Serialize)]
-pub enum PepperResponseV0 {
-    Ok { pepper_hexlified: String },
-    Error(String),
+pub struct PepperResponse {
+    pub pepper_key_hex_string: String,
+    pub pepper_hex_string: String,
 }
 
 /// The response to `PepperRequestV1`, which contains the calculated pepper (encrypted then hexlified) or a processing error.
@@ -54,9 +46,9 @@ pub enum PepperResponseV1 {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct VUFVerificationKey {
+pub struct VRFVerificationKey {
     pub scheme_name: String,
-    pub payload_hexlified: String,
+    pub vrf_public_key_hex_string: String,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
