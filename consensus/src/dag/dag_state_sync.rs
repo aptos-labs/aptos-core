@@ -6,14 +6,14 @@ use super::{
     dag_fetcher::TDagFetcher,
     dag_store::DagStore,
     storage::DAGStorage,
-    types::{CertifiedNodeMessage, RemoteFetchRequest},
+    types::{CertifiedNodeMessage, NodeMetadata, RemoteFetchRequest},
     ProofNotifier,
 };
 use crate::{
     dag::DAGMessage, network::IncomingDAGRequest, payload_manager::TPayloadManager,
     pipeline::execution_client::TExecutionClient,
 };
-use anyhow::{bail, ensure};
+use anyhow::{anyhow, bail, ensure};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, error};
@@ -109,16 +109,16 @@ impl StateSyncTrigger {
     async fn notify_commit_proof(&self, ledger_info: &LedgerInfoWithSignatures) {
         // if the anchor exists between ledger info round and highest ordered round
         // Note: ledger info round <= highest ordered round
-        if self
+        let local_highest_committed_round = self
             .ledger_info_provider
-            .get_highest_committed_anchor_round()
-            < ledger_info.commit_info().round()
-            && self
-                .dag_store
-                .read()
-                .highest_ordered_anchor_round()
-                .unwrap_or_default()
-                >= ledger_info.commit_info().round()
+            .get_highest_committed_anchor_round();
+        let local_highest_ordered_round = self
+            .dag_store
+            .read()
+            .highest_ordered_anchor_round()
+            .unwrap_or_default();
+        if local_highest_committed_round < ledger_info.commit_info().round()
+        // && local_highest_ordered_round < ledger_info.commit_info().round()
         {
             self.proof_notifier
                 .send_commit_proof(ledger_info.clone())
@@ -243,18 +243,28 @@ impl DagStateSynchronizer {
         sync_dag_store: Arc<DagStore>,
         commit_li: LedgerInfoWithSignatures,
     ) -> anyhow::Result<DagStore> {
-        match dag_fetcher
-            .fetch(request, responders, sync_dag_store.clone())
-            .await
-        {
-            Ok(_) => {},
-            Err(err) => {
-                error!("error fetching nodes {}", err);
-                bail!(err)
-            },
-        }
+        let dag_store = sync_dag_store.clone();
+        let dag_sync_fut = async move {
+            debug!("Syncing DAG. Fetching Nodes");
+            dag_fetcher
+                .fetch(request.clone(), responders, dag_store.clone())
+                .await
+                .map_err(|err| {
+                    error!("error fetching nodes {}", err);
+                    anyhow!(err)
+                })?;
 
-        self.execution_client.sync_to(commit_li).await?;
+            Ok(())
+        };
+        let execution_client = self.execution_client.clone();
+        let state_sync_fut = async move {
+            debug!(target_ledger_info = commit_li, "Requesting sync to");
+            execution_client
+                .sync_to(commit_li)
+                .await
+                .map_err(|err| anyhow!(err))
+        };
+        futures::future::try_join(dag_sync_fut, state_sync_fut).await?;
 
         Ok(Arc::into_inner(sync_dag_store).unwrap())
     }
