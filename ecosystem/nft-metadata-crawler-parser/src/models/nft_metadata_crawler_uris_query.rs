@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::error;
 
-#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[derive(Clone, Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(asset_uri))]
 #[diesel(table_name = parsed_asset_uris)]
 pub struct NFTMetadataCrawlerURIsQuery {
@@ -32,8 +32,8 @@ pub struct NFTMetadataCrawlerURIsQuery {
 
 impl NFTMetadataCrawlerURIsQuery {
     pub fn get_by_asset_uri(
-        asset_uri: &str,
         conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
+        asset_uri: &str,
     ) -> Option<Self> {
         let mut op = || {
             parsed_asset_uris::table
@@ -55,9 +55,9 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 
     pub fn get_by_raw_image_uri(
+        conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
         asset_uri: &str,
         raw_image_uri: &str,
-        conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Option<Self> {
         let mut op = || {
             parsed_asset_uris::table
@@ -81,9 +81,9 @@ impl NFTMetadataCrawlerURIsQuery {
     }
 
     pub fn get_by_raw_animation_uri(
+        conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
         asset_uri: &str,
         raw_animation_uri: &str,
-        conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     ) -> Option<Self> {
         let mut op = || {
             parsed_asset_uris::table
