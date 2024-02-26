@@ -227,3 +227,6 @@ impl Display for BlockInfo {
         )
     }
 }
+
+/// A continuously increasing sequence number for committed blocks.
+pub type BlockHeight = u64;

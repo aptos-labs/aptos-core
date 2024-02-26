@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::block_info::BlockHeight;
+
 impl DbReader for AptosDB {
     fn get_epoch_ending_ledger_infos(
         &self,
@@ -184,10 +186,23 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// Get the first version that will likely not be pruned soon
-    fn get_first_viable_txn_version(&self) -> Result<Version> {
-        gauged_api("get_first_viable_txn_version", || {
-            Ok(self.ledger_pruner.get_min_viable_version())
+    /// Get the first block version / height that will likely not be pruned soon.
+    fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)> {
+        gauged_api("get_first_viable_block", || {
+            let min_version = self.ledger_pruner.get_min_viable_version();
+            if !self.skip_index_and_usage {
+                let (block_version, index, _seq_num) = self
+                    .event_store
+                    .lookup_event_at_or_after_version(&new_block_event_key(), min_version)?
+                    .ok_or_else(|| AptosDbError::NotFound(format!("NewBlockEvent at or after version {}", min_version)))?;
+                let event = self.event_store.get_event_by_version_and_index(block_version, index)?;
+                return Ok((block_version, event.expect_new_block_event()?.height()));
+            }
+
+            self
+                .ledger_db
+                .metadata_db()
+                .get_block_height_at_or_after_version(min_version)
         })
     }
 
@@ -521,23 +536,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
-        gauged_api("get_next_block_event", || {
-            self.error_if_ledger_pruned("NewBlockEvent", version)?;
-            if let Some((block_version, _, _)) = self
-                .event_store
-                .lookup_event_at_or_after_version(&new_block_event_key(), version)?
-            {
-                self.event_store.get_block_metadata(block_version)
-            } else {
-                bail!(
-                    "Failed to find a block event at or after version {}",
-                    version
-                )
-            }
-        })
-    }
-
     // Returns latest `num_events` NewBlockEvents and their versions.
     // TODO(grao): Remove after DAG.
     fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {
@@ -558,22 +556,9 @@ impl DbReader for AptosDB {
 
             let mut events = Vec::with_capacity(num_events);
             for item in iter.take(num_events) {
-                let (block_height, block_info) = item?;
+                let (_block_height, block_info) = item?;
                 let first_version = block_info.first_version();
-                let event = self
-                    .ledger_db
-                    .event_db()
-                    .get_events_by_version(first_version)?
-                    .into_iter()
-                    .find(|event| {
-                        if let Some(key) = event.event_key() {
-                            if *key == new_block_event_key() {
-                                return true;
-                            }
-                        }
-                        false
-                    })
-                    .ok_or_else(|| anyhow!("Event for block_height {block_height} at version {first_version} is not found."))?;
+                let event = self.ledger_db.event_db().expect_new_block_event(first_version)?;
                 events.push(EventWithVersion::new(first_version, event));
             }
 
