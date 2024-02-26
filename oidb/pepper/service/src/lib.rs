@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::vrf_keys::VRF_SCHEME0_SK;
+use crate::vuf_keys::VUF_SCHEME0_SK;
 use anyhow::{anyhow, bail, ensure};
 use aptos_oidb_pepper_common::{
-    jwt::Claims, sha3_256, vrf::{self, VRF}, PepperInput, PepperRequest, PepperResponse
+    jwt::Claims, sha3_256, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse
 };
 use aptos_types::{
     oidb::{Configuration, OpenIdSig},
@@ -15,7 +15,7 @@ use std::collections::HashSet;
 
 pub mod about;
 pub mod jwk;
-pub mod vrf_keys;
+pub mod vuf_keys;
 
 pub type Issuer = String;
 pub type KeyID = String;
@@ -111,7 +111,7 @@ epk_expiry_time_secs,
         aud: actual_aud.clone(),
     };
     let input_bytes = bcs::to_bytes(&input).unwrap();
-    let (pepper, vuf_proof) = vrf::scheme0::Scheme0::eval(&VRF_SCHEME0_SK, &input_bytes)?;
+    let (pepper, vuf_proof) = vuf::scheme0::Scheme0::eval(&VUF_SCHEME0_SK, &input_bytes)?;
     ensure!(vuf_proof.is_empty(), "internal proof error");
     let pepper_hexlified = hex::encode(pepper);
     Ok(pepper_hexlified)

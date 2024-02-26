@@ -4,7 +4,7 @@ use aptos_crypto::
     ed25519::Ed25519PublicKey
 ;
 use aptos_oidb_pepper_common::{
-    asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption}, jwt, vrf::{self, VRF}, PepperInput, PepperRequest, PepperResponse, VRFVerificationKey
+    asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption}, jwt, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse, VUFVerificationKey
 };
 use aptos_types::{
     oidb::{Configuration, OpenIdSig, test_utils::get_sample_esk},
@@ -65,19 +65,19 @@ async fn main() {
     println!("Starting an interaction with aptos-oidb-pepper-service.");
     let url = get_pepper_service_url();
     println!();
-    let vrf_pub_key_url = format!("{url}/vrf-pub-key");
+    let vuf_pub_key_url = format!("{url}/vuf-pub-key");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
-        vrf_pub_key_url
+        vuf_pub_key_url
     );
     let client = reqwest::Client::new();
     let response = client
-        .get(vrf_pub_key_url)
+        .get(vuf_pub_key_url)
         .send()
         .await
         .unwrap()
-        .json::<VRFVerificationKey>()
+        .json::<VUFVerificationKey>()
         .await
         .unwrap();
     println!();
@@ -85,14 +85,14 @@ async fn main() {
         "response_json={}",
         serde_json::to_string_pretty(&response).unwrap()
     );
-    let VRFVerificationKey {
+    let VUFVerificationKey {
         scheme_name,
-        vrf_public_key_hex_string,
+        vuf_public_key_hex_string,
     } = response;
     assert_eq!("Scheme0", scheme_name.as_str());
-    let vrf_pk_bytes = hex::decode(vrf_public_key_hex_string).unwrap();
-    let vrf_pk: ark_bls12_381::G2Projective =
-        ark_bls12_381::G2Affine::deserialize_compressed(vrf_pk_bytes.as_slice())
+    let vuf_pk_bytes = hex::decode(vuf_public_key_hex_string).unwrap();
+    let vuf_pk: ark_bls12_381::G2Projective =
+        ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk_bytes.as_slice())
             .unwrap()
             .into();
 
@@ -175,7 +175,7 @@ async fn main() {
         aud: claims.claims.aud.clone(),
     };
     let pepper_input_bytes = bcs::to_bytes(&pepper_input).unwrap();
-    vrf::scheme0::Scheme0::verify(&vrf_pk, &pepper_input_bytes, &pepper_bytes, &[]).unwrap();
+    vuf::scheme0::Scheme0::verify(&vuf_pk, &pepper_input_bytes, &pepper_bytes, &[]).unwrap();
     println!();
     println!("Pepper verification succeeded!");
 }

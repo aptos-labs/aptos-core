@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 pub mod asymmetric_encryption;
 pub mod elgamal;
 pub mod jwt;
-pub mod vrf;
+pub mod vuf;
 
 pub fn sha3_256(input: &[u8]) -> Vec<u8> {
     let mut hasher = sha3::Sha3_256::new();
@@ -46,9 +46,9 @@ pub enum PepperResponseV1 {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct VRFVerificationKey {
+pub struct VUFVerificationKey {
     pub scheme_name: String,
-    pub vrf_public_key_hex_string: String,
+    pub vuf_public_key_hex_string: String,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]

@@ -2,9 +2,9 @@
 
 Start the pepper service in terminal 1.
 ```bash
-VRF_KEY_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00 cargo run -p aptos-oidb-pepper-service
+VUF_KEY_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00 cargo run -p aptos-oidb-pepper-service
 ```
-NOTE: `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00` is a dummy VRF private key.
+NOTE: `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00` is a dummy VUF private key.
 
 Run the example client in terminal 2.
 ```bash

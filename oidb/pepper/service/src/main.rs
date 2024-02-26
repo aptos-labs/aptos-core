@@ -4,7 +4,7 @@ use aptos_oidb_pepper_common::PepperRequest;
 use aptos_oidb_pepper_service::{
     about::ABOUT_JSON,
     jwk,
-    vrf_keys::{VRF_SCHEME0_SK, VRF_VERIFICATION_KEY_JSON},
+    vuf_keys::{VUF_SCHEME0_SK, VUF_VERIFICATION_KEY_JSON},
 };
 use hyper::{
     header::{
@@ -34,14 +34,14 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(ABOUT_JSON.as_str()))
             .expect("Response should build"),
-        (&Method::GET, "/vrf-pub-key") => hyper::Response::builder()
+        (&Method::GET, "/vuf-pub-key") => hyper::Response::builder()
             .status(StatusCode::OK)
             .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
             .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
             .header(ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
             .header(ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type, Authorization")
             .header(CONTENT_TYPE, "application/json")
-            .body(Body::from(VRF_VERIFICATION_KEY_JSON.as_str()))
+            .body(Body::from(VUF_VERIFICATION_KEY_JSON.as_str()))
             .expect("Response should build"),
         (&Method::POST, "/") => {
             let body = req.into_body();
@@ -97,7 +97,7 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
 #[tokio::main]
 async fn main() {
     // Trigger private key loading.
-    let _ = VRF_SCHEME0_SK.deref();
+    let _ = VUF_SCHEME0_SK.deref();
 
     env_logger::Builder::new()
         .filter(None, LevelFilter::Info)
