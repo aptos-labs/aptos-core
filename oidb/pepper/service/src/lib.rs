@@ -30,7 +30,7 @@ pub fn process(request: PepperRequest) -> anyhow::Result<PepperResponse> {
 
 fn process_v0(request: PepperRequest) -> anyhow::Result<String> {
     let PepperRequest {
-        jwt_b64: jwt,
+        jwt,
         overriding_aud,
         epk_hex_string,
         epk_expiry_time_secs,

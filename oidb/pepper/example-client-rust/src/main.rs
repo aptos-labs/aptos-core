@@ -140,7 +140,7 @@ async fn main() {
     };
 
     let pepper_request = PepperRequest {
-        jwt_b64: jwt.clone(),
+        jwt: jwt.clone(),
         overriding_aud: None,
         epk_hex_string: hex::encode(epk.to_bytes()),
         epk_expiry_time_secs,

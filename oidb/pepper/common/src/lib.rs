@@ -21,7 +21,7 @@ pub fn sha3_256(input: &[u8]) -> Vec<u8> {
 /// The spec of a request to this pepper service.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PepperRequest {
-    pub jwt_b64: String,
+    pub jwt: String,
     /// If specified, generate pepper for `jwk.payload.iss, jwk.payload.sub, overriding_aud`.
     /// Otherwise, generate pepper for `jwk.payload.iss, jwk.payload.sub, jwk.payload.aud`.
     pub overriding_aud: Option<String>,
