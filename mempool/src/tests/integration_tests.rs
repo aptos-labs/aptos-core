@@ -8,12 +8,12 @@ use crate::tests::{
 };
 use aptos_config::network_id::PeerNetworkId;
 use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use aptos_network2::{
     testutils::{
         test_framework::TestFramework,
         test_node::{
             pfn_pfn_mock_connection, pfn_vfn_mock_connection, validator_mock_connection,
-            vfn_validator_mock_connection, vfn_vfn_mock_connection, NodeId, TestNode,
+            vfn_validator_mock_connection, vfn_vfn_mock_connection, ApplicationNode, NodeId, TestNode,
         },
     },
     transport::ConnectionMetadata,
@@ -162,7 +162,7 @@ async fn test_skip_ack_rebroadcast() {
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
 
     // After we drop, we should rebroadcast successfully
-    node.drop_next_network_msg(other_peer_network_id.network_id())
+    node.drop_next_network_msg(other_peer_network_id)
         .await;
     node.send_broadcast_and_receive_ack(other_peer_network_id, ALL_TXNS)
         .await;
@@ -204,14 +204,25 @@ async fn test_ready_txns() {
     node.assert_txns_not_in_mempool(TXN_2);
     node.add_txns_via_client(TXN_2).await;
 
+    // setup receiver (which we expect to _not_ receive things accross 100ms timeout)
+    let mut peer_receiver = node.setup_fake_peer_receiver(other_peer_network_id);
+
     // No txns should be sent or ready
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
     node.assert_txns_not_in_mempool(ALL_TXNS);
-    node.wait_for_no_msg(
-        other_peer_network_id.network_id(),
-        Duration::from_millis(100),
-    )
-    .await;
+    if let Ok(msg) = tokio::time::timeout(Duration::from_millis(100), peer_receiver.recv()).await {
+        panic!(
+            "A message was sent during wait {:?}:{:?} - {:?}",
+            node.node_id(),
+            other_peer_network_id.network_id(),
+            msg
+        )
+    }
+    // node.wait_for_no_msg(
+    //     other_peer_network_id,
+    //     Duration::from_millis(100),
+    // )
+    // .await;
 
     // Adding earlier txns should fill in the gaps, and now it should send all
     node.add_txns_via_client(TXN_1).await;
@@ -229,18 +240,24 @@ async fn test_broadcast_self_txns() {
         validator_mock_connection(ConnectionOrigin::Inbound, &ALL_PROTOCOLS);
 
     // Other node sends earlier txn
+    println!("a");
     node.connect_self(other_peer_network_id.network_id(), other_metadata.clone());
-    node.receive_message(ProtocolId::MempoolDirectSend, other_peer_network_id, TXN_1)
-        .await;
+    println!("b");
+    node.receive_message(ProtocolId::MempoolDirectSend, other_peer_network_id, TXN_1).await;
+    println!("c");
     node.assert_txns_in_mempool(TXN_1);
+    println!("d");
 
     // Add txns to current node
     node.add_txns_via_client(TXN_2).await;
+    println!("e");
     node.assert_txns_in_mempool(ALL_TXNS);
+    println!("f");
 
     // Txns should be sent to other node (but not the earlier txn)
     node.send_broadcast_and_receive_ack(other_peer_network_id, TXN_2)
         .await;
+    println!("done");
 }
 
 /// Test that gas price updates work and push onward to other nodes

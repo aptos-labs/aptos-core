@@ -6,7 +6,7 @@ use aptos_crypto::{
     traits::Uniform,
     x25519::{PrivateKey, PublicKey},
 };
-use aptos_network::protocols::wire::{handshake, messaging};
+use aptos_network2::protocols::wire::{handshake, messaging};
 use aptos_types::network_address as address;
 use rand::{rngs::StdRng, SeedableRng};
 use serde_reflection::{Registry, Result, Samples, Tracer, TracerConfig};

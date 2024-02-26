@@ -16,8 +16,8 @@ use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListe
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::Level;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::{
-    interface::{NetworkClient, NetworkServiceEvents},
+use aptos_network2::application::{
+    interface::{NetworkClient, NetworkEvents},
     storage::PeersAndMetadata,
 };
 use aptos_storage_interface::DbReader;
@@ -37,7 +37,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     config: &NodeConfig,
     mempool: Arc<Mutex<CoreMempool>>,
     network_client: NetworkClient<MempoolSyncMsg>,
-    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    network_events: NetworkEvents<MempoolSyncMsg>,
     client_events: MempoolEventsReceiver,
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
@@ -64,7 +64,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     executor.spawn(coordinator(
         smp,
         executor.clone(),
-        network_service_events,
+        network_events,
         client_events,
         quorum_store_requests,
         mempool_listener,
@@ -90,7 +90,7 @@ pub fn bootstrap(
     config: &NodeConfig,
     db: Arc<dyn DbReader>,
     network_client: NetworkClient<MempoolSyncMsg>,
-    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    network_events: NetworkEvents<MempoolSyncMsg>,
     client_events: MempoolEventsReceiver,
     quorum_store_requests: Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
@@ -105,7 +105,7 @@ pub fn bootstrap(
         config,
         mempool,
         network_client,
-        network_service_events,
+        network_events,
         client_events,
         quorum_store_requests,
         mempool_listener,

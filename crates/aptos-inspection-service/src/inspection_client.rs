@@ -4,6 +4,7 @@
 use anyhow::Result;
 use reqwest::Url;
 use std::collections::HashMap;
+use aptos_logger::{info, warn};
 
 /// A simple metric value enum (to represent different value types)
 #[derive(Clone, Debug)]
@@ -60,6 +61,7 @@ impl InspectionClient {
         metric_name: &str,
     ) -> Result<Option<HashMap<String, MetricValue>>> {
         let metrics = self.get_forge_metrics().await?;
+        let num_metrics = metrics.len();
         let search_string = format!("{}{{", metric_name);
 
         // Filter out all metrics that don't start with the search string
@@ -76,6 +78,7 @@ impl InspectionClient {
 
         // Return None if the result is empty
         if result.is_empty() {
+            warn!("no metrics of {} matched, wanted {}", num_metrics, metric_name);
             Ok(None)
         } else {
             Ok(Some(result))

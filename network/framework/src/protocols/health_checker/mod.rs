@@ -19,12 +19,12 @@
 //! - Use successful inbound pings as a sign of remote note being healthy
 //! - Ping a peer only in periods of no application-level communication with the peer
 use crate::{
-    application::interface::NetworkClientInterface,
-    constants::NETWORK_CHANNEL_SIZE,
-    counters,
-    logging::NetworkSchema,
+    // application::interface::NetworkClientInterface,
+    // constants::NETWORK_CHANNEL_SIZE,
+    // counters,
+    // logging::NetworkSchema,
     protocols::{
-        health_checker::interface::HealthCheckNetworkInterface,
+        // health_checker::interface::HealthCheckNetworkInterface,
         network::{
             Event, NetworkApplicationConfig, NetworkClientConfig, NetworkEvents,
             NetworkServiceConfig,
@@ -33,7 +33,7 @@ use crate::{
     },
     ProtocolId,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+// use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::{NetworkContext, PeerNetworkId};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
@@ -71,9 +71,9 @@ pub fn health_checker_network_config() -> NetworkApplicationConfig {
     let network_service_config = NetworkServiceConfig::new(
         direct_send_protocols,
         rpc_protocols,
-        aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
-            .queue_style(QueueStyle::LIFO)
-            .counters(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
+        // aptos_channel::Config::new(NETWORK_CHANNEL_SIZE)
+        //     .queue_style(QueueStyle::LIFO)
+        //     .counters(&counters::PENDING_HEALTH_CHECKER_NETWORK_EVENTS),
     );
     NetworkApplicationConfig::new(network_client_config, network_service_config)
 }

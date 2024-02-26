@@ -14,22 +14,22 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
-use aptos_id_generator::U32IdGenerator;
+use aptos_id_generator::{IdGenerator, U32IdGenerator};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::MempoolNotifier;
-use aptos_network::{
+use aptos_network2::{
     application::{
-        interface::{NetworkClient, NetworkServiceEvents},
+        interface::{NetworkClient},// NetworkServiceEvents
         storage::PeersAndMetadata,
     },
-    peer_manager::{
-        conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
-        PeerManagerRequestSender,
-    },
+    // peer_manager::{
+    //     conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
+    //     PeerManagerRequestSender,
+    // },
     protocols::{
         direct_send::Message,
-        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
-        rpc::InboundRpcRequest,
+        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender, OutboundPeerConnections},
+        // rpc::InboundRpcRequest,
         wire::handshake::v1::ProtocolId::MempoolDirectSend,
     },
     testutils::{
@@ -42,18 +42,21 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
-use aptos_types::{
-    account_address::AccountAddress,
-    mempool_status::MempoolStatusCode,
-    on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
-    transaction::SignedTransaction,
-};
+use aptos_types::{account_address::AccountAddress, mempool_status::MempoolStatusCode, on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload}, PeerId, transaction::SignedTransaction};
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
+use async_trait::async_trait;
 use futures::{channel::oneshot, SinkExt};
 use maplit::btreemap;
 use std::{collections::HashMap, hash::Hash, sync::Arc};
+use std::collections::BTreeMap;
+// use rand::rngs::OsRng;
 use tokio::{runtime::Handle, time::Duration};
 use tokio_stream::StreamExt;
+use aptos_config::config::RoleType;
+use aptos_network2::application::interface::OutboundRpcMatcher;
+use aptos_network2::protocols::network::{Closer, NetworkSource, PeerStub, ReceivedMessage};
+use aptos_network2::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest, RpcResponse};
+use bytes::Bytes;
 
 /// An individual mempool node that runs in it's own runtime.
 ///
@@ -79,7 +82,7 @@ pub struct MempoolNode {
     peers_and_metadata: Arc<PeersAndMetadata>,
 
     inbound_handles: HashMap<NetworkId, InboundNetworkHandle>,
-    outbound_handles: HashMap<NetworkId, OutboundMessageReceiver>,
+    outbound_handles: HashMap<NetworkId, Arc<OutboundPeerConnections>>,
     other_inbound_handles: HashMap<PeerNetworkId, InboundNetworkHandle>,
 }
 
@@ -89,6 +92,7 @@ impl std::fmt::Display for MempoolNode {
     }
 }
 
+#[async_trait]
 impl ApplicationNode for MempoolNode {
     fn node_id(&self) -> NodeId {
         self.node_id
@@ -129,7 +133,7 @@ impl ApplicationNode for MempoolNode {
             .clone()
     }
 
-    fn get_outbound_handle(&mut self, network_id: NetworkId) -> &mut OutboundMessageReceiver {
+    fn get_outbound_handle(&mut self, network_id: NetworkId) -> &mut Arc<OutboundPeerConnections> {
         self.outbound_handles.get_mut(&network_id).unwrap()
     }
 
@@ -140,6 +144,10 @@ impl ApplicationNode for MempoolNode {
     fn peer_network_ids(&self) -> &HashMap<NetworkId, PeerNetworkId> {
         &self.peer_network_ids
     }
+
+    // async fn get_next_network_msg(&mut self, network_id: NetworkId) -> (PeerId,NetworkMessage) {
+    //     TestNode::get_next_network_msg(self, network_id).await
+    // }
 }
 
 impl MempoolNode {
@@ -245,6 +253,20 @@ impl MempoolNode {
         }
     }
 
+    pub fn setup_fake_peer_receiver(
+        &mut self,
+        expected_peer_network_id: PeerNetworkId,
+    ) -> (tokio::sync::mpsc::Receiver<(NetworkMessage,u64)>) {
+        let (sender, mut peer_receiver) = tokio::sync::mpsc::channel(10);
+        let peer_outbound_rpc = OutboundRpcMatcher::new();
+        let peer_closer = Closer::new();
+        let peer = PeerStub::new(sender.clone(), sender, peer_outbound_rpc, peer_closer);
+        let network_id = expected_peer_network_id.network_id();
+        let peer_senders = self.outbound_handles.get_mut(&network_id).unwrap();
+        peer_senders.insert(expected_peer_network_id, peer);
+        peer_receiver
+    }
+
     pub async fn receive_message(
         &mut self,
         protocol_id: ProtocolId,
@@ -252,7 +274,17 @@ impl MempoolNode {
         txns: &[TestTransaction],
     ) {
         let network_id = remote_peer_network_id.network_id();
-        let remote_peer_id = remote_peer_network_id.peer_id();
+
+        // setup receive
+        let mut peer_receiver = self.setup_fake_peer_receiver(remote_peer_network_id);
+        // let omr = self.outbound_handles.get_mut(&network_id).unwrap();
+        // let (sender, mut peer_receiver) = tokio::sync::mpsc::channel(10);
+        // let peer_outbound_rpc = OutboundRpcMatcher::new();
+        // let peer_closer = Closer::new();
+        // let peer = PeerStub::new(sender.clone(), sender, peer_outbound_rpc, peer_closer);
+        // omr.insert(remote_peer_network_id, peer);
+
+        // let remote_peer_id = remote_peer_network_id.peer_id();
         let inbound_handle = self.get_inbound_handle(network_id);
         let batch_id = MultiBatchId::from_timeline_ids(&vec![1].into(), &vec![10].into());
         let msg = MempoolSyncMsg::BroadcastTransactionsRequest {
@@ -260,43 +292,91 @@ impl MempoolNode {
             transactions: sign_transactions(txns),
         };
         let data = protocol_id.to_bytes(&msg).unwrap().into();
-        let (notif, maybe_receiver) = match protocol_id {
-            ProtocolId::MempoolDirectSend => (
-                PeerManagerNotification::RecvMessage(remote_peer_id, Message {
-                    protocol_id,
-                    mdata: data,
-                }),
-                None,
-            ),
-            ProtocolId::MempoolRpc => {
-                let (res_tx, res_rx) = oneshot::channel();
-                let notif = PeerManagerNotification::RecvRpc(remote_peer_id, InboundRpcRequest {
-                    protocol_id,
-                    data,
-                    res_tx,
-                });
-                (notif, Some(res_rx))
-            },
-
+        // let (notif, maybe_receiver) = match protocol_id {
+        //     ProtocolId::MempoolDirectSend => (
+        //         PeerManagerNotification::RecvMessage(remote_peer_id, Message {
+        //             protocol_id,
+        //             mdata: data,
+        //         }),
+        //         None,
+        //     ),
+        //     ProtocolId::MempoolRpc => {
+        //         let (res_tx, res_rx) = oneshot::channel();
+        //         let notif = PeerManagerNotification::RecvRpc(remote_peer_id, InboundRpcRequest {
+        //             protocol_id,
+        //             data,
+        //             res_tx,
+        //         });
+        //         (notif, Some(res_rx))
+        //     },
+        //
+        //     protocol_id => panic!("Invalid protocol id found: {:?}", protocol_id),
+        // };
+        // inbound_handle
+        //     .inbound_message_sender
+        //     .push((remote_peer_id, protocol_id), notif)
+        //     .unwrap();
+        let request_id = self.request_id_generator.next();
+        let nmsg = match protocol_id {
+            ProtocolId::MempoolDirectSend => NetworkMessage::DirectSendMsg(DirectSendMsg{
+                protocol_id,
+                priority: 0,
+                raw_msg: data,
+            }),
+            ProtocolId::MempoolRpc => NetworkMessage::RpcRequest(RpcRequest{
+                protocol_id,
+                request_id,
+                priority: 0,
+                raw_request: data,
+            }),
             protocol_id => panic!("Invalid protocol id found: {:?}", protocol_id),
         };
-        inbound_handle
-            .inbound_message_sender
-            .push((remote_peer_id, protocol_id), notif)
-            .unwrap();
+        let rmsg = ReceivedMessage{
+            message: nmsg,
+            sender: remote_peer_network_id,
+            rx_at: 0,
+        };
+        inbound_handle.inbound_message_sender.send(rmsg).await;
 
-        let response: MempoolSyncMsg = if let Some(res_rx) = maybe_receiver {
-            let response = res_rx.await.unwrap().unwrap();
-            protocol_id.from_bytes(&response).unwrap()
-        } else {
-            match self.get_outbound_handle(network_id).next().await.unwrap() {
-                PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                    assert_eq!(peer_id, remote_peer_id);
-                    msg.protocol_id.from_bytes(&msg.mdata).unwrap()
-                },
-                _ => panic!("Should not be getting an RPC response"),
+        // wait for RPC or direct response
+        // let omr = self.outbound_handles.get_mut(&network_id).unwrap();
+        let response_outer = match peer_receiver.recv().await {
+            None => {
+                unreachable!("expected some response")
+            }
+            Some((msg, _when)) => msg
+        };
+        let response: MempoolSyncMsg = match response_outer {
+            NetworkMessage::Error(xe) => {
+                unreachable!("unexpected error message: {:?}", xe);
+            }
+            NetworkMessage::RpcRequest(req) => {
+                unreachable!("unexpected rpc request: {:?}", req);
+            }
+            NetworkMessage::RpcResponse(response) => {
+                assert_eq!(request_id, response.request_id);
+                assert_eq!(ProtocolId::MempoolRpc, protocol_id);
+                protocol_id.from_bytes(response.raw_response.as_slice()).unwrap()
+            }
+            NetworkMessage::DirectSendMsg(response) => {
+                assert_eq!(ProtocolId::MempoolDirectSend, protocol_id);
+                assert_eq!(ProtocolId::MempoolDirectSend, response.protocol_id);
+                response.protocol_id.from_bytes(response.raw_msg.as_slice()).unwrap()
             }
         };
+        // let response: MempoolSyncMsg = if let Some(res_rx) = maybe_receiver {
+        //     let response = res_rx.await.unwrap().unwrap();
+        //     protocol_id.from_bytes(&response).unwrap()
+        // } else {
+        //     let outbound_handle = self.outbound_handles.get_mut(&network_id).unwrap();
+        //     match outbound_handle.next().await.unwrap() {
+        //         PeerManagerRequest::SendDirectSend(peer_id, msg) => {
+        //             assert_eq!(peer_id, remote_peer_id);
+        //             msg.protocol_id.from_bytes(&msg.mdata).unwrap()
+        //         },
+        //         _ => panic!("Should not be getting an RPC response"),
+        //     }
+        // };
         if let MempoolSyncMsg::BroadcastTransactionsResponse {
             request_id,
             retry,
@@ -350,17 +430,38 @@ impl MempoolNode {
     ) {
         let network_id = expected_peer_network_id.network_id();
         let expected_peer_id = expected_peer_network_id.peer_id();
+
+        // formerly get_next_network_msg
+        // let (peer_id, message) = TestNode::get_next_network_msg(self, network_id).await;
+        // let (peer_id, protocol_id, data, maybe_rpc_sender) = match message {
+        //     PeerManagerRequest::SendRpc(peer_id, msg) => {
+        //         (peer_id, msg.protocol_id, msg.data, Some(msg.res_tx))
+        //     },
+        //     PeerManagerRequest::SendDirectSend(peer_id, msg) => {
+        //         (peer_id, msg.protocol_id, msg.mdata, None)
+        //     },
+        // };
+        // assert_eq!(peer_id, expected_peer_id);
+        let (sender, mut peer_receiver) = tokio::sync::mpsc::channel(10);
+        let peer_outbound_rpc = OutboundRpcMatcher::new();
+        let peer_closer = Closer::new();
+        let peer = PeerStub::new(sender.clone(), sender, peer_outbound_rpc, peer_closer);
+        let peer_senders = self.outbound_handles.get_mut(&network_id).unwrap();
+        peer_senders.insert(expected_peer_network_id, peer);
+
         let inbound_handle = self.get_inbound_handle(network_id);
-        let message = self.get_next_network_msg(network_id).await;
-        let (peer_id, protocol_id, data, maybe_rpc_sender) = match message {
-            PeerManagerRequest::SendRpc(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.data, Some(msg.res_tx))
-            },
-            PeerManagerRequest::SendDirectSend(peer_id, msg) => {
-                (peer_id, msg.protocol_id, msg.mdata, None)
-            },
+        let (message, _when) = peer_receiver.recv().await.unwrap();
+        let (protocol_id, data, rpc_id) = match message {
+            NetworkMessage::RpcRequest(request) => {
+                (request.protocol_id, request.raw_request, Some(request.request_id))
+            }
+            NetworkMessage::DirectSendMsg(msg) => {
+                (msg.protocol_id, msg.raw_msg, None)
+            }
+            message => {
+                panic!("unexpected message {:?}", message);
+            }
         };
-        assert_eq!(peer_id, expected_peer_id);
         let mempool_message = common::decompress_and_deserialize(&data.to_vec());
         let request_id = match mempool_message {
             MempoolSyncMsg::BroadcastTransactionsRequest {
@@ -400,18 +501,80 @@ impl MempoolNode {
         };
         let bytes = protocol_id.to_bytes(&response).unwrap();
 
-        if let Some(rpc_sender) = maybe_rpc_sender {
-            rpc_sender.send(Ok(bytes.into())).unwrap();
+        let rmsg = if let Some(request_id) = rpc_id {
+            ReceivedMessage{
+                message: NetworkMessage::RpcResponse(RpcResponse{
+                    request_id,
+                    priority: 0,
+                    raw_response: bytes,
+                }),
+                sender: PeerNetworkId::new(expected_peer_network_id.network_id(), PeerId::random()),
+                rx_at: 0,
+            }
         } else {
-            let notif = PeerManagerNotification::RecvMessage(peer_id, Message {
-                protocol_id,
-                mdata: bytes.into(),
-            });
-            inbound_handle
-                .inbound_message_sender
-                .push((peer_id, protocol_id), notif)
-                .unwrap();
+            ReceivedMessage{
+                message: NetworkMessage::DirectSendMsg(DirectSendMsg{
+                    protocol_id,
+                    priority: 0,
+                    raw_msg: bytes,
+                }),
+                sender: expected_peer_network_id,
+                rx_at: 0,
+            }
+        };
+        inbound_handle.inbound_message_sender.send(rmsg).await.unwrap();
+    }
+
+    /// Drop a network message.  This is required over [`TestNode::get_network_msg`] because the
+    /// oneshot channel must be dropped.
+    pub async fn drop_next_network_msg(
+        &mut self,
+        peer_network_id: PeerNetworkId,
+    ) -> (ProtocolId, bytes::Bytes) {
+        let mut peer_receiver = self.setup_fake_peer_receiver(peer_network_id);
+        let (message, _when) = peer_receiver.recv().await.unwrap();
+        match message {
+            NetworkMessage::RpcRequest(req) => {
+                (req.protocol_id, req.raw_request.into())
+            }
+            NetworkMessage::DirectSendMsg(msg) => {
+                (msg.protocol_id, msg.raw_msg.into())
+            }
+            message => {
+                panic!("unexpected message {:?}", message)
+            }
         }
+    }
+
+    /// Sends the next queued network message on `Node`'s network (`NetworkId`)
+    pub async fn send_next_network_msg(&mut self, network_id: NetworkId) {
+        println!("TODO: send_next_network_msg does this need a replacement?")
+        // let (remote_peer_id, request) = TestNode::get_next_network_msg(self, network_id).await;
+        // let sender_peer_network_id = self.peer_network_id(network_id);
+        // let receiver_peer_network_id = PeerNetworkId::new(network_id, remote_peer_id);
+        // let receiver_handle = self.get_inbound_handle_for_peer(receiver_peer_network_id);
+        //
+        // // TODO: Add timeout functionality
+        // let fake_message = match request {
+        //     NetworkMessage::RpcRequest(req) => {
+        //         ReceivedMessage{
+        //             message: NetworkMessage::RpcRequest(req),
+        //             sender: sender_peer_network_id,
+        //             rx_at: 0,
+        //         }
+        //     }
+        //     NetworkMessage::DirectSendMsg(msg) => {
+        //         ReceivedMessage{
+        //             message: NetworkMessage::DirectSendMsg(msg),
+        //             sender: sender_peer_network_id,
+        //             rx_at: 0,
+        //         }
+        //     }
+        //     _ => {
+        //         return;
+        //     }
+        // };
+        // receiver_handle.inbound_message_sender.send(fake_message).await.unwrap();
     }
 }
 
@@ -450,7 +613,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
 
         let (
             network_client,
-            network_service_events,
+            network_events,
             inbound_handles,
             outbound_handles,
             peers_and_metadata,
@@ -459,7 +622,7 @@ impl TestFramework<MempoolNode> for MempoolTestFramework {
             setup_mempool(
                 config,
                 network_client,
-                network_service_events,
+                network_events,
                 peers_and_metadata.clone(),
             );
 
@@ -488,9 +651,9 @@ pub fn setup_node_networks(
     network_ids: &[NetworkId],
 ) -> (
     NetworkClient<MempoolSyncMsg>,
-    NetworkServiceEvents<MempoolSyncMsg>,
+    NetworkEvents<MempoolSyncMsg>,
     HashMap<NetworkId, InboundNetworkHandle>,
-    HashMap<NetworkId, OutboundMessageReceiver>,
+    HashMap<NetworkId, Arc<OutboundPeerConnections>>,
     Arc<PeersAndMetadata>,
 ) {
     let peers_and_metadata = PeersAndMetadata::new(network_ids);
@@ -501,13 +664,13 @@ pub fn setup_node_networks(
     let mut inbound_handles = HashMap::new();
     let mut outbound_handles = HashMap::new();
     for network_id in network_ids {
-        let (network_sender, network_events, inbound_handle, outbound_handle) =
+        let (network_sender, network_events, inbound_handle, peer_senders) =
             setup_network(peers_and_metadata.clone());
 
         network_senders.insert(*network_id, network_sender);
         network_and_events.insert(*network_id, network_events);
         inbound_handles.insert(*network_id, inbound_handle);
-        outbound_handles.insert(*network_id, outbound_handle);
+        outbound_handles.insert(*network_id, peer_senders);
     }
 
     // Create a network client and service events
@@ -517,11 +680,15 @@ pub fn setup_node_networks(
         network_senders,
         peers_and_metadata.clone(),
     );
-    let network_service_events = NetworkServiceEvents::new(network_and_events);
+    let (_network_recived_messages_tx, network_recived_messages_rx) = tokio::sync::mpsc::channel(10);
+    let network_source = NetworkSource::new_single_source(network_recived_messages_rx);
+    let peer_senders = Arc::new(OutboundPeerConnections::new());
+    let contexts = Arc::new(BTreeMap::new());
+    let network_events = NetworkEvents::new(network_source, peer_senders, "test", contexts);
 
     (
         network_client,
-        network_service_events,
+        network_events,
         inbound_handles,
         outbound_handles,
         peers_and_metadata,
@@ -535,30 +702,34 @@ fn setup_network(
     NetworkSender<MempoolSyncMsg>,
     NetworkEvents<MempoolSyncMsg>,
     InboundNetworkHandle,
-    OutboundMessageReceiver,
+    Arc<OutboundPeerConnections>,// OutboundMessageReceiver,
 ) {
-    let (reqs_inbound_sender, reqs_inbound_receiver) = aptos_channel();
-    let (reqs_outbound_sender, reqs_outbound_receiver) = aptos_channel();
-    let (connection_outbound_sender, _connection_outbound_receiver) = aptos_channel();
-    let (connection_inbound_sender, connection_inbound_receiver) = conn_notifs_channel::new();
+    let (reqs_inbound_sender, reqs_inbound_receiver) = tokio::sync::mpsc::channel(10);//aptos_channel();
+    // let (reqs_outbound_sender, reqs_outbound_receiver) = tokio::sync::mpsc::channel(10);//aptos_channel();
+    // let (connection_outbound_sender, _connection_outbound_receiver) = tokio::sync::mpsc::channel(10);//aptos_channel();
+    // let (connection_inbound_sender, connection_inbound_receiver) = tokio::sync::mpsc::channel(10);//conn_notifs_channel::new();
 
+    let peer_senders = Arc::new(OutboundPeerConnections::new());
     // Create the network sender and events
     let network_sender = NetworkSender::new(
-        PeerManagerRequestSender::new(reqs_outbound_sender),
-        ConnectionRequestSender::new(connection_outbound_sender),
+        NetworkId::Validator,
+        peer_senders.clone(),
+        RoleType::Validator,
     );
+    let network_source = NetworkSource::new_single_source(reqs_inbound_receiver);
+    let contexts = Arc::new(BTreeMap::new());
     let network_events =
-        NetworkEvents::new(reqs_inbound_receiver, connection_inbound_receiver, None);
+        NetworkEvents::new(network_source, peer_senders.clone(), "test", contexts);
 
     (
         network_sender,
         network_events,
         InboundNetworkHandle {
             inbound_message_sender: reqs_inbound_sender,
-            connection_update_sender: connection_inbound_sender,
+            // connection_update_sender: connection_inbound_sender,
             peers_and_metadata,
         },
-        reqs_outbound_receiver,
+        peer_senders, //reqs_outbound_receiver,
     )
 }
 
@@ -573,7 +744,7 @@ fn aptos_channel<K: Eq + Hash + Clone, T>(
 fn setup_mempool(
     config: NodeConfig,
     network_client: NetworkClient<MempoolSyncMsg>,
-    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    network_events: NetworkEvents<MempoolSyncMsg>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     MempoolClientSender,
@@ -610,7 +781,7 @@ fn setup_mempool(
         &config,
         mempool.clone(),
         network_client,
-        network_service_events,
+        network_events,
         ac_endpoint_receiver,
         quorum_store_receiver,
         mempool_listener,

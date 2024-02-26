@@ -8,7 +8,7 @@ use aptos_crypto::bls12381::PrivateKey;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
-use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_network2::application::interface::{NetworkClient, NetworkEvents};
 use aptos_types::account_address::AccountAddress;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use tokio::runtime::Runtime;
@@ -18,7 +18,7 @@ pub fn start_jwk_consensus_runtime(
     my_addr: AccountAddress,
     consensus_key: PrivateKey,
     network_client: NetworkClient<JWKConsensusMsg>,
-    network_service_events: NetworkServiceEvents<JWKConsensusMsg>,
+    network_events: NetworkEvents<JWKConsensusMsg>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     jwk_updated_events: EventNotificationListener,
     vtxn_pool_writer: VTxnPoolState,
@@ -35,7 +35,7 @@ pub fn start_jwk_consensus_runtime(
         jwk_consensus_network_client,
         vtxn_pool_writer,
     );
-    let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
+    let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
     runtime.spawn(network_task.start());
     runtime.spawn(epoch_manager.start(network_receiver));
     runtime

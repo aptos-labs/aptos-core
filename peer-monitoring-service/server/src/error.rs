@@ -25,8 +25,8 @@ impl Error {
     }
 }
 
-impl From<aptos_network::application::error::Error> for Error {
-    fn from(error: aptos_network::application::error::Error) -> Self {
+impl From<aptos_network2::application::error::Error> for Error {
+    fn from(error: aptos_network2::application::error::Error) -> Self {
         Error::UnexpectedErrorEncountered(error.to_string())
     }
 }

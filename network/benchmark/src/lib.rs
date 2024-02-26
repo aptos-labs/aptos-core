@@ -11,9 +11,9 @@ use aptos_logger::{
     warn,
 };
 use aptos_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
-use aptos_network::{
-    application::interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
-    protocols::{network::Event, rpc::error::RpcError, wire::handshake::v1::ProtocolId},
+use aptos_network2::{
+    application::interface::{NetworkClient, NetworkClientInterface, NetworkEvents},
+    protocols::{network::Event, RpcError, wire::handshake::v1::ProtocolId},
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{account_address::AccountAddress, PeerId};
@@ -27,6 +27,9 @@ use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{ops::DerefMut, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, select, sync::RwLock};
+use aptos_network2::application::error::Error;
+use aptos_network2::application::storage::ConnectionNotification;
+use aptos_network2::error::NetworkError;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[allow(clippy::large_enum_variant)]
@@ -61,15 +64,15 @@ pub static PENDING_NETBENCH_NETWORK_EVENTS: Lazy<IntCounterVec> = Lazy::new(|| {
 
 // Get messages from the network and quickly shuffle them to N threads of workers.
 async fn source_loop(
-    network_requests: NetworkServiceEvents<NetbenchMessage>,
-    work: async_channel::Sender<(NetworkId, Event<NetbenchMessage>)>,
+    mut network_events: NetworkEvents<NetbenchMessage>,
+    work: async_channel::Sender<Event<NetbenchMessage>>,
 ) {
-    let network_events: Vec<_> = network_requests
-        .into_network_and_events()
-        .into_iter()
-        .map(|(network_id, events)| events.map(move |event| (network_id, event)))
-        .collect();
-    let mut network_events = futures::stream::select_all(network_events).fuse();
+    // let network_events: Vec<_> = network_requests
+    //     .into_network_and_events()
+    //     .into_iter()
+    //     .map(|(network_id, events)| events.map(move |event| (network_id, event)))
+    //     .collect();
+    // let mut network_events = futures::stream::select_all(network_events).fuse();
 
     loop {
         match network_events.next().await {
@@ -103,10 +106,10 @@ async fn handle_direct(
                 send_micros: time_service.now_unix_time().as_micros() as u64,
                 request_send_micros: send.send_micros,
             };
-            let result = network_client.send_to_peer(
+            let result = network_client.send_to_peer_blocking(
                 NetbenchMessage::DataReply(reply),
                 PeerNetworkId::new(network_id, peer_id),
-            );
+            ).await;
             if let Err(err) = result {
                 direct_messages("reply_err");
                 info!(
@@ -180,18 +183,17 @@ async fn handle_rpc(
 
 /// handle work split out by source_loop()
 async fn handler_task(
-    node_config: NodeConfig,
     network_client: NetworkClient<NetbenchMessage>,
-    work_rx: async_channel::Receiver<(NetworkId, Event<NetbenchMessage>)>,
+    work_rx: async_channel::Receiver<Event<NetbenchMessage>>,
     time_service: TimeService,
     shared: Arc<RwLock<NetbenchSharedState>>,
 ) {
-    let config = node_config.netbench.unwrap();
     loop {
-        let (network_id, event) = match work_rx.recv().await {
+        let event = match work_rx.recv().await {
             Ok(v) => v,
-            Err(_) => {
+            Err(err) => {
                 // RecvError means source was closed, we're done here.
+                info!("netbench handler_task exit {}", err);
                 return;
             },
         };
@@ -200,8 +202,8 @@ async fn handler_task(
                 let msg_wrapper: NetbenchMessage = wat;
                 handle_direct(
                     &network_client,
-                    network_id,
-                    peer_id,
+                    peer_id.network_id(),
+                    peer_id.peer_id(),
                     msg_wrapper,
                     time_service.clone(),
                     shared.clone(),
@@ -210,7 +212,7 @@ async fn handler_task(
             },
             Event::RpcRequest(peer_id, msg_wrapper, protocol_id, sender) => {
                 handle_rpc(
-                    peer_id,
+                    peer_id.peer_id(),
                     msg_wrapper,
                     protocol_id,
                     time_service.clone(),
@@ -218,29 +220,6 @@ async fn handler_task(
                 )
                 .await;
             },
-            Event::NewPeer(wat) => {
-                if config.enable_direct_send_testing {
-                    Handle::current().spawn(direct_sender(
-                        node_config.clone(),
-                        network_client.clone(),
-                        time_service.clone(),
-                        network_id,
-                        wat.remote_peer_id,
-                        shared.clone(),
-                    ));
-                }
-                if config.enable_rpc_testing {
-                    Handle::current().spawn(rpc_sender(
-                        node_config.clone(),
-                        network_client.clone(),
-                        time_service.clone(),
-                        network_id,
-                        wat.remote_peer_id,
-                        shared.clone(),
-                    ));
-                }
-            },
-            Event::LostPeer(_) => {}, // don't care
         }
     }
 }
@@ -249,8 +228,9 @@ async fn handler_task(
 pub async fn run_netbench_service(
     node_config: NodeConfig,
     network_client: NetworkClient<NetbenchMessage>,
-    network_requests: NetworkServiceEvents<NetbenchMessage>,
+    network_requests: NetworkEvents<NetbenchMessage>,
     time_service: TimeService,
+    runtime_handle: Handle,
 ) {
     let shared = Arc::new(RwLock::new(NetbenchSharedState::new()));
     let config = node_config.netbench.unwrap();
@@ -273,24 +253,106 @@ pub async fn run_netbench_service(
         },
     };
     let (work_sender, work_receiver) = async_channel::bounded(num_threads * 2);
-    let runtime_handle = Handle::current();
+    let listener_task = runtime_handle.spawn(connection_listener(
+        node_config.clone(),
+        network_client.clone(),
+        time_service.clone(),
+        shared.clone(),
+        runtime_handle.clone(),
+    ));
     let source_task = runtime_handle.spawn(source_loop(network_requests, work_sender));
     let mut handlers = vec![];
+    info!("netbench starting {} threads", num_threads);
     for _ in 0..num_threads {
         handlers.push(runtime_handle.spawn(handler_task(
-            node_config.clone(),
             network_client.clone(),
             work_receiver.clone(),
             time_service.clone(),
             shared.clone(),
         )));
     }
-    if let Err(err) = source_task.await {
-        warn!("benchmark source_thread join: {}", err);
-    }
+    let listener_task_result = listener_task.await;
+    info!("netbench listener_task exited {:?}",listener_task_result);
+    let source_task_result = source_task.await;
+    info!("netbench source_task exited {:?}", source_task_result);
     for hai in handlers {
         if let Err(err) = hai.await {
-            warn!("benchmark handler_thread join: {}", err);
+            warn!("netbench handler_thread[] join: {}", err);
+        }
+    }
+}
+
+async fn connection_listener(
+    node_config: NodeConfig,
+    network_client: NetworkClient<NetbenchMessage>,
+    time_service: TimeService,
+    shared: Arc<RwLock<NetbenchSharedState>>,
+    handle: Handle,
+) {
+    let config = node_config.netbench.unwrap();
+    if let Ok(peers) = network_client.peers_and_metadata.get_connected_peers_and_metadata() {
+        info!("netbench connection_listener got {} initial peers", peers.len());
+        for peer_network_id in peers.keys() {
+            info!("netbench connection_listener new for initial {:?}", peer_network_id);
+            if config.enable_direct_send_testing {
+                handle.spawn(direct_sender(
+                    node_config.clone(),
+                    network_client.clone(),
+                    time_service.clone(),
+                    peer_network_id.network_id(),
+                    peer_network_id.peer_id(),
+                    shared.clone(),
+                    handle.clone(),
+                ));
+            }
+            if config.enable_rpc_testing {
+                handle.spawn(rpc_sender(
+                    node_config.clone(),
+                    network_client.clone(),
+                    time_service.clone(),
+                    peer_network_id.network_id(),
+                    peer_network_id.peer_id(),
+                    shared.clone(),
+                ));
+            }
+        }
+    }
+    let mut connection_notifications = network_client.peers_and_metadata.subscribe();
+    loop {
+        match connection_notifications.recv().await {
+            None => {
+                info!("netbench connection_listener exit");
+                return;
+            }
+            Some(note) => match note {
+                ConnectionNotification::NewPeer(meta, netcontext) => {
+                    info!("netbench connection_listener new {:?} {:?}", meta, netcontext);
+                    if config.enable_direct_send_testing {
+                        handle.spawn(direct_sender(
+                            node_config.clone(),
+                            network_client.clone(),
+                            time_service.clone(),
+                            netcontext.network_id(),
+                            netcontext.peer_id(),
+                            shared.clone(),
+                            handle.clone(),
+                        ));
+                    }
+                    if config.enable_rpc_testing {
+                        handle.spawn(rpc_sender(
+                            node_config.clone(),
+                            network_client.clone(),
+                            time_service.clone(),
+                            netcontext.network_id(),
+                            netcontext.peer_id(),
+                            shared.clone(),
+                        ));
+                    }
+                }
+                ConnectionNotification::LostPeer(_, _, _) => {
+                    // don't care, things will disconnect elsewhere
+                }
+            }
         }
     }
 }
@@ -298,32 +360,68 @@ pub async fn run_netbench_service(
 // Once every X milliseconds log a message
 const BLAB_MILLIS: u64 = 1000; // 1 second
 
-pub async fn direct_sender(
+async fn direct_sender(
     node_config: NodeConfig,
     network_client: NetworkClient<NetbenchMessage>,
     time_service: TimeService,
     network_id: NetworkId,
     peer_id: PeerId,
     shared: Arc<RwLock<NetbenchSharedState>>,
+    handle: Handle,
 ) {
     let config = node_config.netbench.unwrap();
     let interval = Duration::from_nanos(1_000_000_000 / config.direct_send_per_second);
     let ticker = time_service.interval(interval);
     futures::pin_mut!(ticker);
+    let ticker_semaphore = Arc::new(tokio::sync::Semaphore::new(0));
+
+    // TODO: configurable sender threads
+    for _ in 0..4 {
+        handle.spawn(direct_sender_worker(
+            node_config.clone(),
+            network_client.clone(),
+            time_service.clone(),
+            network_id,
+            peer_id,
+            shared.clone(),
+            ticker_semaphore.clone(),
+        ));
+    }
+
+    loop {
+        ticker.next().await;
+        direct_messages("tickP");
+        ticker_semaphore.add_permits(1);
+    }
+}
+
+async fn direct_sender_worker(
+    node_config: NodeConfig,
+    network_client: NetworkClient<NetbenchMessage>,
+    time_service: TimeService,
+    network_id: NetworkId,
+    peer_id: PeerId,
+    shared: Arc<RwLock<NetbenchSharedState>>,
+    ticker_semaphore: Arc<tokio::sync::Semaphore>,
+) {
+    let config = node_config.netbench.unwrap();
     let data_size = config.direct_send_data_size;
     let mut rng = OsRng;
     let mut blob = Vec::<u8>::with_capacity(data_size);
+    let mut counter: u64 = rng.gen();
+
+    info!("netbench ds worker start {}", counter);
 
     // random payload filler
     for _ in 0..data_size {
         blob.push(rng.gen());
     }
-
-    let mut counter: u64 = rng.gen();
-
     loop {
-        ticker.next().await;
+        let wat = ticker_semaphore.acquire().await.unwrap();
+        wat.forget();
+        direct_messages("tickC");
 
+        let start = time_service.now();
         counter += 1;
         {
             // tweak the random payload a little on every send
@@ -348,20 +446,29 @@ pub async fn direct_sender(
         let wrapper = NetbenchMessage::DataSend(msg);
         let result = network_client.send_to_peer(wrapper, PeerNetworkId::new(network_id, peer_id));
         if let Err(err) = result {
-            direct_messages("serr");
+            if let Error::NetworkError(ne) = &err {
+                match ne {
+                    NetworkError::PeerFullCondition => {
+                        // okay, wait, try again
+                        direct_messages_send("qdrop", time_service.now().duration_since(start));
+                        continue;
+                    }
+                    NetworkError::NotConnected => {
+                        info!("netbench [{} {}] disconnected", network_id, peer_id);
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+            direct_messages_send("serr", time_service.now().duration_since(start));
             info!(
                 "netbench [{},{}] direct send err: {}",
                 network_id, peer_id, err
             );
             return;
         } else {
-            direct_messages("sent");
+            direct_messages_send("sent", time_service.now().duration_since(start));
         }
-
-        sample!(
-            SampleRate::Duration(Duration::from_millis(BLAB_MILLIS)),
-            info!("netbench ds counter={}", counter)
-        );
     }
 }
 
@@ -418,7 +525,7 @@ pub async fn rpc_sender(
                     })
                 }
                 let wrapper = NetbenchMessage::DataSend(msg);
-                let result = network_client.send_to_peer_rpc(wrapper, Duration::from_secs(10), PeerNetworkId::new(network_id, peer_id));
+                let result = network_client.send_to_peer_rpc(wrapper, Duration::from_secs(5), PeerNetworkId::new(network_id, peer_id));
                 rpc_messages("sent");
                 open_rpcs.push(result);
 
@@ -442,7 +549,7 @@ pub async fn rpc_sender(
                         let nowu = time_service.now_unix_time().as_micros() as u64;
                         if let NetbenchMessage::DataReply(msg) = msg_wrapper {
                             let send_dt = nowu - msg.request_send_micros;
-                            info!("netbench [{}] rpc at {} µs, took {} µs", msg.request_counter, nowu, send_dt);
+                            // info!("netbench [{}] rpc at {} µs, took {} µs", msg.request_counter, nowu, send_dt);
                             rpc_messages("ok");
                             rpc_bytes("ok").inc_by(data_size as u64);
                             rpc_micros("ok").inc_by(send_dt);
@@ -533,10 +640,26 @@ pub static APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGES: Lazy<IntCounterVec> = Lazy::
     .unwrap()
 });
 
+pub static APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGE_SEND_NANOS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_network_benchmark_direct_message_send_nanos",
+        "Benchmark direct messages send nanos",
+        &["state"]
+    )
+        .unwrap()
+});
+
 fn direct_messages(state_label: &'static str) {
+
     APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGES
         .with_label_values(&[state_label])
         .inc();
+}
+
+fn direct_messages_send(state_label: &'static str, dt: Duration) {
+let values = [state_label];
+    APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGES.with_label_values(&values).inc();
+    APTOS_NETWORK_BENCHMARK_DIRECT_MESSAGE_SEND_NANOS.with_label_values(&values).inc_by(dt.as_nanos() as u64);
 }
 
 pub static APTOS_NETWORK_BENCHMARK_DIRECT_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {

@@ -366,11 +366,11 @@ aptos-move-examples = { path = "aptos-move/move-examples" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
-aptos-network = { path = "network/framework" }
 aptos-network-benchmark = { path = "network/benchmark" }
-aptos-network-builder = { path = "network/builder" }
+aptos-network2-builder = { path = "network/builder" }
 aptos-network-checker = { path = "crates/aptos-network-checker" }
 aptos-network-discovery = { path = "network/discovery" }
+aptos-network2 = { path = "network/framework" }
 aptos-nft-metadata-crawler-parser = { path = "ecosystem/nft-metadata-crawler-parser" }
 aptos-node = { path = "aptos-node" }
 aptos-node-checker = { path = "ecosystem/node-checker" }
@@ -617,6 +617,7 @@ proptest = "1.4.0"
 proptest-derive = "0.4.0"
 prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
+protobuf = "~2"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"

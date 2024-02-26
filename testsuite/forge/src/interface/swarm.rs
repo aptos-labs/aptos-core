@@ -156,25 +156,32 @@ pub trait SwarmExt: Swarm {
     async fn wait_for_connectivity(&self, deadline: Instant) -> Result<()> {
         let validators = self.validators().collect::<Vec<_>>();
         let full_nodes = self.full_nodes().collect::<Vec<_>>();
+        let num_nodes = validators.len() + full_nodes.len();
 
-        while !try_join_all(
-            validators
-                .iter()
-                .map(|node| node.check_connectivity(NetworkId::Validator, validators.len() - 1))
-                .chain(full_nodes.iter().map(|node| node.check_connectivity())),
-        )
-        .await
-        .map(|v| v.iter().all(|r| *r))
-        .unwrap_or(false)
-        {
+        loop {
+            let results = try_join_all(
+                validators.iter().map(|node| node.check_connectivity(NetworkId::Validator, validators.len() - 1))
+                    .chain(full_nodes.iter().map(|node| node.check_connectivity()))).await;
+            let wat = match results {
+                Ok(okays) => {
+                    let okay_count = okays.iter().map(|b| match b{true => 1, false => 0}).fold(0, |a,b| a+b);
+                    if okay_count as usize == num_nodes {
+                        info!("Swarm connectivity check passed");
+                        return Ok(());
+                    }
+                    info!("wait_for_connectivity {}/{}", okay_count, num_nodes);
+                    Ok(())
+                }
+                Err(err) => {
+                    Err(err)
+                }
+            };
             if Instant::now() > deadline {
-                return Err(anyhow!("waiting for swarm connectivity timed out"));
+                return Err(anyhow!("waiting for swarm connectivity timed out, {:?}", wat));
             }
 
             tokio::time::sleep(Duration::from_millis(500)).await;
-        }
-        info!("Swarm connectivity check passed");
-        Ok(())
+        };
     }
 
     /// Perform a safety check, ensuring that no forks have occurred in the network.

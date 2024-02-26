@@ -15,7 +15,7 @@ use crate::{
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
-use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_network2::application::interface::{NetworkClient, NetworkEvents};
 use aptos_types::dkg::{DKGTrait, DefaultDKG};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
@@ -26,7 +26,7 @@ pub fn start_dkg_runtime(
     my_addr: AccountAddress,
     dkg_dealer_sk: <DefaultDKG as DKGTrait>::DealerPrivateKey,
     network_client: NetworkClient<DKGMessage>,
-    network_service_events: NetworkServiceEvents<DKGMessage>,
+    network_events: NetworkEvents<DKGMessage>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     dkg_start_events: EventNotificationListener,
     vtxn_pool: VTxnPoolState,
@@ -44,7 +44,7 @@ pub fn start_dkg_runtime(
         dkg_network_client,
         vtxn_pool,
     );
-    let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
+    let (network_task, network_receiver) = NetworkTask::new(network_events, self_receiver);
     runtime.spawn(network_task.start());
     runtime.spawn(dkg_epoch_manager.start(network_receiver));
     runtime

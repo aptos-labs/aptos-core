@@ -600,6 +600,7 @@ fn update_optimistic_fetch_metrics(
             NetworkId::Validator => num_validator_optimistic_fetches += 1,
             NetworkId::Vfn => num_vfn_optimistic_fetches += 1,
             NetworkId::Public => num_public_optimistic_fetches += 1,
+            NetworkId::Internal => {},
         }
     }
 

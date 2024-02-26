@@ -6,11 +6,11 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_infallible::RwLock;
 use aptos_logger::warn;
-use aptos_network::{
-    application::interface::{NetworkClient, NetworkServiceEvents},
+use aptos_network2::{
+    application::interface::{NetworkClient, NetworkEvents},
     protocols::network::{Event, RpcError},
     ProtocolId,
 };
@@ -18,7 +18,7 @@ use aptos_reliable_broadcast::RBNetworkSender;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{
-    stream::{select, select_all},
+    stream::select,
     SinkExt, Stream, StreamExt,
 };
 use futures_channel::oneshot;
@@ -68,6 +68,7 @@ impl NetworkSender {
         if receiver == self.author() {
             let (tx, rx) = oneshot::channel();
             let protocol = RPC[0];
+            let receiver = PeerNetworkId::new(NetworkId::Validator, receiver);
             let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
             self.self_sender.clone().send(self_msg).await?;
             if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
@@ -108,21 +109,11 @@ pub struct NetworkTask {
 impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
-        network_service_events: NetworkServiceEvents<DKGMessage>,
+        network_events: NetworkEvents<DKGMessage>,
         self_receiver: aptos_channels::Receiver<Event<DKGMessage>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (rpc_tx, rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
 
-        let network_and_events = network_service_events.into_network_and_events();
-        if (network_and_events.values().len() != 1)
-            || !network_and_events.contains_key(&NetworkId::Validator)
-        {
-            panic!("The network has not been setup correctly for DKG!");
-        }
-
-        // Collect all the network events into a single stream
-        let network_events: Vec<_> = network_and_events.into_values().collect();
-        let network_events = select_all(network_events).fuse();
         let all_events = Box::new(select(network_events, self_receiver));
 
         (NetworkTask { rpc_tx, all_events }, NetworkReceivers {
@@ -136,14 +127,14 @@ impl NetworkTask {
                 Event::RpcRequest(peer_id, msg, protocol, response_sender) => {
                     let req = IncomingRpcRequest {
                         msg,
-                        sender: peer_id,
+                        sender: peer_id.peer_id(),
                         response_sender: Box::new(RealRpcResponseSender {
                             inner: Some(response_sender),
                             protocol,
                         }),
                     };
 
-                    if let Err(e) = self.rpc_tx.push(peer_id, (peer_id, req)) {
+                    if let Err(e) = self.rpc_tx.push(peer_id.peer_id(), (peer_id.peer_id(), req)) {
                         warn!(error = ?e, "aptos channel closed");
                     };
                 },

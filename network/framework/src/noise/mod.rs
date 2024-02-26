@@ -12,7 +12,7 @@
 //! Usage example:
 //!
 //! ```
-//! use aptos_network::noise::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader};
+//! use aptos_network2::noise::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader};
 //! use futures::{executor, future, io::{AsyncReadExt, AsyncWriteExt}};
 //! use aptos_memsocket::MemorySocket;
 //! use aptos_config::{config::{Peer, PeerRole}, network_id::{NetworkContext, NetworkId}};
@@ -22,7 +22,7 @@
 //! use aptos_types::PeerId;
 //! use std::{collections::{HashSet, HashMap}, io, sync::Arc};
 //! use aptos_config::config::RoleType;
-//! use aptos_network::application::storage::PeersAndMetadata;
+//! use aptos_network2::application::storage::PeersAndMetadata;
 //!
 //! fn example() -> io::Result<()> {
 //! // create client and server NoiseUpgrader
@@ -42,9 +42,8 @@
 //!
 //! let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
 //! let mut trusted_peers = peers_and_metadata.get_trusted_peers(&network_id).unwrap();
-//! trusted_peers.insert(client_peer_id, Peer::new(Vec::new(), client_pubkey_set, PeerRole::Validator));
-//! trusted_peers.insert(server_peer_id, Peer::new(Vec::new(), server_pubkey_set, PeerRole::Validator));
-//! peers_and_metadata.set_trusted_peers(&network_id, trusted_peers).unwrap();
+//! trusted_peers.write().insert(client_peer_id, Peer::new(Vec::new(), client_pubkey_set, PeerRole::Validator));
+//! trusted_peers.write().insert(server_peer_id, Peer::new(Vec::new(), server_pubkey_set, PeerRole::Validator));
 //!
 //! let client_auth = HandshakeAuthMode::mutual(peers_and_metadata.clone());
 //! let client_context = NetworkContext::new(
@@ -110,4 +109,4 @@ pub mod stream;
 pub mod fuzzing;
 
 pub use error::NoiseHandshakeError;
-pub use handshake::{AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader};
+pub use handshake::{AntiReplayTimestamps, NoiseUpgrader}; // HandshakeAuthMode

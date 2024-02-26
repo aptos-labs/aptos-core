@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::application;
+// use crate::application;
 use aptos_crypto::noise::NoiseError;
 use aptos_short_hex_str::ShortHexStr;
 use aptos_types::PeerId;
@@ -93,9 +93,9 @@ impl NoiseHandshakeError {
         matches!(self, ServerReplayDetected(_, _))
     }
 }
-
-impl From<application::error::Error> for NoiseHandshakeError {
-    fn from(error: application::error::Error) -> Self {
-        NoiseHandshakeError::UnexpectedError(error.to_string())
-    }
-}
+//
+// impl From<application::error::Error> for NoiseHandshakeError {
+//     fn from(error: application::error::Error) -> Self {
+//         NoiseHandshakeError::UnexpectedError(error.to_string())
+//     }
+// }

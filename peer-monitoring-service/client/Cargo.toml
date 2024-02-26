@@ -19,7 +19,7 @@ aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
-aptos-network = { workspace = true }
+aptos-network2= { workspace = true }
 aptos-peer-monitoring-service-types = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
@@ -37,7 +37,7 @@ tokio = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-config = { workspace = true }
 aptos-netcore = { workspace = true }
-aptos-network = { workspace = true, features = ["fuzzing"] }
+aptos-network2 = { workspace = true, features = ["fuzzing"] }
 aptos-peer-monitoring-service-server = { workspace = true }
 bcs = { workspace = true }
 maplit = { workspace = true }

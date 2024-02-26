@@ -4,7 +4,7 @@
 
 use crate::{
     logging::NetworkSchema,
-    noise::{stream::NoiseStream, AntiReplayTimestamps, HandshakeAuthMode, NoiseUpgrader},
+    noise::{stream::NoiseStream, AntiReplayTimestamps, NoiseUpgrader}, // HandshakeAuthMode
     protocols::{
         identity::exchange_handshake,
         wire::handshake::v1::{HandshakeMsg, MessagingProtocolVersion, ProtocolIdSet},
@@ -34,6 +34,11 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
+use crate::application::storage::PeersAndMetadata;
+
+pub mod util;
+
+pub use crate::transport::util::AptosNetTransportActual;
 
 #[cfg(test)]
 mod test;
@@ -423,6 +428,7 @@ pub async fn upgrade_outbound<T: TSocket>(
 /// the `Handshake` protocol.
 // TODO(philiphayes): rework Transport trait, possibly include Upgrade trait.
 // ideas in this PR thread: https://github.com/aptos-labs/aptos-core/pull/3478#issuecomment-617385633
+#[derive(Clone)]
 pub struct AptosNetTransport<TTransport> {
     base_transport: TTransport,
     ctxt: Arc<UpgradeContext>,
@@ -444,7 +450,8 @@ where
         network_context: NetworkContext,
         time_service: TimeService,
         identity_key: x25519::PrivateKey,
-        auth_mode: HandshakeAuthMode,
+        peers_and_metadata: Arc<PeersAndMetadata>,
+        mutual_auth: bool,
         handshake_version: u8,
         chain_id: ChainId,
         application_protocols: ProtocolIdSet,
@@ -457,7 +464,7 @@ where
         let identity_pubkey = identity_key.public_key();
 
         let upgrade_context = UpgradeContext::new(
-            NoiseUpgrader::new(network_context, identity_key, auth_mode),
+            NoiseUpgrader::new(network_context, identity_key, peers_and_metadata, mutual_auth),
             handshake_version,
             supported_protocols,
             chain_id,

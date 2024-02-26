@@ -16,7 +16,7 @@ use aptos_config::{
     network_id::PeerNetworkId,
 };
 use aptos_logger::prelude::*;
-use aptos_network::application::storage::PeersAndMetadata;
+use aptos_network2::application::storage::PeersAndMetadata;
 use aptos_storage_service_notifications::StorageServiceNotificationListener;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest,
@@ -60,7 +60,7 @@ const CACHED_SUMMARY_UPDATE_CHANNEL_SIZE: usize = 1;
 /// service requests from clients.
 pub struct StorageServiceServer<T> {
     bounded_executor: BoundedExecutor,
-    network_requests: StorageServiceNetworkEvents,
+    network_requests: StorageServiceNetworkEvents, // TODO: change this to use network framework NetworkEvents<StorageServiceMessage> directly
     storage: T,
     storage_service_config: StorageServiceConfig,
     time_service: TimeService,
@@ -396,7 +396,9 @@ impl<T: StorageReaderInterface + Send + Sync> StorageServiceServer<T> {
         self.spawn_continuous_storage_summary_tasks().await;
 
         // Handle the storage requests as they arrive
+        // TODO: change this to use network framework NetworkEvents<StorageServiceMessage> directly
         while let Some(network_request) = self.network_requests.next().await {
+            // TODO: increment a counter here?
             // All handler methods are currently CPU-bound and synchronous
             // I/O-bound, so we want to spawn on the blocking thread pool to
             // avoid starving other async tasks on the same runtime.

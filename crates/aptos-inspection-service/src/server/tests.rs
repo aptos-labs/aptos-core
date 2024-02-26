@@ -12,7 +12,7 @@ use crate::{
 };
 use aptos_config::config::{AptosDataClientConfig, BaseConfig, NodeConfig};
 use aptos_data_client::client::AptosDataClient;
-use aptos_network::application::{interface::NetworkClient, storage::PeersAndMetadata};
+use aptos_network2::application::{interface::NetworkClient, storage::PeersAndMetadata};
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
 use aptos_time_service::TimeService;

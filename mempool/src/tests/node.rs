@@ -17,15 +17,15 @@ use aptos_crypto::{x25519::PrivateKey, Uniform};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, MutexGuard, RwLock};
 use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use aptos_network2::{
     application::{
-        interface::{NetworkClient, NetworkServiceEvents},
-        storage::PeersAndMetadata,
+        interface::{NetworkClient}, // NetworkServiceEvents
+        storage::{ConnectionNotification,PeersAndMetadata},
     },
-    peer_manager::{
-        conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
-        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
-    },
+    // peer_manager::{
+    //     conn_notifs_channel, ConnectionNotification, ConnectionRequestSender,
+    //     PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
+    // },
     protocols::{
         network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
         wire::handshake::v1::ProtocolId::MempoolDirectSend,
@@ -49,7 +49,11 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
+use std::collections::BTreeMap;
 use tokio::runtime::Runtime;
+use tokio::sync::mpsc::error::TryRecvError;
+use aptos_network2::protocols::network::{NetworkSource, OutboundPeerConnections, PeerStub, ReceivedMessage};
+use aptos_network2::protocols::wire::messaging::v1::NetworkMessage;
 
 type MempoolNetworkHandle = (
     NetworkId,
@@ -156,7 +160,8 @@ impl NodeInfoTrait for ValidatorNodeInfo {
         match network_id {
             NetworkId::Validator => self.peer_id,
             NetworkId::Vfn => self.vfn_peer_id,
-            NetworkId::Public => panic!("Invalid network id for validator"),
+            NetworkId::Public => panic!("Invalid public network id for validator"),
+            NetworkId::Internal => panic!("Invalid internal network id for validator"),
         }
     }
 
@@ -193,7 +198,8 @@ impl NodeInfoTrait for ValidatorFullNodeInfo {
         match network_id {
             NetworkId::Public => self.peer_id,
             NetworkId::Vfn => self.vfn_peer_id,
-            NetworkId::Validator => panic!("Invalid network id for validator full node"),
+            NetworkId::Validator => panic!("Invalid validator network id for validator full node"),
+            NetworkId::Internal => panic!("Invalid internal network id for validator full node"),
         }
     }
 
@@ -348,12 +354,12 @@ impl NodeInfoTrait for Node {
 impl Node {
     /// Sets up a single node by starting up mempool and any network handles
     pub fn new(node: NodeInfo, config: NodeConfig) -> Node {
-        let (network_interfaces, network_client, network_service_events, peers_and_metadata) =
+        let (network_interfaces, network_client, network_events, peers_and_metadata) =
             setup_node_network_interfaces(&node);
         let (mempool, runtime, subscriber) = start_node_mempool(
             config,
             network_client,
-            network_service_events,
+            network_events,
             peers_and_metadata.clone(),
         );
 
@@ -436,12 +442,7 @@ impl Node {
     /// Checks that a node has no pending messages to send.
     pub fn check_no_network_messages_sent(&mut self, network_id: NetworkId) {
         self.check_no_subscriber_events();
-        assert!(self
-            .get_network_interface(network_id)
-            .network_reqs_rx
-            .select_next_some()
-            .now_or_never()
-            .is_none())
+        assert!(self.get_network_interface(network_id).network_reqs_rx.try_recv().is_err())
     }
 
     /// Retrieves a network interface for a specific `NetworkId` based on whether it's the primary network
@@ -450,7 +451,7 @@ impl Node {
     }
 
     /// Retrieves the next network request `PeerManagerRequest`
-    pub fn get_next_network_req(&mut self, network_id: NetworkId) -> PeerManagerRequest {
+    pub fn get_next_network_req(&mut self, network_id: NetworkId) -> ReceivedMessage {
         let runtime = self.runtime.clone();
         self.get_network_interface(network_id)
             .get_next_network_req(runtime)
@@ -459,12 +460,12 @@ impl Node {
     /// Send network request `PeerManagerNotification` from a remote peer to the local node
     pub fn send_network_req(
         &mut self,
-        network_id: NetworkId,
+        peer_network_id: PeerNetworkId,
         protocol: ProtocolId,
-        notif: PeerManagerNotification,
+        notif: NetworkMessage,
     ) {
-        self.get_network_interface(network_id)
-            .send_network_req(protocol, notif);
+        self.get_network_interface(peer_network_id.network_id())
+            .send_network_req(protocol, &peer_network_id, notif);
     }
 
     /// Sends a `ConnectionNotification` to the local node
@@ -478,28 +479,39 @@ impl Node {
 /// Allows us to mock out the network without dealing with the details
 pub struct NodeNetworkInterface {
     /// Peer request receiver for messages
-    pub(crate) network_reqs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
+    pub(crate) network_reqs_rx: tokio::sync::mpsc::Receiver<ReceivedMessage>,//aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerRequest>,
     /// Peer notification sender for sending outgoing messages to other peers
-    pub(crate) network_notifs_tx:
-        aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
-    /// Sender for connecting / disconnecting peers
-    pub(crate) network_conn_event_notifs_tx: conn_notifs_channel::Sender,
+    pub(crate) network_notifs_tx: Arc<OutboundPeerConnections>,
+
+    peer_cache_generation: u32,
+    peer_cache: HashMap<PeerNetworkId,PeerStub>,
+    // aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>,
+    // /// Sender for connecting / disconnecting peers
+    // pub(crate) network_conn_event_notifs_tx: conn_notifs_channel::Sender,
+    pub(crate) network_conn_event_notifs_tx: tokio::sync::mpsc::Sender<ConnectionNotification>,
 }
 
 impl NodeNetworkInterface {
-    fn get_next_network_req(&mut self, runtime: Arc<Runtime>) -> PeerManagerRequest {
-        runtime.block_on(self.network_reqs_rx.next()).unwrap()
+    fn get_next_network_req(&mut self, runtime: Arc<Runtime>) -> ReceivedMessage {
+        runtime.block_on(self.network_reqs_rx.recv()).unwrap()
     }
 
-    fn send_network_req(&mut self, protocol: ProtocolId, message: PeerManagerNotification) {
-        let remote_peer_id = match &message {
-            PeerManagerNotification::RecvRpc(peer_id, _) => *peer_id,
-            PeerManagerNotification::RecvMessage(peer_id, _) => *peer_id,
-        };
+    fn send_network_req(&mut self, protocol: ProtocolId, peer_network_id: &PeerNetworkId, message: NetworkMessage) {
+        // let remote_peer_id = match &message {
+        //     PeerManagerNotification::RecvRpc(peer_id, _) => *peer_id,
+        //     PeerManagerNotification::RecvMessage(peer_id, _) => *peer_id,
+        // };
 
-        self.network_notifs_tx
-            .push((remote_peer_id, protocol), message)
-            .unwrap()
+        if let Some((new_peers, new_gen)) = self.network_notifs_tx.get_generational(self.peer_cache_generation) {
+                self.peer_cache = new_peers;
+                self.peer_cache_generation = new_gen;
+        }
+        if let Some(stub)  = self.peer_cache.get(peer_network_id) {
+            _ = stub.sender.try_send((message,0));
+            // TODO: panic on error?
+        } // TODO: else panic on None destination?
+            // .push((remote_peer_id, protocol), message)
+            // .unwrap()
     }
 
     /// Send a notification specifying, where a remote peer has it's state changed
@@ -509,9 +521,7 @@ impl NodeNetworkInterface {
             ConnectionNotification::LostPeer(metadata, _, _) => metadata.remote_peer_id,
         };
 
-        self.network_conn_event_notifs_tx
-            .push(peer_id, notif)
-            .unwrap()
+        self.network_conn_event_notifs_tx.try_send(notif).unwrap()
     }
 }
 
@@ -523,7 +533,7 @@ fn setup_node_network_interfaces(
 ) -> (
     HashMap<NetworkId, NodeNetworkInterface>,
     NetworkClient<MempoolSyncMsg>,
-    NetworkServiceEvents<MempoolSyncMsg>,
+    NetworkEvents<MempoolSyncMsg>,
     Arc<PeersAndMetadata>,
 ) {
     // Create the peers and metadata
@@ -550,12 +560,16 @@ fn setup_node_network_interfaces(
         network_senders,
         peers_and_metadata.clone(),
     );
-    let network_service_events = NetworkServiceEvents::new(network_and_events);
+    let (rm_sender, rm_receiver) = tokio::sync::mpsc::channel(100);
+    let network_source = NetworkSource::new_single_source(rm_receiver);
+    let peer_senders = Arc::new(OutboundPeerConnections::new());
+    let contexts = Arc::new(BTreeMap::new());
+    let network_events = NetworkEvents::new(network_source, peer_senders, "test", contexts);
 
     (
         network_interfaces,
         network_client,
-        network_service_events,
+        network_events,
         peers_and_metadata,
     )
 }
@@ -566,22 +580,33 @@ fn setup_node_network_interface(
 ) -> (NodeNetworkInterface, MempoolNetworkHandle) {
     // Create the network sender and events receiver
     static MAX_QUEUE_SIZE: usize = 8;
-    let (network_reqs_tx, network_reqs_rx) =
-        aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
-    let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
-    let (network_notifs_tx, network_notifs_rx) =
-        aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
-    let (network_conn_event_notifs_tx, conn_status_rx) = conn_notifs_channel::new();
+    // let (network_reqs_tx, network_reqs_rx) =
+    //     aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+    let (network_reqs_tx, network_reqs_rx) = tokio::sync::mpsc::channel(MAX_QUEUE_SIZE);
+    // let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+    // let (network_notifs_tx, network_notifs_rx) = tokio::sync::mpsc::channel(MAX_QUEUE_SIZE);
+        // aptos_channel::new(QueueStyle::FIFO, MAX_QUEUE_SIZE, None);
+    let (network_conn_event_notifs_tx, conn_status_rx) = tokio::sync::mpsc::channel(10); //tokio::sync::mpsc::Receiver<ConnectionNotification>
+    // let (network_conn_event_notifs_tx, conn_status_rx) = conn_notifs_channel::new();
+    let peer_senders = Arc::new(OutboundPeerConnections::new());
     let network_sender = NetworkSender::new(
-        PeerManagerRequestSender::new(network_reqs_tx),
-        ConnectionRequestSender::new(connection_reqs_tx),
+        peer_network_id.network_id(),
+        peer_senders.clone(),
+        RoleType::Validator,
+        // PeerManagerRequestSender::new(network_reqs_tx),
+        // ConnectionRequestSender::new(connection_reqs_tx),
     );
-    let network_events = NetworkEvents::new(network_notifs_rx, conn_status_rx, None);
+    let (net_send, netrx) = tokio::sync::mpsc::channel(1000);
+    let network_source = NetworkSource::new_single_source(netrx);
+    let contexts = Arc::new(BTreeMap::new());
+    let network_events = NetworkEvents::new(network_source, peer_senders.clone(), "test", contexts);//network_notifs_rx, conn_status_rx, None);
 
     (
         NodeNetworkInterface {
             network_reqs_rx,
-            network_notifs_tx,
+            network_notifs_tx: peer_senders,
+            peer_cache_generation: 0,
+            peer_cache: HashMap::new(),
             network_conn_event_notifs_tx,
         },
         (peer_network_id.network_id(), network_sender, network_events),
@@ -592,7 +617,7 @@ fn setup_node_network_interface(
 fn start_node_mempool(
     config: NodeConfig,
     network_client: NetworkClient<MempoolSyncMsg>,
-    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    network_events: NetworkEvents<MempoolSyncMsg>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
     Arc<Mutex<CoreMempool>>,
@@ -625,7 +650,7 @@ fn start_node_mempool(
         &config,
         Arc::clone(&mempool),
         network_client,
-        network_service_events,
+        network_events,
         ac_endpoint_receiver,
         quorum_store_receiver,
         mempool_listener,
