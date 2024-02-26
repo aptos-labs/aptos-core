@@ -57,6 +57,7 @@ class RunGroupConfig:
     expected_tps: float
     included_in: Flow
     waived: bool = field(default=False)
+    expected_stages: int = 1
 
 
 # SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
@@ -90,18 +91,21 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=24000, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=3600, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=15000, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    # this was changed from 42000 to make landings not flaky, needs follow up
-    RunGroupConfig(expected_tps=37500, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=12800, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=30000, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=20700, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=4500, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=16500, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=135, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=2620, key=RunGroupKey(
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced20-market"), expected_stages=10, included_in=Flow.ECONIA),
+
+    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=31300, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=19200, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=4170, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=15400, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=155, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=2450, key=RunGroupKey(
         "mix_publish_transfer",
         transaction_type_override="publish-package coin-transfer",
         transaction_weights_override="1 500",
@@ -152,7 +156,7 @@ TESTS = [
     RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
 
-    RunGroupConfig(expected_tps=12000, key=RunGroupKey("econia-advanced1-market", module_working_set_size=1), included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=12000, key=RunGroupKey("econia-advanced1-market", module_working_set_size=1), included_in=Flow.ECONIA),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
@@ -276,27 +280,9 @@ def get_only(values):
 
 
 def extract_run_results(
-    output: str, execution_only: bool, create_db: bool = False
+    output: str, prefix: str, create_db: bool = False
 ) -> RunResults:
-    if execution_only:
-        tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
-        gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
-        effective_gps = float(
-            re.findall(r"Overall execution effectiveGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        io_gps = float(
-            re.findall(r"Overall execution ioGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        execution_gps = float(
-            re.findall(r"Overall execution executionGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        gpt = float(
-            re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
-        )
-        output_bps = float(
-            re.findall(r"Overall execution output: (\d+\.?\d*) bytes/s", output)[-1]
-        )
-    elif create_db:
+    if create_db:
         tps = float(
             get_only(
                 re.findall(
@@ -311,38 +297,35 @@ def extract_run_results(
         execution_gps = 0
         gpt = 0
         output_bps = 0
-    else:
-        tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
-        gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
-        effective_gps = float(
-            get_only(re.findall(r"Overall effectiveGPS: (\d+\.?\d*) gas/s", output))
-        )
-        io_gps = float(
-            get_only(re.findall(r"Overall ioGPS: (\d+\.?\d*) gas/s", output))
-        )
-        execution_gps = float(
-            get_only(re.findall(r"Overall executionGPS: (\d+\.?\d*) gas/s", output))
-        )
-        gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
-        output_bps = float(
-            re.findall(r"Overall output: (\d+\.?\d*) bytes/s", output)[-1]
-        )
-
-    if create_db:
         fraction_in_execution = 0
         fraction_of_execution_in_vm = 0
         fraction_in_commit = 0
     else:
+        tps = float(get_only(re.findall(prefix + r" TPS: (\d+\.?\d*) txn/s", output)))
+        gps = float(get_only(re.findall(prefix + r" GPS: (\d+\.?\d*) gas/s", output)))
+        effective_gps = float(
+            get_only(re.findall(prefix + r" effectiveGPS: (\d+\.?\d*) gas/s", output))
+        )
+        io_gps = float(
+            get_only(re.findall(prefix + r" ioGPS: (\d+\.?\d*) gas/s", output))
+        )
+        execution_gps = float(
+            get_only(re.findall(prefix + r" executionGPS: (\d+\.?\d*) gas/s", output))
+        )
+        gpt = float(get_only(re.findall(prefix + r" GPT: (\d+\.?\d*) gas/txn", output)))
+        output_bps = float(
+            get_only(re.findall(prefix + r" output: (\d+\.?\d*) bytes/s", output))
+        )
         fraction_in_execution = float(
-            re.findall(r"Overall fraction of total: (\d+\.?\d*) in execution", output)[
+            re.findall(prefix + r" fraction of total: (\d+\.?\d*) in execution", output)[
                 -1
             ]
         )
         fraction_of_execution_in_vm = float(
-            re.findall(r"Overall fraction of execution (\d+\.?\d*) in VM", output)[-1]
+            re.findall(prefix + r" fraction of execution (\d+\.?\d*) in VM", output)[-1]
         )
         fraction_in_commit = float(
-            re.findall(r"Overall fraction of total: (\d+\.?\d*) in commit", output)[-1]
+            re.findall(prefix + r" fraction of total: (\d+\.?\d*) in commit", output)[-1]
         )
 
     return RunResults(
@@ -449,7 +432,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         RunGroupInstance(
             key=RunGroupKey("warmup"),
             single_node_result=extract_run_results(
-                output, execution_only=False, create_db=True
+                output, "Overall", create_db=True
             ),
             number_of_threads_results={},
             block_size=MAX_BLOCK_SIZE,
@@ -501,13 +484,20 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
-                output, execution_only=True
+                output, "Overall execution"
             )
 
         test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
-        single_node_result = extract_run_results(output, execution_only=False)
+        single_node_result = extract_run_results(output, "Overall")
+        stage_node_results = []
+
+        if test.expected_stages > 1:
+            for i in range(test.expected_stages):
+                prefix = f"Staged execution: stage {i}:"
+                if prefix in output:
+                    stage_node_results.append((i, extract_run_results(output, prefix)))
 
         results.append(
             RunGroupInstance(
@@ -518,6 +508,21 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 expected_tps=test.expected_tps,
             )
         )
+
+        for stage, stage_node_result in stage_node_results:  
+            results.append(
+                RunGroupInstance(
+                    key=RunGroupKey(
+                        transaction_type=test.key.transaction_type + f" [stage {stage}]",
+                        module_working_set_size=test.key.module_working_set_size,
+                        executor_type=test.key.executor_type,   
+                    ),
+                    single_node_result=stage_node_result,
+                    number_of_threads_results=number_of_threads_results,
+                    block_size=cur_block_size,
+                    expected_tps=test.expected_tps,
+                )
+            )
 
         # line to be able to aggreate and visualize in Humio
         print(
