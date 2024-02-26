@@ -293,8 +293,10 @@ impl Execution {
     ) {
         let mut package_cache_main = compiled_package_cache;
         let package_cache_other = compiled_package_cache_v2;
+        let mut v2_flag = false;
         if self.execution_mode.is_v2() {
             package_cache_main = compiled_package_cache_v2;
+            v2_flag = true;
         }
         let res_main_opt = self.execute_code(
             cur_version,
@@ -303,6 +305,7 @@ impl Execution {
             &txn_idx.txn,
             package_cache_main,
             debugger.clone(),
+            v2_flag,
         );
         if self.execution_mode.is_compare() {
             let res_other_opt = self.execute_code(
@@ -312,22 +315,23 @@ impl Execution {
                 &txn_idx.txn,
                 package_cache_other,
                 debugger.clone(),
+                true,
             );
             self.print_mismatches(cur_version, &res_main_opt.unwrap(), &res_other_opt.unwrap());
         } else {
-            // let res = res_main_opt.unwrap();
-            // if let Ok(res_ok) = res {
-            //     self.output_result_str(format!(
-            //         "version:{}\nwrite set:{:?}\n events:{:?}\n",
-            //         cur_version, res_ok.0, res_ok.1
-            //     ));
-            // } else {
-            //     self.output_result_str(format!(
-            //         "execution error {} at version: {}, error",
-            //         res.unwrap_err(),
-            //         cur_version
-            //     ));
-            // }
+            let res = res_main_opt.unwrap();
+            if let Ok(res_ok) = res {
+                self.output_result_str(format!(
+                    "version:{}\nwrite set:{:?}\n events:{:?}\n",
+                    cur_version, res_ok.0, res_ok.1
+                ));
+            } else {
+                self.output_result_str(format!(
+                    "execution error {} at version: {}, error",
+                    res.unwrap_err(),
+                    cur_version
+                ));
+            }
         }
     }
 
@@ -339,6 +343,7 @@ impl Execution {
         txn: &Transaction,
         compiled_package_cache: &HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
         debugger_opt: Option<Arc<dyn AptosValidatorInterface + Send>>,
+        v2_flag: bool,
     ) -> Option<Result<(WriteSet, Vec<ContractEvent>), VMStatus>> {
         let executor = FakeExecutor::no_genesis();
         let mut executor = executor.set_not_parallel();
@@ -362,12 +367,14 @@ impl Execution {
                         senders,
                         entry_function,
                         &data_view.as_move_resolver(),
+                        v2_flag,
                     ));
                 } else {
                     return Some(executor.try_exec_entry_with_resolver(
                         senders,
                         entry_function,
                         &executor.data_store().clone().as_move_resolver(),
+                        v2_flag,
                     ));
                 }
             }

@@ -1098,13 +1098,18 @@ impl FakeExecutor {
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
         resolver: &impl AptosMoveResolver,
+        v2_flag: bool,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
 
         let mut features = Features::fetch_config(resolver).unwrap_or_default();
-        features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
+        if v2_flag {
+            features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
+        } else {
+            features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
+        }
         let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
@@ -1117,7 +1122,7 @@ impl FakeExecutor {
             false,
         )
         .unwrap();
-        let mut session = vm.new_clean_session(resolver, SessionId::void());
+        let mut session = vm.new_session(resolver, SessionId::void());
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
