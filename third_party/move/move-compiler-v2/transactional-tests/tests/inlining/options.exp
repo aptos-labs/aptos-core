@@ -1,28 +1,6 @@
-comparison between v1 and v2 failed:
-= processed 3 tasks
-= 
-+ task 1 'publish'. lines 15-25:
-+ Error: compilation errors:
-+  error: cannot mutably borrow since immutable references exist
-+     ┌─ /Users/wrwg/aptos-core/third_party/move/move-stdlib/sources/option.move:140:33
-+     │
-+ 140 │     public fun extract<Element>(t: &mut Option<Element>): Element {
-+     │                                 ^
-+     │                                 │
-+     │                                 mutable borrow attempted here
-+     │                                 previous local borrow
-+ 141 │         assert!(is_some(t), EOPTION_NOT_SET);
-+     │                 ---------- requirement enforced here
-+ 
-+ 
-+ 
-= task 2 'run'. lines 27-27:
-- return values: 2
-+ Error: Function execution failed with VMError: {
-+     major_status: LINKER_ERROR,
-+     sub_status: None,
-+     location: undefined,
-+     indices: redacted,
-+     offsets: redacted,
-+ }
-= 
+processed 3 tasks
+
+task 2 'run'. lines 27-27:
+return values: 2
+
+==> Compiler v2 delivered same results!

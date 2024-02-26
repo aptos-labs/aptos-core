@@ -235,23 +235,6 @@ fun vectors::test_for_each_mut() {
  44: return ()
 }
 
-
-Diagnostics:
-error: cannot mutably borrow since immutable references exist
-    ┌─ tests/checking/inlining/bug_11112.move:8:23
-    │
-  8 │     vector::for_each_mut(&mut v, |e| { *e = s; s = s + 1 });
-    │     ---------------------^^^^^^----------------------------
-    │     │                    │
-    │     │                    mutable borrow attempted here
-    │     │                    previous local borrow
-    │     from a call inlined at this callsite
-    │
-    ┌─ /Users/wrwg/aptos-core/third_party/move/move-compiler-v2/../move-stdlib/sources/vector.move:181:20
-    │
-181 │         while (i < length(v)) {
-    │                    --------- requirement enforced here
-
 ============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
@@ -374,7 +357,7 @@ fun vectors::test_for_each_mut() {
      #
  12: $t13 := freeze_ref($t7)
      # live vars: $t0, $t5, $t7, $t9, $t13
-     # graph: {@700=local($t0)[borrow(false) -> @C00,borrow(true) -> @701],@701=derived[],@C00=derived[]}
+     # graph: {@700=local($t0)[borrow(true) -> @701],@701=derived[freeze -> @C00],@C00=derived[]}
      # locals: {$t0=@700,$t7=@701,$t13=@C00}
      # globals: {}
      # moved: {$t2,$t3,$t4,$t7,$t12,$t13,$t17,$t19}

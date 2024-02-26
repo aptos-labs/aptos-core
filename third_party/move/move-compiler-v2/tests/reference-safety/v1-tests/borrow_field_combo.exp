@@ -1,79 +1,10 @@
 
 Diagnostics:
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:30:21
-   │
-30 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-   ·
-33 │         *c;
-   │         -- requirement enforced here
-   ·
-37 │         *c;
-   │         -- conflicting reference `c`used here
-   ·
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                                                              --------- conflicting reference `other`used here
-
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:30:21
-   │
-30 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-   ·
-34 │         *inner;
-   │         ------ requirement enforced here
-   ·
-37 │         *c;
-   │         -- conflicting reference `c`used here
-   ·
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                                                              --------- conflicting reference `other`used here
-
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:30:21
-   │
-30 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-   ·
-35 │         *f1;
-   │         --- requirement enforced here
-36 │         *inner;
-37 │         *c;
-   │         -- conflicting reference `c`used here
-   ·
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                                                              --------- conflicting reference `other`used here
-
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:30:21
-   │
-30 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-   ·
-36 │         *inner;
-   │         ------ requirement enforced here
-37 │         *c;
-   │         -- conflicting reference `c`used here
-   ·
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                                                              --------- conflicting reference `other`used here
-
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:34:9
    │
+31 │         let c; if (cond) c = freeze(copy inner) else c = &other.s1;
+   │                              ------------------ previous freeze
 32 │         let f1 = &inner.f1;
    │                  --------- previous field borrow
 33 │         *c;
@@ -81,91 +12,29 @@ error: mutable reference in local `inner` requires exclusive access but is borro
    │         ^^^^^^ requirement enforced here
 35 │         *f1;
    │         --- conflicting reference `f1`used here
-
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:39:21
-   │
-39 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                              ---------------------- used by call result
-41 │         let f1 = &inner.f1;
-42 │         *c;
-   │         -- requirement enforced here
-   ·
-46 │         *c;
+36 │         *inner;
+37 │         *c;
    │         -- conflicting reference `c`used here
 
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:39:21
+error: mutable reference in local `inner` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:36:9
    │
-39 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                              ---------------------- used by call result
+31 │         let c; if (cond) c = freeze(copy inner) else c = &other.s1;
+   │                              ------------------ previous freeze
    ·
-43 │         *inner;
-   │         ------ requirement enforced here
-   ·
-46 │         *c;
+36 │         *inner;
+   │         ^^^^^^ requirement enforced here
+37 │         *c;
    │         -- conflicting reference `c`used here
-
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:39:21
-   │
-39 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                              ---------------------- used by call result
-   ·
-44 │         *f1;
-   │         --- requirement enforced here
-45 │         *inner;
-46 │         *c;
-   │         -- conflicting reference `c`used here
-
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:39:21
-   │
-39 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                              ---------------------- used by call result
-   ·
-45 │         *inner;
-   │         ------ requirement enforced here
-46 │         *c;
-   │         -- conflicting reference `c`used here
-
-error: cannot mutably borrow since immutable references exist
-   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:39:21
-   │
-39 │         let inner = &mut outer.s1;
-   │                     ^^^^^^^^^^^^^
-   │                     │
-   │                     mutable borrow attempted here
-   │                     previous field borrow
-40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
-   │                              ---------------------- requirement enforced here
-   ·
-48 │         let inner = &mut outer.s1;
-   │                     ------------- conflicting reference `outer`used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:43:9
    │
+40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
+   │                              ----------------------
+   │                              │  │
+   │                              │  previous freeze
+   │                              used by call result
 41 │         let f1 = &inner.f1;
    │                  --------- previous field borrow
 42 │         *c;
@@ -173,6 +42,23 @@ error: mutable reference in local `inner` requires exclusive access but is borro
    │         ^^^^^^ requirement enforced here
 44 │         *f1;
    │         --- conflicting reference `f1`used here
+45 │         *inner;
+46 │         *c;
+   │         -- conflicting reference `c`used here
+
+error: mutable reference in local `inner` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:45:9
+   │
+40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
+   │                              ----------------------
+   │                              │  │
+   │                              │  previous freeze
+   │                              used by call result
+   ·
+45 │         *inner;
+   │         ^^^^^^ requirement enforced here
+46 │         *c;
+   │         -- conflicting reference `c`used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:86:9

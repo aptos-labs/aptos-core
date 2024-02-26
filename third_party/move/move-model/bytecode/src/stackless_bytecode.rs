@@ -473,7 +473,7 @@ impl Bytecode {
         matches!(self, Bytecode::Ret(..))
     }
 
-    pub fn is_unconditional_branch(&self) -> bool {
+    pub fn is_always_branching(&self) -> bool {
         matches!(
             self,
             Bytecode::Ret(..)

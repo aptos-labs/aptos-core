@@ -13,6 +13,6 @@ module 0x42::m {
     }
 
     fun mut_ref_id(x: u64) {
-        &mut x == &mut x; // error expected, will be fixed with new reference safety
+        &mut x == &mut x;
     }
 }

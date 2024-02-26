@@ -216,6 +216,8 @@ enum BorrowEdgeKind {
     /// call outcome can be different, they are distinguished by code offset -- two call edges are never the
     /// same.
     Call(bool, Operation, CodeOffset),
+    /// Freezes a mutable reference.
+    Freeze,
 }
 
 impl BorrowEdgeKind {
@@ -226,16 +228,7 @@ impl BorrowEdgeKind {
             | BorrowGlobal(is_mut)
             | BorrowField(is_mut, _)
             | Call(is_mut, _, _) => *is_mut,
-        }
-    }
-
-    fn set_mut(&mut self, value: bool) {
-        use BorrowEdgeKind::*;
-        match self {
-            BorrowLocal(is_mut)
-            | BorrowGlobal(is_mut)
-            | BorrowField(is_mut, _)
-            | Call(is_mut, _, _) => *is_mut = value,
+            Freeze => false,
         }
     }
 }
@@ -1020,7 +1013,15 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     ///
     /// If we walk this graph now from the root to the leaves, we can determine safety by directly comparing
     /// hyper edge siblings.
-    fn check_borrow_safety(&mut self, temps: &BTreeSet<TempIndex>) {
+    fn check_borrow_safety(&mut self, temps_vec: &[TempIndex]) {
+        // First check direct duplicates
+        for (i, temp) in temps_vec.iter().enumerate() {
+            if temps_vec[i + 1..].contains(temp) {
+                self.exclusive_access_direct_dup_error(*temp)
+            }
+        }
+        // Now build and analyze the hyper graph
+        let temps = &temps_vec.iter().cloned().collect::<BTreeSet<_>>();
         let filtered_leaves = self
             .state
             .leaves()
@@ -1083,9 +1084,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     let target = edge.target;
                     targets.insert(target);
                     if edge.kind.is_mut() {
-                        if let Some(temps) = filtered_leaves.get(&target) {
+                        if let Some(ts) = filtered_leaves.get(&target) {
                             let mut inter =
-                                temps.intersection(temps).cloned().collect::<BTreeSet<_>>();
+                                ts.intersection(temps).cloned().collect::<BTreeSet<_>>();
                             if !inter.is_empty() {
                                 if !self.state.is_leaf(&target) {
                                     // A mut leaf node must have exclusive access
@@ -1098,7 +1099,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 }
                 if mapped_temps.len() > 1 {
                     // We cannot associate the same mut node with more than one local
-                    self.exclusive_access_dup_error(&hyper, &mapped_temps)
+                    self.exclusive_access_indirect_dup_error(&hyper, &mapped_temps)
                 }
                 hyper_nodes.insert(targets);
             }
@@ -1171,8 +1172,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     }
 
     /// Reports an error about exclusive access requirement for duplicate usage. See safety
-    /// condition (d) in the file header documentation.
-    fn exclusive_access_dup_error(
+    /// condition (d) in the file header documentation. This handles the case were the
+    /// same node is used by multiple temps
+    fn exclusive_access_indirect_dup_error(
         &self,
         labels: &BTreeSet<LifetimeLabel>,
         temps: &BTreeSet<TempIndex>,
@@ -1182,12 +1184,27 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.error_with_hints(
             self.cur_loc(),
             format!(
-                "same mutable reference in {} is also used in other {} in same argument list",
+                "same mutable reference in {} is also used in other {} in argument list",
                 self.display(*ts[0]),
                 self.display(*ts[1])
             ),
             "requirement enforced here",
             labels.iter().flat_map(|l| self.borrow_info(l, |_| true)),
+        )
+    }
+
+    /// Reports an error about exclusive access requirement for duplicate usage. See safety
+    /// condition (d) in the file header documentation. This handles the case were the
+    /// same local is used multiple times.
+    fn exclusive_access_direct_dup_error(&self, temp: TempIndex) {
+        self.error_with_hints(
+            self.cur_loc(),
+            format!(
+                "same mutable reference in {} is used again in argument list",
+                self.display(temp),
+            ),
+            "requirement enforced here",
+            iter::empty(),
         )
     }
 
@@ -1262,6 +1279,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 BorrowGlobal(_) => "global borrow",
                 BorrowField(..) => "field borrow",
                 Call(..) => "call result",
+                Freeze => "freeze",
             },),
         )
     }
@@ -1465,27 +1483,17 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
 
     /// Process a FreezeRef instruction.
     fn freeze_ref(&mut self, code_offset: CodeOffset, dest: TempIndex, src: TempIndex) {
-        // Since our graph doesn't have any skip (epsilon) edges, we model freeze by cloning all incoming
-        // edges and marking them is immutable. This effectively 'undoes' the previous mutable borrow(s), at
-        // least that is how it looks to the borrow logic. The original edges will eventually go out of scope
-        // when src does.
         let label = self
             .state
             .label_for_temp(src)
             .expect("label for reference")
             .clone();
-        let redirected = self.state.make_temp(dest, code_offset, 0, false);
-        for (parent, mut edge) in self
-            .state
-            .parent_edges(&label)
-            .map(|(p, e)| (p, e.clone()))
-            .collect::<Vec<_>>()
-        // need to mutate state
-        {
-            edge.target = redirected.clone();
-            edge.kind.set_mut(false);
-            self.state.add_edge(parent, edge)
-        }
+        let target = self.state.replace_ref(dest, code_offset, 0);
+        self.state.add_edge(label, BorrowEdge {
+            kind: BorrowEdgeKind::Freeze,
+            loc: self.cur_loc(),
+            target,
+        })
     }
 
     /// Process a MoveFrom instruction.
@@ -1614,14 +1622,21 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                 | Operation::Function(..)
                 | Operation::Eq
                 | Operation::Neq => {
-                    let exclusive_refs =
-                        srcs.iter().filter(|t| step.is_ref(**t)).cloned().collect();
+                    let exclusive_refs = srcs
+                        .iter()
+                        .filter(|t| step.is_ref(**t))
+                        .cloned()
+                        .collect_vec();
                     step.check_borrow_safety(&exclusive_refs)
                 },
                 _ => {},
             },
             Ret(_, srcs) => {
-                let exclusive_refs = srcs.iter().filter(|t| step.is_ref(**t)).cloned().collect();
+                let exclusive_refs = srcs
+                    .iter()
+                    .filter(|t| step.is_ref(**t))
+                    .cloned()
+                    .collect_vec();
                 step.check_borrow_safety(&exclusive_refs)
             },
             _ => {},
@@ -1816,6 +1831,7 @@ impl<'a> Display for BorrowEdgeDisplay<'a> {
             BorrowGlobal(is_mut) => write!(f, "borrow_global({})", is_mut),
             BorrowField(is_mut, _) => write!(f, "borrow_field({})", is_mut),
             Call(is_mut, _, _) => write!(f, "call({})", is_mut),
+            Freeze => write!(f, "freeze"),
         })?;
         if display_child {
             write!(f, " -> {}", edge.target)
