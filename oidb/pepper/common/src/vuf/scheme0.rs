@@ -17,7 +17,7 @@ use std::ops::Mul;
 
 pub struct Scheme0 {}
 
-pub static DST: &[u8] = b"APTOS_OIDB_VUF_SCHEME0_DST";
+pub static DST: &[u8] = b"APTOS_PEPPER_SERVICE_BN254_VUF_DST";
 
 impl Scheme0 {
     fn hash_to_g1(input: &[u8]) -> G1Affine {
