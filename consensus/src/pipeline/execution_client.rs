@@ -115,7 +115,7 @@ impl BufferManagerHandle {
 pub struct ExecutionProxyClient {
     execution_proxy: Arc<ExecutionProxy>,
     author: Author,
-    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     bounded_executor: BoundedExecutor,
     // channels to buffer manager
@@ -126,7 +126,7 @@ impl ExecutionProxyClient {
     pub fn new(
         execution_proxy: Arc<ExecutionProxy>,
         author: Author,
-        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
+        self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
     ) -> Self {

@@ -253,36 +253,42 @@ fn test_dag_bitmask() {
     let (signers, epoch_state, dag, _) = setup();
 
     assert_eq!(
-        dag.read().bitmask(15),
-        DagSnapshotBitmask::new(1, vec![vec![false; 4]; 15])
+        dag.read().bitmask(TEST_DAG_WINDOW),
+        DagSnapshotBitmask::new(1, vec![vec![false; 4]; TEST_DAG_WINDOW as usize])
     );
 
     for round in 1..5 {
         let parents = dag
             .read()
-            .get_strong_links_for_round(round, &epoch_state.verifier)
+            .get_strong_links_for_round(round - 1, &epoch_state.verifier)
             .unwrap_or_default();
+        if round > 1 {
+            assert!(!parents.is_empty());
+        }
         for signer in &signers[0..3] {
             let node = new_certified_node(round, signer.author(), parents.clone());
             assert!(dag.write().add_node_for_test(node).is_ok());
         }
     }
-    let mut bitmask = vec![vec![true, true, true, false]; 4];
-    bitmask.resize(15, vec![false; 4]);
-    assert_eq!(dag.read().bitmask(15), DagSnapshotBitmask::new(1, bitmask));
+    let mut bitmask = vec![vec![true, true, true, false]; 2];
+    bitmask.resize(TEST_DAG_WINDOW as usize + 1, vec![false; 4]);
+    assert_eq!(dag.read().bitmask(8), DagSnapshotBitmask::new(3, bitmask));
 
     // Populate the fourth author for all rounds
     for round in 1..5 {
         let parents = dag
             .read()
-            .get_strong_links_for_round(round, &epoch_state.verifier)
+            .get_strong_links_for_round(round - 1, &epoch_state.verifier)
             .unwrap_or_default();
+        if round > 1 {
+            assert!(!parents.is_empty());
+        }
         let node = new_certified_node(round, signers[3].author(), parents.clone());
         assert!(dag.write().add_node_for_test(node).is_ok());
     }
     assert_eq!(
-        dag.read().bitmask(15),
-        DagSnapshotBitmask::new(5, vec![vec![false; 4]; 11])
+        dag.read().bitmask(10),
+        DagSnapshotBitmask::new(5, vec![vec![false; 4]; 6])
     );
     assert_eq!(
         dag.read().bitmask(6),

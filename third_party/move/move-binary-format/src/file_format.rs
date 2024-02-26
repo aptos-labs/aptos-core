@@ -47,7 +47,7 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{fmt, ops::BitOr};
+use std::{fmt, fmt::Formatter, ops::BitOr};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -633,6 +633,17 @@ impl Ability {
     }
 }
 
+impl fmt::Display for Ability {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Ability::Copy => write!(f, "copy"),
+            Ability::Drop => write!(f, "drop"),
+            Ability::Store => write!(f, "store"),
+            Ability::Key => write!(f, "key"),
+        }
+    }
+}
+
 /// A set of `Ability`s
 #[derive(Clone, Eq, Copy, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
@@ -700,6 +711,10 @@ impl AbilitySet {
 
     pub fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
+    }
+
+    pub fn setminus(self, other: Self) -> Self {
+        Self(self.0 & !other.0)
     }
 
     pub fn requires(self) -> Self {
@@ -785,6 +800,22 @@ impl AbilitySet {
 
     pub fn into_u8(self) -> u8 {
         self.0
+    }
+}
+
+impl fmt::Display for AbilitySet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let v = Ability::all().filter_map(|a| {
+            if self.has_ability(a) {
+                Some(a.to_string())
+            } else {
+                None
+            }
+        });
+        f.write_str(
+            &v.reduce(|l, r| format!("{} & {}", l, r))
+                .unwrap_or_default(),
+        )
     }
 }
 

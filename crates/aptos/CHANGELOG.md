@@ -4,6 +4,8 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 - Updated CLI source compilation to use rust toolchain version 1.75.0 (from 1.74.1).
+- Upgraded indexer processors for local testnet from 9936ec73cef251fb01fd2c47412e064cad3975c2 to d5dc7a003c655bdbd30233a8e9076796cceae72c. Upgraded Hasura metadata accordingly.
+- Added support for objects processor in local testnet and enabled it by default.
 
 ## [2.4.0] - 2023/01/05
 - Hide the V2 compiler from input options until the V2 compiler is ready for release

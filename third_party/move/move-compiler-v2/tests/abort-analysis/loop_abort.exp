@@ -67,26 +67,19 @@ fun Test::test0() {
      var $t0: Test::Impotent
      var $t1: Test::Impotent
      var $t2: bool
-     # abort state before: {}
-     # abort state after : {}
+     # abort state: {}
   0: $t2 := false
-     # abort state before: {}
-     # abort state after : {}
+     # abort state: {}
   1: $t1 := pack Test::Impotent($t2)
-     # abort state before: {}
-     # abort state after : {}
+     # abort state: {}
   2: $t0 := infer($t1)
-     # abort state before: {}
-     # abort state after : {}
+     # abort state: {}
   3: label L0
-     # abort state before: {}
-     # abort state after : {}
+     # abort state: {}
   4: goto 3
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   5: label L1
-     # abort state before: {returns}
-     # abort state after : {}
+     # abort state: {returns}
   6: return ()
 }
 
@@ -97,47 +90,33 @@ fun Test::test1() {
      var $t1: Test::Impotent
      var $t2: bool
      var $t3: bool
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   0: $t2 := false
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   1: $t1 := pack Test::Impotent($t2)
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   2: $t0 := infer($t1)
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   3: label L0
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   4: $t3 := true
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   5: if ($t3) goto 6 else goto 8
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   6: label L2
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   7: goto 10
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   8: label L3
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   9: goto 12
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
  10: label L4
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
  11: goto 3
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
  12: label L1
-     # abort state before: {returns}
-     # abort state after : {}
+     # abort state: {returns}
  13: return ()
 }
 
@@ -148,46 +127,32 @@ fun Test::test2($t0: bool) {
      var $t2: Test::Impotent
      var $t3: bool
      var $t4: u64
-     # abort state before: {aborts}
-     # abort state after : {aborts}
+     # abort state: {aborts}
   0: $t3 := false
-     # abort state before: {aborts}
-     # abort state after : {aborts}
+     # abort state: {aborts}
   1: $t2 := pack Test::Impotent($t3)
-     # abort state before: {aborts}
-     # abort state after : {aborts}
+     # abort state: {aborts}
   2: $t1 := infer($t2)
-     # abort state before: {aborts}
-     # abort state after : {aborts}
+     # abort state: {aborts}
   3: if ($t0) goto 4 else goto 9
-     # abort state before: {}
-     # abort state after : {}
+     # abort state: {}
   4: label L0
-     # abort state before: {}
-     # abort state after : {}
+     # abort state: {}
   5: label L3
-     # abort state before: {}
-     # abort state after : {}
+     # abort state: {}
   6: goto 5
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   7: label L4
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
   8: goto 12
-     # abort state before: {aborts}
-     # abort state after : {aborts}
+     # abort state: {aborts}
   9: label L1
-     # abort state before: {aborts}
-     # abort state after : {aborts}
+     # abort state: {aborts}
  10: $t4 := 42
-     # abort state before: {aborts}
-     # abort state after : {}
+     # abort state: {aborts}
  11: abort($t4)
-     # abort state before: {returns}
-     # abort state after : {returns}
+     # abort state: {returns}
  12: label L2
-     # abort state before: {returns}
-     # abort state after : {}
+     # abort state: {returns}
  13: return ()
 }

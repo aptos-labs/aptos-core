@@ -271,8 +271,16 @@ impl<'env> FunctionTarget<'env> {
         if let Some(sym) = self.data.local_names.get(&temp) {
             format!("local `{}`", sym.display(self.global_env().symbol_pool()))
         } else {
-            "local".to_owned()
+            "value".to_owned()
         }
+    }
+
+    /// Returns a name for a local if it is printable
+    pub fn get_local_name_opt(&self, temp: TempIndex) -> Option<String> {
+        self.data
+            .local_names
+            .get(&temp)
+            .map(|sym| sym.display(self.global_env().symbol_pool()).to_string())
     }
 
     /// Gets the type of the local at index. This must use an index in the range as determined by

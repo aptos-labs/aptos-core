@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff};
+use super::{dag_store::DagStore, health::HealthBackoff, order_rule::TOrderRule};
 use crate::{
     dag::{
         dag_fetcher::TFetchRequester,
@@ -35,6 +35,7 @@ use std::{collections::BTreeMap, mem, sync::Arc};
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<DagStore>,
+    order_rule: Arc<dyn TOrderRule>,
     /// Note: The mutex around BTreeMap is to work around Rust Sync semantics.
     /// Fine grained concurrency is implemented by the DashSet below.
     votes_by_round_peer: Mutex<BTreeMap<Round, BTreeMap<Author, Vote>>>,
@@ -52,6 +53,7 @@ pub(crate) struct NodeBroadcastHandler {
 impl NodeBroadcastHandler {
     pub fn new(
         dag: Arc<DagStore>,
+        order_rule: Arc<dyn TOrderRule>,
         signer: Arc<ValidatorSigner>,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
@@ -66,6 +68,7 @@ impl NodeBroadcastHandler {
 
         Self {
             dag,
+            order_rule,
             votes_by_round_peer: Mutex::new(votes_by_round_peer),
             votes_fine_grained_lock: DashSet::with_capacity(epoch_state.verifier.len() * 10),
             signer,
@@ -247,6 +250,7 @@ impl RpcHandler for NodeBroadcastHandler {
             .insert(*node.author(), vote.clone());
 
         self.dag.write().update_votes(&node, false);
+        self.order_rule.process_new_node(node.metadata());
 
         debug!(LogSchema::new(LogEvent::Vote)
             .remote_peer(*node.author())

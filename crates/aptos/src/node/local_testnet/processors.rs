@@ -36,6 +36,7 @@ pub struct ProcessorArgs {
             ProcessorName::DefaultProcessor,
             ProcessorName::EventsProcessor,
             ProcessorName::FungibleAssetProcessor,
+            ProcessorName::ObjectsProcessor,
             ProcessorName::StakeProcessor,
             ProcessorName::TokenProcessor,
             ProcessorName::TokenV2Processor,
@@ -85,9 +86,7 @@ impl ProcessorManager {
             ProcessorName::MonitoringProcessor => {
                 bail!("Monitoring processor is not supported in the local testnet")
             },
-            ProcessorName::ObjectsProcessor => {
-                bail!("Objects processor is not supported in the local testnet")
-            },
+            ProcessorName::ObjectsProcessor => ProcessorConfig::ObjectsProcessor,
         };
         let config = IndexerGrpcProcessorConfig {
             processor_config,
