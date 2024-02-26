@@ -74,6 +74,7 @@ use aptos_vm::data_cache::AsMoveResolver;
 use move_resource_viewer::MoveValueAnnotator;
 use rayon::prelude::*;
 use std::{
+    cell::Cell,
     fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,
