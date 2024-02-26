@@ -13,6 +13,7 @@ use move_model::{
     symbol::*,
 };
 
+#[allow(dead_code)]
 pub fn dummy_module_data(name: ModuleName, id: usize) -> ModuleData {
     ModuleData {
         name,
@@ -38,7 +39,7 @@ pub fn dummy_module_data(name: ModuleName, id: usize) -> ModuleData {
     }
 }
 
-/// Creates a new struct data.
+#[allow(dead_code)]
 pub fn dummy_struct_data(name: Symbol) -> StructData {
     StructData {
         name,
@@ -53,6 +54,7 @@ pub fn dummy_struct_data(name: Symbol) -> StructData {
     }
 }
 
+#[allow(dead_code)]
 pub fn dummy_function_data(name: Symbol) -> FunctionData {
     FunctionData {
         name,
