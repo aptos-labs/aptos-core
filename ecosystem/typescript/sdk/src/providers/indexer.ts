@@ -106,7 +106,7 @@ export type GraphqlQuery = {
 /**
  * Provides methods for retrieving data from Aptos Indexer.
  * For more detailed Queries specification see
- * {@link https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql}
+ * {@link https://cloud.hasura.io/public/graphiql?endpoint=https://api.mainnet.aptoslabs.com/v1/graphql}
  *
  * Some methods support optional extra arguments, such as - TokenStandard, IndexerSortBy, IndexerPaginationArgs
  *
