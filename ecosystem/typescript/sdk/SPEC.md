@@ -73,7 +73,7 @@ We do not use the fourth **`won't`** level in this specification.
   - [ ] **2.2.1** The SDK **must** support pagination with optional `offset` and `limit` parameters to Indexer API request.
   - [ ] **2.2.2** The SDK **must** validate the account address when interacting with the Indexer API.
     - [ ] **2.2.2.1** The SDK **must** validate an account address is a 64 character hex string with a leading `0x`.
-  - [ ] **2.2.3** The SDK **must** handle premade GraphQL queries https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql.
+  - [ ] **2.2.3** The SDK **must** handle premade GraphQL queries https://cloud.hasura.io/public/graphiql?endpoint=https://api.mainnet.aptoslabs.com/v1/graphql.
   - [ ] **2.2.3** The SDK **should** allow the user to pass in a custom GraphQL query.
 - [ ] **2.3** The SDK **should** support interactions with Aptos devnet, testnet and mainnet networks.
 - [ ] **2.4** The SDK **should** support interactions with a custom URL.
