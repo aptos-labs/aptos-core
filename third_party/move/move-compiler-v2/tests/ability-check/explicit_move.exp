@@ -1,0 +1,18 @@
+
+Diagnostics:
+error: local `x` of type `m::R` does not have the `copy` ability
+   ┌─ tests/ability-check/explicit_move.move:12:9
+   │
+12 │         some(x);
+   │         ^^^^^^^ copy needed here because value is still in use
+13 │         some(x);
+   │         ------- used here
+
+error: cannot move local `r` since it is still in use
+   ┌─ tests/ability-check/explicit_move.move:18:17
+   │
+18 │         let x = move r; // expected to fail
+   │                 ^^^^^^ attempted to move here
+19 │         some(x);
+20 │         some(r);
+   │         ------- used here

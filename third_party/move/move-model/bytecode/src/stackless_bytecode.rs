@@ -473,25 +473,23 @@ impl Bytecode {
         matches!(self, Bytecode::Ret(..))
     }
 
-    pub fn is_unconditional_branch(&self) -> bool {
+    pub fn is_always_branching(&self) -> bool {
         matches!(
             self,
             Bytecode::Ret(..)
                 | Bytecode::Jump(..)
                 | Bytecode::Abort(..)
+                | Bytecode::Branch(..)
                 | Bytecode::Call(_, _, Operation::Stop, _, _)
         )
     }
 
-    pub fn is_conditional_branch(&self) -> bool {
-        matches!(
-            self,
-            Bytecode::Branch(..) | Bytecode::Call(_, _, _, _, Some(_))
-        )
+    pub fn is_possibly_branching(&self) -> bool {
+        matches!(self, Bytecode::Call(_, _, _, _, Some(_)))
     }
 
-    pub fn is_branch(&self) -> bool {
-        self.is_conditional_branch() || self.is_unconditional_branch()
+    pub fn is_branching(&self) -> bool {
+        self.is_possibly_branching() || self.is_always_branching()
     }
 
     /// Returns true if the bytecode is spec-only.
@@ -602,7 +600,7 @@ impl Bytecode {
     ) -> Vec<CodeOffset> {
         let bytecode = &code[pc as usize];
         let mut v = vec![];
-        if !bytecode.is_branch() {
+        if !bytecode.is_branching() {
             // Fall through situation, just return the next pc.
             v.push(pc + 1);
         } else {

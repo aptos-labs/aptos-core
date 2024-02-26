@@ -13,9 +13,9 @@ pub mod options;
 pub mod pipeline;
 
 use crate::pipeline::{
-    ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+    ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-    exit_state_analysis::ExitStateAnalysisProcessor, explicit_drop::ExplicitDrop,
+    exit_state_analysis::ExitStateAnalysisProcessor,
     livevar_analysis_processor::LiveVarAnalysisProcessor,
     reference_safety_processor::ReferenceSafetyProcessor,
     split_critical_edges_processor::SplitCriticalEdgesProcessor,
@@ -214,24 +214,16 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
     }
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-        with_copy_inference: true,
-    }));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-    pipeline.add_processor(Box::new(ExplicitDrop {}));
-    if safety_on {
-        // only used for ability checking
-        pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
-        // Ability checker is functionally not relevant so can be completely skipped if safety is off
-        pipeline.add_processor(Box::new(AbilityChecker {}));
-    }
+    pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(AbilityProcessor {}));
+
     // The default optimization pipeline is currently always run by the compiler.
-    add_default_optimization_pipeline(&mut pipeline);
+    add_default_optimization_pipeline(&options, &mut pipeline);
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-        with_copy_inference: false,
-    }));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline
 }
 
@@ -241,17 +233,17 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 /// potentially delete or change code through these optimizations.
 /// While this section of the pipeline is optional, some code that used to previously compile
 /// may no longer compile without this section because of using too many local (temp) variables.
-fn add_default_optimization_pipeline(pipeline: &mut FunctionTargetPipeline) {
-    // Available copies analysis is needed by copy propagation.
-    pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
-    pipeline.add_processor(Box::new(CopyPropagation {}));
-    // Live var analysis is needed by dead store elimination.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-        with_copy_inference: false,
-    }));
-    pipeline.add_processor(Box::new(DeadStoreElimination {}));
-    pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
-    pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
+fn add_default_optimization_pipeline(options: &Options, pipeline: &mut FunctionTargetPipeline) {
+    if options.experiment_on(Experiment::OPTIMIZE) {
+        // Available copies analysis is needed by copy propagation.
+        pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
+        pipeline.add_processor(Box::new(CopyPropagation {}));
+        // Live var analysis is needed by dead store elimination.
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+        pipeline.add_processor(Box::new(DeadStoreElimination {}));
+        pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
+        pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
+    }
 }
 
 /// Disassemble the given compiled units and return the disassembled code as a string.
