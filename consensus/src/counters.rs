@@ -636,6 +636,21 @@ pub static WAIT_DURATION_S: Lazy<DurationHistogram> = Lazy::new(|| {
     CONSENSUS_WAIT_DURATION_BUCKETS.to_vec()).unwrap())
 });
 
+const VERIFY_BUCKETS: &[f64] = &[
+    0.0001, 0.00025, 0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003, 0.0035, 0.004, 0.005, 0.006,
+    0.007, 0.008, 0.009, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0,
+];
+
+pub static VERIFY_MSG: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_verify_msg",
+        "Histogram of the time it takes to verify a message",
+        &["msg"],
+        VERIFY_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
+
 ///////////////////
 // CHANNEL COUNTERS
 ///////////////////
