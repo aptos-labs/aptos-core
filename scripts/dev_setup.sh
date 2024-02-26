@@ -145,9 +145,9 @@ function install_protoc {
   (
     cd "$TMPFILE" || exit
     curl -LOs "https://github.com/protocolbuffers/protobuf/releases/download/v$PROTOC_VERSION/$PROTOC_PKG.zip" --retry 3
-    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
-    sudo unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
-    sudo chmod +x "/usr/local/bin/protoc"
+    "${PRE_COMMAND[@]}" unzip -o "$PROTOC_PKG.zip" -d /usr/local bin/protoc
+    "${PRE_COMMAND[@]}" unzip -o "$PROTOC_PKG.zip" -d /usr/local 'include/*'
+    "${PRE_COMMAND[@]}" chmod +x "/usr/local/bin/protoc"
   )
   rm -rf "$TMPFILE"
 
@@ -650,7 +650,7 @@ function install_nodejs {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     # install via nodesource: https://github.com/nodesource/distributions/issues/1709#issuecomment-1788473588
     NODE_MAJOR=18
-    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | sudo tee /etc/apt/sources.list.d/nodesource.list
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | "${PRE_COMMAND[@]}" tee /etc/apt/sources.list.d/nodesource.list
   fi
   install_pkg nodejs "$PACKAGE_MANAGER"
   install_pkg npm "$PACKAGE_MANAGER"
