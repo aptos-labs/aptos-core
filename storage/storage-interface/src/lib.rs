@@ -52,6 +52,7 @@ pub mod state_view;
 
 use crate::state_delta::StateDelta;
 use aptos_scratchpad::SparseMerkleTree;
+pub use aptos_types::block_info::BlockHeight;
 pub use errors::AptosDbError;
 pub use executed_trees::ExecutedTrees;
 
@@ -174,10 +175,10 @@ pub trait DbReader: Send + Sync {
         /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
         fn get_first_txn_version(&self) -> Result<Option<Version>>;
 
-        /// See [AptosDB::get_first_viable_txn_version].
+        /// See [AptosDB::get_first_viable_block].
         ///
-        /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
-        fn get_first_viable_txn_version(&self) -> Result<Version>;
+        /// [AptosDB::get_first_viable_block]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_block
+        fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)>;
 
         /// See [AptosDB::get_first_write_set_version].
         ///
@@ -240,8 +241,6 @@ pub trait DbReader: Send + Sync {
         /// [AptosDB::get_block_timestamp]:
         /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
         fn get_block_timestamp(&self, version: Version) -> Result<u64>;
-
-        fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)>;
 
         /// See [AptosDB::get_latest_block_events].
         fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>>;

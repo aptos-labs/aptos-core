@@ -21,6 +21,7 @@ use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     account_config::{AccountResource, NewBlockEvent},
+    block_info::BlockHeight,
     contract_event::EventWithVersion,
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
@@ -511,8 +512,8 @@ impl DbReader for FakeAptosDB {
         self.inner.get_first_txn_version()
     }
 
-    fn get_first_viable_txn_version(&self) -> Result<Version> {
-        self.inner.get_first_viable_txn_version()
+    fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)> {
+        self.inner.get_first_viable_block()
     }
 
     fn get_first_write_set_version(&self) -> Result<Option<Version>> {
@@ -595,10 +596,6 @@ impl DbReader for FakeAptosDB {
                 Err(AptosDbError::NotFound("NewBlockEvent".to_string()).into())
             }
         })
-    }
-
-    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
-        self.inner.get_next_block_event(version)
     }
 
     fn get_block_info_by_version(
