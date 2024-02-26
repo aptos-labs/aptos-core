@@ -69,6 +69,7 @@ and implement the governance voting logic on top.
 -  [Function `last_resolved_sequence_number`](#0x1_multisig_account_last_resolved_sequence_number)
 -  [Function `next_sequence_number`](#0x1_multisig_account_next_sequence_number)
 -  [Function `vote`](#0x1_multisig_account_vote)
+-  [Function `available_transaction_queue_capacity`](#0x1_multisig_account_available_transaction_queue_capacity)
 -  [Function `create_with_existing_account`](#0x1_multisig_account_create_with_existing_account)
 -  [Function `create_with_existing_account_and_revoke_auth_key`](#0x1_multisig_account_create_with_existing_account_and_revoke_auth_key)
 -  [Function `create`](#0x1_multisig_account_create)
@@ -91,7 +92,10 @@ and implement the governance voting logic on top.
 -  [Function `approve_transaction`](#0x1_multisig_account_approve_transaction)
 -  [Function `reject_transaction`](#0x1_multisig_account_reject_transaction)
 -  [Function `vote_transanction`](#0x1_multisig_account_vote_transanction)
+-  [Function `vote_transaction`](#0x1_multisig_account_vote_transaction)
+-  [Function `vote_transactions`](#0x1_multisig_account_vote_transactions)
 -  [Function `execute_rejected_transaction`](#0x1_multisig_account_execute_rejected_transaction)
+-  [Function `execute_rejected_transactions`](#0x1_multisig_account_execute_rejected_transactions)
 -  [Function `validate_multisig_transaction`](#0x1_multisig_account_validate_multisig_transaction)
 -  [Function `successful_transaction_execution_cleanup`](#0x1_multisig_account_successful_transaction_execution_cleanup)
 -  [Function `failed_transaction_execution_cleanup`](#0x1_multisig_account_failed_transaction_execution_cleanup)
@@ -884,12 +888,32 @@ Number of signatures required must be more than zero and at most the total numbe
 
 
 
+<a id="0x1_multisig_account_EMAX_PENDING_TRANSACTIONS_EXCEEDED"></a>
+
+The number of pending transactions has exceeded the maximum allowed.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EMAX_PENDING_TRANSACTIONS_EXCEEDED">EMAX_PENDING_TRANSACTIONS_EXCEEDED</a>: u64 = 19;
+</code></pre>
+
+
+
 <a id="0x1_multisig_account_EMULTISIG_ACCOUNTS_NOT_ENABLED_YET"></a>
 
 Multisig accounts has not been enabled on this current network yet.
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EMULTISIG_ACCOUNTS_NOT_ENABLED_YET">EMULTISIG_ACCOUNTS_NOT_ENABLED_YET</a>: u64 = 14;
+</code></pre>
+
+
+
+<a id="0x1_multisig_account_EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED"></a>
+
+The multisig v2 enhancement feature is not enabled.
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED">EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED</a>: u64 = 20;
 </code></pre>
 
 
@@ -990,6 +1014,15 @@ Transaction with specified id cannot be found.
 
 
 <pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_ETRANSACTION_NOT_FOUND">ETRANSACTION_NOT_FOUND</a>: u64 = 2006;
+</code></pre>
+
+
+
+<a id="0x1_multisig_account_MAX_PENDING_TRANSACTIONS"></a>
+
+
+
+<pre><code><b>const</b> <a href="multisig_account.md#0x1_multisig_account_MAX_PENDING_TRANSACTIONS">MAX_PENDING_TRANSACTIONS</a>: u64 = 20;
 </code></pre>
 
 
@@ -1356,6 +1389,37 @@ Return a bool tuple indicating whether an owner has voted and if so, whether the
     <b>let</b> voted = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_contains_key">simple_map::contains_key</a>(votes, &owner);
     <b>let</b> vote = voted && *<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_borrow">simple_map::borrow</a>(votes, &owner);
     (voted, vote)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_available_transaction_queue_capacity"></a>
+
+## Function `available_transaction_queue_capacity`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_available_transaction_queue_capacity">available_transaction_queue_capacity</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_available_transaction_queue_capacity">available_transaction_queue_capacity</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): u64 <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <b>let</b> multisig_account_resource = <b>borrow_global_mut</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    <b>let</b> num_pending_transactions = multisig_account_resource.next_sequence_number - multisig_account_resource.last_executed_sequence_number - 1;
+    <b>if</b> (num_pending_transactions &gt; <a href="multisig_account.md#0x1_multisig_account_MAX_PENDING_TRANSACTIONS">MAX_PENDING_TRANSACTIONS</a>) {
+        0
+    } <b>else</b> {
+        <a href="multisig_account.md#0x1_multisig_account_MAX_PENDING_TRANSACTIONS">MAX_PENDING_TRANSACTIONS</a> - num_pending_transactions
+    }
 }
 </code></pre>
 
@@ -2229,6 +2293,8 @@ Reject a multisig transaction.
 ## Function `vote_transanction`
 
 Generic function that can be used to either approve or reject a multisig transaction
+Retained for backward compatibility: the function with the typographical error in its name
+will continue to be an accessible entry point.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_vote_transanction">vote_transanction</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64, approved: bool)
@@ -2268,6 +2334,64 @@ Generic function that can be used to either approve or reject a multisig transac
             approved,
         }
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_vote_transaction"></a>
+
+## Function `vote_transaction`
+
+Generic function that can be used to either approve or reject a multisig transaction
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_vote_transaction">vote_transaction</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64, approved: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_vote_transaction">vote_transaction</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, sequence_number: u64, approved: bool) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED">EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED</a>));
+    <a href="multisig_account.md#0x1_multisig_account_vote_transanction">vote_transanction</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number, approved);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_vote_transactions"></a>
+
+## Function `vote_transactions`
+
+Generic function that can be used to either approve or reject a batch of transactions within a specified range.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_vote_transactions">vote_transactions</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, starting_sequence_number: u64, final_sequence_number: u64, approved: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_vote_transactions">vote_transactions</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, starting_sequence_number: u64, final_sequence_number: u64, approved: bool) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED">EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED</a>));
+    <b>let</b> sequence_number = starting_sequence_number;
+    <b>while</b>(sequence_number &lt;= final_sequence_number) {
+        <a href="multisig_account.md#0x1_multisig_account_vote_transanction">vote_transanction</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>, sequence_number, approved);
+        sequence_number = sequence_number + 1;
+    }
 }
 </code></pre>
 
@@ -2317,6 +2441,40 @@ Remove the next transaction if it has sufficient owner rejections.
             executor: address_of(owner),
         }
     );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_multisig_account_execute_rejected_transactions"></a>
+
+## Function `execute_rejected_transactions`
+
+Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_execute_rejected_transactions">execute_rejected_transactions</a>(owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>, final_sequence_number: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_execute_rejected_transactions">execute_rejected_transactions</a>(
+    owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>,
+    final_sequence_number: u64,
+) <b>acquires</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a> {
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED">EMULTISIG_V2_ENHANCEMENT_NOT_ENABLED</a>));
+    <b>assert</b>!(<a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &lt; final_sequence_number, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EINVALID_SEQUENCE_NUMBER">EINVALID_SEQUENCE_NUMBER</a>));
+    <b>assert</b>!(final_sequence_number &lt; <a href="multisig_account.md#0x1_multisig_account_next_sequence_number">next_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="multisig_account.md#0x1_multisig_account_EINVALID_SEQUENCE_NUMBER">EINVALID_SEQUENCE_NUMBER</a>));
+    <b>while</b>(<a href="multisig_account.md#0x1_multisig_account_last_resolved_sequence_number">last_resolved_sequence_number</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>) &lt; final_sequence_number) {
+        <a href="multisig_account.md#0x1_multisig_account_execute_rejected_transaction">execute_rejected_transaction</a>(owner, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
+    }
 }
 </code></pre>
 
@@ -2501,6 +2659,14 @@ This function is private so no other code can call this beside the VM itself as 
 
 
 <pre><code><b>fun</b> <a href="multisig_account.md#0x1_multisig_account_add_transaction">add_transaction</a>(creator: <b>address</b>, <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: &<b>mut</b> <a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>, transaction: <a href="multisig_account.md#0x1_multisig_account_MultisigTransaction">MultisigTransaction</a>) {
+    <b>if</b>(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_multisig_v2_enhancement_feature_enabled">features::multisig_v2_enhancement_feature_enabled</a>()) {
+        <b>let</b> num_pending_transactions = <a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.next_sequence_number - (<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>.last_executed_sequence_number + 1);
+        <b>assert</b>!(
+            num_pending_transactions &lt; <a href="multisig_account.md#0x1_multisig_account_MAX_PENDING_TRANSACTIONS">MAX_PENDING_TRANSACTIONS</a>,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="multisig_account.md#0x1_multisig_account_EMAX_PENDING_TRANSACTIONS_EXCEEDED">EMAX_PENDING_TRANSACTIONS_EXCEEDED</a>)
+        );
+    };
+
     // The transaction creator also automatically votes for the transaction.
     <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_add">simple_map::add</a>(&<b>mut</b> transaction.votes, creator, <b>true</b>);
 
