@@ -515,24 +515,8 @@ impl DbReader for AptosDB {
                 "version older than latest version"
             );
 
-            match self.event_store.get_block_metadata(version) {
-                Ok((_first_version, new_block_event)) => Ok(new_block_event.proposed_time()),
-                Err(err) => {
-                    // when event index is disabled, we won't be able to search the NewBlock event stream.
-                    // TODO(grao): evaluate adding dedicated block_height_by_version index
-                    warn!(
-                        error = ?err,
-                        "Failed to fetch block timestamp, falling back to on-chain config.",
-                    );
-                    let ts = self
-                        .get_state_value_by_version(
-                            &StateKey::access_path(CurrentTimeMicroseconds::access_path()?),
-                            version,
-                        )?
-                        .ok_or_else(|| anyhow!("Timestamp not found at version {}", version))?;
-                    Ok(bcs::from_bytes::<CurrentTimeMicroseconds>(ts.bytes())?.microseconds)
-                },
-            }
+            let (_first_version, _last_version, new_block_event) = self.get_block_info_by_version(version)?;
+            Ok(new_block_event.proposed_time())
         })
     }
 
