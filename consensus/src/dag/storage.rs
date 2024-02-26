@@ -7,7 +7,7 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CommitEvent {
     node_id: NodeId,
     parents: Vec<Author>,
