@@ -40,7 +40,7 @@ spec aptos_framework::randomness {
         ensures exists<PerBlockRandomness>(@aptos_framework) ==> global<PerBlockRandomness>(@aptos_framework).round == round;
     }
 
-    spec next_blob(): vector<u8> {
+    spec next_32_bytes(): vector<u8> {
         use std::hash;
         include NextBlobAbortsIf;
         let input = b"APTOS_RANDOMNESS";
