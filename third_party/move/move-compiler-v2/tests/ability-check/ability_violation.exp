@@ -13,7 +13,7 @@ error: value of type `ability::Impotent` does not have the `drop` ability
    ┌─ tests/ability-check/ability_violation.move:4:3
    │
  4 │         move_from<T>(addr);
-   │         ^^^^^^^^^^^^^^^^^^ implicitly dropped here since not longer used
+   │         ^^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
    ·
 14 │         move_from_no_key<Impotent>(addr);
    │         -------------------------------- from a call inlined at this callsite
@@ -28,7 +28,7 @@ error: value of type `ability::S<ability::Impotent>` does not have the `drop` ab
    ┌─ tests/ability-check/ability_violation.move:15:3
    │
 15 │         move_from<S<Impotent>>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ implicitly dropped here since not longer used
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
 
 error: type `ability::Impotent` does not have the `key` ability
    ┌─ tests/ability-check/ability_violation.move:16:3
@@ -66,10 +66,10 @@ error: value of type `ability::Impotent` does not have the `drop` ability
    ┌─ tests/ability-check/ability_violation.move:27:4
    │
 27 │         (x, x);
-   │          ^ implicitly dropped here since not longer used
+   │          ^ implicitly dropped here since it is no longer used
 
 error: value of type `ability::Impotent` does not have the `drop` ability
    ┌─ tests/ability-check/ability_violation.move:27:7
    │
 27 │         (x, x);
-   │             ^ implicitly dropped here since not longer used
+   │             ^ implicitly dropped here since it is no longer used

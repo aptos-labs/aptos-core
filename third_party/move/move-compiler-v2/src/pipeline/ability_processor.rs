@@ -109,6 +109,7 @@ impl FunctionTargetProcessor for AbilityProcessor {
         let mut transformer = Transformer {
             builder,
             live_var,
+            lifetime,
             copy_drop,
         };
         transformer.run(code);
@@ -125,8 +126,14 @@ impl FunctionTargetProcessor for AbilityProcessor {
 
 #[derive(AbstractDomain, Debug, Clone, Default)]
 struct CopyDropState {
+    /// Those temps which need to be copied before this program point.
     needs_copy: SetDomain<TempIndex>,
+    /// Those temps which need to be dropped after this program point.
     needs_drop: SetDomain<TempIndex>,
+    /// Those temps which are consumed by the instruction but need to be checked for the drop ability
+    /// since they internally drop the value. These are currently equalities.
+    check_drop: SetDomain<TempIndex>,
+    /// Those temps which have been moved (that is consumed).
     moved: SetDomain<TempIndex>,
 }
 
@@ -176,7 +183,15 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
             Assign(_, _, src, AssignKind::Move) => {
                 state.moved.insert(*src);
             },
-            Call(_, _, _, srcs, ..) => {
+            Call(_, _, Operation::BorrowLoc, _, _) => {
+                // Operation does not consume operands.
+            },
+            Call(_, _, op, srcs, ..) => {
+                // If this is an equality we need to check drop for the operands, even though we do not need
+                // to emit a drop.
+                if matches!(op, Operation::Eq | Operation::Neq) {
+                    state.check_drop.extend(srcs.iter().cloned())
+                }
                 // For arguments, we also need to check the case that a src, even if not used after this program
                 // point, is again used in the argument list. Also, in difference to assign inference, we only need
                 // to copy the argument if its not primitive.
@@ -221,6 +236,8 @@ struct Transformer<'a> {
     builder: FunctionDataBuilder<'a>,
     /// The live-var information for the function.
     live_var: &'a LiveVarAnnotation,
+    /// The live-var information for the function.
+    lifetime: &'a LifetimeAnnotation,
     /// The result of the copy-drop analysis
     copy_drop: BTreeMap<CodeOffset, CopyDropState>,
 }
@@ -270,8 +287,8 @@ impl<'a> Transformer<'a> {
             },
             _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
         }
-        // Insert any drops needed after this program point
-        self.add_implicit_drops(code_offset, &bc)
+        // Insert/check any drops needed after this program point
+        self.check_and_add_implicit_drops(code_offset, &bc)
     }
 
     fn check_and_emit_bytecode(&mut self, _code_offset: CodeOffset, bc: Bytecode) {
@@ -403,19 +420,42 @@ impl<'a> Transformer<'a> {
 
 impl<'a> Transformer<'a> {
     /// Add implicit drops at the given code offset.
-    fn add_implicit_drops(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
+    fn check_and_add_implicit_drops(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
         // No drop after terminators
         if !bytecode.is_always_branching() {
             let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
             let id = bytecode.get_attr_id();
-            for temp in copy_drop_at.needs_drop.iter() {
+            for temp in copy_drop_at.check_drop.iter() {
                 self.check_drop(bytecode.get_attr_id(), *temp, || {
                     (
-                        "implicitly dropped here since not longer used".to_string(),
+                        "operator drops value here (consider to borrow the argument)".to_string(),
+                        vec![],
+                    )
+                });
+            }
+            for temp in copy_drop_at.needs_drop.iter() {
+                // Give a better error message if we know its borrowed
+                let is_borrowed = self
+                    .lifetime
+                    .get_info_at(code_offset)
+                    .after
+                    .is_borrowed(*temp);
+                self.check_drop(bytecode.get_attr_id(), *temp, || {
+                    (
+                        if is_borrowed {
+                            "still borrowed but will be implicitly \
+                            dropped later since it is no longer used"
+                                .to_string()
+                        } else {
+                            "implicitly dropped here since it is \
+                            no longer used"
+                                .to_string()
+                        },
                         vec![],
                     )
                 });
                 // Only for references we need to generate a Drop instruction
+
                 if self.ty(*temp).is_reference() {
                     self.builder.emit(Bytecode::Call(
                         id,
