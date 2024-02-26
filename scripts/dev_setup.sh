@@ -893,7 +893,9 @@ while getopts "btoprvydaPJh:i:nk" arg; do
   n)
     OPT_DIR="true"
     ;;
-  k) IN_DOCKER="true"
+  k)
+    IN_DOCKER="true"
+    ;;
   *)
     usage
     exit 0
