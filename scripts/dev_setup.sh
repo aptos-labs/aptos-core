@@ -847,9 +847,10 @@ INSTALL_INDIVIDUAL=false
 INSTALL_PACKAGES=()
 INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
+IN_DOCKER=false
 
 #parse args
-while getopts "btoprvydaPJh:i:n" arg; do
+while getopts "btoprvydaPJh:i:nk" arg; do
   case "$arg" in
   b)
     BATCH_MODE="true"
@@ -892,6 +893,7 @@ while getopts "btoprvydaPJh:i:n" arg; do
   n)
     OPT_DIR="true"
     ;;
+  k) IN_DOCKER="true"
   *)
     usage
     exit 0
@@ -1089,17 +1091,19 @@ fi
 
 install_python3
 if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
-  pip3 install pre-commit
+  pip3 install ${IN_DOCKER:+--break-system-packages} pre-commit
   install_libudev-dev
 else
   install_pkg python-pre-commit "$PACKAGE_MANAGER"
 fi
 
-# For now best effort install, will need to improve later
-if command -v pre-commit; then
-  pre-commit install
-else
-  ~/.local/bin/pre-commit install
+if [[ -z $IN_DOCKER ]]; then
+  # For now best effort install, will need to improve later
+  if command -v pre-commit; then
+    pre-commit install
+  else
+    ~/.local/bin/pre-commit install
+  fi
 fi
 
 if [[ "${BATCH_MODE}" == "false" ]]; then
