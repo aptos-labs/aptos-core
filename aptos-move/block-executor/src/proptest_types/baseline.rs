@@ -106,8 +106,6 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         let mut resolved_deltas = vec![];
         let mut group_reads = vec![];
 
-        let has_abort = txns.iter().any(|txn| matches!(txn, MockTransaction::Abort));
-
         for txn in txns.iter() {
             match txn {
                 MockTransaction::Abort => {
@@ -130,17 +128,11 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                     incarnation_counter,
                     incarnation_behaviors,
                 } => {
-                    let incarnation = incarnation_counter.load(Ordering::SeqCst);
-                    if incarnation == 0 {
-                        // Must have never executed because an Abort transaction caused a halt.
-                        assert!(has_abort);
-                        break;
-                    }
-
                     // Determine the behavior of the latest incarnation of the transaction. The index
                     // is based on the value of the incarnation counter prior to the fetch_add during
                     // the last mock execution, and is >= 1 because there is at least one execution.
-                    let last_incarnation = (incarnation - 1) % incarnation_behaviors.len();
+                    let last_incarnation = (incarnation_counter.load(Ordering::SeqCst) - 1)
+                        % incarnation_behaviors.len();
 
                     match incarnation_behaviors[last_incarnation]
                         .deltas
@@ -374,8 +366,8 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
                 assert_eq!(*idx, self.read_values.len());
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
-            Err(BlockExecutionError::FatalBlockExecutorError(_)) => {
-                // TODO: adjust the logic to be able to test better.
+            Err(BlockExecutionError::FatalBlockExecutorError(e)) => {
+                unimplemented!("not tested here FallbackToSequential({:?})", e);
             },
         }
     }
