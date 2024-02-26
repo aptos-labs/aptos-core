@@ -1,3 +1,31 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-11:
++ Error: compilation errors:
++  error: cannot mutably borrow since immutable references exist
++     ┌─ TEMPFILE:7:25
++     │
++   7 │       vector::for_each_mut(&mut v, |e| { *e = s; s = s + 1 });
++     │       ---------------------^^^^^^----------------------------
++     │       │                    │
++     │       │                    mutable borrow attempted here
++     │       │                    previous local borrow
++     │       from a call inlined at this callsite
++     │
++     ┌─ /Users/wrwg/aptos-core/third_party/move/move-stdlib/sources/vector.move:181:20
++     │
++ 181 │         while (i < length(v)) {
++     │                    --------- requirement enforced here
++ 
++ 
++ 
++ task 1 'run'. lines 13-13:
++ Error: Function execution failed with VMError: {
++     major_status: LINKER_ERROR,
++     sub_status: None,
++     location: undefined,
++     indices: redacted,
++     offsets: redacted,
++ }
++ 

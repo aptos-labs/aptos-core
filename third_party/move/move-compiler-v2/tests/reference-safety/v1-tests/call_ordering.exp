@@ -1,9 +1,16 @@
 
 Diagnostics:
-error: cannot mutably borrow local `s` since other references exists
-   ┌─ tests/reference-safety/v1-tests/call_ordering.move:12:25
-   │
-12 │         bar(&mut s.f, { s.f = 0; 1 })
-   │             --------    ^^^ mutable borrow attempted here
-   │             │
-   │             previous mutable field borrow
+error: cannot mutably borrow since immutable references exist
+  ┌─ tests/reference-safety/v1-tests/call_ordering.move:5:12
+  │
+5 │     fun t0(s: &mut S) {
+  │            ^
+  │            │
+  │            mutable borrow attempted here
+  │            previous local borrow
+6 │         let f = &mut s.f;
+7 │         foo(freeze(s), { *f = 0; 1 })
+  │         -----------------------------
+  │         │                │
+  │         │                requirement enforced here
+  │         conflicting reference used here

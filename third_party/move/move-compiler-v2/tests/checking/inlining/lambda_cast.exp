@@ -72,3 +72,16 @@ module 0x12391283::M {
     spec fun $test_1(): u64;
     spec fun $test_2(): u64;
 } // end 0x12391283::M
+
+
+Diagnostics:
+error: cannot mutably borrow since immutable references exist
+   ┌─ /Users/wrwg/aptos-core/third_party/move/move-compiler-v2/../move-stdlib/sources/vector.move:65:33
+   │
+65 │     public fun reverse<Element>(v: &mut vector<Element>) {
+   │                                 ^
+   │                                 │
+   │                                 mutable borrow attempted here
+   │                                 previous local borrow
+66 │         let len = length(v);
+   │                   --------- requirement enforced here

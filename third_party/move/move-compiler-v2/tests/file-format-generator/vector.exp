@@ -1,4 +1,29 @@
 
+Diagnostics:
+error: cannot mutably borrow since immutable references exist
+   ┌─ tests/file-format-generator/vector.move:13:32
+   │
+13 │     public fun remove<Element>(v: &mut vector<Element>, i: u64): Element {
+   │                                ^
+   │                                │
+   │                                mutable borrow attempted here
+   │                                previous local borrow
+14 │         use std::vector;
+15 │         let len = vector::length(v);
+   │                   ----------------- requirement enforced here
+
+error: cannot mutably borrow since immutable references exist
+   ┌─ /Users/wrwg/aptos-core/third_party/move/move-compiler-v2/../move-stdlib/sources/vector.move:65:33
+   │
+65 │     public fun reverse<Element>(v: &mut vector<Element>) {
+   │                                 ^
+   │                                 │
+   │                                 mutable borrow attempted here
+   │                                 previous local borrow
+66 │         let len = length(v);
+   │                   --------- requirement enforced here
+
+
 ============ disassembled file-format ==================
 // Move bytecode v7
 module 42.vector {

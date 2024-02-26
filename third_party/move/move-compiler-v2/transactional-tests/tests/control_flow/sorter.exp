@@ -1,3 +1,95 @@
-processed 2 tasks
-
-==> Compiler v2 delivered same results!
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
++ task 0 'publish'. lines 1-65:
++ Error: compilation errors:
++  error: cannot mutably borrow since immutable references exist
++    ┌─ TEMPFILE:20:14
++    │
++ 20 │     fun sort(x: &mut vector<u64>) {
++    │              ^
++    │              │
++    │              mutable borrow attempted here
++    │              previous local borrow
++ 21 │         let i: u64 = 0;
++ 22 │         while (i < vector::length<u64>(x)) {
++    │                    ---------------------- requirement enforced here
++ 
++ error: cannot mutably borrow since immutable references exist
++    ┌─ TEMPFILE:20:14
++    │
++ 20 │     fun sort(x: &mut vector<u64>) {
++    │              ^
++    │              │
++    │              mutable borrow attempted here
++    │              previous local borrow
++    ·
++ 24 │             while (j < vector::length<u64>(x)) {
++    │                        ---------------------- requirement enforced here
++ 
++ error: cannot mutably borrow since immutable references exist
++    ┌─ TEMPFILE:20:14
++    │
++ 20 │     fun sort(x: &mut vector<u64>) {
++    │              ^
++    │              │
++    │              mutable borrow attempted here
++    │              previous local borrow
++    ·
++ 25 │                 if (*vector::borrow<u64>(x, i) > *vector::borrow<u64>(x, j)) {
++    │                      ------------------------- requirement enforced here
++ 
++ error: cannot mutably borrow since immutable references exist
++    ┌─ TEMPFILE:20:14
++    │
++ 20 │     fun sort(x: &mut vector<u64>) {
++    │              ^
++    │              │
++    │              mutable borrow attempted here
++    │              previous local borrow
++    ·
++ 25 │                 if (*vector::borrow<u64>(x, i) > *vector::borrow<u64>(x, j)) {
++    │                     --------------------------
++    │                     ││
++    │                     │used by call result
++    │                     requirement enforced here
++ 
++ error: cannot mutably borrow since immutable references exist
++    ┌─ TEMPFILE:20:14
++    │
++ 20 │     fun sort(x: &mut vector<u64>) {
++    │              ^
++    │              │
++    │              mutable borrow attempted here
++    │              previous local borrow
++    ·
++ 25 │                 if (*vector::borrow<u64>(x, i) > *vector::borrow<u64>(x, j)) {
++    │                                                   ------------------------- requirement enforced here
++ 
++ error: cannot mutably borrow since immutable references exist
++    ┌─ TEMPFILE:20:14
++    │
++ 20 │     fun sort(x: &mut vector<u64>) {
++    │              ^
++    │              │
++    │              mutable borrow attempted here
++    │              previous local borrow
++    ·
++ 25 │                 if (*vector::borrow<u64>(x, i) > *vector::borrow<u64>(x, j)) {
++    │                                                  --------------------------
++    │                                                  ││
++    │                                                  │used by call result
++    │                                                  requirement enforced here
++ 
++ 
++ 
++ task 1 'run'. lines 67-73:
++ Error: compilation errors:
++  error: unbound module
++    ┌─ TEMPFILE:69:5
++    │
++ 69 │ use 0x42::heap::main;
++    │     ^^^^^^^^^^ Invalid 'use'. Unbound module: '0x42::heap'
++ 
++ 
++ 

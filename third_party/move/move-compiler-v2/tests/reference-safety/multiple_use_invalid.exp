@@ -28,13 +28,3 @@ error: same mutable reference in local `r1` is also used in other local `r2` in 
    │                  ------ previous mutable local borrow
 20 │         s(r1, r2)
    │         ^^^^^^^^^ requirement enforced here
-
-error: same mutable reference in local `r1` is also used in other local `r2` in same argument list
-   ┌─ tests/reference-safety/multiple_use_invalid.move:27:9
-   │
-25 │         let r1 = &mut x;
-   │                  ------ previous mutable local borrow
-26 │         let r2 = &mut x;
-   │                  ------ previous mutable local borrow
-27 │         r1 == r2
-   │         ^^^^^^^^ requirement enforced here
