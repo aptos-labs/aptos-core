@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::error;
 
-#[derive(Clone, Debug, Deserialize, Identifiable, Queryable, Serialize)]
+#[derive(Debug, Deserialize, Identifiable, Queryable, Serialize)]
 #[diesel(primary_key(asset_uri))]
 #[diesel(table_name = parsed_asset_uris)]
 pub struct NFTMetadataCrawlerURIsQuery {
