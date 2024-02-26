@@ -10,20 +10,20 @@ use crate::{
 use anyhow::{format_err, Result};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{NetworkConfig, NodeConfig},
+    config::{NetworkConfig, NodeConfig, RoleType},
     network_id::NetworkId,
 };
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_mempool_notifications::{self, MempoolNotifier};
-use aptos_network::{
+use aptos_network2::{
     application::{
-        interface::{NetworkClient, NetworkServiceEvents},
+        interface::NetworkClient, // NetworkServiceEvents
         storage::PeersAndMetadata,
     },
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
+    // peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
-        network::{NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
+        network::{NetworkEvents, NetworkSender, NetworkSource, NewNetworkEvents, NewNetworkSender, OutboundPeerConnections},
         wire::handshake::v1::ProtocolId::MempoolDirectSend,
     },
 };
@@ -118,15 +118,22 @@ impl MockSharedMempool {
         config.validator_network = Some(NetworkConfig::network_with_id(NetworkId::Validator));
 
         let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
-        let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-        let (_, conn_notifs_rx) = conn_notifs_channel::new();
+        // let (network_reqs_tx, _network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        // let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        // let (_network_notifs_tx, network_notifs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
+        // let (_, conn_notifs_rx) = conn_notifs_channel::new();
+        let peer_senders = Arc::new(OutboundPeerConnections::new());
         let network_sender = NetworkSender::new(
-            PeerManagerRequestSender::new(network_reqs_tx),
-            ConnectionRequestSender::new(connection_reqs_tx),
+            NetworkId::Validator,
+            peer_senders.clone(),
+            RoleType::Validator,
+            // PeerManagerRequestSender::new(network_reqs_tx),
+            // ConnectionRequestSender::new(connection_reqs_tx),
         );
-        let network_events = NetworkEvents::new(network_notifs_rx, conn_notifs_rx, None);
+        let (_network_recived_messages_tx, network_recived_messages_rx) = tokio::sync::mpsc::channel(10);
+        let network_source = NetworkSource::new_single_source(network_recived_messages_rx);
+        let contexts = Arc::new(BTreeMap::new());
+        let network_events = NetworkEvents::new(network_source, peer_senders, "test", contexts);
         let (ac_client, client_events) = mpsc::channel(1_024);
         let (quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
         let (mempool_notifier, mempool_listener) =
@@ -152,15 +159,13 @@ impl MockSharedMempool {
             network_senders,
             peers_and_metadata.clone(),
         );
-        let network_and_events = hashmap! {NetworkId::Validator => network_events};
-        let network_service_events = NetworkServiceEvents::new(network_and_events);
 
         start_shared_mempool(
             handle,
             &config,
             mempool.clone(),
             network_client,
-            network_service_events,
+            network_events,
             client_events,
             quorum_store_receiver,
             mempool_listener,

@@ -9,7 +9,7 @@
 //! use aptos_config::network_id::NetworkContext;
 //! use aptos_logger::info;
 //! use aptos_types::{PeerId, network_address::NetworkAddress};
-//! use aptos_network::logging::NetworkSchema;
+//! use aptos_network2::logging::NetworkSchema;
 //!
 //! info!(
 //!   NetworkSchema::new(&NetworkContext::mock())

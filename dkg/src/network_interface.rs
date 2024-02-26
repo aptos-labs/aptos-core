@@ -2,7 +2,7 @@
 
 use crate::DKGMessage;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_network::{
+use aptos_network2::{
     application::{error::Error, interface::NetworkClientInterface},
     ProtocolId,
 };

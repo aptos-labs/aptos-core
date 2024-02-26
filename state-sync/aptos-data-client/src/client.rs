@@ -26,9 +26,9 @@ use aptos_config::{
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::Mutex;
 use aptos_logger::{info, sample, sample::SampleRate, trace, warn};
-use aptos_network::{
+use aptos_network2::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
-    protocols::network::RpcError,
+    protocols::network::RpcError
 };
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_client::StorageServiceClient;
@@ -767,6 +767,7 @@ impl AptosDataClient {
         );
         self.update_sent_request_metrics(peer, &request);
 
+        let timer = start_request_timer(&metrics::REQUEST_LATENCIES_B, &request.get_label(), peer);
         // Send the request and process the result
         let result = self
             .storage_service_client
@@ -776,6 +777,8 @@ impl AptosDataClient {
                 request.clone(),
             )
             .await;
+        timer.observe_duration();
+
         match result {
             Ok(response) => {
                 trace!(

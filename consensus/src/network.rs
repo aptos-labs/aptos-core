@@ -18,7 +18,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
-use aptos_config::network_id::NetworkId;
+use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
@@ -29,9 +29,9 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_logger::prelude::*;
-use aptos_network::{
-    application::interface::{NetworkClient, NetworkServiceEvents},
-    protocols::{network::Event, rpc::error::RpcError},
+use aptos_network2::{
+    application::interface::NetworkClient,
+    protocols::{network::Event, network::NetworkEvents, RpcError},
     ProtocolId,
 };
 use aptos_reliable_broadcast::{RBMessage, RBNetworkSender};
@@ -44,7 +44,7 @@ use bytes::Bytes;
 use fail::fail_point;
 use futures::{
     channel::oneshot,
-    stream::{select, select_all},
+    stream::select,
     SinkExt, Stream, StreamExt,
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -53,7 +53,12 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+// use futures_channel::oneshot::Canceled;
+use tokio::runtime::Handle;
+// use tokio::time::error::Elapsed;
 use tokio::time::timeout;
+use tokio_stream::wrappers::ReceiverStream;
+use aptos_network2::protocols::network::network_event_prefetch;
 
 pub trait TConsensusMsg: Sized + Serialize + DeserializeOwned {
     fn epoch(&self) -> u64;
@@ -273,13 +278,38 @@ impl NetworkSender {
         if receiver == self.author() {
             let (tx, rx) = oneshot::channel();
             let protocol = RPC[0];
-            let self_msg = Event::RpcRequest(receiver, msg.clone(), RPC[0], tx);
+            let peer_network_id = PeerNetworkId::new(NetworkId::Validator, receiver); // This assumes that consensus traffic _only_ happens on the validator network
+            let self_msg = Event::RpcRequest(peer_network_id, msg.clone(), RPC[0], tx);
+            let start = std::time::Instant::now();
             self.self_sender.clone().send(self_msg).await?;
-            if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
-                Ok(protocol.from_bytes(&bytes)?)
-            } else {
-                bail!("self rpc failed");
+            match timeout(timeout_duration, rx).await {
+                Ok(ok1) => match ok1 {
+                    Ok(ok2) => match ok2 {
+                        Ok(bytes) => {
+                            Ok(protocol.from_bytes(&bytes)?)
+                        }
+                        Err(e3) => {
+                            let dt = std::time::Instant::now().duration_since(start);
+                            bail!("self rpc failed ({:?}), rpc err {:?}", dt, e3);
+                        }
+                    }
+                    Err(_e2) => {
+                        // the far side of the RPC was closed instead of reply, this is okay-ish and should not stack trace
+                        Err(anyhow!("cancelled"))
+                        // let dt = std::time::Instant::now().duration_since(start);
+                        // bail!("self rpc failed ({:?}), cancelled {:?}", dt, e2);
+                    }
+                }
+                Err(e1) => {
+                    let dt = std::time::Instant::now().duration_since(start);
+                    bail!("self rpc failed ({:?}), timeout {:?}", dt, e1);
+                }
             }
+            // if let Ok(Ok(Ok(bytes))) = timeout(timeout_duration, rx).await {
+            //     Ok(protocol.from_bytes(&bytes)?)
+            // } else {
+            //     bail!("self rpc failed");
+            // }
         } else {
             Ok(monitor!(
                 "send_rpc",
@@ -298,8 +328,9 @@ impl NetworkSender {
     async fn broadcast(&self, msg: ConsensusMsg) {
         fail_point!("consensus::send::any", |_| ());
         // Directly send the message to ourself without going through network.
-        let self_msg = Event::Message(self.author, msg.clone());
+        let peer_network_id = PeerNetworkId::new(NetworkId::Internal, self.author);
         let mut self_sender = self.self_sender.clone();
+        let self_msg = Event::Message(peer_network_id, msg.clone());
         if let Err(err) = self_sender.send(self_msg).await {
             error!("Error broadcasting to self: {:?}", err);
         }
@@ -352,7 +383,8 @@ impl NetworkSender {
         let mut self_sender = self.self_sender.clone();
         for peer in recipients {
             if self.author == peer {
-                let self_msg = Event::Message(self.author, msg.clone());
+                let peer_network_id = PeerNetworkId::new(NetworkId::Internal, self.author);
+                let self_msg = Event::Message(peer_network_id, msg.clone());
                 if let Err(err) = self_sender.send(self_msg).await {
                     error!(error = ?err, "Error delivering a self msg");
                 }
@@ -607,8 +639,9 @@ pub struct NetworkTask {
 impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
-        network_service_events: NetworkServiceEvents<ConsensusMsg>,
+        network_events: NetworkEvents<ConsensusMsg>,
         self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
+        handle: &Handle,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
             QueueStyle::FIFO,
@@ -624,17 +657,9 @@ impl NetworkTask {
         let (rpc_tx, rpc_rx) =
             aptos_channel::new(QueueStyle::FIFO, 10, Some(&counters::RPC_CHANNEL_MSGS));
 
-        // Verify the network events have been constructed correctly
-        let network_and_events = network_service_events.into_network_and_events();
-        if (network_and_events.values().len() != 1)
-            || !network_and_events.contains_key(&NetworkId::Validator)
-        {
-            panic!("The network has not been setup correctly for consensus!");
-        }
-
-        // Collect all the network events into a single stream
-        let network_events: Vec<_> = network_and_events.into_values().collect();
-        let network_events = select_all(network_events).fuse();
+        let (event_tx, event_rx) = tokio::sync::mpsc::channel(10); // TODO: configurable prefetch size other than 10?
+        handle.spawn(network_event_prefetch(network_events, event_tx));
+        let network_events = ReceiverStream::new(event_rx);
         let all_events = Box::new(select(network_events, self_receiver));
 
         (
@@ -680,7 +705,7 @@ impl NetworkTask {
                         | ConsensusMsg::BatchMsg(_)
                         | ConsensusMsg::ProofOfStoreMsg(_)) => {
                             Self::push_msg(
-                                peer_id,
+                                peer_id.peer_id(),
                                 quorum_store_msg,
                                 &self.quorum_store_messages_tx,
                             );
@@ -695,8 +720,8 @@ impl NetworkTask {
                                     response_sender: tx,
                                 });
                             if let Err(e) = self.rpc_tx.push(
-                                (peer_id, discriminant(&req_with_callback)),
-                                (peer_id, req_with_callback),
+                                (peer_id.peer_id(), discriminant(&req_with_callback)),
+                                (peer_id.peer_id(), req_with_callback),
                             ) {
                                 warn!(error = ?e, "aptos channel closed");
                             };
@@ -710,8 +735,8 @@ impl NetworkTask {
                                     response_sender: tx,
                                 });
                             if let Err(e) = self.rpc_tx.push(
-                                (peer_id, discriminant(&req_with_callback)),
-                                (peer_id, req_with_callback),
+                                (peer_id.peer_id(), discriminant(&req_with_callback)),
+                                (peer_id.peer_id(), req_with_callback),
                             ) {
                                 warn!(error = ?e, "aptos channel closed");
                             };
@@ -728,12 +753,12 @@ impl NetworkTask {
                                 );
                                 info!(
                                     LogSchema::new(LogEvent::NetworkReceiveProposal)
-                                        .remote_peer(peer_id),
+                                        .remote_peer(peer_id.peer_id()),
                                     block_round = proposal.proposal().round(),
                                     block_hash = proposal.proposal().id(),
                                 );
                             }
-                            Self::push_msg(peer_id, consensus_msg, &self.consensus_messages_tx);
+                            Self::push_msg(peer_id.peer_id(), consensus_msg, &self.consensus_messages_tx);
                         },
                         // TODO: get rid of the rpc dummy value
                         ConsensusMsg::RandGenMessage(req) => {
@@ -741,13 +766,13 @@ impl NetworkTask {
                             let req_with_callback =
                                 IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
                                     req,
-                                    sender: peer_id,
+                                    sender: peer_id.peer_id(),
                                     protocol: RPC[0],
                                     response_sender: tx,
                                 });
                             if let Err(e) = self.rpc_tx.push(
-                                (peer_id, discriminant(&req_with_callback)),
-                                (peer_id, req_with_callback),
+                                (peer_id.peer_id(), discriminant(&req_with_callback)),
+                                (peer_id.peer_id(), req_with_callback),
                             ) {
                                 warn!(error = ?e, "aptos channel closed");
                             };
@@ -792,7 +817,7 @@ impl NetworkTask {
                         ConsensusMsg::DAGMessage(req) => {
                             IncomingRpcRequest::DAGRequest(IncomingDAGRequest {
                                 req,
-                                sender: peer_id,
+                                sender: peer_id.peer_id(),
                                 responder: RpcResponder {
                                     protocol,
                                     response_sender: callback,
@@ -809,7 +834,7 @@ impl NetworkTask {
                         ConsensusMsg::RandGenMessage(req) => {
                             IncomingRpcRequest::RandGenRequest(IncomingRandGenRequest {
                                 req,
-                                sender: peer_id,
+                                sender: peer_id.peer_id(),
                                 protocol,
                                 response_sender: callback,
                             })
@@ -821,13 +846,10 @@ impl NetworkTask {
                     };
                     if let Err(e) = self
                         .rpc_tx
-                        .push((peer_id, discriminant(&req)), (peer_id, req))
+                        .push((peer_id.peer_id(), discriminant(&req)), (peer_id.peer_id(), req))
                     {
                         warn!(error = ?e, "aptos channel closed");
                     };
-                },
-                _ => {
-                    // Ignore `NewPeer` and `LostPeer` events
                 },
             });
         }

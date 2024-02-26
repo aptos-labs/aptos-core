@@ -2,8 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+/*
+
 use crate::{
-    application::{error::Error, interface::NetworkClientInterface, metadata::ConnectionState},
+    // application::{error::Error, interface::NetworkClientInterface, metadata::ConnectionState},
     protocols::{
         health_checker::{HealthCheckerMsg, HealthCheckerNetworkEvents},
         network::Event,
@@ -18,6 +20,7 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
+
 
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
 pub struct HealthCheckData {
@@ -153,3 +156,4 @@ impl<NetworkClient: Unpin> FusedStream for HealthCheckNetworkInterface<NetworkCl
         self.receiver.is_terminated()
     }
 }
+*/

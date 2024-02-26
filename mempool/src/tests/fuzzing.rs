@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_config::{config::NodeConfig, network_id::NetworkId};
 use aptos_infallible::{Mutex, RwLock};
-use aptos_network::{
+use aptos_network2::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
     protocols::wire::handshake::v1::ProtocolId::MempoolDirectSend,
 };

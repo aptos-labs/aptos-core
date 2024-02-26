@@ -1,43 +1,37 @@
 [package]
-name = "aptos-network"
-description = "Aptos networking stack"
+name = "aptos-network2"
 version = "0.1.0"
+edition = "2021"
 
-# Workspace inherited keys
-authors = { workspace = true }
-edition = { workspace = true }
-homepage = { workspace = true }
-license = { workspace = true }
-publish = { workspace = true }
-repository = { workspace = true }
-rust-version = { workspace = true }
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
-aptos-channels = { workspace = true }
 aptos-compression = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
+aptos-event-notifications = { workspace = true }
 aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-memsocket = { workspace = true, optional = true }
 aptos-metrics-core = { workspace = true }
 aptos-netcore = { workspace = true }
+#aptos-network= { workspace = true }
+#aptos-network-discovery = { workspace = true }
 aptos-num-variants = { workspace = true }
 aptos-peer-monitoring-service-types = { workspace = true }
 aptos-proptest-helpers = { workspace = true, optional = true }
-aptos-rate-limiter = { workspace = true }
+aptos-runtimes = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
-arc-swap = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 futures = { workspace = true }
+futures-core = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
@@ -45,8 +39,10 @@ maplit = { workspace = true }
 once_cell = { workspace = true }
 ordered-float = { workspace = true }
 pin-project = { workspace = true }
+prometheus = { workspace = true }
 proptest ={ workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
+protobuf = { workspace = true }
 rand = { workspace = true, features = ["small_rng"] }
 # Note: we cannot rely on the workspace version of rand. So we use this workaround. See:
 # https://github.com/aptos-labs/aptos-core/blob/main/state-sync/aptos-data-client/Cargo.toml#L41.
@@ -57,6 +53,7 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-retry = { workspace = true }
+tokio-stream = { workspace = true }
 tokio-util = { workspace = true }
 
 [dev-dependencies]
@@ -70,6 +67,7 @@ aptos-types = { workspace = true, features = ["fuzzing"] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 rand_core = { workspace = true }
+console-subscriber = { workspace = true }
 
 [features]
 default = []

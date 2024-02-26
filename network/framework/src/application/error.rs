@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error::NetworkError, protocols::network::RpcError};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
+// #[derive(Clone, Debug, Deserialize, Error, PartialEq, Eq, Serialize)]
+#[derive(Debug, Error)]
 pub enum Error {
     #[error("Network error encountered: {0}")]
-    NetworkError(String),
+    NetworkError(NetworkError),
     #[error("Rpc error encountered: {0}")]
     RpcError(String),
     #[error("Unexpected error encountered: {0}")]
@@ -23,7 +23,7 @@ impl From<anyhow::Error> for Error {
 
 impl From<NetworkError> for Error {
     fn from(error: NetworkError) -> Self {
-        Error::NetworkError(error.to_string())
+        Error::NetworkError(error)
     }
 }
 

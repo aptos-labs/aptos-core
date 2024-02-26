@@ -5,8 +5,8 @@
 use crate::{
     application::storage::PeersAndMetadata,
     connectivity_manager::{ConnectivityManager, ConnectivityRequest},
-    counters,
-    peer_manager::{conn_notifs_channel, ConnectionRequestSender},
+    // counters,
+    // peer_manager::{conn_notifs_channel, ConnectionRequestSender},
 };
 use aptos_config::{config::PeerSet, network_id::NetworkContext};
 use aptos_time_service::TimeService;

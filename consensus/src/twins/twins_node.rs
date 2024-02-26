@@ -24,7 +24,7 @@ use aptos_config::{
 use aptos_consensus_types::common::{Author, Round};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_mempool::mocks::MockSharedMempool;
-use aptos_network::{
+use aptos_network2::{
     application::interface::{NetworkClient, NetworkServiceEvents},
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{

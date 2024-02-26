@@ -8,8 +8,8 @@ use aptos_config::{
     network_id::{NetworkContext, NetworkId},
 };
 use aptos_crypto::x25519::{self, PRIVATE_KEY_SIZE};
-use aptos_network::{
-    noise::{HandshakeAuthMode, NoiseUpgrader},
+use aptos_network2::{
+    noise::NoiseUpgrader,
     protocols::wire::handshake::v1::ProtocolIdSet,
     transport::{
         resolve_and_connect, upgrade_outbound, TCPBufferCfg, TcpSocket, UpgradeContext,
@@ -20,6 +20,7 @@ use aptos_types::{account_address, chain_id::ChainId, network_address::NetworkAd
 use futures::{AsyncReadExt, AsyncWriteExt};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
+use aptos_network2::application::storage::PeersAndMetadata;
 
 // This function must take the private key in as an owned value vs as part of
 // the args struct because private key needs to be owned, and cannot be cloned.
@@ -173,12 +174,14 @@ fn build_upgrade_context(
 
     // Build the noise and network handshake, without running a full Noise server
     // with listener.
+    let peers_and_metadata = PeersAndMetadata::new(&[network_id]);
     Arc::new(UpgradeContext::new(
         NoiseUpgrader::new(
             network_context,
             private_key,
             // If we had an incoming message, auth mode would matter.
-            HandshakeAuthMode::server_only(&[network_id]),
+            peers_and_metadata,
+            false,
         ),
         HANDSHAKE_VERSION,
         supported_protocols,

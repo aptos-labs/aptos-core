@@ -321,7 +321,7 @@ async fn get_new_outputs_with_proof(
     mock_client: &mut MockClient,
     known_version: u64,
     known_epoch: u64,
-) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+) -> Receiver<Result<bytes::Bytes, aptos_network2::protocols::network::RpcError>> {
     get_new_outputs_with_proof_for_peer(mock_client, known_version, known_epoch, None).await
 }
 
@@ -331,7 +331,7 @@ async fn get_new_outputs_with_proof_for_peer(
     known_version: u64,
     known_epoch: u64,
     peer_network_id: Option<PeerNetworkId>,
-) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+) -> Receiver<Result<bytes::Bytes, aptos_network2::protocols::network::RpcError>> {
     // Create the data request
     let data_request =
         DataRequest::GetNewTransactionOutputsWithProof(NewTransactionOutputsWithProofRequest {

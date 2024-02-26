@@ -80,6 +80,7 @@ pub enum NetworkId {
     Validator = 0,
     Vfn = 3,
     Public = 4,
+    Internal = 5, // fake network messages sent from service to self in consensus
 }
 
 // This serializer is here for backwards compatibility with the old version, once all nodes have the
@@ -92,6 +93,9 @@ impl Serialize for NetworkId {
             Validator,
             Public,
             Private(String),
+            _Vfn,
+            _NewPublic,
+            Internal,
         }
 
         let converted = match self {
@@ -99,6 +103,7 @@ impl Serialize for NetworkId {
             NetworkId::Public => ConvertNetworkId::Public,
             // TODO: Once all validators & VFNs are on this version, convert to using new serialization as number
             NetworkId::Vfn => ConvertNetworkId::Private(VFN_NETWORK.to_string()),
+            NetworkId::Internal => ConvertNetworkId::Internal,
         };
 
         converted.serialize(serializer)
@@ -120,6 +125,7 @@ impl<'de> Deserialize<'de> for NetworkId {
             // in the 2nd step of migration, we can move to these identifiers
             Vfn,
             NewPublic,
+            Internal,
         }
 
         // A hack around NetworkId to convert the old type to the new version
@@ -130,6 +136,7 @@ impl<'de> Deserialize<'de> for NetworkId {
             ConvertNetworkId::NewPublic => Ok(NetworkId::Public),
             // Technically, there could be a different private network, but it isn't used right now
             ConvertNetworkId::Private(_) => Ok(NetworkId::Vfn),
+            ConvertNetworkId::Internal => Ok(NetworkId::Internal),
         }
     }
 }
@@ -181,6 +188,7 @@ impl NetworkId {
                 RoleType::Validator => &[],
                 RoleType::FullNode => &[PeerRole::Validator],
             },
+            NetworkId::Internal => &[],
         }
     }
 
@@ -199,14 +207,16 @@ impl NetworkId {
                 RoleType::Validator => &[PeerRole::ValidatorFullNode],
                 RoleType::FullNode => &[],
             },
+            NetworkId::Internal => &[],
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             NetworkId::Validator => "Validator",
             NetworkId::Public => "Public",
             NetworkId::Vfn => VFN_NETWORK,
+            NetworkId::Internal => "Internal",
         }
     }
 

@@ -17,7 +17,7 @@ use aptos_config::{
     network_id::PeerNetworkId,
 };
 use aptos_logger::{debug, error, info, sample, sample::SampleRate, warn};
-use aptos_network::application::storage::PeersAndMetadata;
+use aptos_network2::application::storage::PeersAndMetadata;
 use aptos_storage_interface::DbReader;
 use aptos_storage_service_types::{
     requests::{DataRequest, StorageServiceRequest},

@@ -15,7 +15,7 @@ use aptos_event_notifications::{
     ReconfigNotificationListener,
 };
 use aptos_logger::{debug, error};
-use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_network2::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,

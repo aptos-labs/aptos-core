@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::network::ApplicationNetworkInterfaces;
+use crate::network2::ApplicationNetworkInterfaces;
 use aptos_config::config::{NodeConfig, StateSyncConfig};
 use aptos_consensus_notifications::ConsensusNotifier;
 use aptos_data_client::{client::AptosDataClient, poller};
@@ -16,8 +16,8 @@ use aptos_event_notifications::{
 use aptos_executor::chunk_executor::ChunkExecutor;
 use aptos_infallible::RwLock;
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::{
-    interface::{NetworkClient, NetworkClientInterface, NetworkServiceEvents},
+use aptos_network2::application::{
+    interface::{NetworkClient, NetworkClientInterface, NetworkEvents},
     storage::PeersAndMetadata,
 };
 use aptos_state_sync_driver::{
@@ -123,7 +123,7 @@ pub fn start_state_sync_and_get_notification_handles(
 )> {
     // Get the network client and events
     let network_client = storage_network_interfaces.network_client;
-    let network_service_events = storage_network_interfaces.network_service_events;
+    let network_events = storage_network_interfaces.network_events;
 
     // Start the data client
     let peers_and_metadata = network_client.get_peers_and_metadata();
@@ -159,7 +159,7 @@ pub fn start_state_sync_and_get_notification_handles(
     let storage_service_runtime = setup_state_sync_storage_service(
         state_sync_config,
         peers_and_metadata,
-        network_service_events,
+        network_events,
         &db_rw,
         storage_service_listener,
     )?;
@@ -250,7 +250,7 @@ fn setup_aptos_data_client(
 fn setup_state_sync_storage_service(
     config: StateSyncConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
-    network_service_events: NetworkServiceEvents<StorageServiceMessage>,
+    network_events: NetworkEvents<StorageServiceMessage>,
     db_rw: &DbReaderWriter,
     storage_service_listener: StorageServiceNotificationListener,
 ) -> anyhow::Result<Runtime> {
@@ -265,7 +265,7 @@ fn setup_state_sync_storage_service(
         storage_reader,
         TimeService::real(),
         peers_and_metadata,
-        StorageServiceNetworkEvents::new(network_service_events),
+        StorageServiceNetworkEvents::new(network_events, storage_service_runtime.handle()),
         storage_service_listener,
     );
     storage_service_runtime.spawn(service.start());

@@ -25,7 +25,7 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
-use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
+use aptos_network2::protocols::{network::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -554,8 +554,21 @@ impl BufferManager {
                         Ok(()) => {
                             let response =
                                 ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
-                            if let Ok(bytes) = protocol.to_bytes(&response) {
-                                let _ = response_sender.send(Ok(bytes.into()));
+                            match protocol.to_bytes(&response) {
+                                Ok(bytes) => {
+                                    if let Err(reply_err) = response_sender.send(Ok(bytes.into())) {
+                                        error!(
+                                            error = format!("{:?}", reply_err.err().unwrap()),
+                                            "CommitMessage::Vote reply error"
+                                        )
+                                    }
+                                }
+                                Err(bcs_err) => {
+                                    error!(
+                                        error = bcs_err.to_string(),
+                                        "CommitMessage::Vote bcs error"
+                                    )
+                                }
                             }
                             item.try_advance_to_aggregated(&self.epoch_state.verifier)
                         },
@@ -566,7 +579,7 @@ impl BufferManager {
                                 commit_info = commit_info,
                                 "Failed to add commit vote",
                             );
-                            reply_nack(protocol, response_sender);
+                            reply_nack(protocol, response_sender); // TODO: send_commit_vote() doesn't care about the response and this should be direct send not RPC
                             item
                         },
                     };
@@ -599,20 +612,37 @@ impl BufferManager {
                     if aggregated {
                         let response =
                             ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
-                        if let Ok(bytes) = protocol.to_bytes(&response) {
-                            let _ = response_sender.send(Ok(bytes.into()));
+                        match protocol.to_bytes(&response) {
+                            Ok(bytes) => {
+                                if let Err(send_err) = response_sender.send(Ok(bytes.into())) {
+                                    debug!(
+                                        error = format!("{:?}", send_err.err().unwrap()),
+                                        "CommitMessage::Decision send err"
+                                    )
+                                }
+                            }
+                            Err(bcs_err) => {
+                                warn!(
+                                    error = bcs_err.to_string(),
+                                    "CommitMessage::Decision bcs err"
+                                )
+                            }
                         }
                         return Some(target_block_id);
+                    } else {
+                        debug!("CommitMessage::Decision not aggregated")
                     }
+                } else {
+                    debug!("CommitMessage::Decision no cursor")
                 }
                 reply_nack(protocol, response_sender); // TODO: send_commit_proof() doesn't care about the response and this should be direct send not RPC
             },
             CommitMessage::Ack(_) => {
                 // It should be filtered out by verify, so we log errors here
-                error!("Unexpected ack message");
+                warn!("Unexpected ack message");
             },
             CommitMessage::Nack => {
-                error!("Unexpected NACK message");
+                warn!("Unexpected NACK message");
             },
         }
         None
@@ -781,6 +811,7 @@ impl BufferManager {
 }
 
 fn reply_nack(protocol: ProtocolId, response_sender: oneshot::Sender<Result<Bytes, RpcError>>) {
+    // TODO: the benefit of sending a Nack RPC reply is that it cuts down on false 'errors' due to unreplied RPC. Actually the protocol should change to be one-way direct send messages because the sender doesn't actually care about the reply.
     let response = ConsensusMsg::CommitMessage(Box::new(CommitMessage::Nack));
     if let Ok(bytes) = protocol.to_bytes(&response) {
         let _ = response_sender.send(Ok(bytes.into()));

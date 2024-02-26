@@ -7,7 +7,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::warn;
-use aptos_network::application::storage::PeersAndMetadata;
+use aptos_network2::application::storage::PeersAndMetadata;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
 };

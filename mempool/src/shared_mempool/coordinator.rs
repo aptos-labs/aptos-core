@@ -17,15 +17,14 @@ use crate::{
     MempoolEventsReceiver, QuorumStoreRequest,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::common::TransactionSummary;
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_mempool_notifications::{MempoolCommitNotification, MempoolNotificationListener};
-use aptos_network::{
+use aptos_network2::{
     application::{
-        interface::{NetworkClientInterface, NetworkServiceEvents},
+        interface::{NetworkClientInterface, NetworkEvents},
         storage::PeersAndMetadata,
     },
     protocols::network::Event,
@@ -34,7 +33,7 @@ use aptos_types::on_chain_config::{OnChainConfigPayload, OnChainConfigProvider};
 use aptos_vm_validator::vm_validator::TransactionValidation;
 use futures::{
     channel::mpsc,
-    stream::{select_all, FuturesUnordered},
+    stream::FuturesUnordered,
     FutureExt, StreamExt,
 };
 use std::{
@@ -42,13 +41,14 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 use tokio::{runtime::Handle, time::interval};
-use tokio_stream::wrappers::IntervalStream;
+use tokio_stream::wrappers::{IntervalStream, ReceiverStream};
+use aptos_network2::protocols::network::network_event_prefetch;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.
 pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvider>(
     mut smp: SharedMempool<NetworkClient, TransactionValidator>,
     executor: Handle,
-    network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
+    network_events: NetworkEvents<MempoolSyncMsg>,
     mut client_events: MempoolEventsReceiver,
     mut quorum_store_requests: mpsc::Receiver<QuorumStoreRequest>,
     mempool_listener: MempoolNotificationListener,
@@ -65,13 +65,6 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
         LogEvent::Start
     ));
 
-    // Transform events to also include the network id
-    let network_events: Vec<_> = network_service_events
-        .into_network_and_events()
-        .into_iter()
-        .map(|(network_id, events)| events.map(move |event| (network_id, event)))
-        .collect();
-    let mut events = select_all(network_events).fuse();
     let mut scheduled_broadcasts = FuturesUnordered::new();
     let mut update_peers_interval =
         tokio::time::interval(Duration::from_millis(peer_update_interval_ms));
@@ -83,6 +76,10 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
     // worker tasks that can process incoming transactions.
     let workers_available = smp.config.shared_mempool_max_concurrent_inbound_syncs;
     let bounded_executor = BoundedExecutor::new(workers_available, executor.clone());
+
+    let (event_tx, event_rx) = tokio::sync::mpsc::channel(10); // TODO: configurable prefetch size other than 10?
+    executor.spawn(network_event_prefetch(network_events, event_tx));
+    let mut network_events = ReceiverStream::new(event_rx).fuse();
 
     let initial_reconfig = mempool_reconfig_events
         .next()
@@ -110,8 +107,8 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
             (peer, backoff) = scheduled_broadcasts.select_next_some() => {
                 tasks::execute_broadcast(peer, backoff, &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
             },
-            (network_id, event) = events.select_next_some() => {
-                handle_network_event(&bounded_executor, &mut smp, network_id, event).await;
+            event = network_events.select_next_some() => {
+                handle_network_event(&bounded_executor, &mut smp, event).await;
             },
             _ = update_peers_interval.tick().fuse() => {
                 handle_update_peers(peers_and_metadata.clone(), &mut smp, &mut scheduled_broadcasts, executor.clone()).await;
@@ -273,20 +270,13 @@ async fn handle_mempool_reconfig_event<NetworkClient, TransactionValidator, Conf
 async fn handle_network_event<NetworkClient, TransactionValidator>(
     bounded_executor: &BoundedExecutor,
     smp: &mut SharedMempool<NetworkClient, TransactionValidator>,
-    network_id: NetworkId,
     event: Event<MempoolSyncMsg>,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg> + 'static,
     TransactionValidator: TransactionValidation + 'static,
 {
     match event {
-        Event::NewPeer(_) => {
-            // TODO: remove Event
-        },
-        Event::LostPeer(_) => {
-            // TODO: remove Event
-        },
-        Event::Message(peer_id, msg) => {
+        Event::Message(peer_network_id, msg) => {
             counters::shared_mempool_event_inc("message");
             match msg {
                 MempoolSyncMsg::BroadcastTransactionsRequest {
@@ -294,10 +284,9 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                     transactions,
                 } => {
                     let smp_clone = smp.clone();
-                    let peer = PeerNetworkId::new(network_id, peer_id);
                     let ineligible_for_broadcast = (smp.network_interface.is_validator()
                         && !smp.broadcast_within_validator_network())
-                        || smp.network_interface.is_upstream_peer(&peer, None);
+                        || smp.network_interface.is_upstream_peer(&peer_network_id, None);
                     let timeline_state = if ineligible_for_broadcast {
                         TimelineState::NonQualified
                     } else {
@@ -321,7 +310,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                             transactions,
                             request_id,
                             timeline_state,
-                            peer,
+                            peer_network_id,
                             task_start_timer,
                         ))
                         .await;
@@ -333,7 +322,7 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
                 } => {
                     let ack_timestamp = SystemTime::now();
                     smp.network_interface.process_broadcast_ack(
-                        PeerNetworkId::new(network_id, peer_id),
+                        peer_network_id,
                         request_id,
                         retry,
                         backoff,
@@ -343,11 +332,12 @@ async fn handle_network_event<NetworkClient, TransactionValidator>(
             }
         },
         Event::RpcRequest(peer_id, _msg, _, _res_tx) => {
+            let network_id = peer_id.network_id();
             counters::unexpected_msg_count_inc(&network_id);
             sample!(
                 SampleRate::Duration(Duration::from_secs(60)),
                 warn!(LogSchema::new(LogEntry::UnexpectedNetworkMsg)
-                    .peer(&PeerNetworkId::new(network_id, peer_id)))
+                    .peer(&peer_id))
             );
         },
     }

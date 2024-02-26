@@ -6,7 +6,7 @@
 
 mod indexer;
 mod logger;
-mod network;
+mod network2;
 mod services;
 mod state_sync;
 mod storage;
@@ -15,7 +15,7 @@ pub mod utils;
 #[cfg(test)]
 mod tests;
 
-use crate::network::ApplicationNetworkInterfaces;
+use crate::network2::ApplicationNetworkInterfaces;
 use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
@@ -27,6 +27,7 @@ use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
+use aptos_network2::application::ApplicationCollector;
 use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::chain_id::ChainId;
@@ -45,7 +46,10 @@ use std::{
     },
     thread,
 };
+use std::collections::BTreeMap;
 use tokio::runtime::Runtime;
+use aptos_network2::protocols::network::OutboundPeerConnections;
+use crate::network2::AppSetupContext;
 
 const EPOCH_LENGTH_SECS: u64 = 60;
 
@@ -202,6 +206,7 @@ pub struct AptosHandle {
     _peer_monitoring_service_runtime: Runtime,
     _state_sync_runtimes: StateSyncRuntimes,
     _telemetry_runtime: Option<Runtime>,
+    _netbench_runtime: Option<Runtime>,
 }
 
 /// Start an Aptos node
@@ -599,22 +604,50 @@ pub fn setup_environment_and_start_node(
         jwk_consensus_subscriptions,
     ) = state_sync::create_event_subscription_service(&node_config, &db_rw);
 
+    let peer_senders = Arc::new(OutboundPeerConnections::new());
+
     // Set up the networks and gather the application network handles
-    let peers_and_metadata = network::create_peers_and_metadata(&node_config);
-    let (
-        network_runtimes,
-        consensus_network_interfaces,
-        dkg_network_interfaces,
-        jwk_consensus_network_interfaces,
-        mempool_network_interfaces,
-        peer_monitoring_service_network_interfaces,
-        storage_service_network_interfaces,
-    ) = network::setup_networks_and_get_interfaces(
+    let peers_and_metadata = network2::create_peers_and_metadata(&node_config);
+    let (network_runtimes, mut networks) = network2::setup_networks(
         &node_config,
         chain_id,
         peers_and_metadata.clone(),
-        &mut event_subscription_service,
-    );
+        peer_senders.clone(),
+        &mut event_subscription_service);
+
+    let mut apps = ApplicationCollector::new();
+
+    // create map to lookup NetworkContext by NetworkId
+    let mut contexts = BTreeMap::new();
+    for network in networks.iter() {
+        let network_context = network.network_context();
+        contexts.insert(network_context.network_id(), network_context);
+    }
+    let contexts = Arc::new(contexts);
+
+    let app_setup = AppSetupContext{
+        node_config: node_config.clone(),
+        peers_and_metadata: peers_and_metadata.clone(),
+        peer_senders,
+        contexts,
+    };
+
+    let peer_monitoring_service_network_interfaces = network2::peer_monitoring_network_connections(&mut apps, &app_setup);
+    let storage_service_network_interfaces = network2::storage_service_network_connections(&mut apps, &app_setup);
+    let mempool_network_interfaces = network2::mempool_network_connections(&mut apps, &app_setup);
+    let consensus_network_interfaces = network2::consensus_network_connections(&mut apps, &app_setup);
+    let dkg_network_interfaces = network2::dkg_network_connections(&mut apps, &app_setup);
+    let jwk_consensus_network_interfaces = network2::jwk_consensus_network_connections(&mut apps, &app_setup);
+    let netbench_network_interfaces = network2::netbench_network_connections(&mut apps, &app_setup);
+
+    for (protocol_id, ac) in apps.iter() {
+        info!("app_int setup {} -> {} {:?}", protocol_id.as_str(), ac.label, &ac.sender);
+    }
+    let apps = Arc::new(apps);
+    for network in networks.iter_mut() {
+        network.set_apps(apps.clone());
+        network.start();
+    }
 
     // Start the peer monitoring service
     let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
@@ -658,7 +691,7 @@ pub fn setup_environment_and_start_node(
             mempool_network_interfaces,
             mempool_listener,
             mempool_client_receiver,
-            peers_and_metadata,
+            peers_and_metadata.clone(),
         );
 
     // Ensure consensus key in secure DB.
@@ -680,7 +713,7 @@ pub fn setup_environment_and_start_node(
         (Some(interfaces), Ok(dkg_dealer_sk)) => {
             let ApplicationNetworkInterfaces {
                 network_client,
-                network_service_events,
+                network_events,
             } = interfaces;
             let (reconfig_events, dkg_start_events) = dkg_subscriptions
                 .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
@@ -689,7 +722,7 @@ pub fn setup_environment_and_start_node(
                 my_addr,
                 dkg_dealer_sk,
                 network_client,
-                network_service_events,
+                network_events,
                 reconfig_events,
                 dkg_start_events,
                 vtxn_pool.clone(),
@@ -710,7 +743,7 @@ pub fn setup_environment_and_start_node(
         (Some(interfaces), Ok(consensus_key)) => {
             let ApplicationNetworkInterfaces {
                 network_client,
-                network_service_events,
+                network_events,
             } = interfaces;
             let (reconfig_events, onchain_jwk_updated_events) = jwk_consensus_subscriptions.expect(
                 "JWK consensus needs to listen to NewEpochEvents and OnChainJWKMapUpdated events.",
@@ -720,7 +753,7 @@ pub fn setup_environment_and_start_node(
                 my_addr,
                 consensus_key,
                 network_client,
-                network_service_events,
+                network_events,
                 reconfig_events,
                 onchain_jwk_updated_events,
                 vtxn_pool.clone(),
@@ -751,6 +784,18 @@ pub fn setup_environment_and_start_node(
         runtime
     });
 
+    let netbench_runtime = if let Some(netbench_interfaces) = netbench_network_interfaces {
+        let netbench_service_threads = node_config.netbench.unwrap().netbench_service_threads;
+        let netbench_runtime =
+            aptos_runtimes::spawn_named_runtime("benchmark".into(), netbench_service_threads);
+        services::start_netbench_service(&node_config, netbench_interfaces, netbench_runtime.handle());
+        info!("netbench initialized");
+        Some(netbench_runtime)
+    } else {
+        info!("netbench disabled");
+        None
+    };
+
     Ok(AptosHandle {
         _admin_service: admin_service,
         _api_runtime: api_runtime,
@@ -766,6 +811,7 @@ pub fn setup_environment_and_start_node(
         _peer_monitoring_service_runtime: peer_monitoring_service_runtime,
         _state_sync_runtimes: state_sync_runtimes,
         _telemetry_runtime: telemetry_runtime,
+        _netbench_runtime: netbench_runtime,
     })
 }
 

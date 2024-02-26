@@ -10,7 +10,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use aptos_network2::{
     application::metadata::ConnectionState,
     protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
     transport::{ConnectionId, ConnectionMetadata},

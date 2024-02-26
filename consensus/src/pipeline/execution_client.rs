@@ -26,7 +26,7 @@ use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_network2::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,

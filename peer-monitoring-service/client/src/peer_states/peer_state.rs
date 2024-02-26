@@ -18,7 +18,7 @@ use aptos_config::{
 };
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
-use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
+use aptos_network2::application::{interface::NetworkClient, metadata::PeerMetadata};
 use aptos_peer_monitoring_service_types::{
     response::PeerMonitoringServiceResponse, PeerMonitoringMetadata, PeerMonitoringServiceMessage,
 };

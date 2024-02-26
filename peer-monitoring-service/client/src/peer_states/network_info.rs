@@ -12,7 +12,7 @@ use aptos_config::{
 };
 use aptos_infallible::RwLock;
 use aptos_logger::warn;
-use aptos_network::application::metadata::PeerMetadata;
+use aptos_network2::application::metadata::PeerMetadata;
 use aptos_peer_monitoring_service_types::{
     request::PeerMonitoringServiceRequest,
     response::{NetworkInformationResponse, PeerMonitoringServiceResponse},
@@ -212,7 +212,7 @@ mod test {
         network_id::{NetworkId, PeerNetworkId},
     };
     use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::{
+    use aptos_network2::{
         application::metadata::PeerMetadata,
         protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
         transport::{ConnectionId, ConnectionMetadata},
