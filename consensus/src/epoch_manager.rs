@@ -937,6 +937,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffered_proposal_tx,
             self.config.clone(),
             features,
+            true,
         );
 
         round_manager.init(last_vote).await;
