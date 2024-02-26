@@ -65,15 +65,15 @@ async fn main() {
     println!("Starting an interaction with aptos-oidb-pepper-service.");
     let url = get_pepper_service_url();
     println!();
-    let vrf_vrfy_key_url = format!("{url}/vrf-pub-key");
+    let vrf_pub_key_url = format!("{url}/vrf-pub-key");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
-        vrf_vrfy_key_url
+        vrf_pub_key_url
     );
     let client = reqwest::Client::new();
     let response = client
-        .get(vrf_vrfy_key_url)
+        .get(vrf_pub_key_url)
         .send()
         .await
         .unwrap()

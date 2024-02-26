@@ -24,7 +24,7 @@ pub type KeyID = String;
 pub fn process(request: PepperRequest) -> anyhow::Result<PepperResponse> {
     let pepper_key_hex_string = process_v0(request)?;
     let pepper = sha3_256(&hex::decode(pepper_key_hex_string.clone())?);
-    let pepper_hex_string = hex::encode(pepper);
+    let pepper_hex_string = hex::encode(pepper[..31].to_vec());
     Ok(PepperResponse{ pepper_key_hex_string, pepper_hex_string })
 }
 
@@ -83,13 +83,13 @@ epk_expiry_time_secs,
         .kid
         .ok_or_else(|| anyhow!("missing kid in JWT"))?;
 
-    let sig_vrfy_key = jwk::cached_decoding_key(&claims.claims.iss, &key_id)?;
-    let mut validation_with_sig_vrfy = Validation::new(RS256);
-    validation_with_sig_vrfy.validate_exp = false; // Don't validate the exp time
+    let sig_pub_key = jwk::cached_decoding_key(&claims.claims.iss, &key_id)?;
+    let mut validation_with_sig_verification = Validation::new(RS256);
+    validation_with_sig_verification.validate_exp = false; // Don't validate the exp time
     let _claims = jsonwebtoken::decode::<Claims>(
         jwt.as_str(),
-        sig_vrfy_key.as_ref(),
-        &validation_with_sig_vrfy,
+        sig_pub_key.as_ref(),
+        &validation_with_sig_verification,
     ) // Signature verification happens here.
     .map_err(|e| anyhow!("JWT signature verification failed: {e}"))?;
 

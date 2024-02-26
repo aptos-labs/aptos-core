@@ -24,14 +24,14 @@ pub fn parse(jwt: &str) -> anyhow::Result<TokenData<Claims>> {
     jsonwebtoken::decode::<Claims>(
         jwt,
         DUMMY_DECODING_KEY.deref(),
-        VALIDATION_CONFIG_NO_SIG_VRFY.deref(),
+        VALIDATION_CONFIG_NO_SIG_VERIFICATION.deref(),
     )
     .map_err(|e| anyhow!("jwt decoding error: {}", e))
 }
 
 static DUMMY_DECODING_KEY: Lazy<DecodingKey> = Lazy::new(|| DecodingKey::from_secret(&[]));
 
-static VALIDATION_CONFIG_NO_SIG_VRFY: Lazy<Validation> = Lazy::new(|| {
+static VALIDATION_CONFIG_NO_SIG_VERIFICATION: Lazy<Validation> = Lazy::new(|| {
     let mut config = Validation::default();
     config.insecure_disable_signature_validation();
     config.validate_exp = false;
