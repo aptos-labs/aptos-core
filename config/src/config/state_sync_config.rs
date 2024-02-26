@@ -4,7 +4,7 @@
 
 use crate::config::{
     config_optimizer::ConfigOptimizer, config_sanitizer::ConfigSanitizer,
-    node_config_loader::NodeType, Error, NodeConfig, MAX_SENDING_BLOCK_TXNS,
+    node_config_loader::NodeType, Error, NodeConfig,
 };
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
@@ -16,9 +16,9 @@ const MAX_MESSAGE_SIZE: usize = 40 * 1024 * 1024; // In previewnet, 10x the curr
 // The maximum chunk sizes for data client requests and response
 const MAX_EPOCH_CHUNK_SIZE: u64 = 200;
 const MAX_STATE_CHUNK_SIZE: u64 = 4000;
-// In previewnet, use the block size
-// const MAX_TRANSACTION_CHUNK_SIZE: u64 = 2000;
-// const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 1000;
+// In previewnet, use larger block sizes
+const MAX_TRANSACTION_CHUNK_SIZE: u64 = 5000;
+const MAX_TRANSACTION_OUTPUT_CHUNK_SIZE: u64 = 5000;
 
 // The maximum number of concurrent requests to send
 const MAX_CONCURRENT_REQUESTS: u64 = 6;
@@ -193,9 +193,8 @@ impl Default for StorageServiceConfig {
             max_optimistic_fetch_period_ms: 5000, // 5 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_period_ms: 30_000, // 30 seconds
-            // In previewnet, use the block size
-            max_transaction_chunk_size: MAX_SENDING_BLOCK_TXNS,
-            max_transaction_output_chunk_size: MAX_SENDING_BLOCK_TXNS,
+            max_transaction_chunk_size: 10_000, // Allow the max chunk size to be 10k
+            max_transaction_output_chunk_size: 10_000, // Allow the max chunk size to be 10k
             min_time_to_ignore_peers_secs: 300, // 5 minutes
             request_moderator_refresh_interval_ms: 1000, // 1 second
             storage_summary_refresh_interval_ms: 100, // Optimal for <= 10 blocks per second
@@ -298,7 +297,7 @@ impl Default for DynamicPrefetchingConfig {
             enable_dynamic_prefetching: true,
             initial_prefetching_value: 3,
             max_prefetching_value: 30,
-            min_prefetching_value: 3,
+            min_prefetching_value: 2,
             prefetching_value_increase: 1,
             prefetching_value_decrease: 2,
             timeout_freeze_duration_secs: 30,
@@ -363,7 +362,7 @@ impl Default for AptosDataMultiFetchConfig {
             enable_multi_fetch: true,
             additional_requests_per_peer_bucket: 1,
             min_peers_for_multi_fetch: 2,
-            max_peers_for_multi_fetch: 5,
+            max_peers_for_multi_fetch: 3,
             multi_fetch_peer_bucket_size: 10,
         }
     }
@@ -440,9 +439,8 @@ impl Default for AptosDataClientConfig {
             max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
             max_subscription_lag_secs: 30, // 30 seconds
-            // In previewnet, use the block size
-            max_transaction_chunk_size: MAX_SENDING_BLOCK_TXNS,
-            max_transaction_output_chunk_size: MAX_SENDING_BLOCK_TXNS,
+            max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
+            max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000,        // 5 seconds
             response_timeout_ms: 10_000,              // 10 seconds
             subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
