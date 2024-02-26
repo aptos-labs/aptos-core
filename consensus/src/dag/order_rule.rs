@@ -16,7 +16,7 @@ use crate::dag::{
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::Mutex;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_types::epoch_state::EpochState;
 use std::sync::Arc;
 
@@ -46,6 +46,7 @@ impl OrderRule {
         commit_events: Option<Vec<CommitEvent>>,
     ) -> Self {
         if let Some(commit_events) = commit_events {
+            info!("Commit Events from storage: {:?}", commit_events);
             // make sure it's sorted
             assert!(commit_events
                 .windows(2)
@@ -59,12 +60,37 @@ impl OrderRule {
                     if let Some(anchor) = maybe_anchor {
                         dag.write()
                             .reachable_mut(&anchor, None)
-                            .for_each(|node_status| node_status.mark_as_ordered());
+                            .for_each(|node_status| {
+                                debug!(
+                                    "Marking node as ordered from CommitEvent: {}",
+                                    node_status.as_node().id()
+                                );
+                                node_status.mark_as_ordered();
+                            });
                     }
                 }
                 anchor_election.update_reputation(event);
             }
+        } else if lowest_unordered_anchor_round > 1 && !dag.read().is_empty() {
+            debug!("Marking as Ordered.");
+            let mut dag_writer = dag.write();
+            let anchor_round = lowest_unordered_anchor_round.saturating_sub(1);
+            let anchor_author = anchor_election.get_anchor(anchor_round);
+            let anchor_node = dag_writer
+                .get_node_by_round_author(anchor_round, &anchor_author)
+                .expect("must exist")
+                .clone();
+            dag_writer
+                .reachable_mut(&anchor_node, None)
+                .for_each(|node_status| {
+                    debug!(
+                        "Marking node as ordered without CommitEvent: {}",
+                        node_status.as_node().id()
+                    );
+                    node_status.mark_as_ordered();
+                });
         }
+
         let mut order_rule = Self {
             epoch_state,
             lowest_unordered_anchor_round,
@@ -73,6 +99,7 @@ impl OrderRule {
             notifier,
             dag_window_size_config,
         };
+
         // re-check if anything can be ordered to recover pending anchors
         order_rule.process_all();
         order_rule
