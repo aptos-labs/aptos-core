@@ -309,6 +309,7 @@ impl NodeSetup {
             round_manager_tx,
             local_consensus_config.clone(),
             features.clone(),
+            false,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
