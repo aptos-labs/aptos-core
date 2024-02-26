@@ -95,7 +95,7 @@ impl Worker {
             return Ok(());
         }
 
-        // Skip if asset_uri is not a valid URI
+        // Skip if asset_uri is not a valid URI, do not write invalid URI to Postgres
         if Url::parse(&self.asset_uri).is_err() {
             self.log_info("URI is invalid, skipping parse, marking as do_not_parse");
             self.model.set_do_not_parse(true);
@@ -258,7 +258,7 @@ impl Worker {
         // Deduplicate raw_animation_uri
         // Proceed with animation optimization if force or if raw_animation_uri has not been parsed
         let mut raw_animation_uri_option = self.model.get_raw_animation_uri();
-        let dupe_animation_found = self.model.get_raw_animation_uri().map_or(false, |uri| {
+        let dupe_animation_found = raw_animation_uri_option.clone().map_or(false, |uri| {
             match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
                 &mut self.conn,
                 &self.asset_uri,
