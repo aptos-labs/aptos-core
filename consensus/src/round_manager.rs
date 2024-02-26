@@ -196,6 +196,7 @@ pub struct RoundManager {
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
     features: Features,
+    broadcast_vote: bool,
 }
 
 impl RoundManager {
@@ -212,6 +213,7 @@ impl RoundManager {
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
         features: Features,
+        broadcast_vote: bool,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -237,6 +239,7 @@ impl RoundManager {
             buffered_proposal_tx,
             local_config,
             features,
+            broadcast_vote,
         }
     }
 
@@ -812,19 +815,22 @@ impl RoundManager {
             .execute_and_vote(proposal)
             .await
             .context("[RoundManager] Process proposal")?;
-
-        let recipient = self
-            .proposer_election
-            .get_valid_proposer(proposal_round + 1);
-
-        info!(
-            self.new_log(LogEvent::Vote).remote_peer(recipient),
-            "{}", vote
-        );
-
         self.round_state.record_vote(vote.clone());
-        let vote_msg = VoteMsg::new(vote, self.block_store.sync_info());
-        self.network.send_vote(vote_msg, vec![recipient]).await;
+        let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
+
+        if self.broadcast_vote {
+            info!(self.new_log(LogEvent::Vote), "{}", vote);
+            self.network.broadcast_vote(vote_msg).await;
+        } else {
+            let recipient = self
+                .proposer_election
+                .get_valid_proposer(proposal_round + 1);
+            info!(
+                self.new_log(LogEvent::Vote).remote_peer(recipient),
+                "{}", vote
+            );
+            self.network.send_vote(vote_msg, vec![recipient]).await;
+        }
         Ok(())
     }
 
@@ -917,7 +923,7 @@ impl RoundManager {
             is_timeout = vote.is_timeout(),
         );
 
-        if !vote.is_timeout() {
+        if !self.broadcast_vote && !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.
             let next_round = round + 1;
             ensure!(
@@ -928,6 +934,7 @@ impl RoundManager {
                 next_round
             );
         }
+
         let block_id = vote.vote_data().proposed().id();
         // Check if the block already had a QC
         if self
