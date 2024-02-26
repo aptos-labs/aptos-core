@@ -435,665 +435,570 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t1 := 0
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t2 := 0
      # live vars: $t1, $t2
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t0 := ==($t1, $t2)
      # live vars: $t0
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   3: if ($t0) goto 4 else goto 6
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   4: label L0
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   5: goto 9
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   6: label L1
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   7: $t3 := 42
      # live vars: $t3
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   8: abort($t3)
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   9: label L2
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
  10: $t5 := [104, 101, 108, 108, 111]
      # live vars: $t5
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
  11: $t6 := [104, 101, 108, 108, 111]
      # live vars: $t5, $t6
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
  12: $t4 := ==($t5, $t6)
      # live vars: $t4
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  13: if ($t4) goto 14 else goto 16
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  14: label L3
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  15: goto 19
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  16: label L4
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  17: $t7 := 42
      # live vars: $t7
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  18: abort($t7)
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  19: label L5
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  20: $t11 := 0
      # live vars: $t11
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  21: $t10 := borrow_local($t11)
      # live vars: $t10
      # graph: {@1500=local($t11)[borrow(false) -> @1501],@1501=derived[]}
      # locals: {$t10=@1501,$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  22: $t9 := read_ref($t10)
      # live vars: $t9
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  23: $t12 := 0
      # live vars: $t9, $t12
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  24: $t8 := ==($t9, $t12)
      # live vars: $t8
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  25: if ($t8) goto 26 else goto 28
      # live vars:
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  26: label L6
      # live vars:
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  27: goto 31
      # live vars:
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  28: label L7
      # live vars:
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  29: $t13 := 42
      # live vars: $t13
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  30: abort($t13)
      # live vars:
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  31: label L8
      # live vars:
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  32: $t17 := [104, 101, 108, 108, 111]
      # live vars: $t17
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  33: $t16 := borrow_local($t17)
      # live vars: $t16
      # graph: {@1500=local($t11)[],@2100=local($t17)[borrow(false) -> @2101],@2101=derived[]}
      # locals: {$t11=@1500,$t16=@2101,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  34: $t15 := read_ref($t16)
      # live vars: $t15
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  35: $t18 := [104, 101, 108, 108, 111]
      # live vars: $t15, $t18
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  36: $t14 := ==($t15, $t18)
      # live vars: $t14
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  37: if ($t14) goto 38 else goto 40
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  38: label L9
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  39: goto 43
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  40: label L10
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  41: $t19 := 42
      # live vars: $t19
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  42: abort($t19)
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  43: label L11
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  44: $t22 := 0
      # live vars: $t22
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  45: $t21 := borrow_local($t22)
      # live vars: $t21
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t21=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  46: $t20 := infer($t21)
      # live vars: $t20
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  47: $t23 := 1
      # live vars: $t20, $t23
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  48: write_ref($t20, $t23)
      # live vars: $t20
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  49: $t26 := [104, 101, 108, 108, 111]
      # live vars: $t20, $t26
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  50: $t25 := borrow_local($t26)
      # live vars: $t20, $t25
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t25=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  51: $t24 := infer($t25)
      # live vars: $t20, $t24
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  52: $t27 := [98, 121, 101]
      # live vars: $t20, $t24, $t27
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  53: write_ref($t24, $t27)
      # live vars: $t20, $t24
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  54: $t29 := read_ref($t20)
      # live vars: $t24, $t29
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  55: $t30 := 1
      # live vars: $t24, $t29, $t30
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  56: $t28 := ==($t29, $t30)
      # live vars: $t24, $t28
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  57: if ($t28) goto 58 else goto 60
      # live vars: $t24
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  58: label L12
      # live vars: $t24
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  59: goto 63
      # live vars: $t24
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  60: label L13
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  61: $t31 := 42
      # live vars: $t31
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  62: abort($t31)
      # live vars: $t24
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  63: label L14
      # live vars: $t24
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  64: $t33 := read_ref($t24)
      # live vars: $t33
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  65: $t34 := [98, 121, 101]
      # live vars: $t33, $t34
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  66: $t32 := ==($t33, $t34)
      # live vars: $t32
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  67: if ($t32) goto 68 else goto 70
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  68: label L15
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  69: goto 73
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  70: label L16
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  71: $t35 := 42
      # live vars: $t35
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  72: abort($t35)
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  73: label L17
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  74: $t37 := 0
      # live vars: $t37
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  75: $t38 := 0
      # live vars: $t37, $t38
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  76: $t36 := ==($t37, $t38)
      # live vars: $t36
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  77: if ($t36) goto 78 else goto 80
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  78: label L18
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  79: goto 83
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  80: label L19
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  81: $t39 := 42
      # live vars: $t39
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  82: abort($t39)
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  83: label L20
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  84: $t41 := [104, 101, 108, 108, 111]
      # live vars: $t41
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  85: $t42 := [104, 101, 108, 108, 111]
      # live vars: $t41, $t42
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  86: $t40 := ==($t41, $t42)
      # live vars: $t40
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  87: if ($t40) goto 88 else goto 90
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  88: label L21
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  89: goto 93
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  90: label L22
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  91: $t43 := 42
      # live vars: $t43
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  92: abort($t43)
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  93: label L23
      # live vars:
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  94: return ()
 }
@@ -1151,7 +1056,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t1 := 0
      # abort state: {returns,aborts}
@@ -1159,7 +1063,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t2 := 0
      # abort state: {returns,aborts}
@@ -1167,7 +1070,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t0 := ==($t1, $t2)
      # abort state: {returns,aborts}
@@ -1175,7 +1077,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   3: if ($t0) goto 4 else goto 6
      # abort state: {returns,aborts}
@@ -1183,7 +1084,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   4: label L0
      # abort state: {returns,aborts}
@@ -1191,7 +1091,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   5: goto 9
      # abort state: {aborts}
@@ -1199,7 +1098,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   6: label L1
      # abort state: {aborts}
@@ -1207,7 +1105,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   7: $t3 := 42
      # abort state: {aborts}
@@ -1215,7 +1112,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   8: abort($t3)
      # abort state: {returns,aborts}
@@ -1223,7 +1119,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
   9: label L2
      # abort state: {returns,aborts}
@@ -1231,7 +1126,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
  10: $t5 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
@@ -1239,7 +1133,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
  11: $t6 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
@@ -1247,7 +1140,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2}
      #
  12: $t4 := ==($t5, $t6)
      # abort state: {returns,aborts}
@@ -1255,7 +1147,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  13: if ($t4) goto 14 else goto 16
      # abort state: {returns,aborts}
@@ -1263,7 +1154,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  14: label L3
      # abort state: {returns,aborts}
@@ -1271,7 +1161,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  15: goto 19
      # abort state: {aborts}
@@ -1279,7 +1168,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  16: label L4
      # abort state: {aborts}
@@ -1287,7 +1175,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  17: $t7 := 42
      # abort state: {aborts}
@@ -1295,7 +1182,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  18: abort($t7)
      # abort state: {returns,aborts}
@@ -1303,7 +1189,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  19: label L5
      # abort state: {returns,aborts}
@@ -1311,7 +1196,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  20: $t11 := 0
      # abort state: {returns,aborts}
@@ -1319,7 +1203,6 @@ fun <SELF>_0::check() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  21: $t10 := borrow_local($t11)
      # abort state: {returns,aborts}
@@ -1327,7 +1210,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[borrow(false) -> @1501],@1501=derived[]}
      # locals: {$t10=@1501,$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  22: $t9 := read_ref($t10)
      # abort state: {returns,aborts}
@@ -1335,7 +1217,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  23: $t12 := 0
      # abort state: {returns,aborts}
@@ -1343,7 +1224,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6}
      #
  24: $t8 := ==($t9, $t12)
      # abort state: {returns,aborts}
@@ -1351,7 +1231,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  25: if ($t8) goto 26 else goto 28
      # abort state: {returns,aborts}
@@ -1359,7 +1238,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  26: label L6
      # abort state: {returns,aborts}
@@ -1367,7 +1245,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  27: goto 31
      # abort state: {aborts}
@@ -1375,7 +1252,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  28: label L7
      # abort state: {aborts}
@@ -1383,7 +1259,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  29: $t13 := 42
      # abort state: {aborts}
@@ -1391,7 +1266,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  30: abort($t13)
      # abort state: {returns,aborts}
@@ -1399,7 +1273,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  31: label L8
      # abort state: {returns,aborts}
@@ -1407,7 +1280,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  32: $t17 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
@@ -1415,7 +1287,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[]}
      # locals: {$t11=@1500}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  33: $t16 := borrow_local($t17)
      # abort state: {returns,aborts}
@@ -1423,7 +1294,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[borrow(false) -> @2101],@2101=derived[]}
      # locals: {$t11=@1500,$t16=@2101,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  34: $t15 := read_ref($t16)
      # abort state: {returns,aborts}
@@ -1431,7 +1301,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  35: $t18 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
@@ -1439,7 +1308,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12}
      #
  36: $t14 := ==($t15, $t18)
      # abort state: {returns,aborts}
@@ -1447,7 +1315,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  37: if ($t14) goto 38 else goto 40
      # abort state: {returns,aborts}
@@ -1455,7 +1322,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  38: label L9
      # abort state: {returns,aborts}
@@ -1463,7 +1329,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  39: goto 43
      # abort state: {aborts}
@@ -1471,7 +1336,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  40: label L10
      # abort state: {aborts}
@@ -1479,7 +1343,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  41: $t19 := 42
      # abort state: {aborts}
@@ -1487,7 +1350,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  42: abort($t19)
      # abort state: {returns,aborts}
@@ -1495,7 +1357,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  43: label L11
      # abort state: {returns,aborts}
@@ -1503,7 +1364,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  44: $t22 := 0
      # abort state: {returns,aborts}
@@ -1511,7 +1371,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[]}
      # locals: {$t11=@1500,$t17=@2100}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  45: $t21 := borrow_local($t22)
      # abort state: {returns,aborts}
@@ -1519,7 +1378,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t21=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  46: $t20 := infer($t21)
      # abort state: {returns,aborts}
@@ -1527,7 +1385,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  47: $t23 := 1
      # abort state: {returns,aborts}
@@ -1535,7 +1392,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  48: write_ref($t20, $t23)
      # abort state: {returns,aborts}
@@ -1543,7 +1399,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  49: $t26 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
@@ -1551,7 +1406,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  50: $t25 := borrow_local($t26)
      # abort state: {returns,aborts}
@@ -1559,7 +1413,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t25=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  51: $t24 := infer($t25)
      # abort state: {returns,aborts}
@@ -1567,7 +1420,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  52: $t27 := [98, 121, 101]
      # abort state: {returns,aborts}
@@ -1575,7 +1427,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  53: write_ref($t24, $t27)
      # abort state: {returns,aborts}
@@ -1583,7 +1434,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[borrow(true) -> @2D01],@2D01=derived[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t20=@2D01,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  54: $t29 := read_ref($t20)
      # abort state: {returns,aborts}
@@ -1591,7 +1441,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  55: $t30 := 1
      # abort state: {returns,aborts}
@@ -1599,7 +1448,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18}
      #
  56: $t28 := ==($t29, $t30)
      # abort state: {returns,aborts}
@@ -1607,7 +1455,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  57: if ($t28) goto 58 else goto 60
      # abort state: {returns,aborts}
@@ -1615,7 +1462,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  58: label L12
      # abort state: {returns,aborts}
@@ -1623,7 +1469,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  59: goto 63
      # abort state: {aborts}
@@ -1631,7 +1476,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  60: label L13
      # abort state: {aborts}
@@ -1639,7 +1483,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  61: $t31 := 42
      # abort state: {aborts}
@@ -1647,7 +1490,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  62: abort($t31)
      # abort state: {returns,aborts}
@@ -1655,7 +1497,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  63: label L14
      # abort state: {returns,aborts}
@@ -1663,7 +1504,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[borrow(true) -> @3201],@3201=derived[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t24=@3201,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  64: $t33 := read_ref($t24)
      # abort state: {returns,aborts}
@@ -1671,7 +1511,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  65: $t34 := [98, 121, 101]
      # abort state: {returns,aborts}
@@ -1679,7 +1518,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30}
      #
  66: $t32 := ==($t33, $t34)
      # abort state: {returns,aborts}
@@ -1687,7 +1525,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  67: if ($t32) goto 68 else goto 70
      # abort state: {returns,aborts}
@@ -1695,7 +1532,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  68: label L15
      # abort state: {returns,aborts}
@@ -1703,7 +1539,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  69: goto 73
      # abort state: {aborts}
@@ -1711,7 +1546,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  70: label L16
      # abort state: {aborts}
@@ -1719,7 +1553,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  71: $t35 := 42
      # abort state: {aborts}
@@ -1727,7 +1560,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  72: abort($t35)
      # abort state: {returns,aborts}
@@ -1735,7 +1567,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  73: label L17
      # abort state: {returns,aborts}
@@ -1743,7 +1574,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  74: $t37 := 0
      # abort state: {returns,aborts}
@@ -1751,7 +1581,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  75: $t38 := 0
      # abort state: {returns,aborts}
@@ -1759,7 +1588,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34}
      #
  76: $t36 := ==($t37, $t38)
      # abort state: {returns,aborts}
@@ -1767,7 +1595,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  77: if ($t36) goto 78 else goto 80
      # abort state: {returns,aborts}
@@ -1775,7 +1602,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  78: label L18
      # abort state: {returns,aborts}
@@ -1783,7 +1609,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  79: goto 83
      # abort state: {aborts}
@@ -1791,7 +1616,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  80: label L19
      # abort state: {aborts}
@@ -1799,7 +1623,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  81: $t39 := 42
      # abort state: {aborts}
@@ -1807,7 +1630,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  82: abort($t39)
      # abort state: {returns,aborts}
@@ -1815,7 +1637,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  83: label L20
      # abort state: {returns,aborts}
@@ -1823,7 +1644,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  84: $t41 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
@@ -1831,7 +1651,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  85: $t42 := [104, 101, 108, 108, 111]
      # abort state: {returns,aborts}
@@ -1839,7 +1658,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38}
      #
  86: $t40 := ==($t41, $t42)
      # abort state: {returns,aborts}
@@ -1847,7 +1665,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  87: if ($t40) goto 88 else goto 90
      # abort state: {returns}
@@ -1855,7 +1672,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  88: label L21
      # abort state: {returns}
@@ -1863,7 +1679,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  89: goto 93
      # abort state: {aborts}
@@ -1871,7 +1686,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  90: label L22
      # abort state: {aborts}
@@ -1879,7 +1693,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  91: $t43 := 42
      # abort state: {aborts}
@@ -1887,7 +1700,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  92: abort($t43)
      # abort state: {returns}
@@ -1895,7 +1707,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  93: label L23
      # abort state: {returns}
@@ -1903,7 +1714,6 @@ fun <SELF>_0::check() {
      # graph: {@1500=local($t11)[],@2100=local($t17)[],@2D00=local($t22)[],@3200=local($t26)[]}
      # locals: {$t11=@1500,$t17=@2100,$t22=@2D00,$t26=@3200}
      # globals: {}
-     # moved: {$t1,$t2,$t5,$t6,$t9,$t12,$t15,$t18,$t29,$t30,$t33,$t34,$t37,$t38,$t41,$t42}
      #
  94: return ()
 }
