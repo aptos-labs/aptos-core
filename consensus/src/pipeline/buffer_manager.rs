@@ -356,17 +356,7 @@ impl BufferManager {
                     self.commit_proof_rb_handle
                         .replace(self.do_reliable_broadcast(commit_decision));
                 }
-                if aggregated_item.commit_proof.ledger_info().ends_epoch() {
-                    self.commit_msg_tx
-                        .send_epoch_change(EpochChangeProof::new(
-                            vec![aggregated_item.commit_proof.clone()],
-                            false,
-                        ))
-                        .await;
-                    // the epoch ends, reset to avoid executing more blocks, execute after
-                    // this persisting request will result in BlockNotFound
-                    self.reset().await;
-                }
+                let commit_proof = aggregated_item.commit_proof.clone();
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,
@@ -381,6 +371,15 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
+                // this needs to be done after creating the persisting request to avoid it being lost
+                if commit_proof.ledger_info().ends_epoch() {
+                    self.commit_msg_tx
+                        .send_epoch_change(EpochChangeProof::new(vec![commit_proof], false))
+                        .await;
+                    // the epoch ends, reset to avoid executing more blocks, execute after
+                    // this persisting request will result in BlockNotFound
+                    self.reset().await;
+                }
                 info!("Advance head to {:?}", self.buffer.head_cursor());
                 self.previous_commit_time = Instant::now();
                 return;
