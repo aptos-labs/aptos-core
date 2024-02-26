@@ -25,4 +25,4 @@ pub trait VUF {
 /// - Input/output is in G1 and public key is in G2.
 ///
 /// TODO: better name?
-pub mod scheme0;
+pub mod bls12381_g1_bls;

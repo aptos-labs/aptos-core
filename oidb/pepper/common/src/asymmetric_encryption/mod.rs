@@ -26,4 +26,4 @@ pub trait AsymmetricEncryption {
 /// - uses ElGamal over the group that supports ED25519 signatures to encrypt the symmetric key.
 ///
 /// TODO: better name?
-pub mod scheme1;
+pub mod elgamal_curve25519_aes256_gcm;

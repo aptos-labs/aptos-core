@@ -4,7 +4,7 @@ use aptos_oidb_pepper_common::PepperRequest;
 use aptos_oidb_pepper_service::{
     about::ABOUT_JSON,
     jwk,
-    vuf_keys::{VUF_SCHEME0_SK, VUF_VERIFICATION_KEY_JSON},
+    vuf_keys::{VUF_SK, VUF_VERIFICATION_KEY_JSON},
 };
 use hyper::{
     header::{
@@ -97,7 +97,7 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
 #[tokio::main]
 async fn main() {
     // Trigger private key loading.
-    let _ = VUF_SCHEME0_SK.deref();
+    let _ = VUF_SK.deref();
 
     env_logger::Builder::new()
         .filter(None, LevelFilter::Info)

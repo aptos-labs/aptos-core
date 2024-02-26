@@ -15,11 +15,11 @@ use ark_std::{
 };
 use std::ops::Mul;
 
-pub struct Scheme0 {}
+pub struct Bls12381G1Bls {}
 
-pub static DST: &[u8] = b"APTOS_PEPPER_SERVICE_BN254_VUF_DST";
+pub static DST: &[u8] = b"APTOS_PEPPER_SERVICE_BLS12381_VUF_DST";
 
-impl Scheme0 {
+impl Bls12381G1Bls {
     fn hash_to_g1(input: &[u8]) -> G1Affine {
         let mapper = ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher::<
             Projective<ark_bls12_381::g1::Config>,
@@ -31,12 +31,14 @@ impl Scheme0 {
     }
 }
 
-impl VUF for Scheme0 {
+pub const SCHEME_NAME: &'static str = "BLS12381_G1_BLS";
+
+impl VUF for Bls12381G1Bls {
     type PrivateKey = Fr;
     type PublicKey = G2Projective;
 
     fn scheme_name() -> String {
-        "Scheme0".to_string()
+        SCHEME_NAME.to_string()
     }
 
     fn setup<R: CryptoRng + RngCore>(rng: &mut R) -> (Self::PrivateKey, Self::PublicKey) {
@@ -56,7 +58,7 @@ impl VUF for Scheme0 {
         output_g1
             .serialize_compressed(&mut output_bytes)
             .map_err(|e| {
-                anyhow!("vuf::scheme0::eval failed with output serialization error: {e}")
+                anyhow!("Bls12381G1Bls::eval failed with output serialization error: {e}")
             })?;
         Ok((output_bytes, vec![]))
     }
@@ -69,11 +71,11 @@ impl VUF for Scheme0 {
     ) -> anyhow::Result<()> {
         ensure!(
             proof.is_empty(),
-            "vuf::scheme0::verify failed with proof deserialization error"
+            "Bls12381G1Bls::verify failed with proof deserialization error"
         );
         let input_g1 = Self::hash_to_g1(input);
         let output_g1 = G1Affine::deserialize_compressed(output).map_err(|e| {
-            anyhow!("vuf::scheme0::verify failed with output deserialization error: {e}")
+            anyhow!("Bls12381G1Bls::verify failed with output deserialization error: {e}")
         })?;
         ensure!(
             Fq12::ONE
@@ -82,7 +84,7 @@ impl VUF for Scheme0 {
                     (*pk_g2).into_affine()
                 ])
                 .0,
-            "vuf::scheme0::verify failed with final check failure"
+            "Bls12381G1Bls::verify failed with final check failure"
         );
         Ok(())
     }
@@ -90,17 +92,17 @@ impl VUF for Scheme0 {
 
 #[cfg(test)]
 mod tests {
-    use crate::vuf::{scheme0::Scheme0, VUF};
+    use crate::vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF};
 
     #[test]
     fn gen_eval_verify() {
         let mut rng = ark_std::rand::thread_rng();
-        let (sk, pk) = Scheme0::setup(&mut rng);
-        let pk_another = Scheme0::pk_from_sk(&sk).unwrap();
+        let (sk, pk) = Bls12381G1Bls::setup(&mut rng);
+        let pk_another = Bls12381G1Bls::pk_from_sk(&sk).unwrap();
         assert_eq!(pk_another, pk);
         let input: &[u8] = b"hello world again and again and again and again and again and again";
-        let (output, proof) = Scheme0::eval(&sk, input).unwrap();
-        Scheme0::verify(&pk, input, &output, &proof).unwrap();
+        let (output, proof) = Bls12381G1Bls::eval(&sk, input).unwrap();
+        Bls12381G1Bls::verify(&pk, input, &output, &proof).unwrap();
         println!("output={:?}", output);
     }
 }

@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use crate::vuf_keys::VUF_SCHEME0_SK;
+use crate::vuf_keys::VUF_SK;
 use anyhow::{anyhow, bail, ensure};
 use aptos_oidb_pepper_common::{
     jwt::Claims, sha3_256, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse
@@ -111,7 +111,7 @@ epk_expiry_time_secs,
         aud: actual_aud.clone(),
     };
     let input_bytes = bcs::to_bytes(&input).unwrap();
-    let (pepper, vuf_proof) = vuf::scheme0::Scheme0::eval(&VUF_SCHEME0_SK, &input_bytes)?;
+    let (pepper, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)?;
     ensure!(vuf_proof.is_empty(), "internal proof error");
     let pepper_hexlified = hex::encode(pepper);
     Ok(pepper_hexlified)

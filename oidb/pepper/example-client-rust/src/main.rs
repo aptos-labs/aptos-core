@@ -4,7 +4,7 @@ use aptos_crypto::
     ed25519::Ed25519PublicKey
 ;
 use aptos_oidb_pepper_common::{
-    asymmetric_encryption::{scheme1::Scheme, AsymmetricEncryption}, jwt, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse, VUFVerificationKey
+    asymmetric_encryption::{elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption}, jwt, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse, VUFVerificationKey
 };
 use aptos_types::{
     oidb::{Configuration, OpenIdSig, test_utils::get_sample_esk},
@@ -12,6 +12,7 @@ use aptos_types::{
 };
 use ark_serialize::CanonicalDeserialize;
 use std::{fs, io::stdin};
+use aptos_oidb_pepper_common::vuf::bls12381_g1_bls::Bls12381G1Bls;
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
 
@@ -89,7 +90,7 @@ async fn main() {
         scheme_name,
         vuf_public_key_hex_string,
     } = response;
-    assert_eq!("Scheme0", scheme_name.as_str());
+    assert_eq!(Bls12381G1Bls::scheme_name(), scheme_name.as_str());
     let vuf_pk_bytes = hex::decode(vuf_public_key_hex_string).unwrap();
     let vuf_pk: ark_bls12_381::G2Projective =
         ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk_bytes.as_slice())
@@ -99,7 +100,7 @@ async fn main() {
     println!();
     println!(
         "Action 2: generate a {} ephemeral key pair.",
-        Scheme::scheme_name()
+        ElGamalCurve25519Aes256Gcm::scheme_name()
     );
 
     println!();
@@ -175,7 +176,7 @@ async fn main() {
         aud: claims.claims.aud.clone(),
     };
     let pepper_input_bytes = bcs::to_bytes(&pepper_input).unwrap();
-    vuf::scheme0::Scheme0::verify(&vuf_pk, &pepper_input_bytes, &pepper_bytes, &[]).unwrap();
+    vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &pepper_bytes, &[]).unwrap();
     println!();
     println!("Pepper verification succeeded!");
 }

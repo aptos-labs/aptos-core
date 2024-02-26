@@ -1,11 +1,12 @@
 // Copyright © Aptos Foundation
 
-use crate::asymmetric_encryption::AsymmetricEncryption;
+use crate::asymmetric_encryption::{AsymmetricEncryption, elgamal_curve25519_aes256_gcm};
 use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
 use anyhow::bail;
 use curve25519_dalek::digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
+use crate::asymmetric_encryption::elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm;
 
 pub mod asymmetric_encryption;
 pub mod elgamal;
@@ -70,9 +71,9 @@ impl EncryptionPubKey {
             //     let pk = hex::decode(self.payload_hexlified.as_bytes())?;
             //     asymmetric_encryption::scheme0::Scheme::enc(rng, pk.as_slice(), msg)
             // }
-            "Scheme1" => {
+            elgamal_curve25519_aes256_gcm::SCHEME_NAME => {
                 let pk = hex::decode(self.payload_hexlified.as_bytes())?;
-                asymmetric_encryption::scheme1::Scheme::enc(main_rng, aead_rng, pk.as_slice(), msg)
+                ElGamalCurve25519Aes256Gcm::enc(main_rng, aead_rng, pk.as_slice(), msg)
             },
             _ => bail!("EncryptionPubKey::encrypt failed with unknown scheme"),
         }
