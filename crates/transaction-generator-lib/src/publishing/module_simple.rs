@@ -102,6 +102,8 @@ pub enum LoopType {
     BcsToBytes { len: u64 },
 }
 
+/// Automatic arguments function expects (i.e. signer, or multiple signers, etc)
+/// That execution can add before the call.
 #[derive(Debug, Copy, Clone)]
 pub enum AutomaticArgs {
     None,
