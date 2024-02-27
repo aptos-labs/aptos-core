@@ -280,9 +280,7 @@ impl TestConfig {
                 dump_for_only_some_stages: None,
             }
         } else if path.contains("/variable-coalescing/") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-                with_copy_inference: false,
-            }));
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(VariableCoalescing {}));
             Self {
                 stop_before_generating_bytecode: false,
