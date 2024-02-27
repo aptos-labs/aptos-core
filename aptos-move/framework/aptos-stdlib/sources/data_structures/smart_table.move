@@ -180,6 +180,59 @@ module aptos_std::smart_table {
         res
     }
 
+    /// Note bucket can be empty, and bucket index of 0 should handle it
+    public fun keys_paginated<K: store + copy + drop, V: store + copy>(
+        table: &SmartTable<K, V>,
+        starting_bucket_index: u64,
+        starting_vector_index: u64,
+        num_keys_to_get: u64,
+    ): (
+        vector<K>,
+        u64,
+        u64,
+    ) {
+        let keys = vector[];
+        let next_starting_bucket_index = 0;
+        let next_starting_vector_index = 0;
+        if (n_keys_to_check != 0) {
+            let num_keys_checked = 0;
+            let num_buckets = table.num_buckets;
+            if (num_buckets == 0) break;
+            let buckets = table.buckets;
+            let bucket_index = starting_bucket_index;
+            assert!(starting_bucket_index < num_buckets, E_INVALID_BUCKET_INDEX);
+            let bucket = table_with_length::borrow(buckets, bucket_index);
+            let bucket_length = vector::length(bucket);
+            let vector_index = starting_vector_index;
+            if (starting_vector_index != 0) {
+                assert!(starting_vector_index < bucket_length, E_INVALID_VECTOR_INDEX);
+            };
+            loop {
+                if (bucket_length > 0) {
+                    vector::push_back(&mut keys, *vector::borrow(bucket, vector_index));
+                    num_keys_checked = num_keys_checked + 1;
+                    if (num_keys_checked == num_keys_to_get) break;
+                    vector_index = if (vector_index < bucket_length - 1) {
+                        vector_index + 1;
+                    } else {
+                        if (bucket_index < num_buckets - 1) {
+                            bucket_index = bucket_index + 1;
+                            bucket = table_with_length::borrow(buckets, bucket_index)
+                            0
+                        } else {
+                            break;
+                        }
+                    };
+                } else {
+                    if (bucket_index < num_buckets - 1) {
+                        bucket_index = bucket_index + 1;
+                    }
+                }
+        }
+        // Down here then check next starting indices what is next..., but only if keys to still get
+        (keys, next_starting_bucket_index, next_starting_vector_index)
+    }
+
     /// Decide which is the next bucket to split and split it into two with the elements inside the bucket.
     fun split_one_bucket<K, V>(table: &mut SmartTable<K, V>) {
         let new_bucket_index = table.num_buckets;
