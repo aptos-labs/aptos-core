@@ -155,16 +155,16 @@ macro_rules! increment_counter_emit_event {
 
 #[test_case(1)]
 #[test_case(2)]
-fn test_events_with_snapshots(version: u64) {
+fn test_events_with_snapshots(event_version: u64) {
     let data = vec![
         increment_counter!(),
         increment_counter!(),
-        emit_event!(version, Some(2)),
+        emit_event!(event_version, Some(2)),
         increment_counter!(),
         increment_counter!(),
-        increment_counter_emit_event!(SUCCESS, version, Some(5)),
+        increment_counter_emit_event!(SUCCESS, event_version, Some(5)),
         increment_counter!(),
-        emit_event!(version, Some(6)),
+        emit_event!(event_version, Some(6)),
         increment_counter!(),
         increment_counter!(),
     ];
@@ -174,7 +174,7 @@ fn test_events_with_snapshots(version: u64) {
 
 #[test_case(1)]
 #[test_case(2)]
-fn test_events_with_snapshots_not_emitted_on_abort(version: u64) {
+fn test_events_with_snapshots_not_emitted_on_abort(event_version: u64) {
     let data = vec![
         increment_counter!(),
         increment_counter!(),
@@ -186,7 +186,7 @@ fn test_events_with_snapshots_not_emitted_on_abort(version: u64) {
         increment_counter!(),
         increment_counter!(),
         increment_counter!(),
-        increment_counter_emit_event!(EAGGREGATOR_OVERFLOW, version, None),
+        increment_counter_emit_event!(EAGGREGATOR_OVERFLOW, event_version, None),
     ];
 
     let h = run(data);
