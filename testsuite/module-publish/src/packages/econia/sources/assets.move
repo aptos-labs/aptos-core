@@ -57,6 +57,26 @@ module econia::assets {
 
     struct LC{}
 
+    struct MC{}
+
+    struct NC{}
+
+    struct OC{}
+
+    struct PC{}
+
+    struct RC{}
+
+    struct SC{}
+
+    struct TC{}
+
+    struct VC{}
+
+    struct WC{}
+
+    struct XC{}
+
     // Structs <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     // Error codes >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -170,6 +190,16 @@ module econia::assets {
         if (!exists<CoinCapabilities<JC>>(address_of(account))) init_coin_type<JC>(account, b"J Coin", b"JC", 10); // Initialize J coin
         if (!exists<CoinCapabilities<KC>>(address_of(account))) init_coin_type<KC>(account, b"K Coin", b"KC", 10); // Initialize K coin
         if (!exists<CoinCapabilities<LC>>(address_of(account))) init_coin_type<LC>(account, b"L Coin", b"LC", 10); // Initialize L coin
+        if (!exists<CoinCapabilities<MC>>(address_of(account))) init_coin_type<MC>(account, b"M Coin", b"MC", 10); // Initialize M coin
+        if (!exists<CoinCapabilities<NC>>(address_of(account))) init_coin_type<NC>(account, b"N Coin", b"NC", 10); // Initialize N coin
+        if (!exists<CoinCapabilities<OC>>(address_of(account))) init_coin_type<OC>(account, b"O Coin", b"OC", 10); // Initialize O coin
+        if (!exists<CoinCapabilities<PC>>(address_of(account))) init_coin_type<PC>(account, b"P Coin", b"PC", 10); // Initialize P coin
+        if (!exists<CoinCapabilities<RC>>(address_of(account))) init_coin_type<RC>(account, b"R Coin", b"RC", 10); // Initialize R coin
+        if (!exists<CoinCapabilities<SC>>(address_of(account))) init_coin_type<SC>(account, b"S Coin", b"SC", 10); // Initialize S coin
+        if (!exists<CoinCapabilities<TC>>(address_of(account))) init_coin_type<TC>(account, b"T Coin", b"TC", 10); // Initialize T coin
+        if (!exists<CoinCapabilities<VC>>(address_of(account))) init_coin_type<VC>(account, b"V Coin", b"VC", 10); // Initialize V coin
+        if (!exists<CoinCapabilities<WC>>(address_of(account))) init_coin_type<WC>(account, b"W Coin", b"WC", 10); // Initialize W coin
+        if (!exists<CoinCapabilities<XC>>(address_of(account))) init_coin_type<XC>(account, b"X Coin", b"XC", 10); // Initialize X coin
     }
 
     public fun init_setup(

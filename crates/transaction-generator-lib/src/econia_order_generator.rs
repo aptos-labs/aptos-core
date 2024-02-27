@@ -243,8 +243,6 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
         _txn_executor: &dyn ReliableTransactionSubmitter,
         rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
-        let to_setup = self.to_setup.clone();
-        let done = self.done.clone();
         let num_markets = self.num_markets.clone();
         self.num_base_orders_placed += 1;
         if self.num_base_orders_placed <= 100 || self.num_base_orders_placed % 2 == 0 {
@@ -267,12 +265,6 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
             })
         } else {
             Arc::new(move |account, package, publisher, txn_factory, rng| {
-                let batch = to_setup.take_from_pool(1, true, rng);
-                if batch.is_empty() {
-                    return vec![];
-                }
-                done.add_to_pool(batch);
-
                 let mut requests = vec![];
                 for market_id in 1..(*num_markets+1) {
                     let bid_size = rng.gen_range(4, 14);
