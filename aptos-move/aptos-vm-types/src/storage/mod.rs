@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::storage::{
-    change_set_configs::ChangeSetConfigs,
-    io_pricing::{IoPricing, IoPricingV3},
-    space_pricing::DiskSpacePricing,
+    change_set_configs::ChangeSetConfigs, io_pricing::IoPricing, space_pricing::DiskSpacePricing,
 };
 use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
 use aptos_types::{
@@ -12,7 +10,6 @@ use aptos_types::{
     on_chain_config::{ConfigStorage, Features},
 };
 use bytes::Bytes;
-use move_core_types::gas_algebra::NumBytes;
 use std::fmt::Debug;
 
 pub mod change_set_configs;
@@ -41,19 +38,6 @@ impl StorageGasParameters {
             io_pricing,
             space_pricing,
             change_set_configs,
-        }
-    }
-
-    pub fn unlimited(free_write_bytes_quota: NumBytes) -> Self {
-        Self {
-            io_pricing: IoPricing::V3(IoPricingV3 {
-                feature_version: LATEST_GAS_FEATURE_VERSION,
-                legacy_free_write_bytes_quota: free_write_bytes_quota,
-            }),
-            space_pricing: DiskSpacePricing::latest(),
-            change_set_configs: ChangeSetConfigs::unlimited_at_gas_feature_version(
-                LATEST_GAS_FEATURE_VERSION,
-            ),
         }
     }
 
