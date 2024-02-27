@@ -157,8 +157,6 @@ pub struct LifetimeState {
     temp_to_label_map: BTreeMap<TempIndex, LifetimeLabel>,
     /// A map from globals to labels. Represents root states of the active graph.
     global_to_label_map: BTreeMap<QualifiedInstId<StructId>, LifetimeLabel>,
-    /// Contains the set of variables whose values may have been moved to somewhere else.
-    moved: SetDomain<TempIndex>,
 }
 
 /// Represents a node of the borrow graph.
@@ -216,6 +214,8 @@ enum BorrowEdgeKind {
     /// call outcome can be different, they are distinguished by code offset -- two call edges are never the
     /// same.
     Call(bool, Operation, CodeOffset),
+    /// Freezes a mutable reference.
+    Freeze,
 }
 
 impl BorrowEdgeKind {
@@ -226,6 +226,7 @@ impl BorrowEdgeKind {
             | BorrowGlobal(is_mut)
             | BorrowField(is_mut, _)
             | Call(is_mut, _, _) => *is_mut,
+            Freeze => false,
         }
     }
 }
@@ -304,8 +305,6 @@ impl AbstractDomain for LifetimeState {
             change = JoinResult::Changed;
         }
         self.check_graph_consistency();
-
-        change = change.combine(self.moved.join(&other.moved));
         change
     }
 }
@@ -1010,7 +1009,15 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     ///
     /// If we walk this graph now from the root to the leaves, we can determine safety by directly comparing
     /// hyper edge siblings.
-    fn check_borrow_safety(&mut self, temps: &BTreeSet<TempIndex>) {
+    fn check_borrow_safety(&mut self, temps_vec: &[TempIndex]) {
+        // First check direct duplicates
+        for (i, temp) in temps_vec.iter().enumerate() {
+            if temps_vec[i + 1..].contains(temp) {
+                self.exclusive_access_direct_dup_error(*temp)
+            }
+        }
+        // Now build and analyze the hyper graph
+        let temps = &temps_vec.iter().cloned().collect::<BTreeSet<_>>();
         let filtered_leaves = self
             .state
             .leaves()
@@ -1073,9 +1080,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     let target = edge.target;
                     targets.insert(target);
                     if edge.kind.is_mut() {
-                        if let Some(temps) = filtered_leaves.get(&target) {
+                        if let Some(ts) = filtered_leaves.get(&target) {
                             let mut inter =
-                                temps.intersection(temps).cloned().collect::<BTreeSet<_>>();
+                                ts.intersection(temps).cloned().collect::<BTreeSet<_>>();
                             if !inter.is_empty() {
                                 if !self.state.is_leaf(&target) {
                                     // A mut leaf node must have exclusive access
@@ -1088,7 +1095,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 }
                 if mapped_temps.len() > 1 {
                     // We cannot associate the same mut node with more than one local
-                    self.exclusive_access_dup_error(&hyper, &mapped_temps)
+                    self.exclusive_access_indirect_dup_error(&hyper, &mapped_temps)
                 }
                 hyper_nodes.insert(targets);
             }
@@ -1161,8 +1168,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     }
 
     /// Reports an error about exclusive access requirement for duplicate usage. See safety
-    /// condition (d) in the file header documentation.
-    fn exclusive_access_dup_error(
+    /// condition (d) in the file header documentation. This handles the case were the
+    /// same node is used by multiple temps
+    fn exclusive_access_indirect_dup_error(
         &self,
         labels: &BTreeSet<LifetimeLabel>,
         temps: &BTreeSet<TempIndex>,
@@ -1172,12 +1180,27 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.error_with_hints(
             self.cur_loc(),
             format!(
-                "same mutable reference in {} is also used in other {} in same argument list",
+                "same mutable reference in {} is also used in other {} in argument list",
                 self.display(*ts[0]),
                 self.display(*ts[1])
             ),
             "requirement enforced here",
             labels.iter().flat_map(|l| self.borrow_info(l, |_| true)),
+        )
+    }
+
+    /// Reports an error about exclusive access requirement for duplicate usage. See safety
+    /// condition (d) in the file header documentation. This handles the case were the
+    /// same local is used multiple times.
+    fn exclusive_access_direct_dup_error(&self, temp: TempIndex) {
+        self.error_with_hints(
+            self.cur_loc(),
+            format!(
+                "same mutable reference in {} is used again in argument list",
+                self.display(temp),
+            ),
+            "requirement enforced here",
+            iter::empty(),
         )
     }
 
@@ -1252,6 +1275,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 BorrowGlobal(_) => "global borrow",
                 BorrowField(..) => "field borrow",
                 Call(..) => "call result",
+                Freeze => "freeze",
             },),
         )
     }
@@ -1341,11 +1365,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             self.check_read_local(src, mode);
             self.check_write_local(dest);
         }
-        // Track whether the variable content is moved
-        if kind == AssignKind::Move {
-            self.state.moved.insert(src);
-        }
-        self.state.moved.remove(&dest);
     }
 
     /// Process a borrow local instruction.
@@ -1370,7 +1389,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             label,
             BorrowEdge::new(BorrowEdgeKind::BorrowGlobal(is_mut), loc, child),
         );
-        self.state.moved.remove(&dest);
     }
 
     /// Process a borrow field instruction.
@@ -1391,7 +1409,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             label,
             BorrowEdge::new(BorrowEdgeKind::BorrowField(is_mut, field_id), loc, child),
         );
-        self.state.moved.remove(&dest);
     }
 
     /// Process a function call. For now we implement standard Move semantics, where every
@@ -1446,11 +1463,17 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 }
             }
         }
-        // All sources are moved into a call
-        self.state.moved.extend(srcs.iter().cloned());
-        for dest in dests {
-            self.state.moved.remove(dest);
-        }
+    }
+
+    /// Process a FreezeRef instruction.
+    fn freeze_ref(&mut self, code_offset: CodeOffset, dest: TempIndex, src: TempIndex) {
+        let label = *self.state.label_for_temp(src).expect("label for reference");
+        let target = self.state.replace_ref(dest, code_offset, 0);
+        self.state.add_edge(label, BorrowEdge {
+            kind: BorrowEdgeKind::Freeze,
+            loc: self.cur_loc(),
+            target,
+        })
     }
 
     /// Process a MoveFrom instruction.
@@ -1468,7 +1491,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 self.borrow_info(label, |_| true).into_iter(),
             )
         }
-        self.state.moved.remove(&dest);
     }
 
     /// Process a return instruction.
@@ -1510,7 +1532,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 }
             }
         }
-        self.state.moved.extend(srcs.iter().cloned())
     }
 
     /// Process a ReadRef instruction.
@@ -1518,7 +1539,6 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         debug_assert!(self.is_ref(src));
         self.check_write_local(dest);
         self.check_read_local(src, ReadMode::Argument);
-        self.state.moved.remove(&dest);
     }
 
     /// Process a WriteRef instruction.
@@ -1579,14 +1599,21 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                 | Operation::Function(..)
                 | Operation::Eq
                 | Operation::Neq => {
-                    let exclusive_refs =
-                        srcs.iter().filter(|t| step.is_ref(**t)).cloned().collect();
+                    let exclusive_refs = srcs
+                        .iter()
+                        .filter(|t| step.is_ref(**t))
+                        .cloned()
+                        .collect_vec();
                     step.check_borrow_safety(&exclusive_refs)
                 },
                 _ => {},
             },
             Ret(_, srcs) => {
-                let exclusive_refs = srcs.iter().filter(|t| step.is_ref(**t)).cloned().collect();
+                let exclusive_refs = srcs
+                    .iter()
+                    .filter(|t| step.is_ref(**t))
+                    .cloned()
+                    .collect_vec();
                 step.check_borrow_safety(&exclusive_refs)
             },
             _ => {},
@@ -1618,6 +1645,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                     },
                     ReadRef => step.read_ref(dests[0], srcs[0]),
                     WriteRef => step.write_ref(srcs[0], srcs[1]),
+                    FreezeRef => step.freeze_ref(code_offset, dests[0], srcs[0]),
                     MoveFrom(mid, sid, inst) => {
                         step.move_from(dests[0], &mid.qualified_inst(*sid, inst.clone()), srcs[0])
                     },
@@ -1681,11 +1709,6 @@ impl LifetimeInfoAtCodeOffset {
             .keys()
             .filter(|t| !self.after.temp_to_label_map.contains_key(t))
             .cloned()
-    }
-
-    /// Returns true if the value in the variable has been moved at this program point.
-    pub fn is_moved(&self, temp: TempIndex) -> bool {
-        self.after.moved.contains(&temp)
     }
 }
 
@@ -1780,6 +1803,7 @@ impl<'a> Display for BorrowEdgeDisplay<'a> {
             BorrowGlobal(is_mut) => write!(f, "borrow_global({})", is_mut),
             BorrowField(is_mut, _) => write!(f, "borrow_field({})", is_mut),
             Call(is_mut, _, _) => write!(f, "call({})", is_mut),
+            Freeze => write!(f, "freeze"),
         })?;
         if display_child {
             write!(f, " -> {}", edge.target)
@@ -1860,7 +1884,6 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
             graph,
             temp_to_label_map,
             global_to_label_map,
-            moved,
         } = &self.1;
         let pool = self.0.global_env().symbol_pool();
         writeln!(
@@ -1886,14 +1909,6 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
             global_to_label_map
                 .iter()
                 .map(|(str, label)| format!("{}={}", self.0.global_env().display(str), label))
-                .join(",")
-        )?;
-        writeln!(
-            f,
-            "moved: {{{}}}",
-            moved
-                .iter()
-                .map(|t| self.0.get_local_raw_name(*t).display(pool).to_string())
                 .join(",")
         )
     }
