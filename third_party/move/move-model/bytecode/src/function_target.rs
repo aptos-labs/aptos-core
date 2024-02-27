@@ -717,11 +717,13 @@ impl<'env> fmt::Display for FunctionTarget<'env> {
             writeln!(f, ";")?;
         } else {
             writeln!(f, " {{")?;
+            let verification = self.data.variant.is_verified();
             let mentioned_locals = self.get_mentioned_locals();
             for i in self.get_parameter_count()..self.get_local_count() {
                 write!(f, "     var ")?;
                 write_decl(f, i)?;
-                if !mentioned_locals.contains(&i) {
+                if !verification && !mentioned_locals.contains(&i) {
+                    // We do not display unused annotation in verification mode.
                     write!(f, " [unused]")?;
                 }
                 writeln!(f)?;
