@@ -1,0 +1,17 @@
+[package]
+name = "aptos-code-analyzer"
+version = "0.1.0"
+authors = ["Aptos Labs <opensource@aptoslabs.com>"]
+description = "A tool to analyze Move modules"
+repository = "https://github.com/aptos-labs/aptos-core"
+homepage = "https://aptoslabs.com"
+license = "Apache-2.0"
+publish = false
+edition = "2021"
+default-run = "aptos-code-analyzer"
+
+[dependencies]
+aptos-gas-schedule = { workspace = true }
+aptos-types = { workspace = true }
+move-binary-format = { workspace = true }
+move-core-types = { workspace = true }

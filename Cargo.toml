@@ -7,7 +7,7 @@ members = [
     "api/test-context",
     "api/types",
     "aptos-move/aptos-abstract-gas-usage",
-    "aptos-move/aptos-aggregator",
+    "aptos-move/aptos-aggregator", "aptos-move/aptos-code-analyzer",
     "aptos-move/aptos-debugger",
     "aptos-move/aptos-e2e-comparison-testing",
     "aptos-move/aptos-gas-algebra",

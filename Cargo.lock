@@ -766,6 +766,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-code-analyzer"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-schedule",
+ "aptos-types",
+ "move-binary-format",
+ "move-core-types",
+]
+
+[[package]]
 name = "aptos-collections"
 version = "0.1.0"
 
