@@ -64,8 +64,8 @@ impl Default for ExecutionConfig {
             // use min of (num of cores/2, DEFAULT_CONCURRENCY_LEVEL) as default concurrency level
             concurrency_level: 0,
             num_proof_reading_threads: 32,
-            paranoid_type_verification: false,
-            paranoid_hot_potato_verification: false,
+            paranoid_type_verification: true,
+            paranoid_hot_potato_verification: true,
             processed_transactions_detailed_counters: false,
             transaction_filter: Filter::empty(),
         }
