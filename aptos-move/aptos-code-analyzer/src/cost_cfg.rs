@@ -19,8 +19,7 @@ pub struct InstructionCostCalculator {
 }
 
 impl InstructionCostCalculator {
-    #[allow(dead_code)]
-    fn new(state_view: &impl StateView) -> Self {
+    pub fn new(state_view: &impl StateView) -> Self {
         let costs = match GasScheduleV2::fetch_config(state_view) {
             Some(gas_schedule) => gas_schedule.to_btree_map(),
             None => GasSchedule::fetch_config(state_view)
@@ -34,8 +33,8 @@ impl InstructionCostCalculator {
         let cost = |param: &str| -> u64 {
             *self
                 .costs
-                .get(param)
-                .expect("Cost should exist for every instruction")
+                .get(&format!("instr.{}", param))
+                .expect(&format!("Cost should exist for every instruction: {} not found", param))
         };
 
         // TODO: can we do it in a nicer way?
@@ -55,7 +54,7 @@ impl InstructionCostCalculator {
             Bytecode::LdU256(_) => cost("ld_u256"),
             Bytecode::LdTrue => cost("ld_true"),
             Bytecode::LdFalse => cost("ld_false"),
-            Bytecode::LdConst(_) => cost("ld_const_base"),
+            Bytecode::LdConst(_) => cost("ld_const.base"),
 
             Bytecode::ImmBorrowLoc(_) => cost("imm_borrow_loc"),
             Bytecode::MutBorrowLoc(_) => cost("mut_borrow_loc"),
@@ -160,15 +159,28 @@ impl InstructionCostCalculator {
 
 impl ModulePass for InstructionCostCalculator {
     fn run_on_module(&mut self, module: &CompiledModule) {
+
+        let mut num_funcs = 0;
+        for function in module.function_defs() {
+            if function.code.is_some() {
+                num_funcs += 1;
+            }
+        }
+
+        if num_funcs == 0 {
+            println!("SKIP");
+            return
+        }
+
+        println!("{}", num_funcs);
         for function in module.function_defs() {
             let handle = module.function_handle_at(function.function);
             let function_name = module.identifier_at(handle.name).to_owned();
 
             if function.code.is_none() {
-                return;
+                continue;
             }
 
-            println!("{}", function_name);
             let code = &function.code;
             let code = &code.as_ref().unwrap().code;
             let cfg = VMControlFlowGraph::new(code);
@@ -179,7 +191,7 @@ impl ModulePass for InstructionCostCalculator {
                 idx_map.insert(bb, idx);
                 num_edges += cfg.successors(bb).len();
             }
-            println!("{} {}", cfg.num_blocks(), num_edges);
+            println!("{} {} {}", cfg.num_blocks(), num_edges, function_name);
 
             for bb in cfg.blocks() {
                 let mut bb_cost = 0;

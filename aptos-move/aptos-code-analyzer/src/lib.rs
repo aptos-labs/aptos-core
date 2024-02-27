@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod cost_cfg;
-mod passes;
-mod types;
+pub mod cost_cfg;
+pub mod passes;
+pub mod types;

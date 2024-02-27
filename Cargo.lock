@@ -770,7 +770,9 @@ name = "aptos-code-analyzer"
 version = "0.1.0"
 dependencies = [
  "aptos-gas-schedule",
+ "aptos-language-e2e-tests",
  "aptos-types",
+ "clap 4.4.14",
  "move-binary-format",
  "move-core-types",
 ]
