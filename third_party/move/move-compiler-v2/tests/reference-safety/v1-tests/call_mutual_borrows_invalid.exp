@@ -4,7 +4,7 @@ error: mutable reference in local `s1` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:15:9
    │
 14 │         let f = freeze(s1);
-   │                 ---------- previous call result
+   │                 ---------- previous freeze
 15 │         mut_imm(s1, f);
    │         ^^^^^^^^^^^^^^ requirement enforced here
 
@@ -42,6 +42,12 @@ error: cannot mutably borrow since immutable references exist
    │         │      │
    │         │      mutable borrow attempted here
    │         requirement enforced here
+
+error: same mutable reference in local `s1` is used again in argument list
+   ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:23:9
+   │
+23 │         mut_mut(s1, s1);
+   │         ^^^^^^^^^^^^^^^ requirement enforced here
 
 error: mutable reference in local `s1` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:25:9

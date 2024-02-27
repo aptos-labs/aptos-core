@@ -255,308 +255,264 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t3 := 0
      # live vars: $t0, $t3
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t2 := infer($t3)
      # live vars: $t0, $t2
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t5 := borrow_local($t0)
      # live vars: $t0, $t2, $t5
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t5=@201}
      # globals: {}
-     # moved: {}
      #
   3: $t4 := infer($t5)
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
   4: label L0
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
   5: $t7 := vector::length<u8>($t4)
      # live vars: $t0, $t2, $t4, $t7
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t9,$t11,$t13,$t15,$t17}
      #
   6: $t6 := <($t2, $t7)
      # live vars: $t0, $t2, $t4, $t6
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
   7: if ($t6) goto 8 else goto 33
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
   8: label L2
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
   9: $t10 := vector::borrow<u8>($t4, $t2)
      # live vars: $t0, $t2, $t4, $t10
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[call(false) -> @900],@900=derived[]}
      # locals: {$t0=@200,$t4=@201,$t10=@900}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  10: $t9 := read_ref($t10)
      # live vars: $t0, $t2, $t4, $t9
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t11,$t13,$t15,$t17}
      #
  11: $t11 := 0
      # live vars: $t0, $t2, $t4, $t9, $t11
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t11,$t13,$t15,$t17}
      #
  12: $t8 := !=($t9, $t11)
      # live vars: $t0, $t2, $t4, $t8
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  13: if ($t8) goto 14 else goto 17
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  14: label L5
      # live vars: $t0, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  15: goto 37
      # live vars: $t0, $t2, $t4
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
  16: goto 18
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  17: label L6
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  18: label L7
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  19: $t13 := 1
      # live vars: $t0, $t2, $t4, $t13
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  20: $t12 := +($t2, $t13)
      # live vars: $t0, $t4, $t12
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  21: $t2 := infer($t12)
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  22: $t16 := vector::borrow<u8>($t4, $t2)
      # live vars: $t0, $t2, $t4, $t16
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[call(false) -> @1600],@1600=derived[]}
      # locals: {$t0=@200,$t4=@201,$t16=@1600}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  23: $t15 := read_ref($t16)
      # live vars: $t0, $t2, $t4, $t15
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t17}
      #
  24: $t17 := 5
      # live vars: $t0, $t2, $t4, $t15, $t17
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t17}
      #
  25: $t14 := ==($t15, $t17)
      # live vars: $t0, $t2, $t4, $t14
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  26: if ($t14) goto 27 else goto 30
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  27: label L8
      # live vars: $t0, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  28: goto 37
      # live vars: $t0, $t2, $t4
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
  29: goto 31
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  30: label L9
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  31: label L10
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  32: goto 35
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  33: label L3
      # live vars: $t0, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  34: goto 37
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  35: label L4
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  36: goto 4
      # live vars: $t0, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  37: label L1
      # live vars: $t0, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  38: $t19 := copy($t0)
      # live vars: $t0, $t4, $t19
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  39: $t18 := infer($t19)
      # live vars: $t0, $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  40: $t20 := infer($t0)
      # live vars: $t4
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t4=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  41: $t21 := infer($t4)
      # live vars: $t21
      # graph: {@200=local($t0)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t21=@201}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17}
      #
  42: $t1 := vector::length<u8>($t21)
      # live vars: $t1
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t2,$t4,$t7,$t9,$t11,$t13,$t15,$t17,$t21}
      #
  43: return $t1
 }

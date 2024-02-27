@@ -15,7 +15,7 @@ use move_core_types::u256::U256;
 use num::BigInt;
 use std::collections::BTreeMap;
 
-/// Adds specification builtin functions.
+/// Adds builtin functions.
 pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     let loc = trans.env.internal_loc();
     let bool_t = &Type::new_prim(PrimitiveType::Bool);
@@ -235,38 +235,41 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             bool_t,
             SpecAndImpl,
         );
+        {
+            let ref_param_t = Type::Reference(ReferenceKind::Immutable, Box::new(param_t.clone()));
 
-        // Eq and Neq have special treatment because they are generic.
-        trans.define_spec_or_builtin_fun(
-            trans.bin_op_symbol(&PA::BinOp_::Eq),
-            SpecOrBuiltinFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Eq,
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: BTreeMap::default(),
-                params: vec![
-                    mk_param(trans, 1, param_t.clone()),
-                    mk_param(trans, 2, param_t.clone()),
-                ],
-                result_type: bool_t.clone(),
-                visibility: SpecAndImpl,
-            },
-        );
-        trans.define_spec_or_builtin_fun(
-            trans.bin_op_symbol(&PA::BinOp_::Neq),
-            SpecOrBuiltinFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Neq,
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: BTreeMap::default(),
-                params: vec![
-                    mk_param(trans, 1, param_t.clone()),
-                    mk_param(trans, 2, param_t.clone()),
-                ],
-                result_type: bool_t.clone(),
-                visibility: SpecAndImpl,
-            },
-        );
+            // Eq and Neq have special treatment because they are generic.
+            // Also we overload them for being based on references or not.
+            for pt in [ref_param_t.clone(), param_t.clone()] {
+                trans.define_spec_or_builtin_fun(
+                    trans.bin_op_symbol(&PA::BinOp_::Eq),
+                    SpecOrBuiltinFunEntry {
+                        loc: loc.clone(),
+                        oper: Operation::Eq,
+                        type_params: vec![param_t_decl.clone()],
+                        type_param_constraints: BTreeMap::default(),
+                        params: vec![
+                            mk_param(trans, 1, pt.clone()),
+                            mk_param(trans, 2, pt.clone()),
+                        ],
+                        result_type: bool_t.clone(),
+                        visibility: SpecAndImpl,
+                    },
+                );
+                trans.define_spec_or_builtin_fun(
+                    trans.bin_op_symbol(&PA::BinOp_::Neq),
+                    SpecOrBuiltinFunEntry {
+                        loc: loc.clone(),
+                        oper: Operation::Neq,
+                        type_params: vec![param_t_decl.clone()],
+                        type_param_constraints: BTreeMap::default(),
+                        params: vec![mk_param(trans, 1, pt.clone()), mk_param(trans, 2, pt)],
+                        result_type: bool_t.clone(),
+                        visibility: SpecAndImpl,
+                    },
+                );
+            }
+        }
     }
 
     {

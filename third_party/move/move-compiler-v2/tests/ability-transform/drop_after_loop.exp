@@ -138,203 +138,174 @@ fun m::drop_after_loop() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t1 := 1
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t0 := infer($t1)
      # live vars: $t0
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t3 := borrow_local($t0)
      # live vars: $t0, $t3
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
-     # moved: {}
      #
   3: $t2 := infer($t3)
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   4: $t5 := true
      # live vars: $t0, $t2, $t5
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   5: $t4 := infer($t5)
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   6: label L0
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   7: if ($t4) goto 8 else goto 14
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   8: label L2
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   9: $t6 := 2
      # live vars: $t0, $t2, $t6
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  10: write_ref($t2, $t6)
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  11: $t7 := false
      # live vars: $t0, $t2, $t7
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  12: $t4 := infer($t7)
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  13: goto 16
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  14: label L3
      # live vars: $t0
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
  15: goto 18
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  16: label L4
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  17: goto 6
      # live vars: $t0
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
  18: label L1
      # live vars: $t0
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
  19: $t9 := 2
      # live vars: $t0, $t9
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
  20: $t8 := ==($t0, $t9)
      # live vars: $t8
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  21: if ($t8) goto 22 else goto 24
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  22: label L5
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  23: goto 27
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  24: label L6
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  25: $t10 := 0
      # live vars: $t10
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  26: abort($t10)
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  27: label L7
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  28: return ()
 }
@@ -359,7 +330,6 @@ fun m::drop_after_loop() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t1 := 1
      # abort state: {returns,aborts}
@@ -367,7 +337,6 @@ fun m::drop_after_loop() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t0 := infer($t1)
      # abort state: {returns,aborts}
@@ -375,7 +344,6 @@ fun m::drop_after_loop() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t3 := borrow_local($t0)
      # abort state: {returns,aborts}
@@ -383,7 +351,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
-     # moved: {}
      #
   3: $t2 := infer($t3)
      # abort state: {returns,aborts}
@@ -391,7 +358,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   4: $t5 := true
      # abort state: {returns,aborts}
@@ -399,7 +365,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   5: $t4 := infer($t5)
      # abort state: {returns,aborts}
@@ -407,7 +372,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   6: label L0
      # abort state: {returns,aborts}
@@ -415,7 +379,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   7: if ($t4) goto 8 else goto 14
      # abort state: {returns,aborts}
@@ -423,7 +386,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   8: label L2
      # abort state: {returns,aborts}
@@ -431,7 +393,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   9: $t6 := 2
      # abort state: {returns,aborts}
@@ -439,7 +400,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  10: write_ref($t2, $t6)
      # abort state: {returns,aborts}
@@ -447,7 +407,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  11: $t7 := false
      # abort state: {returns,aborts}
@@ -455,7 +414,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  12: $t4 := infer($t7)
      # abort state: {returns,aborts}
@@ -463,7 +421,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  13: goto 16
      # abort state: {returns,aborts}
@@ -471,7 +428,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  14: label L3
      # abort state: {returns,aborts}
@@ -479,7 +435,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
  15: goto 18
      # abort state: {returns,aborts}
@@ -487,7 +442,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  16: label L4
      # abort state: {returns,aborts}
@@ -495,7 +449,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
  17: goto 6
      # abort state: {returns,aborts}
@@ -503,7 +456,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
  18: label L1
      # abort state: {returns,aborts}
@@ -511,7 +463,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
  19: $t9 := 2
      # abort state: {returns,aborts}
@@ -519,7 +470,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
  20: $t8 := ==($t0, $t9)
      # abort state: {returns,aborts}
@@ -527,7 +477,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  21: if ($t8) goto 22 else goto 24
      # abort state: {returns}
@@ -535,7 +484,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  22: label L5
      # abort state: {returns}
@@ -543,7 +491,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  23: goto 27
      # abort state: {aborts}
@@ -551,7 +498,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  24: label L6
      # abort state: {aborts}
@@ -559,7 +505,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  25: $t10 := 0
      # abort state: {aborts}
@@ -567,7 +512,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  26: abort($t10)
      # abort state: {returns}
@@ -575,7 +519,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  27: label L7
      # abort state: {returns}
@@ -583,7 +526,6 @@ fun m::drop_after_loop() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {$t0,$t9}
      #
  28: return ()
 }

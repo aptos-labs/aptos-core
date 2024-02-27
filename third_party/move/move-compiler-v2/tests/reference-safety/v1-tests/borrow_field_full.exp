@@ -4,7 +4,7 @@ error: mutable reference in local `inner` requires exclusive access but is borro
    ┌─ tests/reference-safety/v1-tests/borrow_field_full.move:34:9
    │
 31 │         let c = freeze(inner);
-   │                 ------------- previous call result
+   │                 ------------- previous freeze
 32 │         let f1 = &inner.f1;
    │                  --------- previous field borrow
 33 │         *c;
@@ -20,7 +20,7 @@ error: mutable reference in local `inner` requires exclusive access but is borro
    ┌─ tests/reference-safety/v1-tests/borrow_field_full.move:36:9
    │
 31 │         let c = freeze(inner);
-   │                 ------------- previous call result
+   │                 ------------- previous freeze
    ·
 36 │         *inner;
    │         ^^^^^^ requirement enforced here
@@ -33,7 +33,7 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 40 │         let c = id(freeze(inner));
    │                 -----------------
    │                 │  │
-   │                 │  previous call result
+   │                 │  previous freeze
    │                 used by call result
 41 │         let f1 = &inner.f1;
    │                  --------- previous field borrow
@@ -52,7 +52,7 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 40 │         let c = id(freeze(inner));
    │                 -----------------
    │                 │  │
-   │                 │  previous call result
+   │                 │  previous freeze
    │                 used by call result
    ·
 45 │         *inner;
