@@ -413,12 +413,8 @@ fn initialize(
     );
 }
 
-pub fn default_features() -> Vec<FeatureFlag> {
-    FeatureFlag::default_features()
-}
-
 fn initialize_features(session: &mut SessionExt) {
-    let features: Vec<u64> = default_features()
+    let features: Vec<u64> = FeatureFlag::default_features()
         .into_iter()
         .map(|feature| feature as u64)
         .collect();
