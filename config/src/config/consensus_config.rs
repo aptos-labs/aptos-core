@@ -178,14 +178,14 @@ impl Default for ConsensusConfig {
                     // Block enters the pipeline after consensus orders it, and leaves the
                     // pipeline once quorum on execution result among validators has been reached
                     // (so-(badly)-called "commit certificate"), meaning 2f+1 validators have finished execution.
-                    back_pressure_pipeline_latency_limit_ms: 800,
+                    back_pressure_pipeline_latency_limit_ms: 1200,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 100,
                     max_txns_from_block_to_execute: None,
                 },
                 PipelineBackpressureValues {
-                    back_pressure_pipeline_latency_limit_ms: 1100,
+                    back_pressure_pipeline_latency_limit_ms: 1300,
                     max_sending_block_txns_override: 10000,
                     max_sending_block_bytes_override: 5 * 1024 * 1024,
                     backpressure_proposal_delay_ms: 200,
