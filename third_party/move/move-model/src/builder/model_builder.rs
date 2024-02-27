@@ -479,7 +479,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Gets the simple display name of the struct
     fn get_struct_display_name_simple(&self, qid: QualifiedId<StructId>) -> String {
-        self.get_struct_name(qid).display_simple(&self.env).to_string()
+        self.get_struct_name(qid).display_simple(self.env).to_string()
     }
 
     /// Gets the display name of the struct type
@@ -522,7 +522,6 @@ impl<'env> ModelBuilder<'env> {
     fn check_recusive_struct_with_parents(
         &self,
         ty: &Type,
-        loc: &Loc,
         path: &mut Vec<Type>,
         checking: QualifiedId<StructId>,
         loc_checking: &Loc,
@@ -537,7 +536,7 @@ impl<'env> ModelBuilder<'env> {
                         let parent_id = QualifiedId { module_id: *mid, id: *sid };
                         if parent_id == this_struct_id {
                             if checking == this_struct_id {
-                                let loop_notes = self.gen_error_msg_for_fields_loop(&path, this_struct_id);
+                                let loop_notes = self.gen_error_msg_for_fields_loop(path, this_struct_id);
                                 self.error_with_notes(loc_checking, &format!("recursive definition {}", self.get_struct_display_name_simple(this_struct_id)),
                             loop_notes);
                                 return true;
@@ -551,11 +550,11 @@ impl<'env> ModelBuilder<'env> {
                 }
                 if let Some(fields) = &this_struct_entry.fields {
                     path.push(ty.clone());
-                    // check for descent fields recursively
-                    for (_field_name, (field_loc, _field_idx, field_ty_uninstantiated)) in fields.iter() {
+                    // check for descendant fields recursively
+                    for (_field_name, (_field_loc, _field_idx, field_ty_uninstantiated)) in fields.iter() {
                         let field_ty_instantiated = field_ty_uninstantiated.instantiate(insts);
                         // short-curcuit upon first recursive occurence found
-                        if !self.check_recusive_struct_with_parents(&field_ty_instantiated, field_loc, path, checking, loc_checking) {
+                        if !self.check_recusive_struct_with_parents(&field_ty_instantiated, path, checking, loc_checking) {
                             return false;
                         }
                     }
@@ -566,7 +565,7 @@ impl<'env> ModelBuilder<'env> {
                 }
             },
             Type::Vector(ty) => {
-                self.check_recusive_struct_with_parents(ty, loc, path, checking, loc_checking)
+                self.check_recusive_struct_with_parents(ty, path, checking, loc_checking)
             },
             _ => true,
         }
@@ -575,11 +574,10 @@ impl<'env> ModelBuilder<'env> {
     /// Checks for recursive definition of structs and adds diagnostics
     pub fn check_resursive_struct(&self, struct_entry: &StructEntry) {
         let params = (0..struct_entry.type_params.len()).map(|i| Type::TypeParameter(i as u16)).collect_vec();
-        let struct_ty = Type::Struct(struct_entry.module_id.clone(), struct_entry.struct_id.clone(), params);
+        let struct_ty = Type::Struct(struct_entry.module_id, struct_entry.struct_id, params);
         let mut parents = Vec::new();
         self.check_recusive_struct_with_parents(
             &struct_ty,
-            &struct_entry.loc,
             &mut parents,
             struct_entry.module_id.qualified(struct_entry.struct_id),
             &struct_entry.loc
