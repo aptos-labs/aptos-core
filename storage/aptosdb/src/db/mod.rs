@@ -49,7 +49,6 @@ use aptos_types::{
     epoch_state::EpochState,
     event::EventKey,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{CurrentTimeMicroseconds, OnChainConfig},
     proof::{
         accumulator::InMemoryAccumulator, AccumulatorConsistencyProof, SparseMerkleProofExt,
         TransactionAccumulatorRangeProof, TransactionAccumulatorSummary,
@@ -75,6 +74,7 @@ use aptos_vm::data_cache::AsMoveResolver;
 use move_resource_viewer::MoveValueAnnotator;
 use rayon::prelude::*;
 use std::{
+    cell::Cell,
     fmt::{Debug, Formatter},
     iter::Iterator,
     path::Path,
