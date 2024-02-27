@@ -28,6 +28,10 @@ module aptos_std::smart_table {
     const EINVALID_TARGET_BUCKET_SIZE: u64 = 6;
     /// Invalid target bucket size.
     const EEXCEED_MAX_BUCKET_SIZE: u64 = 7;
+    /// Invalid bucket index.
+    const EINVALID_BUCKET_INDEX: u64 = 8;
+    /// Invalid vector index within a bucket.
+    const EINVALID_VECTOR_INDEX: u64 = 9;
 
     /// SmartTable entry contains both the key and value.
     struct Entry<K, V> has copy, drop, store {
@@ -180,7 +184,6 @@ module aptos_std::smart_table {
         res
     }
 
-    /// Note bucket can be empty, and bucket index of 0 should handle it
     public fun keys_paginated<K: store + copy + drop, V: store + copy>(
         table: &SmartTable<K, V>,
         starting_bucket_index: u64,
@@ -194,42 +197,55 @@ module aptos_std::smart_table {
         let keys = vector[];
         let next_starting_bucket_index = 0;
         let next_starting_vector_index = 0;
-        if (n_keys_to_check != 0) {
-            let num_keys_checked = 0;
+        if (num_keys_to_get > 0) {
             let num_buckets = table.num_buckets;
-            if (num_buckets == 0) break;
-            let buckets = table.buckets;
-            let bucket_index = starting_bucket_index;
-            assert!(starting_bucket_index < num_buckets, E_INVALID_BUCKET_INDEX);
-            let bucket = table_with_length::borrow(buckets, bucket_index);
-            let bucket_length = vector::length(bucket);
-            let vector_index = starting_vector_index;
-            if (starting_vector_index != 0) {
-                assert!(starting_vector_index < bucket_length, E_INVALID_VECTOR_INDEX);
-            };
-            loop {
-                if (bucket_length > 0) {
-                    vector::push_back(&mut keys, *vector::borrow(bucket, vector_index));
-                    num_keys_checked = num_keys_checked + 1;
-                    if (num_keys_checked == num_keys_to_get) break;
-                    vector_index = if (vector_index < bucket_length - 1) {
-                        vector_index + 1;
-                    } else {
-                        if (bucket_index < num_buckets - 1) {
-                            bucket_index = bucket_index + 1;
-                            bucket = table_with_length::borrow(buckets, bucket_index)
-                            0
-                        } else {
-                            break;
-                        }
+            if (num_buckets > 0) {
+                let num_keys_checked = 0;
+                let buckets_ref = &table.buckets;
+                let bucket_index = starting_bucket_index;
+                assert!(starting_bucket_index < num_buckets, EINVALID_BUCKET_INDEX);
+                let bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
+                let bucket_length = vector::length(bucket_ref);
+                let vector_index = starting_vector_index;
+                if (starting_vector_index != 0) {
+                    assert!(starting_vector_index < bucket_length, EINVALID_VECTOR_INDEX);
+                };
+                while (num_keys_checked < num_keys_to_get && bucket_index < num_buckets) {
+                    while (bucket_length == 0) { // Advance to next non-empty bucket.
+                        bucket_index = starting_bucket_index + 1;
+                        if (bucket_index == num_buckets) break;
+                        bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
+                        bucket_length = vector::length(bucket_ref);
                     };
-                } else {
-                    if (bucket_index < num_buckets - 1) {
+                    if (bucket_index < num_buckets) {  // Index all keys in non-empty bucket.
+                        while (vector_index < bucket_length) {
+                            vector::push_back(
+                                &mut keys,
+                                vector::borrow(bucket_ref, vector_index).key);
+                            num_keys_checked = num_keys_checked + 1;
+                            vector_index = vector_index + 1;
+                            if (num_keys_checked == num_keys_to_get) {
+                                if (vector_index < bucket_length) {
+                                    next_starting_bucket_index = bucket_index;
+                                    next_starting_vector_index = vector_index;
+                                } else {
+                                    next_starting_vector_index = 0;
+                                    bucket_index = bucket_index + 1;
+                                    next_starting_bucket_index = if (bucket_index < num_buckets) {
+                                        bucket_index
+                                    } else {
+                                        0
+                                    };
+                                };
+                                break
+                            };
+                        };
                         bucket_index = bucket_index + 1;
-                    }
-                }
-        }
-        // Down here then check next starting indices what is next..., but only if keys to still get
+                        vector_index = 0;
+                    } else break
+                };
+            };
+        };
         (keys, next_starting_bucket_index, next_starting_vector_index)
     }
 
