@@ -1092,40 +1092,43 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             let max_batch_expiry_gap_usecs =
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
-            self.bounded_executor
-                .spawn(async move {
-                    match monitor!(
-                        "verify_message",
-                        unverified_event.clone().verify(
-                            peer_id,
-                            &epoch_state.verifier,
-                            quorum_store_enabled,
-                            peer_id == my_peer_id,
-                            max_num_batches,
-                            max_batch_expiry_gap_usecs,
-                        )
-                    ) {
-                        Ok(verified_event) => {
-                            Self::forward_event(
-                                quorum_store_msg_tx,
-                                round_manager_tx,
-                                buffered_proposal_tx,
+            monitor!(
+                "verify_message_outer",
+                self.bounded_executor
+                    .spawn(async move {
+                        match monitor!(
+                            "verify_message",
+                            unverified_event.clone().verify(
                                 peer_id,
-                                verified_event,
-                                payload_manager,
-                            );
-                        },
-                        Err(e) => {
-                            error!(
-                                SecurityEvent::ConsensusInvalidMessage,
-                                remote_peer = peer_id,
-                                error = ?e,
-                                unverified_event = unverified_event
-                            );
-                        },
-                    }
-                })
-                .await;
+                                &epoch_state.verifier,
+                                quorum_store_enabled,
+                                peer_id == my_peer_id,
+                                max_num_batches,
+                                max_batch_expiry_gap_usecs,
+                            )
+                        ) {
+                            Ok(verified_event) => {
+                                Self::forward_event(
+                                    quorum_store_msg_tx,
+                                    round_manager_tx,
+                                    buffered_proposal_tx,
+                                    peer_id,
+                                    verified_event,
+                                    payload_manager,
+                                );
+                            },
+                            Err(e) => {
+                                error!(
+                                    SecurityEvent::ConsensusInvalidMessage,
+                                    remote_peer = peer_id,
+                                    error = ?e,
+                                    unverified_event = unverified_event
+                                );
+                            },
+                        }
+                    })
+                    .await
+            );
         }
         Ok(())
     }
