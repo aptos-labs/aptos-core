@@ -45,56 +45,48 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: if ($t0) goto 1 else goto 4
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: label L0
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t1 := 1
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   3: goto 6
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   4: label L1
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   5: $t1 := 0
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   6: label L2
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   7: return $t1
 }
@@ -109,7 +101,6 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: if ($t0) goto 1 else goto 4
      # abort state: {returns}
@@ -117,7 +108,6 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: label L0
      # abort state: {returns}
@@ -125,7 +115,6 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t1 := 1
      # abort state: {returns}
@@ -133,7 +122,6 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   3: goto 6
      # abort state: {returns}
@@ -141,7 +129,6 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   4: label L1
      # abort state: {returns}
@@ -149,7 +136,6 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   5: $t1 := 0
      # abort state: {returns}
@@ -157,7 +143,6 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   6: label L2
      # abort state: {returns}
@@ -165,7 +150,6 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   7: return $t1
 }
