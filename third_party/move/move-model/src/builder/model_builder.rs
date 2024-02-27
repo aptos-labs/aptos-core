@@ -405,10 +405,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Looks up the StructEntry for a qualified id.
     pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
-        let struct_name = self
-            .reverse_struct_table
-            .get(&(id.module_id, id.id))
-            .expect("invalid Type::Struct");
+        let struct_name = self.get_struct_name(id);
         self.struct_table
             .get(struct_name)
             .expect("invalid Type::Struct")
@@ -470,6 +467,124 @@ impl<'env> ModelBuilder<'env> {
                 }
             }
         }
+    }
+
+    /// Gets the name of the struct
+    fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
+        self
+            .reverse_struct_table
+            .get(&(qid.module_id, qid.id))
+            .expect("invalid Type::Struct")
+    }
+
+    /// Gets the simple display name of the struct
+    fn get_struct_display_name_simple(&self, qid: QualifiedId<StructId>) -> String {
+        self.get_struct_name(qid).display_simple(&self.env).to_string()
+    }
+
+    /// Gets the display name of the struct type
+    /// Requires: the type is a struct type
+    fn get_struct_type_name(&self, ty: &Type) -> String {
+        if let Type::Struct(mid, sid, _) = ty {
+            // TODO: display the struct with type parameters
+            let qid = QualifiedId { module_id: *mid, id: *sid };
+            self.get_struct_display_name_simple(qid).to_string()
+        } else {
+            panic!("ICE: calling `get_struct_type_name` with non-struct type")
+        }
+    }
+
+    /// Generates error messages for recursive structs
+    /// `path`: `path[0]` contains `path[1]` ... `path[-1]` contains `this_struct`
+    fn gen_error_msg_for_fields_loop(
+        &self,
+        path: &Vec<Type>,
+        this_struct_id: QualifiedId<StructId>
+    ) -> Vec<String> {
+        let mut loop_notes = Vec::new();
+        for i in 0..path.len() - 1 {
+            let parent_name = self.get_struct_type_name(&path[i]);
+            let child_name = self.get_struct_type_name(&path[i + 1]);
+            loop_notes.push(format!("{} contains {}...", parent_name, child_name));
+        }
+        loop_notes.push(format!("{} contains {}, which forms a loop.", self.get_struct_type_name(path.last().unwrap()), self.get_struct_display_name_simple(this_struct_id)));
+        loop_notes
+    }
+
+    /// Checks if a field type occurs in its access path,
+    /// and adds diagnostics for recursive struct definitions if `ty` occurs in `path` and `ty` is also the struct type `checking`.
+    ///
+    /// Returns true iff no resursive definition for `checking` is found at this level.
+    ///
+    /// `path`: `path[0]` contains `path[1]` ... `path[-1]` contains `ty`
+    /// `checking`: the root struct which we are checking for recursive definition for
+    /// `loc_checking`: location of the struct we are checking for
+    fn check_recusive_struct_with_parents(
+        &self,
+        ty: &Type,
+        loc: &Loc,
+        path: &mut Vec<Type>,
+        checking: QualifiedId<StructId>,
+        loc_checking: &Loc,
+    ) -> bool {
+        match ty {
+            Type::Struct(mid, sid, insts) => {
+                let this_struct_id = mid.qualified(*sid);
+                let this_struct_entry = self.lookup_struct_entry(this_struct_id);
+                // checks if `ty` occurs in `path`
+                for parent in path.iter() {
+                    if let Type::Struct(mid, sid, _) = parent {
+                        let parent_id = QualifiedId { module_id: *mid, id: *sid };
+                        if parent_id == this_struct_id {
+                            if checking == this_struct_id {
+                                let loop_notes = self.gen_error_msg_for_fields_loop(&path, this_struct_id);
+                                self.error_with_notes(loc_checking, &format!("recursive definition {}", self.get_struct_display_name_simple(this_struct_id)),
+                            loop_notes);
+                                return true;
+                            } else {
+                                return false;
+                            }
+                        }
+                    } else {
+                        unreachable!()
+                    }
+                }
+                if let Some(fields) = &this_struct_entry.fields {
+                    path.push(ty.clone());
+                    // check for descent fields recursively
+                    for (_field_name, (field_loc, _field_idx, field_ty_uninstantiated)) in fields.iter() {
+                        let field_ty_instantiated = field_ty_uninstantiated.instantiate(insts);
+                        // short-curcuit upon first recursive occurence found
+                        if !self.check_recusive_struct_with_parents(&field_ty_instantiated, field_loc, path, checking, loc_checking) {
+                            return false;
+                        }
+                    }
+                    path.pop();
+                    true
+                } else {
+                    true
+                }
+            },
+            Type::Vector(ty) => {
+                self.check_recusive_struct_with_parents(ty, loc, path, checking, loc_checking)
+            },
+            Type::Primitive(..) | Type::TypeParameter(..) => true,
+            _ => panic!("ICE: invalid type in struct"),
+        }
+    }
+
+    /// Checks for recursive definition of structs and adds diagnostics
+    pub fn check_resursive_struct(&self, struct_entry: &StructEntry) {
+        let params = (0..struct_entry.type_params.len()).map(|i| Type::TypeParameter(i as u16)).collect_vec();
+        let struct_ty = Type::Struct(struct_entry.module_id.clone(), struct_entry.struct_id.clone(), params);
+        let mut parents = Vec::new();
+        self.check_recusive_struct_with_parents(
+            &struct_ty,
+            &struct_entry.loc,
+            &mut parents,
+            struct_entry.module_id.qualified(struct_entry.struct_id),
+            &struct_entry.loc
+        );
     }
 
     // Generate warnings about unused schemas.
