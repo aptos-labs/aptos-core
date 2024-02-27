@@ -42,6 +42,8 @@ module aptos_framework::staking_contract {
     use aptos_framework::stake::{Self, OwnerCapability};
     use aptos_framework::staking_config;
 
+    friend aptos_framework::delegation_pool;
+
     const SALT: vector<u8> = b"aptos_framework::staking_contract";
 
     /// Store amount must be at least the min stake required for a stake pool to join the validator set.
@@ -178,6 +180,12 @@ module aptos_framework::staking_contract {
         operator: address,
         old_beneficiary: address,
         new_beneficiary: address,
+    }
+
+    #[event]
+    struct DestoryStakingContractEvent has drop, store {
+        staker: address,
+        operator: address,
     }
 
     #[view]
@@ -635,6 +643,42 @@ module aptos_framework::staking_contract {
         let store = borrow_global_mut<Store>(staker);
         let staking_contract = simple_map::borrow_mut(&mut store.staking_contracts, &operator);
         distribute_internal(staker, operator, staking_contract, &mut store.distribute_events);
+    }
+
+    /// Destroy an owned staking contract and take ownership of its underyling stake pool.
+    /// Extracted state and capabilities will be used to construct a delegation pool of same owner, operator
+    /// and commission fee.
+    public(friend) fun destroy_staking_contract(
+        staker: &signer,
+        operator: address,
+    ): (u64, address, OwnerCapability, u64, Pool, SignerCapability) acquires Store, BeneficiaryForOperator {
+        let staker_address = signer::address_of(staker);
+        assert_staking_contract_exists(staker_address, operator);
+
+        let store = borrow_global_mut<Store>(staker_address);
+        let (_, staking_contract) = simple_map::remove(&mut store.staking_contracts, &operator);
+
+        // withdraw entire inactive stake and unlock commission produced so far
+        distribute_internal(staker_address, operator, &mut staking_contract, &mut store.distribute_events);
+        request_commission_internal(
+            operator,
+            &mut staking_contract,
+            &mut store.add_distribution_events,
+            &mut store.request_commission_events,
+        );
+
+        let StakingContract {
+            principal,
+            pool_address,
+            owner_cap,
+            commission_percentage,
+            distribution_pool,
+            signer_cap,
+        } = staking_contract;
+
+        emit(DestoryStakingContractEvent { staker: staker_address, operator });
+
+        (principal, pool_address, owner_cap, commission_percentage, distribution_pool, signer_cap)
     }
 
     /// Distribute all unlocked (inactive) funds according to distribution shares.
@@ -1434,6 +1478,237 @@ module aptos_framework::staking_contract {
     public entry fun test_get_expected_stake_pool_address(staker: address, operator: address) {
         let pool_address = get_expected_stake_pool_address(staker, operator, vector[0x42, 0x42]);
         assert!(pool_address == @0x9d9648031ada367c26f7878eb0b0406ae6a969b1a43090269e5cdfabe1b48f0f, 0);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
+    #[expected_failure(abort_code = 0x60004, location = Self)]
+    public entry fun test_staker_cannot_destroy_staking_contract_again(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires Store, BeneficiaryForOperator {
+        setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 10);
+        let operator_address = signer::address_of(operator);
+
+        let (_, _, owner_cap, _, distribution_pool, _) = destroy_staking_contract(staker, operator_address);
+        // Handle objects without `drop` ability.
+        stake::deposit_owner_cap(staker, owner_cap);
+        pool_u64::update_total_coins(&mut distribution_pool, 0);
+        pool_u64::destroy_empty(distribution_pool);
+
+        let (_, _, owner_cap, _, distribution_pool, _) = destroy_staking_contract(staker, operator_address);
+        // Should never reach here as the test already aborted.
+        assert!(false, 0);
+        stake::deposit_owner_cap(staker, owner_cap);
+        pool_u64::update_total_coins(&mut distribution_pool, 0);
+        pool_u64::destroy_empty(distribution_pool);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
+    public entry fun test_destroy_staking_contract_commission_requested(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires Store, BeneficiaryForOperator {
+        setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 20);
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = stake_pool_address(staker_address, operator_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        // Validate that entire commission gets allocated to operator.
+        let (principal, _, owner_cap, _, distribution_pool, _) = destroy_staking_contract(staker, operator_address);
+
+        let (active, inactive, _, pending_inactive) = stake::get_stake(pool_address);
+        let operator_reward = (INITIAL_BALANCE * 10 / 10000) * 20 / 100; // commission for one epoch of rewards
+        assert!(operator_reward == pool_u64::balance(&distribution_pool, operator_address), 0);
+        assert!(operator_reward == pending_inactive, 0);
+        assert!(pending_inactive == pool_u64::total_coins(&distribution_pool), 0);
+        assert!(inactive == 0, 0);
+        assert!(active == principal, 0);
+
+        // Handle objects without `drop` ability.
+        stake::deposit_owner_cap(staker, owner_cap);
+        pool_u64::update_total_coins(&mut distribution_pool, 0);
+        pool_u64::destroy_empty(distribution_pool);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator = @0x234)]
+    public entry fun test_destroy_staking_contract_commission_distributed(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires Store, BeneficiaryForOperator {
+        setup_staking_contract(aptos_framework, staker, operator, INITIAL_BALANCE, 20);
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = stake_pool_address(staker_address, operator_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        // Request commission for operator.
+        request_commission(operator, staker_address, operator_address);
+        assert!(pending_distribution_counts(staker_address, operator_address) == 1, 0);
+        assert_distribution(staker_address, operator_address, operator_address, 20000000000);
+
+        // Unlock pending distribution.
+        stake::fast_forward_to_unlock(pool_address);
+        let operator_balance = coin::balance<AptosCoin>(operator_address);
+
+        // Validate that entire commission, now inactive, gets distributed to operator.
+        let (principal, _, owner_cap, _, distribution_pool, _) = destroy_staking_contract(staker, operator_address);
+
+        // pending_inactive commission produced rewards one more epoch and then got inactivated + distributed
+        // no other distribution existed to generate extra pending_inactive commission
+        assert!(
+            coin::balance<AptosCoin>(operator_address) == operator_balance + (20000000000 + 20000000000 * 10 / 10000),
+            0
+        );
+
+        let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
+        // The last epoch of lockup cycle produced active rewards which got allocated to operator.
+        assert!(pending_inactive == 20016000000, 0);
+        assert!(pending_inactive == pool_u64::balance(&distribution_pool, operator_address), 0);
+        assert!(pending_inactive == pool_u64::total_coins(&distribution_pool), 0);
+        assert!(active == principal, 0);
+        assert!(inactive == 0, 0);
+        assert!(pending_active == 0, 0);
+
+        // Handle objects without `drop` ability.
+        stake::deposit_owner_cap(staker, owner_cap);
+        pool_u64::update_total_coins(&mut distribution_pool, 0);
+        pool_u64::destroy_empty(distribution_pool);
+    }
+
+    #[test(aptos_framework = @0x1, staker = @0x123, operator_1 = @0x234, operator_2 = @0x345)]
+    public entry fun test_destroy_staking_contract_e2e(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator_1: &signer,
+        operator_2: &signer,
+    ) acquires Store, BeneficiaryForOperator {
+        setup_staking_contract(aptos_framework, staker, operator_1, INITIAL_BALANCE, 20);
+        let staker_address = signer::address_of(staker);
+        let operator_1_address = signer::address_of(operator_1);
+        let operator_2_address = signer::address_of(operator_2);
+        let pool_address = stake_pool_address(staker_address, operator_1_address);
+
+        // Create operator 2 account.
+        account::create_account_for_test(operator_2_address);
+        coin::register<AptosCoin>(operator_2);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator_1, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        // Request commission for operator 1.
+        request_commission(operator_1, staker_address, operator_1_address);
+        assert!(pending_distribution_counts(staker_address, operator_1_address) == 1, 0);
+        assert_distribution(staker_address, operator_1_address, operator_1_address, 20000000000);
+
+        // Switch operators.
+        switch_operator_with_same_commission(staker, operator_1_address, operator_2_address);
+        assert!(pending_distribution_counts(staker_address, operator_2_address) == 1, 0);
+        assert_distribution(staker_address, operator_2_address, operator_1_address, 20000000000);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        // Request commission for operator 2.
+        request_commission(operator_2, staker_address, operator_2_address);
+        assert!(pending_distribution_counts(staker_address, operator_2_address) == 2, 0);
+        assert_distribution(staker_address, operator_2_address, operator_1_address, 20016000000);
+        assert_distribution(staker_address, operator_2_address, operator_2_address, 20019999999);
+
+        // Staker unlocks some stake.
+        unlock_stake(staker, operator_2_address, 10000000000);
+        assert!(pending_distribution_counts(staker_address, operator_2_address) == 3, 0);
+        assert_distribution(staker_address, operator_2_address, staker_address, 9999999999);
+
+        // Unlock all pending distributions.
+        stake::fast_forward_to_unlock(pool_address);
+        assert_distribution(staker_address, operator_2_address, staker_address, 9999999999);
+        assert_distribution(staker_address, operator_2_address, operator_1_address, 20016000001);
+        assert_distribution(staker_address, operator_2_address, operator_2_address, 20019999999);
+
+        let (_, inactive, _, pending_inactive) = stake::get_stake(pool_address);
+        // pending_inactive stake produced rewards one more epoch before being inactivated
+        assert!(inactive == (10000000000 + 20016000000 + 20020000000) * (10000 + 10) / 10000, 0);
+        assert!(pending_inactive == 0, 0);
+
+        // Fast forward to generate rewards (to trigger a commission request additional to a distribution).
+        stake::end_epoch();
+        let (_, _, commission_amount) = staking_contract_amounts(staker_address, operator_2_address);
+        let staker_balance = coin::balance<AptosCoin>(staker_address);
+        let operator_1_balance = coin::balance<AptosCoin>(operator_1_address);
+        let operator_2_balance = coin::balance<AptosCoin>(operator_2_address);
+
+        // Destroy staking contract.
+        let (
+            principal,
+            returned_pool_address,
+            owner_cap,
+            commission_percentage,
+            distribution_pool,
+            stake_pool_signer_cap
+        ) = destroy_staking_contract(staker, operator_2_address);
+
+        // Validator remains active.
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 0);
+
+        // Inactive distributions have been entirely withdrawn.
+        // 10000000000 + 10000000000 * 10 / 10000 * (100 - 20) / 100
+        assert!(coin::balance<AptosCoin>(staker_address) == staker_balance + 10008000002, 0);
+        // 20016000000 + 20016000000 * 10 / 10000 * (100 - 20) / 100
+        assert!(coin::balance<AptosCoin>(operator_1_address) == operator_1_balance + 20032012801, 0);
+        // 20020000000 + 20020000000 * 10 / 10000 + (10000000000 + 20016000000) * 10 / 10000 * 20 / 100
+        assert!(coin::balance<AptosCoin>(operator_2_address) == operator_2_balance + 20046023197, 0);
+
+        // `StakingContract` resource doesn't exist anymore.
+        assert!(!staking_contract_exists(staker_address, operator_1_address), 0);
+        assert!(!staking_contract_exists(staker_address, operator_2_address), 0);
+
+        // Remaining stake of the stake pool is accounted for.
+        let (active, inactive, pending_active, pending_inactive) = stake::get_stake(pool_address);
+        assert!(active == principal, 0);
+        assert!(inactive == 0, 0);
+        assert!(pending_active == 0, 0);
+        // Entire pending_inactive stake is owned by operator 2 and represents a commission request.
+        assert!(pending_inactive == pool_u64::total_coins(&distribution_pool), 0);
+        assert!(pending_inactive == pool_u64::balance(&distribution_pool, operator_2_address), 0);
+        assert!(pending_inactive == commission_amount, 0);
+
+        // Resource account storing the stake pool is accessible.
+        assert!(pool_address == account::get_signer_capability_address(&stake_pool_signer_cap), 0);
+        // Ownership capability over the stake pool is accessible.
+        assert!(pool_address == stake::get_owned_pool_address(&owner_cap), 0);
+        // Returned pool address is the expected one.
+        assert!(pool_address == returned_pool_address, 0);
+
+        // Commission is a valid 0-decimals precision percentage.
+        assert!(commission_percentage <= 100, 0);
+
+        // Handle objects without `drop` ability.
+        stake::deposit_owner_cap(staker, owner_cap);
+        pool_u64::update_total_coins(&mut distribution_pool, 0);
+        pool_u64::destroy_empty(distribution_pool);
     }
 
     #[test_only]
