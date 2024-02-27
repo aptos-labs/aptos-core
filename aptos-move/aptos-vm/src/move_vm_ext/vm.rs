@@ -191,24 +191,6 @@ impl MoveVmExt {
         resolver: &'r S,
         session_id: SessionId,
     ) -> SessionExt<'r, '_> {
-        self.new_session_impl(resolver, session_id, false)
-    }
-
-    #[cfg(feature = "comparison-testing")]
-    pub fn new_clean_session<'r, S: AptosMoveResolver>(
-        &self,
-        resolver: &'r S,
-        session_id: SessionId,
-    ) -> SessionExt<'r, '_> {
-        self.new_session_impl(resolver, session_id, true)
-    }
-
-    fn new_session_impl<'r, S: AptosMoveResolver>(
-        &self,
-        resolver: &'r S,
-        session_id: SessionId,
-        must_flush: bool,
-    ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
             .as_uuid()
@@ -230,13 +212,9 @@ impl MoveVmExt {
         extensions.add(NativeStateStorageContext::new(resolver));
         extensions.add(NativeEventContext::default());
 
-        if must_flush {
-            self.inner.flush_loader_cache();
-        } else {
-            // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
-            // cache needs to be flushed to work around those bugs.
-            self.inner.flush_loader_cache_if_invalidated();
-        }
+        // The VM code loader has bugs around module upgrade. After a module upgrade, the internal
+        // cache needs to be flushed to work around those bugs.
+        self.inner.flush_loader_cache_if_invalidated();
 
         SessionExt::new(
             self.inner.new_session_with_extensions(resolver, extensions),
