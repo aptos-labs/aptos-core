@@ -910,7 +910,7 @@ impl FakeExecutor {
                         //// TODO: fill in these with proper values
                         LATEST_GAS_FEATURE_VERSION,
                         InitialGasSchedule::initial(),
-                        StorageGasParameters::unlimited(0.into()),
+                        StorageGasParameters::latest(),
                         10000000000000,
                     ),
                     // coeff_buffer: BTreeMap::new(),
