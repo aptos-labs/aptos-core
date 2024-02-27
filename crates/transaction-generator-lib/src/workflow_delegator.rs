@@ -361,10 +361,7 @@ impl WorkflowTxnGeneratorCreator {
                             root_account,
                             txn_executor,
                             &mut packages,
-                            &mut EconiaLimitOrderTransactionGenerator::new(deposit_coins_pool.clone(),
-                                place_orders_pool.clone(),
-                                num_markets
-                            )
+                            &mut EconiaLimitOrderTransactionGenerator::new(num_markets)
                         )
                         .await
                 };

@@ -17,10 +17,15 @@ use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use rand::{rngs::StdRng, Rng};
 
 use std::sync::Arc;
-const COIN_TYPES: [&str; 11] = ["AC", "BC", "DC", "EC", "FC", "GC", "HC", "IC", "JC", "KC", "LC"];
+const BASE_COIN_TYPES: [&str; 11] = ["AC", "BC", "DC", "EC", "FC", "GC", "HC", "IC", "JC", "KC", "LC"];
+const QUOTE_COIN_TYPES: [&str; 11] = ["QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC"];
 
-fn coin_type(market_id: u64) -> &'static str {
-    COIN_TYPES[(market_id-1) as usize]
+fn base_coin_type(market_id: u64) -> &'static str {
+    BASE_COIN_TYPES[(market_id-1) as usize]
+}
+
+fn quote_coin_type(market_id: u64) -> &'static str {
+    QUOTE_COIN_TYPES[(market_id-1) as usize]
 }
 
 /// Placeas a bid limit order.
@@ -28,7 +33,7 @@ pub fn place_bid_limit_order(
     module_id: ModuleId,
     size: u64,
     price: u64,
-    market_id: u64, 
+    market_id: u64,
     publisher: AccountAddress
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -37,12 +42,12 @@ pub fn place_bid_limit_order(
         vec![TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(base_coin_type(market_id))).unwrap(),
             type_params: vec![],
         })), TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name:  Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            name:  Identifier::new(<&str as Into<Box<str>>>::into(quote_coin_type(market_id))).unwrap(),
             type_params: vec![],
         }))],
         vec![
@@ -67,12 +72,12 @@ pub fn place_ask_limit_order(
         vec![TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module:  Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(base_coin_type(market_id))).unwrap(),
             type_params: vec![],
         })), TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module:  Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(quote_coin_type(market_id))).unwrap(),
             type_params: vec![],
         }))],
         vec![
@@ -96,12 +101,12 @@ pub fn place_bid_market_order(
         vec![TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(base_coin_type(market_id))).unwrap(),
             type_params: vec![],
         })), TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(quote_coin_type(market_id))).unwrap(),
             type_params: vec![],
         }))],
         vec![
@@ -124,12 +129,12 @@ pub fn place_ask_market_order(
         vec![TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(base_coin_type(market_id))).unwrap(),
             type_params: vec![],
         })), TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(quote_coin_type(market_id))).unwrap(),
             type_params: vec![],
         }))],
         vec![
@@ -164,12 +169,12 @@ pub fn register_market_accounts(
         vec![TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(base_coin_type(market_id))).unwrap(),
             type_params: vec![],
         })), TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(quote_coin_type(market_id))).unwrap(),
             type_params: vec![],
         }))],
         vec![
@@ -189,12 +194,12 @@ pub fn deposit_coins(
         vec![TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(base_coin_type(market_id))).unwrap(),
             type_params: vec![],
         })), TypeTag::Struct(Box::new(StructTag {
             address: publisher,
             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(quote_coin_type(market_id))).unwrap(),
             type_params: vec![],
         }))],
         vec![
@@ -204,21 +209,15 @@ pub fn deposit_coins(
 }
 
 pub struct EconiaLimitOrderTransactionGenerator {
-    to_setup: Arc<ObjectPool<LocalAccount>>,
-    done: Arc<ObjectPool<LocalAccount>>,
     num_base_orders_placed: usize,
     num_markets: Arc<u64>,
 }
 
 impl EconiaLimitOrderTransactionGenerator {
     pub fn new(
-        to_setup: Arc<ObjectPool<LocalAccount>>,
-        done: Arc<ObjectPool<LocalAccount>>,
         num_markets: u64
     ) -> Self {
         Self {
-            to_setup,
-            done,
             num_base_orders_placed: 0,
             num_markets: Arc::new(num_markets)
         }
@@ -250,14 +249,6 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
         self.num_base_orders_placed += 1;
         if self.num_base_orders_placed <= 100 || self.num_base_orders_placed % 2 == 0 {
             Arc::new(move |account, package, publisher, txn_factory, rng| {
-                // Question: Is this correct? We are signing the transactions with `account`.
-                // We are not using the batch sampled here.
-                let batch = to_setup.take_from_pool(1, true, rng);
-                if batch.is_empty() {
-                    return vec![];
-                }
-                done.add_to_pool(batch);
-
                 let mut requests = vec![];
                 for market_id in 1..(*num_markets+1) {
                     let bid_size = rng.gen_range(4, 14);
@@ -331,13 +322,13 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketTransactionGenerator
         _root_account: &mut LocalAccount,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
-        rng: &mut StdRng,
+        _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
-        Arc::new(move |_account, package, publisher, txn_factory, rng| {
+        Arc::new(move |_account, package, publisher, txn_factory, _rng| {
             let mut requests = vec![];
             assert!(*num_markets > 0, "num_markets must be greater than 0");
-            assert!(*num_markets <= 10, "num_markets must be less than or equal to 10");
+            assert!(*num_markets <= 11, "num_markets must be less than or equal to 11");
             let builder = txn_factory.payload(register_market(package.get_module_id("txn_generator_utils"), *num_markets));
             requests.push(publisher.sign_with_transaction_builder(builder));
             requests
