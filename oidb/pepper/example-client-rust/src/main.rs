@@ -1,16 +1,11 @@
 // Copyright © Aptos Foundation
 
 use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_oidb_pepper_common::{
-    asymmetric_encryption::{
-        elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption,
-    },
-    jwt,
-    vuf::{self, bls12381_g1_bls::Bls12381G1Bls, VUF},
-    PepperInput, PepperRequest, PepperResponse, VUFVerificationKey,
-};
+use aptos_oidb_pepper_common::{asymmetric_encryption::{
+    AsymmetricEncryption, elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm,
+}, jwt, PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0, vuf::{self, bls12381_g1_bls::Bls12381G1Bls, VUF}, VUFVerificationKey};
 use aptos_types::{
-    oidb::{test_utils::get_sample_esk, Configuration, OpenIdSig},
+    oidb::{Configuration, OpenIdSig, test_utils::get_sample_esk},
     transaction::authenticator::EphemeralPublicKey,
 };
 use ark_serialize::CanonicalDeserialize;
@@ -142,14 +137,13 @@ async fn main() {
         Err(_) => jwt_or_path,
     };
 
-    let pepper_request = PepperRequest {
+    let pepper_request = PepperRequest::V0(PepperRequestV0 {
         jwt: jwt.clone(),
-        overriding_aud: None,
         epk_hex_string: hex::encode(epk.to_bytes()),
         epk_expiry_time_secs,
         epk_blinder_hex_string: hex::encode(blinder),
         uid_key: None,
-    };
+    });
     println!();
     println!(
         "Request pepper with a POST to {} and the body being {}",
@@ -163,14 +157,9 @@ async fn main() {
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse {
-        pepper_key_hex_string,
-        ..
-    } = pepper_response;
-    let pepper_bytes = hex::decode(pepper_key_hex_string).unwrap();
+    let PepperResponse::V0(PepperResponseV0::Ok(pepper)) = pepper_response else { panic!("bad pepper response") };
     println!();
-    println!("Decrypt the pepper using the ephemeral private key.");
-    println!("pepper_bytes={:?}", pepper_bytes);
+    println!("pepper={:?}", pepper);
     let claims = jwt::parse(jwt.as_str()).unwrap();
     println!();
     println!("Verify the pepper against the server's verification key and part of the JWT.");
@@ -181,7 +170,7 @@ async fn main() {
         aud: claims.claims.aud.clone(),
     };
     let pepper_input_bytes = bcs::to_bytes(&pepper_input).unwrap();
-    vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &pepper_bytes, &[])
+    vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &pepper, &[])
         .unwrap();
     println!();
     println!("Pepper verification succeeded!");

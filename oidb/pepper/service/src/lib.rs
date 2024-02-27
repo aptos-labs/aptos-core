@@ -2,12 +2,7 @@
 
 use crate::vuf_keys::VUF_SK;
 use anyhow::{anyhow, bail, ensure};
-use aptos_oidb_pepper_common::{
-    jwt::Claims,
-    sha3_256,
-    vuf::{self, VUF},
-    PepperInput, PepperRequest, PepperResponse,
-};
+use aptos_oidb_pepper_common::{jwt::Claims, PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0, sha3_256, vuf::{self, VUF}};
 use aptos_types::{
     oidb::{Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
@@ -24,20 +19,21 @@ pub type Issuer = String;
 pub type KeyID = String;
 
 /// The core processing logic of this pepper service.
-pub fn process(request: PepperRequest) -> anyhow::Result<PepperResponse> {
-    let pepper_key_hex_string = process_v0(request)?;
-    let pepper = sha3_256(&hex::decode(pepper_key_hex_string.clone())?);
-    let pepper_hex_string = hex::encode(&pepper[..31]);
-    Ok(PepperResponse {
-        pepper_key_hex_string,
-        pepper_hex_string,
-    })
+pub fn process(request: PepperRequest) -> PepperResponse {
+    match request {
+        PepperRequest::V0(req) => {
+            let response_inner = match process_v0(req) {
+                Ok(pepper) => PepperResponseV0::Ok(pepper),
+                Err(e) => PepperResponseV0::Err(e.to_string()),
+            };
+            PepperResponse::V0(response_inner)
+        }
+    }
 }
 
-fn process_v0(request: PepperRequest) -> anyhow::Result<String> {
-    let PepperRequest {
+pub fn process_v0(request: PepperRequestV0) -> anyhow::Result<Vec<u8>> {
+    let PepperRequestV0 {
         jwt,
-        overriding_aud,
         epk_hex_string,
         epk_expiry_time_secs,
         epk_blinder_hex_string,
@@ -99,35 +95,14 @@ fn process_v0(request: PepperRequest) -> anyhow::Result<String> {
     ) // Signature verification happens here.
     .map_err(|e| anyhow!("JWT signature verification failed: {e}"))?;
 
-    // Decide the client_id in the input.
-    let actual_aud = if ACCOUNT_DISCOVERY_CLIENTS.contains(&claims.claims.aud) {
-        if let Some(aud) = overriding_aud.as_ref() {
-            aud
-        } else {
-            &claims.claims.aud
-        }
-    } else {
-        &claims.claims.aud
-    };
-
     let input = PepperInput {
         iss: claims.claims.iss.clone(),
-        uid_key: actual_uid_key.to_owned(),
+        uid_key: actual_uid_key.to_string(),
         uid_val,
-        aud: actual_aud.clone(),
+        aud: claims.claims.aud.clone(),
     };
     let input_bytes = bcs::to_bytes(&input).unwrap();
     let (pepper, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)?;
     ensure!(vuf_proof.is_empty(), "internal proof error");
-    let pepper_hexlified = hex::encode(pepper);
-    Ok(pepper_hexlified)
+    Ok(pepper)
 }
-
-/// The set of the privileged clients.
-///
-/// TODO: should be loaded from env/an external service.
-pub static ACCOUNT_DISCOVERY_CLIENTS: Lazy<HashSet<String>> = Lazy::new(|| {
-    let mut set = HashSet::new();
-    set.insert("407408718192.apps.googleusercontent.com".to_string()); // Google OAuth 2.0 Playground
-    set
-});

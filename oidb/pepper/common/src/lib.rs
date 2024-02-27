@@ -1,14 +1,15 @@
 // Copyright © Aptos Foundation
 
 use crate::asymmetric_encryption::{
-    elgamal_curve25519_aes256_gcm, elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm,
-    AsymmetricEncryption,
+    AsymmetricEncryption, elgamal_curve25519_aes256_gcm,
+    elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm,
 };
 use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
 use anyhow::bail;
 use curve25519_dalek::digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::Error;
 
 pub mod asymmetric_encryption;
 pub mod elgamal;
@@ -23,29 +24,33 @@ pub fn sha3_256(input: &[u8]) -> Vec<u8> {
 
 /// The spec of a request to this pepper service.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PepperRequest {
+pub enum PepperRequest {
+    V0(PepperRequestV0),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum PepperResponse {
+    Error(String),
+    V0(PepperResponseV0),
+}
+
+/// A pepper scheme where:
+/// - The pepper input contains `JWT, epk, blinder, expiry_time, uid_key`, wrapped in type `PepperRequestV0`.
+/// - The pepper output is the `BLS12381_G1_BLS` VUF output of the input, wrapped in type `PepperResponseV0`.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PepperRequestV0 {
     pub jwt: String,
-    /// If specified, generate pepper for `jwk.payload.iss, jwk.payload.sub, overriding_aud`.
-    /// Otherwise, generate pepper for `jwk.payload.iss, jwk.payload.sub, jwk.payload.aud`.
-    pub overriding_aud: Option<String>,
     pub epk_hex_string: String,
     pub epk_expiry_time_secs: u64,
     pub epk_blinder_hex_string: String,
     pub uid_key: Option<String>,
 }
 
-/// The response to `PepperRequestV0`, which contains the calculated pepper (hexlified) or a processing error.
+/// The response to `PepperRequestV0`, which contains either the pepper or a processing error.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PepperResponse {
-    pub pepper_key_hex_string: String,
-    pub pepper_hex_string: String,
-}
-
-/// The response to `PepperRequestV1`, which contains the calculated pepper (encrypted then hexlified) or a processing error.
-#[derive(Debug, Deserialize, Serialize)]
-pub enum PepperResponseV1 {
-    OK { pepper_encrypted_hexlified: String },
-    Error(String),
+pub enum PepperResponseV0 {
+    Ok(Vec<u8>),
+    Err(String),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
