@@ -78,14 +78,12 @@ fun m::f($t0: &mut u64): &mut u64 {
      # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
-     # moved: {}
      #
   0: $t1 := infer($t0)
      # live vars: $t1
      # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
-     # moved: {}
      #
   1: return $t1
 }
@@ -104,63 +102,54 @@ fun m::g() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t1 := 22
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t0 := infer($t1)
      # live vars: $t0
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t3 := borrow_local($t0)
      # live vars: $t0, $t3
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
-     # moved: {}
      #
   3: $t2 := infer($t3)
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   4: $t4 := m::f($t2)
      # live vars: $t0, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[call(true) -> @400],@400=derived[]}
      # locals: {$t0=@200,$t4=@400}
      # globals: {}
-     # moved: {$t2}
      #
   5: $t2 := infer($t4)
      # live vars: $t0
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
   6: $t6 := borrow_local($t0)
      # live vars: $t6
      # graph: {@200=local($t0)[borrow(false) -> @601],@601=derived[]}
      # locals: {$t0=@200,$t6=@601}
      # globals: {}
-     # moved: {}
      #
   7: $t5 := infer($t6)
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
   8: return ()
 }
@@ -175,7 +164,6 @@ fun m::f($t0: &mut u64): &mut u64 {
      # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
-     # moved: {}
      #
   0: $t1 := infer($t0)
      # abort state: {returns}
@@ -183,7 +171,6 @@ fun m::f($t0: &mut u64): &mut u64 {
      # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
-     # moved: {}
      #
   1: return $t1
 }
@@ -203,7 +190,6 @@ fun m::g() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t1 := 22
      # abort state: {returns,aborts}
@@ -211,7 +197,6 @@ fun m::g() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t0 := infer($t1)
      # abort state: {returns,aborts}
@@ -219,7 +204,6 @@ fun m::g() {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t3 := borrow_local($t0)
      # abort state: {returns,aborts}
@@ -227,7 +211,6 @@ fun m::g() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
-     # moved: {}
      #
   3: $t2 := infer($t3)
      # abort state: {returns,aborts}
@@ -235,7 +218,6 @@ fun m::g() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
-     # moved: {}
      #
   4: $t4 := m::f($t2)
      # abort state: {returns}
@@ -243,7 +225,6 @@ fun m::g() {
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[call(true) -> @400],@400=derived[]}
      # locals: {$t0=@200,$t4=@400}
      # globals: {}
-     # moved: {$t2}
      #
   5: $t2 := infer($t4)
      # abort state: {returns}
@@ -251,7 +232,6 @@ fun m::g() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
   6: $t6 := borrow_local($t0)
      # abort state: {returns}
@@ -259,7 +239,6 @@ fun m::g() {
      # graph: {@200=local($t0)[borrow(false) -> @601],@601=derived[]}
      # locals: {$t0=@200,$t6=@601}
      # globals: {}
-     # moved: {}
      #
   7: $t5 := infer($t6)
      # abort state: {returns}
@@ -267,7 +246,6 @@ fun m::g() {
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
-     # moved: {}
      #
   8: return ()
 }

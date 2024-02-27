@@ -51,42 +51,36 @@ fun explicate_drop::test0(): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t2 := 42
      # live vars: $t2
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t1 := infer($t2)
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t4 := borrow_local($t1)
      # live vars: $t4
      # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t1=@200,$t4=@201}
      # globals: {}
-     # moved: {}
      #
   3: $t3 := infer($t4)
      # live vars: $t3
      # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t1=@200,$t3=@201}
      # globals: {}
-     # moved: {}
      #
   4: $t0 := read_ref($t3)
      # live vars: $t0
      # graph: {@200=local($t1)[]}
      # locals: {$t1=@200}
      # globals: {}
-     # moved: {}
      #
   5: return $t0
 }
@@ -105,7 +99,6 @@ fun explicate_drop::test0(): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   0: $t2 := 42
      # abort state: {returns}
@@ -113,7 +106,6 @@ fun explicate_drop::test0(): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   1: $t1 := infer($t2)
      # abort state: {returns}
@@ -121,7 +113,6 @@ fun explicate_drop::test0(): u8 {
      # graph: {}
      # locals: {}
      # globals: {}
-     # moved: {}
      #
   2: $t4 := borrow_local($t1)
      # abort state: {returns}
@@ -129,7 +120,6 @@ fun explicate_drop::test0(): u8 {
      # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t1=@200,$t4=@201}
      # globals: {}
-     # moved: {}
      #
   3: $t3 := infer($t4)
      # abort state: {returns}
@@ -137,7 +127,6 @@ fun explicate_drop::test0(): u8 {
      # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
      # locals: {$t1=@200,$t3=@201}
      # globals: {}
-     # moved: {}
      #
   4: $t0 := read_ref($t3)
      # abort state: {returns}
@@ -145,7 +134,6 @@ fun explicate_drop::test0(): u8 {
      # graph: {@200=local($t1)[]}
      # locals: {$t1=@200}
      # globals: {}
-     # moved: {}
      #
   5: return $t0
 }
