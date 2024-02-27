@@ -283,7 +283,7 @@ impl Worker {
         } else if self.model.get_cdn_animation_uri().is_some() {
             None
         } else {
-            self.model.get_raw_animation_uri().map_or(None, |uri| {
+            self.model.get_raw_animation_uri().and_then(|uri| {
                 match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
                     &mut self.conn,
                     &self.asset_uri,
