@@ -14,6 +14,7 @@ use aptos_types::{
     on_chain_config::FeatureFlag,
     transaction::{EntryFunction, ExecutionStatus, Script, TransactionPayload, TransactionStatus},
 };
+use aptos_vm_types::storage::StorageGasParameters;
 use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
 use once_cell::sync::Lazy;
 
@@ -400,13 +401,11 @@ impl FeePayerPricingInfo {
 }
 
 static PRICING: Lazy<FeePayerPricingInfo> = Lazy::new(|| {
-    use aptos_vm_types::storage::space_pricing::DiskSpacePricing;
-
     let h = MoveHarness::new();
 
     let (_feature_version, params) = h.get_gas_params();
     let params = params.vm.txn;
-    let pricing = DiskSpacePricing::latest();
+    let pricing = StorageGasParameters::latest().space_pricing;
 
     FeePayerPricingInfo {
         estimated_per_new_account_fee_octas: u64::from(
