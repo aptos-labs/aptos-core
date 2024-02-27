@@ -3,23 +3,16 @@
 This document describes the coding guidelines for the [Aptos Core](https://github.com/aptos-labs/aptos-core) Rust codebase. For the Move language, see the [Move Coding Conventions](https://aptos.dev/move/book/SUMMARY).
 Secure coding guidance is provided in the [Aptos Rust Secure Coding Guidelines](./RUST_SECURE_CODING.md).
 
-## Code formatting
+## Code formatting & Code analysis
 
-All code formatting is enforced with [rustfmt](https://github.com/rust-lang/rustfmt) with a project-specific configuration. Below is an example command to adhere to the Aptos Core project conventions.
-
-```
-cargo fmt
-```
-
-## Code analysis
-
-[Clippy](https://github.com/rust-lang/rust-clippy) is used to catch common mistakes and is run as a part of continuous integration. Before submitting your code for review, you can run clippy with our configuration:
+All code formatting is enforced with [rustfmt](https://github.com/rust-lang/rustfmt) with a project-specific configuration. A wrapper script is provided to run rustfmt and Clippy with the correct configuration.
+The `--check` flag can be used to check if the code is formatted correctly.
 
 ```
-cargo xclippy --all-targets
+./scripts/rust_lint.sh
 ```
 
-In general, we follow the recommendations from [rust-lang](https://rust-lang.github.io/api-guidelines/about.html) and [The Rust Programming Language](https://doc.rust-lang.org/book/). The remainder of this guide provides detailed guidelines on specific topics in order to achieve uniformity of the codebase.
+> **Note:** xclippy is an alias for `cargo clippy` with additional flags to enable more lints.
 
 ## Code documentation
 
