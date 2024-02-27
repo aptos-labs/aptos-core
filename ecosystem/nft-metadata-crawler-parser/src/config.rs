@@ -148,13 +148,16 @@ async fn spawn_parser(
     gcs_client: Arc<GCSClient>,
 ) {
     PARSER_INVOCATIONS_COUNT.inc();
-    let pubsub_message = String::from_utf8(msg_base64.to_vec()).unwrap_or_else(|e| {
-        error!(
-            error = ?e,
-            "[NFT Metadata Crawler] Failed to parse PubSub message"
-        );
-        panic!();
-    });
+    let pubsub_message = String::from_utf8(msg_base64.to_vec())
+        .unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to parse PubSub message"
+            );
+            panic!();
+        })
+        .replace('\u{0000}', "")
+        .replace("\\u0000", "");
 
     info!(
         pubsub_message = pubsub_message,
