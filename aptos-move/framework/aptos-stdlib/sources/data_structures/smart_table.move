@@ -195,8 +195,6 @@ module aptos_std::smart_table {
         u64,
     ) {
         let keys = vector[];
-        let next_starting_bucket_index = 0;
-        let next_starting_vector_index = 0;
         if (num_keys_to_get > 0) {
             let num_buckets = table.num_buckets;
             if (num_buckets > 0) {
@@ -210,43 +208,28 @@ module aptos_std::smart_table {
                 if (starting_vector_index != 0) {
                     assert!(starting_vector_index < bucket_length, EINVALID_VECTOR_INDEX);
                 };
-                while (num_keys_checked < num_keys_to_get && bucket_index < num_buckets) {
-                    while (bucket_length == 0) { // Advance to next non-empty bucket.
-                        bucket_index = starting_bucket_index + 1;
-                        if (bucket_index == num_buckets) break;
-                        bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
-                        bucket_length = vector::length(bucket_ref);
-                    };
-                    if (bucket_index < num_buckets) {  // Index all keys in non-empty bucket.
-                        while (vector_index < bucket_length) {
-                            vector::push_back(
-                                &mut keys,
-                                vector::borrow(bucket_ref, vector_index).key);
-                            num_keys_checked = num_keys_checked + 1;
-                            vector_index = vector_index + 1;
-                            if (num_keys_checked == num_keys_to_get) {
-                                if (vector_index < bucket_length) {
-                                    next_starting_bucket_index = bucket_index;
-                                    next_starting_vector_index = vector_index;
-                                } else {
-                                    next_starting_vector_index = 0;
-                                    bucket_index = bucket_index + 1;
-                                    next_starting_bucket_index = if (bucket_index < num_buckets) {
-                                        bucket_index
-                                    } else {
-                                        0
-                                    };
-                                };
-                                break
+                while (bucket_index < num_buckets) {
+                    bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
+                    bucket_length = vector::length(bucket_ref);
+                    while (vector_index < bucket_length) {
+                        vector::push_back(&mut keys, vector::borrow(bucket_ref, vector_index).key);
+                        num_keys_checked = num_keys_checked + 1;
+                        vector_index = vector_index + 1;
+                        if (num_keys_checked == num_keys_to_get) {
+                            if (vector_index == bucket_length) {
+                                vector_index = 0;
+                                bucket_index = bucket_index + 1;
+                                bucket_index = if (bucket_index < num_buckets) bucket_index else 0;
                             };
+                            return (keys, bucket_index, vector_index)
                         };
-                        bucket_index = bucket_index + 1;
-                        vector_index = 0;
-                    } else break
+                    };
+                    bucket_index = bucket_index + 1;
+                    vector_index = 0;
                 };
             };
         };
-        (keys, next_starting_bucket_index, next_starting_vector_index)
+        (keys, 0, 0)
     }
 
     /// Decide which is the next bucket to split and split it into two with the elements inside the bucket.
