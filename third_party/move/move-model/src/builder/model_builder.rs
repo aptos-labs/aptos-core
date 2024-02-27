@@ -568,8 +568,7 @@ impl<'env> ModelBuilder<'env> {
             Type::Vector(ty) => {
                 self.check_recusive_struct_with_parents(ty, loc, path, checking, loc_checking)
             },
-            Type::Primitive(..) | Type::TypeParameter(..) => true,
-            _ => panic!("ICE: invalid type in struct"),
+            _ => true,
         }
     }
 
