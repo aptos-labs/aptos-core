@@ -6,8 +6,12 @@ use crate::storage::{
     io_pricing::{IoPricing, IoPricingV3},
     space_pricing::DiskSpacePricing,
 };
-use aptos_gas_schedule::{AptosGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::{ConfigStorage, Features};
+use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, LATEST_GAS_FEATURE_VERSION};
+use aptos_types::{
+    access_path::AccessPath,
+    on_chain_config::{ConfigStorage, Features},
+};
+use bytes::Bytes;
 use move_core_types::gas_algebra::NumBytes;
 use std::fmt::Debug;
 
@@ -51,5 +55,22 @@ impl StorageGasParameters {
                 LATEST_GAS_FEATURE_VERSION,
             ),
         }
+    }
+
+    pub fn latest() -> Self {
+        struct DummyConfigStorage;
+
+        impl ConfigStorage for DummyConfigStorage {
+            fn fetch_config(&self, _access_path: AccessPath) -> Option<Bytes> {
+                unreachable!("Not supposed to be called from latest() / tests.")
+            }
+        }
+
+        Self::new(
+            LATEST_GAS_FEATURE_VERSION,
+            &Features::default(),
+            &AptosGasParameters::initial(),
+            &DummyConfigStorage,
+        )
     }
 }
