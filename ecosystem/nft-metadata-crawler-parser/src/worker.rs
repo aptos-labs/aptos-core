@@ -295,7 +295,7 @@ impl Worker {
                         self.upsert();
                         None
                     },
-                    None => self.model.get_raw_animation_uri(),
+                    None => Some(uri),
                 }
             })
         };
