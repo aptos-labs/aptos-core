@@ -2,9 +2,7 @@
 
 use anyhow::anyhow;
 use jsonwebtoken::{DecodingKey, TokenData, Validation};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
 
 /// The claims required in a JWT.
 #[derive(Debug, Deserialize, Serialize)]
@@ -21,19 +19,14 @@ pub struct Claims {
 
 /// Simply parse the fields out without performing signature verification.
 pub fn parse(jwt: &str) -> anyhow::Result<TokenData<Claims>> {
-    jsonwebtoken::decode::<Claims>(
-        jwt,
-        DUMMY_DECODING_KEY.deref(),
-        VALIDATION_CONFIG_NO_SIG_VERIFICATION.deref(),
-    )
-    .map_err(|e| anyhow!("jwt decoding error: {}", e))
+    let empty_decoding_key = DecodingKey::from_secret(&[]);
+    let parse_only_validation = {
+        let mut config = Validation::default();
+        config.insecure_disable_signature_validation();
+        config.validate_exp = false;
+        config
+    };
+
+    jsonwebtoken::decode::<Claims>(jwt, &empty_decoding_key, &parse_only_validation)
+        .map_err(|e| anyhow!("jwt decoding error: {}", e))
 }
-
-static DUMMY_DECODING_KEY: Lazy<DecodingKey> = Lazy::new(|| DecodingKey::from_secret(&[]));
-
-static VALIDATION_CONFIG_NO_SIG_VERIFICATION: Lazy<Validation> = Lazy::new(|| {
-    let mut config = Validation::default();
-    config.insecure_disable_signature_validation();
-    config.validate_exp = false;
-    config
-});
