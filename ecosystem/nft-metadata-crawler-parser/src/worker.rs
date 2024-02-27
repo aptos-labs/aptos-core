@@ -96,6 +96,7 @@ impl Worker {
             self.model.set_do_not_parse(true);
             self.upsert();
             SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
+            return Ok(());
         }
 
         // Skip if asset_uri is not a valid URI, do not write invalid URI to Postgres
