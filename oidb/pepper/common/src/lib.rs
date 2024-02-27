@@ -47,11 +47,7 @@ pub struct PepperRequestV0 {
 }
 
 /// The response to `PepperRequestV0`, which contains either the pepper or a processing error.
-#[derive(Debug, Deserialize, Serialize)]
-pub enum PepperResponseV0 {
-    Ok(Vec<u8>),
-    Err(String),
-}
+pub type PepperResponseV0 = Result<Vec<u8>, String>;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct VUFVerificationKey {
