@@ -1753,8 +1753,9 @@ fn realistic_env_max_load_test(
     num_fullnodes: usize,
 ) -> ForgeConfig {
     // Check if HAProxy is enabled
-    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
-        k8s.enable_haproxy
+    let ha_proxy = if let TestCommand::K8sSwarm(ref mut k8s) = test_cmd {
+        k8s.enable_haproxy = true;
+        true
     } else {
         false
     };
