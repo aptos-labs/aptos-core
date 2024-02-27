@@ -34,10 +34,10 @@ pub(crate) struct BigQueryRow {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RemoteNodeConfigEntry {
-    node_type: NodeType,
-    chain_id: ChainId,
-    peer_ids: Vec<PeerId>,
-    node_config: serde_yaml::Value,
+    pub node_type: NodeType,
+    pub chain_id: ChainId,
+    pub peer_ids: Vec<PeerId>,
+    pub node_config: serde_yaml::Value,
 }
 
 #[derive(Debug, Deserialize, Clone)]

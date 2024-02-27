@@ -2,18 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    context::RemoteNodeConfigProvider,
     debug, error,
     errors::ValidatorCacheUpdateError,
     metrics::{VALIDATOR_SET_UPDATE_FAILED_COUNT, VALIDATOR_SET_UPDATE_SUCCESS_COUNT},
     types::common::{ChainCommonName, EpochedPeerStore},
 };
+use anyhow::bail;
 use aptos_config::config::{Peer, PeerRole, PeerSet};
 use aptos_infallible::RwLock;
 use aptos_rest_client::Response;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, chain_id::ChainId, on_chain_config::ValidatorSet, PeerId,
 };
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use futures::TryFutureExt;
+use std::{
+    collections::HashMap,
+    str::FromStr,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::time;
 use url::Url;
 
@@ -24,6 +32,9 @@ pub struct PeerSetCacheUpdater {
 
     query_addresses: Arc<HashMap<ChainCommonName, String>>,
     update_interval: time::Duration,
+
+    remote_config_provider: Arc<RwLock<RemoteNodeConfigProvider>>,
+    remote_config_url: String,
 }
 
 impl PeerSetCacheUpdater {
@@ -32,12 +43,16 @@ impl PeerSetCacheUpdater {
         validator_fullnodes: Arc<RwLock<EpochedPeerStore>>,
         trusted_full_node_addresses: HashMap<ChainCommonName, String>,
         update_interval: Duration,
+        remote_config_provider: Arc<RwLock<RemoteNodeConfigProvider>>,
+        remote_config_url: String,
     ) -> Self {
         Self {
             validators,
             validator_fullnodes,
             query_addresses: Arc::new(trusted_full_node_addresses),
             update_interval,
+            remote_config_provider,
+            remote_config_url,
         }
     }
 
@@ -45,13 +60,53 @@ impl PeerSetCacheUpdater {
         let mut interval = time::interval(self.update_interval);
         tokio::spawn(async move {
             loop {
-                self.update().await;
+                futures::future::join(self.update_validator_set(), self.update_remote_configs())
+                    .await;
                 interval.tick().await;
             }
         });
     }
 
-    async fn update(&self) {
+    async fn update_remote_configs(&self) {
+        let mut url = Url::from_str(&self.remote_config_url).expect("must work");
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("System time is before the UNIX_EPOCH");
+        url.set_query(Some(&format!("{}", now.as_millis())));
+        let result = reqwest::get(url)
+            .map_err(|err| anyhow::anyhow!(err))
+            .and_then(|res| Self::error_for_status_with_body(res))
+            .and_then(|res| async move {
+                let res_bytes = res.bytes().await?;
+                Ok(serde_yaml::from_slice(&res_bytes)?)
+            })
+            .await;
+        let updated_file = match result {
+            Ok(file) => file,
+            Err(err) => {
+                error!("unable to pull remote configs file: {}", err);
+                return;
+            },
+        };
+
+        self.remote_config_provider.write().update(updated_file);
+    }
+
+    async fn error_for_status_with_body(
+        response: reqwest::Response,
+    ) -> Result<reqwest::Response, anyhow::Error> {
+        if response.status().is_client_error() || response.status().is_server_error() {
+            bail!(
+                "HTTP status error ({}) for url ({}): {}",
+                response.status(),
+                response.url().clone(),
+                response.text().await?,
+            )
+        }
+        Ok(response)
+    }
+
+    async fn update_validator_set(&self) {
         for (chain_name, url) in self.query_addresses.iter() {
             match self.update_for_chain(chain_name, url).await {
                 Ok(_) => {
@@ -177,6 +232,7 @@ impl PeerSetCacheUpdater {
 #[cfg(test)]
 mod tests {
     use super::PeerSetCacheUpdater;
+    use crate::context::RemoteNodeConfigProvider;
     use aptos_crypto::{
         bls12381::{PrivateKey, PublicKey},
         test_utils::KeyPair,
@@ -226,9 +282,11 @@ mod tests {
             Arc::new(RwLock::new(HashMap::new())),
             fullnodes,
             Duration::from_secs(10),
+            Arc::new(RwLock::new(RemoteNodeConfigProvider::new())),
+            String::new(),
         );
 
-        updater.update().await;
+        updater.update_validator_set().await;
 
         mock.assert();
         assert!(updater.validators.read().is_empty());
@@ -274,9 +332,11 @@ mod tests {
             Arc::new(RwLock::new(HashMap::new())),
             fullnodes,
             Duration::from_secs(10),
+            Arc::new(RwLock::new(RemoteNodeConfigProvider::new())),
+            String::new(),
         );
 
-        updater.update().await;
+        updater.update_validator_set().await;
 
         mock.assert();
         assert_eq!(updater.validators.read().len(), 1);

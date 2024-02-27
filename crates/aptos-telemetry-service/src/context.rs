@@ -3,7 +3,10 @@
 
 use crate::{
     clients::{big_query::TableWriteClient, humio, victoria_metrics_api::Client as MetricsClient},
-    types::common::EpochedPeerStore,
+    types::{
+        common::{EpochedPeerStore, NodeType},
+        telemetry::{RemoteNodeConfig, RemoteNodeConfigsFile},
+    },
     LogIngestConfig, MetricsEndpointsConfig,
 };
 use aptos_crypto::{noise, x25519};
@@ -157,6 +160,49 @@ impl JsonWebTokenService {
     }
 }
 
+pub struct RemoteNodeConfigProvider {
+    configs_per_chain: HashMap<ChainId, HashMap<(NodeType, PeerId), RemoteNodeConfig>>,
+}
+
+impl RemoteNodeConfigProvider {
+    pub fn new() -> Self {
+        Self {
+            configs_per_chain: HashMap::new(),
+        }
+    }
+
+    pub fn update(&mut self, file: RemoteNodeConfigsFile) {
+        let mut configs_per_chain = HashMap::new();
+
+        for raw_config in file.node_configs {
+            let chain_configs = configs_per_chain
+                .entry(raw_config.chain_id)
+                .or_insert_with(|| HashMap::new());
+
+            for peer in raw_config.peer_ids {
+                chain_configs.insert((raw_config.node_type, peer), RemoteNodeConfig {
+                    version: file.version,
+                    node_config: raw_config.node_config.clone(),
+                });
+            }
+        }
+
+        self.configs_per_chain = configs_per_chain;
+    }
+
+    pub fn get(
+        &self,
+        chain_id: ChainId,
+        peer_id: PeerId,
+        role: NodeType,
+    ) -> Option<RemoteNodeConfig> {
+        self.configs_per_chain
+            .get(&chain_id)
+            .and_then(|chain_config| chain_config.get(&(role, peer_id)))
+            .cloned()
+    }
+}
+
 #[derive(Clone)]
 pub struct Context {
     noise_config: Arc<noise::NoiseConfig>,
@@ -165,6 +211,7 @@ pub struct Context {
     jwt_service: JsonWebTokenService,
     log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
     peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+    remote_config_provider: Arc<RwLock<RemoteNodeConfigProvider>>,
 }
 
 impl Context {
@@ -175,6 +222,7 @@ impl Context {
         jwt_service: JsonWebTokenService,
         log_env_map: HashMap<ChainId, HashMap<PeerId, String>>,
         peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
+        remote_config_provider: Arc<RwLock<RemoteNodeConfigProvider>>,
     ) -> Self {
         Self {
             noise_config: Arc::new(noise::NoiseConfig::new(private_key)),
@@ -183,6 +231,7 @@ impl Context {
             jwt_service,
             log_env_map,
             peer_identities,
+            remote_config_provider,
         }
     }
 
@@ -234,5 +283,9 @@ impl Context {
     #[cfg(test)]
     pub fn log_env_map_mut(&mut self) -> &mut HashMap<ChainId, HashMap<PeerId, String>> {
         &mut self.log_env_map
+    }
+
+    pub fn remote_config_provider(&self) -> Arc<RwLock<RemoteNodeConfigProvider>> {
+        self.remote_config_provider.clone()
     }
 }
