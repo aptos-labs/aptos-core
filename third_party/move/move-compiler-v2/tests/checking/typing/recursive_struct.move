@@ -21,6 +21,10 @@ module 0x42::simple_recursion {
 	struct S4<T> {
 		f: S4<bool>
 	}
+
+	struct S5 {
+		f: S5
+	}
 }
 
 module 0x42::type_param {
