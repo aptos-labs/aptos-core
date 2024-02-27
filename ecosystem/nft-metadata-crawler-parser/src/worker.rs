@@ -92,7 +92,10 @@ impl Worker {
 
         // Check asset_uri against the URI blacklist
         if self.is_blacklisted_uri(&self.asset_uri.clone()) {
-            return Ok(());
+            self.log_info("Found match in URI blacklist, marking as do_not_parse");
+            self.model.set_do_not_parse(true);
+            self.upsert();
+            SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
         }
 
         // Skip if asset_uri is not a valid URI, do not write invalid URI to Postgres
@@ -161,27 +164,36 @@ impl Worker {
             self.upsert();
         }
 
-        // Deduplicate raw_image_uri
-        // Proceed with image optimization if force or if raw_image_uri has not been parsed
-        // Since we default to asset_uri, this check works if raw_image_uri is null because deduplication for asset_uri has already taken place
-        let dupe_image_found = self.model.get_raw_image_uri().map_or(false, |uri| {
-            match NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
-                &mut self.conn,
-                &self.asset_uri,
-                &uri,
-            ) {
-                Some(uris) => {
-                    self.log_info("Duplicate raw_image_uri found");
-                    DUPLICATE_RAW_IMAGE_URI_COUNT.inc();
-                    self.model.set_cdn_image_uri(uris.cdn_image_uri);
-                    self.upsert();
-                    true
-                },
-                None => false,
-            }
-        });
+        // Should I optimize image?
+        // if force: true
+        // else if cdn_image_uri already exists: false
+        // else: perform lookup
+        //     if found: set cdn_image_uri, false
+        //     else: true
+        let should_optimize_image = if self.force {
+            true
+        } else if self.model.get_cdn_image_uri().is_some() {
+            false
+        } else {
+            self.model.get_raw_image_uri().map_or(true, |uri| {
+                match NFTMetadataCrawlerURIsQuery::get_by_raw_image_uri(
+                    &mut self.conn,
+                    &self.asset_uri,
+                    &uri,
+                ) {
+                    Some(uris) => {
+                        self.log_info("Duplicate raw_image_uri found");
+                        DUPLICATE_RAW_IMAGE_URI_COUNT.inc();
+                        self.model.set_cdn_image_uri(uris.cdn_image_uri);
+                        self.upsert();
+                        false
+                    },
+                    None => true,
+                }
+            })
+        };
 
-        if self.force || self.model.get_cdn_image_uri().is_none() && !dupe_image_found {
+        if should_optimize_image {
             // Parse raw_image_uri, use asset_uri if parsing fails
             self.log_info("Parsing raw_image_uri");
             let raw_image_uri = self
@@ -191,6 +203,10 @@ impl Worker {
 
             // Check raw_image_uri against the URI blacklist
             if self.is_blacklisted_uri(&raw_image_uri) {
+                self.log_info("Found match in URI blacklist, marking as do_not_parse");
+                self.model.set_do_not_parse(true);
+                self.upsert();
+                SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
                 return Ok(());
             }
 
@@ -255,28 +271,34 @@ impl Worker {
             self.upsert();
         }
 
-        // Deduplicate raw_animation_uri
-        // Proceed with animation optimization if force or if raw_animation_uri has not been parsed
-        let mut raw_animation_uri_option = self.model.get_raw_animation_uri();
-        let dupe_animation_found = raw_animation_uri_option.clone().map_or(false, |uri| {
-            match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
-                &mut self.conn,
-                &self.asset_uri,
-                &uri,
-            ) {
-                Some(uris) => {
-                    self.log_info("Duplicate raw_animation_uri found");
-                    DUPLICATE_RAW_ANIMATION_URI_COUNT.inc();
-                    self.model.set_cdn_animation_uri(uris.cdn_animation_uri);
-                    self.upsert();
-                    true
-                },
-                None => false,
-            }
-        });
-        if !(self.force || self.model.get_cdn_animation_uri().is_none() && !dupe_animation_found) {
-            raw_animation_uri_option = None;
-        }
+        // Should I optimize animation?
+        // if force: true
+        // else if cdn_animation_uri already exists: false
+        // else: perform lookup
+        //     if found: set cdn_animation_uri, false
+        //     else: true
+        let raw_animation_uri_option = if self.force {
+            self.model.get_raw_animation_uri()
+        } else if self.model.get_cdn_animation_uri().is_some() {
+            None
+        } else {
+            self.model.get_raw_animation_uri().map_or(None, |uri| {
+                match NFTMetadataCrawlerURIsQuery::get_by_raw_animation_uri(
+                    &mut self.conn,
+                    &self.asset_uri,
+                    &uri,
+                ) {
+                    Some(uris) => {
+                        self.log_info("Duplicate raw_image_uri found");
+                        DUPLICATE_RAW_ANIMATION_URI_COUNT.inc();
+                        self.model.set_cdn_animation_uri(uris.cdn_animation_uri);
+                        self.upsert();
+                        None
+                    },
+                    None => self.model.get_raw_animation_uri(),
+                }
+            })
+        };
 
         // If raw_animation_uri_option is None, skip
         if let Some(raw_animation_uri) = raw_animation_uri_option {
@@ -364,19 +386,10 @@ impl Worker {
     }
 
     fn is_blacklisted_uri(&mut self, uri: &str) -> bool {
-        if self
-            .config
+        self.config
             .uri_blacklist
             .iter()
             .any(|blacklist_uri| uri.contains(blacklist_uri))
-        {
-            self.log_info("Found match in URI blacklist, marking as do_not_parse");
-            self.model.set_do_not_parse(true);
-            self.upsert();
-            SKIP_URI_COUNT.with_label_values(&["blacklist"]).inc();
-            return true;
-        }
-        false
     }
 
     fn log_info(&self, message: &str) {
