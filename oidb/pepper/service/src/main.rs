@@ -48,16 +48,14 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
             let request = serde_json::from_slice::<PepperRequest>(&body_bytes);
             let response = match request {
-                Ok(req) => {
-                    match aptos_oidb_pepper_service::process(req) {
-                        Ok(pepper_response) => pepper_response,
-                        Err(e) => {
-                            return Ok(hyper::Response::builder()
-                                .status(400)
-                                .body(Body::from(e.to_string()))
-                                .unwrap());
-                        }
-                    }
+                Ok(req) => match aptos_oidb_pepper_service::process(req) {
+                    Ok(pepper_response) => pepper_response,
+                    Err(e) => {
+                        return Ok(hyper::Response::builder()
+                            .status(400)
+                            .body(Body::from(e.to_string()))
+                            .unwrap());
+                    },
                 },
                 Err(e) => {
                     return Ok(hyper::Response::builder()

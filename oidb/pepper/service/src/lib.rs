@@ -3,7 +3,10 @@
 use crate::vuf_keys::VUF_SK;
 use anyhow::{anyhow, bail, ensure};
 use aptos_oidb_pepper_common::{
-    jwt::Claims, sha3_256, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse
+    jwt::Claims,
+    sha3_256,
+    vuf::{self, VUF},
+    PepperInput, PepperRequest, PepperResponse,
 };
 use aptos_types::{
     oidb::{Configuration, OpenIdSig},
@@ -24,8 +27,11 @@ pub type KeyID = String;
 pub fn process(request: PepperRequest) -> anyhow::Result<PepperResponse> {
     let pepper_key_hex_string = process_v0(request)?;
     let pepper = sha3_256(&hex::decode(pepper_key_hex_string.clone())?);
-    let pepper_hex_string = hex::encode(pepper[..31].to_vec());
-    Ok(PepperResponse{ pepper_key_hex_string, pepper_hex_string })
+    let pepper_hex_string = hex::encode(&pepper[..31]);
+    Ok(PepperResponse {
+        pepper_key_hex_string,
+        pepper_hex_string,
+    })
 }
 
 fn process_v0(request: PepperRequest) -> anyhow::Result<String> {
@@ -61,13 +67,13 @@ fn process_v0(request: PepperRequest) -> anyhow::Result<String> {
 
     let blinder = hex::decode(epk_blinder_hex_string)
         .map_err(|e| anyhow!("blinder unhexlification error: {e}"))?;
-    let epk_bytes = hex::decode(epk_hex_string)
-        .map_err(|e| anyhow!("epk unhexlification error: {e}"))?;
+    let epk_bytes =
+        hex::decode(epk_hex_string).map_err(|e| anyhow!("epk unhexlification error: {e}"))?;
     let epk = bcs::from_bytes::<EphemeralPublicKey>(&epk_bytes)
         .map_err(|e| anyhow!("epk bcs deserialization error: {e}"))?;
     let recalculated_nonce = OpenIdSig::reconstruct_oauth_nonce(
         blinder.as_slice(),
-epk_expiry_time_secs,
+        epk_expiry_time_secs,
         &epk,
         &Configuration::new_for_devnet(),
     )

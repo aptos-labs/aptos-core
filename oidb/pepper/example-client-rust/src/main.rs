@@ -1,18 +1,20 @@
 // Copyright © Aptos Foundation
 
-use aptos_crypto::
-    ed25519::Ed25519PublicKey
-;
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_oidb_pepper_common::{
-    asymmetric_encryption::{elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption}, jwt, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse, VUFVerificationKey
+    asymmetric_encryption::{
+        elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption,
+    },
+    jwt,
+    vuf::{self, bls12381_g1_bls::Bls12381G1Bls, VUF},
+    PepperInput, PepperRequest, PepperResponse, VUFVerificationKey,
 };
 use aptos_types::{
-    oidb::{Configuration, OpenIdSig, test_utils::get_sample_esk},
+    oidb::{test_utils::get_sample_esk, Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
 };
 use ark_serialize::CanonicalDeserialize;
 use std::{fs, io::stdin};
-use aptos_oidb_pepper_common::vuf::bls12381_g1_bls::Bls12381G1Bls;
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
 
@@ -161,7 +163,10 @@ async fn main() {
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse{ pepper_key_hex_string, pepper_hex_string } = pepper_response;
+    let PepperResponse {
+        pepper_key_hex_string,
+        ..
+    } = pepper_response;
     let pepper_bytes = hex::decode(pepper_key_hex_string).unwrap();
     println!();
     println!("Decrypt the pepper using the ephemeral private key.");
@@ -176,7 +181,8 @@ async fn main() {
         aud: claims.claims.aud.clone(),
     };
     let pepper_input_bytes = bcs::to_bytes(&pepper_input).unwrap();
-    vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &pepper_bytes, &[]).unwrap();
+    vuf::bls12381_g1_bls::Bls12381G1Bls::verify(&vuf_pk, &pepper_input_bytes, &pepper_bytes, &[])
+        .unwrap();
     println!();
     println!("Pepper verification succeeded!");
 }

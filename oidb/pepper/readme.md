@@ -2,9 +2,9 @@
 
 Start the pepper service in terminal 1.
 ```bash
-VUF_KEY_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00 cargo run -p aptos-oidb-pepper-service
+VUF_KEY_SEED_HEX=ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff cargo run -p aptos-oidb-pepper-service
 ```
-NOTE: `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00` is a dummy VUF private key.
+NOTE: `ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00` is a dummy VUF private key seed.
 
 Run the example client in terminal 2.
 ```bash

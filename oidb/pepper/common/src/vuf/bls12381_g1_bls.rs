@@ -31,7 +31,7 @@ impl Bls12381G1Bls {
     }
 }
 
-pub const SCHEME_NAME: &'static str = "BLS12381_G1_BLS";
+pub const SCHEME_NAME: &str = "BLS12381_G1_BLS";
 
 impl VUF for Bls12381G1Bls {
     type PrivateKey = Fr;

@@ -59,7 +59,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
 
         ensure!(
             pk.is_torsion_free(),
-              "ElGamalCurve25519Aes256Gcm enc failed with non-prime-order PK"
+            "ElGamalCurve25519Aes256Gcm enc failed with non-prime-order PK"
         );
 
         let aes_key_g1 = Curve25519::rand_element(main_rng);
@@ -115,7 +115,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
 
         ensure!(
             c0.is_torsion_free(),
-              "ElGamalCurve25519Aes256Gcm dec failed with non-prime-order c0"
+            "ElGamalCurve25519Aes256Gcm dec failed with non-prime-order c0"
         );
 
         let c1 = CompressedEdwardsY::from_slice(&ciphertext[32..64])
@@ -126,7 +126,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
 
         ensure!(
             c1.is_torsion_free(),
-              "ElGamalCurve25519Aes256Gcm dec failed with non-prime-order c1"
+            "ElGamalCurve25519Aes256Gcm dec failed with non-prime-order c1"
         );
 
         let aes_key_element = elgamal::decrypt::<Curve25519>(&sk_scalar, &c0, &c1).compress();
@@ -143,7 +143,9 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
 
 #[cfg(test)]
 mod tests {
-    use crate::asymmetric_encryption::{elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption};
+    use crate::asymmetric_encryption::{
+        elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption,
+    };
 
     #[test]
     fn gen_enc_dec() {
@@ -152,8 +154,13 @@ mod tests {
         let (sk, pk) = ElGamalCurve25519Aes256Gcm::key_gen(&mut main_rng);
         let msg = b"hello world again and again and again and again and again and again and again"
             .to_vec();
-        let ciphertext =
-            ElGamalCurve25519Aes256Gcm::enc(&mut main_rng, &mut aead_rng, pk.as_slice(), msg.as_slice()).unwrap();
+        let ciphertext = ElGamalCurve25519Aes256Gcm::enc(
+            &mut main_rng,
+            &mut aead_rng,
+            pk.as_slice(),
+            msg.as_slice(),
+        )
+        .unwrap();
         assert_eq!(
             msg,
             ElGamalCurve25519Aes256Gcm::dec(sk.as_slice(), ciphertext.as_slice()).unwrap()

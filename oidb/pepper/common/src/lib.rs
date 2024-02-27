@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 
-use crate::asymmetric_encryption::{AsymmetricEncryption, elgamal_curve25519_aes256_gcm};
+use crate::asymmetric_encryption::{
+    elgamal_curve25519_aes256_gcm, elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm,
+    AsymmetricEncryption,
+};
 use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
 use anyhow::bail;
 use curve25519_dalek::digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use crate::asymmetric_encryption::elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm;
 
 pub mod asymmetric_encryption;
 pub mod elgamal;

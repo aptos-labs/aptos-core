@@ -1,23 +1,60 @@
 // Copyright © Aptos Foundation
 
+use anyhow::{anyhow, ensure};
 use aptos_oidb_pepper_common::{
     vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
     VUFVerificationKey,
 };
 use ark_ec::CurveGroup;
-use ark_serialize::CanonicalSerialize;
-use once_cell::sync::Lazy;
 use ark_ff::PrimeField;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use log::warn;
+use once_cell::sync::Lazy;
+use sha3::Digest;
 
 pub struct VufScheme0Sk {
     pub sk_bytes: Vec<u8>,
 }
 
+/// Derive the VUF private key from a seed given in the environment.
+fn derive_sk_from_env_seed() -> anyhow::Result<ark_bls12_381::Fr> {
+    let seed_hexlified = std::env::var("VUF_KEY_SEED_HEX")
+        .map_err(|e| anyhow!("error while reading envvar `VUF_KEY_SEED_HEX`: {e}"))?;
+    let seed =
+        hex::decode(seed_hexlified).map_err(|e| anyhow!("seed unhexlification error: {e}"))?;
+    ensure!(seed.len() >= 32, "seed entropy should be at least 32 bytes");
+    let mut hasher = sha3::Sha3_512::new();
+    hasher.update(seed);
+    let sk = ark_bls12_381::Fr::from_be_bytes_mod_order(hasher.finalize().as_slice());
+    Ok(sk)
+}
+
+/// A backward-compatible path to load a sk (serialized and hexlified) from envvar.
+/// TODO: once secret seed is stable, remove this.
+fn deserialize_sk_from_env() -> anyhow::Result<ark_bls12_381::Fr> {
+    let vuf_key_hex = std::env::var("VUF_KEY_HEX")
+        .map_err(|e| anyhow!("error while reading envvar `VUF_KEY_HEX`: {e}"))?;
+    let mut sk_bytes =
+        hex::decode(vuf_key_hex).map_err(|e| anyhow!("sk unhexlification error: {e}"))?;
+    sk_bytes.reverse();
+    let sk = ark_bls12_381::Fr::deserialize_compressed(sk_bytes.as_slice())
+        .map_err(|e| anyhow!("Fr deserialization error: {e}"))?;
+    Ok(sk)
+}
+
 pub static VUF_SK: Lazy<ark_bls12_381::Fr> = Lazy::new(|| {
-    let vuf_key_hex =
-        std::env::var("VUF_KEY_HEX").expect("VUF_KEY_HEX is required for pepper calculation");
-    let sk_bytes = hex::decode(vuf_key_hex).expect("vuf_key_hex should be a valid hex string");
-    ark_bls12_381::Fr::from_be_bytes_mod_order(sk_bytes.as_slice())
+    match derive_sk_from_env_seed() {
+        Ok(sk) => {
+            return sk;
+        },
+        Err(e) => {
+            warn!("`derive_sk_from_env_seed`failed: {e}");
+            warn!("falling back to `deserialize_sk_from_env`");
+            //TODO: once secret seed is stable, remove the fallback path.
+        },
+    }
+
+    deserialize_sk_from_env().expect("fallback sk also failed")
 });
 
 pub static VUF_VERIFICATION_KEY_JSON: Lazy<String> = Lazy::new(|| {
