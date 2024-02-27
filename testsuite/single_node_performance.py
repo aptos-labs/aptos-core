@@ -435,7 +435,16 @@ warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
-    execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
+    try: 
+        execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
+        move_e2e_benchmark_failed = False
+    except:
+        # for land-blocking (i.e. on PR), fail immediately, for speedy response. 
+        # Otherwise run all tests, and fail in the end.
+        if SELECTED_FLOW == Flow.LAND_BLOCKING:
+            print("Move E2E benchmark failed, exiting")
+            exit(1)
+        move_e2e_benchmark_failed = True
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
@@ -605,6 +614,10 @@ if warnings:
 if errors:
     print("Errors: ")
     print("\n".join(errors))
+    exit(1)
+
+if move_e2e_benchmark_failed:
+    print("Move e2e benchmark failed, failing the job. See logs at the beginning for more details.")
     exit(1)
 
 exit(0)
