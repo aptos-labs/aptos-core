@@ -1,0 +1,46 @@
+module 0x42::simple_recursion {
+	struct S {
+		f: T
+	}
+	struct T {
+		f: S
+	}
+
+	struct S1 {
+		f: S2
+	}
+
+	struct S2 {
+		f: S3
+	}
+
+	struct S3 {
+		f: S1
+	}
+
+	struct S4<T> {
+		f: S4<bool>
+	}
+}
+
+module 0x42::type_param {
+	struct S {
+		f: G<S>
+	}
+
+	struct G<T> {
+		f: T
+	}
+
+	struct S1 {
+		f: vector<S1>
+	}
+
+	struct S2<T1, T2> {
+		f: S3<u8, S2<T1, T2>>
+	}
+
+	struct S3<T1, T2> {
+		f: S2<u8, S3<u8, u8>>
+	}
+}

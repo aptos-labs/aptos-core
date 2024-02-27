@@ -1,0 +1,112 @@
+
+Diagnostics:
+error: recursive definition S
+  ┌─ tests/checking/typing/recursive_struct.move:2:2
+  │
+2 │ ╭     struct S {
+3 │ │         f: T
+4 │ │     }
+  │ ╰─────^
+  │
+  = S contains T...
+  = T contains S, which forms a loop.
+
+error: recursive definition T
+  ┌─ tests/checking/typing/recursive_struct.move:5:2
+  │
+5 │ ╭     struct T {
+6 │ │         f: S
+7 │ │     }
+  │ ╰─────^
+  │
+  = T contains S...
+  = S contains T, which forms a loop.
+
+error: recursive definition S1
+   ┌─ tests/checking/typing/recursive_struct.move:9:2
+   │
+ 9 │ ╭     struct S1 {
+10 │ │         f: S2
+11 │ │     }
+   │ ╰─────^
+   │
+   = S1 contains S2...
+   = S2 contains S3...
+   = S3 contains S1, which forms a loop.
+
+error: recursive definition S2
+   ┌─ tests/checking/typing/recursive_struct.move:13:2
+   │
+13 │ ╭     struct S2 {
+14 │ │         f: S3
+15 │ │     }
+   │ ╰─────^
+   │
+   = S2 contains S3...
+   = S3 contains S1...
+   = S1 contains S2, which forms a loop.
+
+error: recursive definition S3
+   ┌─ tests/checking/typing/recursive_struct.move:17:2
+   │
+17 │ ╭     struct S3 {
+18 │ │         f: S1
+19 │ │     }
+   │ ╰─────^
+   │
+   = S3 contains S1...
+   = S1 contains S2...
+   = S2 contains S3, which forms a loop.
+
+error: recursive definition S4
+   ┌─ tests/checking/typing/recursive_struct.move:21:2
+   │
+21 │ ╭     struct S4<T> {
+22 │ │         f: S4<bool>
+23 │ │     }
+   │ ╰─────^
+   │
+   = S4 contains S4, which forms a loop.
+
+error: recursive definition S
+   ┌─ tests/checking/typing/recursive_struct.move:27:2
+   │
+27 │ ╭     struct S {
+28 │ │         f: G<S>
+29 │ │     }
+   │ ╰─────^
+   │
+   = S contains G...
+   = G contains S, which forms a loop.
+
+error: recursive definition S1
+   ┌─ tests/checking/typing/recursive_struct.move:35:2
+   │
+35 │ ╭     struct S1 {
+36 │ │         f: vector<S1>
+37 │ │     }
+   │ ╰─────^
+   │
+   = S1 contains S1, which forms a loop.
+
+error: recursive definition S2
+   ┌─ tests/checking/typing/recursive_struct.move:39:2
+   │
+39 │ ╭     struct S2<T1, T2> {
+40 │ │         f: S3<u8, S2<T1, T2>>
+41 │ │     }
+   │ ╰─────^
+   │
+   = S2 contains S3...
+   = S3 contains S2, which forms a loop.
+
+error: recursive definition S3
+   ┌─ tests/checking/typing/recursive_struct.move:43:2
+   │
+43 │ ╭     struct S3<T1, T2> {
+44 │ │         f: S2<u8, S3<u8, u8>>
+45 │ │     }
+   │ ╰─────^
+   │
+   = S3 contains S2...
+   = S2 contains S3, which forms a loop.
