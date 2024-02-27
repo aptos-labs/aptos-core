@@ -114,6 +114,7 @@ module aptos_framework::delegation_pool {
     use std::vector;
 
     use aptos_std::math64;
+    use aptos_std::pool_u64::{Self as pool_u64_iterable};
     use aptos_std::pool_u64_unbound::{Self as pool_u64, total_coins};
     use aptos_std::table::{Self, Table};
     use aptos_std::smart_table::{Self, SmartTable};
@@ -127,6 +128,7 @@ module aptos_framework::delegation_pool {
     use aptos_framework::stake;
     use aptos_framework::stake::get_operator;
     use aptos_framework::staking_config;
+    use aptos_framework::staking_contract;
     use aptos_framework::timestamp;
 
     const MODULE_SALT: vector<u8> = b"aptos_framework::delegation_pool";
@@ -200,6 +202,8 @@ module aptos_framework::delegation_pool {
     /// Changing operator commission rate in delegation pool is not supported.
     const ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED: u64 = 22;
 
+    /// A staking contract cannot be converted to a delegation pool while owning pending_active stake.
+    const EPENDING_ACTIVE_STAKE_ON_STAKING_CONTRACT: u64 = 23;
 
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -715,6 +719,114 @@ module aptos_framework::delegation_pool {
         }
     }
 
+    /// Initialize a delegation pool from an existing owned staking contract.
+    /// The newly created delegation pool will preserve the operator and commission fee. The staker becomes the pool
+    /// owner and has the same delegated voter set.
+    public entry fun initialize_delegation_pool_from_staking_contract(
+        staker: &signer,
+        operator: address,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        assert!(features::delegation_pools_enabled(), error::invalid_state(EDELEGATION_POOLS_DISABLED));
+        let staker_address = signer::address_of(staker);
+        assert!(!owner_cap_exists(staker_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
+
+        // does not have to withhold the `add_stake` fee from staker if there is no pending_active stake
+        let (_, _, pending_active, _) = stake::get_stake(
+            staking_contract::stake_pool_address(staker_address, operator)
+        );
+        assert!(pending_active == 0, error::invalid_state(EPENDING_ACTIVE_STAKE_ON_STAKING_CONTRACT));
+
+        // destroy staking contract and take ownership of its underlying stake pool
+        let (
+            principal,
+            pool_address,
+            owner_cap,
+            operator_commission_percentage,
+            distribution_pool,
+            stake_pool_signer_cap,
+        ) = staking_contract::destroy_staking_contract(staker, operator);
+
+        // convert existing commission to a 2-decimals precision percentage
+        operator_commission_percentage = operator_commission_percentage * 100;
+
+        let stake_pool_signer = account::create_signer_with_capability(&stake_pool_signer_cap);
+        coin::register<AptosCoin>(&stake_pool_signer);
+
+        // stake_pool_signer becomes owner of the stake pool and stores its `stake::OwnerCapability`
+        stake::deposit_owner_cap(&stake_pool_signer, owner_cap);
+
+        let inactive_shares = table::new<ObservedLockupCycle, pool_u64::Pool>();
+        table::add(
+            &mut inactive_shares,
+            olc_with_index(0),
+            pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR)
+        );
+
+        let pool = DelegationPool {
+            active_shares: pool_u64::create_with_scaling_factor(SHARES_SCALING_FACTOR),
+            observed_lockup_cycle: olc_with_index(0),
+            inactive_shares,
+            pending_withdrawals: table::new<address, ObservedLockupCycle>(),
+            stake_pool_signer_cap,
+            // `staking_contract::distribute_internal` has already withdrawn any existing inactive stake
+            total_coins_inactive: 0,
+            operator_commission_percentage,
+            add_stake_events: account::new_event_handle<AddStakeEvent>(&stake_pool_signer),
+            reactivate_stake_events: account::new_event_handle<ReactivateStakeEvent>(&stake_pool_signer),
+            unlock_stake_events: account::new_event_handle<UnlockStakeEvent>(&stake_pool_signer),
+            withdraw_stake_events: account::new_event_handle<WithdrawStakeEvent>(&stake_pool_signer),
+            distribute_commission_events: account::new_event_handle<DistributeCommissionEvent>(&stake_pool_signer),
+        };
+
+        // Grant ownership of the existing stake to the participants of the destroyed staking contract.
+        // 1. `synchronize_delegation_pool` MUST NOT be called during this process because stake would be distributed as
+        // rewards instead of being individually allocated
+        // 2. partial governance voting remains disabled for simplicity
+
+        // allocate active stake to staker, any active commission has already been unlocked + allocated to operator
+        // no need to assert on minimum required stake as any next operation of delegator enforces it
+        buy_in_active_shares(&mut pool, staker_address, principal);
+
+        // allocate pending_inactive stake to staker, current operator, any previous operators still pending_inactive
+        while (pool_u64_iterable::shareholders_count(&distribution_pool) > 0) {
+            let recipients = pool_u64_iterable::shareholders(&distribution_pool);
+            let recipient = *vector::borrow(&mut recipients, 0);
+            let current_shares = pool_u64_iterable::shares(&distribution_pool, recipient);
+            let amount_to_distribute = pool_u64_iterable::redeem_shares(
+                &mut distribution_pool,
+                recipient,
+                current_shares
+            );
+
+            // no need to assert on minimum required stake as any next operation of delegator enforces it
+            buy_in_pending_inactive_shares(&mut pool, recipient, amount_to_distribute);
+        };
+
+        // destroy distribution pool of 0 remaining shares, any dust will be distributed as pending_inactive rewards
+        pool_u64_iterable::update_total_coins(&mut distribution_pool, 0);
+        pool_u64_iterable::destroy_empty(distribution_pool);
+
+        // store `DelegationPool` on the resource account storing the `StakePool` of the destroyed staking contract
+        // `synchronize_delegation_pool` could not have been called as it acquires `DelegationPool` firstly stored here
+        move_to(&stake_pool_signer, pool);
+
+        // store ownership capability of delegation pool on staker
+        move_to(staker, DelegationPoolOwnership { pool_address });
+
+        // get staker's voter before being set to the resource account
+        let staker_delegated_voter = stake::get_delegated_voter(pool_address);
+
+        // enable partial governance voting
+        if (features::partial_governance_voting_enabled(
+        ) && features::delegation_pool_partial_governance_voting_enabled()) {
+            // partial governance voting could not have been enabled as the following would fail
+            enable_partial_governance_voting(pool_address);
+        };
+
+        // set delegated voter of staker which takes effect immediately
+        initialize_staker_delegated_voter(staker, pool_address, staker_delegated_voter);
+    }
+
     #[view]
     /// Return the beneficiary address of the operator.
     public fun beneficiary_for_operator(operator: address): address acquires BeneficiaryForOperator {
@@ -1187,6 +1299,42 @@ module aptos_framework::delegation_pool {
             pool_address,
             delegator: delegator_address,
             voter: new_voter,
+        });
+    }
+
+    /// Set delegated voter of staker when initializing a delegation pool from a staking contract. This change applies
+    /// instantly without waiting a lockup cycle.
+    fun initialize_staker_delegated_voter(
+        staker: &signer,
+        pool_address: address,
+        voter: address
+    ) acquires DelegationPool, GovernanceRecords {
+        let staker_address = signer::address_of(staker);
+        let delegation_pool = borrow_global<DelegationPool>(pool_address);
+        let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
+        let last_locked_until_secs = stake::get_lockup_secs(pool_address);
+
+        smart_table::add(&mut governance_records.vote_delegation, staker_address, VoteDelegation {
+            voter,
+            pending_voter: voter,
+            last_locked_until_secs,
+        });
+
+        smart_table::add(&mut governance_records.delegated_votes, staker_address, DelegatedVotes {
+            active_shares: 0,
+            pending_inactive_shares: 0,
+            active_shares_next_lockup: 0,
+            last_locked_until_secs,
+        });
+
+        let active_shares = get_delegator_active_shares(delegation_pool, staker_address);
+        let pending_inactive_shares = get_delegator_pending_inactive_shares(delegation_pool, staker_address);
+
+        smart_table::add(&mut governance_records.delegated_votes, voter, DelegatedVotes {
+            active_shares,
+            pending_inactive_shares,
+            active_shares_next_lockup: active_shares,
+            last_locked_until_secs,
         });
     }
 

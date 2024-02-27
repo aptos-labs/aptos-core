@@ -183,7 +183,7 @@ module aptos_framework::staking_contract {
     }
 
     #[event]
-    struct DestoryStakingContractEvent has drop, store {
+    struct DestroyStakingContractEvent has drop, store {
         staker: address,
         operator: address,
     }
@@ -645,7 +645,7 @@ module aptos_framework::staking_contract {
         distribute_internal(staker, operator, staking_contract, &mut store.distribute_events);
     }
 
-    /// Destroy an owned staking contract and take ownership of its underyling stake pool.
+    /// Destroy an owned staking contract and take ownership of its underlying stake pool.
     /// Extracted state and capabilities will be used to construct a delegation pool of same owner, operator
     /// and commission fee.
     public(friend) fun destroy_staking_contract(
@@ -676,7 +676,7 @@ module aptos_framework::staking_contract {
             signer_cap,
         } = staking_contract;
 
-        emit(DestoryStakingContractEvent { staker: staker_address, operator });
+        emit(DestroyStakingContractEvent { staker: staker_address, operator });
 
         (principal, pool_address, owner_cap, commission_percentage, distribution_pool, signer_cap)
     }
