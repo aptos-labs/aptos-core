@@ -44,3 +44,14 @@ module 0x42::type_param {
 		f: S2<u8, S3<u8, u8>>
 	}
 }
+
+module 0x42::instantiate_with_self {
+	struct S<T> {
+		f: T
+	}
+
+	struct U {
+		// this is ok
+		f: S<S<u8>>
+	}
+}
