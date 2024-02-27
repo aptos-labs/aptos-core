@@ -10,25 +10,41 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use move_core_types::{
     ident_str,
-    language_storage::ModuleId,
+    language_storage::{ModuleId, TypeTag, StructTag},
+    identifier::Identifier,
 };
 use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use rand::{rngs::StdRng, Rng};
 
 use std::sync::Arc;
-// use aptos_infallible::RwLock;
+const COIN_TYPES: [&str; 11] = ["AC", "BC", "DC", "EC", "FC", "GC", "HC", "IC", "JC", "KC", "LC"];
+
+fn coin_type(market_id: u64) -> &'static str {
+    COIN_TYPES[(market_id-1) as usize]
+}
 
 /// Placeas a bid limit order.
 pub fn place_bid_limit_order(
     module_id: ModuleId,
     size: u64,
     price: u64,
-    market_id: u64
+    market_id: u64, 
+    publisher: AccountAddress
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("place_bid_limit_order").to_owned(),
-        vec![],
+        vec![TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        })), TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name:  Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            type_params: vec![],
+        }))],
         vec![
             bcs::to_bytes(&size).unwrap(),
             bcs::to_bytes(&price).unwrap(),
@@ -42,12 +58,23 @@ pub fn place_ask_limit_order(
     module_id: ModuleId,
     size: u64,
     price: u64,
-    market_id: u64
+    market_id: u64,
+    publisher: AccountAddress
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("place_ask_limit_order").to_owned(),
-        vec![],
+        vec![TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module:  Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        })), TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module:  Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            type_params: vec![],
+        }))],
         vec![
             bcs::to_bytes(&size).unwrap(),
             bcs::to_bytes(&price).unwrap(),
@@ -60,12 +87,23 @@ pub fn place_ask_limit_order(
 pub fn place_bid_market_order(
     module_id: ModuleId,
     size: u64,
-    market_id: u64
+    market_id: u64,
+    publisher: AccountAddress
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("place_bid_market_order").to_owned(),
-        vec![],
+        vec![TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        })), TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            type_params: vec![],
+        }))],
         vec![
             bcs::to_bytes(&size).unwrap(),
             bcs::to_bytes(&market_id).unwrap(),
@@ -77,12 +115,23 @@ pub fn place_bid_market_order(
 pub fn place_ask_market_order(
     module_id: ModuleId,
     size: u64,
-    market_id: u64
+    market_id: u64,
+    publisher: AccountAddress
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("place_ask_market_order").to_owned(),
-        vec![],
+        vec![TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        })), TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            type_params: vec![],
+        }))],
         vec![
             bcs::to_bytes(&size).unwrap(),
             bcs::to_bytes(&market_id).unwrap(),
@@ -92,23 +141,37 @@ pub fn place_ask_market_order(
 
 pub fn register_market(
     module_id: ModuleId,
+    num_markets: u64,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
-        ident_str!("register_market").to_owned(),
+        ident_str!("register_multiple_markets").to_owned(),
         vec![],
-        vec![],
+        vec![
+            bcs::to_bytes(&num_markets).unwrap(),
+        ],
     ))
 }
 
 pub fn register_market_accounts(
     module_id: ModuleId,
-    market_id: u64
+    market_id: u64,
+    publisher: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("register_market_accounts").to_owned(),
-        vec![],
+        vec![TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        })), TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            type_params: vec![],
+        }))],
         vec![
             bcs::to_bytes(&market_id).unwrap(),
         ],
@@ -117,12 +180,23 @@ pub fn register_market_accounts(
 
 pub fn deposit_coins(
     module_id: ModuleId,
-    market_id: u64
+    market_id: u64,
+    publisher: AccountAddress,
 ) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("deposit_coins").to_owned(),
-        vec![],
+        vec![TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        })), TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+            type_params: vec![],
+        }))],
         vec![
             bcs::to_bytes(&market_id).unwrap(),
         ],
@@ -192,8 +266,8 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
                     let bid_price = rng.gen_range(1, 200);
                     let ask_price = rng.gen_range(201, 400);
 
-                    let bid_builder = txn_factory.payload(place_bid_limit_order(package.get_module_id("txn_generator_utils"), bid_size, bid_price, market_id));
-                    let ask_builder = txn_factory.payload(place_ask_limit_order(package.get_module_id("txn_generator_utils"), ask_size, ask_price, market_id));
+                    let bid_builder = txn_factory.payload(place_bid_limit_order(package.get_module_id("txn_generator_utils"), bid_size, bid_price, market_id, publisher.address()));
+                    let ask_builder = txn_factory.payload(place_ask_limit_order(package.get_module_id("txn_generator_utils"), ask_size, ask_price, market_id, publisher.address()));
 
                     requests.push(account.sign_with_transaction_builder(bid_builder));
                     requests.push(account.sign_with_transaction_builder(ask_builder));
@@ -213,8 +287,8 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
                     let bid_size = rng.gen_range(4, 14);
                     let ask_size = rng.gen_range(4, 14);
 
-                    let bid_builder = txn_factory.payload(place_bid_market_order(package.get_module_id("txn_generator_utils"), bid_size, market_id));
-                    let ask_builder = txn_factory.payload(place_ask_market_order(package.get_module_id("txn_generator_utils"), ask_size, market_id));
+                    let bid_builder = txn_factory.payload(place_bid_market_order(package.get_module_id("txn_generator_utils"), bid_size, market_id, publisher.address()));
+                    let ask_builder = txn_factory.payload(place_ask_market_order(package.get_module_id("txn_generator_utils"), ask_size, market_id, publisher.address()));
 
                     requests.push(account.sign_with_transaction_builder(bid_builder));
                     requests.push(account.sign_with_transaction_builder(ask_builder));
@@ -260,12 +334,12 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketTransactionGenerator
         rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
-        Arc::new(move |account, package, publisher, txn_factory, rng| {
+        Arc::new(move |_account, package, publisher, txn_factory, rng| {
             let mut requests = vec![];
-            for i in 0..*num_markets {
-                let builder = txn_factory.payload(register_market(package.get_module_id("txn_generator_utils")));
-                requests.push(publisher.sign_with_transaction_builder(builder));
-            }
+            assert!(*num_markets > 0, "num_markets must be greater than 0");
+            assert!(*num_markets <= 10, "num_markets must be less than or equal to 10");
+            let builder = txn_factory.payload(register_market(package.get_module_id("txn_generator_utils"), *num_markets));
+            requests.push(publisher.sign_with_transaction_builder(builder));
             requests
         })
     }
@@ -303,13 +377,13 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketUserTransactionGener
         _root_account: &mut LocalAccount,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
-        rng: &mut StdRng,
+        _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
-        Arc::new(move |account, package, publisher, txn_factory, rng| {
+        Arc::new(move |account, package, publisher, txn_factory, _rng| {
             let mut requests = vec![];
             for market_id in 1..(*num_markets+1) {
-                let builder = txn_factory.payload(register_market_accounts(package.get_module_id("txn_generator_utils"), market_id));
+                let builder = txn_factory.payload(register_market_accounts(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
                 requests.push(account.sign_with_transaction_builder(builder));
             }
             requests
@@ -350,13 +424,13 @@ impl UserModuleTransactionGenerator for EconiaDepositCoinsTransactionGenerator {
         _root_account: &mut LocalAccount,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
-        rng: &mut StdRng,
+        _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
-        Arc::new(move |account, package, publisher, txn_factory, rng| {
+        Arc::new(move |account, package, publisher, txn_factory, _rng| {
             let mut requests = vec![];
             for market_id in 1..(*num_markets+1) {
-                let builder = txn_factory.payload(deposit_coins(package.get_module_id("txn_generator_utils"), market_id));
+                let builder = txn_factory.payload(deposit_coins(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
                 requests.push(account.sign_multi_agent_with_transaction_builder(vec![publisher], builder))
             }
             requests

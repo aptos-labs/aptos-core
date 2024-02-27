@@ -124,7 +124,7 @@ impl TransactionGenerator for BypassAccountsPoolWrapperGenerator {
         account: &LocalAccount,
         _num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let mut accounts_to_use =
+        let accounts_to_use =
             self.source_accounts_pool
                 .take_from_pool(self.source_accounts_pool.len(), true, &mut self.rng);
         if accounts_to_use.is_empty() {

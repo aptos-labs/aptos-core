@@ -36,6 +36,27 @@ module econia::assets {
     /// Utility coin type.
     struct UC{}
 
+    /// Aditional coin types
+    struct AC{}
+
+    struct DC{}
+
+    struct EC{}
+
+    struct FC{}
+
+    struct GC{}
+
+    struct HC{}
+    
+    struct IC{}
+
+    struct JC{}
+
+    struct KC{}
+
+    struct LC{}
+
     // Structs <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     // Error codes >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -139,6 +160,16 @@ module econia::assets {
             QUOTE_COIN_DECIMALS); // Initialize mock quote coin.
         init_coin_type<UC>(account, UTILITY_COIN_NAME, UTILITY_COIN_SYMBOL,
             UTILITY_COIN_DECIMALS); // Initialize mock utility coin.
+        if (!exists<CoinCapabilities<AC>>(address_of(account))) init_coin_type<AC>(account, b"A Coin", b"AC", 10); // Initialize A coin
+        if (!exists<CoinCapabilities<DC>>(address_of(account))) init_coin_type<DC>(account, b"D Coin", b"DC", 10); // Initialize D coin
+        if (!exists<CoinCapabilities<FC>>(address_of(account))) init_coin_type<FC>(account, b"F Coin", b"FC", 10); // Initialize F coin
+        if (!exists<CoinCapabilities<EC>>(address_of(account))) init_coin_type<EC>(account, b"E Coin", b"EC", 10); // Initialize E coin
+        if (!exists<CoinCapabilities<GC>>(address_of(account))) init_coin_type<GC>(account, b"G Coin", b"GC", 10); // Initialize G coin
+        if (!exists<CoinCapabilities<HC>>(address_of(account))) init_coin_type<HC>(account, b"H Coin", b"HC", 10); // Initialize H coin
+        if (!exists<CoinCapabilities<IC>>(address_of(account))) init_coin_type<IC>(account, b"I Coin", b"IC", 10); // Initialize I coin
+        if (!exists<CoinCapabilities<JC>>(address_of(account))) init_coin_type<JC>(account, b"J Coin", b"JC", 10); // Initialize J coin
+        if (!exists<CoinCapabilities<KC>>(address_of(account))) init_coin_type<KC>(account, b"K Coin", b"KC", 10); // Initialize K coin
+        if (!exists<CoinCapabilities<LC>>(address_of(account))) init_coin_type<LC>(account, b"L Coin", b"LC", 10); // Initialize L coin
     }
 
     public fun init_setup(

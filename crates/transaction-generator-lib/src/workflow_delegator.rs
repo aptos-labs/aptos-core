@@ -313,7 +313,7 @@ impl WorkflowTxnGeneratorCreator {
                 .await;
 
                 let publishers_pool = Arc::new(ObjectPool::new());
-                publishers_pool.add_to_pool(packages.iter().map(|(package, account)| account.clone()).collect());
+                publishers_pool.add_to_pool(packages.iter().map(|(_package, account)| account).collect());
 
                 let econia_register_market_worker =
                     CustomModulesDelegationGeneratorCreator::create_worker(

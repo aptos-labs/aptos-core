@@ -60,7 +60,7 @@ pub enum TransactionTypeArg {
     SmartTablePicture1BWith1KChange,
     EconiaBasic1Market,
     EconiaAdvanced1Market,
-    EconiaAdvanced20Market,
+    EconiaAdvanced10Market,
 }
 
 impl TransactionTypeArg {
@@ -400,11 +400,11 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
-            TransactionTypeArg::EconiaAdvanced20Market => TransactionType::Workflow {
+            TransactionTypeArg::EconiaAdvanced10Market => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 100000,
+                    num_users: 10000,
                     flow_type: crate::EconiaFlowType::Advanced,
-                    num_markets: 20,
+                    num_markets: 10,
                 },
                 progress_type: WorkflowProgress::MoveByPhases,
                 num_modules: module_working_set_size,
