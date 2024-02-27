@@ -56,7 +56,7 @@ module aptos_framework::version {
     /// aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);
     /// aptos_framework::aptos_governance::reconfigure(&framework_signer);
     /// ```
-    public entry fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
+    public fun set_for_next_epoch(account: &signer, major: u64) acquires Version {
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));
