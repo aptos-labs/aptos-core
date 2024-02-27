@@ -49,7 +49,7 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             let request = serde_json::from_slice::<PepperRequest>(&body_bytes);
             let response = match request {
                 Ok(req) => aptos_oidb_pepper_service::process(req),
-                Err(e) => PepperResponse::Error(format!("request deserialization error: {e}"))
+                Err(e) => PepperResponse::Error(format!("request deserialization error: {e}")),
             };
             let json = serde_json::to_string_pretty(&response).unwrap();
             hyper::Response::builder()

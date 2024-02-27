@@ -2,14 +2,16 @@
 
 use crate::vuf_keys::VUF_SK;
 use anyhow::{anyhow, bail, ensure};
-use aptos_oidb_pepper_common::{jwt::Claims, PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0, sha3_256, vuf::{self, VUF}};
+use aptos_oidb_pepper_common::{
+    jwt::Claims,
+    vuf::{self, VUF},
+    PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0,
+};
 use aptos_types::{
     oidb::{Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
 };
 use jsonwebtoken::{Algorithm::RS256, Validation};
-use once_cell::sync::Lazy;
-use std::collections::HashSet;
 
 pub mod about;
 pub mod jwk;
@@ -27,7 +29,7 @@ pub fn process(request: PepperRequest) -> PepperResponse {
                 Err(e) => PepperResponseV0::Err(e.to_string()),
             };
             PepperResponse::V0(response_inner)
-        }
+        },
     }
 }
 

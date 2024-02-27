@@ -1,26 +1,9 @@
 // Copyright © Aptos Foundation
 
-use crate::asymmetric_encryption::{
-    AsymmetricEncryption, elgamal_curve25519_aes256_gcm,
-    elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm,
-};
-use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
-use anyhow::bail;
-use curve25519_dalek::digest::Digest;
-use rand_core::{CryptoRng, RngCore};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::de::Error;
+use serde::{Deserialize, Serialize};
 
-pub mod asymmetric_encryption;
-pub mod elgamal;
 pub mod jwt;
 pub mod vuf;
-
-pub fn sha3_256(input: &[u8]) -> Vec<u8> {
-    let mut hasher = sha3::Sha3_256::new();
-    hasher.update(input);
-    hasher.finalize().to_vec()
-}
 
 /// The spec of a request to this pepper service.
 #[derive(Debug, Deserialize, Serialize)]
@@ -53,34 +36,6 @@ pub type PepperResponseV0 = Result<Vec<u8>, String>;
 pub struct VUFVerificationKey {
     pub scheme_name: String,
     pub vuf_public_key_hex_string: String,
-}
-
-#[derive(Debug, Default, Deserialize, Serialize)]
-pub struct EncryptionPubKey {
-    pub scheme_name: String,
-    pub payload_hexlified: String,
-}
-
-impl EncryptionPubKey {
-    /// TODO: adjust the dependencies so they can share a RNG.
-    pub fn encrypt<R1: CryptoRng + RngCore, R2: AeadCryptoRng + AeadRngCore>(
-        &self,
-        main_rng: &mut R1,
-        aead_rng: &mut R2,
-        msg: &[u8],
-    ) -> anyhow::Result<Vec<u8>> {
-        match self.scheme_name.as_str() {
-            // "Scheme0" => {
-            //     let pk = hex::decode(self.payload_hexlified.as_bytes())?;
-            //     asymmetric_encryption::scheme0::Scheme::enc(rng, pk.as_slice(), msg)
-            // }
-            elgamal_curve25519_aes256_gcm::SCHEME_NAME => {
-                let pk = hex::decode(self.payload_hexlified.as_bytes())?;
-                ElGamalCurve25519Aes256Gcm::enc(main_rng, aead_rng, pk.as_slice(), msg)
-            },
-            _ => bail!("EncryptionPubKey::encrypt failed with unknown scheme"),
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

@@ -1,11 +1,14 @@
 // Copyright © Aptos Foundation
 
 use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_oidb_pepper_common::{asymmetric_encryption::{
-    AsymmetricEncryption, elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm,
-}, jwt, PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0, vuf::{self, bls12381_g1_bls::Bls12381G1Bls, VUF}, VUFVerificationKey};
+use aptos_oidb_pepper_common::{
+    jwt, vuf,
+    vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
+    PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0,
+    VUFVerificationKey,
+};
 use aptos_types::{
-    oidb::{Configuration, OpenIdSig, test_utils::get_sample_esk},
+    oidb::{test_utils::get_sample_esk, Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
 };
 use ark_serialize::CanonicalDeserialize;
@@ -95,12 +98,6 @@ async fn main() {
             .into();
 
     println!();
-    println!(
-        "Action 2: generate a {} ephemeral key pair.",
-        ElGamalCurve25519Aes256Gcm::scheme_name()
-    );
-
-    println!();
     println!("Action 3: generate some random bytes as a blinder.");
     let blinder: [u8; 31] = [0u8; 31];
     println!("blinder_hexlified={}", hex::encode(blinder));
@@ -157,7 +154,9 @@ async fn main() {
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse::V0(PepperResponseV0::Ok(pepper)) = pepper_response else { panic!("bad pepper response") };
+    let PepperResponse::V0(PepperResponseV0::Ok(pepper)) = pepper_response else {
+        panic!("bad pepper response")
+    };
     println!();
     println!("pepper={:?}", pepper);
     let claims = jwt::parse(jwt.as_str()).unwrap();

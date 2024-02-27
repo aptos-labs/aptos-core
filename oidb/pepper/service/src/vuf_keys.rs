@@ -12,10 +12,6 @@ use log::warn;
 use once_cell::sync::Lazy;
 use sha3::Digest;
 
-pub struct VufScheme0Sk {
-    pub sk_bytes: Vec<u8>,
-}
-
 /// Derive the VUF private key from a seed given in the environment.
 fn derive_sk_from_env_seed() -> anyhow::Result<ark_bls12_381::Fr> {
     let seed_hexlified = std::env::var("VUF_KEY_SEED_HEX")
