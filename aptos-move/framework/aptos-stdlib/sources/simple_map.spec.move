@@ -71,6 +71,7 @@ spec aptos_std::simple_map {
     spec new<Key: store, Value: store>(): SimpleMap<Key, Value> {
         pragma intrinsic;
         pragma opaque;
+        aborts_if [abstract] false;
         ensures [abstract] spec_len(result) == 0;
         ensures [abstract] forall k: Key: !spec_contains_key(result, k);
     }
@@ -81,6 +82,7 @@ spec aptos_std::simple_map {
     ): SimpleMap<Key, Value> {
         pragma intrinsic;
         pragma opaque;
+        aborts_if [abstract] false;
         ensures [abstract] spec_len(result) == len(keys);
         ensures [abstract] forall k: Key: spec_contains_key(result, k) <==> vector::spec_contains(keys, k);
         ensures [abstract] forall i in 0..len(keys):
