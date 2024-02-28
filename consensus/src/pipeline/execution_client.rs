@@ -127,7 +127,6 @@ impl BufferManagerHandle {
         let reset_tx_to_buffer_manager = self.reset_tx_to_buffer_manager.take();
         self.execute_tx = None;
         self.commit_tx = None;
-        self.reset_tx_to_buffer_manager = None;
         (reset_tx_to_rand_manager, reset_tx_to_buffer_manager)
     }
 }
