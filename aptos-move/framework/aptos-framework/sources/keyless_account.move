@@ -1,6 +1,6 @@
-/// This module is responsible for configuring OpenID-based blockchain accounts (OIDBs), which were introduced in
+/// This module is responsible for configuring keyless blockchain accounts which were introduced in
 /// [AIP-61](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-61.md).
-module aptos_framework::openid_account {
+module aptos_framework::keyless_account {
     use std::option;
     use std::option::Option;
     use std::signer;
@@ -14,8 +14,8 @@ module aptos_framework::openid_account {
     #[resource_group(scope = global)]
     struct Group {}
 
-    #[resource_group_member(group = aptos_framework::openid_account::Group)]
-    /// The 288-byte Groth16 verification key (VK) for the ZK relation that implements OIDBs.
+    #[resource_group_member(group = aptos_framework::keyless_account::Group)]
+    /// The 288-byte Groth16 verification key (VK) for the ZK relation that implements keyless accounts
     struct Groth16VerificationKey has key, store {
         /// 32-byte serialization of `alpha * G`, where `G` is the generator of `G1`.
         alpha_g1: vector<u8>,
@@ -30,15 +30,15 @@ module aptos_framework::openid_account {
         gamma_abc_g1: vector<vector<u8>>,
     }
 
-    #[resource_group_member(group = aptos_framework::openid_account::Group)]
+    #[resource_group_member(group = aptos_framework::keyless_account::Group)]
     struct Configuration has key, store {
-        /// An override `aud` for the identity of a recovery service, which will help users recover their OIDB accounts
+        /// An override `aud` for the identity of a recovery service, which will help users recover their keyless accounts
         /// associated with dapps or wallets that have disappeared.
         /// IMPORTANT: This recovery service **cannot** on its own take over user accounts; a user must first sign in
-        /// via OAuth in the recovery service in order to allow it to rotate any of that user's OIDB accounts.
+        /// via OAuth in the recovery service in order to allow it to rotate any of that user's keyless accounts.
         override_aud_vals: vector<String>,
-        /// No transaction can have more than this many OIDB signatures.
-        max_oidb_signatures_per_txn: u16,
+        /// No transaction can have more than this many keyless signatures.
+        max_signatures_per_txn: u16,
         /// How far in the future from the JWT issued at time the EPK expiry can be set.
         max_exp_horizon_secs: u64,
         /// The training wheels PK, if training wheels are on
@@ -78,7 +78,7 @@ module aptos_framework::openid_account {
 
     public fun new_configuration(
         override_aud_val: vector<String>,
-        max_oidb_signatures_per_txn: u16,
+        max_signatures_per_txn: u16,
         max_exp_horizon_secs: u64,
         training_wheels_pubkey: Option<vector<u8>>,
         max_commited_epk_bytes: u16,
@@ -88,7 +88,7 @@ module aptos_framework::openid_account {
     ): Configuration {
         Configuration {
             override_aud_vals: override_aud_val,
-            max_oidb_signatures_per_txn,
+            max_signatures_per_txn,
             max_exp_horizon_secs,
             training_wheels_pubkey,
             max_commited_epk_bytes,
@@ -98,7 +98,7 @@ module aptos_framework::openid_account {
         }
     }
 
-    // Sets the OIDB Groth16 verification key, only callable via governance proposal.
+    // Sets the Groth16 verification key, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
     public fun update_groth16_verification_key(fx: &signer, vk: Groth16VerificationKey) acquires Groth16VerificationKey {
         system_addresses::assert_aptos_framework(fx);
@@ -116,7 +116,7 @@ module aptos_framework::openid_account {
         move_to(fx, vk);
     }
 
-    // Sets the OIDB configuration, only callable via governance proposal.
+    // Sets the keyless configuration, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
     public fun update_configuration(fx: &signer, config: Configuration) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
@@ -124,7 +124,7 @@ module aptos_framework::openid_account {
         if (exists<Configuration>(signer::address_of(fx))) {
             let Configuration {
                 override_aud_vals: _,
-                max_oidb_signatures_per_txn: _,
+                max_signatures_per_txn: _,
                 max_exp_horizon_secs: _,
                 training_wheels_pubkey: _,
                 max_commited_epk_bytes: _,
@@ -137,7 +137,7 @@ module aptos_framework::openid_account {
         move_to(fx, config);
     }
 
-    // Convenience method to set the OIDB training wheels, only callable via governance proposal.
+    // Convenience method to [un]set the training wheels PK, only callable via governance proposal.
     // WARNING: If a malicious key is set, this would lead to stolen funds.
     public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
@@ -158,7 +158,7 @@ module aptos_framework::openid_account {
     }
 
     // Convenience method to clear the set of override `aud`'s, only callable via governance proposal.
-    // WARNING: When no override `aud` is set, recovery of OIDB accounts associated with applications that disappeared
+    // WARNING: When no override `aud` is set, recovery of keyless accounts associated with applications that disappeared
     // is no longer possible.
     public fun remove_all_override_auds(fx: &signer) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);

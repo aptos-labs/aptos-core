@@ -2,8 +2,10 @@
 
 use crate::{
     invalid_signature,
+    keyless::{
+        circuit_constants, circuit_testcases::SAMPLE_EXP_HORIZON_SECS, KEYLESS_ACCOUNT_MODULE_NAME,
+    },
     move_utils::as_move_value::AsMoveValue,
-    oidb::{circuit_constants, circuit_testcases::SAMPLE_EXP_HORIZON_SECS},
 };
 use move_core_types::{
     ident_str,
@@ -14,11 +16,11 @@ use move_core_types::{
 };
 use serde::{Deserialize, Serialize};
 
-/// Reflection of aptos_framework::openid_account::Configs
+/// Reflection of aptos_framework::keyless_account::Configuration
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Configuration {
     pub override_aud_vals: Vec<String>,
-    pub max_oidb_signatures_per_txn: u16,
+    pub max_signatures_per_txn: u16,
     pub max_exp_horizon_secs: u64,
     pub training_wheels_pubkey: Option<Vec<u8>>,
     pub max_commited_epk_bytes: u16,
@@ -31,7 +33,7 @@ impl AsMoveValue for Configuration {
     fn as_move_value(&self) -> MoveValue {
         MoveValue::Struct(MoveStruct::Runtime(vec![
             self.override_aud_vals.as_move_value(),
-            self.max_oidb_signatures_per_txn.as_move_value(),
+            self.max_signatures_per_txn.as_move_value(),
             self.max_exp_horizon_secs.as_move_value(),
             self.training_wheels_pubkey.as_move_value(),
             self.max_commited_epk_bytes.as_move_value(),
@@ -45,7 +47,7 @@ impl AsMoveValue for Configuration {
 /// WARNING: This struct uses resource groups on the Move side. Do NOT implement OnChainConfig
 /// for it, since `OnChainConfig::fetch_config` does not work with resource groups (yet).
 impl MoveStructType for Configuration {
-    const MODULE_NAME: &'static IdentStr = ident_str!("openid_account");
+    const MODULE_NAME: &'static IdentStr = ident_str!(KEYLESS_ACCOUNT_MODULE_NAME);
     const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
 }
 
@@ -56,7 +58,7 @@ impl Configuration {
     pub fn new_for_devnet() -> Configuration {
         Configuration {
             override_aud_vals: vec![Self::OVERRIDE_AUD_FOR_TESTING.to_owned()],
-            max_oidb_signatures_per_txn: 3,
+            max_signatures_per_txn: 3,
             max_exp_horizon_secs: 10_000_000, // ~115.74 days
             training_wheels_pubkey: None,
             max_commited_epk_bytes: circuit_constants::MAX_COMMITED_EPK_BYTES,
@@ -80,9 +82,10 @@ impl Configuration {
             .count();
 
         if matches == 0 {
-            Err(invalid_signature!(
-                "override aud is not allow-listed in 0x1::openid_account"
-            ))
+            Err(invalid_signature!(format!(
+                "override aud is not allow-listed in 0x1::{}",
+                KEYLESS_ACCOUNT_MODULE_NAME
+            )))
         } else {
             Ok(())
         }
