@@ -10,7 +10,7 @@ use super::{
     ProofNotifier,
 };
 use crate::{
-    dag::DAGMessage, network::IncomingDAGRequest, payload_manager::TPayloadManager,
+    dag::DAGMessage, monitor, network::IncomingDAGRequest, payload_manager::TPayloadManager,
     pipeline::execution_client::TExecutionClient,
 };
 use anyhow::{anyhow, ensure};
@@ -252,13 +252,16 @@ impl DagStateSynchronizer {
                 commit_info = commit_info,
                 "Syncing DAG. Fetching Nodes"
             );
-            dag_fetcher
-                .fetch(request, responders, dag_store)
-                .await
-                .map_err(|err| {
-                    error!("error fetching nodes {}", err);
-                    anyhow!(err)
-                })?;
+            monitor!(
+                "dag_sync_fetch",
+                dag_fetcher
+                    .fetch(request, responders, dag_store)
+                    .await
+                    .map_err(|err| {
+                        error!("error fetching nodes {}", err);
+                        anyhow!(err)
+                    })
+            )?;
 
             Ok(())
         };
@@ -266,10 +269,13 @@ impl DagStateSynchronizer {
         let execution_client = self.execution_client.clone();
         let state_sync_fut = async move {
             debug!(target_ledger_info = commit_li, "Requesting sync to");
-            execution_client
-                .sync_to(commit_li)
-                .await
-                .map_err(|err| anyhow!(err))
+            monitor!(
+                "dag_sync_state",
+                execution_client
+                    .sync_to(commit_li)
+                    .await
+                    .map_err(|err| anyhow!(err))
+            )
         };
         // TODO: explain why this is okay
         futures::future::try_join(dag_sync_fut, state_sync_fut).await?;
