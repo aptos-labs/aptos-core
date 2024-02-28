@@ -21,7 +21,8 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{
-    InitialGasSchedule, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
+    LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -132,8 +133,14 @@ pub struct FakeExecutor {
 }
 
 pub enum GasMeterType {
-    RegularMeter(Vec<u128>),
-    AbstractMeter(Vec<DynamicExpression>),
+    RegularGasMeter,
+    UnmeteredGasMeter,
+}
+
+pub enum ExecFuncTimerDynamicArgs {
+    NoArgs,
+    DistinctSigners,
+    DistinctSignersAndFixed(Vec<AccountAddress>),
 }
 
 impl FakeExecutor {
@@ -790,6 +797,7 @@ impl FakeExecutor {
 
     /// exec_func_record_running_time is like exec(), however, we can run a Module published under
     /// the creator address instead of 0x1, as what is currently done in exec.
+    /// Additionally we have dynamic_args and gas_meter_type to configure it further.
     pub fn exec_func_record_running_time(
         &mut self,
         module: &ModuleId,
@@ -797,18 +805,38 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
         iterations: u64,
+        dynamic_args: ExecFuncTimerDynamicArgs,
+        gas_meter_type: GasMeterType,
     ) -> u128 {
         // FIXME: should probably read the timestamp from storage.
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
 
+        let mut extra_accounts = match &dynamic_args {
+            ExecFuncTimerDynamicArgs::DistinctSigners
+            | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
+                .map(|_| *self.new_account_at(AccountAddress::random()).address())
+                .collect::<Vec<_>>(),
+            _ => vec![],
+        };
+
         let resolver = self.data_store.as_move_resolver();
 
-        // TODO(Gas): we probably want to switch to non-zero costs in the future
+        let (gas_params, storage_gas_params) = match gas_meter_type {
+            GasMeterType::RegularGasMeter => (
+                AptosGasParameters::initial(),
+                StorageGasParameters::latest(),
+            ),
+            GasMeterType::UnmeteredGasMeter => (
+                AptosGasParameters::zeros(),
+                StorageGasParameters::unlimited(0.into()),
+            ),
+        };
+
         let vm = MoveVmExt::new(
-            NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
+            gas_params.natives.clone(),
+            gas_params.vm.misc.clone(),
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             self.features.clone(),
@@ -830,13 +858,53 @@ impl FakeExecutor {
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
             let ty = type_params.clone();
-            let arg = args.clone();
-            // TODO: consider using StandardGasMeter
-            let gas_meter = &mut UnmeteredGasMeter;
+            let mut arg = args.clone();
+            match &dynamic_args {
+                ExecFuncTimerDynamicArgs::DistinctSigners => {
+                    arg.insert(0, bcs::to_bytes(&extra_accounts.pop().unwrap()).unwrap());
+                },
+                ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(signers) => {
+                    for signer in signers.iter().rev() {
+                        arg.insert(0, bcs::to_bytes(&signer).unwrap());
+                    }
+                    arg.insert(0, bcs::to_bytes(&extra_accounts.pop().unwrap()).unwrap());
+                },
+                _ => {},
+            }
+
+            let (mut regular, mut unmetered) = match gas_meter_type {
+                GasMeterType::RegularGasMeter => (
+                    Some(MemoryTrackedGasMeter::new(StandardGasMeter::new(
+                        StandardGasAlgebra::new(
+                            LATEST_GAS_FEATURE_VERSION,
+                            gas_params.vm.clone(),
+                            storage_gas_params.clone(),
+                            1_000_000_000_000_000,
+                        ),
+                    ))),
+                    None,
+                ),
+                GasMeterType::UnmeteredGasMeter => (None, Some(UnmeteredGasMeter)),
+            };
 
             let start = Instant::now();
-            let result =
-                session.execute_function_bypass_visibility(module, &fun_name, ty, arg, gas_meter);
+            // Not sure how to create a common type for both. Box<dyn GasMeter> doesn't work for some reason.
+            let result = match gas_meter_type {
+                GasMeterType::RegularGasMeter => session.execute_function_bypass_visibility(
+                    module,
+                    &fun_name,
+                    ty,
+                    arg,
+                    regular.as_mut().unwrap(),
+                ),
+                GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
+                    module,
+                    &fun_name,
+                    ty,
+                    arg,
+                    unmetered.as_mut().unwrap(),
+                ),
+            };
             let elapsed = start.elapsed();
             if let Err(err) = result {
                 if !should_error {

@@ -10,8 +10,8 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{
-        ExecutionConfigV1, GasScheduleV2, OnChainConfig, OnChainConsensusConfig,
-        OnChainExecutionConfig, TransactionShufflerType, Version,
+        ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2, OnChainConfig,
+        OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType, Version,
     },
 };
 use futures::executor::block_on;
@@ -595,7 +595,7 @@ impl Default for ReleaseConfig {
                     name: "feature_flags".to_string(),
                     update_sequence: vec![
                         ReleaseEntry::FeatureFlag(Features {
-                            enabled: aptos_vm_genesis::default_features()
+                            enabled: AptosFeatureFlag::default_features()
                                 .into_iter()
                                 .map(crate::components::feature_flags::FeatureFlag::from)
                                 .collect(),

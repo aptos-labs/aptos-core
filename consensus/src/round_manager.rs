@@ -8,6 +8,7 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore,
     },
     counters,
+    counters::{PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -84,17 +85,24 @@ impl UnverifiedEvent {
         max_num_batches: usize,
         max_batch_expiry_gap_usecs: u64,
     ) -> Result<VerifiedEvent, VerifyError> {
+        let start_time = Instant::now();
         Ok(match self {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
                     p.verify(validator, quorum_store_enabled)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proposal"])
+                        .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::ProposalMsg(p)
             },
             UnverifiedEvent::VoteMsg(v) => {
                 if !self_message {
                     v.verify(validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["vote"])
+                        .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::VoteMsg(v)
             },
@@ -103,6 +111,9 @@ impl UnverifiedEvent {
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
                     b.verify(peer_id, max_num_batches)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["batch"])
+                        .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::BatchMsg(b)
             },
@@ -114,12 +125,18 @@ impl UnverifiedEvent {
                         max_batch_expiry_gap_usecs,
                         validator,
                     )?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["signed_batch"])
+                        .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::SignedBatchInfo(sd)
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 if !self_message {
                     p.verify(max_num_batches, validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proof_of_store"])
+                        .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::ProofOfStoreMsg(p)
             },
@@ -195,6 +212,7 @@ pub struct RoundManager {
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
     features: Features,
+    broadcast_vote: bool,
 }
 
 impl RoundManager {
@@ -211,6 +229,7 @@ impl RoundManager {
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
         features: Features,
+        broadcast_vote: bool,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -236,6 +255,7 @@ impl RoundManager {
             buffered_proposal_tx,
             local_config,
             features,
+            broadcast_vote,
         }
     }
 
@@ -669,16 +689,35 @@ impl RoundManager {
                     (count_acc + 1, size_acc + txn.size_in_bytes())
                 })
             });
+
         let num_validator_txns = num_validator_txns as u64;
         let validator_txns_total_bytes = validator_txns_total_bytes as u64;
+        let vtxn_count_limit = self.vtxn_config.per_block_limit_txn_count();
+        let vtxn_bytes_limit = self.vtxn_config.per_block_limit_total_bytes();
+        let author_hex = author.to_hex();
+        PROPOSED_VTXN_COUNT
+            .with_label_values(&[&author_hex])
+            .inc_by(num_validator_txns);
+        PROPOSED_VTXN_BYTES
+            .with_label_values(&[&author_hex])
+            .inc_by(validator_txns_total_bytes);
+        info!(
+            vtxn_count_limit = vtxn_count_limit,
+            vtxn_count_proposed = num_validator_txns,
+            vtxn_bytes_limit = vtxn_bytes_limit,
+            vtxn_bytes_proposed = validator_txns_total_bytes,
+            proposer = author_hex,
+            "Summarizing proposed validator txns."
+        );
+
         ensure!(
-            num_validator_txns <= self.vtxn_config.per_block_limit_txn_count(),
+            num_validator_txns <= vtxn_count_limit,
             "process_proposal failed with per-block vtxn count limit exceeded: limit={}, actual={}",
             self.vtxn_config.per_block_limit_txn_count(),
             num_validator_txns
         );
         ensure!(
-            validator_txns_total_bytes <= self.vtxn_config.per_block_limit_total_bytes(),
+            validator_txns_total_bytes <= vtxn_bytes_limit,
             "process_proposal failed with per-block vtxn bytes limit exceeded: limit={}, actual={}",
             self.vtxn_config.per_block_limit_total_bytes(),
             validator_txns_total_bytes
@@ -792,19 +831,22 @@ impl RoundManager {
             .execute_and_vote(proposal)
             .await
             .context("[RoundManager] Process proposal")?;
-
-        let recipient = self
-            .proposer_election
-            .get_valid_proposer(proposal_round + 1);
-
-        info!(
-            self.new_log(LogEvent::Vote).remote_peer(recipient),
-            "{}", vote
-        );
-
         self.round_state.record_vote(vote.clone());
-        let vote_msg = VoteMsg::new(vote, self.block_store.sync_info());
-        self.network.send_vote(vote_msg, vec![recipient]).await;
+        let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
+
+        if self.broadcast_vote {
+            info!(self.new_log(LogEvent::Vote), "{}", vote);
+            self.network.broadcast_vote(vote_msg).await;
+        } else {
+            let recipient = self
+                .proposer_election
+                .get_valid_proposer(proposal_round + 1);
+            info!(
+                self.new_log(LogEvent::Vote).remote_peer(recipient),
+                "{}", vote
+            );
+            self.network.send_vote(vote_msg, vec![recipient]).await;
+        }
         Ok(())
     }
 
@@ -897,7 +939,7 @@ impl RoundManager {
             is_timeout = vote.is_timeout(),
         );
 
-        if !vote.is_timeout() {
+        if !self.broadcast_vote && !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.
             let next_round = round + 1;
             ensure!(
@@ -908,6 +950,7 @@ impl RoundManager {
                 next_round
             );
         }
+
         let block_id = vote.vote_data().proposed().id();
         // Check if the block already had a QC
         if self

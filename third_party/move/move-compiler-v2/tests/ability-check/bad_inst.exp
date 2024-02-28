@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: type `test::T` is missing ability `drop`
+   ┌─ tests/ability-check/bad_inst.move:13:16
+   │
+13 │         U<S<T>> { x: S { x: T { } } }
+   │                      ^^^^^^^^^^^^^^ in instantiation of struct `test::S` here
+
+error: type `test::T` is missing ability `drop`
+   ┌─ tests/ability-check/bad_inst.move:13:3
+   │
+13 │         U<S<T>> { x: S { x: T { } } }
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ in instantiation of struct `test::U` here

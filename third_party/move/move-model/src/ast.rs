@@ -2076,14 +2076,33 @@ impl<'a> ExpDisplay<'a> {
 }
 
 impl Operation {
-    /// Creates a display of an operation which can be used in formatting.
-    pub fn display<'a>(&'a self, env: &'a GlobalEnv, node_id: NodeId) -> OperationDisplay<'a> {
+    fn display_with_context<'a>(
+        &'a self,
+        env: &'a GlobalEnv,
+        node_id: NodeId,
+        tctx: TypeDisplayContext<'a>,
+    ) -> OperationDisplay<'a> {
         OperationDisplay {
             env,
             oper: self,
             node_id,
-            tctx: TypeDisplayContext::new(env),
+            tctx,
         }
+    }
+
+    /// Creates a display of an operation which can be used in formatting.
+    pub fn display<'a>(&'a self, env: &'a GlobalEnv, node_id: NodeId) -> OperationDisplay<'a> {
+        self.display_with_context(env, node_id, env.get_type_display_ctx())
+    }
+
+    /// Creates a display of an operation using the type display ctx from the function.
+    pub fn display_with_fun_env<'a>(
+        &'a self,
+        env: &'a GlobalEnv,
+        fun_env: &'a FunctionEnv,
+        node_id: NodeId,
+    ) -> OperationDisplay<'a> {
+        self.display_with_context(env, node_id, fun_env.get_type_display_ctx())
     }
 
     fn display_for_exp<'a>(

@@ -243,7 +243,7 @@ impl NodeSetup {
 
         playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
-        let (self_sender, self_receiver) = aptos_channels::new_test(1000);
+        let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
         let network = Arc::new(NetworkSender::new(
             author,
             consensus_network_client,
@@ -309,6 +309,7 @@ impl NodeSetup {
             round_manager_tx,
             local_consensus_config.clone(),
             features.clone(),
+            false,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

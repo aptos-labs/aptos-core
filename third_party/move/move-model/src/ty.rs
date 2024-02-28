@@ -344,6 +344,11 @@ impl Type {
         matches!(self, Type::TypeParameter(..))
     }
 
+    /// Determines whether this is a primitive.
+    pub fn is_primitive(&self) -> bool {
+        matches!(self, Type::Primitive(_))
+    }
+
     /// Determines whether this is a reference.
     pub fn is_reference(&self) -> bool {
         matches!(self, Type::Reference(_, _))
@@ -378,6 +383,15 @@ impl Type {
     pub fn get_vector_element_type(&self) -> Option<Type> {
         if let Type::Vector(e) = self {
             Some(e.as_ref().clone())
+        } else {
+            None
+        }
+    }
+
+    /// Get the target type of a reference
+    pub fn get_target_type(&self) -> Option<&Type> {
+        if let Type::Reference(_, t) = self {
+            Some(t.as_ref())
         } else {
             None
         }
@@ -2192,7 +2206,7 @@ pub fn check_struct_inst<F, G, H>(
 where
     F: Fn(u16) -> TypeParameterKind + Copy,
     G: Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy,
-    H: Fn(&Loc, &str) + Copy,
+    H: Fn(&Loc, &Type, &str) + Copy,
 {
     let (ty_params, struct_abilities) = get_struct_sig(mid, sid);
     let ty_args_abilities_meet = ty_args
@@ -2209,17 +2223,18 @@ where
                 let ty_arg_abilities =
                     infer_abilities_opt_check(ty_arg, get_ty_param_kinds, get_struct_sig, on_err);
                 if let Some((loc, on_err)) = on_err {
-                    // check ability constraints on the type param
-                    if !constraints.is_subset(ty_arg_abilities) {
-                        on_err(loc, "Invalid instantiation")
-                    }
-                    // check phantomness of the type param
-                    if !is_phantom_position && is_phantom_type_arg(get_ty_param_kinds, ty_arg) {
-                        on_err(loc, "Not a phantom position")
-                    }
+                    check_type_arg_abilities(
+                        get_ty_param_kinds,
+                        ty_arg,
+                        constraints,
+                        is_phantom_position,
+                        ty_arg_abilities,
+                        loc,
+                        on_err,
+                    );
                 }
                 if is_phantom_position {
-                    // phantom type parameters don't participte in ability derivations
+                    // phantom type parameters don't participate in ability derivations
                     AbilitySet::ALL
                 } else {
                     ty_arg_abilities
@@ -2228,6 +2243,29 @@ where
         )
         .fold(AbilitySet::ALL, AbilitySet::intersect);
     instantiate_abilities(struct_abilities, ty_args_abilities_meet)
+}
+
+/// check ability constraints on the type param
+pub fn check_type_arg_abilities<F, H>(
+    get_ty_param_kinds: F,
+    ty_arg: &Type,
+    required_abilities: AbilitySet,
+    is_phantom_position: bool,
+    given_abilities: AbilitySet,
+    loc: &Loc,
+    on_err: H,
+) where
+    F: Fn(u16) -> TypeParameterKind + Copy,
+    H: Fn(&Loc, &Type, &str) + Copy,
+{
+    if !required_abilities.is_subset(given_abilities) {
+        let missing = required_abilities.setminus(given_abilities);
+        on_err(loc, ty_arg, &format!("missing ability `{}`", missing))
+    }
+    // check phantomness of the type param
+    if !is_phantom_position && is_phantom_type_arg(get_ty_param_kinds, ty_arg) {
+        on_err(loc, ty_arg, "not a phantom position")
+    }
 }
 
 /// Returns the abilities of the type, optionally checking for type instantiation,
@@ -2247,7 +2285,7 @@ pub fn infer_abilities_opt_check<F, G, H>(
 where
     F: Fn(u16) -> TypeParameterKind + Copy,
     G: Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy,
-    H: Fn(&Loc, &str) + Copy,
+    H: Fn(&Loc, &Type, &str) + Copy,
 {
     match ty {
         Type::Primitive(p) => match p {
@@ -2303,7 +2341,7 @@ pub fn infer_and_check_abilities<F, G, H>(
 where
     F: Fn(u16) -> TypeParameterKind + Copy,
     G: Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy,
-    H: Fn(&Loc, &str) + Copy,
+    H: Fn(&Loc, &Type, &str) + Copy,
 {
     infer_abilities_opt_check(ty, get_ty_param_kinds, get_struct_sig, Some((loc, on_err)))
 }
@@ -2320,6 +2358,6 @@ where
         ty,
         get_ty_param_kinds,
         get_struct_sig,
-        None::<(&Loc, fn(&Loc, &str))>,
+        None::<(&Loc, fn(&Loc, &Type, &str))>,
     )
 }

@@ -8,11 +8,11 @@ use crate::{
     data_cache::{AsMoveResolver, StorageAdapter},
     errors::{discarded_output, expect_only_successful_execution},
     gas::{check_gas, get_gas_parameters},
+    keyless_validation,
     move_vm_ext::{
         get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, MoveVmExt,
         RespawnedSession, SessionExt, SessionId,
     },
-    oidb_validation,
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
@@ -1296,9 +1296,9 @@ impl AptosVM {
             ));
         }
 
-        let authenticators = aptos_types::oidb::get_oidb_authenticators(transaction)
+        let authenticators = aptos_types::keyless::get_authenticators(transaction)
             .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
-        oidb_validation::validate_oidb_authenticators(&authenticators, self.features(), resolver)?;
+        keyless_validation::validate_authenticators(&authenticators, self.features(), resolver)?;
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and

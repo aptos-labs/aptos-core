@@ -872,7 +872,7 @@ export enum AnyPublicKey_Type {
   TYPE_ED25519 = 1,
   TYPE_SECP256K1_ECDSA = 2,
   TYPE_SECP256R1_ECDSA = 3,
-  TYPE_OIDB = 4,
+  TYPE_KEYLESS = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -891,8 +891,8 @@ export function anyPublicKey_TypeFromJSON(object: any): AnyPublicKey_Type {
     case "TYPE_SECP256R1_ECDSA":
       return AnyPublicKey_Type.TYPE_SECP256R1_ECDSA;
     case 4:
-    case "TYPE_OIDB":
-      return AnyPublicKey_Type.TYPE_OIDB;
+    case "TYPE_KEYLESS":
+      return AnyPublicKey_Type.TYPE_KEYLESS;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -910,8 +910,8 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
       return "TYPE_SECP256K1_ECDSA";
     case AnyPublicKey_Type.TYPE_SECP256R1_ECDSA:
       return "TYPE_SECP256R1_ECDSA";
-    case AnyPublicKey_Type.TYPE_OIDB:
-      return "TYPE_OIDB";
+    case AnyPublicKey_Type.TYPE_KEYLESS:
+      return "TYPE_KEYLESS";
     case AnyPublicKey_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -932,7 +932,7 @@ export interface AnySignature {
   ed25519?: Ed25519 | undefined;
   secp256k1Ecdsa?: Secp256k1Ecdsa | undefined;
   webauthn?: WebAuthn | undefined;
-  oidb?: Oidb | undefined;
+  keyless?: Keyless | undefined;
 }
 
 export enum AnySignature_Type {
@@ -940,7 +940,7 @@ export enum AnySignature_Type {
   TYPE_ED25519 = 1,
   TYPE_SECP256K1_ECDSA = 2,
   TYPE_WEBAUTHN = 3,
-  TYPE_OIDB = 4,
+  TYPE_KEYLESS = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -959,8 +959,8 @@ export function anySignature_TypeFromJSON(object: any): AnySignature_Type {
     case "TYPE_WEBAUTHN":
       return AnySignature_Type.TYPE_WEBAUTHN;
     case 4:
-    case "TYPE_OIDB":
-      return AnySignature_Type.TYPE_OIDB;
+    case "TYPE_KEYLESS":
+      return AnySignature_Type.TYPE_KEYLESS;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -978,8 +978,8 @@ export function anySignature_TypeToJSON(object: AnySignature_Type): string {
       return "TYPE_SECP256K1_ECDSA";
     case AnySignature_Type.TYPE_WEBAUTHN:
       return "TYPE_WEBAUTHN";
-    case AnySignature_Type.TYPE_OIDB:
-      return "TYPE_OIDB";
+    case AnySignature_Type.TYPE_KEYLESS:
+      return "TYPE_KEYLESS";
     case AnySignature_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -998,7 +998,7 @@ export interface WebAuthn {
   signature?: Uint8Array | undefined;
 }
 
-export interface Oidb {
+export interface Keyless {
   signature?: Uint8Array | undefined;
 }
 
@@ -7719,7 +7719,7 @@ function createBaseAnySignature(): AnySignature {
     ed25519: undefined,
     secp256k1Ecdsa: undefined,
     webauthn: undefined,
-    oidb: undefined,
+    keyless: undefined,
   };
 }
 
@@ -7740,8 +7740,8 @@ export const AnySignature = {
     if (message.webauthn !== undefined) {
       WebAuthn.encode(message.webauthn, writer.uint32(42).fork()).ldelim();
     }
-    if (message.oidb !== undefined) {
-      Oidb.encode(message.oidb, writer.uint32(50).fork()).ldelim();
+    if (message.keyless !== undefined) {
+      Keyless.encode(message.keyless, writer.uint32(50).fork()).ldelim();
     }
     return writer;
   },
@@ -7793,7 +7793,7 @@ export const AnySignature = {
             break;
           }
 
-          message.oidb = Oidb.decode(reader, reader.uint32());
+          message.keyless = Keyless.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -7843,7 +7843,7 @@ export const AnySignature = {
       ed25519: isSet(object.ed25519) ? Ed25519.fromJSON(object.ed25519) : undefined,
       secp256k1Ecdsa: isSet(object.secp256k1Ecdsa) ? Secp256k1Ecdsa.fromJSON(object.secp256k1Ecdsa) : undefined,
       webauthn: isSet(object.webauthn) ? WebAuthn.fromJSON(object.webauthn) : undefined,
-      oidb: isSet(object.oidb) ? Oidb.fromJSON(object.oidb) : undefined,
+      keyless: isSet(object.keyless) ? Keyless.fromJSON(object.keyless) : undefined,
     };
   },
 
@@ -7864,8 +7864,8 @@ export const AnySignature = {
     if (message.webauthn !== undefined) {
       obj.webauthn = WebAuthn.toJSON(message.webauthn);
     }
-    if (message.oidb !== undefined) {
-      obj.oidb = Oidb.toJSON(message.oidb);
+    if (message.keyless !== undefined) {
+      obj.keyless = Keyless.toJSON(message.keyless);
     }
     return obj;
   },
@@ -7886,7 +7886,9 @@ export const AnySignature = {
     message.webauthn = (object.webauthn !== undefined && object.webauthn !== null)
       ? WebAuthn.fromPartial(object.webauthn)
       : undefined;
-    message.oidb = (object.oidb !== undefined && object.oidb !== null) ? Oidb.fromPartial(object.oidb) : undefined;
+    message.keyless = (object.keyless !== undefined && object.keyless !== null)
+      ? Keyless.fromPartial(object.keyless)
+      : undefined;
     return message;
   },
 };
@@ -8158,22 +8160,22 @@ export const WebAuthn = {
   },
 };
 
-function createBaseOidb(): Oidb {
+function createBaseKeyless(): Keyless {
   return { signature: new Uint8Array(0) };
 }
 
-export const Oidb = {
-  encode(message: Oidb, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const Keyless = {
+  encode(message: Keyless, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.signature !== undefined && message.signature.length !== 0) {
       writer.uint32(10).bytes(message.signature);
     }
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): Oidb {
+  decode(input: _m0.Reader | Uint8Array, length?: number): Keyless {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseOidb();
+    const message = createBaseKeyless();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -8194,40 +8196,42 @@ export const Oidb = {
   },
 
   // encodeTransform encodes a source of message objects.
-  // Transform<Oidb, Uint8Array>
-  async *encodeTransform(source: AsyncIterable<Oidb | Oidb[]> | Iterable<Oidb | Oidb[]>): AsyncIterable<Uint8Array> {
+  // Transform<Keyless, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<Keyless | Keyless[]> | Iterable<Keyless | Keyless[]>,
+  ): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
       if (globalThis.Array.isArray(pkt)) {
         for (const p of (pkt as any)) {
-          yield* [Oidb.encode(p).finish()];
+          yield* [Keyless.encode(p).finish()];
         }
       } else {
-        yield* [Oidb.encode(pkt as any).finish()];
+        yield* [Keyless.encode(pkt as any).finish()];
       }
     }
   },
 
   // decodeTransform decodes a source of encoded messages.
-  // Transform<Uint8Array, Oidb>
+  // Transform<Uint8Array, Keyless>
   async *decodeTransform(
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
-  ): AsyncIterable<Oidb> {
+  ): AsyncIterable<Keyless> {
     for await (const pkt of source) {
       if (globalThis.Array.isArray(pkt)) {
         for (const p of (pkt as any)) {
-          yield* [Oidb.decode(p)];
+          yield* [Keyless.decode(p)];
         }
       } else {
-        yield* [Oidb.decode(pkt as any)];
+        yield* [Keyless.decode(pkt as any)];
       }
     }
   },
 
-  fromJSON(object: any): Oidb {
+  fromJSON(object: any): Keyless {
     return { signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0) };
   },
 
-  toJSON(message: Oidb): unknown {
+  toJSON(message: Keyless): unknown {
     const obj: any = {};
     if (message.signature !== undefined && message.signature.length !== 0) {
       obj.signature = base64FromBytes(message.signature);
@@ -8235,11 +8239,11 @@ export const Oidb = {
     return obj;
   },
 
-  create(base?: DeepPartial<Oidb>): Oidb {
-    return Oidb.fromPartial(base ?? {});
+  create(base?: DeepPartial<Keyless>): Keyless {
+    return Keyless.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<Oidb>): Oidb {
-    const message = createBaseOidb();
+  fromPartial(object: DeepPartial<Keyless>): Keyless {
+    const message = createBaseKeyless();
     message.signature = object.signature ?? new Uint8Array(0);
     return message;
   },

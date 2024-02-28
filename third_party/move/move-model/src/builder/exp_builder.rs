@@ -12,7 +12,7 @@ use crate::{
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
     model::{
-        FieldId, Loc, ModuleId, NodeId, Parameter, QualifiedInstId, SpecFunId, StructId,
+        FieldId, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedInstId, SpecFunId, StructId,
         TypeParameter, TypeParameterKind,
     },
     symbol::{Symbol, SymbolPool},
@@ -165,6 +165,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         et
     }
 
+    fn env(&self) -> &GlobalEnv {
+        self.parent.parent.env
+    }
+
     pub fn set_spec_block_map(&mut self, map: BTreeMap<EA::SpecId, EA::SpecBlock>) {
         self.spec_block_map = map
     }
@@ -240,12 +244,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Shortcut for accessing symbol pool.
     pub fn symbol_pool(&self) -> &SymbolPool {
-        self.parent.parent.env.symbol_pool()
+        self.env().symbol_pool()
     }
 
     /// Shortcut for translating a Move AST location into ours.
     pub fn to_loc(&self, loc: &move_ir_types::location::Loc) -> Loc {
-        self.parent.parent.env.to_loc(loc)
+        self.env().to_loc(loc)
     }
 
     /// Shortcut for reporting an error.
@@ -265,13 +269,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     pub fn error_with_labels(&mut self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
         self.had_errors = true;
         if self.mode != ExpTranslationMode::TryImplAsSpec {
-            self.parent.parent.env.error_with_labels(loc, msg, labels);
+            self.env().error_with_labels(loc, msg, labels);
         }
     }
 
     /// Shortcut for reporting a bug
     pub fn bug(&mut self, loc: &Loc, msg: &str) {
-        self.parent.parent.env.diag(Severity::Bug, loc, msg)
+        self.env().diag(Severity::Bug, loc, msg)
     }
 
     /// Creates a fresh type variable.
@@ -302,32 +306,32 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Shortcut to create a new node id and assigns type and location to it.
     pub fn new_node_id_with_type_loc(&self, ty: &Type, loc: &Loc) -> NodeId {
-        self.parent.parent.env.new_node(loc.clone(), ty.clone())
+        self.env().new_node(loc.clone(), ty.clone())
     }
 
     // Short cut for getting node type.
     pub fn get_node_type(&self, node_id: NodeId) -> Type {
-        self.parent.parent.env.get_node_type(node_id)
+        self.env().get_node_type(node_id)
     }
 
     // Short cut for getting node type.
     pub fn get_node_type_opt(&self, node_id: NodeId) -> Option<Type> {
-        self.parent.parent.env.get_node_type_opt(node_id)
+        self.env().get_node_type_opt(node_id)
     }
 
     // Short cut for getting node location.
     pub fn get_node_loc(&self, node_id: NodeId) -> Loc {
-        self.parent.parent.env.get_node_loc(node_id)
+        self.env().get_node_loc(node_id)
     }
 
     // Short cut for getting node instantiation.
     pub fn get_node_instantiation_opt(&self, node_id: NodeId) -> Option<Vec<Type>> {
-        self.parent.parent.env.get_node_instantiation_opt(node_id)
+        self.env().get_node_instantiation_opt(node_id)
     }
 
     /// Shortcut to update node type.
     pub fn update_node_type(&self, node_id: NodeId, ty: Type) {
-        self.parent.parent.env.update_node_type(node_id, ty);
+        self.env().update_node_type(node_id, ty);
     }
 
     /// Shortcut to set/update instantiation for the given node id.
@@ -348,65 +352,81 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Finalizes types in this translator, producing errors if some could not be inferred
     /// and remained incomplete.
     pub fn finalize_types(&mut self) {
-        for i in self.node_counter_start..self.parent.parent.env.next_free_node_number() {
-            let node_id = NodeId::new(i);
+        if !self.had_errors {
+            let mut reported_types = BTreeSet::new();
+            let mut reported_vars = BTreeSet::new();
+            for i in self.node_counter_start..self.env().next_free_node_number() {
+                let node_id = NodeId::new(i);
 
-            if let Some(ty) = self.get_node_type_opt(node_id) {
-                let ty = self.finalize_type(node_id, &ty);
-                self.update_node_type(node_id, ty);
-            }
-            if let Some(inst) = self.get_node_instantiation_opt(node_id) {
-                let inst = inst
-                    .iter()
-                    .map(|ty| self.finalize_type(node_id, ty))
-                    .collect_vec();
-                self.update_node_instantiation(node_id, inst);
+                if let Some(ty) = self.get_node_type_opt(node_id) {
+                    let ty =
+                        self.finalize_type(node_id, &ty, &mut reported_types, &mut reported_vars);
+                    self.update_node_type(node_id, ty);
+                }
+                if let Some(inst) = self.get_node_instantiation_opt(node_id) {
+                    let inst = inst
+                        .iter()
+                        .map(|ty| {
+                            self.finalize_type(node_id, ty, &mut reported_types, &mut reported_vars)
+                        })
+                        .collect_vec();
+                    self.update_node_instantiation(node_id, inst);
+                }
             }
         }
     }
 
     /// Finalize the the given type, producing an error if it is not complete, or if
     /// invalid type instantiations are found.
-    fn finalize_type(&mut self, node_id: NodeId, ty: &Type) -> Type {
+    fn finalize_type(
+        &mut self,
+        node_id: NodeId,
+        ty: &Type,
+        reported_types: &mut BTreeSet<Type>,
+        reported_vars: &mut BTreeSet<u32>,
+    ) -> Type {
         let ty = self.subs.specialize_with_defaults(ty);
-        // Report error only if there are no other errors in this builder,
-        // to avoid noisy followup errors.
-        if !self.had_errors {
-            let loc = self.parent.parent.env.get_node_loc(node_id);
-            let mut incomplete = false;
-            let mut visitor = |t: &Type| {
-                use Type::*;
-                match t {
-                    Var(_) => {
+        let loc = self.env().get_node_loc(node_id);
+        let mut incomplete = false;
+        let mut visitor = |t: &Type| {
+            use Type::*;
+            match t {
+                Var(id) => {
+                    if !reported_vars.contains(id) {
                         incomplete = true;
-                    },
-                    Struct(_, _, inst) => {
-                        for i in inst {
-                            self.check_valid_instantiation(&loc, i)
+                        reported_vars.insert(*id);
+                    }
+                },
+                Struct(_, _, inst) => {
+                    for i in inst {
+                        if !reported_types.contains(i) && !self.check_valid_instantiation(&loc, i) {
+                            reported_types.insert(i.clone());
                         }
-                    },
-                    Vector(t) => self.check_valid_instantiation(&loc, t),
-                    _ => {},
-                }
-            };
-            ty.visit(&mut visitor);
-
-            if incomplete {
-                // This type could not be fully inferred.
-                self.error(
-                    &loc,
-                    &format!(
-                        "unable to infer type: `{}`",
-                        ty.display(&self.type_display_context())
-                    ),
-                );
+                    }
+                },
+                Vector(t) => {
+                    if !reported_types.contains(t) && !self.check_valid_instantiation(&loc, t) {
+                        reported_types.insert(*t.clone());
+                    }
+                },
+                _ => {},
             }
+        };
+        ty.visit(&mut visitor);
+        if incomplete {
+            self.error(
+                &loc,
+                &format!(
+                    "unable to infer type: `{}`",
+                    ty.display(&self.type_display_context())
+                ),
+            );
         }
         ty
     }
 
     /// Check whether the given type is allowed as a type instantiation.
-    fn check_valid_instantiation(&mut self, loc: &Loc, ty: &Type) {
+    fn check_valid_instantiation(&mut self, loc: &Loc, ty: &Type) -> bool {
         use Type::*;
         if !matches!(
             ty,
@@ -417,14 +437,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 &format!(
                     "invalid type instantiation `{}`: only structs, vectors, and primitive types allowed",
                     ty.display(&self.type_display_context()))
-            )
+            );
+            return false;
         }
+        true
     }
 
     /// Constructs a type display context used to visualize types in error messages.
     fn type_display_context(&self) -> TypeDisplayContext<'_> {
         TypeDisplayContext {
-            env: self.parent.parent.env,
+            env: self.env(),
             type_param_names: Some(self.type_params.iter().map(|(s, _, _)| *s).collect()),
             subs_opt: Some(&self.subs),
             builder_struct_table: Some(&self.parent.parent.reverse_struct_table),
@@ -433,8 +455,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
     /// Creates an error expression.
     pub fn new_error_exp(&mut self) -> ExpData {
-        let id =
-            self.new_node_id_with_type_loc(&Type::Error, &self.parent.parent.env.internal_loc());
+        let id = self.new_node_id_with_type_loc(&Type::Error, &self.env().internal_loc());
         ExpData::Invalid(id)
     }
 
@@ -482,7 +503,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.type_params.push((name, ty, loc.clone()));
         } else if report_errors {
             let param_name = name.display(self.symbol_pool());
-            let context = TypeDisplayContext::new(self.parent.parent.env);
+            let context = TypeDisplayContext::new(self.env());
             self.error(
                 loc,
                 &format!(
@@ -653,7 +674,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         module_name: m.clone(),
                         symbol: name,
                     }
-                    .display(self.parent.parent.env)
+                    .display(self.env())
                 );
             }
         }
@@ -951,7 +972,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 );
                 let module_id = if self.parent.module_name == module_name {
                     self.parent.module_id
-                } else if let Some(module_env) = self.parent.parent.env.find_module(&module_name) {
+                } else if let Some(module_env) = self.env().find_module(&module_name) {
                     module_env.get_id()
                 } else {
                     self.error(&loc, &format!("undeclared module `{}`", module));
@@ -989,7 +1010,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 ResourceSpecifier::Resource(mid.qualified_inst(sid, inst))
                             } else {
                                 // errors reported
-                                debug_assert!(self.parent.parent.env.has_errors());
+                                debug_assert!(self.env().has_errors());
                                 ResourceSpecifier::Any
                             }
                         }
@@ -1060,7 +1081,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &[&name_exp],
                     )
                 {
-                    let inst = self.parent.parent.env.get_node_instantiation(id);
+                    let inst = self.env().get_node_instantiation(id);
                     (
                         loc,
                         AddressSpecifier::Call(
@@ -1070,7 +1091,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     )
                 } else {
                     // Error reported
-                    debug_assert!(self.parent.parent.env.has_errors());
+                    debug_assert!(self.env().has_errors());
                     (loc, AddressSpecifier::Any)
                 }
             },
@@ -1153,7 +1174,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let loc = self.to_loc(loc);
                 let elem_ty = if let Some(tys) = ty_opt {
                     if tys.len() != 1 {
-                        self.error(&loc, "wrong number of type arguments");
+                        self.error(
+                            &loc,
+                            &format!(
+                                "wrong number of type arguments (expected 1, got {})",
+                                tys.len()
+                            ),
+                        );
                         Type::Error
                     } else {
                         self.translate_type(&tys[0])
@@ -1662,7 +1689,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         for (id, sym) in pat.vars() {
             if seen.insert(sym, id).is_some() {
                 self.error(
-                    &self.parent.parent.env.get_node_loc(id),
+                    &self.env().get_node_loc(id),
                     &format!(
                         "duplicate assignment to `{}`",
                         sym.display(self.symbol_pool())
@@ -1688,6 +1715,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 };
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
                 if name.value.as_str() == "_" {
+                    let specialized_expected_type = self.subs.specialize(expected_type);
+                    if let Type::Tuple(tys) = specialized_expected_type {
+                        if tys.len() != 1 {
+                            self.error(loc, &format!("expected {} item(s), found 1", tys.len(),));
+                            return self.new_error_pat(loc);
+                        }
+                    }
                     Pattern::Wildcard(id)
                 } else {
                     let name = self.symbol_pool().make(&name.value);
@@ -2340,10 +2374,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         self.error(
             loc,
-            &format!(
-                "undeclared `{}`",
-                global_var_sym.display(self.parent.parent.env)
-            ),
+            &format!("undeclared `{}`", global_var_sym.display(self.env())),
         );
         self.new_error_exp()
     }
@@ -2363,8 +2394,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 loc,
                 &format!(
                     "constant `{}` cannot be used here because it is private to the module `{}`",
-                    sym.display_full(self.parent.parent.env),
-                    sym.module_name.display_full(self.parent.parent.env)
+                    sym.display_full(self.env()),
+                    sym.module_name.display_full(self.env())
                 ),
             );
             self.new_error_exp()
@@ -2556,7 +2587,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // Translate generic arguments, if any.
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
         // Translate arguments.
-        let (arg_types, translated_args) = self.translate_exp_list(args);
+        let (arg_types, mut translated_args) = self.translate_exp_list(args);
         let args_have_errors = arg_types.iter().any(|t| t == &Type::Error);
         // Lookup candidates.
         let cand_modules = if let Some(m) = module {
@@ -2641,24 +2672,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
             let mut success = true;
             for (i, arg_ty) in arg_types.iter().enumerate() {
-                let arg_ty = if cand.get_operation().allows_ref_param_for_value()
-                    && self.mode != ExpTranslationMode::Impl
-                {
-                    // Drop reference when translating specifications for eq/neq operation.
-                    if let Type::Reference(_, target_ty) = arg_ty {
-                        target_ty.as_ref().clone()
-                    } else {
-                        arg_ty.clone()
-                    }
-                } else {
-                    arg_ty.clone()
-                };
                 let instantiated = params[i].1.instantiate(&instantiation);
                 if let Err(err) = subs.unify(
                     &self.unification_context,
                     self.type_variance(),
                     WideningOrder::LeftToRight,
-                    &arg_ty,
+                    arg_ty,
                     &instantiated,
                 ) {
                     let arg_loc = if i < translated_args.len() {
@@ -2688,6 +2707,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 matching.push((cand, subs, instantiation))
             }
         }
+        self.prioritize_overloads(&mut matching);
         // Deliver results, reporting errors if there are no or ambiguous matches.
         match matching.len() {
             0 => {
@@ -2732,7 +2752,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // Check result type against expected type.
                 let ty = self.check_type(loc, &result_type, expected_type, "");
                 let id = self.new_node_id_with_type_loc(&ty, loc);
-                self.set_node_instantiation(id, instantiation);
+                self.set_node_instantiation(id, instantiation.clone());
 
                 // Map implementation operations to specification ops if compiling function as spec
                 // function.
@@ -2777,7 +2797,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                     "impure function `{}`",
                                     self.display_call_cand(module, name, cand),
                                 )];
-                                self.parent.parent.env.error_with_notes(
+                                self.env().error_with_notes(
                                     loc,
                                     &format!(
                                         "calling impure function `{}` is not allowed",
@@ -2791,6 +2811,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     }
                     self.called_spec_funs.insert((module_id, spec_fun_id));
                 }
+                self.add_conversions(cand, &instantiation, &mut translated_args);
                 ExpData::Call(id, oper, translated_args)
             },
             _ => {
@@ -2806,7 +2827,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             )
                         })
                         .collect_vec();
-                    self.parent.parent.env.error_with_notes(
+                    self.env().error_with_notes(
                         loc,
                         &format!("ambiguous application of `{}`", display),
                         notes,
@@ -2814,6 +2835,56 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 }
                 self.new_error_exp()
             },
+        }
+    }
+
+    /// Adds conversions to the given arguments for the given resolved function entry. Currently
+    /// the only supported conversion is from `&mut T` to `&T` and we treat with it in an ad-hoc
+    /// manor.
+    fn add_conversions(&self, entry: &AnyFunEntry, instantiation: &[Type], args: &mut [Exp]) {
+        let params = entry.get_signature().1;
+        for (param_ty, exp) in params
+            .iter()
+            .map(|Parameter(_, ty, _)| ty.instantiate(instantiation))
+            .zip(args.iter_mut())
+        {
+            let exp_id = exp.node_id();
+            let exp_ty = self.env().get_node_type(exp_id);
+            if exp_ty.is_mutable_reference() && param_ty.is_immutable_reference() {
+                // Insert Freeze operation
+                let new_id =
+                    self.new_node_id_with_type_loc(&param_ty, &self.env().get_node_loc(exp_id));
+                *exp = ExpData::Call(new_id, Operation::Freeze, vec![exp.clone()]).into_exp();
+            }
+        }
+    }
+
+    /// Prioritize the list of overloads. This is currently special cased for the
+    /// equality which has one version with references and one without. The one with
+    /// references, if it matches, is preferred as it allows for widening of `&mut` to `&`
+    /// parameters.
+    fn prioritize_overloads(&self, overloads: &mut Vec<(&AnyFunEntry, Substitution, Vec<Type>)>) {
+        while overloads.len() > 1 {
+            let cand1 = overloads[0].0;
+            let cand2 = overloads[1].0;
+            if matches!(cand1.get_operation(), Operation::Eq | Operation::Neq) {
+                let (_, params1, _) = cand1.get_signature();
+                let (_, params2, _) = cand2.get_signature();
+                let Parameter(_, ty1, _) = &params1[0];
+                let Parameter(_, ty2, _) = &params2[0];
+                // Only one and exactly one can be a reference
+                debug_assert!(
+                    ty1.is_reference() && !ty2.is_reference()
+                        || !ty1.is_reference() && ty2.is_reference()
+                );
+                if ty1.is_reference() {
+                    overloads.remove(1);
+                } else {
+                    overloads.remove(0);
+                }
+            } else {
+                break;
+            }
         }
     }
 
@@ -2977,10 +3048,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.get_struct_with_diag(
             struct_name,
             struct_name_loc,
-            &format!(
-                "undeclared struct `{}`",
-                struct_name.display(self.parent.parent.env)
-            ),
+            &format!("undeclared struct `{}`", struct_name.display(self.env())),
         )
     }
 
@@ -2997,7 +3065,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 struct_name_loc,
                 &format!(
                     "native struct `{}` cannot be packed or unpacked",
-                    struct_name.display(self.parent.parent.env)
+                    struct_name.display(self.env())
                 ),
             );
             None
@@ -3029,7 +3097,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     &format!(
                         "field `{}` not declared in struct `{}`",
                         field_name.display(self.symbol_pool()),
-                        struct_name.display(self.parent.parent.env)
+                        struct_name.display(self.env())
                     ),
                 );
                 succeed = false;
@@ -3345,7 +3413,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             .map(|cond| self.translate_exp(cond, &BOOL_TYPE).into_exp());
         self.exit_scope();
         let quant_ty = if rkind.is_choice() {
-            self.parent.parent.env.get_node_type(rranges[0].0.node_id())
+            self.env().get_node_type(rranges[0].0.node_id())
         } else {
             BOOL_TYPE.clone()
         };
@@ -3526,7 +3594,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     loc,
                     &format!(
                         "`{}` is a function and not a macro",
-                        qsym.display(self.parent.parent.env)
+                        qsym.display(self.env())
                     ),
                 );
             } else {

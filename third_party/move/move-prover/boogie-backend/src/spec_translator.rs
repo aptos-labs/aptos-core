@@ -913,13 +913,16 @@ impl<'env> SpecTranslator<'env> {
                     "currently `TRACE(..)` cannot be used in spec functions or in lets",
                 )
             },
+            Operation::Freeze => {
+                // Skip freeze operation
+                self.translate_exp(&args[0])
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
-            | Operation::Freeze
             | Operation::Abort
             | Operation::Vector
             | Operation::Old => {

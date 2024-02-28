@@ -118,7 +118,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     #[allow(unused)]
     execution_config: ExecutionConfig,
     time_service: Arc<dyn TimeService>,
-    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     timeout_sender: aptos_channels::Sender<Round>,
     quorum_store_enabled: bool,
@@ -157,7 +157,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     pub(crate) fn new(
         node_config: &NodeConfig,
         time_service: Arc<dyn TimeService>,
-        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
+        self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         timeout_sender: aptos_channels::Sender<Round>,
         quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
@@ -815,6 +815,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             buffered_proposal_tx,
             self.config.clone(),
             features,
+            true,
         );
 
         round_manager.init(last_vote).await;
