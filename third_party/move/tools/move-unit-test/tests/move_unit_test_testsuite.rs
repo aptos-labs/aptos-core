@@ -54,7 +54,13 @@ fn run_test_with_modifiers(
             }
 
             results.push((
-                test_config.run_and_report_unit_tests(test_plan.unwrap(), None, None, None, buffer)?,
+                test_config.run_and_report_unit_tests(
+                    test_plan.unwrap(),
+                    None,
+                    None,
+                    None,
+                    buffer,
+                )?,
                 modified_exp_path,
             ))
         }

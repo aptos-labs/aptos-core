@@ -4,11 +4,12 @@
 
 use aptos_framework::{extended_checks, path_in_crate};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::{account_config::CORE_CODE_ADDRESS, on_chain_config::{Features, OnChainConfig, TimedFeaturesBuilder}};
+use aptos_types::on_chain_config::{
+    aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder,
+};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_command_line_common::{env::read_bool_env_var, testing::MOVE_COMPILER_V2};
-use move_core_types::effects::{ChangeSet, Op};
 use move_package::{CompilerConfig, CompilerVersion};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
@@ -34,7 +35,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         // TODO(Gas): double check if this is correct
         UnitTestingConfig::default_with_bound(Some(100_000)),
         aptos_test_natives(),
-        aptos_test_genesis(),
+        aptos_test_feature_flags_genesis(),
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
@@ -52,7 +53,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
             build_config,
             UnitTestingConfig::default_with_bound(Some(100_000)),
             aptos_test_natives(),
-            aptos_test_genesis(),
+            aptos_test_feature_flags_genesis(),
             /* cost_table */ None,
             /* compute_coverage */ false,
             &mut std::io::stdout(),
@@ -76,20 +77,6 @@ pub fn aptos_test_natives() -> NativeFunctionTable {
         TimedFeaturesBuilder::enable_all().build(),
         Features::default(),
     )
-}
-
-pub fn aptos_test_genesis() -> ChangeSet {
-    let features_value = bcs::to_bytes(&Features::default()).unwrap();
-
-    let mut change_set = ChangeSet::new();
-    // we need to initialize features to their defaults.
-    change_set.add_resource_op(
-        CORE_CODE_ADDRESS,
-        Features::struct_tag(),
-        Op::New(features_value.into()),
-    ).expect("adding genesis Feature resource must succeed");
-
-    change_set
 }
 
 #[test]
