@@ -53,8 +53,8 @@ pub enum FeatureFlag {
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
     RECONFIGURE_WITH_DKG = 45,
-    OIDB_SIGNATURE = 46,
-    OIDB_ZKLESS_SIGNATURE = 47,
+    KEYLESS_ACCOUNTS = 46,
+    KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
     REMOVE_DETAILED_ERROR_FROM_HASH = 48,
     JWK_CONSENSUS = 49,
     CONCURRENT_FUNGIBLE_ASSETS = 50,
@@ -106,8 +106,8 @@ impl FeatureFlag {
             FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
             FeatureFlag::WEBAUTHN_SIGNATURE,
             // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
-            FeatureFlag::OIDB_SIGNATURE,
-            FeatureFlag::OIDB_ZKLESS_SIGNATURE,
+            FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::JWK_CONSENSUS,
             FeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
@@ -222,20 +222,20 @@ impl Features {
         self.is_enabled(FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET)
     }
 
-    /// Whether the OIDB feature is enabled, specifically the ZK path with ZKP-based signatures.
-    /// The ZK-less path is controlled via a different `FeatureFlag::OIDB_ZKLESS_SIGNATURE` flag.
-    pub fn is_oidb_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::OIDB_SIGNATURE)
+    /// Whether the keyless accounts feature is enabled, specifically the ZK path with ZKP-based signatures.
+    /// The ZK-less path is controlled via a different `FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS` flag.
+    pub fn is_keyless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS)
     }
 
-    /// If `FeatureFlag::OIDB_SIGNATURE` is enabled, this feature additionally allows for a "ZK-less
+    /// If `FeatureFlag::KEYLESS_ACCOUNTS` is enabled, this feature additionally allows for a "ZK-less
     /// path" where the blockchain can verify OpenID signatures directly. This ZK-less mode exists
     /// for two reasons. First, it gives as a simpler way to test the feature. Second, it acts as a
     /// safety precaution in case of emergency (e.g., if the ZK-based signatures must be temporarily
     /// turned off due to a zeroday exploit, the ZK-less path will still allow users to transact,
     /// but without privacy).
-    pub fn is_oidb_zkless_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::OIDB_ZKLESS_SIGNATURE)
+    pub fn is_keyless_zkless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
     pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {

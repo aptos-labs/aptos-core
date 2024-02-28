@@ -64,10 +64,10 @@ AnyPublicKey:
           - public_key:
               TYPENAME: Secp256r1EcdsaPublicKey
     3:
-      OIDB:
+      Keyless:
         STRUCT:
           - public_key:
-              TYPENAME: OidbPublicKey
+              TYPENAME: KeylessPublicKey
 AnySignature:
   ENUM:
     0:
@@ -86,10 +86,10 @@ AnySignature:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
     3:
-      OIDB:
+      Keyless:
         STRUCT:
           - signature:
-              TYPENAME: OidbSignature
+              TYPENAME: KeylessSignature
 AssertionSignature:
   ENUM:
     0:
@@ -248,6 +248,21 @@ JWKMoveStruct:
   STRUCT:
     - variant:
         TYPENAME: Any
+KeylessPublicKey:
+  STRUCT:
+    - iss_val: STR
+    - idc:
+        TYPENAME: IdCommitment
+KeylessSignature:
+  STRUCT:
+    - sig:
+        TYPENAME: ZkpOrOpenIdSig
+    - jwt_header_b64: STR
+    - exp_timestamp_secs: U64
+    - ephemeral_pubkey:
+        TYPENAME: EphemeralPublicKey
+    - ephemeral_signature:
+        TYPENAME: EphemeralSignature
 ModuleId:
   STRUCT:
     - address:
@@ -286,21 +301,6 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
-OidbPublicKey:
-  STRUCT:
-    - iss_val: STR
-    - idc:
-        TYPENAME: IdCommitment
-OidbSignature:
-  STRUCT:
-    - sig:
-        TYPENAME: ZkpOrOpenIdSig
-    - jwt_header_b64: STR
-    - exp_timestamp_secs: U64
-    - ephemeral_pubkey:
-        TYPENAME: EphemeralPublicKey
-    - ephemeral_signature:
-        TYPENAME: EphemeralSignature
 OpenIdSig:
   STRUCT:
     - jwt_sig_b64: STR

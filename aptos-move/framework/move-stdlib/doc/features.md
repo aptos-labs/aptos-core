@@ -86,10 +86,10 @@ return true.
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
 -  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
 -  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
--  [Function `get_oidb_feature`](#0x1_features_get_oidb_feature)
--  [Function `oidb_feature_enabled`](#0x1_features_oidb_feature_enabled)
--  [Function `get_oidb_zkless_feature`](#0x1_features_get_oidb_zkless_feature)
--  [Function `oidb_zkless_feature_enabled`](#0x1_features_oidb_zkless_feature_enabled)
+-  [Function `get_keyless_accounts_feature`](#0x1_features_get_keyless_accounts_feature)
+-  [Function `keyless_accounts_enabled`](#0x1_features_keyless_accounts_enabled)
+-  [Function `get_keyless_but_zkless_accounts_feature`](#0x1_features_get_keyless_but_zkless_accounts_feature)
+-  [Function `keyless_but_zkless_accounts_feature_enabled`](#0x1_features_keyless_but_zkless_accounts_feature_enabled)
 -  [Function `get_jwk_consensus_feature`](#0x1_features_get_jwk_consensus_feature)
 -  [Function `jwk_consensus_enabled`](#0x1_features_jwk_consensus_enabled)
 -  [Function `get_concurrent_fungible_assets_feature`](#0x1_features_get_concurrent_fungible_assets_feature)
@@ -411,6 +411,30 @@ Lifetime: permanent
 
 
 
+<a id="0x1_features_KEYLESS_ACCOUNTS"></a>
+
+Whether keyless accounts are enabled, possibly with the ZK-less verification mode.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_KEYLESS_ACCOUNTS">KEYLESS_ACCOUNTS</a>: u64 = 46;
+</code></pre>
+
+
+
+<a id="0x1_features_KEYLESS_BUT_ZKLESS_ACCOUNTS"></a>
+
+Whether the ZK-less mode of the keyless accounts feature is enabled.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_KEYLESS_BUT_ZKLESS_ACCOUNTS">KEYLESS_BUT_ZKLESS_ACCOUNTS</a>: u64 = 47;
+</code></pre>
+
+
+
 <a id="0x1_features_LIMIT_MAX_IDENTIFIER_LENGTH"></a>
 
 
@@ -470,30 +494,6 @@ Whether deploying to objects is enabled.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_OBJECT_CODE_DEPLOYMENT">OBJECT_CODE_DEPLOYMENT</a>: u64 = 52;
-</code></pre>
-
-
-
-<a id="0x1_features_OIDB_SIGNATURE"></a>
-
-Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_OIDB_SIGNATURE">OIDB_SIGNATURE</a>: u64 = 46;
-</code></pre>
-
-
-
-<a id="0x1_features_OIDB_ZKLESS_SIGNATURE"></a>
-
-Whether the ZK-less mode of the OIDB feature is enabled.
-
-Lifetime: transient
-
-
-<pre><code><b>const</b> <a href="features.md#0x1_features_OIDB_ZKLESS_SIGNATURE">OIDB_ZKLESS_SIGNATURE</a>: u64 = 47;
 </code></pre>
 
 
@@ -1944,13 +1944,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_oidb_feature"></a>
+<a id="0x1_features_get_keyless_accounts_feature"></a>
 
-## Function `get_oidb_feature`
+## Function `get_keyless_accounts_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_oidb_feature">get_oidb_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_keyless_accounts_feature">get_keyless_accounts_feature</a>(): u64
 </code></pre>
 
 
@@ -1959,20 +1959,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_oidb_feature">get_oidb_feature</a>(): u64 { <a href="features.md#0x1_features_OIDB_SIGNATURE">OIDB_SIGNATURE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_keyless_accounts_feature">get_keyless_accounts_feature</a>(): u64 { <a href="features.md#0x1_features_KEYLESS_ACCOUNTS">KEYLESS_ACCOUNTS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a id="0x1_features_oidb_feature_enabled"></a>
+<a id="0x1_features_keyless_accounts_enabled"></a>
 
-## Function `oidb_feature_enabled`
+## Function `keyless_accounts_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_oidb_feature_enabled">oidb_feature_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_keyless_accounts_enabled">keyless_accounts_enabled</a>(): bool
 </code></pre>
 
 
@@ -1981,8 +1981,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_oidb_feature_enabled">oidb_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OIDB_SIGNATURE">OIDB_SIGNATURE</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_keyless_accounts_enabled">keyless_accounts_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_KEYLESS_ACCOUNTS">KEYLESS_ACCOUNTS</a>)
 }
 </code></pre>
 
@@ -1990,13 +1990,13 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_get_oidb_zkless_feature"></a>
+<a id="0x1_features_get_keyless_but_zkless_accounts_feature"></a>
 
-## Function `get_oidb_zkless_feature`
+## Function `get_keyless_but_zkless_accounts_feature`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_oidb_zkless_feature">get_oidb_zkless_feature</a>(): u64
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_keyless_but_zkless_accounts_feature">get_keyless_but_zkless_accounts_feature</a>(): u64
 </code></pre>
 
 
@@ -2005,20 +2005,20 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_oidb_zkless_feature">get_oidb_zkless_feature</a>(): u64 { <a href="features.md#0x1_features_OIDB_ZKLESS_SIGNATURE">OIDB_ZKLESS_SIGNATURE</a> }
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_keyless_but_zkless_accounts_feature">get_keyless_but_zkless_accounts_feature</a>(): u64 { <a href="features.md#0x1_features_KEYLESS_BUT_ZKLESS_ACCOUNTS">KEYLESS_BUT_ZKLESS_ACCOUNTS</a> }
 </code></pre>
 
 
 
 </details>
 
-<a id="0x1_features_oidb_zkless_feature_enabled"></a>
+<a id="0x1_features_keyless_but_zkless_accounts_feature_enabled"></a>
 
-## Function `oidb_zkless_feature_enabled`
+## Function `keyless_but_zkless_accounts_feature_enabled`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_oidb_zkless_feature_enabled">oidb_zkless_feature_enabled</a>(): bool
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_keyless_but_zkless_accounts_feature_enabled">keyless_but_zkless_accounts_feature_enabled</a>(): bool
 </code></pre>
 
 
@@ -2027,8 +2027,8 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_oidb_zkless_feature_enabled">oidb_zkless_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_OIDB_ZKLESS_SIGNATURE">OIDB_ZKLESS_SIGNATURE</a>)
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_keyless_but_zkless_accounts_feature_enabled">keyless_but_zkless_accounts_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_KEYLESS_BUT_ZKLESS_ACCOUNTS">KEYLESS_BUT_ZKLESS_ACCOUNTS</a>)
 }
 </code></pre>
 
