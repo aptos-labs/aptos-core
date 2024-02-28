@@ -757,7 +757,7 @@ fn wrap_with_two_region_env<T: NetworkTest + 'static>(test: T) -> CompositeNetwo
 
 fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(100).unwrap())
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
