@@ -643,7 +643,7 @@ impl EntryPoints {
                     type_params: vec![],
                 }))],
                 vec![
-                    bcs::to_bytes(&1).unwrap(), //market id
+                    bcs::to_bytes(&1u64).unwrap(), //market id
                 ],
             )),
             EntryPoints::EconiaDepositCoins => {
@@ -662,7 +662,7 @@ impl EntryPoints {
                         type_params: vec![],
                     }))], 
                     vec![
-                        bcs::to_bytes(&1).unwrap(), // market id
+                        bcs::to_bytes(&1u64).unwrap(), // market id
                     ])
                 )
             },
@@ -687,7 +687,7 @@ impl EntryPoints {
                     vec![
                         bcs::to_bytes(&size).unwrap(),  // size
                         bcs::to_bytes(&price).unwrap(), // amount
-                        bcs::to_bytes(&1).unwrap(), // market id
+                        bcs::to_bytes(&1u64).unwrap(), // market id
                     ],
                 ))
             },
@@ -712,7 +712,7 @@ impl EntryPoints {
                     vec![
                         bcs::to_bytes(&size).unwrap(),  // size
                         bcs::to_bytes(&price).unwrap(), // amount
-                        bcs::to_bytes(&1).unwrap(), //market id
+                        bcs::to_bytes(&1u64).unwrap(), //market id
                     ],
                 ))
             },
@@ -739,7 +739,7 @@ impl EntryPoints {
                         vec![
                             bcs::to_bytes(&size).unwrap(),  // size
                             bcs::to_bytes(&price).unwrap(), // amount
-                            bcs::to_bytes(&1).unwrap(), // market id
+                            bcs::to_bytes(&1u64).unwrap(), // market id
                         ],
                     ))
                 } else {
@@ -760,7 +760,7 @@ impl EntryPoints {
                         vec![
                             bcs::to_bytes(&size).unwrap(),  // size
                             bcs::to_bytes(&price).unwrap(), // amount
-                            bcs::to_bytes(&1).unwrap(), // market id
+                            bcs::to_bytes(&1u64).unwrap(), // market id
                         ],
                     ))
                 }
