@@ -465,7 +465,6 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
             None => {
                 // TODO: counter
                 error!("read_thread got rpc req for protocol {:?} we don't handle", protocol_id);
-                println!("read_thread got rpc req for protocol {:?} we don't handle", protocol_id);
                 // TODO: drop connection
             }
             Some(app) => {
@@ -478,11 +477,9 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                 let data_len = nmsg.data_len() as u64;
                 match app.sender.try_send(ReceivedMessage::new(nmsg, self.remote_peer_network_id)) {
                     Ok(_) => {
-                        println!("forward {:?}", &protocol_id);
                         peer_read_message_bytes(&self.remote_peer_network_id.network_id(), &protocol_id, data_len);
                     }
                     Err(_) => {
-                        println!("forward {:?} ERROR DROP", &protocol_id);
                         app_inbound_drop(&self.remote_peer_network_id.network_id(), &protocol_id, data_len);
                     }
                 }
@@ -605,7 +602,6 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
 
     async fn run(mut self, mut closed: Closer) {
         info!("read_thread start");
-        println!("read_thread start");
         let close_reason;
         loop {
             let rrmm = tokio::select! {
@@ -617,31 +613,25 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                         peer = self.remote_peer_network_id,
                         "peerclose"
                     );
-                    println!("reader peerclose");
                     return;
                 },
             };
-            println!("reader rmm");
             match rrmm {
                 Some(rmm) => match rmm {
                     Ok(msg) => match msg {
                         MultiplexMessage::Message(nmsg) => {
-                            println!("read msg");
                             self.handle_message(nmsg).await;
                         }
                         MultiplexMessage::Stream(fragment) => {
-                            println!("read frag");
                             self.handle_stream(fragment).await;
                         }
                     }
                     Err(err) => {
-                        println!("read_thread {} err {}", self.remote_peer_network_id, err);
                         info!("read_thread {} err {}", self.remote_peer_network_id, err);
                         // Error, but not a close-worthy error?
                     }
                 }
                 None => {
-                    println!("read_thread {} None", self.remote_peer_network_id);
                     info!("read_thread {} None", self.remote_peer_network_id);
                     close_reason = "reader next none";
                     break;
@@ -809,15 +799,14 @@ mod tests {
                 let hexlen = min(send_size, 10);
                 let hexend = i + hexlen;
                 let hexwat = sender_blob.get(i..hexend).unwrap().encode_hex::<String>();
-                println!("send {:?} size={:?} {:?}...", i, send_size, hexwat);
+                info!("send {:?} size={:?} {:?}...", i, send_size, hexwat);
                 if let Err(err) = sender.send((msg, 0)).await {
                     panic!("send err: {:?}", err);
                 }
-                // println!("sent {:?}", i);
             }
-            println!("send thread wait");
+            info!("send thread wait");
             send_thread_closer.wait().await;
-            println!("send thread exit");
+            info!("send thread exit");
         };
         handle.spawn(send_thread);
 
@@ -834,9 +823,9 @@ mod tests {
                     match rmsg.message {
                         NetworkMessage::DirectSendMsg(msg) => {
                             if raw_msg == msg.raw_msg {
-                                println!("got {:?} ok [{:?}] bytes", i, msg.raw_msg.len());
+                                info!("got {:?} ok [{:?}] bytes", i, msg.raw_msg.len());
                             } else {
-                                println!("msg {:?} not equal [{:?}] bytes", i, msg.raw_msg.len());
+                                info!("msg {:?} not equal [{:?}] bytes", i, msg.raw_msg.len());
                                 errcount += 1;
                                 if errcount >= 10 {
                                     panic!("too many errors");
@@ -851,8 +840,8 @@ mod tests {
             }
             send_sem_readside.add_permits(1);
         }
-        println!("outer done");
+        info!("outer done");
         send_thread_close_sender.close().await;
-        println!("done done");
+        info!("done done");
     }
 }
