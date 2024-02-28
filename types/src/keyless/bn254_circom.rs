@@ -202,7 +202,7 @@ pub fn get_public_inputs_hash(
         let idc = Fr::from_le_bytes_mod_order(&pk.idc.0);
 
         // Add the exp_timestamp_secs as a scalar
-        let exp_timestamp_secs = Fr::from(sig.exp_timestamp_secs);
+        let exp_timestamp_secs = Fr::from(sig.exp_date_secs);
 
         // Add the epk lifespan as a scalar
         let exp_horizon_secs = Fr::from(proof.exp_horizon_secs);

@@ -81,7 +81,7 @@ async fn test_keyless_oidc_txn_with_expired_epk() {
     let (tw_sk, mut swarm) = setup_local_net().await;
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
-    sig.exp_timestamp_secs = 1; // This should fail the verification since the expiration date is way in the past
+    sig.exp_date_secs = 1; // This should fail the verification since the expiration date is way in the past
 
     let mut info = swarm.aptos_public_info();
     let signed_txn = sign_transaction(&mut info, sig, pk, &tw_sk).await;

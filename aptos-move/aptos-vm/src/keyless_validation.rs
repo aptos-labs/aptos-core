@@ -183,7 +183,7 @@ pub(crate) fn validate_authenticators(
                     JWK::RSA(rsa_jwk) => {
                         openid_sig
                             .verify_jwt_claims(
-                                sig.exp_timestamp_secs,
+                                sig.exp_date_secs,
                                 &sig.ephemeral_pubkey,
                                 pk,
                                 config,

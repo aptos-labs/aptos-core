@@ -104,7 +104,7 @@ pub(crate) fn trace_keyless_structs(
             training_wheels_signature: None,
         }),
         jwt_header: "".to_string(),
-        exp_timestamp_secs: 0,
+        exp_date_secs: 0,
         ephemeral_pubkey: EphemeralPublicKey::Ed25519 { public_key },
         ephemeral_signature: EphemeralSignature::Ed25519 { signature },
     };

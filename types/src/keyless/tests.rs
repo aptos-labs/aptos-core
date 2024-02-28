@@ -44,7 +44,7 @@ fn test_keyless_oidc_sig_verifies() {
     };
 
     oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap();
 
     oidc_sig
@@ -57,7 +57,7 @@ fn test_keyless_oidc_sig_verifies() {
     assert_ne!(bad_oidc_sig.pepper, oidc_sig.pepper);
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("IDC verification failed"));
 
@@ -81,7 +81,7 @@ fn test_keyless_oidc_sig_verifies() {
         base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("IDC verification failed"));
 
@@ -93,7 +93,7 @@ fn test_keyless_oidc_sig_verifies() {
         base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("'nonce' claim"));
 
@@ -105,7 +105,7 @@ fn test_keyless_oidc_sig_verifies() {
         base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("'iss' claim "));
 }

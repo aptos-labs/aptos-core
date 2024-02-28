@@ -85,7 +85,7 @@ pub struct KeylessSignature {
     pub jwt_header: String,
 
     /// The expiry time of the `ephemeral_pubkey` represented as a UNIX epoch timestamp in seconds.
-    pub exp_timestamp_secs: u64,
+    pub exp_date_secs: u64,
 
     /// A short lived public key used to verify the `ephemeral_signature`.
     pub ephemeral_pubkey: EphemeralPublicKey,
@@ -126,7 +126,7 @@ impl KeylessSignature {
 
     pub fn verify_expiry(&self, current_time: &CurrentTimeMicroseconds) -> anyhow::Result<()> {
         let block_time = UNIX_EPOCH + Duration::from_micros(current_time.microseconds);
-        let expiry_time = seconds_from_epoch(self.exp_timestamp_secs);
+        let expiry_time = seconds_from_epoch(self.exp_date_secs);
 
         if block_time > expiry_time {
             bail!("Keyless signature is expired");
