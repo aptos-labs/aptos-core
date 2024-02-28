@@ -9,10 +9,11 @@ use crate::{
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
-use aptos_types::dkg::DKGState;
+use aptos_types::{
+    dkg::DKGState,
+    on_chain_config::{FeatureFlag, Features},
+};
 use std::{sync::Arc, time::Duration};
-use aptos_types::on_chain_config::FeatureFlag;
-use aptos_vm_genesis::default_features_resource_for_genesis;
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
 #[tokio::test]
@@ -29,7 +30,7 @@ async fn randomness_correctness() {
             conf.consensus_config.enable_validator_txns();
 
             // Ensure randomness flag is set.
-            let mut features = default_features_resource_for_genesis();
+            let mut features = Features::default();
             features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
             conf.initial_features_override = Some(features);
         }))

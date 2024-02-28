@@ -436,7 +436,7 @@ fn initialize(
 
 fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<FeatureFlag>>) {
     let features: Vec<u64> = features_override
-        .unwrap_or_else(||Features::default().into_flag_vec())
+        .unwrap_or_else(FeatureFlag::default_features)
         .into_iter()
         .map(|feature| feature as u64)
         .collect();
