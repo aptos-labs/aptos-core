@@ -12533,6 +12533,9 @@
           }
         }
       },
+      "DeprecatedModuleBundlePayload": {
+        "type": "object"
+      },
       "DirectWriteSet": {
         "type": "object",
         "required": [
@@ -12935,20 +12938,6 @@
           },
           "signature": {
             "$ref": "#/components/schemas/Signature"
-          }
-        }
-      },
-      "ModuleBundlePayload": {
-        "type": "object",
-        "required": [
-          "modules"
-        ],
-        "properties": {
-          "modules": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/MoveModuleBytecode"
-            }
           }
         }
       },
@@ -13444,7 +13433,7 @@
             "ed25519": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
             "secp256k1_ecdsa": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
             "secp256r1_ecdsa": "#/components/schemas/PublicKey_string(HexEncodedBytes)",
-            "zk_id": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
+            "oidb": "#/components/schemas/PublicKey_string(HexEncodedBytes)"
           }
         }
       },
@@ -13458,7 +13447,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "zk_id"
+                "example": "oidb"
               }
             }
           },
@@ -13549,7 +13538,7 @@
             "ed25519": "#/components/schemas/Signature_string(HexEncodedBytes)",
             "secp256k1_ecdsa": "#/components/schemas/Signature_string(HexEncodedBytes)",
             "web_authn": "#/components/schemas/Signature_string(HexEncodedBytes)",
-            "zk_id": "#/components/schemas/Signature_string(HexEncodedBytes)"
+            "oidb": "#/components/schemas/Signature_string(HexEncodedBytes)"
           }
         }
       },
@@ -13563,7 +13552,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "example": "zk_id"
+                "example": "oidb"
               }
             }
           },
@@ -13752,7 +13741,7 @@
             "$ref": "#/components/schemas/TransactionPayload_ScriptPayload"
           },
           {
-            "$ref": "#/components/schemas/TransactionPayload_ModuleBundlePayload"
+            "$ref": "#/components/schemas/TransactionPayload_DeprecatedModuleBundlePayload"
           },
           {
             "$ref": "#/components/schemas/TransactionPayload_MultisigPayload"
@@ -13763,10 +13752,29 @@
           "mapping": {
             "entry_function_payload": "#/components/schemas/TransactionPayload_EntryFunctionPayload",
             "script_payload": "#/components/schemas/TransactionPayload_ScriptPayload",
-            "module_bundle_payload": "#/components/schemas/TransactionPayload_ModuleBundlePayload",
+            "module_bundle_payload": "#/components/schemas/TransactionPayload_DeprecatedModuleBundlePayload",
             "multisig_payload": "#/components/schemas/TransactionPayload_MultisigPayload"
           }
         }
+      },
+      "TransactionPayload_DeprecatedModuleBundlePayload": {
+        "allOf": [
+          {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "example": "module_bundle_payload"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/DeprecatedModuleBundlePayload"
+          }
+        ]
       },
       "TransactionPayload_EntryFunctionPayload": {
         "allOf": [
@@ -13784,25 +13792,6 @@
           },
           {
             "$ref": "#/components/schemas/EntryFunctionPayload"
-          }
-        ]
-      },
-      "TransactionPayload_ModuleBundlePayload": {
-        "allOf": [
-          {
-            "type": "object",
-            "required": [
-              "type"
-            ],
-            "properties": {
-              "type": {
-                "type": "string",
-                "example": "module_bundle_payload"
-              }
-            }
-          },
-          {
-            "$ref": "#/components/schemas/ModuleBundlePayload"
           }
         ]
       },

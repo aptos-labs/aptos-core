@@ -21,7 +21,8 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{
-    InitialGasSchedule, MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION,
+    AptosGasParameters, InitialGasSchedule, MiscGasParameters, NativeGasParameters,
+    LATEST_GAS_FEATURE_VERSION,
 };
 use aptos_keygen::KeyGen;
 use aptos_memory_usage_tracker::MemoryTrackedGasMeter;
@@ -57,7 +58,7 @@ use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
     move_vm_ext::{MoveVmExt, SessionId},
-    verifier, AptosVM, VMExecutor, VMValidator,
+    verifier, AptosVM, VMValidator,
 };
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -128,11 +129,18 @@ pub struct FakeExecutor {
     executor_mode: Option<ExecutorMode>,
     features: Features,
     chain_id: u8,
+    allow_block_executor_fallback: bool,
 }
 
 pub enum GasMeterType {
-    RegularMeter(Vec<u128>),
-    AbstractMeter(Vec<DynamicExpression>),
+    RegularGasMeter,
+    UnmeteredGasMeter,
+}
+
+pub enum ExecFuncTimerDynamicArgs {
+    NoArgs,
+    DistinctSigners,
+    DistinctSignersAndFixed(Vec<AccountAddress>),
 }
 
 impl FakeExecutor {
@@ -155,10 +163,9 @@ impl FakeExecutor {
             executor_mode: None,
             features: Features::default(),
             chain_id: chain_id.id(),
+            allow_block_executor_fallback: true,
         };
         executor.apply_write_set(write_set);
-        // As a set effect, also allow module bundle txns. TODO: Remove
-        aptos_vm::aptos_vm::allow_module_bundle_for_test();
         executor
     }
 
@@ -177,6 +184,10 @@ impl FakeExecutor {
     /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
     pub fn set_parallel(self) -> Self {
         self.set_executor_mode(ExecutorMode::BothComparison)
+    }
+
+    pub fn disable_block_executor_fallback(&mut self) {
+        self.allow_block_executor_fallback = false;
     }
 
     /// Creates an executor from the genesis file GENESIS_FILE_LOCATION
@@ -236,6 +247,7 @@ impl FakeExecutor {
             executor_mode: None,
             features: Features::default(),
             chain_id: ChainId::test().id(),
+            allow_block_executor_fallback: true,
         }
     }
 
@@ -470,21 +482,29 @@ impl FakeExecutor {
         }
     }
 
-    pub fn execute_transaction_block_parallel(
+    fn execute_transaction_block_impl(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
         onchain_config: BlockExecutorConfigFromOnchain,
+        sequential: bool,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        let config = BlockExecutorConfig {
+            local: BlockExecutorLocalConfig {
+                concurrency_level: if sequential {
+                    1
+                } else {
+                    usize::min(4, num_cpus::get())
+                },
+                allow_fallback: self.allow_block_executor_fallback,
+                discard_failed_blocks: false,
+            },
+            onchain: onchain_config,
+        };
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
             &self.data_store,
-            BlockExecutorConfig {
-                local: BlockExecutorLocalConfig {
-                    concurrency_level: usize::min(4, num_cpus::get()),
-                },
-                onchain: onchain_config,
-            },
+            config,
             None,
         ).map(BlockOutput::into_transaction_outputs_forced)
     }
@@ -520,20 +540,17 @@ impl FakeExecutor {
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(
-                AptosVM::execute_block(
-                    &sig_verified_block,
-                    &self.data_store,
-                    onchain_config.clone(),
-                )
-                .map(BlockOutput::into_transaction_outputs_forced),
-            )
+            Some(self.execute_transaction_block_impl(
+                &sig_verified_block,
+                onchain_config.clone(),
+                true,
+            ))
         } else {
             None
         };
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_parallel(&sig_verified_block, onchain_config))
+            Some(self.execute_transaction_block_impl(&sig_verified_block, onchain_config, false))
         } else {
             None
         };
@@ -605,7 +622,9 @@ impl FakeExecutor {
 
         // TODO(Gas): revisit this.
         let resolver = self.data_store.as_move_resolver();
-        let vm = AptosVM::new(&resolver);
+        let vm = AptosVM::new(
+            &resolver, /*override_is_delayed_field_optimization_capable=*/ None,
+        );
 
         let (_status, output, gas_profiler) = vm.execute_user_transaction_with_custom_gas_meter(
             &resolver,
@@ -627,8 +646,12 @@ impl FakeExecutor {
                         entry_func.function().to_owned(),
                         entry_func.ty_args().to_vec(),
                     ),
-                    TransactionPayload::ModuleBundle(..) => unreachable!("not supported"),
                     TransactionPayload::Multisig(..) => unimplemented!("not supported yet"),
+
+                    // Deprecated.
+                    TransactionPayload::ModuleBundle(..) => {
+                        unreachable!("Module bundle payload has been removed")
+                    },
                 };
                 Ok(gas_profiler)
             },
@@ -675,8 +698,11 @@ impl FakeExecutor {
     }
 
     /// Verifies the given transaction by running it through the VM verifier.
-    pub fn verify_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
-        let vm = AptosVM::new(&self.get_state_view().as_move_resolver());
+    pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
+        let vm = AptosVM::new(
+            &self.get_state_view().as_move_resolver(),
+            /*override_is_delayed_field_optimization_capable=*/ None,
+        );
         vm.validate_transaction(txn, &self.data_store)
     }
 
@@ -771,6 +797,7 @@ impl FakeExecutor {
 
     /// exec_func_record_running_time is like exec(), however, we can run a Module published under
     /// the creator address instead of 0x1, as what is currently done in exec.
+    /// Additionally we have dynamic_args and gas_meter_type to configure it further.
     pub fn exec_func_record_running_time(
         &mut self,
         module: &ModuleId,
@@ -778,23 +805,44 @@ impl FakeExecutor {
         type_params: Vec<TypeTag>,
         args: Vec<Vec<u8>>,
         iterations: u64,
+        dynamic_args: ExecFuncTimerDynamicArgs,
+        gas_meter_type: GasMeterType,
     ) -> u128 {
         // FIXME: should probably read the timestamp from storage.
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
 
+        let mut extra_accounts = match &dynamic_args {
+            ExecFuncTimerDynamicArgs::DistinctSigners
+            | ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(_) => (0..iterations)
+                .map(|_| *self.new_account_at(AccountAddress::random()).address())
+                .collect::<Vec<_>>(),
+            _ => vec![],
+        };
+
         let resolver = self.data_store.as_move_resolver();
 
-        // TODO(Gas): we probably want to switch to non-zero costs in the future
+        let (gas_params, storage_gas_params) = match gas_meter_type {
+            GasMeterType::RegularGasMeter => (
+                AptosGasParameters::initial(),
+                StorageGasParameters::latest(),
+            ),
+            GasMeterType::UnmeteredGasMeter => (
+                AptosGasParameters::zeros(),
+                StorageGasParameters::unlimited(0.into()),
+            ),
+        };
+
         let vm = MoveVmExt::new(
-            NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
+            gas_params.natives.clone(),
+            gas_params.vm.misc.clone(),
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             self.features.clone(),
             timed_features,
             &resolver,
+            false,
         )
         .unwrap();
 
@@ -810,13 +858,53 @@ impl FakeExecutor {
             let fun_name = Self::name(function_name);
             let should_error = fun_name.clone().into_string().ends_with(POSTFIX);
             let ty = type_params.clone();
-            let arg = args.clone();
-            // TODO: consider using StandardGasMeter
-            let gas_meter = &mut UnmeteredGasMeter;
+            let mut arg = args.clone();
+            match &dynamic_args {
+                ExecFuncTimerDynamicArgs::DistinctSigners => {
+                    arg.insert(0, bcs::to_bytes(&extra_accounts.pop().unwrap()).unwrap());
+                },
+                ExecFuncTimerDynamicArgs::DistinctSignersAndFixed(signers) => {
+                    for signer in signers.iter().rev() {
+                        arg.insert(0, bcs::to_bytes(&signer).unwrap());
+                    }
+                    arg.insert(0, bcs::to_bytes(&extra_accounts.pop().unwrap()).unwrap());
+                },
+                _ => {},
+            }
+
+            let (mut regular, mut unmetered) = match gas_meter_type {
+                GasMeterType::RegularGasMeter => (
+                    Some(MemoryTrackedGasMeter::new(StandardGasMeter::new(
+                        StandardGasAlgebra::new(
+                            LATEST_GAS_FEATURE_VERSION,
+                            gas_params.vm.clone(),
+                            storage_gas_params.clone(),
+                            1_000_000_000_000_000,
+                        ),
+                    ))),
+                    None,
+                ),
+                GasMeterType::UnmeteredGasMeter => (None, Some(UnmeteredGasMeter)),
+            };
 
             let start = Instant::now();
-            let result =
-                session.execute_function_bypass_visibility(module, &fun_name, ty, arg, gas_meter);
+            // Not sure how to create a common type for both. Box<dyn GasMeter> doesn't work for some reason.
+            let result = match gas_meter_type {
+                GasMeterType::RegularGasMeter => session.execute_function_bypass_visibility(
+                    module,
+                    &fun_name,
+                    ty,
+                    arg,
+                    regular.as_mut().unwrap(),
+                ),
+                GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
+                    module,
+                    &fun_name,
+                    ty,
+                    arg,
+                    unmetered.as_mut().unwrap(),
+                ),
+            };
             let elapsed = start.elapsed();
             if let Err(err) = result {
                 if !should_error {
@@ -872,6 +960,7 @@ impl FakeExecutor {
                     a2.lock().unwrap().push(expression);
                 }),
                 &resolver,
+                /*aggregator_v2_type_tagging=*/ false,
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void());
@@ -945,6 +1034,7 @@ impl FakeExecutor {
                 self.features.clone(),
                 timed_features,
                 &resolver,
+                false,
             )
             .unwrap();
             let mut session = vm.new_session(&resolver, SessionId::void());
@@ -1008,6 +1098,7 @@ impl FakeExecutor {
             features.clone(),
             timed_features,
             &resolver,
+            features.is_aggregator_v2_delayed_fields_enabled(),
         )
         .unwrap();
         let mut session = vm.new_session(&resolver, SessionId::void());
@@ -1063,6 +1154,7 @@ impl FakeExecutor {
             // FIXME: should probably read the timestamp from storage.
             TimedFeaturesBuilder::enable_all().build(),
             &resolver,
+            false,
         )
         .unwrap();
         let mut session = vm.new_session(&resolver, SessionId::void());

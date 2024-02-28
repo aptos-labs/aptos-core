@@ -61,12 +61,12 @@ impl StacklessControlFlowGraph {
                 if from_all_blocks && *succ_block_id == DUMMY_EXIT {
                     continue;
                 }
-                let predecessors = &mut block_id_to_predecessors.get_mut(succ_block_id).unwrap();
+                let predecessors = block_id_to_predecessors.get_mut(succ_block_id).unwrap();
                 predecessors.push(*block_id);
             }
         }
         if from_all_blocks {
-            let predecessors = &mut block_id_to_predecessors.get_mut(&DUMMY_EXIT).unwrap();
+            let predecessors = block_id_to_predecessors.get_mut(&DUMMY_EXIT).unwrap();
             blocks.keys().for_each(|block_id| {
                 if *block_id != DUMMY_ENTRANCE && *block_id != DUMMY_EXIT {
                     predecessors.push(*block_id);
@@ -193,7 +193,7 @@ impl StacklessControlFlowGraph {
             block_ids.insert(*label_offsets.get(&label).unwrap());
         }
 
-        if bytecode.is_branch() && pc + 1 < (code.len() as CodeOffset) {
+        if bytecode.is_branching() && pc + 1 < (code.len() as CodeOffset) {
             block_ids.insert(pc + 1);
         }
     }
@@ -297,9 +297,16 @@ impl std::fmt::Display for DotCFGEdge {
 }
 
 /// Generate the dot representation of the CFG (which can be rendered by the Dot program)
-pub fn generate_cfg_in_dot_format<'env>(func_target: &'env FunctionTarget<'env>) -> String {
+pub fn generate_cfg_in_dot_format<'env>(
+    func_target: &'env FunctionTarget<'env>,
+    forward: bool,
+) -> String {
     let code = &func_target.data.code;
-    let cfg = StacklessControlFlowGraph::new_forward(code);
+    let cfg = if forward {
+        StacklessControlFlowGraph::new_forward(code)
+    } else {
+        StacklessControlFlowGraph::new_backward(code, true)
+    };
     let label_offsets = Bytecode::label_offsets(code);
     let mut graph = Graph::new();
 

@@ -14,24 +14,56 @@ use proptest::prelude::*;
 
 const STRESSTEST_MODE: bool = false;
 
-const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
+pub(crate) const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
 const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
 
 const DEFAULT_EXECUTOR_MODE: ExecutorMode = ExecutorMode::SequentialOnly;
 
-fn setup(
+fn _setup(
+    executor_mode: ExecutorMode,
+    aggregator_execution_mode: AggregatorMode,
+    txns: usize,
+    allow_block_executor_fallback: bool,
+) -> AggV2TestHarness {
+    let path = common::test_dir_path("aggregator_v2.data/pack");
+    match aggregator_execution_mode {
+        AggregatorMode::EnabledOnly => initialize(
+            path,
+            executor_mode,
+            true,
+            txns,
+            allow_block_executor_fallback,
+        ),
+        AggregatorMode::DisabledOnly => initialize(
+            path,
+            executor_mode,
+            false,
+            txns,
+            allow_block_executor_fallback,
+        ),
+        AggregatorMode::BothComparison => initialize_enabled_disabled_comparison(
+            path,
+            executor_mode,
+            txns,
+            allow_block_executor_fallback,
+        ),
+    }
+}
+
+pub(crate) fn setup(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
 ) -> AggV2TestHarness {
-    let path = common::test_dir_path("aggregator_v2.data/pack");
-    match aggregator_execution_mode {
-        AggregatorMode::EnabledOnly => initialize(path, executor_mode, true, txns),
-        AggregatorMode::DisabledOnly => initialize(path, executor_mode, false, txns),
-        AggregatorMode::BothComparison => {
-            initialize_enabled_disabled_comparison(path, executor_mode, txns)
-        },
-    }
+    _setup(executor_mode, aggregator_execution_mode, txns, false)
+}
+
+fn setup_allow_fallback(
+    executor_mode: ExecutorMode,
+    aggregator_execution_mode: AggregatorMode,
+    txns: usize,
+) -> AggV2TestHarness {
+    _setup(executor_mode, aggregator_execution_mode, txns, true)
 }
 
 #[cfg(test)]
@@ -200,6 +232,15 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     prop_oneof![
         Just(UseType::UseResourceType),
         Just(UseType::UseTableType),
+        Just(UseType::UseResourceGroupType),
+    ]
+    .boxed()
+}
+
+fn arb_droppable_use_type() -> BoxedStrategy<UseType> {
+    prop_oneof![
+        Just(UseType::UseResourceType),
+        // Just(UseType::UseTableType),
         Just(UseType::UseResourceGroupType),
     ]
     .boxed()
@@ -397,6 +438,57 @@ proptest! {
             (SUCCESS, h.new(&agg_loc, 399)),
             // Overflow on materialized value leads to abort with EAGGREGATOR_OVERFLOW.
             (EAGGREGATOR_OVERFLOW, h.materialize_and_add(&agg_loc, 400)),
+        ];
+
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
+    fn test_aggregator_with_republish(test_env in arb_test_env(6), element_type in arb_agg_type(), use_type in arb_use_type()) {
+        println!("Testing test_aggregator_with_republish {:?}", test_env);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 600, 400)),
+            (SUCCESS, h.add(&agg_loc, 1)),
+            (SUCCESS, h.republish()),
+            (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 200)),
+            (SUCCESS, h.add(&agg_loc, 1)),
+        ];
+
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
+    fn test_aggregator_recreate(test_env in arb_test_env(13), element_type in arb_agg_type(), use_type in arb_droppable_use_type()) {
+        println!("Testing test_aggregator_recreate {:?}", test_env);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 13);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add(&agg_loc, 4)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add(&agg_loc, 4)),
+            (SUCCESS, h.delete(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add_delete(&agg_loc, 4)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 5)),
+            (EAGGREGATOR_OVERFLOW, h.add_delete(&agg_loc, 7)),
+            (SUCCESS, h.add_delete(&agg_loc, 3)),
         ];
 
         h.run_block_in_parts_and_check(

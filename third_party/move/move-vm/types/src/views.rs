@@ -1,6 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::delayed_values::delayed_field_id::DelayedFieldID;
 use move_core_types::{
     account_address::AccountAddress, gas_algebra::AbstractMemorySize, language_storage::TypeTag,
 };
@@ -35,6 +36,12 @@ pub trait ValueView {
         struct Acc(AbstractMemorySize);
 
         impl ValueVisitor for Acc {
+            fn visit_delayed(&mut self, _depth: usize, _id: DelayedFieldID) {
+                // TODO[agg_v2](cleanup): `legacy_abstract_memory_size` is not used
+                //   anyway, so this function will be removed soon (hopefully).
+                //   Contributions are appreciated!
+            }
+
             fn visit_u8(&mut self, _depth: usize, _val: u8) {
                 self.0 += LEGACY_CONST_SIZE;
             }
@@ -124,6 +131,7 @@ pub trait ValueView {
 
 /// Trait that defines a visitor that could be used to traverse a value recursively.
 pub trait ValueVisitor {
+    fn visit_delayed(&mut self, depth: usize, id: DelayedFieldID);
     fn visit_u8(&mut self, depth: usize, val: u8);
     fn visit_u16(&mut self, depth: usize, val: u16);
     fn visit_u32(&mut self, depth: usize, val: u32);

@@ -527,7 +527,6 @@ export interface TransactionPayload {
   type?: TransactionPayload_Type | undefined;
   entryFunctionPayload?: EntryFunctionPayload | undefined;
   scriptPayload?: ScriptPayload | undefined;
-  moduleBundlePayload?: ModuleBundlePayload | undefined;
   writeSetPayload?: WriteSetPayload | undefined;
   multisigPayload?: MultisigPayload | undefined;
 }
@@ -536,7 +535,6 @@ export enum TransactionPayload_Type {
   TYPE_UNSPECIFIED = 0,
   TYPE_ENTRY_FUNCTION_PAYLOAD = 1,
   TYPE_SCRIPT_PAYLOAD = 2,
-  TYPE_MODULE_BUNDLE_PAYLOAD = 3,
   TYPE_WRITE_SET_PAYLOAD = 4,
   TYPE_MULTISIG_PAYLOAD = 5,
   UNRECOGNIZED = -1,
@@ -553,9 +551,6 @@ export function transactionPayload_TypeFromJSON(object: any): TransactionPayload
     case 2:
     case "TYPE_SCRIPT_PAYLOAD":
       return TransactionPayload_Type.TYPE_SCRIPT_PAYLOAD;
-    case 3:
-    case "TYPE_MODULE_BUNDLE_PAYLOAD":
-      return TransactionPayload_Type.TYPE_MODULE_BUNDLE_PAYLOAD;
     case 4:
     case "TYPE_WRITE_SET_PAYLOAD":
       return TransactionPayload_Type.TYPE_WRITE_SET_PAYLOAD;
@@ -577,8 +572,6 @@ export function transactionPayload_TypeToJSON(object: TransactionPayload_Type): 
       return "TYPE_ENTRY_FUNCTION_PAYLOAD";
     case TransactionPayload_Type.TYPE_SCRIPT_PAYLOAD:
       return "TYPE_SCRIPT_PAYLOAD";
-    case TransactionPayload_Type.TYPE_MODULE_BUNDLE_PAYLOAD:
-      return "TYPE_MODULE_BUNDLE_PAYLOAD";
     case TransactionPayload_Type.TYPE_WRITE_SET_PAYLOAD:
       return "TYPE_WRITE_SET_PAYLOAD";
     case TransactionPayload_Type.TYPE_MULTISIG_PAYLOAD:
@@ -648,10 +641,6 @@ export function multisigTransactionPayload_TypeToJSON(object: MultisigTransactio
     default:
       return "UNRECOGNIZED";
   }
-}
-
-export interface ModuleBundlePayload {
-  modules?: MoveModuleBytecode[] | undefined;
 }
 
 export interface MoveModuleBytecode {
@@ -883,7 +872,7 @@ export enum AnyPublicKey_Type {
   TYPE_ED25519 = 1,
   TYPE_SECP256K1_ECDSA = 2,
   TYPE_SECP256R1_ECDSA = 3,
-  TYPE_ZKID = 4,
+  TYPE_OIDB = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -902,8 +891,8 @@ export function anyPublicKey_TypeFromJSON(object: any): AnyPublicKey_Type {
     case "TYPE_SECP256R1_ECDSA":
       return AnyPublicKey_Type.TYPE_SECP256R1_ECDSA;
     case 4:
-    case "TYPE_ZKID":
-      return AnyPublicKey_Type.TYPE_ZKID;
+    case "TYPE_OIDB":
+      return AnyPublicKey_Type.TYPE_OIDB;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -921,8 +910,8 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
       return "TYPE_SECP256K1_ECDSA";
     case AnyPublicKey_Type.TYPE_SECP256R1_ECDSA:
       return "TYPE_SECP256R1_ECDSA";
-    case AnyPublicKey_Type.TYPE_ZKID:
-      return "TYPE_ZKID";
+    case AnyPublicKey_Type.TYPE_OIDB:
+      return "TYPE_OIDB";
     case AnyPublicKey_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -930,11 +919,20 @@ export function anyPublicKey_TypeToJSON(object: AnyPublicKey_Type): string {
 }
 
 export interface AnySignature {
-  type?: AnySignature_Type | undefined;
+  type?:
+    | AnySignature_Type
+    | undefined;
+  /**
+   * Deprecated: use signature_variant instead.
+   * Note: >= 1.10, this field is deprecated.
+   *
+   * @deprecated
+   */
+  signature?: Uint8Array | undefined;
   ed25519?: Ed25519 | undefined;
   secp256k1Ecdsa?: Secp256k1Ecdsa | undefined;
   webauthn?: WebAuthn | undefined;
-  zkid?: ZkId | undefined;
+  oidb?: Oidb | undefined;
 }
 
 export enum AnySignature_Type {
@@ -942,7 +940,7 @@ export enum AnySignature_Type {
   TYPE_ED25519 = 1,
   TYPE_SECP256K1_ECDSA = 2,
   TYPE_WEBAUTHN = 3,
-  TYPE_ZKID = 4,
+  TYPE_OIDB = 4,
   UNRECOGNIZED = -1,
 }
 
@@ -961,8 +959,8 @@ export function anySignature_TypeFromJSON(object: any): AnySignature_Type {
     case "TYPE_WEBAUTHN":
       return AnySignature_Type.TYPE_WEBAUTHN;
     case 4:
-    case "TYPE_ZKID":
-      return AnySignature_Type.TYPE_ZKID;
+    case "TYPE_OIDB":
+      return AnySignature_Type.TYPE_OIDB;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -980,8 +978,8 @@ export function anySignature_TypeToJSON(object: AnySignature_Type): string {
       return "TYPE_SECP256K1_ECDSA";
     case AnySignature_Type.TYPE_WEBAUTHN:
       return "TYPE_WEBAUTHN";
-    case AnySignature_Type.TYPE_ZKID:
-      return "TYPE_ZKID";
+    case AnySignature_Type.TYPE_OIDB:
+      return "TYPE_OIDB";
     case AnySignature_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -1000,7 +998,7 @@ export interface WebAuthn {
   signature?: Uint8Array | undefined;
 }
 
-export interface ZkId {
+export interface Oidb {
   signature?: Uint8Array | undefined;
 }
 
@@ -4391,7 +4389,6 @@ function createBaseTransactionPayload(): TransactionPayload {
     type: 0,
     entryFunctionPayload: undefined,
     scriptPayload: undefined,
-    moduleBundlePayload: undefined,
     writeSetPayload: undefined,
     multisigPayload: undefined,
   };
@@ -4407,9 +4404,6 @@ export const TransactionPayload = {
     }
     if (message.scriptPayload !== undefined) {
       ScriptPayload.encode(message.scriptPayload, writer.uint32(26).fork()).ldelim();
-    }
-    if (message.moduleBundlePayload !== undefined) {
-      ModuleBundlePayload.encode(message.moduleBundlePayload, writer.uint32(34).fork()).ldelim();
     }
     if (message.writeSetPayload !== undefined) {
       WriteSetPayload.encode(message.writeSetPayload, writer.uint32(42).fork()).ldelim();
@@ -4447,13 +4441,6 @@ export const TransactionPayload = {
           }
 
           message.scriptPayload = ScriptPayload.decode(reader, reader.uint32());
-          continue;
-        case 4:
-          if (tag !== 34) {
-            break;
-          }
-
-          message.moduleBundlePayload = ModuleBundlePayload.decode(reader, reader.uint32());
           continue;
         case 5:
           if (tag !== 42) {
@@ -4519,9 +4506,6 @@ export const TransactionPayload = {
         ? EntryFunctionPayload.fromJSON(object.entryFunctionPayload)
         : undefined,
       scriptPayload: isSet(object.scriptPayload) ? ScriptPayload.fromJSON(object.scriptPayload) : undefined,
-      moduleBundlePayload: isSet(object.moduleBundlePayload)
-        ? ModuleBundlePayload.fromJSON(object.moduleBundlePayload)
-        : undefined,
       writeSetPayload: isSet(object.writeSetPayload) ? WriteSetPayload.fromJSON(object.writeSetPayload) : undefined,
       multisigPayload: isSet(object.multisigPayload) ? MultisigPayload.fromJSON(object.multisigPayload) : undefined,
     };
@@ -4537,9 +4521,6 @@ export const TransactionPayload = {
     }
     if (message.scriptPayload !== undefined) {
       obj.scriptPayload = ScriptPayload.toJSON(message.scriptPayload);
-    }
-    if (message.moduleBundlePayload !== undefined) {
-      obj.moduleBundlePayload = ModuleBundlePayload.toJSON(message.moduleBundlePayload);
     }
     if (message.writeSetPayload !== undefined) {
       obj.writeSetPayload = WriteSetPayload.toJSON(message.writeSetPayload);
@@ -4561,9 +4542,6 @@ export const TransactionPayload = {
       : undefined;
     message.scriptPayload = (object.scriptPayload !== undefined && object.scriptPayload !== null)
       ? ScriptPayload.fromPartial(object.scriptPayload)
-      : undefined;
-    message.moduleBundlePayload = (object.moduleBundlePayload !== undefined && object.moduleBundlePayload !== null)
-      ? ModuleBundlePayload.fromPartial(object.moduleBundlePayload)
       : undefined;
     message.writeSetPayload = (object.writeSetPayload !== undefined && object.writeSetPayload !== null)
       ? WriteSetPayload.fromPartial(object.writeSetPayload)
@@ -5180,103 +5158,6 @@ export const MultisigTransactionPayload = {
     message.entryFunctionPayload = (object.entryFunctionPayload !== undefined && object.entryFunctionPayload !== null)
       ? EntryFunctionPayload.fromPartial(object.entryFunctionPayload)
       : undefined;
-    return message;
-  },
-};
-
-function createBaseModuleBundlePayload(): ModuleBundlePayload {
-  return { modules: [] };
-}
-
-export const ModuleBundlePayload = {
-  encode(message: ModuleBundlePayload, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.modules !== undefined && message.modules.length !== 0) {
-      for (const v of message.modules) {
-        MoveModuleBytecode.encode(v!, writer.uint32(10).fork()).ldelim();
-      }
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): ModuleBundlePayload {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseModuleBundlePayload();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 10) {
-            break;
-          }
-
-          message.modules!.push(MoveModuleBytecode.decode(reader, reader.uint32()));
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  // encodeTransform encodes a source of message objects.
-  // Transform<ModuleBundlePayload, Uint8Array>
-  async *encodeTransform(
-    source:
-      | AsyncIterable<ModuleBundlePayload | ModuleBundlePayload[]>
-      | Iterable<ModuleBundlePayload | ModuleBundlePayload[]>,
-  ): AsyncIterable<Uint8Array> {
-    for await (const pkt of source) {
-      if (globalThis.Array.isArray(pkt)) {
-        for (const p of (pkt as any)) {
-          yield* [ModuleBundlePayload.encode(p).finish()];
-        }
-      } else {
-        yield* [ModuleBundlePayload.encode(pkt as any).finish()];
-      }
-    }
-  },
-
-  // decodeTransform decodes a source of encoded messages.
-  // Transform<Uint8Array, ModuleBundlePayload>
-  async *decodeTransform(
-    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
-  ): AsyncIterable<ModuleBundlePayload> {
-    for await (const pkt of source) {
-      if (globalThis.Array.isArray(pkt)) {
-        for (const p of (pkt as any)) {
-          yield* [ModuleBundlePayload.decode(p)];
-        }
-      } else {
-        yield* [ModuleBundlePayload.decode(pkt as any)];
-      }
-    }
-  },
-
-  fromJSON(object: any): ModuleBundlePayload {
-    return {
-      modules: globalThis.Array.isArray(object?.modules)
-        ? object.modules.map((e: any) => MoveModuleBytecode.fromJSON(e))
-        : [],
-    };
-  },
-
-  toJSON(message: ModuleBundlePayload): unknown {
-    const obj: any = {};
-    if (message.modules?.length) {
-      obj.modules = message.modules.map((e) => MoveModuleBytecode.toJSON(e));
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<ModuleBundlePayload>): ModuleBundlePayload {
-    return ModuleBundlePayload.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<ModuleBundlePayload>): ModuleBundlePayload {
-    const message = createBaseModuleBundlePayload();
-    message.modules = object.modules?.map((e) => MoveModuleBytecode.fromPartial(e)) || [];
     return message;
   },
 };
@@ -7832,7 +7713,14 @@ export const AnyPublicKey = {
 };
 
 function createBaseAnySignature(): AnySignature {
-  return { type: 0, ed25519: undefined, secp256k1Ecdsa: undefined, webauthn: undefined, zkid: undefined };
+  return {
+    type: 0,
+    signature: new Uint8Array(0),
+    ed25519: undefined,
+    secp256k1Ecdsa: undefined,
+    webauthn: undefined,
+    oidb: undefined,
+  };
 }
 
 export const AnySignature = {
@@ -7840,17 +7728,20 @@ export const AnySignature = {
     if (message.type !== undefined && message.type !== 0) {
       writer.uint32(8).int32(message.type);
     }
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      writer.uint32(18).bytes(message.signature);
+    }
     if (message.ed25519 !== undefined) {
-      Ed25519.encode(message.ed25519, writer.uint32(18).fork()).ldelim();
+      Ed25519.encode(message.ed25519, writer.uint32(26).fork()).ldelim();
     }
     if (message.secp256k1Ecdsa !== undefined) {
-      Secp256k1Ecdsa.encode(message.secp256k1Ecdsa, writer.uint32(26).fork()).ldelim();
+      Secp256k1Ecdsa.encode(message.secp256k1Ecdsa, writer.uint32(34).fork()).ldelim();
     }
     if (message.webauthn !== undefined) {
-      WebAuthn.encode(message.webauthn, writer.uint32(34).fork()).ldelim();
+      WebAuthn.encode(message.webauthn, writer.uint32(42).fork()).ldelim();
     }
-    if (message.zkid !== undefined) {
-      ZkId.encode(message.zkid, writer.uint32(42).fork()).ldelim();
+    if (message.oidb !== undefined) {
+      Oidb.encode(message.oidb, writer.uint32(50).fork()).ldelim();
     }
     return writer;
   },
@@ -7874,28 +7765,35 @@ export const AnySignature = {
             break;
           }
 
-          message.ed25519 = Ed25519.decode(reader, reader.uint32());
+          message.signature = reader.bytes();
           continue;
         case 3:
           if (tag !== 26) {
             break;
           }
 
-          message.secp256k1Ecdsa = Secp256k1Ecdsa.decode(reader, reader.uint32());
+          message.ed25519 = Ed25519.decode(reader, reader.uint32());
           continue;
         case 4:
           if (tag !== 34) {
             break;
           }
 
-          message.webauthn = WebAuthn.decode(reader, reader.uint32());
+          message.secp256k1Ecdsa = Secp256k1Ecdsa.decode(reader, reader.uint32());
           continue;
         case 5:
           if (tag !== 42) {
             break;
           }
 
-          message.zkid = ZkId.decode(reader, reader.uint32());
+          message.webauthn = WebAuthn.decode(reader, reader.uint32());
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.oidb = Oidb.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -7941,10 +7839,11 @@ export const AnySignature = {
   fromJSON(object: any): AnySignature {
     return {
       type: isSet(object.type) ? anySignature_TypeFromJSON(object.type) : 0,
+      signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0),
       ed25519: isSet(object.ed25519) ? Ed25519.fromJSON(object.ed25519) : undefined,
       secp256k1Ecdsa: isSet(object.secp256k1Ecdsa) ? Secp256k1Ecdsa.fromJSON(object.secp256k1Ecdsa) : undefined,
       webauthn: isSet(object.webauthn) ? WebAuthn.fromJSON(object.webauthn) : undefined,
-      zkid: isSet(object.zkid) ? ZkId.fromJSON(object.zkid) : undefined,
+      oidb: isSet(object.oidb) ? Oidb.fromJSON(object.oidb) : undefined,
     };
   },
 
@@ -7952,6 +7851,9 @@ export const AnySignature = {
     const obj: any = {};
     if (message.type !== undefined && message.type !== 0) {
       obj.type = anySignature_TypeToJSON(message.type);
+    }
+    if (message.signature !== undefined && message.signature.length !== 0) {
+      obj.signature = base64FromBytes(message.signature);
     }
     if (message.ed25519 !== undefined) {
       obj.ed25519 = Ed25519.toJSON(message.ed25519);
@@ -7962,8 +7864,8 @@ export const AnySignature = {
     if (message.webauthn !== undefined) {
       obj.webauthn = WebAuthn.toJSON(message.webauthn);
     }
-    if (message.zkid !== undefined) {
-      obj.zkid = ZkId.toJSON(message.zkid);
+    if (message.oidb !== undefined) {
+      obj.oidb = Oidb.toJSON(message.oidb);
     }
     return obj;
   },
@@ -7974,6 +7876,7 @@ export const AnySignature = {
   fromPartial(object: DeepPartial<AnySignature>): AnySignature {
     const message = createBaseAnySignature();
     message.type = object.type ?? 0;
+    message.signature = object.signature ?? new Uint8Array(0);
     message.ed25519 = (object.ed25519 !== undefined && object.ed25519 !== null)
       ? Ed25519.fromPartial(object.ed25519)
       : undefined;
@@ -7983,7 +7886,7 @@ export const AnySignature = {
     message.webauthn = (object.webauthn !== undefined && object.webauthn !== null)
       ? WebAuthn.fromPartial(object.webauthn)
       : undefined;
-    message.zkid = (object.zkid !== undefined && object.zkid !== null) ? ZkId.fromPartial(object.zkid) : undefined;
+    message.oidb = (object.oidb !== undefined && object.oidb !== null) ? Oidb.fromPartial(object.oidb) : undefined;
     return message;
   },
 };
@@ -8255,22 +8158,22 @@ export const WebAuthn = {
   },
 };
 
-function createBaseZkId(): ZkId {
+function createBaseOidb(): Oidb {
   return { signature: new Uint8Array(0) };
 }
 
-export const ZkId = {
-  encode(message: ZkId, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const Oidb = {
+  encode(message: Oidb, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.signature !== undefined && message.signature.length !== 0) {
       writer.uint32(10).bytes(message.signature);
     }
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): ZkId {
+  decode(input: _m0.Reader | Uint8Array, length?: number): Oidb {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseZkId();
+    const message = createBaseOidb();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -8291,40 +8194,40 @@ export const ZkId = {
   },
 
   // encodeTransform encodes a source of message objects.
-  // Transform<ZkId, Uint8Array>
-  async *encodeTransform(source: AsyncIterable<ZkId | ZkId[]> | Iterable<ZkId | ZkId[]>): AsyncIterable<Uint8Array> {
+  // Transform<Oidb, Uint8Array>
+  async *encodeTransform(source: AsyncIterable<Oidb | Oidb[]> | Iterable<Oidb | Oidb[]>): AsyncIterable<Uint8Array> {
     for await (const pkt of source) {
       if (globalThis.Array.isArray(pkt)) {
         for (const p of (pkt as any)) {
-          yield* [ZkId.encode(p).finish()];
+          yield* [Oidb.encode(p).finish()];
         }
       } else {
-        yield* [ZkId.encode(pkt as any).finish()];
+        yield* [Oidb.encode(pkt as any).finish()];
       }
     }
   },
 
   // decodeTransform decodes a source of encoded messages.
-  // Transform<Uint8Array, ZkId>
+  // Transform<Uint8Array, Oidb>
   async *decodeTransform(
     source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
-  ): AsyncIterable<ZkId> {
+  ): AsyncIterable<Oidb> {
     for await (const pkt of source) {
       if (globalThis.Array.isArray(pkt)) {
         for (const p of (pkt as any)) {
-          yield* [ZkId.decode(p)];
+          yield* [Oidb.decode(p)];
         }
       } else {
-        yield* [ZkId.decode(pkt as any)];
+        yield* [Oidb.decode(pkt as any)];
       }
     }
   },
 
-  fromJSON(object: any): ZkId {
+  fromJSON(object: any): Oidb {
     return { signature: isSet(object.signature) ? bytesFromBase64(object.signature) : new Uint8Array(0) };
   },
 
-  toJSON(message: ZkId): unknown {
+  toJSON(message: Oidb): unknown {
     const obj: any = {};
     if (message.signature !== undefined && message.signature.length !== 0) {
       obj.signature = base64FromBytes(message.signature);
@@ -8332,11 +8235,11 @@ export const ZkId = {
     return obj;
   },
 
-  create(base?: DeepPartial<ZkId>): ZkId {
-    return ZkId.fromPartial(base ?? {});
+  create(base?: DeepPartial<Oidb>): Oidb {
+    return Oidb.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<ZkId>): ZkId {
-    const message = createBaseZkId();
+  fromPartial(object: DeepPartial<Oidb>): Oidb {
+    const message = createBaseOidb();
     message.signature = object.signature ?? new Uint8Array(0);
     return message;
   },

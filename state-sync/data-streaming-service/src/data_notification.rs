@@ -88,6 +88,11 @@ impl DataClientRequest {
         }
     }
 
+    /// Returns true iff the request is a new data request
+    pub fn is_new_data_request(&self) -> bool {
+        self.is_optimistic_fetch_request() || self.is_subscription_request()
+    }
+
     /// Returns true iff the request is an optimistic fetch request
     pub fn is_optimistic_fetch_request(&self) -> bool {
         matches!(self, DataClientRequest::NewTransactionsWithProof(_))

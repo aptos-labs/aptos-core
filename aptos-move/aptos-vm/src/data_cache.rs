@@ -13,7 +13,7 @@ use crate::{
 use aptos_aggregator::{
     bounded_math::SignedU128,
     resolver::{TAggregatorV1View, TDelayedFieldView},
-    types::{DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
+    types::{DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
 use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
@@ -21,10 +21,12 @@ use aptos_types::{
     delayed_fields::PanicError,
     on_chain_config::{ConfigStorage, Features, OnChainConfig},
     state_store::{
-        errors::StateviewError, state_key::StateKey, state_storage_usage::StateStorageUsage,
-        state_value::StateValue, StateView, StateViewId,
+        errors::StateviewError,
+        state_key::StateKey,
+        state_storage_usage::StateStorageUsage,
+        state_value::{StateValue, StateValueMetadata},
+        StateView, StateViewId,
     },
-    write_set::WriteOp,
 };
 use aptos_vm_types::{
     resolver::{
@@ -41,6 +43,7 @@ use move_core_types::{
     resolver::{resource_size, ModuleResolver, ResourceResolver},
     value::MoveTypeLayout,
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
@@ -84,7 +87,7 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
             maybe_resource_group_view,
             executor_view,
             gas_feature_version,
-            features.is_resource_group_charge_as_size_sum_enabled(),
+            features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
 
         Self::new(
@@ -247,7 +250,6 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.executor_view.is_delayed_field_optimization_capable()
@@ -275,19 +277,18 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         self.executor_view.generate_delayed_field_id(width)
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        self.executor_view.validate_and_convert_delayed_field_id(id)
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        self.executor_view.validate_delayed_field_id(id)
     }
 
     fn get_reads_needing_exchange(
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -296,7 +297,7 @@ impl<'e, E: ExecutorView> TDelayedFieldView for StorageAdapter<'e, E> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         self.executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -325,7 +326,7 @@ impl<S: StateView> AsMoveResolver<S> for S {
             None,
             self,
             gas_feature_version,
-            features.is_resource_group_charge_as_size_sum_enabled(),
+            features.is_resource_groups_split_in_vm_change_set_enabled(),
         );
         let max_identifier_size = get_max_identifier_size(&features);
         StorageAdapter::new(
@@ -373,19 +374,19 @@ pub(crate) mod tests {
     ) -> StorageAdapter<S> {
         assert!(group_size_kind != GroupSizeKind::AsSum, "not yet supported");
 
-        let (gas_feature_version, resource_group_charge_as_size_sum_enabled) = match group_size_kind
-        {
-            GroupSizeKind::AsSum => (12, true),
-            GroupSizeKind::AsBlob => (10, false),
-            GroupSizeKind::None => (1, false),
-        };
+        let (gas_feature_version, resource_groups_split_in_vm_change_set_enabled) =
+            match group_size_kind {
+                GroupSizeKind::AsSum => (12, true),
+                GroupSizeKind::AsBlob => (10, false),
+                GroupSizeKind::None => (1, false),
+            };
 
         let group_adapter = ResourceGroupAdapter::new(
             // TODO[agg_v2](test) add a converter for StateView for tests that implements ResourceGroupView
             None,
             state_view,
             gas_feature_version,
-            resource_group_charge_as_size_sum_enabled,
+            resource_groups_split_in_vm_change_set_enabled,
         );
         StorageAdapter::new(state_view, 0, 0, group_adapter)
     }

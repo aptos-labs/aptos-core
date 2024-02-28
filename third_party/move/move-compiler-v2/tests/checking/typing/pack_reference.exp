@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: invalid type instantiation `&u64`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/pack_reference.move:5:9
+  │
+5 │         Box { f: r_imm };
+  │         ^^^^^^^^^^^^^^^^
+
+error: invalid type instantiation `&mut u64`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/pack_reference.move:6:9
+  │
+6 │         Box { f: r_mut };
+  │         ^^^^^^^^^^^^^^^^

@@ -56,7 +56,6 @@ impl AptosDB {
             ledger_commit_lock: std::sync::Mutex::new(()),
             indexer: None,
             skip_index_and_usage,
-            indexer_async_v2: None,
         }
     }
 
@@ -69,7 +68,6 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         empty_buffered_state_for_restore: bool,
-        enable_indexer_async_v2: bool,
     ) -> Result<Self> {
         ensure!(
             pruner_config.eq(&NO_OP_STORAGE_PRUNER_CONFIG) || !readonly,
@@ -101,13 +99,6 @@ impl AptosDB {
             )?;
         }
 
-        if enable_indexer_async_v2 {
-            myself.open_indexer_async_v2(
-                db_paths.default_root_path(),
-                rocksdb_configs.index_db_config,
-            )?;
-        }
-
         Ok(myself)
     }
 
@@ -125,10 +116,10 @@ impl AptosDB {
         );
 
         if indexer.next_version() < ledger_next_version {
-            let state_view = DbStateView {
-                db: self.state_store.clone(),
-                version: Some(ledger_next_version - 1),
-            };
+            use aptos_storage_interface::state_view::DbStateViewAtVersion;
+            let db : Arc<dyn DbReader> = self.state_store.clone();
+
+            let state_view = db.state_view_at_version(Some(ledger_next_version - 1))?;
             let resolver = state_view.as_move_resolver();
             let annotator = MoveValueAnnotator::new(&resolver);
 
@@ -153,16 +144,6 @@ impl AptosDB {
         Ok(())
     }
 
-    fn open_indexer_async_v2(
-        &mut self,
-        db_root_path: impl AsRef<Path>,
-        rocksdb_config: RocksdbConfig,
-    ) -> Result<()> {
-        let indexer_async_v2 = IndexerAsyncV2::open(db_root_path, rocksdb_config, DashMap::new())?;
-        self.indexer_async_v2 = Some(indexer_async_v2);
-        Ok(())
-    }
-
     #[cfg(any(test, feature = "fuzzing"))]
     fn new_without_pruner<P: AsRef<Path> + Clone>(
         db_root_path: P,
@@ -170,7 +151,6 @@ impl AptosDB {
         buffered_state_target_items: usize,
         max_num_nodes_per_lru_cache_shard: usize,
         enable_indexer: bool,
-        enable_indexer_async_v2: bool,
     ) -> Self {
         Self::open(
             StorageDirPaths::from_path(db_root_path),
@@ -180,7 +160,6 @@ impl AptosDB {
             enable_indexer,
             buffered_state_target_items,
             max_num_nodes_per_lru_cache_shard,
-            enable_indexer_async_v2,
         )
         .expect("Unable to open AptosDB")
     }
@@ -252,30 +231,49 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
     }
 }
 
+thread_local! {
+    static ENTERED_GAUGED_API: Cell<bool> = Cell::new(false);
+}
+
 fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {
-    let timer = Instant::now();
+    let nested =  ENTERED_GAUGED_API.with(|entered| {
+        if entered.get() {
+            true
+        } else {
+            entered.set(true);
+            false
+        }
+    });
 
-    let res = api_impl();
+    if nested {
+        api_impl()
+    } else {
+        let timer = Instant::now();
 
-    let res_type = match &res {
-        Ok(_) => "Ok",
-        Err(e) => {
-            warn!(
-                api_name = api_name,
-                error = ?e,
-                "AptosDB API returned error."
-            );
-            "Err"
-        },
-    };
-    API_LATENCY_SECONDS
-        .with_label_values(&[api_name, res_type])
-        .observe(timer.elapsed().as_secs_f64());
+        let res = api_impl();
 
-    res
+        let res_type = match &res {
+            Ok(_) => "Ok",
+            Err(e) => {
+                warn!(
+                    api_name = api_name,
+                    error = ?e,
+                    "AptosDB API returned error."
+                );
+                "Err"
+            },
+        };
+        API_LATENCY_SECONDS
+            .with_label_values(&[api_name, res_type])
+            .observe(timer.elapsed().as_secs_f64());
+        ENTERED_GAUGED_API.with(|entered| entered.set(false));
+
+        res
+    }
+
 }
 
 // Convert requested range and order to a range in ascending order.

@@ -1,0 +1,182 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::main() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 0
+  1: $t0 := infer($t1)
+  2: label L0
+  3: $t2 := true
+  4: if ($t2) goto 5 else goto 11
+  5: label L2
+  6: $t4 := 1
+  7: $t3 := +($t0, $t4)
+  8: $t0 := infer($t3)
+  9: goto 15
+ 10: goto 13
+ 11: label L3
+ 12: goto 15
+ 13: label L4
+ 14: goto 2
+ 15: label L1
+ 16: $t6 := 1
+ 17: $t5 := ==($t0, $t6)
+ 18: if ($t5) goto 19 else goto 21
+ 19: label L5
+ 20: goto 24
+ 21: label L6
+ 22: $t7 := 42
+ 23: abort($t7)
+ 24: label L7
+ 25: return ()
+}
+
+============ after AvailableCopiesAnalysisProcessor: ================
+
+[variant baseline]
+fun m::main() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     # before: {}, after: {}
+  0: $t1 := 0
+     # before: {}, after: {$t0 := $t1}
+  1: $t0 := move($t1)
+     # before: {$t0 := $t1}, after: {$t0 := $t1}
+  2: label L0
+     # before: {$t0 := $t1}, after: {$t0 := $t1}
+  3: $t2 := true
+     # before: {$t0 := $t1}, after: {$t0 := $t1}
+  4: if ($t2) goto 5 else goto 11
+     # before: {$t0 := $t1}, after: {$t0 := $t1}
+  5: label L2
+     # before: {$t0 := $t1}, after: {$t0 := $t1}
+  6: $t4 := 1
+     # before: {$t0 := $t1}, after: {$t0 := $t1}
+  7: $t3 := +($t0, $t4)
+     # before: {$t0 := $t1}, after: {$t0 := $t3}
+  8: $t0 := move($t3)
+     # before: {$t0 := $t3}, after: {$t0 := $t3}
+  9: goto 15
+ 10: goto 13
+     # before: {$t0 := $t1}, after: {$t0 := $t1}
+ 11: label L3
+     # before: {$t0 := $t1}, after: {$t0 := $t1}
+ 12: goto 15
+ 13: label L4
+ 14: goto 2
+     # before: {}, after: {}
+ 15: label L1
+     # before: {}, after: {}
+ 16: $t6 := 1
+     # before: {}, after: {}
+ 17: $t5 := ==($t0, $t6)
+     # before: {}, after: {}
+ 18: if ($t5) goto 19 else goto 21
+     # before: {}, after: {}
+ 19: label L5
+     # before: {}, after: {}
+ 20: goto 24
+     # before: {}, after: {}
+ 21: label L6
+     # before: {}, after: {}
+ 22: $t7 := 42
+     # before: {}, after: {}
+ 23: abort($t7)
+     # before: {}, after: {}
+ 24: label L7
+     # before: {}, after: {}
+ 25: return ()
+}
+
+============ after CopyPropagation: ================
+
+[variant baseline]
+fun m::main() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 0
+  1: $t0 := move($t1)
+  2: label L0
+  3: $t2 := true
+  4: if ($t2) goto 5 else goto 11
+  5: label L2
+  6: $t4 := 1
+  7: $t3 := +($t1, $t4)
+  8: $t0 := move($t3)
+  9: goto 15
+ 10: goto 13
+ 11: label L3
+ 12: goto 15
+ 13: label L4
+ 14: goto 2
+ 15: label L1
+ 16: $t6 := 1
+ 17: $t5 := ==($t0, $t6)
+ 18: if ($t5) goto 19 else goto 21
+ 19: label L5
+ 20: goto 24
+ 21: label L6
+ 22: $t7 := 42
+ 23: abort($t7)
+ 24: label L7
+ 25: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::main() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 0
+  1: $t0 := move($t1)
+  2: label L0
+  3: $t2 := true
+  4: if ($t2) goto 5 else goto 11
+  5: label L2
+  6: $t4 := 1
+  7: $t3 := +($t1, $t4)
+  8: $t0 := move($t3)
+  9: goto 15
+ 10: goto 13
+ 11: label L3
+ 12: goto 15
+ 13: label L4
+ 14: goto 2
+ 15: label L1
+ 16: $t6 := 1
+ 17: $t5 := ==($t0, $t6)
+ 18: if ($t5) goto 19 else goto 21
+ 19: label L5
+ 20: goto 24
+ 21: label L6
+ 22: $t7 := 42
+ 23: abort($t7)
+ 24: label L7
+ 25: return ()
+}

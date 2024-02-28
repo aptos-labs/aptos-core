@@ -12,8 +12,7 @@ use aptos_aggregator::{
     delta_change_set::DeltaWithMax,
     resolver::{TAggregatorV1View, TDelayedFieldView},
     types::{
-        code_invariant_error, expect_ok, DelayedFieldID, DelayedFieldValue,
-        DelayedFieldsSpeculativeError, PanicOr,
+        code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
     },
 };
 use aptos_gas_algebra::Fee;
@@ -26,7 +25,7 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
         StateViewId,
     },
-    write_set::{TransactionWrite, WriteOp},
+    write_set::TransactionWrite,
 };
 use aptos_vm_types::{
     abstract_write_op::{AbstractResourceWriteOp, WriteWithDelayedFieldsOp},
@@ -38,12 +37,13 @@ use aptos_vm_types::{
     storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
     language_storage::StructTag,
     value::MoveTypeLayout,
     vm_status::{err_msg, StatusCode, VMStatus},
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
@@ -192,7 +192,6 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         self.base_executor_view
@@ -267,20 +266,18 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         self.base_executor_view.generate_delayed_field_id(width)
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        self.base_executor_view
-            .validate_and_convert_delayed_field_id(id)
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError> {
+        self.base_executor_view.validate_delayed_field_id(id)
     }
 
     fn get_reads_needing_exchange(
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         self.base_executor_view
             .get_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -289,7 +286,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         &self,
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         self.base_executor_view
             .get_group_reads_needing_exchange(delayed_write_set_keys, skip)
     }
@@ -387,13 +384,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             .transpose()?
             .and_then(|g| g.inner_ops().get(resource_tag))
         {
-            randomly_check_layout_matches(maybe_layout, layout.as_deref()).map_err(|e| {
-                // TODO[agg_v2](cleanup): Push into `randomly_check_layout_matches` once Satya's
-                //                        change lands. Consider the error code as well.
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                    .with_message(format!("get_resource_from_group layout check: {:?}", e))
-            })?;
-
+            randomly_check_layout_matches(maybe_layout, layout.as_deref())?;
             Ok(write_op.extract_raw_bytes())
         } else {
             self.base_resource_group_view.get_resource_from_group(
@@ -577,6 +568,7 @@ mod test {
                         ),
                     ]),
                     0,
+                    0,
                 ),
             ),
             (
@@ -587,6 +579,7 @@ mod test {
                         mock_tag_1(),
                         (WriteOp::legacy_modification(serialize(&5000).into()), None),
                     )]),
+                    0,
                     0,
                 ),
             ),

@@ -6,7 +6,7 @@ use crate::{
     bounded_math::SignedU128,
     delta_change_set::{serialize, DeltaOp},
     types::{
-        code_invariant_error, DelayedFieldID, DelayedFieldValue, DelayedFieldsSpeculativeError,
+        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError,
         DeltaApplicationFailureReason, PanicOr,
     },
 };
@@ -21,6 +21,7 @@ use aptos_types::{
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -66,6 +67,14 @@ pub trait TAggregatorV1View {
         // precise read.
         let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
         Ok(maybe_state_value.map(StateValue::into_metadata))
+    }
+
+    fn get_aggregator_v1_state_value_size(
+        &self,
+        id: &Self::Identifier,
+    ) -> PartialVMResult<Option<u64>> {
+        let maybe_state_value = self.get_aggregator_v1_state_value(id)?;
+        Ok(maybe_state_value.map(|v| v.size() as u64))
     }
 
     /// Consumes a single delta of aggregator V1, and tries to materialize it
@@ -130,7 +139,6 @@ pub trait TDelayedFieldView {
     type Identifier;
     type ResourceKey;
     type ResourceGroupTag;
-    type ResourceValue;
 
     fn is_delayed_field_optimization_capable(&self) -> bool;
 
@@ -166,45 +174,40 @@ pub trait TDelayedFieldView {
     /// new aggregator V2.
     fn generate_delayed_field_id(&self, width: u32) -> Self::Identifier;
 
-    /// Validate that given value (from aggregator structure) is a valid delayed field identifier,
-    /// and convert it to Self::Identifier if so.
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        id: u64,
-    ) -> Result<Self::Identifier, PanicError>;
+    fn validate_delayed_field_id(&self, id: &Self::Identifier) -> Result<(), PanicError>;
 
     /// Returns the list of resources that satisfy all the following conditions:
     /// 1. The resource is read during the transaction execution.
     /// 2. The resource is not present in write set of the VM Change Set.
     /// 3. The resource has a delayed field in it that is part of delayed field change set.
-    /// We get these resources and include them in the write set of the transaction output.
+    /// We get the keys of these resources and metadata to include them in the write set
+    /// of the transaction output after value exchange.
     fn get_reads_needing_exchange(
         &self,
-        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>;
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    >;
 
     /// Returns the list of resource groups that satisfy all the following conditions:
     /// 1. At least one of the resource in the group is read during the transaction execution.
     /// 2. The resource group is not present in the write set of the VM Change Set.
     /// 3. At least one of the resources in the group has a delayed field in it that is part.
     /// of delayed field change set.
-    /// We get these resource groups and include them in the write set of the transaction output.
-    /// For each such resource group, this function outputs (resource key, (metadata op, resource group size))
+    /// We get the keys of these resource groups and metadata to include them in the write set
+    /// of the transaction output after value exchange. For each such resource group, this function
+    /// outputs:(resource key, (metadata, resource group size))
     fn get_group_reads_needing_exchange(
         &self,
-        delayed_write_set_keys: &HashSet<Self::Identifier>,
+        delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError>;
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError>;
 }
 
 pub trait DelayedFieldResolver:
-    TDelayedFieldView<
-    Identifier = DelayedFieldID,
-    ResourceKey = StateKey,
-    ResourceGroupTag = StructTag,
-    ResourceValue = WriteOp,
->
+    TDelayedFieldView<Identifier = DelayedFieldID, ResourceKey = StateKey, ResourceGroupTag = StructTag>
 {
 }
 
@@ -213,7 +216,6 @@ impl<T> DelayedFieldResolver for T where
         Identifier = DelayedFieldID,
         ResourceKey = StateKey,
         ResourceGroupTag = StructTag,
-        ResourceValue = WriteOp,
     >
 {
 }
@@ -225,7 +227,6 @@ where
     type Identifier = DelayedFieldID;
     type ResourceGroupTag = StructTag;
     type ResourceKey = StateKey;
-    type ResourceValue = WriteOp;
 
     fn is_delayed_field_optimization_capable(&self) -> bool {
         // For resolvers that are not capable, it cannot be enabled
@@ -255,27 +256,26 @@ where
         unimplemented!("generate_delayed_field_id not implemented")
     }
 
-    fn validate_and_convert_delayed_field_id(
-        &self,
-        _id: u64,
-    ) -> Result<Self::Identifier, PanicError> {
-        unimplemented!("get_and_validate_delayed_field_id not implemented")
+    fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
+        unimplemented!()
     }
 
     fn get_reads_needing_exchange(
         &self,
-        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>, PanicError>
-    {
+    ) -> Result<
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        PanicError,
+    > {
         unimplemented!("get_reads_needing_exchange not implemented")
     }
 
     fn get_group_reads_needing_exchange(
         &self,
-        _delayed_write_set_keys: &HashSet<Self::Identifier>,
+        _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
         unimplemented!("get_group_reads_needing_exchange not implemented")
     }
 }

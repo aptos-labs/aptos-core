@@ -16,7 +16,7 @@ use aptos_framework::natives::{
 use aptos_table_natives::{NativeTableContext, TableChangeSet};
 use aptos_types::{
     access_path::AccessPath, block_metadata::BlockMetadata, block_metadata_ext::BlockMetadataExt,
-    contract_event::ContractEvent, on_chain_config::Features, state_store::state_key::StateKey,
+    contract_event::ContractEvent, state_store::state_key::StateKey,
     validator_txn::ValidatorTransaction,
 };
 use aptos_vm_types::{change_set::VMChangeSet, storage::change_set_configs::ChangeSetConfigs};
@@ -30,7 +30,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{move_vm::MoveVM, session::Session};
-use move_vm_types::values::Value;
+use move_vm_types::{value_serde::serialize_and_allow_delayed_values, values::Value};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
@@ -151,24 +151,54 @@ impl SessionId {
     pub fn as_uuid(&self) -> HashValue {
         self.hash()
     }
+
+    pub(crate) fn into_script_hash(self) -> Vec<u8> {
+        match self {
+            Self::Txn {
+                sender: _,
+                sequence_number: _,
+                script_hash,
+            }
+            | Self::Prologue {
+                sender: _,
+                sequence_number: _,
+                script_hash,
+            }
+            | Self::Epilogue {
+                sender: _,
+                sequence_number: _,
+                script_hash,
+            }
+            | Self::RunOnAbort {
+                sender: _,
+                sequence_number: _,
+                script_hash,
+            }
+            | Self::ValidatorTxn { script_hash } => script_hash,
+            Self::BlockMeta { id: _ }
+            | Self::Genesis { id: _ }
+            | Self::Void
+            | Self::BlockMetaExt { id: _ } => vec![],
+        }
+    }
 }
 
 pub struct SessionExt<'r, 'l> {
     inner: Session<'r, 'l>,
     remote: &'r dyn AptosMoveResolver,
-    features: Arc<Features>,
+    is_storage_slot_metadata_enabled: bool,
 }
 
 impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn new(
         inner: Session<'r, 'l>,
         remote: &'r dyn AptosMoveResolver,
-        features: Arc<Features>,
+        is_storage_slot_metadata_enabled: bool,
     ) -> Self {
         Self {
             inner,
             remote,
-            features,
+            is_storage_slot_metadata_enabled,
         }
     }
 
@@ -179,15 +209,25 @@ impl<'r, 'l> SessionExt<'r, 'l> {
                                   layout: MoveTypeLayout,
                                   has_aggregator_lifting: bool|
          -> PartialVMResult<BytesWithResourceLayout> {
-            value
-                .simple_serialize(&layout)
-                .map(Into::into)
-                .map(|bytes| (bytes, has_aggregator_lifting.then_some(Arc::new(layout))))
-                .ok_or_else(|| {
-                    PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("Error when serializing resource {}.", value))
-                })
+            let serialization_result = if has_aggregator_lifting {
+                // We allow serialization of native values here because we want to
+                // temporarily store native values (via encoding to ensure deterministic
+                // gas charging) in block storage.
+                serialize_and_allow_delayed_values(&value, &layout)
+                    .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
+            } else {
+                // Otherwise, there should be no native values so ensure
+                // serialization fails here if there are any.
+                value
+                    .simple_serialize(&layout)
+                    .map(|bytes| (bytes.into(), None))
+            };
+            serialization_result.ok_or_else(|| {
+                PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("Error when serializing resource {}.", value))
+            })
         };
+
         let (change_set, mut extensions) = self
             .inner
             .finish_with_extensions_with_custom_effects(&resource_converter)?;
@@ -209,10 +249,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();
 
-        let woc = WriteOpConverter::new(
-            self.remote,
-            self.features.is_storage_slot_metadata_enabled(),
-        );
+        let woc = WriteOpConverter::new(self.remote, self.is_storage_slot_metadata_enabled);
 
         let change_set = Self::convert_change_set(
             &woc,

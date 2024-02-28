@@ -19,18 +19,17 @@ use aptos_gas_schedule::{
 };
 use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
-    bn254_circom,
-    bn254_circom::Groth16VerificationKey,
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
     move_utils::as_move_value::AsMoveValue,
+    oidb,
+    oidb::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
-    zkid,
 };
 use aptos_vm::{
     data_cache::AsMoveResolver,
@@ -55,7 +54,8 @@ const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
-const ZKID_MODULE_NAME: &str = "zkid";
+const OIDB_MODULE_NAME: &str = "openid_account";
+const JWKS_MODULE_NAME: &str = "jwks";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -118,6 +118,7 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -229,6 +230,7 @@ pub fn encode_genesis_change_set(
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();
@@ -254,7 +256,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
-    initialize_zkid(&mut session);
+    initialize_oidb(&mut session, chain_id);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -411,56 +413,8 @@ fn initialize(
     );
 }
 
-pub fn default_features() -> Vec<FeatureFlag> {
-    vec![
-        FeatureFlag::CODE_DEPENDENCY_CHECK,
-        FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
-        FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
-        FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
-        FeatureFlag::VM_BINARY_FORMAT_V6,
-        FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
-        FeatureFlag::BLAKE2B_256_NATIVE,
-        FeatureFlag::RESOURCE_GROUPS,
-        FeatureFlag::MULTISIG_ACCOUNTS,
-        FeatureFlag::DELEGATION_POOLS,
-        FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
-        FeatureFlag::BLS12_381_STRUCTURES,
-        FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
-        FeatureFlag::STRUCT_CONSTRUCTORS,
-        FeatureFlag::SIGNATURE_CHECKER_V2,
-        FeatureFlag::STORAGE_SLOT_METADATA,
-        FeatureFlag::CHARGE_INVARIANT_VIOLATION,
-        FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
-        FeatureFlag::GAS_PAYER_ENABLED,
-        FeatureFlag::BULLETPROOFS_NATIVES,
-        FeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
-        FeatureFlag::MODULE_EVENT,
-        FeatureFlag::EMIT_FEE_STATEMENT,
-        FeatureFlag::STORAGE_DELETION_REFUND,
-        FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
-        FeatureFlag::AGGREGATOR_V2_API,
-        FeatureFlag::SAFER_RESOURCE_GROUPS,
-        FeatureFlag::SAFER_METADATA,
-        FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
-        FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
-        FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
-        FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
-        FeatureFlag::CONCURRENT_TOKEN_V2,
-        FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
-        FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
-        FeatureFlag::BN254_STRUCTURES,
-        FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM,
-        FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
-        FeatureFlag::WEBAUTHN_SIGNATURE,
-        // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
-        FeatureFlag::ZK_ID_SIGNATURES,
-        FeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
-        FeatureFlag::JWK_CONSENSUS,
-    ]
-}
-
 fn initialize_features(session: &mut SessionExt) {
-    let features: Vec<u64> = default_features()
+    let features: Vec<u64> = FeatureFlag::default_features()
         .into_iter()
         .map(|feature| feature as u64)
         .collect();
@@ -531,11 +485,11 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
     );
 }
 
-fn initialize_zkid(session: &mut SessionExt) {
-    let config = zkid::Configuration::new_for_devnet_and_testing();
+fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
+    let config = oidb::Configuration::new_for_devnet();
     exec_function(
         session,
-        ZKID_MODULE_NAME,
+        OIDB_MODULE_NAME,
         "update_configuration",
         vec![],
         serialize_values(&vec![
@@ -543,15 +497,30 @@ fn initialize_zkid(session: &mut SessionExt) {
             config.as_move_value(),
         ]),
     );
-    let vk = Groth16VerificationKey::from(bn254_circom::DEVNET_VERIFYING_KEY.clone());
+    if !chain_id.is_mainnet() {
+        let vk = Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone());
+        exec_function(
+            session,
+            OIDB_MODULE_NAME,
+            "update_groth16_verification_key",
+            vec![],
+            serialize_values(&vec![
+                MoveValue::Signer(CORE_CODE_ADDRESS),
+                vk.as_move_value(),
+            ]),
+        );
+    }
     exec_function(
         session,
-        ZKID_MODULE_NAME,
-        "update_groth16_verification_key",
+        JWKS_MODULE_NAME,
+        "upsert_oidc_provider",
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            vk.as_move_value(),
+            "https://accounts.google.com".to_string().as_move_value(),
+            "https://accounts.google.com/.well-known/openid-configuration"
+                .to_string()
+                .as_move_value(),
         ]),
     );
 }
@@ -958,6 +927,7 @@ pub fn test_genesis_module_publishing() {
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &data_cache,
+        false,
     )
     .unwrap();
     let id1 = HashValue::zero();

@@ -30,6 +30,7 @@ members = [
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
     "aptos-move/block-executor",
+    "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
@@ -199,6 +200,7 @@ members = [
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
+    "third_party/move/move-examples",
     "third_party/move/move-ir-compiler",
     "third_party/move/move-ir-compiler/move-bytecode-source-map",
     "third_party/move/move-ir-compiler/move-ir-to-bytecode",
@@ -362,6 +364,7 @@ aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
+aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
@@ -471,8 +474,9 @@ version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
-blst = "0.3.7"
-blstrs = { version = "0.7.1", features = ["serde"] }
+blst = "0.3.11"
+# The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
+blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
@@ -524,6 +528,7 @@ event-listener = "2.5.3"
 fail = "0.5.0"
 ff = "0.13"
 field_count = "0.1.1"
+fixed = "1.25.1"
 flate2 = "1.0.24"
 futures = "0.3.29"
 futures-channel = "0.3.29"
@@ -638,6 +643,7 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
+rsa = { version = "0.9.6" }
 rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
@@ -672,6 +678,7 @@ strum = "0.24.1"
 strum_macros = "0.24.2"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
+tar = "0.4.40"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
 test-case = "3.1.0"

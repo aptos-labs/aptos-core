@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid call of `!`: expected `bool` but found `integer` for argument 1
+  ┌─ tests/checking/typing/v1-operators/boolean_not_non_boolean.move:3:6
+  │
+3 │     !0;
+  │      ^
