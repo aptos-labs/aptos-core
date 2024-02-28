@@ -82,7 +82,7 @@ impl Default for QuorumStoreConfig {
             batch_generation_min_non_empty_interval_ms: 200,
             batch_generation_max_interval_ms: 250,
             // In previewnet, these are bumped up
-            sender_max_batch_txns: 500,
+            sender_max_batch_txns: 1000,
             sender_max_batch_bytes: 4 * 1024 * 1024,
             sender_max_num_batches: DEFAULT_MAX_NUM_BATCHES,
             sender_max_total_txns: 4000,
