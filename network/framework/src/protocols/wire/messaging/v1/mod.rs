@@ -297,7 +297,6 @@ impl<TWriteSocket: AsyncWrite> Sink<&MultiplexMessage> for MultiplexMessageSink<
 
     fn start_send(self: Pin<&mut Self>, message: &MultiplexMessage) -> Result<(), Self::Error> {
         let frame = bcs::to_bytes(message).map_err(WriteError::SerializeError)?;
-        println!("MMS BCS to {:?} bytes", frame.len());
         let frame = Bytes::from(frame);
 
         self.project()
