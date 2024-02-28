@@ -3168,7 +3168,6 @@ dependencies = [
 name = "aptos-oidb-pepper-common"
 version = "0.1.0"
 dependencies = [
- "aes-gcm",
  "anyhow",
  "aptos-crypto",
  "aptos-types",
@@ -3218,7 +3217,6 @@ dependencies = [
 name = "aptos-oidb-pepper-service"
 version = "0.1.0"
 dependencies = [
- "aes-gcm",
  "anyhow",
  "aptos-oidb-pepper-common",
  "aptos-types",
