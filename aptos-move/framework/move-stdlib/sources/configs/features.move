@@ -417,6 +417,17 @@ module std::features {
         is_enabled(MAX_OBJECT_NESTING_CHECK)
     }
 
+    /// Whether keyless accounts support passkey-based ephemeral signatures.
+    ///
+    /// Lifetime: transient
+    const KEYLESS_ACCOUNTS_WITH_PASSKEYS: u64 = 54;
+
+    public fun get_keyless_accounts_with_passkeys_feature(): u64 { KEYLESS_ACCOUNTS_WITH_PASSKEYS }
+
+    public fun keyless_accounts_with_passkeys_feature_enabled(): bool acquires Features {
+        is_enabled(KEYLESS_ACCOUNTS_WITH_PASSKEYS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
