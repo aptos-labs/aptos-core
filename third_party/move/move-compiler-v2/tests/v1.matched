@@ -301,6 +301,7 @@ move-compiler/tests/move_check/typing/main_arguments.exp   move-compiler-v2/test
 move-compiler/tests/move_check/typing/main_arguments_various_caes.exp   move-compiler-v2/tests/checking/typing/main_arguments_various_caes.exp
 move-compiler/tests/move_check/typing/main_call_entry.exp   move-compiler-v2/tests/checking/typing/main_call_entry.exp
 move-compiler/tests/move_check/typing/main_call_visibility_friend.exp   move-compiler-v2/tests/visibility-checker/v1-typing/main_call_visibility_friend.exp
+move-compiler/tests/move_check/typing/main_return_type_not_unit.exp   move-compiler-v2/tests/checking/typing/main_return_type_not_unit.exp
 move-compiler/tests/move_check/typing/main_with_type_parameters.exp   move-compiler-v2/tests/checking/typing/main_with_type_parameters.exp
 move-compiler/tests/move_check/typing/module_call.exp   move-compiler-v2/tests/checking/typing/module_call.exp
 move-compiler/tests/move_check/typing/module_call_complicated_rhs.exp   move-compiler-v2/tests/checking/typing/module_call_complicated_rhs.exp
