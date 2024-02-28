@@ -62,6 +62,8 @@ module aptos_framework::block {
     const EINVALID_PROPOSER: u64 = 2;
     /// Epoch interval cannot be 0.
     const EZERO_EPOCH_INTERVAL: u64 = 3;
+    /// The maximum capacity of the commit history cannot be 0.
+    const EZERO_MAX_CAPACITY: u64 = 3;
 
     /// This can only be called during Genesis.
     public(friend) fun initialize(aptos_framework: &signer, epoch_interval_microsecs: u64) {
@@ -87,6 +89,7 @@ module aptos_framework::block {
 
     /// Initialize the commit history resource if it's not in genesis.
     public fun initialize_commit_history(fx: &signer, max_capacity: u32) {
+        assert!(max_capacity > 0, error::invalid_argument(EZERO_MAX_CAPACITY));
         move_to<CommitHistory>(fx, CommitHistory {
             max_capacity,
             next_idx: 0,
