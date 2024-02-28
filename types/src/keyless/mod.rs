@@ -78,11 +78,11 @@ pub struct KeylessSignature {
     /// `exp_timestamp_secs`.
     pub sig: ZkpOrOpenIdSig,
 
-    /// The base64url-encoded header (no dot at the end), which contains two relevant fields:
+    /// The decoded/plaintext b64 header (i.e., *not* base64url-encoded), with two relevant fields:
     ///  1. `kid`, which indicates which of the OIDC provider's JWKs should be used to verify the
     ///     \[ZKPoK of an\] OpenID signature.,
     ///  2. `alg`, which indicates which type of signature scheme was used to sign the JWT
-    pub jwt_header_b64: String,
+    pub jwt_header: String,
 
     /// The expiry time of the `ephemeral_pubkey` represented as a UNIX epoch timestamp in seconds.
     pub exp_timestamp_secs: u64,
@@ -120,8 +120,7 @@ impl KeylessSignature {
     pub const MAX_LEN: usize = 4000;
 
     pub fn parse_jwt_header(&self) -> anyhow::Result<JWTHeader> {
-        let jwt_header_json = base64url_decode_as_str(&self.jwt_header_b64)?;
-        let header: JWTHeader = serde_json::from_str(&jwt_header_json)?;
+        let header: JWTHeader = serde_json::from_str(&self.jwt_header)?;
         Ok(header)
     }
 

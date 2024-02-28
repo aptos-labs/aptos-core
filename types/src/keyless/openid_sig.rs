@@ -3,8 +3,8 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     keyless::{
-        base64url_decode_as_str, seconds_from_epoch, Configuration, IdCommitment, KeylessPublicKey,
-        Pepper,
+        base64url_decode_as_str, base64url_encode_str, seconds_from_epoch, Configuration,
+        IdCommitment, KeylessPublicKey, Pepper,
     },
     transaction::authenticator::EphemeralPublicKey,
 };
@@ -113,14 +113,20 @@ impl OpenIdSig {
         Ok(())
     }
 
+    /// `jwt_header` is the *decoded* JWT header (i.e., *not* base64url-encoded)
     pub fn verify_jwt_signature(
         &self,
         rsa_jwk: &RSA_JWK,
-        jwt_header_b64: &String,
+        jwt_header: &String,
     ) -> anyhow::Result<()> {
         let jwt_payload_b64 = &self.jwt_payload_b64;
         let jwt_sig_b64 = &self.jwt_sig_b64;
-        let jwt_token = format!("{}.{}.{}", jwt_header_b64, jwt_payload_b64, jwt_sig_b64);
+        let jwt_token = format!(
+            "{}.{}.{}",
+            base64url_encode_str(jwt_header),
+            jwt_payload_b64,
+            jwt_sig_b64
+        );
         rsa_jwk.verify_signature(&jwt_token)?;
         Ok(())
     }

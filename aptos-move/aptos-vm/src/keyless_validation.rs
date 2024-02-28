@@ -202,7 +202,7 @@ pub(crate) fn validate_authenticators(
                         //
                         // We are now ready to verify the RSA signature
                         openid_sig
-                            .verify_jwt_signature(&rsa_jwk, &sig.jwt_header_b64)
+                            .verify_jwt_signature(&rsa_jwk, &sig.jwt_header)
                             .map_err(|_| {
                                 invalid_signature!(
                                     "RSA signature verification failed for OpenIdSig"

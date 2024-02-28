@@ -48,7 +48,7 @@ fn test_keyless_oidc_sig_verifies() {
         .unwrap();
 
     oidc_sig
-        .verify_jwt_signature(&SAMPLE_JWK, &sig.jwt_header_b64)
+        .verify_jwt_signature(&SAMPLE_JWK, &sig.jwt_header)
         .unwrap();
 
     // Maul the pepper; verification should fail

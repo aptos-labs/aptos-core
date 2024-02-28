@@ -7,7 +7,8 @@ use crate::{
         circuit_testcases::{
             SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
             SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
-            SAMPLE_JWT_PARSED, SAMPLE_PEPPER, SAMPLE_PK, SAMPLE_PROOF, SAMPLE_UID_KEY,
+            SAMPLE_JWT_HEADER_DECODED, SAMPLE_JWT_PARSED, SAMPLE_PEPPER, SAMPLE_PK, SAMPLE_PROOF,
+            SAMPLE_UID_KEY,
         },
         Groth16Zkp, KeylessPublicKey, KeylessSignature, OpenIdSig, SignedGroth16Zkp,
         ZkpOrOpenIdSig,
@@ -54,7 +55,7 @@ pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
     let zk_sig = KeylessSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(groth16zkp.clone()),
-        jwt_header_b64: SAMPLE_JWT_HEADER_B64.to_string(),
+        jwt_header: SAMPLE_JWT_HEADER_DECODED.to_string(),
         exp_timestamp_secs: SAMPLE_EXP_DATE,
         ephemeral_pubkey: SAMPLE_EPK.clone(),
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
@@ -94,7 +95,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
     let zk_sig = KeylessSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_sig.clone()),
-        jwt_header_b64,
+        jwt_header: SAMPLE_JWT_HEADER_DECODED.to_string(),
         exp_timestamp_secs: SAMPLE_EXP_DATE,
         ephemeral_pubkey: SAMPLE_EPK.clone(),
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
