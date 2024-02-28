@@ -96,6 +96,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use crate::dag::shoal_plus_plus::shoalpp_bootstrap::ShoalppBootstrapper;
+use crate::network::IncomingShoalppRequest;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -103,6 +105,9 @@ const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
 /// Number of rounds we expect storage to be ahead of the proposer round,
 /// used for fetching data from DB.
 const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
+
+// TODO: move to config
+const BOLT_ENABLED: bool = true;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {
@@ -147,7 +152,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     recovery_mode: bool,
 
     aptos_time_service: aptos_time_service::TimeService,
-    dag_rpc_tx: Option<aptos_channel::Sender<AccountAddress, IncomingDAGRequest>>,
+    shoalpp_rpc_tx: Option<aptos_channel::Sender<AccountAddress, (Author, IncomingShoalppRequest)>>,
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
     payload_manager: Arc<PayloadManager>,
@@ -202,7 +207,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             batch_retrieval_tx: None,
             bounded_executor,
             recovery_mode: false,
-            dag_rpc_tx: None,
+            shoalpp_rpc_tx: None,
             dag_shutdown_tx: None,
             aptos_time_service,
             dag_config,
@@ -1022,7 +1027,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let signer = new_signer_from_storage(self.author, &self.config.safety_rules.backend);
         let network_sender_arc = Arc::new(network_sender);
 
-        let bootstrapper = DagBootstrapper::new(
+        let bootstrapper = ShoalppBootstrapper::new(
             self.author,
             self.dag_config.clone(),
             onchain_dag_consensus_config.clone(),
@@ -1043,12 +1048,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             features,
         );
 
-        let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
-        self.dag_rpc_tx = Some(dag_rpc_tx);
-        let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
-        self.dag_shutdown_tx = Some(dag_shutdown_tx);
+        let (shoalpp_rpc_tx, shoalpp_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        self.shoalpp_rpc_tx = Some(shoalpp_rpc_tx);
+        let (shoalpp_shutdown_tx, shoalpp_shutdown_rx) = oneshot::channel();
+        self.dag_shutdown_tx = Some(shoalpp_shutdown_tx);
 
-        tokio::spawn(bootstrapper.start(dag_rpc_rx, dag_shutdown_rx));
+        tokio::spawn(bootstrapper.start(shoalpp_rpc_rx, shoalpp_shutdown_rx));
+
     }
 
     fn enable_quorum_store(&mut self, onchain_config: &OnChainConsensusConfig) -> bool {
@@ -1313,9 +1319,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     Err(anyhow::anyhow!("Quorum store not started"))
                 }
             },
-            IncomingRpcRequest::DAGRequest(request) => {
-                if let Some(tx) = &self.dag_rpc_tx {
-                    tx.push(peer_id, request)
+            IncomingRpcRequest::ShoalppRequest(request) => {
+                if let Some(tx) = &self.shoalpp_rpc_tx {
+                    tx.push(peer_id, (peer_id, request))
                 } else {
                     Err(anyhow::anyhow!("DAG not bootstrapped"))
                 }

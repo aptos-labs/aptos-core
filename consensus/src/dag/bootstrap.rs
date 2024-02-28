@@ -318,6 +318,7 @@ impl SyncMode {
 }
 
 pub struct DagBootstrapper {
+    dag_id: u8,
     self_peer: Author,
     config: DagConsensusConfig,
     onchain_config: DagConsensusConfigV1,
@@ -341,6 +342,7 @@ pub struct DagBootstrapper {
 impl DagBootstrapper {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        dag_id: u8,
         self_peer: Author,
         config: DagConsensusConfig,
         onchain_config: DagConsensusConfigV1,
@@ -361,6 +363,7 @@ impl DagBootstrapper {
         features: Features,
     ) -> Self {
         Self {
+            dag_id,
             self_peer,
             config,
             onchain_config,
@@ -607,6 +610,7 @@ impl DagBootstrapper {
         let health_backoff =
             HealthBackoff::new(self.epoch_state.clone(), chain_health, pipeline_health);
         let dag_driver = DagDriver::new(
+            self.dag_id,
             self.self_peer,
             self.epoch_state.clone(),
             dag_store.clone(),
@@ -722,6 +726,7 @@ pub(super) fn bootstrap_dag_for_test(
     let mut features = Features::default();
     features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let bootstraper = DagBootstrapper::new(
+        0, // TODO
         self_peer,
         DagConsensusConfig::default(),
         DagConsensusConfigV1::default(),

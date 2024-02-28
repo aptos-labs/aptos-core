@@ -44,6 +44,7 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub(crate) struct DagDriver {
+    dag_id: u8,
     author: Author,
     epoch_state: Arc<EpochState>,
     dag: Arc<DagStore>,
@@ -65,6 +66,7 @@ pub(crate) struct DagDriver {
 impl DagDriver {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        dag_id: u8,
         author: Author,
         epoch_state: Arc<EpochState>,
         dag: Arc<DagStore>,
@@ -88,6 +90,7 @@ impl DagDriver {
             dag.read().highest_strong_links_round(&epoch_state.verifier);
 
         let driver = Self {
+            dag_id,
             author,
             epoch_state,
             dag,
@@ -283,6 +286,7 @@ impl DagDriver {
         );
         let new_node = Node::new(
             self.epoch_state.epoch,
+            self.dag_id,
             new_round,
             self.author,
             timestamp,
@@ -373,7 +377,7 @@ impl RpcHandler for DagDriver {
             .remote_peer(*certified_node.author())
             .round(certified_node.round()));
         if self.dag.read().exists(certified_node.metadata()) {
-            return Ok(CertifiedAck::new(epoch));
+            return Ok(CertifiedAck::new(epoch, self.dag_id));
         }
 
         observe_node(certified_node.timestamp(), NodeStage::CertifiedNodeReceived);
@@ -384,6 +388,6 @@ impl RpcHandler for DagDriver {
         self.add_node(certified_node)
             .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
 
-        Ok(CertifiedAck::new(epoch))
+        Ok(CertifiedAck::new(epoch, self.dag_id))
     }
 }

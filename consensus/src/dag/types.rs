@@ -56,6 +56,7 @@ impl Extensions {
 #[derive(Serialize)]
 struct NodeWithoutDigest<'a> {
     epoch: u64,
+    dag_id: u8,
     round: Round,
     author: Author,
     timestamp: u64,
@@ -80,6 +81,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
     fn from(node: &'a Node) -> Self {
         Self {
             epoch: node.metadata.epoch,
+            dag_id: node.metadata.dag_id,
             round: node.metadata.round,
             author: node.metadata.author,
             timestamp: node.metadata.timestamp,
@@ -94,6 +96,7 @@ impl<'a> From<&'a Node> for NodeWithoutDigest<'a> {
 /// Represents the metadata about the node, without payload and parents from Node
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, CryptoHasher, BCSCryptoHash)]
 pub struct NodeMetadata {
+    dag_id: u8,
     node_id: NodeId,
     timestamp: u64,
     digest: HashValue,
@@ -109,6 +112,7 @@ impl NodeMetadata {
         digest: HashValue,
     ) -> Self {
         Self {
+            dag_id: 0, // TODO
             node_id: NodeId {
                 epoch,
                 round,
@@ -117,6 +121,10 @@ impl NodeMetadata {
             timestamp,
             digest,
         }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.dag_id
     }
 
     pub fn digest(&self) -> &HashValue {
@@ -161,6 +169,7 @@ pub struct Node {
 impl Node {
     pub fn new(
         epoch: u64,
+        dag_id: u8,
         round: Round,
         author: Author,
         timestamp: u64,
@@ -171,6 +180,7 @@ impl Node {
     ) -> Self {
         let digest = Self::calculate_digest_internal(
             epoch,
+            dag_id,
             round,
             author,
             timestamp,
@@ -182,6 +192,7 @@ impl Node {
 
         Self {
             metadata: NodeMetadata {
+                dag_id,
                 node_id: NodeId {
                     epoch,
                     round,
@@ -216,6 +227,7 @@ impl Node {
     /// Calculate the node digest based on all fields in the node
     fn calculate_digest_internal(
         epoch: u64,
+        dag_id: u8,
         round: Round,
         author: Author,
         timestamp: u64,
@@ -226,6 +238,7 @@ impl Node {
     ) -> HashValue {
         let node_with_out_digest = NodeWithoutDigest {
             epoch,
+            dag_id,
             round,
             author,
             timestamp,
@@ -240,6 +253,7 @@ impl Node {
     fn calculate_digest(&self) -> HashValue {
         Self::calculate_digest_internal(
             self.metadata.epoch,
+            self.metadata.dag_id,
             self.metadata.round,
             self.metadata.author,
             self.metadata.timestamp,
@@ -248,6 +262,10 @@ impl Node {
             &self.parents,
             &self.extensions,
         )
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.metadata.dag_id()
     }
 
     pub fn digest(&self) -> HashValue {
@@ -337,6 +355,13 @@ impl Node {
                 )
                 .is_ok(),
             "not enough parents to satisfy voting power"
+        );
+
+        ensure!(
+            self.parents()
+                .iter()
+                .all(|parent| parent.metadata().dag_id() == self.dag_id()),
+            "invalid parent dag_id"
         );
 
         // TODO: validate timestamp
@@ -464,6 +489,10 @@ impl CertifiedNodeMessage {
         }
     }
 
+    pub fn dag_id(&self) -> u8 {
+        self.certified_node.dag_id()
+    }
+
     pub fn certified_node(self) -> CertifiedNode {
         self.certified_node
     }
@@ -509,6 +538,10 @@ impl Vote {
             metadata,
             signature,
         }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.metadata.dag_id()
     }
 
     pub fn signature(&self) -> &Signature {
@@ -614,12 +647,20 @@ impl CertificateAckState {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct CertifiedAck {
+    dag_id: u8,
     epoch: u64,
 }
 
 impl CertifiedAck {
-    pub fn new(epoch: u64) -> Self {
-        Self { epoch }
+    pub fn new(epoch: u64, dag_id: u8) -> Self {
+        Self {
+            dag_id,
+            epoch,
+        }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.dag_id
     }
 }
 
@@ -671,6 +712,10 @@ impl RemoteFetchRequest {
             targets,
             exists_bitmask,
         }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.targets[0].dag_id()
     }
 
     pub fn epoch(&self) -> u64 {
@@ -759,6 +804,7 @@ impl FetchResponse {
             }),
             "nodes don't match requested bitmask"
         );
+        ensure!(!self.certified_nodes.is_empty(), "Certified_nodes is empty");
         ensure!(
             self.certified_nodes
                 .iter()
@@ -766,7 +812,18 @@ impl FetchResponse {
             "unable to verify certified nodes"
         );
 
+        ensure!(
+            self.certified_nodes
+                .iter()
+                .all(|node| node.dag_id() == self.dag_id()),
+            "wrong dag_id in certified nodes"
+        );
+
         Ok(self)
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.certified_nodes[0].dag_id()
     }
 }
 
@@ -853,6 +910,21 @@ impl DAGMessage {
             DAGMessage::TestMessage(_) | DAGMessage::TestAck(_) => {
                 bail!("Unexpected to verify {}", self.name())
             },
+        }
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        match self {
+            DAGMessage::NodeMsg(node) => node.dag_id(),
+            DAGMessage::VoteMsg(vote) => vote.dag_id(),
+            DAGMessage::CertifiedNodeMsg(cnm) => cnm.dag_id(),
+            DAGMessage::CertifiedAckMsg(ack) => ack.dag_id(),
+            DAGMessage::FetchRequest(req) => req.dag_id(),
+            DAGMessage::FetchResponse(rsp) => rsp.dag_id(),
+            #[cfg(test)]
+            DAGMessage::TestMessage(_) => 0, // todo
+            #[cfg(test)]
+            DAGMessage::TestAck(_) => 0, // todo
         }
     }
 }

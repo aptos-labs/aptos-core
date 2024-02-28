@@ -22,6 +22,7 @@ mod storage;
 #[cfg(test)]
 mod tests;
 mod types;
+pub mod shoal_plus_plus;
 
 pub use adapter::{ProofNotifier, StorageAdapter};
 pub use bootstrap::DagBootstrapper;

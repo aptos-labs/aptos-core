@@ -25,6 +25,7 @@ use aptos_types::epoch_state::EpochState;
 use futures::{stream::FuturesUnordered, StreamExt};
 use std::sync::Arc;
 use tokio::{runtime::Handle, select};
+use crate::network::TConsensusMsg;
 
 pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
@@ -92,9 +93,9 @@ impl NetworkHandler {
                 let epoch_state = epoch_state.clone();
                 async move {
                     let epoch = rpc_request.req.epoch();
-                    let result = rpc_request
-                        .req
-                        .try_into()
+                    let result = Ok(rpc_request
+                        .req)
+                        // .try_into()
                         .and_then(|dag_message: DAGMessage| {
                             monitor!(
                                 "dag_message_verify",
