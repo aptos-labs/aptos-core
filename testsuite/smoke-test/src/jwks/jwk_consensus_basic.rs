@@ -145,4 +145,6 @@ async fn jwk_consensus_basic() {
 
     info!("Tear down.");
     provider_alice.shutdown().await;
+
+    assert!(false);
 }
