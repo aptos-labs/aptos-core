@@ -73,7 +73,7 @@ impl SignedGroth16Zkp {
 
             // TODO(keyless): unnecessary cloning here; requires refactoring of our CryptoHasher trait which requires Deserialize to be implemented
             let proof_and_statement = Groth16ZkpAndStatement {
-                proof: self.proof.clone(),
+                proof: self.proof,
                 public_inputs_hash,
             };
 

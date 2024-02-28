@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 use crate::smoke_test_environment::SwarmBuilder;
-use anyhow::Context;
 use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -196,14 +195,16 @@ async fn sign_transaction<'a>(
     let esk = get_sample_esk();
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
-    let public_inputs_hash : Option<[u8; 32]> = if let ZkpOrOpenIdSig::Groth16Zkp(_) = &sig.sig {
+    let public_inputs_hash: Option<[u8; 32]> = if let ZkpOrOpenIdSig::Groth16Zkp(_) = &sig.sig {
         // This will only calculate the hash if it's needed, avoiding unnecessary computation.
-        Some(get_public_inputs_hash(&sig, &pk, jwk, config)
-            .unwrap()
-            .into_bigint()
-            .to_bytes_le()
-            .try_into()
-            .expect("expected 32-byte public inputs hash"))
+        Some(
+            get_public_inputs_hash(&sig, &pk, jwk, config)
+                .unwrap()
+                .into_bigint()
+                .to_bytes_le()
+                .try_into()
+                .expect("expected 32-byte public inputs hash"),
+        )
     } else {
         None
     };
@@ -212,7 +213,7 @@ async fn sign_transaction<'a>(
     match &mut sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(proof) => {
             let proof_and_statement = Groth16ZkpAndStatement {
-                proof: proof.proof.clone(),
+                proof: proof.proof,
                 public_inputs_hash: public_inputs_hash.unwrap(),
             };
 

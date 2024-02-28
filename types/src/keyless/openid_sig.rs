@@ -113,11 +113,7 @@ impl OpenIdSig {
     }
 
     /// `jwt_header` is the *decoded* JWT header (i.e., *not* base64url-encoded)
-    pub fn verify_jwt_signature(
-        &self,
-        rsa_jwk: &RSA_JWK,
-        jwt_header: &String,
-    ) -> anyhow::Result<()> {
+    pub fn verify_jwt_signature(&self, rsa_jwk: &RSA_JWK, jwt_header: &str) -> anyhow::Result<()> {
         let jwt_b64 = format!(
             "{}.{}.{}",
             base64url_encode_str(jwt_header),

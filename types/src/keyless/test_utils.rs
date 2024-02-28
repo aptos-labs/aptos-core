@@ -83,7 +83,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     .unwrap();
 
     let openid_sig = OpenIdSig {
-        jwt_sig: jwt_sig,
+        jwt_sig,
         jwt_payload_json: SAMPLE_JWT_PAYLOAD_DECODED.to_string(),
         uid_key: SAMPLE_UID_KEY.to_owned(),
         epk_blinder: SAMPLE_EPK_BLINDER.clone(),
