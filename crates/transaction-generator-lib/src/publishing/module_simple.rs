@@ -102,6 +102,15 @@ pub enum LoopType {
     BcsToBytes { len: u64 },
 }
 
+/// Automatic arguments function expects (i.e. signer, or multiple signers, etc)
+/// That execution can add before the call.
+#[derive(Debug, Copy, Clone)]
+pub enum AutomaticArgs {
+    None,
+    Signer,
+    SignerAndMultiSig,
+}
+
 //
 // List of entry points to expose
 //
@@ -612,6 +621,55 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
             EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
+        }
+    }
+
+    pub fn automatic_args(&self) -> AutomaticArgs {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loop { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::EmitEvents { .. }
+            | EntryPoints::MakeOrChangeTable { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. } => AutomaticArgs::Signer,
+            EntryPoints::Nop2Signers | EntryPoints::Nop5Signers => AutomaticArgs::SignerAndMultiSig,
+            EntryPoints::IncGlobal
+            | EntryPoints::IncGlobalAggV2
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => AutomaticArgs::None,
+            EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
+                AutomaticArgs::Signer
+            },
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => AutomaticArgs::Signer,
+            EntryPoints::ResourceGroupsGlobalWriteTag { .. }
+            | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => {
+                AutomaticArgs::SignerAndMultiSig
+            },
+            EntryPoints::ResourceGroupsSenderWriteTag { .. }
+            | EntryPoints::ResourceGroupsSenderMultiChange { .. } => AutomaticArgs::Signer,
+            EntryPoints::TokenV2AmbassadorMint => AutomaticArgs::SignerAndMultiSig,
+            EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
+            EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
+                AutomaticArgs::None
+            },
+            EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
+            EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
         }
     }
 }
