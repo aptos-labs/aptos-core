@@ -132,7 +132,6 @@ module aptos_framework::genesis {
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
         jwks::initialize(&aptos_framework_account);
-        config_buffer::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -384,7 +383,6 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
-    use aptos_framework::config_buffer;
 
     #[verify_only]
     fun initialize_for_verification(
