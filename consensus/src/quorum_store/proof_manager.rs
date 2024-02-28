@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::types::PersistedValue;
 use crate::{
     monitor,
     quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
@@ -11,20 +12,24 @@ use aptos_consensus_types::{
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
 use aptos_logger::prelude::*;
-use aptos_types::PeerId;
+use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
+    ReceiveBatches(Vec<PersistedValue>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
 pub struct ProofManager {
     proofs_for_consensus: ProofQueue,
+    // TODO: Should this be a HashMap: BatchKey -> PersistedValue? Should this be a DashMap?
+    // TODO: Remove a batch from the queue if the batch's expiration time is reached
+    batches_without_proof_of_store: HashMap<BatchInfo, Option<Vec<SignedTransaction>>>,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
@@ -39,6 +44,7 @@ impl ProofManager {
     ) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(my_peer_id),
+            batches_without_proof_of_store: HashMap::new(),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -48,10 +54,19 @@ impl ProofManager {
 
     pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
         for proof in proofs.into_iter() {
+            self.batches_without_proof_of_store.remove(proof.info());
             self.proofs_for_consensus.push(proof);
         }
         (self.remaining_total_txn_num, self.remaining_total_proof_num) =
             self.proofs_for_consensus.remaining_txns_and_proofs();
+    }
+
+    pub(crate) fn receive_batches(&mut self, batches: Vec<PersistedValue>) {
+        for mut batch in batches.into_iter() {
+            // TODO: Cloning payload here. Try to avoid this.
+            self.batches_without_proof_of_store
+                .insert(batch.batch_info().clone(), batch.take_payload());
+        }
     }
 
     pub(crate) fn handle_commit_notification(
@@ -63,7 +78,9 @@ impl ProofManager {
             "QS: got clean request from execution at block timestamp {}",
             block_timestamp
         );
-
+        for batch in batches.iter() {
+            self.batches_without_proof_of_store.remove(batch);
+        }
         self.proofs_for_consensus.mark_committed(batches);
         self.proofs_for_consensus
             .handle_updated_block_timestamp(block_timestamp);
@@ -76,6 +93,8 @@ impl ProofManager {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
                 max_bytes,
+                _max_inline_txns,
+                _max_inline_bytes,
                 return_non_full,
                 filter,
                 callback,
@@ -94,6 +113,8 @@ impl ProofManager {
                     max_bytes,
                     return_non_full,
                 );
+
+                // TODO: Add a counter in grafana to monitor how many inline transactions/bytes are added
 
                 let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() {
@@ -161,6 +182,9 @@ impl ProofManager {
                             ProofManagerCommand::ReceiveProofs(proofs) => {
                                 self.receive_proofs(proofs.take());
                             },
+                            ProofManagerCommand::ReceiveBatches(batches) => {
+                                self.receive_batches(batches);
+                            }
                             ProofManagerCommand::CommitNotification(block_timestamp, batches) => {
                                 self.handle_commit_notification(
                                     block_timestamp,

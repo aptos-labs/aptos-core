@@ -53,6 +53,8 @@ async fn get_proposal(
     let req = GetPayloadCommand::GetPayloadRequest(
         max_txns,
         1000000,
+        max_txns / 2,
+        100000,
         true,
         PayloadFilter::InQuorumStore(filter_set),
         callback_tx,

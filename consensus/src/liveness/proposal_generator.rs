@@ -335,6 +335,9 @@ impl ProposalGenerator {
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     max_block_txns,
                     max_block_bytes,
+                    // TODO: Set max_inline_txns and max_inline_bytes correctly
+                    10,
+                    20000,
                     validator_txn_filter,
                     payload_filter,
                     wait_callback,
