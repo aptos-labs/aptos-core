@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{Issuer, KeyID};
 use anyhow::{anyhow, Result};
 use dashmap::DashMap;

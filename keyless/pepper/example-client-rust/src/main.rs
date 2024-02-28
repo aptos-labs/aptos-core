@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_oidb_pepper_common::{
+use aptos_keyless_pepper_common::{
     jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey,
 };
 use aptos_types::{

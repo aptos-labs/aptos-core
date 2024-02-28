@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
 use anyhow::{anyhow, ensure};
-use aptos_oidb_pepper_common::{
+use aptos_keyless_pepper_common::{
     vuf,
     vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
     PepperV0VufPubKey,

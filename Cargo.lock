@@ -2498,6 +2498,85 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-keyless-pepper-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-bn254",
+ "ark-ec",
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
+ "base64 0.13.1",
+ "bcs 0.1.4",
+ "byteorder",
+ "curve25519-dalek",
+ "ff 0.13.0",
+ "group 0.13.0",
+ "hex",
+ "jsonwebtoken 8.3.0",
+ "num-bigint 0.3.3",
+ "once_cell",
+ "poseidon-ark",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "sha2 0.10.8",
+ "sha3 0.9.1",
+]
+
+[[package]]
+name = "aptos-keyless-pepper-example-client-rust"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-keyless-pepper-common",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-serialize",
+ "bcs 0.1.4",
+ "hex",
+ "rand 0.7.3",
+ "reqwest",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-keyless-pepper-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-keyless-pepper-common",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-ec",
+ "ark-ff",
+ "ark-serialize",
+ "bcs 0.1.4",
+ "byteorder",
+ "dashmap",
+ "env_logger",
+ "group 0.13.0",
+ "hex",
+ "hyper",
+ "jsonwebtoken 8.3.0",
+ "jwt",
+ "log",
+ "once_cell",
+ "rand 0.7.3",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha3 0.9.1",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-language-e2e-tests"
 version = "0.1.0"
 dependencies = [
@@ -3162,85 +3241,6 @@ dependencies = [
  "proc-macro2 1.0.76",
  "quote 1.0.35",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "aptos-oidb-pepper-common"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-types",
- "ark-bls12-381",
- "ark-bn254",
- "ark-ec",
- "ark-ff",
- "ark-serialize",
- "ark-std",
- "base64 0.13.1",
- "bcs 0.1.4",
- "byteorder",
- "curve25519-dalek",
- "ff 0.13.0",
- "group 0.13.0",
- "hex",
- "jsonwebtoken 8.3.0",
- "num-bigint 0.3.3",
- "once_cell",
- "poseidon-ark",
- "rand 0.7.3",
- "rand_core 0.5.1",
- "serde",
- "sha2 0.10.8",
- "sha3 0.9.1",
-]
-
-[[package]]
-name = "aptos-oidb-pepper-example-client-rust"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-crypto",
- "aptos-oidb-pepper-common",
- "aptos-types",
- "ark-bls12-381",
- "ark-serialize",
- "bcs 0.1.4",
- "hex",
- "rand 0.7.3",
- "reqwest",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "aptos-oidb-pepper-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "aptos-oidb-pepper-common",
- "aptos-types",
- "ark-bls12-381",
- "ark-ec",
- "ark-ff",
- "ark-serialize",
- "bcs 0.1.4",
- "byteorder",
- "dashmap",
- "env_logger",
- "group 0.13.0",
- "hex",
- "hyper",
- "jsonwebtoken 8.3.0",
- "jwt",
- "log",
- "once_cell",
- "rand 0.7.3",
- "reqwest",
- "serde",
- "serde_json",
- "sha3 0.9.1",
- "tokio",
 ]
 
 [[package]]

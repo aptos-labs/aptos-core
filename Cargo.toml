@@ -139,7 +139,7 @@ members = [
     "network/framework",
     "network/memsocket",
     "network/netcore",
-    "oidb/pepper/common", "oidb/pepper/example-client-rust", "oidb/pepper/service",
+    "keyless/pepper/common", "keyless/pepper/example-client-rust", "keyless/pepper/service",
     "peer-monitoring-service/client",
     "peer-monitoring-service/server",
     "peer-monitoring-service/types",
@@ -385,8 +385,8 @@ aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
-aptos-oidb-pepper-common = { path = "oidb/pepper/common" }
-aptos-oidb-pepper-service = { path = "oidb/pepper/service" }
+aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
+aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
 aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "protos/rust" }

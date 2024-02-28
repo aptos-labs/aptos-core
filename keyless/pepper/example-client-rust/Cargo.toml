@@ -1,6 +1,6 @@
 [package]
-name = "aptos-oidb-pepper-example-client-rust"
-description = "Aptos OIDB pepper service"
+name = "aptos-keyless-pepper-example-client-rust"
+description = "Aptos Keyless pepper service"
 version = "0.1.0"
 
 # Workspace inherited keys
@@ -15,7 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-oidb-pepper-common = { workspace = true }
+aptos-keyless-pepper-common = { workspace = true }
 aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-serialize = { workspace = true }

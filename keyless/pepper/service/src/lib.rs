@@ -5,7 +5,7 @@ use crate::{
     vuf_keys::VUF_SK,
     ProcessingFailure::{BadRequest, InternalError},
 };
-use aptos_oidb_pepper_common::{
+use aptos_keyless_pepper_common::{
     jwt::Claims,
     vuf::{self, VUF},
     PepperInput, PepperRequest, PepperResponse,
@@ -44,7 +44,7 @@ pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailu
         return Err(BadRequest("Only Ed25519 epk is supported".to_string()));
     }
 
-    let claims = aptos_oidb_pepper_common::jwt::parse(jwt.as_str())
+    let claims = aptos_keyless_pepper_common::jwt::parse(jwt.as_str())
         .map_err(|e| BadRequest(format!("JWT decoding error: {e}")))?;
 
     let now_secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
