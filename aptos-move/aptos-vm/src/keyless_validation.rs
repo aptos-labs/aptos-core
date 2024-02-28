@@ -12,7 +12,7 @@ use aptos_types::{
         KeylessSignature, ZkpOrOpenIdSig,
     },
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
-    transaction::authenticator::EphemeralPublicKey,
+    transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
     vm_status::{StatusCode, VMStatus},
 };
 use move_binary_format::errors::Location;
@@ -106,6 +106,11 @@ pub(crate) fn validate_authenticators(
     // Feature gating
     for (_, sig) in authenticators {
         if !features.is_keyless_enabled() && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. }) {
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+        }
+        if !features.is_keyless_with_passkeys_enabled()
+            && matches!(sig.ephemeral_signature, EphemeralSignature::WebAuthn { .. })
+        {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
         if (!features.is_keyless_enabled() || !features.is_keyless_zkless_enabled())

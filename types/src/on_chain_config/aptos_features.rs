@@ -65,6 +65,7 @@ pub enum FeatureFlag {
     REFUNDABLE_BYTES = 51,
     OBJECT_CODE_DEPLOYMENT = 52,
     MAX_OBJECT_NESTING_CHECK = 53,
+    KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
 }
 
 impl FeatureFlag {
@@ -116,6 +117,7 @@ impl FeatureFlag {
             FeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
+            FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
         ]
     }
 }
@@ -240,6 +242,10 @@ impl Features {
     /// but without privacy).
     pub fn is_keyless_zkless_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS)
+    }
+
+    pub fn is_keyless_with_passkeys_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
     }
 
     pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
