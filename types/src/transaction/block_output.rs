@@ -10,6 +10,10 @@ pub struct BlockOutput<Output: Debug> {
 }
 
 impl<Output: Debug> BlockOutput<Output> {
+    pub fn num_outputs(&self) -> usize {
+        self.transaction_outputs.len()
+    }
+
     pub fn new(transaction_outputs: Vec<Output>) -> Self {
         Self {
             transaction_outputs,
