@@ -10,10 +10,14 @@ use super::{
     ProofNotifier,
 };
 use crate::{
-    dag::DAGMessage, monitor, network::IncomingDAGRequest, payload_manager::TPayloadManager,
+    dag::DAGMessage,
+    monitor,
+    network::{IncomingDAGRequest, RpcResponder},
+    payload_manager::TPayloadManager,
     pipeline::execution_client::TExecutionClient,
 };
 use anyhow::{anyhow, ensure};
+use aptos_bounded_executor::{BoundedExecutor, ConcurrentStream};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, error};
@@ -24,6 +28,7 @@ use aptos_types::{
 use core::fmt;
 use futures::StreamExt;
 use std::sync::Arc;
+use tokio::runtime::Handle;
 
 #[derive(Debug)]
 pub enum SyncOutcome {
@@ -307,12 +312,33 @@ impl SyncModeMessageHandler {
     }
 
     pub(crate) async fn run(
-        mut self,
+        self,
         dag_rpc_rx: &mut aptos_channel::Receiver<Author, IncomingDAGRequest>,
         buffer: &mut Vec<DAGMessage>,
     ) -> Option<CertifiedNodeMessage> {
-        while let Some(msg) = dag_rpc_rx.next().await {
-            match self.process_rpc(msg, buffer) {
+        let executor = BoundedExecutor::new(32, Handle::current());
+        let epoch_state = self.epoch_state.clone();
+        let mut verified_msg_stream =
+            dag_rpc_rx.concurrent_map(executor.clone(), move |rpc_request: IncomingDAGRequest| {
+                let epoch_state = epoch_state.clone();
+                async move {
+                    let epoch = rpc_request.req.epoch();
+                    let result = rpc_request
+                        .req
+                        .try_into()
+                        .and_then(|dag_message: DAGMessage| {
+                            monitor!(
+                                "dag_message_verify",
+                                dag_message.verify(rpc_request.sender, &epoch_state.verifier)
+                            )?;
+                            Ok(dag_message)
+                        });
+                    (result, epoch, rpc_request.sender, rpc_request.responder)
+                }
+            });
+
+        while let Some((msg, epoch, author, responder)) = verified_msg_stream.next().await {
+            match self.process_verified_message(msg, epoch, author, responder, buffer) {
                 Ok(may_be_cert_node) => {
                     if let Some(next_sync_msg) = may_be_cert_node {
                         return Some(next_sync_msg);
@@ -326,38 +352,41 @@ impl SyncModeMessageHandler {
         None
     }
 
-    fn process_rpc(
-        &mut self,
-        rpc_request: IncomingDAGRequest,
+    fn process_verified_message(
+        &self,
+        dag_message_result: anyhow::Result<DAGMessage>,
+        epoch: u64,
+        author: Author,
+        responder: RpcResponder,
         buffer: &mut Vec<DAGMessage>,
     ) -> anyhow::Result<Option<CertifiedNodeMessage>> {
-        let dag_message: DAGMessage = rpc_request.req.try_into()?;
-
-        debug!(
-            "processing rpc message {} from {}",
-            dag_message.name(),
-            rpc_request.sender
-        );
-
-        match dag_message.verify(rpc_request.sender, &self.epoch_state.verifier) {
-            Ok(_) => match dag_message {
-                DAGMessage::NodeMsg(_) => {
-                    debug!("ignoring node msg");
-                },
-                DAGMessage::CertifiedNodeMsg(ref cert_node_msg) => {
-                    if cert_node_msg.round() < self.start_round {
-                        debug!("ignoring stale certified node msg");
-                    } else if cert_node_msg.round() > self.target_round + (2 * self.window) {
-                        debug!("cancelling current sync");
-                        return Ok(Some(cert_node_msg.clone()));
-                    } else {
-                        buffer.push(dag_message);
-                    }
-                },
-                DAGMessage::FetchRequest(_) => {
-                    debug!("ignoring fetch msg");
-                },
-                _ => unreachable!("verification must catch this error"),
+        match dag_message_result {
+            Ok(dag_message) => {
+                debug!(
+                    epoch = epoch,
+                    author = author,
+                    message = dag_message,
+                    "Verified DAG message"
+                );
+                match dag_message {
+                    DAGMessage::NodeMsg(_) => {
+                        debug!("ignoring node msg");
+                    },
+                    DAGMessage::CertifiedNodeMsg(ref cert_node_msg) => {
+                        if cert_node_msg.round() < self.start_round {
+                            debug!("ignoring stale certified node msg");
+                        } else if cert_node_msg.round() > self.target_round + (2 * self.window) {
+                            debug!("cancelling current sync");
+                            return Ok(Some(cert_node_msg.clone()));
+                        } else {
+                            buffer.push(dag_message);
+                        }
+                    },
+                    DAGMessage::FetchRequest(_) => {
+                        debug!("ignoring fetch msg");
+                    },
+                    _ => unreachable!("verification must catch this error"),
+                };
             },
             Err(err) => {
                 error!(error = ?err, "error verifying message");
