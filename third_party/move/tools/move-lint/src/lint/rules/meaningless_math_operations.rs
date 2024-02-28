@@ -1,11 +1,13 @@
-//! `MeaninglessMathOperationsVisitor` detects and warns about operations in Move programs that have no effect, such as adding zero. 
+//! `MeaninglessMathOperationsVisitor` detects and warns about operations in Move programs that have no effect, such as adding zero.
 //! It aims to improve code clarity by identifying operations that can be simplified or removed.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{Exp, ExpData, Operation, Value};
 use move_model::model::{FunctionEnv, GlobalEnv};
 use num_bigint::BigInt;
-
 pub struct MeaninglessMathOperationsVisitor;
 
 impl Default for MeaninglessMathOperationsVisitor {
@@ -24,7 +26,12 @@ impl MeaninglessMathOperationsVisitor {
     }
 
     /// Checks for meaningless math operations.
-    fn check_meaningless_math_operations(&self, exp: &ExpData, env: &GlobalEnv) {
+    fn check_meaningless_math_operations(
+        &self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let ExpData::Call(_, oper, args) = exp {
             if self.is_meaningless_operation(oper, args) {
                 let message = "Detected a meaningless mathematical operation.";
@@ -33,6 +40,7 @@ impl MeaninglessMathOperationsVisitor {
                     message,
                     codespan_reporting::diagnostic::Severity::Warning,
                     env,
+                    diags,
                 );
             }
         }
@@ -70,7 +78,8 @@ impl ExpressionAnalysisVisitor for MeaninglessMathOperationsVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
-        self.check_meaningless_math_operations(exp, env);
+        self.check_meaningless_math_operations(exp, env, diags);
     }
 }

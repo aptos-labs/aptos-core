@@ -1,0 +1,27 @@
+warning: Loop has no code. Did you forget to implement?
+  ┌─ ./sources/infinite_loop_detector.move:3:9
+  │  
+3 │ ╭         loop { // Should trigger a warning
+4 │ │             // No break or return statement
+5 │ │       
+6 │ │         }
+  │ ╰─────────^ Loop has no code. Did you forget to implement?
+
+warning: Unnecessary 'while(true)' detected. Consider using 'loop' instead.
+   ┌─ ./sources/infinite_loop_detector.move:11:9
+   │  
+11 │ ╭         while (true) { // Correct usage
+12 │ │             if (counter >= 10) { break };
+13 │ │             counter = counter + 1;
+14 │ │         }
+   │ ╰─────────^ Unnecessary 'while(true)' detected. Consider using 'loop' instead.
+
+warning: Potential infinite loop detected. No 'break' or 'return' found in the loop.
+  ┌─ ./sources/infinite_loop_detector.move:3:9
+  │  
+3 │ ╭         loop { // Should trigger a warning
+4 │ │             // No break or return statement
+5 │ │       
+6 │ │         }
+  │ ╰─────────^ Potential infinite loop detected. No 'break' or 'return' found in the loop.
+

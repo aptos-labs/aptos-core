@@ -1,0 +1,6 @@
+warning: Array index out of bounds detected in vector::borrow.
+   ┌─ ./sources/out_of_bounds_array_indexing.move:13:9
+   │
+13 │         vector::borrow(&arr, 10);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^ Array index out of bounds detected in vector::borrow.
+

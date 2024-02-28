@@ -1,0 +1,60 @@
+warning: Loop has no code. Did you forget to implement?
+  ┌─ ./sources/unconditional_exit_loop.move:4:9
+  │  
+4 │ ╭         loop {
+5 │ │             if (condition()) {
+6 │ │                 break;
+7 │ │             }
+8 │ │            
+9 │ │         };
+  │ ╰─────────^ Loop has no code. Did you forget to implement?
+
+warning: Loop has no code. Did you forget to implement?
+   ┌─ ./sources/unconditional_exit_loop.move:12:9
+   │  
+12 │ ╭         loop {
+13 │ │             if (condition()) {
+14 │ │                 // Some code...
+15 │ │             } else {
+   · │
+18 │ │            
+19 │ │         };
+   │ ╰─────────^ Loop has no code. Did you forget to implement?
+
+warning: Loop has no code. Did you forget to implement?
+   ┌─ ./sources/unconditional_exit_loop.move:22:9
+   │  
+22 │ ╭         loop {
+23 │ │             if (condition()) {
+24 │ │                 return;
+25 │ │             }
+26 │ │            
+27 │ │         };
+   │ ╰─────────^ Loop has no code. Did you forget to implement?
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/unconditional_exit_loop.move:13:17
+   │
+13 │             if (condition()) {
+   │                 ^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/unconditional_exit_loop.move:23:17
+   │
+23 │             if (condition()) {
+   │                 ^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/unconditional_exit_loop.move:39:17
+   │
+39 │             if (condition()) {
+   │                 ^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Loop always exits unconditionally. Consider revising the loop's logic.
+   ┌─ ./sources/unconditional_exit_loop.move:31:13
+   │  
+31 │ ╭             loop {
+32 │ │                 break;
+33 │ │             }
+   │ ╰─────────────^ Loop always exits unconditionally. Consider revising the loop's logic.
+

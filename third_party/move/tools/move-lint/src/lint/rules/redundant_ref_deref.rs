@@ -4,6 +4,9 @@ use crate::lint::{
     utils::{add_diagnostic_and_emit, LintConfig},
     visitor::ExpressionAnalysisVisitor,
 };
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::{
     ast::{ExpData, Operation},
     model::{FunctionEnv, GlobalEnv},
@@ -26,7 +29,12 @@ impl RedundantRefDerefVisitor {
         Box::new(Self::new())
     }
 
-    fn check_borrow_deref_ref(&self, exp: &ExpData, env: &GlobalEnv) {
+    fn check_borrow_deref_ref(
+        &self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let ExpData::Call(_, Operation::Borrow(_), exp_vec) = exp {
             if let Some(ExpData::Call(_, Operation::Deref, inner_exp_vec)) =
                 exp_vec.get(0).map(|e| e.as_ref())
@@ -40,6 +48,7 @@ impl RedundantRefDerefVisitor {
                         message,
                         codespan_reporting::diagnostic::Severity::Warning,
                         env,
+                        diags,
                     );
                 }
             }
@@ -54,7 +63,8 @@ impl ExpressionAnalysisVisitor for RedundantRefDerefVisitor {
         _: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
-        self.check_borrow_deref_ref(exp, env);
+        self.check_borrow_deref_ref(exp, env, diags);
     }
 }

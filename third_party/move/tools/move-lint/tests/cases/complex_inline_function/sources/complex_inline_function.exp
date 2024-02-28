@@ -1,0 +1,12 @@
+warning: Inline function is longer than 10 lines and used 2 times in this code. This would lead to a much larger bytecode as the inline function is expanded in each use
+   ┌─ ./sources/complex_inline_function.move:2:5
+   │  
+ 2 │ ╭     inline fun complex_inline_function() {
+ 3 │ │         let result = 1;
+ 4 │ │         result = result + 1;
+ 5 │ │         result = result + 2;
+   · │
+14 │ │         result;
+15 │ │     }
+   │ ╰─────^ Inline function is longer than 10 lines and used 2 times in this code. This would lead to a much larger bytecode as the inline function is expanded in each use
+

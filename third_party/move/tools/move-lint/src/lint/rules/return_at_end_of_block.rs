@@ -2,9 +2,11 @@
 //! It aims to improve code clarity by suggesting the removal of unnecessary return expressions.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::ExpData;
 use move_model::model::{FunctionEnv, GlobalEnv};
-
 pub struct ReturnAtEndOfBlockVisitor {
     exp_in_function: Vec<ExpData>,
 }
@@ -31,7 +33,11 @@ impl ReturnAtEndOfBlockVisitor {
     }
 
     /// Checks if the last expression in a function is a return expression.
-    fn check_return_at_end_of_function(&mut self, env: &GlobalEnv) {
+    fn check_return_at_end_of_function(
+        &mut self,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if self.exp_in_function.is_empty() || self.exp_in_function.len() < 2 {
             return;
         }
@@ -44,6 +50,7 @@ impl ReturnAtEndOfBlockVisitor {
                 message,
                 codespan_reporting::diagnostic::Severity::Warning,
                 env,
+                diags,
             );
         }
         self.clear_exp_in_function();
@@ -51,7 +58,13 @@ impl ReturnAtEndOfBlockVisitor {
 }
 
 impl ExpressionAnalysisVisitor for ReturnAtEndOfBlockVisitor {
-    fn visit_function_custom(&mut self, func_env: &FunctionEnv, env: &GlobalEnv, _: &LintConfig) {
+    fn visit_function_custom(
+        &mut self,
+        func_env: &FunctionEnv,
+        env: &GlobalEnv,
+        _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         let func = func_env.get_def();
         if let Some(func) = func.as_ref() {
             func.visit_pre_post(
@@ -63,6 +76,6 @@ impl ExpressionAnalysisVisitor for ReturnAtEndOfBlockVisitor {
             );
         }
 
-        self.check_return_at_end_of_function(env);
+        self.check_return_at_end_of_function(env, diags);
     }
 }

@@ -2,11 +2,13 @@
 //! It specifically checks for accesses beyond the length of arrays via `vector::borrow` and `vector::borrow_mut` functions.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{Exp, ExpData, Operation, Pattern, Value};
 use move_model::model::{FunId, FunctionEnv, GlobalEnv, ModuleId};
 use move_model::symbol::Symbol;
 use num_bigint::BigInt;
-
 pub struct OutOfBoundsArrayIndexingVisitor;
 
 impl Default for OutOfBoundsArrayIndexingVisitor {
@@ -30,11 +32,12 @@ impl OutOfBoundsArrayIndexingVisitor {
         env: &GlobalEnv,
         arr_length: usize,
         assigned_symbol: &Symbol,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let ExpData::Call(_, Operation::MoveFunction(mid, fid), args) = exp {
             let func_env = self.get_function_env(env, *mid, *fid);
             if self.is_vector_borrow(&func_env, env) {
-                self.check_vector_borrow_args(args, env, arr_length, assigned_symbol, exp);
+                self.check_vector_borrow_args(args, env, arr_length, assigned_symbol, exp, diags);
             }
         }
     }
@@ -58,6 +61,7 @@ impl OutOfBoundsArrayIndexingVisitor {
         arr_length: usize,
         assigned_symbol: &Symbol,
         exp: &ExpData,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if args.len() > 1 {
             if let ExpData::Value(_, Value::Number(index)) = args[1].as_ref() {
@@ -66,7 +70,7 @@ impl OutOfBoundsArrayIndexingVisitor {
                         if symbol == assigned_symbol
                             && self.is_index_out_of_bounds(index, arr_length)
                         {
-                            self.emit_out_of_bounds_warning(exp, env);
+                            self.emit_out_of_bounds_warning(exp, env, diags);
                         }
                     }
                 }
@@ -80,13 +84,19 @@ impl OutOfBoundsArrayIndexingVisitor {
     }
 
     /// Emits a warning for an out-of-bounds access attempt.
-    fn emit_out_of_bounds_warning(&self, exp: &ExpData, env: &GlobalEnv) {
+    fn emit_out_of_bounds_warning(
+        &self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         let message = "Array index out of bounds detected in vector::borrow.";
         add_diagnostic_and_emit(
             &env.get_node_loc(exp.node_id()),
             message,
             codespan_reporting::diagnostic::Severity::Warning,
             env,
+            diags,
         );
     }
 
@@ -113,13 +123,20 @@ impl ExpressionAnalysisVisitor for OutOfBoundsArrayIndexingVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let ExpData::Block(_, Pattern::Var(_, symbol), some_binding_exp, _) = exp {
             let binding_exp = some_binding_exp.as_ref().expect("binding_exp");
             if let ExpData::Call(_, Operation::Vector, arr_length) = binding_exp.as_ref() {
                 exp.visit_pre_post(&mut |is_pre_visit, exp: &ExpData| {
                     if !is_pre_visit {
-                        self.check_out_of_bounds_indexing(exp, env, arr_length.len(), symbol);
+                        self.check_out_of_bounds_indexing(
+                            exp,
+                            env,
+                            arr_length.len(),
+                            symbol,
+                            diags,
+                        );
                     }
                 });
             }

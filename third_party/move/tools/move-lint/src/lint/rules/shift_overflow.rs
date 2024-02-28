@@ -1,13 +1,15 @@
 //! Detect potential overflow scenarios where the number of bits being shifted exceeds the bit width of
 //! the variable being shifted, which could lead to unintended behavior or loss of data. If such a
 //! potential overflow is detected, a warning is generated to alert the developer.
+use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
+use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{Exp, ExpData, Operation, Value};
 use move_model::model::{FunctionEnv, GlobalEnv, NodeId};
 use move_model::ty::{PrimitiveType, Type};
 use num::ToPrimitive;
-
-use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
-use crate::lint::visitor::ExpressionAnalysisVisitor;
 
 pub struct ShiftOverflowVisitor {}
 
@@ -26,7 +28,12 @@ impl ShiftOverflowVisitor {
         Box::new(Self::new())
     }
 
-    fn check_shift_overflow(&mut self, exp: &ExpData, env: &GlobalEnv) {
+    fn check_shift_overflow(
+        &mut self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let Some((call_node_id, op, exp_vec)) = self.extract_call_data(exp) {
             if let Some(number_size) = self.get_bit_width(op, env, call_node_id) {
                 if let Some(value) = self.extract_value(&exp_vec[1]) {
@@ -37,6 +44,7 @@ impl ShiftOverflowVisitor {
                             message,
                             codespan_reporting::diagnostic::Severity::Warning,
                             env,
+                            diags,
                         );
                     }
                 }
@@ -97,7 +105,8 @@ impl ExpressionAnalysisVisitor for ShiftOverflowVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
-        self.check_shift_overflow(exp, env);
+        self.check_shift_overflow(exp, env, diags);
     }
 }

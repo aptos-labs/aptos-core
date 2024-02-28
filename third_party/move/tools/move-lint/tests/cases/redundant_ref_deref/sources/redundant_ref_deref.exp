@@ -1,0 +1,12 @@
+warning: Redundant borrow-dereference detected. Consider removing the borrow-dereference operation and using the expression directly.
+   ┌─ ./sources/redundant_ref_deref.move:14:20
+   │
+14 │         let ref2 = &*(&resource);
+   │                    ^^^^^^^^^^^^^ Redundant borrow-dereference detected. Consider removing the borrow-dereference operation and using the expression directly.
+
+warning: Redundant dereference of a reference detected (`*&` or `*&mut`). Consider simplifying the expression.
+   ┌─ ./sources/redundant_ref_deref.move:14:21
+   │
+14 │         let ref2 = &*(&resource);
+   │                     ^^^^^^^^^^^^ Redundant dereference of a reference detected (`*&` or `*&mut`). Consider simplifying the expression.
+

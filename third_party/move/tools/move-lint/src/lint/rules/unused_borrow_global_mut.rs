@@ -1,12 +1,14 @@
 //! Detect borrow_global_mut variables that are not actually used to modify any data.
 use crate::lint::utils::add_diagnostic_and_emit;
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::model::{FunctionEnv, GlobalEnv};
 use move_stackless_bytecode::function_target::FunctionTarget;
 use move_stackless_bytecode::stackless_bytecode::{AttrId, Bytecode, Operation};
 use move_stackless_bytecode::stackless_bytecode_generator::StacklessBytecodeGenerator;
 use std::collections::{BTreeMap, HashSet};
-
 // /Struct representing the visitor for detecting unused mutable variables.
 #[derive(Debug)]
 pub struct UnusedBorrowGlobalMutVisitor {}
@@ -94,7 +96,12 @@ impl ExpressionAnalysisVisitor for UnusedBorrowGlobalMutVisitor {
     fn requires_bytecode_inspection(&self) -> bool {
         true
     }
-    fn visit_function_with_bytecode(&mut self, func_env: &FunctionEnv, env: &GlobalEnv) {
+    fn visit_function_with_bytecode(
+        &mut self,
+        func_env: &FunctionEnv,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if func_env.is_inline() {
             return;
         }
@@ -123,6 +130,7 @@ impl ExpressionAnalysisVisitor for UnusedBorrowGlobalMutVisitor {
                 message,
                 codespan_reporting::diagnostic::Severity::Warning,
                 env,
+                diags,
             );
         }
     }

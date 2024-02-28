@@ -6,7 +6,9 @@ use move_model::ty::{PrimitiveType, Type};
 
 use crate::lint::utils::{add_diagnostic_and_emit, get_var_info_from_func_param, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
 
+use codespan_reporting::diagnostic::Diagnostic;
 pub struct UnnecessaryTypeConversionVisitor;
 
 impl Default for UnnecessaryTypeConversionVisitor {
@@ -30,6 +32,7 @@ impl UnnecessaryTypeConversionVisitor {
         var_name: String,
         env: &GlobalEnv,
         node_id: NodeId,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         let message = &format!(
             "Unnecessary type conversion detected. '{}' is already of type '{}'. Avoid casting it to its own type.",
@@ -41,6 +44,7 @@ impl UnnecessaryTypeConversionVisitor {
             message,
             codespan_reporting::diagnostic::Severity::Warning,
             env,
+            diags,
         );
     }
 
@@ -73,6 +77,7 @@ impl UnnecessaryTypeConversionVisitor {
         exp: &ExpData,
         func_env: &FunctionEnv,
         env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let ExpData::Call(node_id, Operation::Cast, args) = exp {
             // Checking if an expression is a type cast operation.
@@ -82,7 +87,9 @@ impl UnnecessaryTypeConversionVisitor {
                 let cast_type = env.get_node_type(*node_id);
                 if var_info.1 == cast_type {
                     if let Type::Primitive(ty) = cast_type {
-                        self.prepare_and_add_diagnostic_and_emit(ty, var_info.0, env, *node_id);
+                        self.prepare_and_add_diagnostic_and_emit(
+                            ty, var_info.0, env, *node_id, diags,
+                        );
                     }
                 }
             }
@@ -97,7 +104,8 @@ impl ExpressionAnalysisVisitor for UnnecessaryTypeConversionVisitor {
         func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
-        self.check_unnecessary_conversion(exp, func_env, env);
+        self.check_unnecessary_conversion(exp, func_env, env, diags);
     }
 }

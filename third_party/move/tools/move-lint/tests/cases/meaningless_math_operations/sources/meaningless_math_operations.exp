@@ -1,0 +1,30 @@
+warning: Detected a meaningless mathematical operation.
+   ┌─ ./sources/meaningless_math_operations.move:25:9
+   │
+25 │         x + 0 // Should trigger a warning
+   │         ^^^^^ Detected a meaningless mathematical operation.
+
+warning: Detected a meaningless mathematical operation.
+   ┌─ ./sources/meaningless_math_operations.move:21:9
+   │
+21 │         x * 1 // Should trigger a warning
+   │         ^^^^^ Detected a meaningless mathematical operation.
+
+warning: Detected a meaningless mathematical operation.
+   ┌─ ./sources/meaningless_math_operations.move:13:9
+   │
+13 │         x << 0 // Should trigger a warning
+   │         ^^^^^^ Detected a meaningless mathematical operation.
+
+warning: Detected a meaningless mathematical operation.
+   ┌─ ./sources/meaningless_math_operations.move:17:9
+   │
+17 │         x >> 0 // Should trigger a warning
+   │         ^^^^^^ Detected a meaningless mathematical operation.
+
+warning: Detected a meaningless mathematical operation.
+   ┌─ ./sources/meaningless_math_operations.move:29:9
+   │
+29 │         x - 0 // Should trigger a warning
+   │         ^^^^^ Detected a meaningless mathematical operation.
+

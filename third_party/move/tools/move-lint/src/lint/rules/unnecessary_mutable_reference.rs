@@ -1,12 +1,14 @@
 //! Check for unnecessary mutable references obtained from data structures such as vector, table,
 //! etc. that are created but no data is actually modified.
 use crate::lint::{utils::add_diagnostic_and_emit, visitor::ExpressionAnalysisVisitor};
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::{
     ast::{Exp, ExpData, Operation},
     model::{FunctionEnv, GlobalEnv, ModuleEnv},
     ty::{ReferenceKind, Type},
 };
-
 #[derive(Debug)]
 pub struct UnnecessaryMutableReferenceLint;
 
@@ -25,7 +27,12 @@ impl UnnecessaryMutableReferenceLint {
         Box::new(Self::new())
     }
 
-    fn check_unnecessary_mutable_references(&self, module: &ModuleEnv, env: &GlobalEnv) {
+    fn check_unnecessary_mutable_references(
+        &self,
+        module: &ModuleEnv,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         for func_env in module.get_functions() {
             if let Some(body) = func_env.get_def().as_ref() {
                 body.visit_pre_post(
@@ -38,7 +45,7 @@ impl UnnecessaryMutableReferenceLint {
                             ) = exp
                             {
                                 let func_env = env.get_function(module_id.qualified(*fun_id));
-                                self.check_arguments(args, &func_env, env);
+                                self.check_arguments(args, &func_env, env, diags);
                             }
                         }
                     }),
@@ -47,7 +54,13 @@ impl UnnecessaryMutableReferenceLint {
         }
     }
 
-    fn check_arguments(&self, args: &[Exp], func_env: &FunctionEnv, env: &GlobalEnv) {
+    fn check_arguments(
+        &self,
+        args: &[Exp],
+        func_env: &FunctionEnv,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         for (index, arg) in args.iter().enumerate() {
             if let ExpData::Call(node_id, Operation::Borrow(ReferenceKind::Mutable), _) =
                 arg.as_ref()
@@ -60,6 +73,7 @@ impl UnnecessaryMutableReferenceLint {
                         message,
                         codespan_reporting::diagnostic::Severity::Warning,
                         env,
+                        diags,
                     );
                 }
             }
@@ -67,12 +81,20 @@ impl UnnecessaryMutableReferenceLint {
     }
 
     fn is_mutable_required(&self, index: usize, func_env: &FunctionEnv) -> bool {
-        matches!(func_env.get_parameter_types().get(index), Some(Type::Reference(ReferenceKind::Mutable, _)))
+        matches!(
+            func_env.get_parameter_types().get(index),
+            Some(Type::Reference(ReferenceKind::Mutable, _))
+        )
     }
 }
 
 impl ExpressionAnalysisVisitor for UnnecessaryMutableReferenceLint {
-    fn visit_module(&mut self, module: &ModuleEnv, env: &GlobalEnv) {
-        self.check_unnecessary_mutable_references(module, env);
+    fn visit_module(
+        &mut self,
+        module: &ModuleEnv,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
+        self.check_unnecessary_mutable_references(module, env, diags);
     }
 }

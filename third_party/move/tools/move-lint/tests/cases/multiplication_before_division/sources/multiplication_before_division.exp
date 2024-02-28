@@ -1,0 +1,78 @@
+warning: Multiplication should come before division to avoid rounding errors.
+  ┌─ ./sources/multiplication_before_division.move:4:17
+  │
+4 │         let b = x / z * y; // <Issue:7>
+  │                 ^^^^^^^^^ Multiplication should come before division to avoid rounding errors.
+
+warning: Multiplication should come before division to avoid rounding errors.
+   ┌─ ./sources/multiplication_before_division.move:15:18
+   │
+15 │         let _i = (x * y) / z * (a / b); // <Issue:15>
+   │                  ^^^^^^^^^^^^^^^^^^^^^ Multiplication should come before division to avoid rounding errors.
+
+warning: Multiplication should come before division to avoid rounding errors.
+  ┌─ ./sources/multiplication_before_division.move:4:17
+  │
+4 │         let b = x / z * y; // <Issue:7>
+  │                 ^^^^^^^^^ Multiplication should come before division to avoid rounding errors.
+
+warning: Multiplication should come before division to avoid rounding errors.
+   ┌─ ./sources/multiplication_before_division.move:15:18
+   │
+15 │         let _i = (x * y) / z * (a / b); // <Issue:15>
+   │                  ^^^^^^^^^^^^^^^^^^^^^ Multiplication should come before division to avoid rounding errors.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+  ┌─ ./sources/multiplication_before_division.move:3:17
+  │
+3 │         let a = x * y / z;
+  │                 ^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+  ┌─ ./sources/multiplication_before_division.move:7:18
+  │
+7 │         let _d = x * y / (z * 2); // <Issue:10>
+  │                  ^^^^^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+  ┌─ ./sources/multiplication_before_division.move:8:18
+  │
+8 │         let _e = (x * 2) / y; // <Issue:11>
+  │                  ^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+   ┌─ ./sources/multiplication_before_division.move:11:18
+   │
+11 │         let _f = (x * y) / (z + 1); // <Issue:12>
+   │                  ^^^^^^^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+   ┌─ ./sources/multiplication_before_division.move:12:18
+   │
+12 │         let _g = (x * (y + 1)) / z; // <Issue:13>
+   │                  ^^^^^^^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+   ┌─ ./sources/multiplication_before_division.move:15:18
+   │
+15 │         let _i = (x * y) / z * (a / b); // <Issue:15>
+   │                  ^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+   ┌─ ./sources/multiplication_before_division.move:16:18
+   │
+16 │         let _j = x * y * a / (z + b); // <Issue:16>
+   │                  ^^^^^^^^^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+   ┌─ ./sources/multiplication_before_division.move:17:18
+   │
+17 │         let _k = x * (y / (z + a)) / b; // <Issue:17>
+   │                  ^^^^^^^^^^^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+   ┌─ ./sources/multiplication_before_division.move:18:18
+   │
+18 │         let _l = x * (y / (z * a)) / (b + 1); // <Issue:18>
+   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+

@@ -2,9 +2,11 @@
 //! It enhances code readability by recommending a more idiomatic loop construct.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{ExpData, Value};
 use move_model::model::{FunctionEnv, GlobalEnv};
-
 pub struct UnnecessaryWhileTrueVisitor;
 
 impl Default for UnnecessaryWhileTrueVisitor {
@@ -23,7 +25,12 @@ impl UnnecessaryWhileTrueVisitor {
     }
 
     /// Checks for `while(true)` loops.
-    fn check_unnecessary_while_true(&self, exp: &ExpData, env: &GlobalEnv) {
+    fn check_unnecessary_while_true(
+        &self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let ExpData::Loop(_, body) = exp {
             if let ExpData::IfElse(_, cond, _, _) = body.as_ref() {
                 if let ExpData::Value(_, Value::Bool(true)) = cond.as_ref() {
@@ -34,6 +41,7 @@ impl UnnecessaryWhileTrueVisitor {
                         message,
                         codespan_reporting::diagnostic::Severity::Warning,
                         env,
+                        diags,
                     );
                 }
             }
@@ -48,7 +56,8 @@ impl ExpressionAnalysisVisitor for UnnecessaryWhileTrueVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
-        self.check_unnecessary_while_true(exp, env);
+        self.check_unnecessary_while_true(exp, env, diags);
     }
 }

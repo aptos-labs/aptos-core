@@ -1,0 +1,12 @@
+warning: Redundant boolean expression detected. Consider simplifying it.
+  ┌─ ./sources/check_redundant_boolean_expressions.move:4:9
+  │
+4 │         x && true // Should not trigger a warning
+  │         ^^^^^^^^^ Redundant boolean expression detected. Consider simplifying it.
+
+warning: Redundant boolean expression detected. Consider simplifying it.
+   ┌─ ./sources/check_redundant_boolean_expressions.move:14:9
+   │
+14 │         false || x // Should trigger a warning
+   │         ^^^^^^^^^^ Redundant boolean expression detected. Consider simplifying it.
+

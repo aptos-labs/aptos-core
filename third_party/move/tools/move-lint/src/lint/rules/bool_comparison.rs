@@ -3,6 +3,9 @@
 //! Examples: if (x == true) can be simplified to if (x), if (x == false) can be simplified to if (!x)
 use crate::lint::utils::{add_diagnostic_and_emit, get_var_info_from_func_param, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+
+use codespan::FileId;
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{ExpData, Operation, Value};
 use move_model::model::{FunctionEnv, GlobalEnv};
 pub struct BoolComparisonVisitor;
@@ -60,6 +63,7 @@ impl BoolComparisonVisitor {
         cond: &ExpData,
         func_env: &FunctionEnv,
         env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let ExpData::Call(_, oper, args) = &cond {
             if let (Some(first_arg), Some(second_arg)) = (args.get(0), args.get(1)) {
@@ -90,11 +94,12 @@ impl BoolComparisonVisitor {
                             &diagnostic_msg,
                             codespan_reporting::diagnostic::Severity::Warning,
                             env,
+                            diags,
                         );
                     }
                 } else {
                     for exp in args {
-                        self.check_boolean_comparison(exp, func_env, env);
+                        self.check_boolean_comparison(exp, func_env, env, diags);
                     }
                 }
             }
@@ -123,11 +128,12 @@ impl BoolComparisonVisitor {
                             &diagnostic_msg,
                             codespan_reporting::diagnostic::Severity::Warning,
                             env,
+                            diags,
                         );
                     }
                 } else {
                     for exp in args {
-                        self.check_boolean_comparison(exp, func_env, env);
+                        self.check_boolean_comparison(exp, func_env, env, diags);
                     }
                 }
             }
@@ -142,9 +148,10 @@ impl ExpressionAnalysisVisitor for BoolComparisonVisitor {
         func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let ExpData::IfElse(_, cond, _, _) = exp {
-            self.check_boolean_comparison(cond.as_ref(), func_env, env);
+            self.check_boolean_comparison(cond.as_ref(), func_env, env, diags);
         }
     }
 }

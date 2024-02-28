@@ -1,0 +1,26 @@
+warning: Getter method 'get_age' returns a field 'name' which does not match its name.
+   ┌─ ./sources/getter_method_field_match.move:17:8
+   │
+17 │        return borrow_global<Person>(user_addr).name
+   │        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Getter method 'get_age' returns a field 'name' which does not match its name.
+
+warning: Getter method 'get_city' does not return required field.
+   ┌─ ./sources/getter_method_field_match.move:34:9
+   │
+34 │         return 123
+   │         ^^^^^^^^^^ Getter method 'get_city' does not return required field.
+
+warning: Imports in module "Detector" are not sorted alphabetically.
+  ┌─ ./sources/getter_method_field_match.move:2:14
+  │  
+2 │       use std::string::{String, utf8};
+  │ ╭──────────────^
+3 │ │     use std::signer;
+  │ ╰───────────────────^ Imports in module "Detector" are not sorted alphabetically.
+
+warning: Return statement at the end of the function is redundant. Consider removing it.
+   ┌─ ./sources/getter_method_field_match.move:34:9
+   │
+34 │         return 123
+   │         ^^^^^^^^^^ Return statement at the end of the function is redundant. Consider removing it.
+

@@ -1,0 +1,8 @@
+warning: Mutable parameter 'my_struct' is never modified in function 'function_do_not_modify'.
+  ┌─ ./sources/unmodified_mutable_argument_lint.move:6:5
+  │  
+6 │ ╭     public fun function_do_not_modify(my_struct: &mut MyStruct): u64 {
+7 │ │         my_struct.value
+8 │ │     }
+  │ ╰─────^ Mutable parameter 'my_struct' is never modified in function 'function_do_not_modify'.
+

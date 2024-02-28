@@ -1,4 +1,5 @@
-use codespan::{FileId, Span};
+use codespan::FileId;
+use codespan::Span;
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label},
     term::{
@@ -33,6 +34,7 @@ pub fn add_diagnostic_and_emit(
     message: &str,
     severity: codespan_reporting::diagnostic::Severity,
     env: &GlobalEnv,
+    diags: &mut Vec<Diagnostic<FileId>>,
 ) {
     let writer = StandardStream::stderr(ColorChoice::Always);
     let config = Config::default();
@@ -45,6 +47,8 @@ pub fn add_diagnostic_and_emit(
     let diagnostic = Diagnostic::new(severity)
         .with_message(message)
         .with_labels(vec![label]);
+
+    diags.push(diagnostic.clone());
     emit(
         &mut writer.lock(),
         &config,
@@ -61,6 +65,7 @@ pub fn add_diagnostic_and_emit_by_span(
     message: &str,
     severity: codespan_reporting::diagnostic::Severity,
     env: &GlobalEnv,
+    diags: &mut Vec<Diagnostic<FileId>>,
 ) {
     let writer = StandardStream::stderr(ColorChoice::Always);
     let config = Config::default();
@@ -70,6 +75,8 @@ pub fn add_diagnostic_and_emit_by_span(
     let diagnostic = Diagnostic::new(severity)
         .with_message(message)
         .with_labels(vec![label]);
+    diags.push(diagnostic.clone());
+
     emit(
         &mut writer.lock(),
         &config,
@@ -83,6 +90,7 @@ pub fn get_var_info_from_func_param(index: usize, params: &[Parameter]) -> Optio
     params.get(index)
 }
 pub fn read_config(path: &Path) -> Result<LintConfig, Box<dyn std::error::Error>> {
+    eprintln!("Reading config from path: {:?}", path);
     let binding = path.join("lint.toml");
     let exist_path = Path::new(&binding);
     let mut file = OpenOptions::new()

@@ -1,0 +1,12 @@
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+  ┌─ ./sources/use_mul_div.move:5:9
+  │
+5 │         (x * y) / z
+  │         ^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+
+warning: Use math64::mul_div or math128::mul_div instead of mul/div.
+   ┌─ ./sources/use_mul_div.move:20:9
+   │
+20 │         (x * y) / z
+   │         ^^^^^^^^^^^ Use math64::mul_div or math128::mul_div instead of mul/div.
+

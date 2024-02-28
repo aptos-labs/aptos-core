@@ -5,6 +5,8 @@
 //! does not affect the outcome of the expression.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{Exp, ExpData, Operation, Value};
 use move_model::model::{FunctionEnv, GlobalEnv};
 
@@ -26,7 +28,12 @@ impl RedundantBooleanExpressions {
     }
 
     /// Checks for redundant boolean expressions.
-    fn check_redundant_boolean_expressions(&self, exp: &ExpData, env: &GlobalEnv) {
+    fn check_redundant_boolean_expressions(
+        &self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let ExpData::Call(_, oper, args) = exp {
             if self.is_redundant_boolean_expression(oper, args) {
                 let message = "Redundant boolean expression detected. Consider simplifying it.";
@@ -35,6 +42,7 @@ impl RedundantBooleanExpressions {
                     message,
                     codespan_reporting::diagnostic::Severity::Warning,
                     env,
+                    diags,
                 );
             }
         }
@@ -77,7 +85,8 @@ impl ExpressionAnalysisVisitor for RedundantBooleanExpressions {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
-        self.check_redundant_boolean_expressions(exp, env);
+        self.check_redundant_boolean_expressions(exp, env, diags);
     }
 }

@@ -1,0 +1,12 @@
+warning: Unused borrowed mutable variable. Consider normal borrow (borrow_global, vector::borrow, etc.) instead
+  ┌─ ./sources/unused_borrow_global_mut.move:7:21
+  │
+7 │         let c_ref = borrow_global_mut<Counter>(addr);
+  │                     ^^^^^^^^^^^^^^^^^ Unused borrowed mutable variable. Consider normal borrow (borrow_global, vector::borrow, etc.) instead
+
+warning: Unused borrowed mutable variable. Consider normal borrow (borrow_global, vector::borrow, etc.) instead
+  ┌─ ./sources/unused_borrow_global_mut.move:9:22
+  │
+9 │         let _d_ref = borrow_global_mut<Counter>(addr);
+  │                      ^^^^^^^^^^^^^^^^^ Unused borrowed mutable variable. Consider normal borrow (borrow_global, vector::borrow, etc.) instead
+

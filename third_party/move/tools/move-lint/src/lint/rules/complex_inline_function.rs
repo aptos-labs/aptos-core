@@ -6,6 +6,9 @@ use crate::lint::{
     utils::{add_diagnostic_and_emit, LintConfig},
     visitor::ExpressionAnalysisVisitor,
 };
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::{
     ast::ExpData,
     model::{FunctionEnv, GlobalEnv},
@@ -73,6 +76,7 @@ impl ExpressionAnalysisVisitor for ComplexInlineFunctionVisitor {
         func_env: &FunctionEnv,
         env: &GlobalEnv,
         lint_config: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let Some(func) = func_env.get_def().as_ref() {
             func.visit_pre_post(
@@ -98,6 +102,7 @@ impl ExpressionAnalysisVisitor for ComplexInlineFunctionVisitor {
                     &message,
                     codespan_reporting::diagnostic::Severity::Warning,
                     env,
+                    diags,
                 );
             }
         }

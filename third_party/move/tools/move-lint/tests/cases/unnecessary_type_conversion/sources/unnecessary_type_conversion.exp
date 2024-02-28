@@ -1,0 +1,6 @@
+warning: Unnecessary type conversion detected. 'x' is already of type 'u64'. Avoid casting it to its own type.
+  ┌─ ./sources/unnecessary_type_conversion.move:4:18
+  │
+4 │         let _b = (x as u64); // <Issue:3>
+  │                  ^^^^^^^^^^ Unnecessary type conversion detected. 'x' is already of type 'u64'. Avoid casting it to its own type.
+

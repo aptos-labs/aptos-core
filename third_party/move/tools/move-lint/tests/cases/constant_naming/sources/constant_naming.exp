@@ -1,0 +1,24 @@
+warning: Constant names should be in all caps and snake case.
+   ┌─ ./sources/constant_naming.move:10:5
+   │
+10 │     const Another_badName: u64 = 42; // Should trigger a warning
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Constant names should be in all caps and snake case.
+
+warning: Constant names should be in all caps and snake case.
+  ┌─ ./sources/constant_naming.move:8:5
+  │
+8 │     const Maxcount: u64 = 500; // Should trigger a warning
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^ Constant names should be in all caps and snake case.
+
+warning: Constant names should be in all caps and snake case.
+  ┌─ ./sources/constant_naming.move:9:5
+  │
+9 │     const MinValue: u64 = 1; // Should trigger a warning
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^ Constant names should be in all caps and snake case.
+
+warning: Constant names should be in all caps and snake case.
+   ┌─ ./sources/constant_naming.move:11:5
+   │
+11 │     const YetAnotherName: u64 = 777; // Should trigger a warning
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Constant names should be in all caps and snake case.
+

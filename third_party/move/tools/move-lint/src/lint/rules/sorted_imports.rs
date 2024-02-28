@@ -1,7 +1,8 @@
 //! Check for unsorted imports.
 use crate::lint::{utils::add_diagnostic_and_emit_by_span, visitor::ExpressionAnalysisVisitor};
+use codespan::FileId;
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::model::{GlobalEnv, ModuleEnv};
-
 #[derive(Debug)]
 pub struct SortedImportsLint;
 
@@ -14,7 +15,7 @@ impl SortedImportsLint {
         Box::new(Self::new())
     }
 
-    fn check_imports_sorted(&self, module_env: &ModuleEnv) {
+    fn check_imports_sorted(&self, module_env: &ModuleEnv, diags: &mut Vec<Diagnostic<FileId>>) {
         let imports = module_env.get_use_decls().to_vec();
         let imports_string = imports
             .iter()
@@ -45,13 +46,19 @@ impl SortedImportsLint {
                 &message,
                 codespan_reporting::diagnostic::Severity::Warning,
                 module_env.env,
+                diags,
             );
         }
     }
 }
 
 impl ExpressionAnalysisVisitor for SortedImportsLint {
-    fn visit_module(&mut self, module_env: &ModuleEnv, _env: &GlobalEnv) {
-        self.check_imports_sorted(module_env);
+    fn visit_module(
+        &mut self,
+        module_env: &ModuleEnv,
+        _env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
+        self.check_imports_sorted(module_env, diags);
     }
 }

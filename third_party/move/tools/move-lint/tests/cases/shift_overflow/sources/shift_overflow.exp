@@ -1,0 +1,24 @@
+warning: Potential overflow detected. The number of bits being shifted exceeds the bit width of the variable being shifted
+  ┌─ ./sources/shift_overflow.move:5:18
+  │
+5 │         let _b = x << 65; // <Issue:5>
+  │                  ^^^^^^^ Potential overflow detected. The number of bits being shifted exceeds the bit width of the variable being shifted
+
+warning: Potential overflow detected. The number of bits being shifted exceeds the bit width of the variable being shifted
+  ┌─ ./sources/shift_overflow.move:6:18
+  │
+6 │         let _b = x >> 66; // <Issue:5>
+  │                  ^^^^^^^ Potential overflow detected. The number of bits being shifted exceeds the bit width of the variable being shifted
+
+warning: Potential overflow detected. The number of bits being shifted exceeds the bit width of the variable being shifted
+  ┌─ ./sources/shift_overflow.move:5:18
+  │
+5 │         let _b = x << 65; // <Issue:5>
+  │                  ^^^^^^^ Potential overflow detected. The number of bits being shifted exceeds the bit width of the variable being shifted
+
+warning: Potential overflow detected. The number of bits being shifted exceeds the bit width of the variable being shifted
+  ┌─ ./sources/shift_overflow.move:6:18
+  │
+6 │         let _b = x >> 66; // <Issue:5>
+  │                  ^^^^^^^ Potential overflow detected. The number of bits being shifted exceeds the bit width of the variable being shifted
+

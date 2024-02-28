@@ -3,6 +3,9 @@
 //! can potentially be combined to simplify the code.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{ExpData, Operation, Value};
 use move_model::model::{FunctionEnv, GlobalEnv};
 
@@ -24,7 +27,12 @@ impl CombinableBoolVisitor {
     }
 
     // Check if the given expression contains two comparisons that can be combined.
-    fn find_combinable_comparison(&mut self, cond: &ExpData, env: &GlobalEnv) {
+    fn find_combinable_comparison(
+        &mut self,
+        cond: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let ExpData::Call(_, Operation::Or, args) = cond {
             if let (ExpData::Call(_, op1, args1), ExpData::Call(_, op2, args2)) =
                 (&args[0].as_ref(), &args[1].as_ref())
@@ -35,7 +43,8 @@ impl CombinableBoolVisitor {
                     if let (
                         ExpData::Value(_, Value::Number(num1)),
                         ExpData::Value(_, Value::Number(num2)),
-                    ) = (right_operand_1.as_ref(), right_operand_2.as_ref()) {
+                    ) = (right_operand_1.as_ref(), right_operand_2.as_ref())
+                    {
                         if num1 != num2 {
                             return;
                         }
@@ -90,6 +99,7 @@ impl CombinableBoolVisitor {
                             message,
                             codespan_reporting::diagnostic::Severity::Warning,
                             env,
+                            diags,
                         );
                     }
                 }
@@ -105,9 +115,10 @@ impl ExpressionAnalysisVisitor for CombinableBoolVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let ExpData::IfElse(_, cond, _, _) = exp {
-            self.find_combinable_comparison(cond.as_ref(), env);
+            self.find_combinable_comparison(cond.as_ref(), env, diags);
         }
     }
 }

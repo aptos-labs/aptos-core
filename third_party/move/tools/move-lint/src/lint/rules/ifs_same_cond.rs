@@ -2,9 +2,11 @@
 //! refactored to improve code readability and maintainability.
 use crate::lint::utils::{add_diagnostic_and_emit, get_var_info_from_func_param, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::ExpData;
 use move_model::model::{FunctionEnv, GlobalEnv};
-
 pub struct IfsSameCondVisitor {
     if_condition: Vec<String>,
 }
@@ -26,7 +28,13 @@ impl IfsSameCondVisitor {
     }
 
     /// Checks if the current 'if' condition is a duplicate and sets the condition for future checks.
-    fn check_and_set_condition(&mut self, exp: &ExpData, func_env: &FunctionEnv, env: &GlobalEnv) {
+    fn check_and_set_condition(
+        &mut self,
+        exp: &ExpData,
+        func_env: &FunctionEnv,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         let current_condition = self.get_condition_string(exp, env, func_env);
         let founded_item = self.if_condition.contains(&current_condition);
         if founded_item {
@@ -37,6 +45,7 @@ impl IfsSameCondVisitor {
                 message,
                 codespan_reporting::diagnostic::Severity::Warning,
                 env,
+                diags,
             );
         } else {
             self.if_condition.push(current_condition);
@@ -85,14 +94,20 @@ impl IfsSameCondVisitor {
 }
 
 impl ExpressionAnalysisVisitor for IfsSameCondVisitor {
-    fn visit_function_custom(&mut self, func_env: &FunctionEnv, env: &GlobalEnv, _: &LintConfig) {
+    fn visit_function_custom(
+        &mut self,
+        func_env: &FunctionEnv,
+        env: &GlobalEnv,
+        _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         let func = func_env.get_def();
         if let Some(func) = func.as_ref() {
             func.visit_pre_post(
                 &mut (|up: bool, exp: &ExpData| {
                     if !up {
                         if let ExpData::IfElse(_, cond, _, _) = exp {
-                            self.check_and_set_condition(cond.as_ref(), func_env, env);
+                            self.check_and_set_condition(cond.as_ref(), func_env, env, diags);
                         }
                     }
                 }),

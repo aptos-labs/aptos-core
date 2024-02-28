@@ -4,7 +4,9 @@ use move_model::{
     ast::ExpData,
     model::{FunctionEnv, GlobalEnv},
 };
+use codespan::FileId;
 
+use codespan_reporting::diagnostic::Diagnostic;
 use crate::lint::{visitor::ExpressionAnalysisVisitor, utils::{add_diagnostic_and_emit, LintConfig}};
 #[derive(Debug)]
 pub struct DeepNestingVisitor {
@@ -31,7 +33,7 @@ impl DeepNestingVisitor {
 }
 
 impl ExpressionAnalysisVisitor for DeepNestingVisitor {
-    fn visit_function(&mut self, func_env: &FunctionEnv, env: &GlobalEnv, _: &LintConfig) {
+    fn visit_function(&mut self, func_env: &FunctionEnv, env: &GlobalEnv, _: &LintConfig, diags: &mut Vec<Diagnostic<FileId>>) {
         if let Some(func) = func_env.get_def().as_ref() {
             func.visit_pre_post(
                 &mut (|up: bool, exp: &ExpData| {
@@ -47,7 +49,8 @@ impl ExpressionAnalysisVisitor for DeepNestingVisitor {
                                     &env.get_node_loc(*node_id),
                                     &message,
                                     codespan_reporting::diagnostic::Severity::Warning,
-                                    env
+                                    env,
+                                    diags
                                 );
                             }
                         } else if self.nesting_level > 0 {

@@ -1,0 +1,24 @@
+warning: Block nesting level exceeds allowed limit of 5. Consider refactoring your code.
+   ┌─ ./sources/deep_nesting.move:21:29
+   │  
+21 │ ╭                             if (reward_token == 6){
+22 │ │                                 let current_amount2 = vector::borrow_mut(&mut new_reward, reward_token);
+23 │ │                                 *current_amount2 = *current_amount2 + 3;
+24 │ │                             }
+   │ ╰─────────────────────────────^ Block nesting level exceeds allowed limit of 5. Consider refactoring your code.
+
+warning: Block nesting level exceeds allowed limit of 5. Consider refactoring your code.
+   ┌─ ./sources/deep_nesting.move:41:29
+   │  
+41 │ ╭                             if (reward_token == 13){
+42 │ │                                 a = 3;
+43 │ │                                 
+44 │ │                             }
+   │ ╰─────────────────────────────^ Block nesting level exceeds allowed limit of 5. Consider refactoring your code.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/deep_nesting.move:12:21
+   │
+12 │                 if (reward_token == 3){
+   │                     ^^^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+

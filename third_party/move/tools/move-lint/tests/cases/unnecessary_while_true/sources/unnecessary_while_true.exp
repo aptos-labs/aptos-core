@@ -1,0 +1,9 @@
+warning: Unnecessary 'while(true)' detected. Consider using 'loop' instead.
+  ┌─ ./sources/unnecessary_while_true.move:4:9
+  │  
+4 │ ╭         while (true) { // Should trigger a warning
+5 │ │             if (counter >= 10) { break };
+6 │ │             counter = counter + 1;
+7 │ │         }
+  │ ╰─────────^ Unnecessary 'while(true)' detected. Consider using 'loop' instead.
+

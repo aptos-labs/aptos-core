@@ -1,0 +1,126 @@
+warning: Simplify comparison by using <= instead.
+  ┌─ ./sources/combinable_bool_conditions.move:7:13
+  │
+7 │         if (x < y || x == y) {}; // should be x <= y
+  │             ^^^^^^^^^^^^^^^ Simplify comparison by using <= instead.
+
+warning: Simplify comparison by using >= instead.
+  ┌─ ./sources/combinable_bool_conditions.move:8:13
+  │
+8 │         if (x == y || x > y) {}; // should be x >= y
+  │             ^^^^^^^^^^^^^^^ Simplify comparison by using >= instead.
+
+warning: Simplify comparison by using >= instead.
+  ┌─ ./sources/combinable_bool_conditions.move:9:13
+  │
+9 │         if (x > y || x == y) {}; // should be x >= y
+  │             ^^^^^^^^^^^^^^^ Simplify comparison by using >= instead.
+
+warning: Unequal (!=) condition is unnecessary and can be removed
+   ┌─ ./sources/combinable_bool_conditions.move:10:13
+   │
+10 │         if (x != y || x < y) {}; // same as x < y
+   │             ^^^^^^^^^^^^^^^ Unequal (!=) condition is unnecessary and can be removed
+
+warning: Unequal (!=) condition is unnecessary and can be removed
+   ┌─ ./sources/combinable_bool_conditions.move:11:13
+   │
+11 │         if (x < y || x != y) {}; // same as x < y
+   │             ^^^^^^^^^^^^^^^ Unequal (!=) condition is unnecessary and can be removed
+
+warning: Unequal (!=) condition is unnecessary and can be removed
+   ┌─ ./sources/combinable_bool_conditions.move:12:13
+   │
+12 │         if (x != y || x > y) {}; // same as x > y
+   │             ^^^^^^^^^^^^^^^ Unequal (!=) condition is unnecessary and can be removed
+
+warning: Unequal (!=) condition is unnecessary and can be removed
+   ┌─ ./sources/combinable_bool_conditions.move:13:13
+   │
+13 │         if (x > y || x != y) {}; // same as x > y
+   │             ^^^^^^^^^^^^^^^ Unequal (!=) condition is unnecessary and can be removed
+
+warning: Unequal (!=) condition is unnecessary and can be removed
+   ┌─ ./sources/combinable_bool_conditions.move:14:13
+   │
+14 │         if (x > y || y != x) {}; // same as x > y
+   │             ^^^^^^^^^^^^^^^ Unequal (!=) condition is unnecessary and can be removed
+
+warning: Simplify comparison by using <= instead.
+   ┌─ ./sources/combinable_bool_conditions.move:16:13
+   │
+16 │         if (m == n || m < n) {}; // should be m <= n
+   │             ^^^^^^^^^^^^^^^ Simplify comparison by using <= instead.
+
+warning: Simplify comparison by using <= instead.
+   ┌─ ./sources/combinable_bool_conditions.move:23:13
+   │
+23 │         if (x == 11 || x < 11) {};
+   │             ^^^^^^^^^^^^^^^^^ Simplify comparison by using <= instead.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+  ┌─ ./sources/combinable_bool_conditions.move:7:13
+  │
+7 │         if (x < y || x == y) {}; // should be x <= y
+  │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+  ┌─ ./sources/combinable_bool_conditions.move:8:13
+  │
+8 │         if (x == y || x > y) {}; // should be x >= y
+  │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+  ┌─ ./sources/combinable_bool_conditions.move:9:13
+  │
+9 │         if (x > y || x == y) {}; // should be x >= y
+  │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/combinable_bool_conditions.move:10:13
+   │
+10 │         if (x != y || x < y) {}; // same as x < y
+   │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/combinable_bool_conditions.move:11:13
+   │
+11 │         if (x < y || x != y) {}; // same as x < y
+   │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/combinable_bool_conditions.move:12:13
+   │
+12 │         if (x != y || x > y) {}; // same as x > y
+   │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/combinable_bool_conditions.move:13:13
+   │
+13 │         if (x > y || x != y) {}; // same as x > y
+   │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/combinable_bool_conditions.move:14:13
+   │
+14 │         if (x > y || y != x) {}; // same as x > y
+   │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/combinable_bool_conditions.move:16:13
+   │
+16 │         if (m == n || m < n) {}; // should be m <= n
+   │             ^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/combinable_bool_conditions.move:22:13
+   │
+22 │         if (x == 11 || x < 3) {};
+   │             ^^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/combinable_bool_conditions.move:23:13
+   │
+23 │         if (x == 11 || x < 11) {};
+   │             ^^^^^^^^^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+

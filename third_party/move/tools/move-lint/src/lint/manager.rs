@@ -1,18 +1,19 @@
-use super::{
-    build::CompiledModel, rules::unused_borrow_global_mut::UnusedBorrowGlobalMutVisitor,
-    utils::LintConfig, visitor::ExpressionAnalysisVisitor,
-};
-
-use move_model::model::{FunctionEnv, ModuleEnv};
-use move_stackless_bytecode::function_target_pipeline::{FunctionTargetsHolder, FunctionVariant};
+use super::{build::CompiledModel, utils::LintConfig, visitor::ExpressionAnalysisVisitor};
+use codespan::FileId;
+use codespan_reporting::diagnostic::Diagnostic;
+use move_model::model::ModuleEnv;
 
 pub struct VisitorManager {
     linters: Vec<Box<dyn ExpressionAnalysisVisitor>>,
+    diagnostics: Vec<Diagnostic<FileId>>,
 }
 
 impl VisitorManager {
     pub fn new(linters: Vec<Box<dyn ExpressionAnalysisVisitor>>) -> Self {
-        Self { linters }
+        Self {
+            linters,
+            diagnostics: Vec::new(),
+        }
     }
 
     pub fn run(&mut self, env: (CompiledModel, CompiledModel), lint_config: &LintConfig) {
@@ -35,18 +36,36 @@ impl VisitorManager {
     ) {
         for linter in &mut self.linters {
             // Visit the module environment with the current linter.
-            linter.visit_module(module_env.1, module_env.1.env);
+            linter.visit_module(module_env.1, module_env.1.env, &mut self.diagnostics);
 
             // Visit each function within the module environment with the current linter.
             for func_env in module_env.1.get_functions() {
-                linter.visit_function_custom(&func_env, module_env.1.env, lint_config);
-                linter.visit_function(&func_env, module_env.1.env, lint_config);
+                linter.visit_function_custom(
+                    &func_env,
+                    module_env.1.env,
+                    lint_config,
+                    &mut self.diagnostics,
+                );
+                linter.visit_function(
+                    &func_env,
+                    module_env.1.env,
+                    lint_config,
+                    &mut self.diagnostics,
+                );
             }
             for func_env in module_env.0.get_functions() {
                 if linter.requires_bytecode_inspection() {
-                    linter.visit_function_with_bytecode(&func_env, module_env.0.env);
+                    linter.visit_function_with_bytecode(
+                        &func_env,
+                        module_env.0.env,
+                        &mut self.diagnostics,
+                    );
                 }
             }
         }
+    }
+
+    pub fn diagnostics(&self) -> &Vec<Diagnostic<FileId>> {
+        &self.diagnostics
     }
 }

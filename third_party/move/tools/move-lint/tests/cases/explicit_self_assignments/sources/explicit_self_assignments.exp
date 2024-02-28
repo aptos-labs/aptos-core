@@ -1,0 +1,6 @@
+warning: Explicit self-assignment detected. Consider removing it.
+   ┌─ ./sources/explicit_self_assignments.move:10:9
+   │
+10 │         a = a; // Should trigger a warning
+   │         ^^^^^ Explicit self-assignment detected. Consider removing it.
+

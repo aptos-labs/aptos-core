@@ -1,0 +1,78 @@
+warning: Use x directly instead of comparing it to true.
+  ┌─ ./sources/bool_comparison.move:4:13
+  │
+4 │         if (x == true) {};
+  │             ^^^^^^^^^ Use x directly instead of comparing it to true.
+
+warning: Use !x directly instead of comparing it to false.
+  ┌─ ./sources/bool_comparison.move:5:13
+  │
+5 │         if (x == false) {};
+  │             ^^^^^^^^^^ Use !x directly instead of comparing it to false.
+
+warning: Use !x directly instead of comparing it to true.
+  ┌─ ./sources/bool_comparison.move:6:13
+  │
+6 │         if (x != true) {};
+  │             ^^^^^^^^^ Use !x directly instead of comparing it to true.
+
+warning: Use x directly instead of comparing it to false.
+  ┌─ ./sources/bool_comparison.move:7:13
+  │
+7 │         if (x != false) {};
+  │             ^^^^^^^^^^ Use x directly instead of comparing it to false.
+
+warning: Use x directly instead of comparing it to true.
+  ┌─ ./sources/bool_comparison.move:8:13
+  │
+8 │         if (x == true || ERROR_NUM == 2) {};
+  │             ^^^^^^^^^ Use x directly instead of comparing it to true.
+
+warning: Use x directly instead of comparing it to true.
+  ┌─ ./sources/bool_comparison.move:8:13
+  │
+8 │         if (x == true || ERROR_NUM == 2) {};
+  │             ^^^^^^^^^ Use x directly instead of comparing it to true.
+
+warning: Use x directly instead of comparing it to true.
+  ┌─ ./sources/bool_comparison.move:9:13
+  │
+9 │         if (x == true && x != false) {};
+  │             ^^^^^^^^^ Use x directly instead of comparing it to true.
+
+warning: Use x directly instead of comparing it to false.
+  ┌─ ./sources/bool_comparison.move:9:26
+  │
+9 │         if (x == true && x != false) {};
+  │                          ^^^^^^^^^^ Use x directly instead of comparing it to false.
+
+warning: Use x directly instead of comparing it to true.
+  ┌─ ./sources/bool_comparison.move:9:13
+  │
+9 │         if (x == true && x != false) {};
+  │             ^^^^^^^^^ Use x directly instead of comparing it to true.
+
+warning: Use x directly instead of comparing it to false.
+  ┌─ ./sources/bool_comparison.move:9:26
+  │
+9 │         if (x == true && x != false) {};
+  │                          ^^^^^^^^^^ Use x directly instead of comparing it to false.
+
+warning: Use x directly instead of comparing it to true.
+   ┌─ ./sources/bool_comparison.move:12:13
+   │
+12 │         if (true == x) {};
+   │             ^^^^^^^^^ Use x directly instead of comparing it to true.
+
+warning: Use condition directly instead of comparing it to true.
+   ┌─ ./sources/bool_comparison.move:13:13
+   │
+13 │         if (condition() == true) {};
+   │             ^^^^^^^^^^^^^^^^^^^ Use condition directly instead of comparing it to true.
+
+warning: Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+   ┌─ ./sources/bool_comparison.move:12:13
+   │
+12 │         if (true == x) {};
+   │             ^^^^^^^^^ Detected consecutive if conditions with the same expression. Consider refactoring to avoid redundancy.
+

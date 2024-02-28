@@ -1,0 +1,6 @@
+warning: Potential multiplication overflow detected.
+   ┌─ ./sources/overflow_multiplication_detector.move:11:17
+   │
+11 │         let _ = a * b; // Should trigger a warning
+   │                 ^^^^^ Potential multiplication overflow detected.
+

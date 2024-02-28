@@ -1,0 +1,40 @@
+warning: Getter method 'nested_blocks' does not return required field.
+   ┌─ ./sources/return_at_end_of_block.move:28:9
+   │  
+28 │ ╭         if (x < 5) {
+29 │ │             if (x == 4) {
+30 │ │                 return 3;
+31 │ │             };
+   · │
+34 │ │             1
+35 │ │         }
+   │ ╰─────────^ Getter method 'nested_blocks' does not return required field.
+
+warning: Getter method 'return_not_at_end' does not return required field.
+   ┌─ ./sources/return_at_end_of_block.move:19:47
+   │  
+19 │       public fun return_not_at_end(x: u64): u64 {
+   │ ╭───────────────────────────────────────────────^
+20 │ │         if (x > 10) {
+21 │ │             return x;
+22 │ │         };
+23 │ │         x + 2
+24 │ │     }
+   │ ╰─────^ Getter method 'return_not_at_end' does not return required field.
+
+warning: Getter method 'with_explicit_return' does not return required field.
+  ┌─ ./sources/return_at_end_of_block.move:3:50
+  │  
+3 │       public fun with_explicit_return(x: u64): u64 {
+  │ ╭──────────────────────────────────────────────────^
+4 │ │         let y = x + 1;
+5 │ │         return y
+6 │ │     }
+  │ ╰─────^ Getter method 'with_explicit_return' does not return required field.
+
+warning: Return statement at the end of the function is redundant. Consider removing it.
+  ┌─ ./sources/return_at_end_of_block.move:5:9
+  │
+5 │         return y
+  │         ^^^^^^^^ Return statement at the end of the function is redundant. Consider removing it.
+

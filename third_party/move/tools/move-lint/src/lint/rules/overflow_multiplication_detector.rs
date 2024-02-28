@@ -1,15 +1,17 @@
 //! `OverflowMultiplicationDetectorVisitor` identifies and warns about potential overflow in multiplication operations in Move programs.
 //! It leverages declared variable values and type information to predict overflow possibilities.
-use std::collections::BTreeMap;
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{Exp, ExpData, Operation, Pattern, Value};
 use move_model::model::{FunctionEnv, GlobalEnv};
 use move_model::symbol::Symbol;
 use move_model::ty::{PrimitiveType, Type};
 use num::ToPrimitive;
 use num_bigint::BigInt;
-
+use std::collections::BTreeMap;
 pub struct OverflowMultiplicationDetectorVisitor {
     declared_vars: BTreeMap<Symbol, BigInt>,
 }
@@ -36,7 +38,12 @@ impl OverflowMultiplicationDetectorVisitor {
     }
 
     /// Checks for multiplications that can overflow.
-    fn check_overflow_multiplication(&self, exp: &ExpData, env: &GlobalEnv) {
+    fn check_overflow_multiplication(
+        &self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let ExpData::Call(_, Operation::Mul, args) = exp {
             if args.len() == 2 {
                 let lhs_exp = &args[0];
@@ -55,6 +62,7 @@ impl OverflowMultiplicationDetectorVisitor {
                             message,
                             codespan_reporting::diagnostic::Severity::Warning,
                             env,
+                            diags,
                         );
                     }
                 }
@@ -96,12 +104,13 @@ impl ExpressionAnalysisVisitor for OverflowMultiplicationDetectorVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let ExpData::Block(_, Pattern::Var(_, symbol), Some(binding_exp), _) = exp {
             if let ExpData::Value(_, Value::Number(num)) = binding_exp.as_ref() {
                 self.insert_declared_var(*symbol, num);
             }
         }
-        self.check_overflow_multiplication(exp, env);
+        self.check_overflow_multiplication(exp, env, diags);
     }
 }

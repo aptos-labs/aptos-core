@@ -1,0 +1,6 @@
+warning: Unnecessary mutable reference detected. Consider using an immutable reference instead.
+   ┌─ ./sources/unnecessary_mutable_reference.move:16:48
+   │
+16 │         test_function_with_immutable_reference(&mut data) // Should be flagged as unnecessary mutable reference
+   │                                                ^^^^^^^^^ Unnecessary mutable reference detected. Consider using an immutable reference instead.
+

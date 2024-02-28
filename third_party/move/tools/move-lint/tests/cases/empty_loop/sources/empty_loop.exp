@@ -1,0 +1,34 @@
+warning: Loop has no code. Did you forget to implement?
+   ┌─ ./sources/empty_loop.move:10:9
+   │
+10 │         loop {};
+   │         ^^^^^^^ Loop has no code. Did you forget to implement?
+
+warning: Loop has no code. Did you forget to implement?
+   ┌─ ./sources/empty_loop.move:19:9
+   │  
+19 │ ╭         while (i < 5) {
+20 │ │             
+21 │ │         };
+   │ ╰─────────^ Loop has no code. Did you forget to implement?
+
+warning: Loop has no code. Did you forget to implement?
+   ┌─ ./sources/empty_loop.move:23:9
+   │
+23 │         while ({ x = x + 1; x < 10}) {};
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Loop has no code. Did you forget to implement?
+
+warning: Potential infinite loop detected. No 'break' or 'return' found in the loop.
+  ┌─ ./sources/empty_loop.move:6:9
+  │  
+6 │ ╭         loop {
+7 │ │             i = i + 1;
+8 │ │         };
+  │ ╰─────────^ Potential infinite loop detected. No 'break' or 'return' found in the loop.
+
+warning: Potential infinite loop detected. No 'break' or 'return' found in the loop.
+   ┌─ ./sources/empty_loop.move:10:9
+   │
+10 │         loop {};
+   │         ^^^^^^^ Potential infinite loop detected. No 'break' or 'return' found in the loop.
+

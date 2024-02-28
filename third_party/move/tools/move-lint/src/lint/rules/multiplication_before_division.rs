@@ -1,6 +1,9 @@
 //! Detect expressions where multiplication appears before division, which can magnify rounding error.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{Exp, ExpData, Operation};
 use move_model::model::{FunctionEnv, GlobalEnv};
 pub struct MultiplicationBeforeDivisionVisitor;
@@ -30,7 +33,12 @@ impl MultiplicationBeforeDivisionVisitor {
         Box::new(Self::new())
     }
 
-    fn check_multiplication_before_division(&mut self, exp: &ExpData, env: &GlobalEnv) {
+    fn check_multiplication_before_division(
+        &mut self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let ExpData::Block(_, _, Some(call), _) = &exp {
             if let ExpData::Call(_, Operation::Mul, exp_vec) = call.as_ref() {
                 if has_binop_div_in_exp(&exp_vec[0]) {
@@ -41,6 +49,7 @@ impl MultiplicationBeforeDivisionVisitor {
                         message,
                         codespan_reporting::diagnostic::Severity::Warning,
                         env,
+                        diags,
                     );
                 }
             }
@@ -55,7 +64,8 @@ impl ExpressionAnalysisVisitor for MultiplicationBeforeDivisionVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
-        self.check_multiplication_before_division(exp, env);
+        self.check_multiplication_before_division(exp, env, diags);
     }
 }

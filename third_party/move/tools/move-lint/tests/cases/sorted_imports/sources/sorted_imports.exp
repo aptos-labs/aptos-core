@@ -1,0 +1,9 @@
+warning: Imports in module "counter" are not sorted alphabetically.
+  ┌─ ./sources/sorted_imports.move:2:26
+  │  
+2 │       use aptos_framework::object::{Self, Object};
+  │ ╭──────────────────────────^
+3 │ │     use aptos_std::table::{Self, Table};
+4 │ │     use aptos_std::simple_map::{Self, SimpleMap};
+  │ ╰───────────────────────────────────────────────^ Imports in module "counter" are not sorted alphabetically.
+

@@ -4,11 +4,13 @@ use crate::lint::{
     utils::{add_diagnostic_and_emit, LintConfig},
     visitor::ExpressionAnalysisVisitor,
 };
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::{
     ast::ExpData,
     model::{FunctionEnv, GlobalEnv, NodeId},
 };
-
 #[derive(Debug)]
 pub struct UnconditionalExitLoopVisitor;
 
@@ -44,7 +46,13 @@ impl UnconditionalExitLoopVisitor {
         Box::new(Self::new())
     }
 
-    fn check_for_unconditional_exit(&self, node_id: &NodeId, loop_body: &ExpData, env: &GlobalEnv) {
+    fn check_for_unconditional_exit(
+        &self,
+        node_id: &NodeId,
+        loop_body: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         let always_exits = does_exp_in_loop_always_exit(loop_body);
         if always_exits {
             let message = "Loop always exits unconditionally. Consider revising the loop's logic.";
@@ -53,6 +61,7 @@ impl UnconditionalExitLoopVisitor {
                 message,
                 codespan_reporting::diagnostic::Severity::Warning,
                 env,
+                diags,
             );
         }
     }
@@ -65,9 +74,10 @@ impl ExpressionAnalysisVisitor for UnconditionalExitLoopVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         if let ExpData::Loop(node_id, loop_body) = exp {
-            self.check_for_unconditional_exit(node_id, loop_body.as_ref(), env);
+            self.check_for_unconditional_exit(node_id, loop_body.as_ref(), env, diags);
         }
     }
 }

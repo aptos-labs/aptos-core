@@ -1,6 +1,0 @@
-[package]
-name = "Detector"
-version = "0.0.0"
-
-[addresses]
-NamedAddr = "0xCAFE"

@@ -6,9 +6,11 @@
 //! readability and maintainability.
 use crate::lint::utils::{add_diagnostic_and_emit, LintConfig};
 use crate::lint::visitor::ExpressionAnalysisVisitor;
+use codespan::FileId;
+
+use codespan_reporting::diagnostic::Diagnostic;
 use move_model::ast::{ExpData, Pattern};
 use move_model::model::{FunctionEnv, GlobalEnv};
-
 pub struct ExplicitSelfAssignmentsVisitor;
 
 impl Default for ExplicitSelfAssignmentsVisitor {
@@ -27,7 +29,12 @@ impl ExplicitSelfAssignmentsVisitor {
     }
 
     /// Checks for explicit self-assignments in expressions.
-    fn check_explicit_self_assignment(&self, exp: &ExpData, env: &GlobalEnv) {
+    fn check_explicit_self_assignment(
+        &self,
+        exp: &ExpData,
+        env: &GlobalEnv,
+        diags: &mut Vec<Diagnostic<FileId>>,
+    ) {
         if let ExpData::Assign(node_id, Pattern::Var(_, lhs), exp) = exp {
             if let ExpData::LocalVar(_, rhs) = exp.as_ref() {
                 if lhs == rhs {
@@ -37,6 +44,7 @@ impl ExplicitSelfAssignmentsVisitor {
                         message,
                         codespan_reporting::diagnostic::Severity::Warning,
                         env,
+                        diags,
                     );
                 }
             }
@@ -51,7 +59,8 @@ impl ExpressionAnalysisVisitor for ExplicitSelfAssignmentsVisitor {
         _func_env: &FunctionEnv,
         env: &GlobalEnv,
         _: &LintConfig,
+        diags: &mut Vec<Diagnostic<FileId>>,
     ) {
-        self.check_explicit_self_assignment(exp, env);
+        self.check_explicit_self_assignment(exp, env, diags);
     }
 }
