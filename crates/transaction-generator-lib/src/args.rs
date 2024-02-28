@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType};
+use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind, WorkflowProgress};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -58,6 +58,9 @@ pub enum TransactionTypeArg {
     SmartTablePicture30KWith200Change,
     SmartTablePicture1MWith1KChange,
     SmartTablePicture1BWith1KChange,
+    EconiaBasic1Market,
+    EconiaAdvanced1Market,
+    EconiaAdvanced10Market,
 }
 
 impl TransactionTypeArg {
@@ -376,6 +379,36 @@ impl TransactionTypeArg {
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
+            },
+            TransactionTypeArg::EconiaBasic1Market => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 10000,
+                    flow_type: crate::EconiaFlowType::Basic,
+                    num_markets: 1,
+                },
+                progress_type: WorkflowProgress::MoveByPhases,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::EconiaAdvanced1Market => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 10000,
+                    flow_type: crate::EconiaFlowType::Advanced,
+                    num_markets: 1,
+                },
+                progress_type: WorkflowProgress::MoveByPhases,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::EconiaAdvanced10Market => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 10000,
+                    flow_type: crate::EconiaFlowType::Advanced,
+                    num_markets: 10,
+                },
+                progress_type: WorkflowProgress::MoveByPhases,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
             },
         }
     }

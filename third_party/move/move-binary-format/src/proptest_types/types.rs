@@ -23,8 +23,8 @@ use proptest::{
 };
 use std::collections::BTreeSet;
 
-#[derive(Debug)]
-struct TypeSignatureIndex(u16);
+// #[derive(Debug)]
+// struct TypeSignatureIndex(u16);
 
 #[derive(Debug)]
 pub struct StDefnMaterializeState {

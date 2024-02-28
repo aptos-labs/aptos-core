@@ -282,7 +282,7 @@ impl TransactionGenerator {
         connected_tx_grps: usize,
         shuffle_connected_txns: bool,
         hotspot_probability: Option<f32>,
-    ) {
+    ) -> usize {
         assert!(self.block_sender.is_some());
         self.gen_transfer_transactions(
             block_size,
@@ -292,6 +292,7 @@ impl TransactionGenerator {
             shuffle_connected_txns,
             hotspot_probability,
         );
+        num_transfer_blocks
     }
 
     pub fn run_workload(
@@ -301,14 +302,15 @@ impl TransactionGenerator {
         transaction_generators: Vec<Box<dyn aptos_transaction_generator_lib::TransactionGenerator>>,
         phase: Arc<AtomicUsize>,
         transactions_per_sender: usize,
-    ) {
+    ) -> usize {
+        let last_non_empty_phase = Arc::new(AtomicUsize::new(0));
         let transaction_generators = Mutex::new(transaction_generators);
         assert!(self.block_sender.is_some());
         let num_senders_per_block =
             (block_size + transactions_per_sender - 1) / transactions_per_sender;
         let account_pool_size = self.main_signer_accounts.as_ref().unwrap().accounts.len();
         let transaction_generator = ThreadLocal::with_capacity(self.num_workers);
-        for _ in 0..num_blocks {
+        for i in 0..num_blocks {
             let sender_indices = rand::seq::index::sample(
                 &mut thread_rng(),
                 account_pool_size,
@@ -317,10 +319,11 @@ impl TransactionGenerator {
             .into_iter()
             .flat_map(|sender_idx| vec![sender_idx; transactions_per_sender])
             .collect();
-            self.generate_and_send_block(
+            let terminate = self.generate_and_send_block(
                 self.main_signer_accounts.as_ref().unwrap(),
                 sender_indices,
                 phase.clone(),
+                last_non_empty_phase.clone(),
                 |sender_idx, _| {
                     let sender = &self.main_signer_accounts.as_ref().unwrap().accounts[sender_idx];
                     let mut transaction_generator = transaction_generator
@@ -330,12 +333,17 @@ impl TransactionGenerator {
                         .borrow_mut();
                     transaction_generator
                         .generate_transactions(sender, 1)
-                        .pop()
-                        .map(Transaction::UserTransaction)
+                        .iter()
+                        .map(|txn| Transaction::UserTransaction(txn.clone()))
+                        .collect()
                 },
                 |sender_idx| *sender_idx,
             );
+            if terminate {
+                return i + 1;
+            }
         }
+        num_blocks
     }
 
     pub fn create_seed_accounts(
@@ -421,6 +429,7 @@ impl TransactionGenerator {
                 self.seed_accounts_cache.as_ref().unwrap(),
                 input,
                 Arc::new(AtomicUsize::new(0)),
+                Arc::new(AtomicUsize::new(0)),
                 |(sender_idx, new_account), account_cache| {
                     let sender = &account_cache.accounts[sender_idx];
                     let txn = sender.sign_with_transaction_builder(
@@ -430,7 +439,7 @@ impl TransactionGenerator {
                                 init_account_balance,
                             ),
                     );
-                    Some(Transaction::UserTransaction(txn))
+                    vec![Transaction::UserTransaction(txn)]
                 },
                 |(sender_idx, _)| *sender_idx,
             );
@@ -621,12 +630,13 @@ impl TransactionGenerator {
             account_cache,
             transfer_indices,
             Arc::new(AtomicUsize::new(0)),
+            Arc::new(AtomicUsize::new(0)),
             |(sender_idx, receiver_idx), account_cache| {
                 let txn = account_cache.accounts[sender_idx].sign_with_transaction_builder(
                     self.transaction_factory
                         .transfer(account_cache.accounts[receiver_idx].address(), 1),
                 );
-                Some(Transaction::UserTransaction(txn))
+                vec![Transaction::UserTransaction(txn)]
             },
             |(sender_idx, _)| *sender_idx,
         );
@@ -637,11 +647,13 @@ impl TransactionGenerator {
         account_cache: &AccountCache,
         inputs: Vec<T>,
         phase: Arc<AtomicUsize>,
+        last_non_empty_phase: Arc<AtomicUsize>,
         func: F,
         sender_func: S,
-    ) where
+    ) -> bool
+    where
         T: Send,
-        F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
+        F: Fn(T, &AccountCache) -> Vec<Transaction> + Send + Sync,
         S: Fn(&T) -> usize,
     {
         let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
@@ -658,9 +670,11 @@ impl TransactionGenerator {
                 let tx = tx.clone();
                 scope.spawn(move |_| {
                     for (index, job) in per_worker_jobs {
-                        if let Some(txn) = job() {
-                            tx.send((index, txn)).unwrap();
-                        }
+                        let txns = job();
+                        tx.send((index, txns)).unwrap();
+                        // if let Some(txn) = job() {
+                        //     tx.send((index, txn)).unwrap();
+                        // }
                     }
                 });
             }
@@ -673,19 +687,28 @@ impl TransactionGenerator {
 
         let mut transactions = Vec::new();
         for i in 0..block_size {
-            if let Some(txn) = transactions_by_index.get(&i) {
-                transactions.push(txn.clone());
+            if let Some(txns) = transactions_by_index.get(&i) {
+                transactions.extend(txns.clone());
             }
         }
 
         if transactions.is_empty() {
             let val = phase.fetch_add(1, Ordering::Relaxed);
+            let last_generated_at = last_non_empty_phase.load(Ordering::Relaxed);
+            if val > last_generated_at + 2 {
+                info!(
+                    "Block generation: no transactions generated in phase {}, and since {}, ending execution",
+                    val, last_generated_at
+                );
+                return true;
+            }
             info!(
                 "Block generation: no transactions generated in phase {}, moving to next phase",
                 val
             );
         } else {
             let val = phase.load(Ordering::Relaxed);
+            last_non_empty_phase.fetch_max(val, Ordering::Relaxed);
             info!(
                 "Block generation: {} transactions generated in phase {}",
                 transactions.len(),
@@ -700,6 +723,7 @@ impl TransactionGenerator {
         if let Some(sender) = &self.block_sender {
             sender.send(transactions).unwrap();
         }
+        false
     }
 
     pub fn gen_transfer_transactions(
