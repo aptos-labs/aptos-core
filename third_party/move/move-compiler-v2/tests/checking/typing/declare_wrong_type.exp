@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: expected `M::R` but found `M::S`
+error: cannot adapt `S` to annotated type `R`
   ┌─ tests/checking/typing/declare_wrong_type.move:6:13
   │
 6 │         let S { g } : R;
   │             ^^^^^^^
 
-error: expected `M::R` but found `M::S`
+error: cannot adapt `S` to annotated type `R`
   ┌─ tests/checking/typing/declare_wrong_type.move:7:14
   │
 7 │         let (S { g }, R { f }): (R, R);

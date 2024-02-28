@@ -1,72 +1,72 @@
 
 Diagnostics:
-error: invalid call of `M::foo`: expected `address` but found `bool` for argument 1
+error: cannot pass `bool` to a function which expects argument of type `address`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:20:13
    │
 20 │         foo(false, 0, S{});
    │             ^^^^^
 
-error: invalid call of `M::foo`: expected `u64` but found `bool` for argument 2
+error: cannot pass `bool` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:21:19
    │
 21 │         foo(@0x0, false, S{});
    │                   ^^^^^
 
-error: invalid call of `M::foo`: expected `M::S` but found `bool` for argument 3
+error: cannot pass `bool` to a function which expects argument of type `S`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:22:22
    │
 22 │         foo(@0x0, 0, false);
    │                      ^^^^^
 
-error: invalid call of `M::foo`: expected `u64` but found `bool` for argument 2
+error: cannot pass `bool` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:23:19
    │
 23 │         foo(@0x0, false, false);
    │                   ^^^^^
 
-error: invalid call of `M::foo`: expected `address` but found `bool` for argument 1
+error: cannot pass `bool` to a function which expects argument of type `address`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:24:13
    │
 24 │         foo(false, 0, false);
    │             ^^^^^
 
-error: invalid call of `M::foo`: expected `address` but found `bool` for argument 1
+error: cannot pass `bool` to a function which expects argument of type `address`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:25:13
    │
 25 │         foo(false, false, S{});
    │             ^^^^^
 
-error: invalid call of `X::foo`: expected `address` but found `bool` for argument 1
+error: cannot pass `bool` to a function which expects argument of type `address`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:29:16
    │
 29 │         X::foo(false, 0, X::s());
    │                ^^^^^
 
-error: invalid call of `X::foo`: expected `u64` but found `bool` for argument 2
+error: cannot pass `bool` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:30:22
    │
 30 │         X::foo(@0x0, false, X::s());
    │                      ^^^^^
 
-error: invalid call of `X::foo`: expected `X::S` but found `M::S` for argument 3
+error: cannot pass `S` to a function which expects argument of type `X::S`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:31:25
    │
 31 │         X::foo(@0x0, 0, S{});
    │                         ^^^
 
-error: invalid call of `X::foo`: expected `u64` but found `bool` for argument 2
+error: cannot pass `bool` to a function which expects argument of type `u64`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:32:22
    │
 32 │         X::foo(@0x0, false, S{});
    │                      ^^^^^
 
-error: invalid call of `X::foo`: expected `address` but found `bool` for argument 1
+error: cannot pass `bool` to a function which expects argument of type `address`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:33:16
    │
 33 │         X::foo(false, 0, S{});
    │                ^^^^^
 
-error: invalid call of `X::foo`: expected `address` but found `bool` for argument 1
+error: cannot pass `bool` to a function which expects argument of type `address`
    ┌─ tests/checking/typing/module_call_wrong_argument_in_list.move:34:16
    │
 34 │         X::foo(false, false, X::s());

@@ -30,7 +30,7 @@ error: undeclared `m::y`
 21 │     fun f6(x: address) acquires *(make_up_address(y)) {
    │                                                   ^
 
-error: expected `address` but found `u64`
+error: cannot pass `u64` to a function which expects argument of type `address`
    ┌─ tests/checking/access_specifiers/access_err.move:24:30
    │
 24 │     fun f7(x: u64) acquires *(make_up_address_wrong(x)) {

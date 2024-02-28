@@ -1,36 +1,36 @@
 
 Diagnostics:
-error: expected `&u64` but found `integer` (from assignment or declaration context)
+error: cannot assign `integer` to left-hand side of type `&u64`
   ┌─ tests/checking/typing/assign_unpack_references_invalid.move:9:9
   │
 9 │         f = 0;
   │         ^
 
-error: expected `&M::S` but found `M::S` (from assignment or declaration context)
+error: cannot assign `S` to left-hand side of type `&S`
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:10:9
    │
 10 │         s2 = S { f: 0 }
    │         ^^
 
-error: expected `&mut u64` but found `integer` (from assignment or declaration context)
+error: cannot assign `integer` to left-hand side of type `&mut u64`
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:17:9
    │
 17 │         f = 0;
    │         ^
 
-error: expected `&mut M::S` but found `M::S` (from assignment or declaration context)
+error: cannot assign `S` to left-hand side of type `&mut S`
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:18:9
    │
 18 │         s2 = S { f: 0 }
    │         ^^
 
-error: mutability mismatch (&mut != &) (from assignment or declaration context)
+error: the left-hand side expected `&mut` but `&` was provided
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:26:9
    │
 26 │         f = &0;
    │         ^
 
-error: mutability mismatch (&mut != &) (from assignment or declaration context)
+error: the left-hand side expected `&mut` but `&` was provided
    ┌─ tests/checking/typing/assign_unpack_references_invalid.move:27:9
    │
 27 │         s2 = &S { f: 0 }

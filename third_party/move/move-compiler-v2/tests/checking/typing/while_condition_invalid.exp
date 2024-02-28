@@ -1,48 +1,48 @@
 
 Diagnostics:
-error: expected `bool` but found `()`
+error: expected `bool` but found a value of type `()`
   ┌─ tests/checking/typing/while_condition_invalid.move:3:16
   │
 3 │         while (()) ();
   │                ^^
 
-error: expected `bool` but found `()`
+error: expected `bool` but found a value of type `()`
   ┌─ tests/checking/typing/while_condition_invalid.move:4:16
   │
 4 │         while ((())) ();
   │                ^^^^
 
-error: expected `bool` but found `()`
+error: expected `bool` but found a value of type `()`
   ┌─ tests/checking/typing/while_condition_invalid.move:5:16
   │
 5 │         while ({}) ()
   │                ^^
 
-error: expected `bool` but found `T`
+error: expected `bool` but found a value of type `T`
   ┌─ tests/checking/typing/while_condition_invalid.move:9:16
   │
 9 │         while (x) ();
   │                ^
 
-error: expected `bool` but found `integer`
+error: expected `bool` but found a value of type `integer`
    ┌─ tests/checking/typing/while_condition_invalid.move:10:16
    │
 10 │         while (0) ();
    │                ^
 
-error: expected `bool` but found `address`
+error: expected `bool` but found a value of type `address`
    ┌─ tests/checking/typing/while_condition_invalid.move:11:16
    │
 11 │         while (@0x0) ()
    │                ^^^^
 
-error: expected `bool` but found `(?1, ?2)`
+error: expected `bool` but found a value of type `(bool, bool)`
    ┌─ tests/checking/typing/while_condition_invalid.move:15:16
    │
 15 │         while ((false, true)) ();
    │                ^^^^^^^^^^^^^
 
-error: expected `bool` but found `(?3, ?4)`
+error: expected `bool` but found a value of type `(integer, bool)`
    ┌─ tests/checking/typing/while_condition_invalid.move:16:16
    │
 16 │         while ((0, false)) ()
