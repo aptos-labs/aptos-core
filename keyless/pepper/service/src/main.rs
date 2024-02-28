@@ -4,7 +4,7 @@ use aptos_keyless_pepper_common::{BadPepperRequestError, PepperRequest};
 use aptos_keyless_pepper_service::{
     about::ABOUT_JSON,
     jwk, process,
-    vuf_keys::{VUF_SK, PEPPER_V0_VUF_VERIFICATION_KEY_JSON},
+    vuf_keys::{PEPPER_V0_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     ProcessingFailure::{BadRequest, InternalError},
 };
 use hyper::{

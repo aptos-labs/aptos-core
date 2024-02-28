@@ -2,7 +2,6 @@
 
 use anyhow::{anyhow, ensure};
 use aptos_keyless_pepper_common::{
-    vuf,
     vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
     PepperV0VufPubKey,
 };
@@ -58,8 +57,6 @@ pub static PEPPER_V0_VUF_VERIFICATION_KEY_JSON: Lazy<String> = Lazy::new(|| {
     let pk = Bls12381G1Bls::pk_from_sk(&VUF_SK).expect("bad sk");
     let mut buf = vec![];
     pk.into_affine().serialize_compressed(&mut buf).unwrap();
-    let obj = PepperV0VufPubKey {
-        public_key: buf,
-    };
+    let obj = PepperV0VufPubKey { public_key: buf };
     serde_json::to_string_pretty(&obj).unwrap()
 });

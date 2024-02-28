@@ -1,6 +1,5 @@
 // Copyright © Aptos Foundation
 
-use std::time::{SystemTime, UNIX_EPOCH};
 use crate::{
     vuf_keys::VUF_SK,
     ProcessingFailure::{BadRequest, InternalError},
@@ -11,11 +10,12 @@ use aptos_keyless_pepper_common::{
     PepperInput, PepperRequest, PepperResponse,
 };
 use aptos_types::{
-    oidb::{Configuration, OpenIdSig},
+    keyless::{Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
 };
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod about;
 pub mod jwk;
@@ -47,12 +47,15 @@ pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailu
     let claims = aptos_keyless_pepper_common::jwt::parse(jwt.as_str())
         .map_err(|e| BadRequest(format!("JWT decoding error: {e}")))?;
 
-    let now_secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let now_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
     if exp_date_secs <= now_secs {
         return Err(BadRequest("epk expired".to_string()));
     }
 
-    if exp_date_secs >= claims.claims.iat + config.max_exp_horizon_secs  {
+    if exp_date_secs >= claims.claims.iat + config.max_exp_horizon_secs {
         return Err(BadRequest("epk expiry date too far".to_string()));
     }
 
@@ -77,13 +80,9 @@ pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailu
         )));
     };
 
-    let recalculated_nonce = OpenIdSig::reconstruct_oauth_nonce(
-        epk_blinder.as_slice(),
-        exp_date_secs,
-        &epk,
-        &config,
-    )
-    .map_err(|e| BadRequest(format!("nonce reconstruction error: {e}")))?;
+    let recalculated_nonce =
+        OpenIdSig::reconstruct_oauth_nonce(epk_blinder.as_slice(), exp_date_secs, &epk, &config)
+            .map_err(|e| BadRequest(format!("nonce reconstruction error: {e}")))?;
 
     if claims.claims.nonce != recalculated_nonce {
         return Err(BadRequest("with nonce mismatch".to_string()));

@@ -5,13 +5,16 @@ use aptos_keyless_pepper_common::{
     jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey,
 };
 use aptos_types::{
-    oidb::{test_utils::get_sample_esk, Configuration, OpenIdSig},
+    keyless::{test_utils::get_sample_esk, Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
 };
 use ark_serialize::CanonicalDeserialize;
 use reqwest::StatusCode;
-use std::{fs, io::stdin};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    fs,
+    io::stdin,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
 
@@ -86,9 +89,7 @@ async fn main() {
         "response_json={}",
         serde_json::to_string_pretty(&response).unwrap()
     );
-    let PepperV0VufPubKey {
-        public_key: vuf_pk,
-    } = response;
+    let PepperV0VufPubKey { public_key: vuf_pk } = response;
     let vuf_pk: ark_bls12_381::G2Projective =
         ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk.as_slice())
             .unwrap()
@@ -101,7 +102,11 @@ async fn main() {
 
     println!();
     println!("Action 4: decide an expiry unix time.");
-    let epk_expiry_time_secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() + 86400;
+    let epk_expiry_time_secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        + 86400;
     println!("expiry_time_sec={}", epk_expiry_time_secs);
 
     let esk = get_sample_esk();
