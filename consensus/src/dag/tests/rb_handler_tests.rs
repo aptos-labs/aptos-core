@@ -80,6 +80,7 @@ async fn test_node_broadcast_receiver_succeed() {
         ValidatorTxnConfig::default_disabled(),
         Features::default(),
         health_backoff,
+        false,
     );
 
     let expected_result = Vote::new(
@@ -134,6 +135,7 @@ async fn test_node_broadcast_receiver_failure() {
                     NoChainHealth::new(),
                     NoPipelineBackpressure::new(),
                 ),
+                false,
             )
         })
         .collect();
@@ -225,6 +227,7 @@ async fn test_node_broadcast_receiver_storage() {
             NoChainHealth::new(),
             NoPipelineBackpressure::new(),
         ),
+        false,
     );
     let sig = rb_receiver.process(node).await.expect("must succeed");
 
@@ -248,6 +251,7 @@ async fn test_node_broadcast_receiver_storage() {
             NoChainHealth::new(),
             NoPipelineBackpressure::new(),
         ),
+        false,
     );
     assert_ok!(rb_receiver.gc_before_round(2));
     assert_eq!(storage.get_votes().unwrap().len(), 0);

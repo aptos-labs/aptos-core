@@ -41,7 +41,7 @@ impl ConsensusAlgorithmConfig {
                 quorum_store_enabled,
                 ..
             } => *quorum_store_enabled,
-            ConsensusAlgorithmConfig::DAG(_) => true,
+            ConsensusAlgorithmConfig::DAG(config) => config.quorum_store_enabled,
         }
     }
 
@@ -434,6 +434,7 @@ pub enum AnchorElectionMode {
 pub struct DagConsensusConfigV1 {
     pub dag_ordering_causal_history_window: usize,
     pub anchor_election_mode: AnchorElectionMode,
+    pub quorum_store_enabled: bool,
 }
 
 impl Default for DagConsensusConfigV1 {
@@ -453,6 +454,7 @@ impl Default for DagConsensusConfigV1 {
                     use_history_from_previous_epoch_max_count: 5,
                 }),
             ),
+            quorum_store_enabled: false,
         }
     }
 }
