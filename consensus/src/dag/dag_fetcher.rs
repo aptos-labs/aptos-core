@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{dag_store::DagStore, errors::DagFetchError, DAGRpcResult};
-use crate::dag::{
-    dag_network::{RpcResultWithResponder, TDAGNetworkSender},
-    errors::FetchRequestHandleError,
-    observability::logging::{LogEvent, LogSchema},
-    types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
-    RpcHandler, RpcWithFallback,
+use crate::{
+    dag::{
+        dag_network::{RpcResultWithResponder, TDAGNetworkSender},
+        errors::FetchRequestHandleError,
+        observability::logging::{LogEvent, LogSchema},
+        types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
+        RpcHandler, RpcWithFallback,
+    },
+    monitor,
 };
 use anyhow::{bail, ensure};
 use aptos_bitvec::BitVec;
@@ -195,7 +198,7 @@ impl DagFetcherService {
                     match self.fetch(local_request.node(), local_request.responders(&self.ordered_authors)) {
                         Ok(fut) => {
                             self.futures.push(async move {
-                                fut.await?;
+                                monitor!("dag_fetch_fut", fut.await)?;
                                 Ok(local_request)
                             }.boxed())
                         },

@@ -469,9 +469,11 @@ impl DagStore {
                 to_prune.push(digest);
             }
         }
-        if let Err(e) = storage.delete_certified_nodes(to_prune) {
-            error!("Error deleting expired nodes: {:?}", e);
-        }
+        monitor!("dag_store_new_gc", {
+            if let Err(e) = storage.delete_certified_nodes(to_prune) {
+                error!("Error deleting expired nodes: {:?}", e);
+            }
+        });
         if dag.read().is_empty() {
             warn!(
                 "[DAG] Start with empty DAG store at {}, need state sync",

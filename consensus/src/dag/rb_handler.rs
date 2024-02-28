@@ -8,6 +8,7 @@ use crate::{
         dag_network::RpcHandler,
         errors::NodeBroadcastHandleError,
         observability::{
+            counters::RB_HANDLE_ACKS,
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, NodeStage},
         },
@@ -70,7 +71,10 @@ impl NodeBroadcastHandler {
         quorum_store_enabled: bool,
     ) -> Self {
         let epoch = epoch_state.epoch;
-        let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
+        let votes_by_round_peer = monitor!(
+            "dag_rb_handler_storage_read",
+            read_votes_from_storage(&storage, epoch)
+        );
 
         Self {
             dag,
@@ -260,6 +264,7 @@ impl RpcHandler for NodeBroadcastHandler {
             .or_default()
             .get(node.author())
         {
+            RB_HANDLE_ACKS.inc();
             return Ok(ack.clone());
         }
 
