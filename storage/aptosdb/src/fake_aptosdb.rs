@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    gauged_api,
+    db::include::aptosdb_internal::gauged_api,
     metrics::{LATEST_CHECKPOINT_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH},
     AptosDB,
 };
@@ -110,7 +110,7 @@ impl FakeBufferedState {
     ) -> Result<()> {
         ensure!(
             new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version
-        );
+        ).into();
         if let Some(_updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option
         {
@@ -128,7 +128,7 @@ impl FakeBufferedState {
         } else {
             ensure!(
                 new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version
-            );
+            ).into();
             self.state_after_checkpoint = new_state_after_checkpoint;
         }
         self.report_latest_committed_version();
@@ -199,7 +199,7 @@ impl FakeAptosDB {
         Ok(root_hash)
     }
 
-    fn get_frozen_subtree_hashes(&self, num_transactions: u64) -> Result<Vec<HashValue>> {
+    fn get_frozen_subtree_hashes(&self, num_transactions: u64) -> anyhow::Result<Vec<HashValue>> {
         MerkleAccumulator::<FakeAptosDB, TransactionAccumulatorHasher>::get_frozen_subtree_hashes(
             self,
             num_transactions,
@@ -349,7 +349,7 @@ impl FakeAptosDB {
 
             // Once everything is successfully stored, update the latest in-memory ledger info.
             if let Some(x) = ledger_info_with_sigs {
-                self.inner.ledger_store.set_latest_ledger_info(x.clone());
+                self.inner.ledger_db.set_latest_ledger_info(x.clone());
 
                 LEDGER_VERSION.set(x.ledger_info().version() as i64);
                 NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
@@ -627,7 +627,7 @@ impl DbReader for FakeAptosDB {
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_>> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
         self.inner
             .get_prefixed_state_value_iterator(key_prefix, cursor, version)
     }
@@ -800,7 +800,7 @@ impl DbReader for FakeAptosDB {
     ) -> Result<TransactionAccumulatorSummary> {
         let num_txns = ledger_version + 1;
         let frozen_subtrees = self.get_frozen_subtree_hashes(num_txns)?;
-        TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?)
+        Ok(TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?)?)
     }
 
     fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
@@ -849,7 +849,7 @@ impl DbReader for FakeAptosDB {
 /// This is necessary for constructing the [ExecutedTrees] to serve [DbReader::get_latest_executed_trees]
 /// requests.
 impl HashReader for FakeAptosDB {
-    fn get(&self, position: Position) -> Result<HashValue> {
+    fn get(&self, position: Position) -> anyhow::Result<HashValue> {
         self.txn_hash_by_position
             .get(&position)
             .as_deref()

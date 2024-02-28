@@ -235,7 +235,7 @@ thread_local! {
     static ENTERED_GAUGED_API: Cell<bool> = Cell::new(false);
 }
 
-fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
+pub fn gauged_api<T, F>(api_name: &'static str, api_impl: F) -> Result<T>
 where
     F: FnOnce() -> Result<T>,
 {
