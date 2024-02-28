@@ -235,17 +235,12 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 /// While this section of the pipeline is optional, some code that used to previously compile
 /// may no longer compile without this section because of using too many local (temp) variables.
 fn add_default_optimization_pipeline(pipeline: &mut FunctionTargetPipeline) {
-    // Available copies analysis is needed by copy propagation.
-    pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
-    pipeline.add_processor(Box::new(CopyPropagation {}));
-    // Live var analysis is needed by dead store elimination.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-    pipeline.add_processor(Box::new(DeadStoreElimination {}));
     pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
     pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
-    // Live var analysis is needed by variable coalescing.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline.add_processor(Box::new(VariableCoalescing {}));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(DeadStoreElimination {}));
 }
 
 /// Disassemble the given compiled units and return the disassembled code as a string.
