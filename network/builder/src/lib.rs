@@ -19,7 +19,6 @@ use aptos_types::chain_id::ChainId;
 use aptos_network2::application::storage::PeersAndMetadata;
 use aptos_network2::connectivity_manager::{ConnectivityManager, ConnectivityRequest};
 use aptos_network2::noise::stream::NoiseStream;
-use aptos_network2::protocols::health_checker::HealthChecker;
 use aptos_network2::protocols::wire::handshake::v1::ProtocolIdSet;
 use aptos_network2::protocols::network::OutboundPeerConnections;
 use aptos_network2::transport::{APTOS_TCP_TRANSPORT, AptosNetTransport, AptosNetTransportActual};
@@ -260,7 +259,6 @@ impl NetworkBuilder {
             self.config.listen_address.clone(),
             handle,
             self.network_context.network_id(),
-            // self.apps.clone(),
         );
         info!("network {:?} listening on {:?}", self.network_context.network_id(), listen_addr);
         self.state = State::STARTED;
