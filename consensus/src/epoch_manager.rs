@@ -727,6 +727,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<PayloadManager>,
         rand_config: Option<RandConfig>,
         features: Features,
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let epoch = epoch_state.epoch;
         info!(
@@ -776,6 +777,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &onchain_execution_config,
                 &features,
                 rand_config,
+                rand_msg_rx,
             )
             .await;
 
@@ -1017,6 +1019,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .initialize_shared_component(&epoch_state, &consensus_config)
             .await;
 
+        let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(
+            QueueStyle::FIFO,
+            100,
+            None,
+        );
+
+        self.rand_manager_msg_tx = Some(rand_msg_tx);
+
         if consensus_config.is_dag_enabled() {
             self.start_new_epoch_with_dag(
                 epoch_state,
@@ -1027,6 +1037,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 payload_manager,
                 rand_config,
                 &features,
+                rand_msg_rx,
             )
             .await
         } else {
@@ -1039,6 +1050,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 payload_manager,
                 rand_config,
                 &features,
+                rand_msg_rx,
             )
             .await
         }
@@ -1080,6 +1092,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<PayloadManager>,
         rand_config: Option<RandConfig>,
         features: &Features,
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         match self.storage.start() {
             LivenessStorageData::FullRecoveryData(initial_data) => {
@@ -1094,6 +1107,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     payload_manager,
                     rand_config,
                     features.clone(),
+                    rand_msg_rx,
                 )
                 .await
             },
@@ -1120,6 +1134,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         payload_manager: Arc<PayloadManager>,
         rand_config: Option<RandConfig>,
         features: &Features,
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let epoch = epoch_state.epoch;
         let consensus_key = new_consensus_key_from_storage(&self.config.safety_rules.backend)
@@ -1141,6 +1156,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 &on_chain_execution_config,
                 features,
                 rand_config,
+                rand_msg_rx,
             )
             .await;
 

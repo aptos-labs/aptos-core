@@ -61,7 +61,8 @@ pub trait TExecutionClient: Send + Sync {
         onchain_execution_config: &OnChainExecutionConfig,
         features: &Features,
         rand_config: Option<RandConfig>,
-    ) -> Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>>;
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+    );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>>;
@@ -170,7 +171,8 @@ impl ExecutionProxyClient {
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
-    ) -> Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>> {
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+    ) {
         let network_sender = NetworkSender::new(
             self.author,
             self.network_sender.clone(),
@@ -187,53 +189,44 @@ impl ExecutionProxyClient {
                 Some(&counters::BUFFER_MANAGER_MSGS),
             );
 
-        let (
-            execution_ready_block_tx,
-            execution_ready_block_rx,
-            maybe_reset_tx_to_rand_manager,
-            maybe_rand_msg_tx,
-        ) = if let Some(rand_config) = rand_config {
-            let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
-            let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
-            let (rand_msg_tx, rand_msg_rx) = aptos_channel::new::<
-                AccountAddress,
-                IncomingRandGenRequest,
-            >(QueueStyle::FIFO, 100, None);
+        let (execution_ready_block_tx, execution_ready_block_rx, maybe_reset_tx_to_rand_manager) =
+            if let Some(rand_config) = rand_config {
+                let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
+                let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
 
-            let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
-            let consensus_key =
-                load_consensus_key_from_secure_storage(&self.consensus_config.safety_rules)
-                    .expect("Failed in loading consensus key for ExecutionProxyClient.");
-            let signer = Arc::new(ValidatorSigner::new(self.author, consensus_key));
+                let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
+                let consensus_key =
+                    load_consensus_key_from_secure_storage(&self.consensus_config.safety_rules)
+                        .expect("Failed in loading consensus key for ExecutionProxyClient.");
+                let signer = Arc::new(ValidatorSigner::new(self.author, consensus_key));
 
-            let rand_manager = RandManager::<Share, AugmentedData>::new(
-                self.author,
-                epoch_state.clone(),
-                signer,
-                rand_config,
-                rand_ready_block_tx,
-                Arc::new(network_sender.clone()),
-                self.rand_storage.clone(),
-                self.bounded_executor.clone(),
-            );
+                let rand_manager = RandManager::<Share, AugmentedData>::new(
+                    self.author,
+                    epoch_state.clone(),
+                    signer,
+                    rand_config,
+                    rand_ready_block_tx,
+                    Arc::new(network_sender.clone()),
+                    self.rand_storage.clone(),
+                    self.bounded_executor.clone(),
+                );
 
-            tokio::spawn(rand_manager.start(
-                ordered_block_rx,
-                rand_msg_rx,
-                reset_rand_manager_rx,
-                self.bounded_executor.clone(),
-            ));
+                tokio::spawn(rand_manager.start(
+                    ordered_block_rx,
+                    rand_msg_rx,
+                    reset_rand_manager_rx,
+                    self.bounded_executor.clone(),
+                ));
 
-            (
-                ordered_block_tx,
-                rand_ready_block_rx,
-                Some(reset_tx_to_rand_manager),
-                Some(rand_msg_tx),
-            )
-        } else {
-            let (ordered_block_tx, ordered_block_rx) = unbounded();
-            (ordered_block_tx, ordered_block_rx, None, None)
-        };
+                (
+                    ordered_block_tx,
+                    rand_ready_block_rx,
+                    Some(reset_tx_to_rand_manager),
+                )
+            } else {
+                let (ordered_block_tx, ordered_block_rx) = unbounded();
+                (ordered_block_tx, ordered_block_rx, None)
+            };
 
         self.handle.write().init(
             execution_ready_block_tx,
@@ -266,8 +259,6 @@ impl ExecutionProxyClient {
         tokio::spawn(signing_phase.start());
         tokio::spawn(persisting_phase.start());
         tokio::spawn(buffer_manager.start());
-
-        maybe_rand_msg_tx
     }
 }
 
@@ -282,11 +273,13 @@ impl TExecutionClient for ExecutionProxyClient {
         onchain_execution_config: &OnChainExecutionConfig,
         features: &Features,
         rand_config: Option<RandConfig>,
-    ) -> Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>> {
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+    ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             commit_signer_provider,
             epoch_state.clone(),
             rand_config,
+            rand_msg_rx,
         );
 
         let transaction_shuffler =
@@ -457,8 +450,8 @@ impl TExecutionClient for DummyExecutionClient {
         _onchain_execution_config: &OnChainExecutionConfig,
         _features: &Features,
         _rand_config: Option<RandConfig>,
-    ) -> Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>> {
-        None
+        _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+    ) {
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {

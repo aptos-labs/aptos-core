@@ -98,8 +98,8 @@ impl TExecutionClient for MockExecutionClient {
         _onchain_execution_config: &OnChainExecutionConfig,
         _features: &Features,
         _rand_config: Option<RandConfig>,
-    ) -> Option<aptos_channel::Sender<AccountAddress, IncomingRandGenRequest>> {
-        None
+        _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
+    ) {
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
