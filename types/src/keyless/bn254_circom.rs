@@ -184,7 +184,7 @@ pub fn get_public_inputs_hash(
 
         // Add the hash of the jwt_header with the "." separator appended
         let jwt_header_b64_with_separator =
-            format!("{}.", base64url_encode_str(sig.jwt_header.as_str()));
+            format!("{}.", base64url_encode_str(sig.jwt_header_json.as_str()));
         let jwt_header_hash = poseidon_bn254::pad_and_hash_string(
             &jwt_header_b64_with_separator,
             config.max_jwt_header_b64_bytes as usize,

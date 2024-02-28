@@ -55,7 +55,7 @@ pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
     let zk_sig = KeylessSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(groth16zkp.clone()),
-        jwt_header: SAMPLE_JWT_HEADER_DECODED.to_string(),
+        jwt_header_json: SAMPLE_JWT_HEADER_DECODED.to_string(),
         exp_date_secs: SAMPLE_EXP_DATE,
         ephemeral_pubkey: SAMPLE_EPK.clone(),
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
@@ -83,8 +83,8 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     .unwrap();
 
     let openid_sig = OpenIdSig {
-        jwt_sig,
-        jwt_payload: SAMPLE_JWT_PAYLOAD_DECODED.to_string(),
+        jwt_sig: jwt_sig,
+        jwt_payload_json: SAMPLE_JWT_PAYLOAD_DECODED.to_string(),
         uid_key: SAMPLE_UID_KEY.to_owned(),
         epk_blinder: SAMPLE_EPK_BLINDER.clone(),
         pepper: SAMPLE_PEPPER.clone(),
@@ -93,7 +93,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
     let zk_sig = KeylessSignature {
         sig: ZkpOrOpenIdSig::OpenIdSig(openid_sig.clone()),
-        jwt_header: SAMPLE_JWT_HEADER_DECODED.to_string(),
+        jwt_header_json: SAMPLE_JWT_HEADER_DECODED.to_string(),
         exp_date_secs: SAMPLE_EXP_DATE,
         ephemeral_pubkey: SAMPLE_EPK.clone(),
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),

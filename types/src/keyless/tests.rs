@@ -47,7 +47,7 @@ fn test_keyless_oidc_sig_verifies() {
         .unwrap();
 
     oidc_sig
-        .verify_jwt_signature(&SAMPLE_JWK, &sig.jwt_header)
+        .verify_jwt_signature(&SAMPLE_JWK, &sig.jwt_header_json)
         .unwrap();
 
     // Maul the pepper; verification should fail
@@ -76,7 +76,7 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.sub = format!("{}+1", SAMPLE_JWT_PARSED.oidc_claims.sub);
-    bad_oidc_sig.jwt_payload = serde_json::to_string(&jwt).unwrap();
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
         .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
@@ -87,7 +87,7 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.nonce = "bad nonce".to_string();
-    bad_oidc_sig.jwt_payload = serde_json::to_string(&jwt).unwrap();
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
         .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
@@ -98,7 +98,7 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.iss = "bad iss".to_string();
-    bad_oidc_sig.jwt_payload = serde_json::to_string(&jwt).unwrap();
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
         .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
