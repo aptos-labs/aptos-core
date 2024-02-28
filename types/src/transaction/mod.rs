@@ -9,8 +9,8 @@ use crate::{
     block_metadata::BlockMetadata,
     chain_id::ChainId,
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
+    keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
-    oidb::{OidbPublicKey, OidbSignature},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
     transaction::authenticator::{
@@ -624,15 +624,15 @@ impl SignedTransaction {
         }
     }
 
-    pub fn new_oidb(
+    pub fn new_keyless(
         raw_txn: RawTransaction,
-        public_key: OidbPublicKey,
-        signature: OidbSignature,
+        public_key: KeylessPublicKey,
+        signature: KeylessSignature,
     ) -> SignedTransaction {
         let authenticator = TransactionAuthenticator::single_sender(
             AccountAuthenticator::single_key(SingleKeyAuthenticator::new(
-                AnyPublicKey::oidb(public_key),
-                AnySignature::oidb(signature),
+                AnyPublicKey::keyless(public_key),
+                AnySignature::keyless(signature),
             )),
         );
         SignedTransaction {

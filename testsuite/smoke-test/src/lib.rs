@@ -27,9 +27,9 @@ mod inspection_service;
 #[cfg(test)]
 mod jwks;
 #[cfg(test)]
-mod network;
+mod keyless;
 #[cfg(test)]
-mod oidb;
+mod network;
 #[cfg(test)]
 mod rest_api;
 #[cfg(test)]

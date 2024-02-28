@@ -31,12 +31,15 @@ mod groth16_vk;
 mod openid_sig;
 pub mod test_utils;
 
-use crate::oidb::circuit_constants::devnet_prepared_vk;
+use crate::keyless::circuit_constants::devnet_prepared_vk;
 pub use bn254_circom::get_public_inputs_hash;
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Zkp, SignedGroth16Zkp};
 pub use groth16_vk::Groth16VerificationKey;
 pub use openid_sig::{Claims, OpenIdSig};
+
+/// The name of the Move module for keyless accounts deployed at 0x1.
+pub const KEYLESS_ACCOUNT_MODULE_NAME: &str = "keyless_account";
 
 /// The devnet VK that is initialized during genesis.
 pub static DEVNET_VERIFICATION_KEY: Lazy<PreparedVerifyingKey<Bn254>> =
@@ -67,8 +70,9 @@ pub enum ZkpOrOpenIdSig {
     OpenIdSig(OpenIdSig),
 }
 
+/// NOTE: See `KeylessPublicKey` comments for why this cannot be named `Signature`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct OidbSignature {
+pub struct KeylessSignature {
     /// A \[ZKPoK of an\] OpenID signature over several relevant fields (e.g., `aud`, `sub`, `iss`,
     /// `nonce`) where `nonce` contains a commitment to `ephemeral_pubkey` and an expiration time
     /// `exp_timestamp_secs`.
@@ -89,16 +93,16 @@ pub struct OidbSignature {
     pub ephemeral_signature: EphemeralSignature,
 }
 
-impl TryFrom<&[u8]> for OidbSignature {
+impl TryFrom<&[u8]> for KeylessSignature {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
-        bcs::from_bytes::<OidbSignature>(bytes)
+        bcs::from_bytes::<KeylessSignature>(bytes)
             .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
-impl ValidCryptoMaterial for OidbSignature {
+impl ValidCryptoMaterial for KeylessSignature {
     fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self).expect("Only unhandleable errors happen here.")
     }
@@ -110,9 +114,9 @@ pub struct JWTHeader {
     pub alg: String,
 }
 
-impl OidbSignature {
-    /// A reasonable upper bound for the number of bytes we expect in an OIDB public key. This is
-    /// enforced by our full nodes when they receive OIDB TXNs.
+impl KeylessSignature {
+    /// A reasonable upper bound for the number of bytes we expect in a keyless public key. This is
+    /// enforced by our full nodes when they receive TXNs.
     pub const MAX_LEN: usize = 4000;
 
     pub fn parse_jwt_header(&self) -> anyhow::Result<JWTHeader> {
@@ -126,14 +130,14 @@ impl OidbSignature {
         let expiry_time = seconds_from_epoch(self.exp_timestamp_secs);
 
         if block_time > expiry_time {
-            bail!("OIDB signature is expired");
+            bail!("Keyless signature is expired");
         } else {
             Ok(())
         }
     }
 }
 
-/// The pepper is used to create a _hiding_ identity commitment (IDC) when deriving an OIDB address.
+/// The pepper is used to create a _hiding_ identity commitment (IDC) when deriving a keyless address.
 /// We fix its size at `poseidon_bn254::BYTES_PACKED_PER_SCALAR` to avoid extra hashing work when
 /// computing the public inputs hash.
 ///
@@ -174,17 +178,17 @@ impl Pepper {
 pub struct IdCommitment(#[serde(with = "serde_bytes")] pub(crate) Vec<u8>);
 
 impl IdCommitment {
-    /// The max length of the value of the JWT's `aud` field supported in our circuit. OIDB address
+    /// The max length of the value of the JWT's `aud` field supported in our circuit. Keyless address
     /// derivation depends on this, so it should not be changed.
     pub const MAX_AUD_VAL_BYTES: usize = circuit_constants::MAX_AUD_VAL_BYTES;
     /// The max length of the JWT field name that stores the user's ID (e.g., `sub`, `email`) which is
-    /// supported in our circuit. OIDB address derivation depends on this, so it should not be changed.
+    /// supported in our circuit. Keyless address derivation depends on this, so it should not be changed.
     pub const MAX_UID_KEY_BYTES: usize = circuit_constants::MAX_UID_KEY_BYTES;
     /// The max length of the value of the JWT's UID field (`sub`, `email`) that stores the user's ID
-    /// which is supported in our circuit. OIDB address derivation depends on this, so it should not
+    /// which is supported in our circuit. Keyless address derivation depends on this, so it should not
     /// be changed.
     pub const MAX_UID_VAL_BYTES: usize = circuit_constants::MAX_UID_VAL_BYTES;
-    /// The size of the identity commitment (IDC) used to derive an OIDB address. This value should **NOT*
+    /// The size of the identity commitment (IDC) used to derive a keyless address. This value should **NOT*
     /// be changed since on-chain addresses are based on it (e.g., hashing a larger-sized IDC would lead
     /// to a different address).
     pub const NUM_BYTES: usize = 32;
@@ -230,8 +234,12 @@ impl TryFrom<&[u8]> for IdCommitment {
     }
 }
 
+/// NOTE: Could not use keyless::PublicKey here due to the way `testsuite/generate-format` works.
+/// Would need to use `#[key_name(<some_other_name>)]` to avoid naming conflicts with another
+/// `PublicKey` struct. But the `key_name` procedural macro only works with the `[De]SerializeKey`
+/// procedural macros, which we cannot use since they force us to reimplement serialization.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct OidbPublicKey {
+pub struct KeylessPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
     /// e.g., https://accounts.google.com
     pub iss_val: String,
@@ -246,9 +254,9 @@ pub struct OidbPublicKey {
     pub idc: IdCommitment,
 }
 
-impl OidbPublicKey {
-    /// A reasonable upper bound for the number of bytes we expect in an OIDB public key. This is
-    /// enforced by our full nodes when they receive OIDB TXNs.
+impl KeylessPublicKey {
+    /// A reasonable upper bound for the number of bytes we expect in a keyless public key. This is
+    /// enforced by our full nodes when they receive TXNs.
     pub const MAX_LEN: usize = 200 + IdCommitment::NUM_BYTES;
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -256,25 +264,25 @@ impl OidbPublicKey {
     }
 }
 
-impl TryFrom<&[u8]> for OidbPublicKey {
+impl TryFrom<&[u8]> for KeylessPublicKey {
     type Error = CryptoMaterialError;
 
     fn try_from(_value: &[u8]) -> Result<Self, Self::Error> {
-        bcs::from_bytes::<OidbPublicKey>(_value)
+        bcs::from_bytes::<KeylessPublicKey>(_value)
             .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
-pub fn get_oidb_authenticators(
+pub fn get_authenticators(
     transaction: &SignedTransaction,
-) -> anyhow::Result<Vec<(OidbPublicKey, OidbSignature)>> {
+) -> anyhow::Result<Vec<(KeylessPublicKey, KeylessSignature)>> {
     // Check all the signers in the TXN
     let single_key_authenticators = transaction
         .authenticator_ref()
         .to_single_key_authenticators()?;
     let mut authenticators = Vec::with_capacity(MAX_NUM_OF_SIGS);
     for authenticator in single_key_authenticators {
-        if let (AnyPublicKey::OIDB { public_key }, AnySignature::OIDB { signature }) =
+        if let (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) =
             (authenticator.public_key(), authenticator.signature())
         {
             authenticators.push((public_key.clone(), signature.clone()))

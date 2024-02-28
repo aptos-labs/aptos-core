@@ -2,7 +2,7 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    oidb::{Configuration, IdCommitment, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
+    keyless::{Configuration, IdCommitment, KeylessPublicKey, KeylessSignature, ZkpOrOpenIdSig},
     serialize,
 };
 use anyhow::bail;
@@ -14,7 +14,7 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
-// TODO(oidb): Some of this stuff, if not all, belongs to the aptos-crypto crate
+// TODO(keyless): Some of this stuff, if not all, belongs to the aptos-crypto crate
 
 pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
@@ -148,8 +148,8 @@ impl TryInto<G2Affine> for &G2Bytes {
 }
 
 pub fn get_public_inputs_hash(
-    sig: &OidbSignature,
-    pk: &OidbPublicKey,
+    sig: &KeylessSignature,
+    pk: &KeylessPublicKey,
     jwk: &RSA_JWK,
     config: &Configuration,
 ) -> anyhow::Result<Fr> {
@@ -240,13 +240,13 @@ pub fn get_public_inputs_hash(
         frs.push(use_override_aud);
         poseidon_bn254::hash_scalars(frs)
     } else {
-        bail!("Cannot get_public_inputs_hash for OidbSignature")
+        bail!("Can only call `get_public_inputs_hash` on keyless::Signature with Groth16 ZK proof")
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::oidb::{
+    use crate::keyless::{
         bn254_circom::{
             G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES,
             G2_PROJECTIVE_COMPRESSED_NUM_BYTES,

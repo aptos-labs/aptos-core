@@ -2,8 +2,8 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    oidb::{
-        base64url_decode_as_str, seconds_from_epoch, Configuration, IdCommitment, OidbPublicKey,
+    keyless::{
+        base64url_decode_as_str, seconds_from_epoch, Configuration, IdCommitment, KeylessPublicKey,
         Pepper,
     },
     transaction::authenticator::EphemeralPublicKey,
@@ -41,16 +41,19 @@ impl OpenIdSig {
 
     /// Verifies an `OpenIdSig` by doing the following checks:
     ///  1. Check that the ephemeral public key lifespan is under MAX_EXPIRY_HORIZON_SECS
-    ///  2. Check that the iss claim in the OidbPublicKey matches the one in the jwt_payload
-    ///  3. Check that the identity commitment in the OidbPublicKey matches the one constructed from the jwt_payload
-    ///  4. Check that the nonce constructed from the ephemeral public key, blinder, and exp_timestamp_secs matches the one in the jwt_payload
-    // TODO(oidb): Refactor to return a `Result<(), VMStatus>` because (1) this is now called in the
-    //  VM and (2) is_override_aud_allowed does.
+    ///  2. Check that the `iss` claim in the `PublicKey` matches the one in the `jwt_payload`
+    ///  3. Check that the identity commitment in the `PublicKey` matches the one constructed from
+    ///     the `jwt_payload`
+    ///  4. Check that the nonce constructed from the ephemeral public key, blinder, and
+    ///     `exp_timestamp_secs` matches the one in the jwt_payload
+    ///
+    /// TODO(keyless): Refactor to return a `Result<(), VMStatus>` because (1) this is now called in the
+    ///  VM and (2) is_override_aud_allowed does.
     pub fn verify_jwt_claims(
         &self,
         exp_timestamp_secs: u64,
         epk: &EphemeralPublicKey,
-        pk: &OidbPublicKey,
+        pk: &KeylessPublicKey,
         config: &Configuration,
     ) -> anyhow::Result<()> {
         let jwt_payload_json = base64url_decode_as_str(&self.jwt_payload_b64)?;

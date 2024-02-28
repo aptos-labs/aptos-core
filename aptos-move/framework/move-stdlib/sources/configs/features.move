@@ -347,26 +347,26 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
-    /// Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
+    /// Whether keyless accounts are enabled, possibly with the ZK-less verification mode.
     ///
     /// Lifetime: transient
-    const OIDB_SIGNATURE: u64 = 46;
+    const KEYLESS_ACCOUNTS: u64 = 46;
 
-    public fun get_oidb_feature(): u64 { OIDB_SIGNATURE }
+    public fun get_keyless_accounts_feature(): u64 { KEYLESS_ACCOUNTS }
 
-    public fun oidb_feature_enabled(): bool acquires Features {
-        is_enabled(OIDB_SIGNATURE)
+    public fun keyless_accounts_enabled(): bool acquires Features {
+        is_enabled(KEYLESS_ACCOUNTS)
     }
 
-    /// Whether the ZK-less mode of the OIDB feature is enabled.
+    /// Whether the ZK-less mode of the keyless accounts feature is enabled.
     ///
     /// Lifetime: transient
-    const OIDB_ZKLESS_SIGNATURE: u64 = 47;
+    const KEYLESS_BUT_ZKLESS_ACCOUNTS: u64 = 47;
 
-    public fun get_oidb_zkless_feature(): u64 { OIDB_ZKLESS_SIGNATURE }
+    public fun get_keyless_but_zkless_accounts_feature(): u64 { KEYLESS_BUT_ZKLESS_ACCOUNTS }
 
-    public fun oidb_zkless_feature_enabled(): bool acquires Features {
-        is_enabled(OIDB_ZKLESS_SIGNATURE)
+    public fun keyless_but_zkless_accounts_feature_enabled(): bool acquires Features {
+        is_enabled(KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
     /// The JWK consensus feature.
