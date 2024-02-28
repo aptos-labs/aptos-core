@@ -23,7 +23,7 @@ use crate::{
     application::interface::{NetworkClient, NetworkClientInterface},
     // constants::NETWORK_CHANNEL_SIZE,
     // counters,
-    logging::NetworkSchema,
+    // logging::NetworkSchema,
     protocols::{
         // health_checker::interface::HealthCheckNetworkInterface,
         network::{
@@ -54,7 +54,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use aptos_config::config::{NetworkConfig, NodeConfig};
 pub use crate::protocols::health_checker::interface::HealthCheckNetworkInterface;
 
-pub mod builder;
+// pub mod builder;
 mod interface;
 #[cfg(test)]
 mod test;
@@ -153,9 +153,18 @@ pub struct HealthChecker<NetworkClient> {
 async fn network_id_ticker(time_service: TimeService, network_id: NetworkId, ping_interval: Duration, sender: tokio::sync::mpsc::Sender<NetworkId>) {
     let ticker = time_service.interval(ping_interval);
     tokio::pin!(ticker);
+    let mut sequential_errors = 0;
     loop {
         let _ = ticker.select_next_some();
-        sender.send(network_id);
+        if let Err(x) = sender.send(network_id).await {
+            error!("{} health checker ticker could not send: {}", network_id, x);
+            sequential_errors += 1;
+            if sequential_errors > 100 {
+                error!("{} health checker ticker giving up", network_id);
+            }
+        } else {
+            sequential_errors = 0;
+        }
     }
 }
 

@@ -28,7 +28,6 @@ use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_network2::application::ApplicationCollector;
-use aptos_network2::protocols::health_checker::HealthCheckerMsg;
 use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::chain_id::ChainId;
@@ -49,9 +48,7 @@ use std::{
 };
 use std::collections::BTreeMap;
 use tokio::runtime::Runtime;
-use aptos_network2::protocols::health_checker::HealthChecker;
 use aptos_network2::protocols::network::OutboundPeerConnections;
-use aptos_time_service::TimeService;
 use crate::network2::AppSetupContext;
 
 const EPOCH_LENGTH_SECS: u64 = 60;
