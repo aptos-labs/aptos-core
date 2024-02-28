@@ -7,7 +7,7 @@ use aptos_sdk::{
     bcs,
     move_types::{
         account_address::AccountAddress, ident_str, identifier::Identifier,
-        language_storage::ModuleId,
+        language_storage::{ModuleId, TypeTag, StructTag},
     },
     types::{
         serde_helper::bcs_utils::bcs_size_of_byte_array,
@@ -602,67 +602,152 @@ impl EntryPoints {
                 ])
             },
             EntryPoints::EconiaRegisterMarket => {
-                get_payload(module_id, ident_str!("register_market").to_owned(), vec![])
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    module_id, 
+                    ident_str!("register_market").to_owned(), 
+                    vec![TypeTag::Struct(Box::new(StructTag {
+                        address: *other.expect("Must provide other"),
+                        module: ident_str!("assets").to_owned(),
+                        name: ident_str!("AC").to_owned(),
+                        type_params: vec![],
+                    })), TypeTag::Struct(Box::new(StructTag {
+                        address: *other.expect("Must provide other"),
+                        module: ident_str!("assets").to_owned(),
+                        name: ident_str!("QC").to_owned(),
+                        type_params: vec![],
+                    }))],
+                    vec![])
+                )
             },
-            EntryPoints::EconiaRegisterMarketUser => get_payload(
+            EntryPoints::EconiaRegisterMarketUser => TransactionPayload::EntryFunction(EntryFunction::new(
                 module_id,
                 ident_str!("register_market_accounts").to_owned(),
+                vec![TypeTag::Struct(Box::new(StructTag {
+                    address: *other.expect("Must provide other"),
+                    module: ident_str!("assets").to_owned(),
+                    name: ident_str!("AC").to_owned(),
+                    type_params: vec![],
+                })), TypeTag::Struct(Box::new(StructTag {
+                    address: *other.expect("Must provide other"),
+                    module: ident_str!("assets").to_owned(),
+                    name: ident_str!("QC").to_owned(),
+                    type_params: vec![],
+                }))],
                 vec![
                     bcs::to_bytes(&1).unwrap(), //market id
                 ],
-            ),
+            )),
             EntryPoints::EconiaDepositCoins => {
-                get_payload(module_id, ident_str!("deposit_coins").to_owned(), vec![
-                    bcs::to_bytes(&1).unwrap(), // market id
-                ])
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    module_id, 
+                    ident_str!("deposit_coins").to_owned(), 
+                    vec![TypeTag::Struct(Box::new(StructTag {
+                        address: *other.expect("Must provide other"),
+                        module: ident_str!("assets").to_owned(),
+                        name: ident_str!("AC").to_owned(),
+                        type_params: vec![],
+                    })), TypeTag::Struct(Box::new(StructTag {
+                        address: *other.expect("Must provide other"),
+                        module: ident_str!("assets").to_owned(),
+                        name: ident_str!("QC").to_owned(),
+                        type_params: vec![],
+                    }))], 
+                    vec![
+                        bcs::to_bytes(&1).unwrap(), // market id
+                    ])
+                )
             },
             EntryPoints::EconiaPlaceBidLimitOrder => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
-                get_payload(
+                TransactionPayload::EntryFunction(EntryFunction::new(
                     module_id,
                     ident_str!("place_bid_limit_order").to_owned(),
+                    vec![TypeTag::Struct(Box::new(StructTag {
+                        address: *other.expect("Must provide other"),
+                        module: ident_str!("assets").to_owned(),
+                        name: ident_str!("AC").to_owned(),
+                        type_params: vec![],
+                    })), TypeTag::Struct(Box::new(StructTag {
+                        address: *other.expect("Must provide other"),
+                        module: ident_str!("assets").to_owned(),
+                        name: ident_str!("QC").to_owned(),
+                        type_params: vec![],
+                    }))],
                     vec![
                         bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
                         bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
                         bcs::to_bytes(&1).unwrap(), // market id
                     ],
-                )
+                ))
             },
             EntryPoints::EconiaPlaceAskLimitOrder => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
-                get_payload(
+                TransactionPayload::EntryFunction(EntryFunction::new(
                     module_id,
                     ident_str!("place_ask_limit_order").to_owned(),
+                    vec![TypeTag::Struct(Box::new(StructTag {
+                        address: *other.expect("Must provide other"),
+                        module: ident_str!("assets").to_owned(),
+                        name: ident_str!("AC").to_owned(),
+                        type_params: vec![],
+                    })), TypeTag::Struct(Box::new(StructTag {
+                        address: *other.expect("Must provide other"),
+                        module: ident_str!("assets").to_owned(),
+                        name: ident_str!("QC").to_owned(),
+                        type_params: vec![],
+                    }))],
                     vec![
                         bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
                         bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
                         bcs::to_bytes(&1).unwrap(), //market id
                     ],
-                )
+                ))
             },
             EntryPoints::EconiaPlaceRandomLimitOrder => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 let is_bid: bool = rng.gen();
                 if is_bid {
-                    get_payload(
+                    TransactionPayload::EntryFunction(EntryFunction::new(
                         module_id,
                         ident_str!("place_bid_limit_order").to_owned(),
+                        vec![TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+                            name: Identifier::new(<&str as Into<Box<str>>>::into("AC")).unwrap(),
+                            type_params: vec![],
+                        })), TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+                            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+                            type_params: vec![],
+                        }))],
                         vec![
-                            bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
+                            bcs::to_bytes(&rng.gen_range(4u64, 14u64)).unwrap(),  // size
                             bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
                             bcs::to_bytes(&1).unwrap(), // market id
                         ],
-                    )
+                    ))
                 } else {
-                    get_payload(
+                    TransactionPayload::EntryFunction(EntryFunction::new(
                         module_id,
                         ident_str!("place_ask_limit_order").to_owned(),
+                        vec![TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+                            name: Identifier::new(<&str as Into<Box<str>>>::into("AC")).unwrap(),
+                            type_params: vec![],
+                        })), TypeTag::Struct(Box::new(StructTag {
+                            address: *other.expect("Must provide other"),
+                            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+                            name: Identifier::new(<&str as Into<Box<str>>>::into("QC")).unwrap(),
+                            type_params: vec![],
+                        }))],
                         vec![
-                            bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
+                            bcs::to_bytes(&rng.gen_range(4u64, 14u64)).unwrap(),  // size
                             bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
                             bcs::to_bytes(&1).unwrap(), // market id
                         ],
-                    )
+                    ))
                 }
             },
         }
