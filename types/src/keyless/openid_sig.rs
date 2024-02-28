@@ -3,8 +3,8 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     keyless::{
-        base64url_decode_as_str, base64url_encode_bytes, base64url_encode_str, seconds_from_epoch,
-        Configuration, IdCommitment, KeylessPublicKey, Pepper,
+        base64url_encode_bytes, base64url_encode_str, seconds_from_epoch, Configuration,
+        IdCommitment, KeylessPublicKey, Pepper,
     },
     transaction::authenticator::EphemeralPublicKey,
 };

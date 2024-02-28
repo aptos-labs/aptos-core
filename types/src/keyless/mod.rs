@@ -34,7 +34,7 @@ pub mod test_utils;
 use crate::keyless::circuit_constants::devnet_prepared_vk;
 pub use bn254_circom::get_public_inputs_hash;
 pub use configuration::Configuration;
-pub use groth16_sig::{Groth16Zkp, SignedGroth16Zkp};
+pub use groth16_sig::{Groth16Zkp, Groth16ZkpAndStatement, SignedGroth16Zkp};
 pub use groth16_vk::Groth16VerificationKey;
 pub use openid_sig::{Claims, OpenIdSig};
 
@@ -298,6 +298,7 @@ pub(crate) fn base64url_encode_bytes(data: &[u8]) -> String {
     base64::encode_config(data, URL_SAFE_NO_PAD)
 }
 
+#[allow(unused)]
 fn base64url_decode_as_str(b64: &str) -> anyhow::Result<String> {
     let decoded_bytes = base64::decode_config(b64, URL_SAFE_NO_PAD)?;
     // Convert the decoded bytes to a UTF-8 string

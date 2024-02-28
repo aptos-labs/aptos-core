@@ -161,17 +161,21 @@ pub(crate) fn validate_authenticators(
                         config.is_allowed_override_aud(proof.override_aud_val.as_ref().unwrap())?;
                     }
 
+                    let public_inputs_hash = get_public_inputs_hash(sig, pk, &rsa_jwk, config)
+                        .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
+
                     // The training wheels signature is only checked if a training wheels PK is set on chain
                     if training_wheels_pk.is_some() {
                         proof
-                            .verify_training_wheels_sig(training_wheels_pk.as_ref().unwrap())
+                            .verify_training_wheels_sig(
+                                training_wheels_pk.as_ref().unwrap(),
+                                &public_inputs_hash,
+                            )
                             .map_err(|_| {
                                 invalid_signature!("Could not verify training wheels signature")
                             })?;
                     }
 
-                    let public_inputs_hash = get_public_inputs_hash(sig, pk, &rsa_jwk, config)
-                        .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
                     proof
                         .verify_proof(public_inputs_hash, pvk)
                         .map_err(|_| invalid_signature!("Proof verification failed"))?;
@@ -182,12 +186,7 @@ pub(crate) fn validate_authenticators(
                 match jwk {
                     JWK::RSA(rsa_jwk) => {
                         openid_sig
-                            .verify_jwt_claims(
-                                sig.exp_date_secs,
-                                &sig.ephemeral_pubkey,
-                                pk,
-                                config,
-                            )
+                            .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, pk, config)
                             .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
 
                         // TODO(OpenIdSig): Implement batch verification for all RSA signatures in

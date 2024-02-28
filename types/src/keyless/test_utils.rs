@@ -3,7 +3,7 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     keyless::{
-        base64url_encode_bytes, base64url_encode_str,
+        base64url_encode_str,
         circuit_testcases::{
             SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
             SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
