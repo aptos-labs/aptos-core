@@ -230,7 +230,6 @@ impl ChunkOutput {
                         )
                     })
                     .collect::<Vec<_>>(),
-                None,
             ),
         };
         Ok(transaction_outputs)
