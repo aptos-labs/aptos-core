@@ -77,8 +77,7 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.sub = format!("{}+1", SAMPLE_JWT_PARSED.oidc_claims.sub);
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
         .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
@@ -89,8 +88,7 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.nonce = "bad nonce".to_string();
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
         .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
@@ -101,8 +99,7 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.iss = "bad iss".to_string();
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
         .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
