@@ -450,7 +450,10 @@ impl DagBootstrapper {
                         let commit_events = self
                             .storage
                             .get_latest_k_committed_events(
-                                config.proposer_window_num_validators_multiplier as u64
+                                std::cmp::max(
+                                    config.proposer_window_num_validators_multiplier,
+                                    config.voter_window_num_validators_multiplier,
+                                ) as u64
                                     * self.epoch_state.verifier.len() as u64,
                             )
                             .expect("Failed to read commit events from storage");
