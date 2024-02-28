@@ -13,21 +13,24 @@ use aptos_rest_client::Client;
 use aptos_types::{
     jwks::{
         jwk::{JWKMoveStruct, JWK},
+        rsa::RSA_JWK,
         AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
     },
     keyless::{
+        get_public_inputs_hash,
         test_utils::{
             get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk,
             get_sample_openid_sig_and_pk,
         },
-        Configuration, Groth16VerificationKey, KeylessPublicKey, KeylessSignature, ZkpOrOpenIdSig,
-        KEYLESS_ACCOUNT_MODULE_NAME,
+        Configuration, Groth16VerificationKey, Groth16ZkpAndStatement, KeylessPublicKey,
+        KeylessSignature, ZkpOrOpenIdSig, KEYLESS_ACCOUNT_MODULE_NAME,
     },
     transaction::{
         authenticator::{AnyPublicKey, EphemeralSignature},
         SignedTransaction,
     },
 };
+use ark_ff::{BigInteger, PrimeField};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::time::Duration;
@@ -52,18 +55,18 @@ async fn test_keyless_oidc_txn_verifies() {
 
 #[tokio::test]
 async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
-    let (tw_sk, mut swarm) = setup_local_net().await;
+    let (tw_sk, config, jwk, mut swarm) = setup_local_net().await;
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
     match &mut sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(_) => panic!("Internal inconsistency"),
         ZkpOrOpenIdSig::OpenIdSig(openid_sig) => {
-            openid_sig.jwt_sig_b64 = "bad signature".to_string() // Mauling the signature
+            openid_sig.jwt_sig = vec![0u8; 16] // Mauling the signature
         },
     }
 
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_transaction(&mut info, sig, pk, &tw_sk).await;
+    let signed_txn = sign_transaction(&mut info, sig, pk, &jwk, &config, &tw_sk).await;
 
     info!("Submit OpenID transaction with bad JWT signature");
     let result = info
@@ -78,13 +81,13 @@ async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
 
 #[tokio::test]
 async fn test_keyless_oidc_txn_with_expired_epk() {
-    let (tw_sk, mut swarm) = setup_local_net().await;
+    let (tw_sk, config, jwk, mut swarm) = setup_local_net().await;
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
-    sig.exp_timestamp_secs = 1; // This should fail the verification since the expiration date is way in the past
+    sig.exp_date_secs = 1; // This should fail the verification since the expiration date is way in the past
 
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_transaction(&mut info, sig, pk, &tw_sk).await;
+    let signed_txn = sign_transaction(&mut info, sig, pk, &jwk, &config, &tw_sk).await;
 
     info!("Submit OpenID transaction with expired EPK");
     let result = info
@@ -115,7 +118,7 @@ async fn test_keyless_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_groth16_with_mauled_proof() {
-    let (tw_sk, mut swarm) = setup_local_net().await;
+    let (tw_sk, config, jwk, mut swarm) = setup_local_net().await;
     let (mut sig, pk) = get_sample_groth16_sig_and_pk();
 
     match &mut sig.sig {
@@ -127,7 +130,7 @@ async fn test_keyless_groth16_with_mauled_proof() {
     }
 
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_transaction(&mut info, sig, pk, &tw_sk).await;
+    let signed_txn = sign_transaction(&mut info, sig, pk, &jwk, &config, &tw_sk).await;
 
     info!("Submit keyless Groth16 transaction");
     let result = info
@@ -142,13 +145,13 @@ async fn test_keyless_groth16_with_mauled_proof() {
 
 #[tokio::test]
 async fn test_keyless_groth16_with_bad_tw_signature() {
-    let (_tw_sk, mut swarm) = setup_local_net().await;
+    let (_tw_sk, config, jwk, mut swarm) = setup_local_net().await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
 
     // using the sample ESK rather than the TW SK to get a bad training wheels signature
-    let signed_txn = sign_transaction(&mut info, sig, pk, &get_sample_esk()).await;
+    let signed_txn = sign_transaction(&mut info, sig, pk, &jwk, &config, &get_sample_esk()).await;
 
     info!("Submit keyless Groth16 transaction");
     let result = info
@@ -167,6 +170,8 @@ async fn sign_transaction<'a>(
     info: &mut AptosPublicInfo<'a>,
     mut sig: KeylessSignature,
     pk: KeylessPublicKey,
+    jwk: &RSA_JWK,
+    config: &Configuration,
     tw_sk: &Ed25519PrivateKey,
 ) -> SignedTransaction {
     let addr = info
@@ -190,11 +195,30 @@ async fn sign_transaction<'a>(
     let esk = get_sample_esk();
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
+    let public_inputs_hash: Option<[u8; 32]> = if let ZkpOrOpenIdSig::Groth16Zkp(_) = &sig.sig {
+        // This will only calculate the hash if it's needed, avoiding unnecessary computation.
+        Some(
+            get_public_inputs_hash(&sig, &pk, jwk, config)
+                .unwrap()
+                .into_bigint()
+                .to_bytes_le()
+                .try_into()
+                .expect("expected 32-byte public inputs hash"),
+        )
+    } else {
+        None
+    };
+
     // Compute the training wheels signature if not present
     match &mut sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+            let proof_and_statement = Groth16ZkpAndStatement {
+                proof: proof.proof,
+                public_inputs_hash: public_inputs_hash.unwrap(),
+            };
+
             proof.training_wheels_signature = Some(EphemeralSignature::ed25519(
-                tw_sk.sign(&proof.proof).unwrap(),
+                tw_sk.sign(&proof_and_statement).unwrap(),
             ));
         },
         ZkpOrOpenIdSig::OpenIdSig(_) => {},
@@ -211,30 +235,31 @@ async fn get_transaction(
     LocalSwarm,
     SignedTransaction,
 ) {
-    let (tw_sk, mut swarm) = setup_local_net().await;
+    let (tw_sk, config, jwk, mut swarm) = setup_local_net().await;
 
     let (sig, pk) = get_pk_and_sig_func();
 
     let mut info = swarm.aptos_public_info();
-    let signed_txn = sign_transaction(&mut info, sig.clone(), pk.clone(), &tw_sk).await;
+    let signed_txn =
+        sign_transaction(&mut info, sig.clone(), pk.clone(), &jwk, &config, &tw_sk).await;
 
     (sig, pk, swarm, signed_txn)
 }
 
-async fn setup_local_net() -> (Ed25519PrivateKey, LocalSwarm) {
+async fn setup_local_net() -> (Ed25519PrivateKey, Configuration, RSA_JWK, LocalSwarm) {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .build_with_cli(0)
         .await;
 
-    let tw_sk = spawn_network_and_execute_gov_proposals(&mut swarm, &mut cli).await;
-    (tw_sk, swarm)
+    let (tw_sk, config, jwk) = spawn_network_and_execute_gov_proposals(&mut swarm, &mut cli).await;
+    (tw_sk, config, jwk, swarm)
 }
 
 async fn spawn_network_and_execute_gov_proposals(
     swarm: &mut LocalSwarm,
     cli: &mut CliTestFramework,
-) -> Ed25519PrivateKey {
+) -> (Ed25519PrivateKey, Configuration, RSA_JWK) {
     let client = swarm.validators().next().unwrap().rest_client();
     let root_idx = cli.add_account_with_address_to_cli(
         swarm.root_key(),
@@ -325,7 +350,7 @@ fun main(core_resources: &signer) {{
         entries: vec![ProviderJWKs {
             issuer: iss.into_bytes(),
             version: 0,
-            jwks: vec![JWKMoveStruct::from(JWK::RSA(jwk))],
+            jwks: vec![JWKMoveStruct::from(JWK::RSA(jwk.clone()))],
         }],
     };
     assert_eq!(expected_providers_jwks, patched_jwks.jwks);
@@ -344,7 +369,7 @@ fun main(core_resources: &signer) {{
     // Increment sequence number since we patched a JWK
     info.root_account().increment_sequence_number();
 
-    training_wheels_sk
+    (training_wheels_sk, config, jwk)
 }
 
 async fn get_latest_jwkset(rest_client: &Client) -> PatchedJWKs {
