@@ -2,16 +2,14 @@
 
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_oidb_pepper_common::{
-    jwt, vuf,
-    vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
-    PepperInput, PepperRequest, PepperRequestV0, PepperResponse, PepperResponseV0,
-    VUFVerificationKey,
+    jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperSchemeInfo,
 };
 use aptos_types::{
     oidb::{test_utils::get_sample_esk, Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
 };
 use ark_serialize::CanonicalDeserialize;
+use reqwest::StatusCode;
 use std::{fs, io::stdin};
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
@@ -67,6 +65,7 @@ async fn main() {
     let url = get_pepper_service_url();
     println!();
     let vuf_pub_key_url = format!("{url}/vuf-pub-key");
+    let pepper_v0_url = format!("{url}/v0");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
@@ -78,7 +77,7 @@ async fn main() {
         .send()
         .await
         .unwrap()
-        .json::<VUFVerificationKey>()
+        .json::<PepperSchemeInfo>()
         .await
         .unwrap();
     println!();
@@ -86,14 +85,14 @@ async fn main() {
         "response_json={}",
         serde_json::to_string_pretty(&response).unwrap()
     );
-    let VUFVerificationKey {
+    let PepperSchemeInfo {
         scheme_name,
-        vuf_public_key_hex_string,
+        public_key: vuf_pk,
+        ..
     } = response;
-    assert_eq!(Bls12381G1Bls::scheme_name(), scheme_name.as_str());
-    let vuf_pk_bytes = hex::decode(vuf_public_key_hex_string).unwrap();
+    assert_eq!(vuf::bls12381_g1_bls::SCHEME_NAME, scheme_name.as_str());
     let vuf_pk: ark_bls12_381::G2Projective =
-        ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk_bytes.as_slice())
+        ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk.as_slice())
             .unwrap()
             .into();
 
@@ -134,29 +133,33 @@ async fn main() {
         Err(_) => jwt_or_path,
     };
 
-    let pepper_request = PepperRequest::V0(PepperRequestV0 {
+    let pepper_request = PepperRequest {
         jwt: jwt.clone(),
-        epk_hex_string: hex::encode(epk.to_bytes()),
+        epk,
         epk_expiry_time_secs,
-        epk_blinder_hex_string: hex::encode(blinder),
         uid_key: None,
-    });
+        epk_blinder: blinder.to_vec(),
+    };
     println!();
     println!(
         "Request pepper with a POST to {} and the body being {}",
         url,
         serde_json::to_string_pretty(&pepper_request).unwrap()
     );
-    let raw_response = client.post(url).json(&pepper_request).send().await.unwrap();
+    let raw_response = client
+        .post(pepper_v0_url)
+        .json(&pepper_request)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(StatusCode::OK, raw_response.status());
     let pepper_response = raw_response.json::<PepperResponse>().await.unwrap();
     println!();
     println!(
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse::V0(PepperResponseV0::Ok(pepper)) = pepper_response else {
-        panic!("bad pepper response")
-    };
+    let PepperResponse { signature: pepper } = pepper_response;
     println!();
     println!("pepper={:?}", pepper);
     let claims = jwt::parse(jwt.as_str()).unwrap();

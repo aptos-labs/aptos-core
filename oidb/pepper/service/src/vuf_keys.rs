@@ -2,8 +2,9 @@
 
 use anyhow::{anyhow, ensure};
 use aptos_oidb_pepper_common::{
+    vuf,
     vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
-    VUFVerificationKey,
+    PepperSchemeInfo,
 };
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
@@ -57,9 +58,10 @@ pub static VUF_VERIFICATION_KEY_JSON: Lazy<String> = Lazy::new(|| {
     let pk = Bls12381G1Bls::pk_from_sk(&VUF_SK).expect("bad sk");
     let mut buf = vec![];
     pk.into_affine().serialize_compressed(&mut buf).unwrap();
-    let obj = VUFVerificationKey {
-        scheme_name: Bls12381G1Bls::scheme_name(),
-        vuf_public_key_hex_string: hex::encode(buf),
+    let obj = PepperSchemeInfo {
+        scheme_name: vuf::bls12381_g1_bls::SCHEME_NAME.to_string(),
+        public_key: buf,
+        doc: None,
     };
     serde_json::to_string_pretty(&obj).unwrap()
 });
