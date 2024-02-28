@@ -659,6 +659,8 @@ impl EntryPoints {
             },
             EntryPoints::EconiaPlaceBidLimitOrder => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let size: u64 = rng.gen_range(4u64, 14u64);
+                let price: u64 = rng.gen_range(1u64, 30u64);
                 TransactionPayload::EntryFunction(EntryFunction::new(
                     module_id,
                     ident_str!("place_bid_limit_order").to_owned(),
@@ -674,14 +676,16 @@ impl EntryPoints {
                         type_params: vec![],
                     }))],
                     vec![
-                        bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
-                        bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
+                        bcs::to_bytes(&size).unwrap(),  // size
+                        bcs::to_bytes(&price).unwrap(), // amount
                         bcs::to_bytes(&1).unwrap(), // market id
                     ],
                 ))
             },
             EntryPoints::EconiaPlaceAskLimitOrder => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let size: u64 = rng.gen_range(4u64, 14u64);
+                let price: u64 = rng.gen_range(1u64, 30u64);
                 TransactionPayload::EntryFunction(EntryFunction::new(
                     module_id,
                     ident_str!("place_ask_limit_order").to_owned(),
@@ -697,14 +701,16 @@ impl EntryPoints {
                         type_params: vec![],
                     }))],
                     vec![
-                        bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
-                        bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
+                        bcs::to_bytes(&size).unwrap(),  // size
+                        bcs::to_bytes(&price).unwrap(), // amount
                         bcs::to_bytes(&1).unwrap(), //market id
                     ],
                 ))
             },
             EntryPoints::EconiaPlaceRandomLimitOrder => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let size: u64 = rng.gen_range(4u64, 14u64);
+                let price: u64 = rng.gen_range(1u64, 30u64);
                 let is_bid: bool = rng.gen();
                 if is_bid {
                     TransactionPayload::EntryFunction(EntryFunction::new(
@@ -722,8 +728,8 @@ impl EntryPoints {
                             type_params: vec![],
                         }))],
                         vec![
-                            bcs::to_bytes(&rng.gen_range(4u64, 14u64)).unwrap(),  // size
-                            bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
+                            bcs::to_bytes(&size).unwrap(),  // size
+                            bcs::to_bytes(&price).unwrap(), // amount
                             bcs::to_bytes(&1).unwrap(), // market id
                         ],
                     ))
@@ -743,8 +749,8 @@ impl EntryPoints {
                             type_params: vec![],
                         }))],
                         vec![
-                            bcs::to_bytes(&rng.gen_range(4u64, 14u64)).unwrap(),  // size
-                            bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
+                            bcs::to_bytes(&size).unwrap(),  // size
+                            bcs::to_bytes(&price).unwrap(), // amount
                             bcs::to_bytes(&1).unwrap(), // market id
                         ],
                     ))
