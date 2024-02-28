@@ -62,6 +62,8 @@ message Transaction {
     UserTransaction user = 10;
     ValidatorTransaction validator = 21;
   }
+
+  TransactionSizeInfo size_info = 22;
 }
 
 message BlockMetadataTransaction {
@@ -537,4 +539,20 @@ message AccountSignature {
     SingleKeySignature single_key_signature = 5;
     MultiKeySignature multi_key_signature = 6;
   }
+}
+
+message TransactionSizeInfo {
+  uint32 transaction_bytes = 1;
+  repeated EventSizeInfo event_size_info = 2;
+  repeated WriteOpSizeInfo write_op_size_info = 3;
+}
+
+message EventSizeInfo {
+  uint32 type_tag_bytes = 1;
+  uint32 total_bytes = 2;
+}
+
+message WriteOpSizeInfo {
+  uint32 key_bytes = 1;
+  uint32 value_bytes = 2;
 }
