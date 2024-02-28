@@ -32,6 +32,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures_channel::oneshot;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min,
@@ -758,12 +759,6 @@ impl FetchResponse {
                 }
             }),
             "nodes don't match requested bitmask"
-        );
-        ensure!(
-            self.certified_nodes
-                .iter()
-                .all(|node| node.verify(validator_verifier).is_ok()),
-            "unable to verify certified nodes"
         );
 
         Ok(self)
