@@ -134,6 +134,10 @@ impl NFTMetadataCrawlerURIs {
         self.json_parser_retry_count += 1;
     }
 
+    pub fn reset_json_parser_retry_count(&mut self) {
+        self.json_parser_retry_count = 0;
+    }
+
     pub fn get_image_optimizer_retry_count(&self) -> i32 {
         self.image_optimizer_retry_count
     }

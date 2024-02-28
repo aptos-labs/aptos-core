@@ -164,7 +164,7 @@ impl<'a> FunctionGenerator<'a> {
                 let bc = &bytecode[i];
                 let next_bc = &bytecode[i + 1];
                 self.gen_bytecode(&bytecode_ctx, &bytecode[i], Some(next_bc));
-                if !bc.is_branch() && matches!(next_bc, Bytecode::Label(..)) {
+                if !bc.is_branching() && matches!(next_bc, Bytecode::Label(..)) {
                     // At block boundaries without a preceding branch, need to flush stack
                     // TODO: to avoid this, we should use the CFG for code generation.
                     self.abstract_flush_stack_after(&bytecode_ctx, 0);

@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.4.0"
+version = "2.5.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -3073,6 +3073,7 @@ dependencies = [
  "hex",
  "jemallocator",
  "maplit",
+ "num_cpus",
  "rand 0.7.3",
  "rayon",
  "rstack-self",
@@ -10676,6 +10677,7 @@ dependencies = [
  "flexi_logger",
  "im",
  "itertools 0.10.5",
+ "lazy_static",
  "log",
  "move-binary-format",
  "move-bytecode-source-map",

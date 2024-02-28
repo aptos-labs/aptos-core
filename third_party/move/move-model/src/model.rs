@@ -3229,6 +3229,16 @@ impl<'env> StructEnv<'env> {
         }
         default()
     }
+
+    /// Produce a TypeDisplayContext to print types within the scope of this env
+    pub fn get_type_display_ctx(&self) -> TypeDisplayContext<'env> {
+        let type_param_names = self
+            .get_type_parameters()
+            .iter()
+            .map(|param| param.0)
+            .collect();
+        TypeDisplayContext::new_with_params(self.module_env.env, type_param_names)
+    }
 }
 
 // =================================================================================================
