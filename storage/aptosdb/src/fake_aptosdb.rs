@@ -6,7 +6,7 @@ use crate::{
     metrics::{LATEST_CHECKPOINT_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH},
     AptosDB,
 };
-use anyhow::{ensure, format_err, Result};
+use anyhow::{ensure, format_err};
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
@@ -14,7 +14,7 @@ use aptos_crypto::{
 };
 use aptos_infallible::Mutex;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, AptosDbError, DbReader,
+    Result, cached_state_view::ShardedStateCache, state_delta::StateDelta, AptosDbError, DbReader,
     DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
