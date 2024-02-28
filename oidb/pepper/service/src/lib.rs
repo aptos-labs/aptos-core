@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use std::time::{SystemTime, UNIX_EPOCH};
 use crate::{
     vuf_keys::VUF_SK,
     ProcessingFailure::{BadRequest, InternalError},
@@ -33,10 +34,11 @@ pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailu
     let PepperRequest {
         jwt,
         epk,
-        epk_expiry_time_secs,
+        exp_date_secs,
         epk_blinder,
         uid_key,
     } = request;
+    let config = Configuration::new_for_devnet();
 
     if !matches!(epk, EphemeralPublicKey::Ed25519 { .. }) {
         return Err(BadRequest("Only Ed25519 epk is supported".to_string()));
@@ -44,6 +46,15 @@ pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailu
 
     let claims = aptos_oidb_pepper_common::jwt::parse(jwt.as_str())
         .map_err(|e| BadRequest(format!("JWT decoding error: {e}")))?;
+
+    let now_secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    if exp_date_secs <= now_secs {
+        return Err(BadRequest("epk expired".to_string()));
+    }
+
+    if exp_date_secs >= claims.claims.iat + config.max_exp_horizon_secs  {
+        return Err(BadRequest("epk expiry date too far".to_string()));
+    }
 
     let actual_uid_key = if let Some(uid_key) = uid_key.as_ref() {
         uid_key
@@ -68,9 +79,9 @@ pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailu
 
     let recalculated_nonce = OpenIdSig::reconstruct_oauth_nonce(
         epk_blinder.as_slice(),
-        epk_expiry_time_secs,
+        exp_date_secs,
         &epk,
-        &Configuration::new_for_devnet(),
+        &config,
     )
     .map_err(|e| BadRequest(format!("nonce reconstruction error: {e}")))?;
 

@@ -4,7 +4,7 @@ use aptos_oidb_pepper_common::{BadPepperRequestError, PepperRequest};
 use aptos_oidb_pepper_service::{
     about::ABOUT_JSON,
     jwk, process,
-    vuf_keys::{VUF_SK, VUF_VERIFICATION_KEY_JSON},
+    vuf_keys::{VUF_SK, PEPPER_V0_VUF_VERIFICATION_KEY_JSON},
     ProcessingFailure::{BadRequest, InternalError},
 };
 use hyper::{
@@ -35,16 +35,16 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(ABOUT_JSON.as_str()))
             .expect("Response should build"),
-        (&Method::GET, "/vuf-pub-key") => hyper::Response::builder()
+        (&Method::GET, "/v0/vuf-pub-key") => hyper::Response::builder()
             .status(StatusCode::OK)
             .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
             .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
             .header(ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
             .header(ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type, Authorization")
             .header(CONTENT_TYPE, "application/json")
-            .body(Body::from(VUF_VERIFICATION_KEY_JSON.as_str()))
+            .body(Body::from(PEPPER_V0_VUF_VERIFICATION_KEY_JSON.as_str()))
             .expect("Response should build"),
-        (&Method::POST, "/v0") => {
+        (&Method::POST, "/v0/fetch") => {
             let body = req.into_body();
             let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
             let pepper_request = serde_json::from_slice::<PepperRequest>(&body_bytes);

@@ -58,7 +58,7 @@ pub struct PepperRequest {
         deserialize_with = "deserialize_epk_from_hex"
     )]
     pub epk: EphemeralPublicKey,
-    pub epk_expiry_time_secs: u64,
+    pub exp_date_secs: u64,
     #[serde(
         serialize_with = "serialize_bytes_to_hex",
         deserialize_with = "deserialize_bytes_from_hex"
@@ -78,17 +78,15 @@ pub struct PepperResponse {
     pub signature: Vec<u8>, // unique BLS signature
 }
 
-/// The response to ??
+/// The response to `/v0/vuf-pub-key`.
+/// NOTE that in pepper v0, VUF is fixed to be `BLS12381_G1_BLS`.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PepperSchemeInfo {
-    pub scheme_name: String, // e.g., "BLS12381_G1_BLS"
+pub struct PepperV0VufPubKey {
     #[serde(
         serialize_with = "serialize_bytes_to_hex",
         deserialize_with = "deserialize_bytes_from_hex"
     )]
     pub public_key: Vec<u8>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<String>, // e.g., Some("https://aptos.dev/keyless/pepper-service-docs")
 }
 
 #[derive(Debug, Deserialize, Serialize)]

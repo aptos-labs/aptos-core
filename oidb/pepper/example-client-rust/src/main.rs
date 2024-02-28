@@ -2,7 +2,7 @@
 
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_oidb_pepper_common::{
-    jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperSchemeInfo,
+    jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey,
 };
 use aptos_types::{
     oidb::{test_utils::get_sample_esk, Configuration, OpenIdSig},
@@ -11,6 +11,7 @@ use aptos_types::{
 use ark_serialize::CanonicalDeserialize;
 use reqwest::StatusCode;
 use std::{fs, io::stdin};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
 
@@ -64,8 +65,8 @@ async fn main() {
     println!("Starting an interaction with aptos-oidb-pepper-service.");
     let url = get_pepper_service_url();
     println!();
-    let vuf_pub_key_url = format!("{url}/vuf-pub-key");
-    let pepper_v0_url = format!("{url}/v0");
+    let vuf_pub_key_url = format!("{url}/v0/vuf-pub-key");
+    let fetch_url = format!("{url}/v0/fetch");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
@@ -77,7 +78,7 @@ async fn main() {
         .send()
         .await
         .unwrap()
-        .json::<PepperSchemeInfo>()
+        .json::<PepperV0VufPubKey>()
         .await
         .unwrap();
     println!();
@@ -85,12 +86,9 @@ async fn main() {
         "response_json={}",
         serde_json::to_string_pretty(&response).unwrap()
     );
-    let PepperSchemeInfo {
-        scheme_name,
+    let PepperV0VufPubKey {
         public_key: vuf_pk,
-        ..
     } = response;
-    assert_eq!(vuf::bls12381_g1_bls::SCHEME_NAME, scheme_name.as_str());
     let vuf_pk: ark_bls12_381::G2Projective =
         ark_bls12_381::G2Affine::deserialize_compressed(vuf_pk.as_slice())
             .unwrap()
@@ -103,7 +101,7 @@ async fn main() {
 
     println!();
     println!("Action 4: decide an expiry unix time.");
-    let epk_expiry_time_secs = 2000000000;
+    let epk_expiry_time_secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() + 86400;
     println!("expiry_time_sec={}", epk_expiry_time_secs);
 
     let esk = get_sample_esk();
@@ -136,18 +134,18 @@ async fn main() {
     let pepper_request = PepperRequest {
         jwt: jwt.clone(),
         epk,
-        epk_expiry_time_secs,
+        exp_date_secs: epk_expiry_time_secs,
         uid_key: None,
         epk_blinder: blinder.to_vec(),
     };
     println!();
     println!(
         "Request pepper with a POST to {} and the body being {}",
-        url,
+        fetch_url,
         serde_json::to_string_pretty(&pepper_request).unwrap()
     );
     let raw_response = client
-        .post(pepper_v0_url)
+        .post(fetch_url)
         .json(&pepper_request)
         .send()
         .await
