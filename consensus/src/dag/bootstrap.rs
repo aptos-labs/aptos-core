@@ -661,6 +661,7 @@ impl DagBootstrapper {
             self.randomness_config.clone(),
             self.jwk_consensus_config.clone(),
             health_backoff,
+            self.quorum_store_enabled,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 
