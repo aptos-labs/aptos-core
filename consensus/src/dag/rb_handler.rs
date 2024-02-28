@@ -48,6 +48,7 @@ pub(crate) struct NodeBroadcastHandler {
     vtxn_config: ValidatorTxnConfig,
     features: Features,
     health_backoff: HealthBackoff,
+    quorum_store_enabled: bool,
 }
 
 impl NodeBroadcastHandler {
@@ -62,6 +63,7 @@ impl NodeBroadcastHandler {
         vtxn_config: ValidatorTxnConfig,
         features: Features,
         health_backoff: HealthBackoff,
+        quorum_store_enabled: bool,
     ) -> Self {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
@@ -79,6 +81,7 @@ impl NodeBroadcastHandler {
             vtxn_config,
             features,
             health_backoff,
+            quorum_store_enabled,
         }
     }
 
@@ -174,6 +177,13 @@ impl NodeBroadcastHandler {
                 bail!(NodeBroadcastHandleError::MissingParents);
             }
         }
+
+        ensure!(
+            node.payload()
+                .verify(&self.epoch_state.verifier, self.quorum_store_enabled)
+                .is_ok(),
+            "invalid payload"
+        );
 
         Ok(node)
     }

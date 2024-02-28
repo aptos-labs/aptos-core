@@ -643,6 +643,7 @@ impl DagBootstrapper {
             self.vtxn_config.clone(),
             self.features.clone(),
             health_backoff,
+            self.quorum_store_enabled,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 
