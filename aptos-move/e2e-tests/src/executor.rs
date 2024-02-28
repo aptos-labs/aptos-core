@@ -823,12 +823,16 @@ impl FakeExecutor {
 
         let resolver = self.data_store.as_move_resolver();
 
-        let gas_params = match gas_meter_type {
-            GasMeterType::RegularGasMeter => AptosGasParameters::initial(),
-            GasMeterType::UnmeteredGasMeter => AptosGasParameters::zeros(),
+        let (gas_params, storage_gas_params) = match gas_meter_type {
+            GasMeterType::RegularGasMeter => (
+                AptosGasParameters::initial(),
+                StorageGasParameters::latest(),
+            ),
+            GasMeterType::UnmeteredGasMeter => (
+                AptosGasParameters::zeros(),
+                StorageGasParameters::unlimited(0.into()),
+            ),
         };
-        // TODO we should use actual storage gas params, but it is hard to initialize them
-        let storage_gas_params = StorageGasParameters::unlimited(0.into());
 
         let vm = MoveVmExt::new(
             gas_params.natives.clone(),
