@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 
-use crate::{move_utils::as_move_value::AsMoveValue, serialize};
+use crate::{
+    keyless::KEYLESS_ACCOUNT_MODULE_NAME, move_utils::as_move_value::AsMoveValue, serialize,
+};
 use aptos_crypto::CryptoMaterialError;
 use ark_bn254::{Bn254, G1Affine, G2Affine};
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
@@ -14,7 +16,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
-/// Reflection of aptos_framework::openid_account::Groth16PreparedVerificationKey
+/// Reflection of aptos_framework::keyless_account::Groth16VerificationKey
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Groth16VerificationKey {
     pub alpha_g1: Vec<u8>,
@@ -39,7 +41,7 @@ impl AsMoveValue for Groth16VerificationKey {
 /// WARNING: This struct uses resource groups on the Move side. Do NOT implement OnChainConfig
 /// for it, since `OnChainConfig::fetch_config` does not work with resource groups (yet).
 impl MoveStructType for Groth16VerificationKey {
-    const MODULE_NAME: &'static IdentStr = ident_str!("openid_account");
+    const MODULE_NAME: &'static IdentStr = ident_str!(KEYLESS_ACCOUNT_MODULE_NAME);
     const STRUCT_NAME: &'static IdentStr = ident_str!("Groth16VerificationKey");
 }
 

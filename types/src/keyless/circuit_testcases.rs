@@ -1,14 +1,14 @@
 // Copyright © Aptos Foundation
 
-//^ This file stores the details associated with a sample OIDB ZK proof. The constants are outputted by
-//^ `input_gen.py` in the `oidb-circuit` repo (or can be derived implicitly from that code).
+//^ This file stores the details associated with a sample ZK proof. The constants are outputted by
+//^ `input_gen.py` in the `keyless-circuit` repo (or can be derived implicitly from that code).
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    oidb::{
+    keyless::{
         base64url_encode_str,
         bn254_circom::{G1Bytes, G2Bytes},
-        Claims, Configuration, Groth16Zkp, IdCommitment, OidbPublicKey, OpenIdSig, Pepper,
+        Claims, Configuration, Groth16Zkp, IdCommitment, KeylessPublicKey, OpenIdSig, Pepper,
     },
     transaction::authenticator::EphemeralPublicKey,
 };
@@ -43,7 +43,7 @@ static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     .unwrap()
 });
 
-/// TODO(oidb): Use a multiline format here, for diff-friendliness
+/// TODO(keyless): Use a multiline format here, for diff-friendliness
 pub(crate) static SAMPLE_JWT_PAYLOAD_DECODED: Lazy<String> = Lazy::new(|| {
     format!(
         r#"{{"iss":"https://accounts.google.com","azp":"407408718192.apps.googleusercontent.com","aud":"407408718192.apps.googleusercontent.com","sub":"113990307082899718775","hd":"aptoslabs.com","email":"michael@aptoslabs.com","email_verified":true,"at_hash":"bxIESuI59IoZb5alCASqBg","name":"Michael Straka","picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c","given_name":"Michael","family_name":"Straka","locale":"en","iat":1700255944,"exp":2700259544,"nonce":"{}"}}"#,
@@ -101,7 +101,7 @@ MHEVe8PBGOZYLcAdq4YiOIBgddoYyRsq5bzHtTQFgYQVK99Cnxo+PQAvzGb+dpjN
 acgc4kgDThAjD7VlXad9UHpNMO8=
 -----END PRIVATE KEY-----"#;
 
-    // TODO(oidb): Hacking around the difficulty of parsing PKCS#8-encoded PEM files with the `pem` crate
+    // TODO(keyless): Hacking around the difficulty of parsing PKCS#8-encoded PEM files with the `pem` crate
     let der = rsa::RsaPrivateKey::from_pkcs8_pem(sk)
         .unwrap()
         .to_pkcs1_der()
@@ -127,10 +127,10 @@ pub(crate) static SAMPLE_EPK: Lazy<EphemeralPublicKey> =
 
 pub(crate) static SAMPLE_EPK_BLINDER: Lazy<Vec<u8>> = Lazy::new(|| vec![42u8]);
 
-pub(crate) static SAMPLE_OIDB_PK: Lazy<OidbPublicKey> = Lazy::new(|| {
+pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
     assert_eq!(SAMPLE_UID_KEY, "sub");
 
-    OidbPublicKey {
+    KeylessPublicKey {
         iss_val: SAMPLE_JWT_PARSED.oidc_claims.iss.to_owned(),
         idc: IdCommitment::new_from_preimage(
             &SAMPLE_PEPPER,

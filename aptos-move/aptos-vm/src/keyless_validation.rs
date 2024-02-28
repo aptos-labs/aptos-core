@@ -7,9 +7,9 @@ use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
-    oidb::{
-        get_public_inputs_hash, Configuration, Groth16VerificationKey, OidbPublicKey,
-        OidbSignature, ZkpOrOpenIdSig,
+    keyless::{
+        get_public_inputs_hash, Configuration, Groth16VerificationKey, KeylessPublicKey,
+        KeylessSignature, ZkpOrOpenIdSig,
     },
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     transaction::authenticator::EphemeralPublicKey,
@@ -78,39 +78,37 @@ fn get_configs_onchain(
     get_resource_on_chain::<Configuration>(resolver)
 }
 
-fn get_jwk_for_oidb_authenticator(
+fn get_jwk_for_authenticator(
     jwks: &PatchedJWKs,
-    oidb_pub_key: &OidbPublicKey,
-    oidb_sig: &OidbSignature,
+    pk: &KeylessPublicKey,
+    sig: &KeylessSignature,
 ) -> Result<JWK, VMStatus> {
-    let jwt_header = oidb_sig
+    let jwt_header = sig
         .parse_jwt_header()
         .map_err(|_| invalid_signature!("Failed to parse JWT header"))?;
-    let jwk_move_struct = jwks
-        .get_jwk(&oidb_pub_key.iss_val, &jwt_header.kid)
-        .map_err(|_| {
-            invalid_signature!(format!(
-                "JWK for {} with KID {} was not found",
-                oidb_pub_key.iss_val, jwt_header.kid
-            ))
-        })?;
+    let jwk_move_struct = jwks.get_jwk(&pk.iss_val, &jwt_header.kid).map_err(|_| {
+        invalid_signature!(format!(
+            "JWK for {} with KID {} was not found",
+            pk.iss_val, jwt_header.kid
+        ))
+    })?;
 
     let jwk = JWK::try_from(jwk_move_struct)
         .map_err(|_| invalid_signature!("Could not unpack Any in JWK Move struct"))?;
     Ok(jwk)
 }
 
-pub(crate) fn validate_oidb_authenticators(
-    authenticators: &Vec<(OidbPublicKey, OidbSignature)>,
+pub(crate) fn validate_authenticators(
+    authenticators: &Vec<(KeylessPublicKey, KeylessSignature)>,
     features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
-    // OIDB feature gating.
+    // Feature gating
     for (_, sig) in authenticators {
-        if !features.is_oidb_enabled() && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. }) {
+        if !features.is_keyless_enabled() && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. }) {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
-        if (!features.is_oidb_enabled() || !features.is_oidb_zkless_enabled())
+        if (!features.is_keyless_enabled() || !features.is_keyless_zkless_enabled())
             && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
         {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
@@ -122,15 +120,14 @@ pub(crate) fn validate_oidb_authenticators(
     }
 
     let config = &get_configs_onchain(resolver)?;
-    if authenticators.len() > config.max_oidb_signatures_per_txn as usize {
-        return Err(invalid_signature!("Too many OIDB authenticators"));
+    if authenticators.len() > config.max_signatures_per_txn as usize {
+        return Err(invalid_signature!("Too many keyless authenticators"));
     }
 
     let onchain_timestamp_obj = get_current_time_onchain(resolver)?;
     // Check the expiry timestamp on all authenticators first to fail fast
-    for (_, oidb_sig) in authenticators {
-        oidb_sig
-            .verify_expiry(&onchain_timestamp_obj)
+    for (_, sig) in authenticators {
+        sig.verify_expiry(&onchain_timestamp_obj)
             .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
     }
 
@@ -148,10 +145,10 @@ pub(crate) fn validate_oidb_authenticators(
         )),
     };
 
-    for (oidb_pub_key, oidb_sig) in authenticators {
-        let jwk = get_jwk_for_oidb_authenticator(&patched_jwks, oidb_pub_key, oidb_sig)?;
+    for (pk, sig) in authenticators {
+        let jwk = get_jwk_for_authenticator(&patched_jwks, pk, sig)?;
 
-        match &oidb_sig.sig {
+        match &sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
                 JWK::RSA(rsa_jwk) => {
                     if proof.exp_horizon_secs > config.max_exp_horizon_secs {
@@ -173,10 +170,8 @@ pub(crate) fn validate_oidb_authenticators(
                             })?;
                     }
 
-                    let public_inputs_hash =
-                        get_public_inputs_hash(oidb_sig, oidb_pub_key, &rsa_jwk, config).map_err(
-                            |_| invalid_signature!("Could not compute public inputs hash"),
-                        )?;
+                    let public_inputs_hash = get_public_inputs_hash(sig, pk, &rsa_jwk, config)
+                        .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
                     proof
                         .verify_proof(public_inputs_hash, pvk)
                         .map_err(|_| invalid_signature!("Proof verification failed"))?;
@@ -188,9 +183,9 @@ pub(crate) fn validate_oidb_authenticators(
                     JWK::RSA(rsa_jwk) => {
                         openid_sig
                             .verify_jwt_claims(
-                                oidb_sig.exp_timestamp_secs,
-                                &oidb_sig.ephemeral_pubkey,
-                                oidb_pub_key,
+                                sig.exp_timestamp_secs,
+                                &sig.ephemeral_pubkey,
+                                pk,
                                 config,
                             )
                             .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
@@ -207,7 +202,7 @@ pub(crate) fn validate_oidb_authenticators(
                         //
                         // We are now ready to verify the RSA signature
                         openid_sig
-                            .verify_jwt_signature(&rsa_jwk, &oidb_sig.jwt_header_b64)
+                            .verify_jwt_signature(&rsa_jwk, &sig.jwt_header_b64)
                             .map_err(|_| {
                                 invalid_signature!(
                                     "RSA signature verification failed for OpenIdSig"
