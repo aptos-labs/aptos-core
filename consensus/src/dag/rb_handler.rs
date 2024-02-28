@@ -33,6 +33,7 @@ use async_trait::async_trait;
 use claims::assert_some;
 use dashmap::DashSet;
 use std::{collections::BTreeMap, mem, sync::Arc};
+use tokio::task::JoinHandle;
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<DagStore>,
@@ -96,7 +97,7 @@ impl NodeBroadcastHandler {
         }
     }
 
-    pub fn gc_before_round(&self, min_round: Round) -> anyhow::Result<()> {
+    pub fn gc_before_round(&self, min_round: Round) -> anyhow::Result<JoinHandle<()>> {
         let mut votes_by_round_peer_guard = self.votes_by_round_peer.lock();
         let to_retain = votes_by_round_peer_guard.split_off(&min_round);
         let to_delete = mem::replace(&mut *votes_by_round_peer_guard, to_retain);
@@ -112,14 +113,13 @@ impl NodeBroadcastHandler {
             .collect();
         //TODO: limit spawn?
         let storage = self.storage.clone();
-        tokio::task::spawn_blocking(move || {
+        Ok(tokio::task::spawn_blocking(move || {
             monitor!("dag_votes_gc", {
                 if let Err(e) = storage.delete_votes(to_delete) {
                     error!("Error deleting votes: {:?}", e);
                 }
             });
-        });
-        Ok(())
+        }))
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {

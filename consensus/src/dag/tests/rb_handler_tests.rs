@@ -257,6 +257,7 @@ async fn test_node_broadcast_receiver_storage() {
         ),
         false,
     );
-    assert_ok!(rb_receiver.gc_before_round(2));
+    let handle = assert_ok!(rb_receiver.gc_before_round(2));
+    let _ = handle.await;
     assert_eq!(storage.get_votes().unwrap().len(), 0);
 }
