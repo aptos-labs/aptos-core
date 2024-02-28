@@ -347,7 +347,16 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
-    /// Whether keyless accounts are enabled, possibly with the ZK-less verification mode.
+    /// The on-chain randomness feature.
+    ///
+    /// Lifetime: transient
+    const RECONFIGURE_WITH_DKG: u64 = 45;
+    public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
+    public fun reconfigure_with_dkg_enabled(): bool acquires Features {
+        is_enabled(RECONFIGURE_WITH_DKG)
+    }
+
+    /// Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
     ///
     /// Lifetime: transient
     const KEYLESS_ACCOUNTS: u64 = 46;
@@ -383,22 +392,13 @@ module std::features {
     /// Whether enable Fungible Asset creation
     /// to create higher throughput concurrent variants.
     /// Lifetime: transient
-    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 49;
+    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 50;
 
     public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
 
     public fun concurrent_fungible_assets_enabled(): bool acquires Features {
         // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
         is_enabled(CONCURRENT_FUNGIBLE_ASSETS) && aggregator_v2_api_enabled()
-    }
-
-    /// The on-chain randomness feature.
-    ///
-    /// Lifetime: transient
-    const RECONFIGURE_WITH_DKG: u64 = 45;
-    public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
-    public fun reconfigure_with_dkg_enabled(): bool acquires Features {
-        is_enabled(RECONFIGURE_WITH_DKG)
     }
 
     /// Whether deploying to objects is enabled.

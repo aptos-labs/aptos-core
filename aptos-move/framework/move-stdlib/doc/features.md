@@ -87,6 +87,8 @@ return true.
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
 -  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
 -  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
+-  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
+-  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `get_keyless_accounts_feature`](#0x1_features_get_keyless_accounts_feature)
 -  [Function `keyless_accounts_enabled`](#0x1_features_keyless_accounts_enabled)
 -  [Function `get_keyless_but_zkless_accounts_feature`](#0x1_features_get_keyless_but_zkless_accounts_feature)
@@ -95,8 +97,6 @@ return true.
 -  [Function `jwk_consensus_enabled`](#0x1_features_jwk_consensus_enabled)
 -  [Function `get_concurrent_fungible_assets_feature`](#0x1_features_get_concurrent_fungible_assets_feature)
 -  [Function `concurrent_fungible_assets_enabled`](#0x1_features_concurrent_fungible_assets_enabled)
--  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
--  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `is_object_code_deployment_enabled`](#0x1_features_is_object_code_deployment_enabled)
 -  [Function `get_max_object_nesting_check_feature`](#0x1_features_get_max_object_nesting_check_feature)
 -  [Function `max_object_nesting_check_enabled`](#0x1_features_max_object_nesting_check_enabled)
@@ -339,7 +339,7 @@ to create higher throughput concurrent variants.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>: u64 = 49;
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>: u64 = 50;
 </code></pre>
 
 
@@ -454,7 +454,7 @@ Lifetime: permanent
 
 <a id="0x1_features_KEYLESS_ACCOUNTS"></a>
 
-Whether keyless accounts are enabled, possibly with the ZK-less verification mode.
+Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
 
 Lifetime: transient
 
@@ -1997,6 +1997,52 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_reconfigure_with_dkg_feature"></a>
+
+## Function `get_reconfigure_with_dkg_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64 { <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_reconfigure_with_dkg_enabled"></a>
+
+## Function `reconfigure_with_dkg_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_get_keyless_accounts_feature"></a>
 
 ## Function `get_keyless_accounts_feature`
@@ -2175,52 +2221,6 @@ Lifetime: transient
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_concurrent_fungible_assets_enabled">concurrent_fungible_assets_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     // concurrent fungible assets cannot be used <b>if</b> aggregator v2 api is not enabled.
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_get_reconfigure_with_dkg_feature"></a>
-
-## Function `get_reconfigure_with_dkg_feature`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64 { <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a> }
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_features_reconfigure_with_dkg_enabled"></a>
-
-## Function `reconfigure_with_dkg_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>)
 }
 </code></pre>
 
