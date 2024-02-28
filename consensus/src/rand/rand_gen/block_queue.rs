@@ -94,6 +94,10 @@ impl BlockQueue {
         }
     }
 
+    pub fn queue(&self) -> &BTreeMap<Round, QueueItem> {
+        &self.queue
+    }
+
     pub fn push_back(&mut self, item: QueueItem) {
         for block in item.blocks() {
             observe_block(block.timestamp_usecs(), BlockStage::RAND_ENTER);

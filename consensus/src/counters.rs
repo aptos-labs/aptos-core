@@ -959,3 +959,11 @@ pub static PROPOSED_VTXN_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_rand_queue_size",
+        "Number of randomness-pending blocks."
+    )
+    .unwrap()
+});
