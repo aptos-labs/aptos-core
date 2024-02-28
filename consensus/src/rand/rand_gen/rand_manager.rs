@@ -412,14 +412,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     }
 
     pub fn observe_queue(&self) {
-        let queue = &self.block_queue.queue;
+        let queue = &self.block_queue.queue();
         RAND_QUEUE_SIZE.set(queue.len() as i64);
-        info!(
-            epoch = self.epoch_state.epoch,
-            queue_size = queue.len(),
-            min_round = queue.keys().min().copied(),
-            max_round = queue.keys().max().copied(),
-            "Rand queue summary.",
-        );
     }
 }
