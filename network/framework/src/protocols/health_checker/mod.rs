@@ -262,89 +262,44 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 }
                 tick_network_id = net_ticks.select_next_some() => {
                     if let Some(net) = self.networks.get(&tick_network_id) {
-                                self.round += 1;
-        let connected = self.network_interface.connected_peers();
-        if connected.is_empty() {
-            trace!(
-                            // NetworkSchema::new(&self.network_context),
-                            round = self.round,
-                            "{} No connected peer to ping round: {}",
-                            tick_network_id,
-                            self.round
-                        );
-            return
-        }
+                        self.round += 1;
+                        let connected = self.network_interface.connected_peers();
+                        if connected.is_empty() {
+                            trace!(
+                                round = self.round,
+                                "{} No connected peer to ping round: {}",
+                                tick_network_id,
+                                self.round
+                            );
+                            continue
+                        }
 
-        for peer_id in connected {
-            let nonce = self.rng.gen::<u32>();
-            trace!(
-                            // NetworkSchema::new(&self.network_context),
-                            round = self.round,
-                            "{} Will ping: {} for round: {} nonce: {}",
-                            tick_network_id,
-                            peer_id.short_str(),
-                            self.round,
-                            nonce
-                        );
+                        for peer_id in connected {
+                            let nonce = self.rng.gen::<u32>();
+                            trace!(
+                                round = self.round,
+                                "{} Will ping: {} for round: {} nonce: {}",
+                                tick_network_id,
+                                peer_id.short_str(),
+                                self.round,
+                                nonce
+                            );
 
-            tick_handlers.push(Self::ping_peer(
-                tick_network_id, //self.network_context,
-                self.network_interface.network_client(),
-                peer_id,
-                self.round,
-                nonce,
-                net.ping_timeout,
-            ));
-        }
+                            tick_handlers.push(Self::ping_peer(
+                                tick_network_id,
+                                self.network_interface.network_client(),
+                                peer_id,
+                                self.round,
+                                nonce,
+                                net.ping_timeout,
+                            ));
+                        }
                     }
-                    // self.send_for_network(tick_network_id, &mut tick_handlers);
                 }
             }
         }
         warn!("Health checker actor terminated");
     }
-
-    // async fn send_for_network(&mut self, tick_network_id: NetworkId, tick_handlers: &mut FuturesUnordered<(PeerId, u64, u32, Result<Pong, RpcError>)>) {
-    //     let net = if let Some(xn) = self.networks.get(tick_network_id) {
-    //         xn
-    //     } else {
-    //         return
-    //     };
-    //     self.round += 1;
-    //     let connected = self.network_interface.connected_peers();
-    //     if connected.is_empty() {
-    //         trace!(
-    //                         // NetworkSchema::new(&self.network_context),
-    //                         round = self.round,
-    //                         "{} No connected peer to ping round: {}",
-    //                         tick_network_id,
-    //                         self.round
-    //                     );
-    //         return
-    //     }
-    //
-    //     for peer_id in connected {
-    //         let nonce = self.rng.gen::<u32>();
-    //         trace!(
-    //                         // NetworkSchema::new(&self.network_context),
-    //                         round = self.round,
-    //                         "{} Will ping: {} for round: {} nonce: {}",
-    //                         tick_network_id,
-    //                         peer_id.short_str(),
-    //                         self.round,
-    //                         nonce
-    //                     );
-    //
-    //         tick_handlers.push(Self::ping_peer(
-    //             tick_network_id, //self.network_context,
-    //             self.network_interface.network_client(),
-    //             peer_id,
-    //             self.round,
-    //             nonce,
-    //             net.ping_timeout,
-    //         ));
-    //     }
-    // }
 
     fn handle_ping_request(
         &mut self,
@@ -357,7 +312,6 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             Ok(msg) => msg,
             Err(e) => {
                 warn!(
-                    // NetworkSchema::new(&self.network_context),
                     error = ?e,
                     "Unable to serialize pong response: {}", e
                 );
@@ -366,9 +320,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         };
         let peer_id = peer_id.peer_id();
         trace!(
-            // NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
             "Sending Pong response to peer: {} with nonce: {}",
-            // self.network_context,
             peer_id,
             ping.0,
         );
@@ -389,11 +341,9 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             Ok(pong) => {
                 if pong.0 == req_nonce {
                     trace!(
-                        // NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                         rount = round,
                         "Ping successful for peer: {} round: {}",
-                        // self.network_context,
-                        peer_id,//.short_str(),
+                        peer_id,
                         round
                     );
                     // Update last successful ping to current round.
@@ -403,9 +353,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 } else {
                     warn!(
                         SecurityEvent::InvalidHealthCheckerMsg,
-                        // NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                         "Pong nonce doesn't match Ping nonce. Round: {}, Pong: {}, Ping: {}",
-                        // self.network_context,
                         round,
                         pong.0,
                         req_nonce
@@ -415,13 +363,10 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             },
             Err(err) => {
                 warn!(
-                    // NetworkSchema::new(&self.network_context)
-                    //     .remote_peer(&peer_id),
                     error = ?err,
                     round = round,
                     "Ping failed for peer: {} round: {} with error: {:?}",
-                    // self.network_context,
-                    peer_id,//.short_str(),
+                    peer_id,
                     round,
                     err
                 );
@@ -444,24 +389,17 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     .unwrap_or(0);
                 if failures > ping_failures_tolerated {
                     info!(
-                        // NetworkSchema::new(&self.network_context).remote_peer(&peer_id),
                         "Disconnecting from peer: {}",
-                        // self.network_context,
                         peer_id
                     );
-                    // let peer_network_id =
-                    //     PeerNetworkId::new(self.network_context.network_id(), peer_id);
                     if let Err(err) = self
                         .network_interface
                         .disconnect_peer(peer_id)
                         .await
                     {
                         warn!(
-                            // NetworkSchema::new(&self.network_context)
-                            //     .remote_peer(&peer_id),
                             error = ?err,
                             "Failed to disconnect from peer: {} with error: {:?}",
-                            // self.network_context,
                             peer_id,
                             err
                         );
@@ -480,7 +418,6 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         ping_timeout: Duration,
     ) -> (PeerNetworkId, u64, u32, Result<Pong, RpcError>) {
         trace!(
-            // NetworkSchema::new(&network_context).remote_peer(&peer_id),
             round = round,
             "{} Sending Ping request to peer: {} for round: {} nonce: {}",
             network_id,
