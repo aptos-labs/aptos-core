@@ -29,7 +29,7 @@ use std::{
 
 /// Annotation which is attached to function data.
 #[derive(Default, Clone)]
-pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
+pub struct LiveVarAnnotation(pub BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
 impl LiveVarAnnotation {
     /// Get the live var info at the given code offset

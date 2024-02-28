@@ -21,7 +21,7 @@ use crate::pipeline::{
     split_critical_edges_processor::SplitCriticalEdgesProcessor,
     uninitialized_use_checker::UninitializedUseChecker,
     unreachable_code_analysis::UnreachableCodeProcessor,
-    unreachable_code_remover::UnreachableCodeRemover,
+    unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
@@ -207,6 +207,7 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
 pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
     let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
+    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
     let mut pipeline = FunctionTargetPipeline::default();
     if options.experiment_on(Experiment::SPLIT_CRITICAL_EDGES) {
         pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
@@ -218,9 +219,9 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
     pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
     pipeline.add_processor(Box::new(AbilityProcessor {}));
-
-    // The default optimization pipeline is currently always run by the compiler.
-    add_default_optimization_pipeline(&options, &mut pipeline);
+    if optimize_on {
+        add_default_optimization_pipeline(&mut pipeline);
+    }
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
@@ -233,17 +234,18 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
 /// potentially delete or change code through these optimizations.
 /// While this section of the pipeline is optional, some code that used to previously compile
 /// may no longer compile without this section because of using too many local (temp) variables.
-fn add_default_optimization_pipeline(options: &Options, pipeline: &mut FunctionTargetPipeline) {
-    if options.experiment_on(Experiment::OPTIMIZE) {
-        // Available copies analysis is needed by copy propagation.
-        pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
-        pipeline.add_processor(Box::new(CopyPropagation {}));
-        // Live var analysis is needed by dead store elimination.
-        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-        pipeline.add_processor(Box::new(DeadStoreElimination {}));
-        pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
-        pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
-    }
+fn add_default_optimization_pipeline(pipeline: &mut FunctionTargetPipeline) {
+    // Available copies analysis is needed by copy propagation.
+    pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(CopyPropagation {}));
+    // Live var analysis is needed by dead store elimination.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(DeadStoreElimination {}));
+    pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
+    pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
+    // Live var analysis is needed by variable coalescing.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(VariableCoalescing {}));
 }
 
 /// Disassemble the given compiled units and return the disassembled code as a string.

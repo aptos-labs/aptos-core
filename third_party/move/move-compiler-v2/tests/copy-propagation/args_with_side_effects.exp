@@ -99,7 +99,7 @@ fun m::add($t0: u64, $t1: u64): u64 {
 public fun m::test($t0: u64): u64 {
      var $t1: u64
      var $t2: u64
-     var $t3: u64
+     var $t3: u64 [unused]
      var $t4: u64
      var $t5: u64
   0: $t2 := copy($t0)
