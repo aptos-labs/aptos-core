@@ -845,6 +845,12 @@ impl EntryPoints {
             },
             EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
             EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
+            EntryPoints::EconiaRegisterMarket
+            | EntryPoints::EconiaRegisterMarketUser
+            | EntryPoints::EconiaPlaceBidLimitOrder
+            | EntryPoints::EconiaPlaceAskLimitOrder
+            | EntryPoints::EconiaPlaceRandomLimitOrder => AutomaticArgs::Signer,
+            EntryPoints::EconiaDepositCoins => AutomaticArgs::SignerAndMultiSig,
         }
     }
 }
