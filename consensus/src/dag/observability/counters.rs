@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram, register_histogram_vec, register_int_gauge, Histogram, HistogramVec,
-    IntGauge,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_gauge,
+    Histogram, HistogramVec, IntCounter, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -64,6 +64,14 @@ pub static NUM_ROUNDS_PER_BLOCK: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_dag_num_rounds_per_block",
         "Histogram counting the number of rounds per block",
+    )
+    .unwrap()
+});
+
+pub static RB_HANDLE_ACKS: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_dag_rb_handle_acks",
+        "Count of number of RB Handler Acks returned."
     )
     .unwrap()
 });

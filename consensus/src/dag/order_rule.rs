@@ -2,17 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::dag_store::DagStore;
-use crate::dag::{
-    adapter::OrderedNotifier,
-    anchor_election::AnchorElection,
-    dag_store::NodeStatus,
-    observability::{
-        logging::{LogEvent, LogSchema},
-        tracing::{observe_node, NodeStage},
+use crate::{
+    dag::{
+        adapter::OrderedNotifier,
+        anchor_election::AnchorElection,
+        dag_store::NodeStatus,
+        observability::{
+            logging::{LogEvent, LogSchema},
+            tracing::{observe_node, NodeStage},
+        },
+        storage::CommitEvent,
+        types::NodeMetadata,
+        CertifiedNode,
     },
-    storage::CommitEvent,
-    types::NodeMetadata,
-    CertifiedNode,
+    monitor,
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::Mutex;
@@ -261,10 +264,13 @@ impl OrderRule {
 
 impl TOrderRule for Mutex<OrderRule> {
     fn process_new_node(&self, node_metadata: &NodeMetadata) {
-        self.lock().process_new_node(node_metadata)
+        monitor!(
+            "dag_order_new_node",
+            self.lock().process_new_node(node_metadata)
+        );
     }
 
     fn process_all(&self) {
-        self.lock().process_all()
+        monitor!("dag_order_all", self.lock().process_all());
     }
 }

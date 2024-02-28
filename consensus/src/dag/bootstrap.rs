@@ -277,7 +277,7 @@ impl SyncMode {
                             info!("sync succeeded. running full bootstrap.");
                             // If the sync task finishes successfully, we can transition to Active mode by
                             // rebootstrapping all components starting from the DAG store.
-                            let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
+                            let (new_state, new_handler, new_fetch_service) = monitor!("dag_sync_full_bootstrap", bootstrapper.full_bootstrap());
                             Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
@@ -288,7 +288,7 @@ impl SyncMode {
                             info!("sync failed. resuming with current DAG state.");
                             // If the sync task fails, then continue the DAG in Active Mode with existing state.
                             let (new_handler, new_fetch_service) =
-                                bootstrapper.bootstrap_components(&self.base_state);
+                                monitor!("dag_failed_sync_bootstrap", bootstrapper.bootstrap_components(&self.base_state));
                             Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
@@ -360,6 +360,7 @@ impl DagBootstrapper {
         executor: BoundedExecutor,
         features: Features,
     ) -> Self {
+        info!("OnChainConfig: {:?}", onchain_config);
         Self {
             self_peer,
             config,
