@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
-    register_histogram, register_histogram_vec, register_int_counter, register_int_gauge,
-    Histogram, HistogramVec, IntCounter, IntGauge,
+    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
+    register_int_gauge, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
 };
 use once_cell::sync::Lazy;
 
@@ -72,6 +72,15 @@ pub static RB_HANDLE_ACKS: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "aptos_consensus_dag_rb_handle_acks",
         "Count of number of RB Handler Acks returned."
+    )
+    .unwrap()
+});
+
+pub static ANCHOR_ORDER_TYPE: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_dag_anchor_order_type",
+        "Number of anchors ordered",
+        &["mode"]
     )
     .unwrap()
 });

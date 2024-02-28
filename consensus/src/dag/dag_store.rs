@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    observability::counters::ANCHOR_ORDER_TYPE,
     types::{DagSnapshotBitmask, NodeMetadata},
     Node,
 };
@@ -269,12 +270,20 @@ impl InMemDag {
                     aggregated_strong_voting_power,
                     ..
                 } => {
-                    validator_verifier
+                    let super_majority_weak_votes = validator_verifier
                         .check_aggregated_voting_power(*aggregated_weak_voting_power, true)
-                        .is_ok()
-                        || validator_verifier
-                            .check_aggregated_voting_power(*aggregated_strong_voting_power, false)
-                            .is_ok()
+                        .is_ok();
+                    let minority_strong_votes = validator_verifier
+                        .check_aggregated_voting_power(*aggregated_strong_voting_power, false)
+                        .is_ok();
+                    if super_majority_weak_votes && minority_strong_votes {
+                        ANCHOR_ORDER_TYPE.with_label_values(&[&"both"]).inc();
+                    } else if super_majority_weak_votes {
+                        ANCHOR_ORDER_TYPE.with_label_values(&[&"weak"]).inc();
+                    } else if minority_strong_votes {
+                        ANCHOR_ORDER_TYPE.with_label_values(&[&"strong"]).inc();
+                    }
+                    super_majority_weak_votes || minority_strong_votes
                 },
                 NodeStatus::Ordered(_) => {
                     error!("checking voting power for Ordered node");
