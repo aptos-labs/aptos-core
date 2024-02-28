@@ -14,6 +14,7 @@ use aptos_network2::protocols::wire::handshake::v1::ProtocolId;
 use aptos_network2_builder::NetworkBuilder;
 use aptos_logger::{debug, info};
 use aptos_network2::application::interface::NetworkClient;
+use aptos_network2::protocols::health_checker::{HealthCheckerMsg, HealthCheckerNetwork};
 use aptos_network2::protocols::network::{NetworkEvents, NetworkSender, NetworkSource, NewNetworkEvents, NewNetworkSender, OutboundPeerConnections};
 use aptos_network2::application::storage::{PEERS_AND_METADATA_SINGLETON, PeersAndMetadata};
 use aptos_time_service::TimeService;
@@ -182,6 +183,18 @@ pub fn jwk_consensus_network_connections(
     Some(build_network_connections(setup, direct_send_protocols, rpc_protocols, queue_size, counter_label, apps))
 }
 
+pub fn health_checker_network_connections(
+    apps: &mut ApplicationCollector,
+    setup: &AppSetupContext,
+) -> ApplicationNetworkInterfaces<HealthCheckerMsg> {
+    let direct_send_protocols = Vec::<ProtocolId>::new();
+    let rpc_protocols = vec![ProtocolId::HealthCheckerRpc];
+    let queue_size = 10; // TODO: configurable?
+    let counter_label = "peer_monitoring";
+
+    build_network_connections(setup, direct_send_protocols, rpc_protocols, queue_size, counter_label, apps)
+}
+
 pub fn peer_monitoring_network_connections(
     apps: &mut ApplicationCollector,
     setup: &AppSetupContext,
@@ -261,6 +274,17 @@ fn extract_network_configs(node_config: &NodeConfig) -> Vec<NetworkConfig> {
         network_configs.push(network_config.clone());
     }
     network_configs
+}
+
+pub fn health_checker_networks(
+    node_config: &NodeConfig,
+) -> Vec<HealthCheckerNetwork> {
+    let network_configs = extract_network_configs(node_config);
+    let mut hcnets = Vec::new();
+    for network_config in network_configs.into_iter() {
+        hcnets.push(HealthCheckerNetwork::new(node_config, &network_config));
+    }
+    hcnets
 }
 
 /// Extracts all network ids from the given node config

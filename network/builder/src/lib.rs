@@ -19,6 +19,7 @@ use aptos_types::chain_id::ChainId;
 use aptos_network2::application::storage::PeersAndMetadata;
 use aptos_network2::connectivity_manager::{ConnectivityManager, ConnectivityRequest};
 use aptos_network2::noise::stream::NoiseStream;
+use aptos_network2::protocols::health_checker::HealthChecker;
 use aptos_network2::protocols::wire::handshake::v1::ProtocolIdSet;
 use aptos_network2::protocols::network::OutboundPeerConnections;
 use aptos_network2::transport::{APTOS_TCP_TRANSPORT, AptosNetTransport, AptosNetTransportActual};
@@ -103,6 +104,10 @@ impl NetworkBuilder {
 
     pub fn set_apps(&mut self, apps: Arc<ApplicationCollector>) {
         self.apps = apps;
+    }
+
+    pub fn add_health_checker(&mut self) {
+
     }
 
     pub fn active_protocol_ids(&self) -> ProtocolIdSet {
@@ -246,6 +251,7 @@ impl NetworkBuilder {
             self.peer_senders.clone(),
         );
         handle.spawn(cm.start(handle.clone()));
+
         for disco in self.discovery_listeners.drain(..) {
             disco.start(&handle);
         }

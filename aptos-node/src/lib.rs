@@ -28,6 +28,7 @@ use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_network2::application::ApplicationCollector;
+use aptos_network2::protocols::health_checker::HealthCheckerMsg;
 use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::chain_id::ChainId;
@@ -48,7 +49,9 @@ use std::{
 };
 use std::collections::BTreeMap;
 use tokio::runtime::Runtime;
+use aptos_network2::protocols::health_checker::HealthChecker;
 use aptos_network2::protocols::network::OutboundPeerConnections;
+use aptos_time_service::TimeService;
 use crate::network2::AppSetupContext;
 
 const EPOCH_LENGTH_SECS: u64 = 60;
@@ -632,6 +635,7 @@ pub fn setup_environment_and_start_node(
         contexts,
     };
 
+    let health_checker_network_interfaces = network2::health_checker_network_connections(&mut apps, &app_setup);
     let peer_monitoring_service_network_interfaces = network2::peer_monitoring_network_connections(&mut apps, &app_setup);
     let storage_service_network_interfaces = network2::storage_service_network_connections(&mut apps, &app_setup);
     let mempool_network_interfaces = network2::mempool_network_connections(&mut apps, &app_setup);
@@ -655,6 +659,8 @@ pub fn setup_environment_and_start_node(
         peer_monitoring_service_network_interfaces,
         db_rw.reader.clone(),
     );
+
+    services::start_health_checker(network2::health_checker_networks(&node_config), health_checker_network_interfaces, peer_monitoring_service_runtime.handle().clone());
 
     // Start state sync and get the notification endpoints for mempool and consensus
     let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =

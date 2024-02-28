@@ -4,7 +4,7 @@
 use crate::{bootstrap_api, indexer, mpsc::Receiver, network2::ApplicationNetworkInterfaces};
 use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
-use aptos_config::config::NodeConfig;
+use aptos_config::config::{NetworkConfig, NodeConfig, RoleType};
 use aptos_consensus::{
     network_interface::ConsensusMsg, persistent_liveness_storage::StorageWriteProxy,
     quorum_store::quorum_store_db::QuorumStoreDB,
@@ -19,6 +19,7 @@ use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdate
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network2::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
+use aptos_network2::protocols::health_checker::{HealthChecker,HealthCheckerMsg,HealthCheckerNetwork,HealthCheckNetworkInterface};
 use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
@@ -31,7 +32,9 @@ use aptos_types::chain_id::ChainId;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use futures::channel::{mpsc, mpsc::Sender};
 use std::{sync::Arc, time::Instant};
+use std::time::Duration;
 use tokio::runtime::{Handle, Runtime};
+use aptos_config::network_id::{NetworkContext, NetworkId};
 
 const AC_SMP_CHANNEL_BUFFER_SIZE: usize = 1_024;
 const INTRA_NODE_CHANNEL_BUFFER_SIZE: usize = 1;
@@ -180,6 +183,29 @@ pub fn start_node_inspection_service(
         aptos_data_client,
         peers_and_metadata,
     )
+}
+
+pub fn start_health_checker(
+    networks: Vec<HealthCheckerNetwork>,
+    // node_config: &NodeConfig,
+    // network_config: &NetworkConfig,
+    health_checker_network_interfaces: ApplicationNetworkInterfaces<HealthCheckerMsg>,
+    handle: Handle,
+) {
+    let ApplicationNetworkInterfaces::<HealthCheckerMsg>{network_client: hc_client, network_events: hc_events} = health_checker_network_interfaces;
+    // let ping_interval = Duration::from_millis(network_config.ping_interval_ms);
+    // let ping_timeout = Duration::from_millis(network_config.ping_timeout_ms);
+    // let ping_failures_tolerated = network_config.ping_failures_tolerated;
+    // let role = node_config.base.role;
+    // let netcontext = NetworkContext::new(role, network_config.network_id, network_config.peer_id());
+    let hc_client = HealthCheckNetworkInterface::new(hc_client, hc_events);
+    let hc = HealthChecker::new(
+        networks,
+        TimeService::real(),
+        hc_client,
+    );
+    // aptos_network2::protocols::health_checker::start(&node_config, hc_client, hc_events, TimeService::real());
+    handle.spawn(hc.start(handle.clone()));
 }
 
 /// Starts the peer monitoring service and returns the runtime
