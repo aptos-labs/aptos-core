@@ -1283,7 +1283,6 @@ where
         signature_verified_block: &[T],
         base_view: &S,
     ) -> BlockExecutionResult<BlockOutput<E::Output>, E::Error> {
-        println!("0228 - num_txns={}", signature_verified_block.len());
         if self.config.local.concurrency_level > 1 {
             let parallel_result = self.execute_transactions_parallel(
                 executor_arguments,
@@ -1293,7 +1292,6 @@ where
 
             // If parallel gave us result, return it
             if let Ok(output) = parallel_result {
-                println!("0228 - mt - num_outputs={}", output.num_outputs());
                 return Ok(output);
             }
 
@@ -1319,7 +1317,6 @@ where
         // If sequential gave us result, return it
         let sequential_error = match sequential_result {
             Ok(output) => {
-                println!("0228 - st - num_outputs={}", output.num_outputs());
                 return Ok(output);
             },
             Err(SequentialBlockExecutionError::ResourceGroupSerializationError) => {

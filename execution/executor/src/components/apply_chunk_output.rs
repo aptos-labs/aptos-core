@@ -200,6 +200,7 @@ impl ApplyChunkOutput {
         TransactionsWithParsedOutput,
         TransactionsWithParsedOutput,
     )> {
+        println!("0228 - num_txns={}", transactions.len());
         let mut transaction_outputs: Vec<ParsedTransactionOutput> =
             transaction_outputs.into_iter().map(Into::into).collect();
         // N.B. off-by-1 intentionally, for exclusive index
@@ -241,7 +242,7 @@ impl ApplyChunkOutput {
             .partition::<Vec<(Transaction, ParsedTransactionOutput)>, _>(|(_, o)| {
                 matches!(o.status(), TransactionStatus::Keep(_))
             });
-
+        println!("0228 - num_to_discard={}", to_discard.len());
         // Append the StateCheckpoint transaction to the end of to_keep
         if let Some(block_id) = state_checkpoint_to_add {
             let state_checkpoint_txn = Transaction::StateCheckpoint(block_id);
