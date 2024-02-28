@@ -11,6 +11,7 @@ use aptos_framework::APTOS_PACKAGES;
 use aptos_language_e2e_tests::{data_store::FakeDataStore, executor::FakeExecutor};
 use aptos_types::{
     contract_event::ContractEvent,
+    on_chain_config::{FeatureFlag, Features, OnChainConfig},
     transaction::{Transaction, TransactionPayload, Version},
     vm_status::VMStatus,
     write_set::WriteSet,
@@ -360,21 +361,35 @@ impl Execution {
                 }
                 let mut senders = vec![sender];
                 senders.extend(TransactionMetadata::new(signed_trans).secondary_signers);
+                let enable_v7 = |features: &mut Features| {
+                    if v2_flag {
+                        features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
+                    } else {
+                        features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
+                    }
+                };
                 if let Some(debugger) = debugger_opt {
                     let data_view =
                         DataStateView::new(debugger, version, executor.data_store().clone());
+                    let mut features =
+                        Features::fetch_config(&data_view.as_move_resolver()).unwrap_or_default();
+                    enable_v7(&mut features);
                     return Some(executor.try_exec_entry_with_resolver(
                         senders,
                         entry_function,
                         &data_view.as_move_resolver(),
-                        v2_flag,
+                        features,
                     ));
                 } else {
+                    let mut features =
+                        Features::fetch_config(&executor.data_store().clone().as_move_resolver())
+                            .unwrap_or_default();
+                    enable_v7(&mut features);
                     return Some(executor.try_exec_entry_with_resolver(
                         senders,
                         entry_function,
                         &executor.data_store().clone().as_move_resolver(),
-                        v2_flag,
+                        features,
                     ));
                 }
             }

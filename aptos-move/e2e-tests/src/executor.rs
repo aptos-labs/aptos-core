@@ -1098,18 +1098,11 @@ impl FakeExecutor {
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
         resolver: &impl AptosMoveResolver,
-        v2_flag: bool,
+        features: Features,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
-
-        let mut features = Features::fetch_config(resolver).unwrap_or_default();
-        if v2_flag {
-            features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
-        } else {
-            features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
-        }
         let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let vm = MoveVmExt::new(
             NativeGasParameters::zeros(),
