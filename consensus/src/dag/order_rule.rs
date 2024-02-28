@@ -45,8 +45,8 @@ impl OrderRule {
         dag_window_size_config: Round,
         commit_events: Option<Vec<CommitEvent>>,
     ) -> Self {
+        info!("Commit Events from storage: {:?}", commit_events);
         if let Some(commit_events) = commit_events {
-            info!("Commit Events from storage: {:?}", commit_events);
             // make sure it's sorted
             assert!(commit_events
                 .windows(2)
@@ -71,24 +71,6 @@ impl OrderRule {
                 }
                 anchor_election.update_reputation(event);
             }
-        } else if lowest_unordered_anchor_round > 1 && !dag.read().is_empty() {
-            debug!("Marking as Ordered.");
-            let mut dag_writer = dag.write();
-            let anchor_round = lowest_unordered_anchor_round.saturating_sub(1);
-            let anchor_author = anchor_election.get_anchor(anchor_round);
-            let anchor_node = dag_writer
-                .get_node_by_round_author(anchor_round, &anchor_author)
-                .expect("must exist")
-                .clone();
-            dag_writer
-                .reachable_mut(&anchor_node, None)
-                .for_each(|node_status| {
-                    debug!(
-                        "Marking node as ordered without CommitEvent: {}",
-                        node_status.as_node().id()
-                    );
-                    node_status.mark_as_ordered();
-                });
         }
 
         let mut order_rule = Self {
