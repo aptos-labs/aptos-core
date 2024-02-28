@@ -154,7 +154,7 @@ impl Default for DagHealthConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagConsensusConfig {
     pub node_payload_config: DagPayloadConfig,
@@ -164,6 +164,19 @@ pub struct DagConsensusConfig {
     pub health_config: DagHealthConfig,
     #[serde(default = "QuorumStoreConfig::default_for_dag")]
     pub quorum_store: QuorumStoreConfig,
+}
+
+impl Default for DagConsensusConfig {
+    fn default() -> Self {
+        Self {
+            node_payload_config: DagPayloadConfig::default(),
+            rb_config: ReliableBroadcastConfig::default(),
+            fetcher_config: DagFetcherConfig::default(),
+            round_state_config: DagRoundStateConfig::default(),
+            health_config: DagHealthConfig::default(),
+            quorum_store: QuorumStoreConfig::default_for_dag(),
+        }
+    }
 }
 
 impl ConfigSanitizer for DagConsensusConfig {
