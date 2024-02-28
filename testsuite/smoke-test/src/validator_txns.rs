@@ -51,4 +51,6 @@ async fn dummy_validator_txns() {
         .wait_for_all_nodes_to_catchup_to_version(version_milestone_1, Duration::from_secs(60))
         .await
         .expect("milestone 1 taking too long");
+
+    assert!(false);
 }
