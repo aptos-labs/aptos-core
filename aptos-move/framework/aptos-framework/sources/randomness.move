@@ -53,8 +53,16 @@ module aptos_framework::randomness {
     /// Generate 32 random bytes.
     fun next_blob(): vector<u8> acquires PerBlockRandomness {
         let input = DST;
-        let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
-        let seed = *option::borrow(&randomness.seed);
+        let seed = if (exists<PerBlockRandomness>(@aptos_framework)) {
+            let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
+            if (option::is_some(&randomness.seed)) {
+                *option::borrow(&randomness.seed)
+            } else {
+                b"asdfasdfasdfasdfasdfasdfasdfasdf"
+            }
+        } else {
+            b"qwerqwerqwerqwerqwerqwerqwerqwer"
+        };
         vector::append(&mut input, seed);
         vector::append(&mut input, transaction_context::get_transaction_hash());
         vector::append(&mut input, fetch_and_increment_txn_counter());
