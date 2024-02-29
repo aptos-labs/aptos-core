@@ -27,6 +27,10 @@ mod e2e_correctness;
 mod enable_feature_0;
 mod enable_feature_1;
 mod enable_feature_2;
+mod on_chain_config_updates;
+mod recover_from_force_end_epoch_0;
+mod recover_from_force_end_epoch_1;
+mod recover_from_force_end_epoch_2;
 mod validator_restart_during_dkg;
 
 #[allow(dead_code)]

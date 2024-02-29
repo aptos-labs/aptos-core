@@ -26,3 +26,21 @@ pub(crate) async fn get_current_consensus_config(rest_client: &Client) -> OnChai
     )
     .unwrap()
 }
+
+pub(crate) async fn get_consensus_config_at_version(
+    rest_client: &Client,
+    version: u64,
+) -> OnChainConsensusConfig {
+    bcs::from_bytes(
+        &rest_client
+            .get_account_resource_at_version_bcs::<Vec<u8>>(
+                CORE_CODE_ADDRESS,
+                "0x1::consensus_config::ConsensusConfig",
+                version,
+            )
+            .await
+            .unwrap()
+            .into_inner(),
+    )
+    .unwrap()
+}
