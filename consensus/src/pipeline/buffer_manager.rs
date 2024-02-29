@@ -534,6 +534,7 @@ impl BufferManager {
     fn process_commit_message(&mut self, commit_msg: IncomingCommitRequest) -> Option<HashValue> {
         let IncomingCommitRequest {
             req,
+            author,
             protocol,
             response_sender,
         } = commit_msg;
@@ -710,16 +711,20 @@ impl BufferManager {
             while let Some(commit_msg) = commit_msg_rx.next().await {
                 let tx = verified_commit_msg_tx.clone();
                 let epoch_state_clone = epoch_state.clone();
-                bounded_executor
-                    .spawn(async move {
-                        match commit_msg.req.verify(&epoch_state_clone.verifier) {
-                            Ok(_) => {
-                                let _ = tx.unbounded_send(commit_msg);
-                            },
-                            Err(e) => warn!("Invalid commit message: {}", e),
-                        }
-                    })
-                    .await;
+                if commit_msg.author == self.author {
+                    let _ = tx.unbounded_send(commit_msg);
+                } else {
+                    bounded_executor
+                        .spawn(async move {
+                            match commit_msg.req.verify(&epoch_state_clone.verifier) {
+                                Ok(_) => {
+                                    let _ = tx.unbounded_send(commit_msg);
+                                },
+                                Err(e) => warn!("Invalid commit message: {}", e),
+                            }
+                        })
+                        .await;
+                }
             }
         });
         while !self.stop {
