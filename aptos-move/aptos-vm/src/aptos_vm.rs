@@ -437,11 +437,11 @@ impl AptosVM {
                 );
             }
         }
-
-        let txn_status = TransactionStatus::from_vm_status(
+        let (txn_status, txn_aux_data) = TransactionStatus::from_vm_status(
             error_vm_status.clone(),
             self.features()
                 .is_enabled(FeatureFlag::CHARGE_INVARIANT_VIOLATION),
+            self.features(),
         );
 
         match txn_status {
@@ -464,7 +464,7 @@ impl AptosVM {
                         change_set,
                         fee_statement,
                         TransactionStatus::Keep(status),
-                        TransactionAuxiliaryData::from_vm_status(&error_vm_status),
+                        txn_aux_data,
                     ),
                     Err(err) => discarded_output(err.status_code()),
                 };
@@ -1693,7 +1693,7 @@ impl AptosVM {
         let output = VMOutput::new(
             change_set,
             FeeStatement::zero(),
-            VMStatus::Executed.into(),
+            TransactionStatus::from_executed_vm_status(VMStatus::Executed),
             TransactionAuxiliaryData::default(),
         );
         Ok((VMStatus::Executed, output))
