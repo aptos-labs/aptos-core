@@ -8,6 +8,7 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore,
     },
     counters,
+    counters::{PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -678,16 +679,35 @@ impl RoundManager {
                     (count_acc + 1, size_acc + txn.size_in_bytes())
                 })
             });
+
         let num_validator_txns = num_validator_txns as u64;
         let validator_txns_total_bytes = validator_txns_total_bytes as u64;
+        let vtxn_count_limit = self.vtxn_config.per_block_limit_txn_count();
+        let vtxn_bytes_limit = self.vtxn_config.per_block_limit_total_bytes();
+        let author_hex = author.to_hex();
+        PROPOSED_VTXN_COUNT
+            .with_label_values(&[&author_hex])
+            .inc_by(num_validator_txns);
+        PROPOSED_VTXN_BYTES
+            .with_label_values(&[&author_hex])
+            .inc_by(validator_txns_total_bytes);
+        info!(
+            vtxn_count_limit = vtxn_count_limit,
+            vtxn_count_proposed = num_validator_txns,
+            vtxn_bytes_limit = vtxn_bytes_limit,
+            vtxn_bytes_proposed = validator_txns_total_bytes,
+            proposer = author_hex,
+            "Summarizing proposed validator txns."
+        );
+
         ensure!(
-            num_validator_txns <= self.vtxn_config.per_block_limit_txn_count(),
+            num_validator_txns <= vtxn_count_limit,
             "process_proposal failed with per-block vtxn count limit exceeded: limit={}, actual={}",
             self.vtxn_config.per_block_limit_txn_count(),
             num_validator_txns
         );
         ensure!(
-            validator_txns_total_bytes <= self.vtxn_config.per_block_limit_total_bytes(),
+            validator_txns_total_bytes <= vtxn_bytes_limit,
             "process_proposal failed with per-block vtxn bytes limit exceeded: limit={}, actual={}",
             self.vtxn_config.per_block_limit_total_bytes(),
             validator_txns_total_bytes
