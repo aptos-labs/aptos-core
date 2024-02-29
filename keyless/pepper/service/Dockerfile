@@ -6,6 +6,7 @@ RUN ./scripts/dev_setup.sh -k -b
 RUN cargo build --release -p aptos-keyless-pepper-service
 
 FROM rust:1.75.0
+ARG GIT_COMMIT
 COPY --from=builder /app/target/release/aptos-keyless-pepper-service /usr/local/bin
 ENV GIT_COMMIT=$GIT_COMMIT
 EXPOSE 8000
