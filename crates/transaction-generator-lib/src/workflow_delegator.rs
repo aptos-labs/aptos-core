@@ -411,13 +411,14 @@ impl WorkflowTxnGeneratorCreator {
                     Some(deposit_coins_pool.clone()),
                 )));
 
-                creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
+                creators.push(Box::new(AccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                         txn_factory.clone(),
                         packages.clone(),
                         econia_place_orders_worker,
                     )),
                     deposit_coins_pool.clone(),
+                    Some(place_orders_pool.clone()),
                 )));
 
                 let pool_per_stage = if create_accounts {
