@@ -7,7 +7,7 @@ use crate::{
     quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, ProofWithData},
+    common::{Payload, PayloadFilter, ProofWithData, ProofWithDataWithTxnLimit},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
@@ -97,8 +97,8 @@ impl ProofManager {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
                 max_bytes,
-                _max_inline_txns,
-                _max_inline_bytes,
+                max_inline_txns,
+                max_inline_bytes,
                 return_non_full,
                 filter,
                 callback,
@@ -118,20 +118,71 @@ impl ProofManager {
                     return_non_full,
                 );
 
-                // TODO: Add a counter in grafana to monitor how many inline transactions/bytes are added
-                let _cur_txns = proof_block.iter().map(|p| p.num_txns()).sum::<u64>();
-                let _cur_bytes = proof_block.iter().map(|p| p.num_bytes()).sum::<u64>();
+                let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
+                if self.allow_batches_without_pos_in_proposal {
+                    // TODO: Add a counter in grafana to monitor how many inline transactions/bytes are added
+                    let mut cur_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
+                    let mut cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
+                    let mut inline_txns: u64 = 0;
+                    let mut inline_bytes: u64 = 0;
+                    let proof_batches =
+                        proof_block.iter().map(|p| p.info()).collect::<HashSet<_>>();
+
+                    for (batch, txns) in self.batches_without_proof_of_store.iter_mut() {
+                        if excluded_batches.contains(batch) || proof_batches.contains(batch) {
+                            continue;
+                        };
+                        if let Some(txns) = txns {
+                            // TODO: Should we calculate batch size by summing up sizes of individual txns?
+                            if cur_txns + txns.len() as u64 <= max_txns
+                                && cur_bytes + batch.num_bytes() <= max_bytes
+                                && inline_txns + txns.len() as u64 <= max_inline_txns
+                                && inline_bytes + batch.num_bytes() <= max_inline_bytes
+                            {
+                                inline_txns += txns.len() as u64;
+                                inline_bytes += batch.num_bytes();
+                                cur_txns += txns.len() as u64;
+                                cur_bytes += batch.num_bytes();
+                                // TODO: Can cloning be avoided here?
+                                inline_block.push((batch.clone(), txns.clone()));
+                            }
+                        }
+                    }
+                }
 
                 let res = GetPayloadResponse::GetPayloadResponse(
-                    if proof_block.is_empty() {
+                    if proof_block.is_empty() && inline_block.is_empty() {
                         Payload::empty(true)
-                    } else {
+                    } else if inline_block.is_empty() {
                         trace!(
                             "QS: GetBlockRequest excluded len {}, block len {}",
                             excluded_batches.len(),
                             proof_block.len()
                         );
                         Payload::InQuorumStore(ProofWithData::new(proof_block))
+                    } else {
+                        trace!(
+                            "QS: GetBlockRequest excluded len {}, block len {}, inline len {}",
+                            excluded_batches.len(),
+                            proof_block.len(),
+                            inline_block.len()
+                        );
+                        // TODO: Need to calcuale max_txns_to_execute correctly here.
+                        let max_txns_to_execute: usize = proof_block
+                            .iter()
+                            .map(|p| p.info().num_txns() as usize)
+                            .sum::<usize>()
+                            + inline_block
+                                .iter()
+                                .map(|(_, txns)| txns.len())
+                                .sum::<usize>();
+                        Payload::QuroumStoreInlineHybrid(
+                            inline_block,
+                            ProofWithDataWithTxnLimit::new(
+                                ProofWithData::new(proof_block),
+                                Some(max_txns_to_execute),
+                            ),
+                        )
                     },
                 );
                 match callback.send(Ok(res)) {
