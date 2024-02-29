@@ -39,7 +39,7 @@ pub mod common {
         }
     }
 
-    #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+    #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum NodeType {
         Validator,
         ValidatorFullNode,

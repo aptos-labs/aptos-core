@@ -13,10 +13,11 @@ use aptos_logger::debug;
 use aptos_telemetry_service::types::{
     auth::{AuthRequest, AuthResponse},
     response::IndexResponse,
-    telemetry::TelemetryDump,
+    telemetry::{RemoteNodeConfig, TelemetryDump},
 };
 use aptos_types::{chain_id::ChainId, PeerId};
 use flate2::{write::GzEncoder, Compression};
+use futures::TryFutureExt;
 use prometheus::{default_registry, Registry};
 use reqwest::{header::CONTENT_ENCODING, Response, StatusCode, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, RequestBuilder};
@@ -398,6 +399,27 @@ impl TelemetrySender {
             },
             Err(e) => {
                 debug!("Unable to check chain access {}", e);
+                None
+            },
+        }
+    }
+
+    pub(crate) async fn get_remote_config(&self) -> Option<RemoteNodeConfig> {
+        let response = self
+            .send_authenticated_request(
+                self.client.get(
+                    self.build_path("config/node")
+                        .expect("unable to build telemetry path for config/node"),
+                ),
+            )
+            .and_then(|res| error_for_status_with_body(res))
+            .and_then(|res| async move { Ok(res.json::<Option<RemoteNodeConfig>>().await?) })
+            .await;
+        debug!("get remote config response {:?}", response);
+        match response {
+            Ok(response) => response,
+            Err(e) => {
+                debug!("Unable to get remote config {}", e);
                 None
             },
         }

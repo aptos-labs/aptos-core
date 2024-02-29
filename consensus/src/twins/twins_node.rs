@@ -143,7 +143,7 @@ impl SMRNode {
         let (timeout_sender, timeout_receiver) =
             aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
         let (self_sender, self_receiver) =
-            aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
+            aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());

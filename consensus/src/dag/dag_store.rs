@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
+    observability::counters::ANCHOR_ORDER_TYPE,
     types::{DagSnapshotBitmask, NodeMetadata},
     Node,
 };
@@ -10,6 +11,7 @@ use crate::{
         storage::DAGStorage,
         types::{CertifiedNode, NodeCertificate},
     },
+    monitor,
     payload_manager::TPayloadManager,
 };
 use anyhow::{anyhow, ensure};
@@ -268,12 +270,20 @@ impl InMemDag {
                     aggregated_strong_voting_power,
                     ..
                 } => {
-                    validator_verifier
+                    let super_majority_weak_votes = validator_verifier
                         .check_aggregated_voting_power(*aggregated_weak_voting_power, true)
-                        .is_ok()
-                        || validator_verifier
-                            .check_aggregated_voting_power(*aggregated_strong_voting_power, false)
-                            .is_ok()
+                        .is_ok();
+                    let minority_strong_votes = validator_verifier
+                        .check_aggregated_voting_power(*aggregated_strong_voting_power, false)
+                        .is_ok();
+                    if super_majority_weak_votes && minority_strong_votes {
+                        ANCHOR_ORDER_TYPE.with_label_values(&[&"both"]).inc();
+                    } else if super_majority_weak_votes {
+                        ANCHOR_ORDER_TYPE.with_label_values(&[&"weak"]).inc();
+                    } else if minority_strong_votes {
+                        ANCHOR_ORDER_TYPE.with_label_values(&[&"strong"]).inc();
+                    }
+                    super_majority_weak_votes || minority_strong_votes
                 },
                 NodeStatus::Ordered(_) => {
                     error!("checking voting power for Ordered node");
@@ -374,21 +384,27 @@ impl InMemDag {
         self.highest_round() + 1
     }
 
-    pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
-        let lowest_round = self.lowest_incomplete_round();
-
+    pub fn bitmask(&self, latest_commit_round: Round, target_round: Round) -> DagSnapshotBitmask {
+        let from_round = if self.is_empty() {
+            self.lowest_round()
+        } else {
+            latest_commit_round
+                .saturating_sub(self.window_size)
+                .max(self.lowest_incomplete_round())
+                .max(self.lowest_round())
+        };
         let mut bitmask: Vec<_> = self
             .nodes_by_round
-            .range(lowest_round..=target_round)
+            .range(from_round..=target_round)
             .map(|(_, round_nodes)| round_nodes.iter().map(|node| node.is_some()).collect())
             .collect();
 
         bitmask.resize(
-            (target_round - lowest_round + 1) as usize,
+            (target_round - from_round + 1) as usize,
             vec![false; self.author_to_index.len()],
         );
 
-        DagSnapshotBitmask::new(lowest_round, bitmask)
+        DagSnapshotBitmask::new(from_round, bitmask)
     }
 
     pub(super) fn prune(&mut self) -> BTreeMap<u64, Vec<Option<NodeStatus>>> {
@@ -462,9 +478,11 @@ impl DagStore {
                 to_prune.push(digest);
             }
         }
-        if let Err(e) = storage.delete_certified_nodes(to_prune) {
-            error!("Error deleting expired nodes: {:?}", e);
-        }
+        monitor!("dag_store_new_gc", {
+            if let Err(e) = storage.delete_certified_nodes(to_prune) {
+                error!("Error deleting expired nodes: {:?}", e);
+            }
+        });
         if dag.read().is_empty() {
             warn!(
                 "[DAG] Start with empty DAG store at {}, need state sync",
@@ -526,9 +544,15 @@ impl DagStore {
                 .flat_map(|(_, round_ref)| round_ref.iter().flatten())
                 .map(|node_status| *node_status.as_node().metadata().digest())
                 .collect();
-            if let Err(e) = self.storage.delete_certified_nodes(digests) {
-                error!("Error deleting expired nodes: {:?}", e);
-            }
+            let storage = self.storage.clone();
+            // TODO: limit spawns?
+            tokio::task::spawn_blocking(move || {
+                monitor!("dag_commit_callback_gc", {
+                    if let Err(e) = storage.delete_certified_nodes(digests) {
+                        error!("Error deleting expired nodes: {:?}", e);
+                    }
+                });
+            });
         }
     }
 }

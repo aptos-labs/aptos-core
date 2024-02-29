@@ -35,7 +35,8 @@ pub fn routes(
             .or(custom_event::custom_event_ingest(context.clone()))
             .or(prometheus_push_metrics::metrics_ingest(context.clone()))
             .or(log_ingest::log_ingest(context.clone()))
-            .or(remote_config::telemetry_log_env(context)),
+            .or(remote_config::telemetry_log_env(context.clone()))
+            .or(remote_config::remote_node_config(context)),
     );
 
     v1_api

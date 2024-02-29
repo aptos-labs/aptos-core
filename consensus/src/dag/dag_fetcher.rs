@@ -1,23 +1,37 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, DAGRpcResult};
-use crate::dag::{
-    dag_network::{RpcResultWithResponder, TDAGNetworkSender},
-    errors::FetchRequestHandleError,
-    observability::logging::{LogEvent, LogSchema},
-    types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
-    RpcHandler, RpcWithFallback,
+use super::{
+    adapter::{LedgerInfoProvider, TLedgerInfoProvider},
+    dag_store::DagStore,
+    errors::DagFetchError,
+    DAGRpcResult,
 };
-use anyhow::{anyhow, ensure};
+use crate::{
+    dag::{
+        dag_network::{RpcResultWithResponder, TDAGNetworkSender},
+        errors::FetchRequestHandleError,
+        observability::logging::{LogEvent, LogSchema},
+        types::{CertifiedNode, FetchResponse, Node, NodeMetadata, RemoteFetchRequest},
+        RpcHandler, RpcWithFallback,
+    },
+    monitor,
+};
+use anyhow::{bail, ensure};
 use aptos_bitvec::BitVec;
+use aptos_bounded_executor::{BoundedExecutor, ConcurrentStream};
 use aptos_config::config::DagFetcherConfig;
-use aptos_consensus_types::common::Author;
+use aptos_consensus_types::common::{Author, Round};
 use aptos_logger::{debug, error, info};
 use aptos_time_service::TimeService;
 use aptos_types::epoch_state::EpochState;
 use async_trait::async_trait;
-use futures::{stream::FuturesUnordered, Stream, StreamExt};
+use futures::{
+    future::Shared,
+    stream::{self, FuturesUnordered},
+    Future, FutureExt, Stream, StreamExt, TryFutureExt,
+};
+use itertools::Itertools;
 use std::{
     collections::HashMap,
     pin::Pin,
@@ -25,9 +39,13 @@ use std::{
     task::{Context, Poll},
     time::Duration,
 };
-use tokio::sync::{
-    mpsc::{Receiver, Sender},
-    oneshot,
+use tokio::{
+    runtime::Handle,
+    select,
+    sync::{
+        mpsc::{Receiver, Sender},
+        oneshot,
+    },
 };
 
 pub struct FetchWaiter<T> {
@@ -128,10 +146,19 @@ impl LocalFetchRequest {
 }
 
 pub struct DagFetcherService {
-    inner: DagFetcher,
+    inner: Arc<DagFetcher>,
     dag: Arc<DagStore>,
     request_rx: Receiver<LocalFetchRequest>,
     ordered_authors: Vec<Author>,
+    inflight_requests: HashMap<
+        (Round, BitVec),
+        Shared<Pin<Box<dyn Future<Output = Result<(), DagFetchError>> + Send>>>,
+    >,
+    futures:
+        FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<LocalFetchRequest>> + Send>>>,
+    max_concurrent_fetches: usize,
+    ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+    dag_window_size_config: Round,
 }
 
 impl DagFetcherService {
@@ -141,6 +168,8 @@ impl DagFetcherService {
         dag: Arc<DagStore>,
         time_service: TimeService,
         config: DagFetcherConfig,
+        ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+        dag_window_size_config: Round,
     ) -> (
         Self,
         FetchRequester,
@@ -153,10 +182,15 @@ impl DagFetcherService {
         let ordered_authors = epoch_state.verifier.get_ordered_account_addresses();
         (
             Self {
-                inner: DagFetcher::new(epoch_state, network, time_service, config),
+                max_concurrent_fetches: config.max_concurrent_fetches,
+                inner: Arc::new(DagFetcher::new(epoch_state, network, time_service, config)),
                 dag,
                 request_rx,
                 ordered_authors,
+                inflight_requests: HashMap::new(),
+                futures: FuturesUnordered::new(),
+                ledger_info_provider,
+                dag_window_size_config,
             },
             FetchRequester {
                 request_tx,
@@ -169,29 +203,43 @@ impl DagFetcherService {
     }
 
     pub async fn start(mut self) {
-        while let Some(local_request) = self.request_rx.recv().await {
-            match self
-                .fetch(
-                    local_request.node(),
-                    local_request.responders(&self.ordered_authors),
-                )
-                .await
-            {
-                Ok(_) => local_request.notify(),
-                Err(err) => error!("unable to complete fetch successfully: {}", err),
+        loop {
+            select! {
+                Some(result) = self.futures.next() => {
+                    match result {
+                        Ok(local_request) => local_request.notify(),
+                        Err(err) => error!("unable to complete fetch successfully: {}", err),
+                    }
+                },
+                // TODO: Configure concurrency
+                Some(local_request) = self.request_rx.recv(), if self.futures.len() < self.max_concurrent_fetches => {
+                    match self.fetch(local_request.node(), local_request.responders(&self.ordered_authors)) {
+                        Ok(fut) => {
+                            self.futures.push(async move {
+                                monitor!("dag_fetch_fut", fut.await)?;
+                                Ok(local_request)
+                            }.boxed())
+                        },
+                        Err(err) => error!("unable to initiate fetch successfully: {}", err),
+                    }
+                },
+                else => {
+                    info!("Dag Fetch Service exiting.");
+                    return;
+                }
             }
         }
     }
 
-    pub(super) async fn fetch(
+    pub(super) fn fetch(
         &mut self,
         node: &Node,
         responders: Vec<Author>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Shared<impl Future<Output = Result<(), DagFetchError>>>> {
         let remote_request = {
             let dag_reader = self.dag.read();
             ensure!(
-                node.round() > dag_reader.lowest_incomplete_round(),
+                node.round() >= dag_reader.lowest_incomplete_round(),
                 "Already synced beyond requested round {}, lowest incomplete round {}",
                 node.round(),
                 dag_reader.lowest_incomplete_round()
@@ -203,18 +251,51 @@ impl DagFetcherService {
                 .collect();
 
             if missing_parents.is_empty() {
-                return Ok(());
+                return Ok(async { Ok(()) }.boxed().shared());
             }
+
+            let latest_committed_round = self
+                .ledger_info_provider
+                .get_latest_ledger_info()
+                .commit_info()
+                .round();
+            let target_round = node.round().saturating_sub(1);
+
+            ensure!(
+                latest_committed_round.saturating_sub(self.dag_window_size_config) < target_round,
+                "potentially stale request {:?}",
+                node.metadata()
+            );
 
             RemoteFetchRequest::new(
                 node.metadata().epoch(),
                 missing_parents,
-                dag_reader.bitmask(node.round().saturating_sub(1)),
+                dag_reader.bitmask(latest_committed_round, target_round),
             )
         };
-        self.inner
-            .fetch(remote_request, responders, self.dag.clone())
-            .await
+
+        let target_round = remote_request.target_round();
+        let Some(bitmap) = remote_request.exists_bitmask().bitvec(target_round) else {
+            bail!(
+                "cannot get bitmap for target_round {} in {:?}",
+                target_round,
+                remote_request.exists_bitmask()
+            );
+        };
+
+        let future = self
+            .inflight_requests
+            .entry((target_round, bitmap))
+            .or_insert_with(|| {
+                let fetcher = self.inner.clone();
+                let dag_clone = self.dag.clone();
+                async move { fetcher.fetch(remote_request, responders, dag_clone).await }
+                    .boxed()
+                    .shared()
+            })
+            .clone();
+
+        Ok(future)
     }
 }
 
@@ -225,7 +306,7 @@ pub trait TDagFetcher: Send {
         remote_request: RemoteFetchRequest,
         responders: Vec<Author>,
         dag: Arc<DagStore>,
-    ) -> anyhow::Result<()>;
+    ) -> Result<(), DagFetchError>;
 }
 
 pub(crate) struct DagFetcher {
@@ -258,7 +339,7 @@ impl TDagFetcher for DagFetcher {
         remote_request: RemoteFetchRequest,
         responders: Vec<Author>,
         dag: Arc<DagStore>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), DagFetchError> {
         debug!(
             LogSchema::new(LogEvent::FetchNodes),
             start_round = remote_request.start_round(),
@@ -277,19 +358,66 @@ impl TDagFetcher for DagFetcher {
             self.config.max_concurrent_responders,
         );
 
+        let bounded_executor = BoundedExecutor::new(32, Handle::current());
         while let Some(RpcResultWithResponder { responder, result }) = rpc.next().await {
+            let remote_request_clone = remote_request.clone();
             match result {
                 Ok(DAGRpcResult(Ok(response))) => {
-                    match FetchResponse::try_from(response).and_then(|response| {
-                        response.verify(&remote_request, &self.epoch_state.verifier)
-                    }) {
-                        Ok(fetch_response) => {
-                            let certified_nodes = fetch_response.certified_nodes();
+                    match async move {
+                        FetchResponse::try_from(response).and_then(|response| {
+                            response.verify(&remote_request_clone, &self.epoch_state.verifier)
+                        })
+                    }
+                    .and_then(|response| {
+                        let epoch_state = self.epoch_state.clone();
+                        let bounded_executor = bounded_executor.clone();
+                        async move {
+                            let nodes = response.certified_nodes();
+                            let epoch = epoch_state.epoch;
+                            ensure!(
+                                stream::iter(nodes.clone())
+                                    .concurrent_map(bounded_executor.clone(), move |node| {
+                                        let epoch_state = epoch_state.clone();
+                                        async move { node.verify(&epoch_state.verifier).is_ok() }
+                                    })
+                                    .all(|ok| async move { ok })
+                                    .await,
+                                "unable to verify certified nodes"
+                            );
+                            Ok(nodes)
+                        }
+                    })
+                    .await
+                    {
+                        Ok(certified_nodes) => {
                             // TODO: support chunk response or fallback to state sync
                             {
-                                for node in certified_nodes.into_iter().rev() {
-                                    if let Err(e) = dag.add_node(node) {
-                                        error!(error = ?e, "failed to add node");
+                                let groups: Vec<(Round, Vec<_>)> = certified_nodes
+                                    .into_iter()
+                                    .rev()
+                                    .group_by(|node| node.round())
+                                    .into_iter()
+                                    .map(|(key, group)| (key, group.collect()))
+                                    .collect();
+                                for (_round, round_group) in groups {
+                                    let mut tasks = FuturesUnordered::new();
+
+                                    for node in round_group.into_iter() {
+                                        let dag = dag.clone();
+                                        let handle = bounded_executor
+                                            .spawn(async move {
+                                                if let Err(e) = dag.add_node(node) {
+                                                    error!(error = ?e, "failed to add node");
+                                                }
+                                            })
+                                            .await;
+                                        tasks.push(handle);
+                                    }
+
+                                    while let Some(result) = tasks.next().await {
+                                        if let Err(err) = result {
+                                            error!("task ended with error {:?}", err);
+                                        }
                                     }
                                 }
                             }
@@ -311,7 +439,7 @@ impl TDagFetcher for DagFetcher {
                 },
             }
         }
-        Err(anyhow!("Fetch with fallback failed"))
+        Err(DagFetchError::Failed)
     }
 }
 

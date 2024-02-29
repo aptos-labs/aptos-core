@@ -48,6 +48,9 @@ tokio-retry = { workspace = true }
 tokio-stream = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
+serde_yaml = { workspace = true }
 
 [dev-dependencies]
 httpmock = { workspace = true }
+claims = { workspace = true }
+aptos-temppath = { workspace = true }

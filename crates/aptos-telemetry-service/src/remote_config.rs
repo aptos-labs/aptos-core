@@ -33,6 +33,31 @@ async fn handle_telemetry_log_env(
     Ok(reply::json(&env))
 }
 
+pub fn remote_node_config(context: Context) -> BoxedFilter<(impl Reply,)> {
+    warp::path!("config" / "node")
+        .and(warp::get())
+        .and(with_auth(context.clone(), vec![
+            NodeType::Validator,
+            NodeType::ValidatorFullNode,
+            NodeType::PublicFullNode,
+        ]))
+        .and(context.filter())
+        .and_then(handle_remote_node_config)
+        .boxed()
+}
+
+async fn handle_remote_node_config(
+    claims: Claims,
+    context: Context,
+) -> Result<impl Reply, Rejection> {
+    let may_be_config = context.remote_config_provider().read().get(
+        claims.chain_id,
+        claims.peer_id,
+        claims.node_type,
+    );
+    Ok(reply::json(&may_be_config))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{jwt_auth::create_jwt_token, tests::test_context, types::common::NodeType};

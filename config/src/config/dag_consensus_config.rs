@@ -83,6 +83,7 @@ pub struct DagFetcherConfig {
     pub rpc_timeout_ms: u64,
     pub min_concurrent_responders: u32,
     pub max_concurrent_responders: u32,
+    pub max_concurrent_fetches: usize,
 }
 
 impl Default for DagFetcherConfig {
@@ -92,6 +93,7 @@ impl Default for DagFetcherConfig {
             rpc_timeout_ms: 1000,
             min_concurrent_responders: 1,
             max_concurrent_responders: 4,
+            max_concurrent_fetches: 4,
         }
     }
 }
@@ -151,7 +153,7 @@ impl Default for DagHealthConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct DagConsensusConfig {
     pub node_payload_config: DagPayloadConfig,
@@ -161,6 +163,19 @@ pub struct DagConsensusConfig {
     pub health_config: DagHealthConfig,
     #[serde(default = "QuorumStoreConfig::default_for_dag")]
     pub quorum_store: QuorumStoreConfig,
+}
+
+impl Default for DagConsensusConfig {
+    fn default() -> Self {
+        Self {
+            node_payload_config: DagPayloadConfig::default(),
+            rb_config: ReliableBroadcastConfig::default(),
+            fetcher_config: DagFetcherConfig::default(),
+            round_state_config: DagRoundStateConfig::default(),
+            health_config: DagHealthConfig::default(),
+            quorum_store: QuorumStoreConfig::default_for_dag(),
+        }
+    }
 }
 
 impl ConfigSanitizer for DagConsensusConfig {

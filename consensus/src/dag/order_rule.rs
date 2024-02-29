@@ -2,29 +2,36 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::dag_store::DagStore;
-use crate::dag::{
-    adapter::OrderedNotifier,
-    anchor_election::AnchorElection,
-    dag_store::NodeStatus,
-    observability::{
-        logging::{LogEvent, LogSchema},
-        tracing::{observe_node, NodeStage},
+use crate::{
+    dag::{
+        adapter::OrderedNotifier,
+        anchor_election::AnchorElection,
+        dag_store::NodeStatus,
+        observability::{
+            logging::{LogEvent, LogSchema},
+            tracing::{observe_node, NodeStage},
+        },
+        storage::CommitEvent,
+        types::NodeMetadata,
+        CertifiedNode,
     },
-    storage::CommitEvent,
-    types::NodeMetadata,
-    CertifiedNode,
+    monitor,
 };
 use aptos_consensus_types::common::Round;
-use aptos_infallible::RwLock;
-use aptos_logger::debug;
+use aptos_infallible::Mutex;
+use aptos_logger::{debug, info};
 use aptos_types::epoch_state::EpochState;
 use std::sync::Arc;
 
-#[derive(Clone)]
+pub trait TOrderRule: Send + Sync {
+    fn process_new_node(&self, node_metadata: &NodeMetadata);
+
+    fn process_all(&self);
+}
+
 pub struct OrderRule {
     epoch_state: Arc<EpochState>,
-    // TODO: try to share order rule, instead of this Arc.
-    lowest_unordered_anchor_round: Arc<RwLock<Round>>,
+    lowest_unordered_anchor_round: Round,
     dag: Arc<DagStore>,
     anchor_election: Arc<dyn AnchorElection>,
     notifier: Arc<dyn OrderedNotifier>,
@@ -41,6 +48,7 @@ impl OrderRule {
         dag_window_size_config: Round,
         commit_events: Option<Vec<CommitEvent>>,
     ) -> Self {
+        info!("Commit Events from storage: {:?}", commit_events);
         if let Some(commit_events) = commit_events {
             // make sure it's sorted
             assert!(commit_events
@@ -55,20 +63,28 @@ impl OrderRule {
                     if let Some(anchor) = maybe_anchor {
                         dag.write()
                             .reachable_mut(&anchor, None)
-                            .for_each(|node_status| node_status.mark_as_ordered());
+                            .for_each(|node_status| {
+                                debug!(
+                                    "Marking node as ordered from CommitEvent: {}",
+                                    node_status.as_node().id()
+                                );
+                                node_status.mark_as_ordered();
+                            });
                     }
                 }
                 anchor_election.update_reputation(event);
             }
         }
+
         let mut order_rule = Self {
             epoch_state,
-            lowest_unordered_anchor_round: Arc::new(RwLock::new(lowest_unordered_anchor_round)),
+            lowest_unordered_anchor_round,
             dag,
             anchor_election,
             notifier,
             dag_window_size_config,
         };
+
         // re-check if anything can be ordered to recover pending anchors
         order_rule.process_all();
         order_rule
@@ -81,7 +97,7 @@ impl OrderRule {
 
     /// Find if there's anchors that can be ordered start from `start_round` until `round`,
     /// if so find next one until nothing can be ordered.
-    fn check_ordering_between(&self, mut start_round: Round, round: Round) {
+    fn check_ordering_between(&mut self, mut start_round: Round, round: Round) {
         while start_round <= round {
             if let Some(direct_anchor) =
                 self.find_first_anchor_with_enough_votes(start_round, round)
@@ -89,7 +105,7 @@ impl OrderRule {
                 let ordered_anchor = self.find_first_anchor_to_order(direct_anchor);
                 self.finalize_order(ordered_anchor);
                 // if there's any anchor being ordered, the loop continues to check if new anchor can be ordered as well.
-                start_round = *self.lowest_unordered_anchor_round.read();
+                start_round = self.lowest_unordered_anchor_round;
             } else {
                 break;
             }
@@ -115,6 +131,11 @@ impl OrderRule {
                 {
                     return Some(anchor_node.clone());
                 }
+            } else {
+                debug!(
+                    anchor = anchor_author,
+                    "Anchor not found for round {}", start_round
+                );
             }
             start_round += 2;
         }
@@ -135,7 +156,7 @@ impl OrderRule {
         while let Some(prev_anchor) = dag_reader
             .reachable(
                 Some(current_anchor.metadata().clone()).iter(),
-                Some(*self.lowest_unordered_anchor_round.read()),
+                Some(self.lowest_unordered_anchor_round),
                 |node_status| matches!(node_status, NodeStatus::Unordered { .. }),
             )
             // skip the current anchor itself
@@ -149,19 +170,17 @@ impl OrderRule {
     }
 
     /// Finalize the ordering with the given anchor node, update anchor election and construct blocks for execution.
-    fn finalize_order(&self, anchor: Arc<CertifiedNode>) {
-        let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
-
+    fn finalize_order(&mut self, anchor: Arc<CertifiedNode>) {
         // Check we're in the expected instance
         assert!(Self::check_parity(
-            lowest_unordered_anchor_round,
+            self.lowest_unordered_anchor_round,
             anchor.round(),
         ));
         let lowest_round_to_reach = anchor.round().saturating_sub(self.dag_window_size_config);
 
         // Ceil it to the closest unordered anchor round
         let lowest_anchor_round = std::cmp::max(
-            lowest_unordered_anchor_round,
+            self.lowest_unordered_anchor_round,
             lowest_round_to_reach
                 + !Self::check_parity(lowest_round_to_reach, anchor.round()) as u64,
         );
@@ -204,25 +223,29 @@ impl OrderRule {
         debug!(
             LogSchema::new(LogEvent::OrderedAnchor),
             id = anchor.id(),
-            lowest_unordered_anchor_round = lowest_unordered_anchor_round,
+            lowest_unordered_anchor_round = self.lowest_unordered_anchor_round,
             "Reached round {} with {} nodes",
             lowest_anchor_round,
             ordered_nodes.len()
         );
 
-        *self.lowest_unordered_anchor_round.write() = anchor.round() + 1;
+        self.lowest_unordered_anchor_round = anchor.round() + 1;
         self.notifier
             .send_ordered_nodes(ordered_nodes, failed_authors_and_rounds);
     }
 
     /// Check if this node can trigger anchors to be ordered
-    pub fn process_new_node(&self, node_metadata: &NodeMetadata) {
-        let lowest_unordered_anchor_round = *self.lowest_unordered_anchor_round.read();
-
+    pub fn process_new_node(&mut self, node_metadata: &NodeMetadata) {
         let round = node_metadata.round();
+
+        debug!(
+            lowest_unordered_round = self.lowest_unordered_anchor_round,
+            node_round = round,
+            "Trigger Ordering"
+        );
         // If the node comes from the proposal round in the current instance, it can't trigger any ordering
-        if round <= lowest_unordered_anchor_round
-            || Self::check_parity(round, lowest_unordered_anchor_round)
+        if round <= self.lowest_unordered_anchor_round
+            || Self::check_parity(round, self.lowest_unordered_anchor_round)
         {
             return;
         }
@@ -233,8 +256,21 @@ impl OrderRule {
 
     /// Check the whole dag to see if anything can be ordered.
     pub fn process_all(&mut self) {
-        let start_round = *self.lowest_unordered_anchor_round.read();
+        let start_round = self.lowest_unordered_anchor_round;
         let round = self.dag.read().highest_round();
         self.check_ordering_between(start_round, round);
+    }
+}
+
+impl TOrderRule for Mutex<OrderRule> {
+    fn process_new_node(&self, node_metadata: &NodeMetadata) {
+        monitor!(
+            "dag_order_new_node",
+            self.lock().process_new_node(node_metadata)
+        );
+    }
+
+    fn process_all(&self) {
+        monitor!("dag_order_all", self.lock().process_all());
     }
 }

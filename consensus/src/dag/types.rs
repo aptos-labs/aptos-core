@@ -11,6 +11,7 @@ use crate::{
     network_interface::ConsensusMsg,
 };
 use anyhow::{bail, ensure};
+use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::{Author, Payload, Round};
 use aptos_crypto::{
     bls12381::Signature,
@@ -31,6 +32,7 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures_channel::oneshot;
+use rayon::iter::IntoParallelRefIterator;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min,
@@ -758,12 +760,6 @@ impl FetchResponse {
             }),
             "nodes don't match requested bitmask"
         );
-        ensure!(
-            self.certified_nodes
-                .iter()
-                .all(|node| node.verify(validator_verifier).is_ok()),
-            "unable to verify certified nodes"
-        );
 
         Ok(self)
     }
@@ -993,5 +989,10 @@ impl DagSnapshotBitmask {
 
     pub fn len(&self) -> usize {
         self.bitmask.len()
+    }
+
+    pub fn bitvec(&self, round: Round) -> Option<BitVec> {
+        let round_idx = round.checked_sub(self.first_round)? as usize;
+        self.bitmask.get(round_idx).map(|bitvec| bitvec.into())
     }
 }

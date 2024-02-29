@@ -117,6 +117,7 @@ pub struct IncomingDAGRequest {
 #[derive(Debug)]
 pub struct IncomingCommitRequest {
     pub req: CommitMessage,
+    pub author: Author,
     pub protocol: ProtocolId,
     pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
 }
@@ -201,7 +202,7 @@ pub struct NetworkSender {
     consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
-    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     validators: ValidatorVerifier,
     time_service: aptos_time_service::TimeService,
 }
@@ -210,7 +211,7 @@ impl NetworkSender {
     pub fn new(
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
-        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
+        self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
         validators: ValidatorVerifier,
     ) -> Self {
         NetworkSender {
@@ -272,6 +273,9 @@ impl NetworkSender {
         msg: ConsensusMsg,
         timeout_duration: Duration,
     ) -> anyhow::Result<ConsensusMsg> {
+        fail_point!("consensus::send::any", |_| {
+            Err(anyhow::anyhow!("Injected error in send_rpc"))
+        });
         counters::CONSENSUS_SENT_MSGS
             .with_label_values(&[msg.name()])
             .inc();
@@ -646,7 +650,7 @@ impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
         network_events: NetworkEvents<ConsensusMsg>,
-        self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
+        self_receiver: aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
         handle: &Handle,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
@@ -722,6 +726,7 @@ impl NetworkTask {
                             let req_with_callback =
                                 IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                     req: CommitMessage::Vote(*commit_vote),
+                                    author: peer_id.peer_id(),
                                     protocol: RPC[0],
                                     response_sender: tx,
                                 });
@@ -737,6 +742,7 @@ impl NetworkTask {
                             let req_with_callback =
                                 IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                     req: CommitMessage::Decision(*commit_decision),
+                                    author: peer_id.peer_id(),
                                     protocol: RPC[0],
                                     response_sender: tx,
                                 });
@@ -833,6 +839,7 @@ impl NetworkTask {
                         ConsensusMsg::CommitMessage(req) => {
                             IncomingRpcRequest::CommitRequest(IncomingCommitRequest {
                                 req: *req,
+                                author: peer_id.peer_id(),
                                 protocol,
                                 response_sender: callback,
                             })

@@ -41,7 +41,7 @@ use aptos_channels::{
 };
 use aptos_config::config::DagConsensusConfig;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{debug, info};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
@@ -59,7 +59,7 @@ use futures_channel::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
+use std::{fmt, ops::Deref, sync::Arc, time::Duration};
 use tokio::{
     runtime::Handle,
     select,
@@ -70,7 +70,7 @@ use tokio_retry::strategy::ExponentialBackoff;
 #[derive(Clone)]
 struct BootstrapBaseState {
     dag_store: Arc<DagStore>,
-    order_rule: OrderRule,
+    order_rule: Arc<Mutex<OrderRule>>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ordered_notifier: Arc<OrderedNotifierAdapter>,
     commit_history: Arc<dyn CommitHistory>,
@@ -277,7 +277,7 @@ impl SyncMode {
                             info!("sync succeeded. running full bootstrap.");
                             // If the sync task finishes successfully, we can transition to Active mode by
                             // rebootstrapping all components starting from the DAG store.
-                            let (new_state, new_handler, new_fetch_service) = bootstrapper.full_bootstrap();
+                            let (new_state, new_handler, new_fetch_service) = monitor!("dag_sync_full_bootstrap", bootstrapper.full_bootstrap());
                             Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
@@ -288,7 +288,7 @@ impl SyncMode {
                             info!("sync failed. resuming with current DAG state.");
                             // If the sync task fails, then continue the DAG in Active Mode with existing state.
                             let (new_handler, new_fetch_service) =
-                                bootstrapper.bootstrap_components(&self.base_state);
+                                monitor!("dag_failed_sync_bootstrap", bootstrapper.bootstrap_components(&self.base_state));
                             Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
@@ -360,6 +360,7 @@ impl DagBootstrapper {
         executor: BoundedExecutor,
         features: Features,
     ) -> Self {
+        info!("OnChainConfig: {:?}", onchain_config);
         Self {
             self_peer,
             config,
@@ -387,18 +388,28 @@ impl DagBootstrapper {
         config: &ProposerAndVoterConfig,
     ) -> Arc<LeaderReputationAdapter> {
         let num_validators = self.epoch_state.verifier.len();
-        // TODO: support multiple epochs
+        let epoch_to_validators_vec = self.storage.get_epoch_to_proposers();
+        let epoch_to_validator_map = epoch_to_validators_vec
+            .iter()
+            .map(|(key, value)| {
+                (
+                    *key,
+                    value
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, author)| (*author, idx))
+                        .collect(),
+                )
+            })
+            .collect();
         let metadata_adapter = Arc::new(MetadataBackendAdapter::new(
-            num_validators * 10,
-            HashMap::from([(
-                self.epoch_state.epoch,
-                self.epoch_state
-                    .verifier
-                    .address_to_validator_index()
-                    .clone(),
-            )]),
+            num_validators
+                * std::cmp::max(
+                    config.proposer_window_num_validators_multiplier,
+                    config.voter_window_num_validators_multiplier,
+                ),
+            epoch_to_validator_map,
         ));
-        // TODO: use onchain config
         let heuristic: Box<dyn ReputationHeuristic> = Box::new(ProposerAndVoterHeuristic::new(
             self.self_peer,
             config.active_weight,
@@ -419,10 +430,7 @@ impl DagBootstrapper {
 
         Arc::new(LeaderReputationAdapter::new(
             self.epoch_state.epoch,
-            HashMap::from([(
-                self.epoch_state.epoch,
-                self.epoch_state.verifier.get_ordered_account_addresses(),
-            )]),
+            epoch_to_validators_vec,
             voting_power,
             metadata_adapter,
             heuristic,
@@ -442,7 +450,13 @@ impl DagBootstrapper {
                 let election = Arc::new(RoundRobinAnchorElection::new(
                     self.epoch_state.verifier.get_ordered_account_addresses(),
                 ));
-                (election.clone(), election, None)
+                let commit_events = self
+                    .storage
+                    .get_latest_k_committed_events(
+                        (self.onchain_config.dag_ordering_causal_history_window * 3) as u64,
+                    )
+                    .expect("Failed to read commit events from storage");
+                (election.clone(), election, Some(commit_events))
             },
             AnchorElectionMode::LeaderReputation(reputation_type) => {
                 let (commit_events, leader_reputation) = match reputation_type {
@@ -450,7 +464,10 @@ impl DagBootstrapper {
                         let commit_events = self
                             .storage
                             .get_latest_k_committed_events(
-                                config.voter_window_num_validators_multiplier as u64
+                                std::cmp::max(
+                                    config.proposer_window_num_validators_multiplier,
+                                    config.voter_window_num_validators_multiplier,
+                                ) as u64
                                     * self.epoch_state.verifier.len() as u64,
                             )
                             .expect("Failed to read commit events from storage");
@@ -515,7 +532,7 @@ impl DagBootstrapper {
             ledger_info_provider.clone(),
         ));
 
-        let order_rule = OrderRule::new(
+        let order_rule = Arc::new(Mutex::new(OrderRule::new(
             self.epoch_state.clone(),
             commit_round + 1,
             dag.clone(),
@@ -523,7 +540,7 @@ impl DagBootstrapper {
             ordered_notifier.clone(),
             self.onchain_config.dag_ordering_causal_history_window as Round,
             commit_events,
-        );
+        )));
 
         BootstrapBaseState {
             dag_store: dag,
@@ -578,6 +595,8 @@ impl DagBootstrapper {
                 dag_store.clone(),
                 self.time_service.clone(),
                 self.config.fetcher_config.clone(),
+                ledger_info_provider.clone(),
+                self.onchain_config.dag_ordering_causal_history_window as Round,
             );
         let fetch_requester = Arc::new(fetch_requester);
         let (new_round_tx, new_round_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -625,6 +644,7 @@ impl DagBootstrapper {
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag_store.clone(),
+            order_rule.clone(),
             self.signer.clone(),
             self.epoch_state.clone(),
             self.storage.clone(),
@@ -633,6 +653,7 @@ impl DagBootstrapper {
             self.vtxn_config.clone(),
             self.features.clone(),
             health_backoff,
+            self.quorum_store_enabled,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
 

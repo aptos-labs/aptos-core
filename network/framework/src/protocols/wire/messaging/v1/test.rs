@@ -239,7 +239,6 @@ proptest! {
         let (msg_tx, mut msg_rx) = tokio::sync::mpsc::channel(1024); // aptos_channels::new_test(1024);
         // let mut outbound_stream = OutboundStream::new(128, 64 * 255, stream_tx);
         // let mut inbound_stream = InboundStreamBuffer::new(255);
-
         let messages_clone = messages.clone();
         let f_stream_all = async move {
             for message in messages_clone {
