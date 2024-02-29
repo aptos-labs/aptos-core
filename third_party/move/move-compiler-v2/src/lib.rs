@@ -2,6 +2,18 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod ast_simplifier;
+mod bytecode_generator;
+pub mod env_pipeline;
+mod experiments;
+mod file_format_generator;
+pub mod flow_insensitive_checkers;
+pub mod function_checker;
+pub mod inliner;
+pub mod logging;
+pub mod options;
+pub mod pipeline;
+
 use crate::pipeline::{
     ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -36,17 +48,6 @@ use move_stackless_bytecode::function_target_pipeline::{
 use move_symbol_pool::Symbol;
 pub use options::*;
 use std::{collections::BTreeSet, path::Path};
-
-mod bytecode_generator;
-pub mod env_pipeline;
-mod experiments;
-mod file_format_generator;
-pub mod flow_insensitive_checkers;
-pub mod function_checker;
-pub mod inliner;
-pub mod logging;
-pub mod options;
-pub mod pipeline;
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
@@ -89,9 +90,17 @@ pub fn run_move_compiler(
     function_checker::check_access_and_use(&mut env, false);
     check_errors(&env, error_writer, "post-inlining access checks")?;
 
+    // Run inlining.  No code elimination for now.
+    ast_simplifier::run_simplifier(&mut env, false);
+    check_errors(&env, error_writer, "simplifier")?;
+
+    debug!("After simplifier, GlobalEnv={}", env.dump_env());
+
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;
+
+    debug!("After bytecode_gen, GlobalEnv={}", env.dump_env());
 
     // Run transformation pipeline
     let pipeline = bytecode_pipeline(&env);

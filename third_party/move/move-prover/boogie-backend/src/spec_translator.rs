@@ -740,6 +740,10 @@ impl<'env> SpecTranslator<'env> {
             Value::Vector(val) => {
                 emit!(self.writer, &boogie_value_blob(self.env, self.options, val))
             },
+            Value::Tuple(val) => {
+                let loc = self.env.get_node_loc(node_id);
+                self.error(&loc, &format!("tuple value not yet supported: {:#?}", val))
+            },
         }
     }
 

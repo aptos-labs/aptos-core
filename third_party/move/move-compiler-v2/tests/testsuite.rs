@@ -5,7 +5,7 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::debug;
 use move_compiler_v2::{
-    annotate_units, disassemble_compiled_units,
+    annotate_units, ast_simplifier, disassemble_compiled_units,
     env_pipeline::{lambda_lifter, lambda_lifter::LambdaLiftingOptions, EnvProcessorPipeline},
     flow_insensitive_checkers, function_checker, inliner, logging, pipeline,
     pipeline::{
@@ -121,19 +121,16 @@ impl TestConfig {
         );
         // The bytecode transformation pipeline
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/inlining/bug_11112") || path.contains("/inlining/bug_9717_looponly") {
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-            Self {
-                stop_before_generating_bytecode: false,
-                dump_ast: AstDumpLevel::EndStage,
-                env_pipeline,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: true,
-                dump_for_only_some_stages: None,
-            }
-        } else if path.contains("/inlining/") || path.contains("/folding/") {
+
+        if path.contains("/inlining/")
+            || path.contains("/folding/")
+            || path.contains("/simplifier/")
+        {
+            env_pipeline.add("simplifier", |env: &mut GlobalEnv| {
+                ast_simplifier::run_simplifier(
+                    env, false, // No code elimination
+                )
+            });
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));

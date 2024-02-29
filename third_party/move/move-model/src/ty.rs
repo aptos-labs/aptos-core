@@ -2600,8 +2600,14 @@ where
         ),
         Type::TypeParameter(i) => get_ty_param_kinds(*i).abilities,
         Type::Reference(_, _) => AbilitySet::REFERENCES,
+        Type::Tuple(et) => {
+            let x = et
+                .iter()
+                .map(|ty| infer_abilities_opt_check(ty, get_ty_param_kinds, get_struct_sig, on_err))
+                .reduce(|a, b| a.intersect(b));
+            x.unwrap_or(AbilitySet::PRIMITIVES)
+        },
         Type::Fun(_, _)
-        | Type::Tuple(_)
         | Type::TypeDomain(_)
         | Type::ResourceDomain(_, _, _)
         | Type::Error
