@@ -3751,6 +3751,13 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             if entry.module_id != self.module_id {
                 continue;
             }
+            // If the function is from a script, its return value must be unit.
+            if self.module_name.is_script() && !entry.result_type.is_unit() {
+                self.parent.error(
+                    &entry.name_loc,
+                    "The function entry point to a `script` must have the return type `()`",
+                );
+            }
             // New function
             let spec = self.fun_specs.remove(&name.symbol).unwrap_or_default();
             let def = self.fun_defs.remove(&name.symbol);

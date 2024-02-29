@@ -2,7 +2,10 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    oidb::{Configuration, IdCommitment, OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
+    keyless::{
+        base64url_encode_str, Configuration, IdCommitment, KeylessPublicKey, KeylessSignature,
+        ZkpOrOpenIdSig,
+    },
     serialize,
 };
 use anyhow::bail;
@@ -14,7 +17,7 @@ use num_traits::{One, Zero};
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 
-// TODO(oidb): Some of this stuff, if not all, belongs to the aptos-crypto crate
+// TODO(keyless): Some of this stuff, if not all, belongs to the aptos-crypto crate
 
 pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
@@ -148,8 +151,8 @@ impl TryInto<G2Affine> for &G2Bytes {
 }
 
 pub fn get_public_inputs_hash(
-    sig: &OidbSignature,
-    pk: &OidbPublicKey,
+    sig: &KeylessSignature,
+    pk: &KeylessPublicKey,
     jwk: &RSA_JWK,
     config: &Configuration,
 ) -> anyhow::Result<Fr> {
@@ -180,9 +183,10 @@ pub fn get_public_inputs_hash(
         };
 
         // Add the hash of the jwt_header with the "." separator appended
-        let jwt_header_with_separator = format!("{}.", sig.jwt_header_b64);
+        let jwt_header_b64_with_separator =
+            format!("{}.", base64url_encode_str(sig.jwt_header_json.as_str()));
         let jwt_header_hash = poseidon_bn254::pad_and_hash_string(
-            &jwt_header_with_separator,
+            &jwt_header_b64_with_separator,
             config.max_jwt_header_b64_bytes as usize,
         )?;
 
@@ -198,7 +202,7 @@ pub fn get_public_inputs_hash(
         let idc = Fr::from_le_bytes_mod_order(&pk.idc.0);
 
         // Add the exp_timestamp_secs as a scalar
-        let exp_timestamp_secs = Fr::from(sig.exp_timestamp_secs);
+        let exp_timestamp_secs = Fr::from(sig.exp_date_secs);
 
         // Add the epk lifespan as a scalar
         let exp_horizon_secs = Fr::from(proof.exp_horizon_secs);
@@ -240,13 +244,13 @@ pub fn get_public_inputs_hash(
         frs.push(use_override_aud);
         poseidon_bn254::hash_scalars(frs)
     } else {
-        bail!("Cannot get_public_inputs_hash for OidbSignature")
+        bail!("Can only call `get_public_inputs_hash` on keyless::Signature with Groth16 ZK proof")
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::oidb::{
+    use crate::keyless::{
         bn254_circom::{
             G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES,
             G2_PROJECTIVE_COMPRESSED_NUM_BYTES,

@@ -42,10 +42,6 @@ impl DiskSpacePricing {
         }
     }
 
-    pub fn latest() -> Self {
-        Self::V2
-    }
-
     /// Calculates the storage fee for a state slot allocation.
     pub fn charge_refund_write_op(
         &self,

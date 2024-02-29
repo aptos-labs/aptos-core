@@ -1291,54 +1291,72 @@ fn workload_mix_test() -> ForgeConfig {
                     mempool_backlog: 10000,
                 })
                 .transaction_mix(vec![
+                    // To test both variants, make module publish with such frequency, so that there are
+                    // similar number of sequential and parallel blocks.
+                    // For other transactions, make more expensive transactions somewhat rarer.
                     (
                         TransactionTypeArg::AccountGeneration.materialize_default(),
-                        5,
+                        10000,
                     ),
-                    (TransactionTypeArg::NoOp5Signers.materialize_default(), 1),
-                    (TransactionTypeArg::CoinTransfer.materialize_default(), 1),
-                    (TransactionTypeArg::PublishPackage.materialize_default(), 1),
                     (
-                        TransactionTypeArg::AccountResource32B.materialize(1, true),
-                        1,
+                        TransactionTypeArg::CoinTransfer.materialize_default(),
+                        10000,
                     ),
-                    // (
-                    //     TransactionTypeArg::AccountResource10KB.materialize(1, true),
-                    //     1,
-                    // ),
-                    (
-                        TransactionTypeArg::ModifyGlobalResource.materialize(1, false),
-                        1,
-                    ),
-                    // (
-                    //     TransactionTypeArg::ModifyGlobalResource.materialize(10, false),
-                    //     1,
-                    // ),
+                    (TransactionTypeArg::PublishPackage.materialize_default(), 3),
                     (
                         TransactionTypeArg::Batch100Transfer.materialize_default(),
-                        1,
+                        100,
                     ),
-                    // (
-                    //     TransactionTypeArg::TokenV1NFTMintAndTransferSequential
-                    //         .materialize_default(),
-                    //     1,
-                    // ),
-                    // (
-                    //     TransactionTypeArg::TokenV1NFTMintAndTransferParallel.materialize_default(),
-                    //     1,
-                    // ),
-                    // (
-                    //     TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
-                    //     1,
-                    // ),
+                    (
+                        TransactionTypeArg::VectorPicture30k.materialize_default(),
+                        100,
+                    ),
+                    (
+                        TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(1, true),
+                        100,
+                    ),
                     (
                         TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
-                        1,
+                        10000,
+                    ),
+                    (
+                        TransactionTypeArg::ModifyGlobalResource.materialize(1, false),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB
+                            .materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::TokenV1NFTMintAndTransferSequential
+                            .materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
+                        10000,
                     ),
                 ]),
         )
         .with_success_criteria(
-            SuccessCriteria::new(100)
+            SuccessCriteria::new(3000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {

@@ -219,7 +219,6 @@ move-compiler/tests/move_check/typing/{
   infinite_instantiations_invalid.move,
   infinite_instantiations_valid.move,
   invalid_type_acquire.move,
-  main_return_type_not_unit.move,
   missing_acquire.move,
   module_call_constraints_not_satisfied.move,
   module_call_internal.move,

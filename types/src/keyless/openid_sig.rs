@@ -2,9 +2,9 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    oidb::{
-        base64url_decode_as_str, seconds_from_epoch, Configuration, IdCommitment, OidbPublicKey,
-        Pepper,
+    keyless::{
+        base64url_encode_bytes, base64url_encode_str, seconds_from_epoch, Configuration,
+        IdCommitment, KeylessPublicKey, Pepper,
     },
     transaction::authenticator::EphemeralPublicKey,
 };
@@ -18,10 +18,11 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct OpenIdSig {
-    /// The base64url encoded JWS signature of the OIDC JWT (https://datatracker.ietf.org/doc/html/rfc7515#section-3)
-    pub jwt_sig_b64: String,
-    /// The base64url encoded JSON payload of the OIDC JWT (https://datatracker.ietf.org/doc/html/rfc7519#section-3)
-    pub jwt_payload_b64: String,
+    /// The decoded bytes of the JWS signature in the JWT (https://datatracker.ietf.org/doc/html/rfc7515#section-3)
+    #[serde(with = "serde_bytes")]
+    pub jwt_sig: Vec<u8>,
+    /// The decoded/plaintext JSON payload of the JWT (https://datatracker.ietf.org/doc/html/rfc7519#section-3)
+    pub jwt_payload_json: String,
     /// The name of the key in the claim that maps to the user identifier; e.g., "sub" or "email"
     pub uid_key: String,
     /// The random value used to obfuscate the EPK from OIDC providers in the nonce field
@@ -41,20 +42,22 @@ impl OpenIdSig {
 
     /// Verifies an `OpenIdSig` by doing the following checks:
     ///  1. Check that the ephemeral public key lifespan is under MAX_EXPIRY_HORIZON_SECS
-    ///  2. Check that the iss claim in the OidbPublicKey matches the one in the jwt_payload
-    ///  3. Check that the identity commitment in the OidbPublicKey matches the one constructed from the jwt_payload
-    ///  4. Check that the nonce constructed from the ephemeral public key, blinder, and exp_timestamp_secs matches the one in the jwt_payload
-    // TODO(oidb): Refactor to return a `Result<(), VMStatus>` because (1) this is now called in the
-    //  VM and (2) is_override_aud_allowed does.
+    ///  2. Check that the `iss` claim in the `PublicKey` matches the one in the `jwt_payload`
+    ///  3. Check that the identity commitment in the `PublicKey` matches the one constructed from
+    ///     the `jwt_payload`
+    ///  4. Check that the nonce constructed from the ephemeral public key, blinder, and
+    ///     `exp_timestamp_secs` matches the one in the jwt_payload
+    ///
+    /// TODO(keyless): Refactor to return a `Result<(), VMStatus>` because (1) this is now called in the
+    ///  VM and (2) is_override_aud_allowed does.
     pub fn verify_jwt_claims(
         &self,
         exp_timestamp_secs: u64,
         epk: &EphemeralPublicKey,
-        pk: &OidbPublicKey,
+        pk: &KeylessPublicKey,
         config: &Configuration,
     ) -> anyhow::Result<()> {
-        let jwt_payload_json = base64url_decode_as_str(&self.jwt_payload_b64)?;
-        let claims: Claims = serde_json::from_str(&jwt_payload_json)?;
+        let claims: Claims = serde_json::from_str(&self.jwt_payload_json)?;
 
         let max_expiration_date =
             seconds_from_epoch(claims.oidc_claims.iat + config.max_exp_horizon_secs);
@@ -110,15 +113,19 @@ impl OpenIdSig {
         Ok(())
     }
 
+    /// `jwt_header_json` is the *decoded* JWT header (i.e., *not* base64url-encoded)
     pub fn verify_jwt_signature(
         &self,
         rsa_jwk: &RSA_JWK,
-        jwt_header_b64: &String,
+        jwt_header_json: &str,
     ) -> anyhow::Result<()> {
-        let jwt_payload_b64 = &self.jwt_payload_b64;
-        let jwt_sig_b64 = &self.jwt_sig_b64;
-        let jwt_token = format!("{}.{}.{}", jwt_header_b64, jwt_payload_b64, jwt_sig_b64);
-        rsa_jwk.verify_signature(&jwt_token)?;
+        let jwt_b64 = format!(
+            "{}.{}.{}",
+            base64url_encode_str(jwt_header_json),
+            base64url_encode_str(&self.jwt_payload_json),
+            base64url_encode_bytes(&self.jwt_sig)
+        );
+        rsa_jwk.verify_signature(&jwt_b64)?;
         Ok(())
     }
 

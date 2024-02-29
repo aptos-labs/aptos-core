@@ -4,7 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    oidb::{OidbPublicKey, OidbSignature, ZkpOrOpenIdSig},
+    keyless::{KeylessPublicKey, KeylessSignature, ZkpOrOpenIdSig},
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
@@ -969,8 +969,8 @@ pub enum AnySignature {
     WebAuthn {
         signature: PartialAuthenticatorAssertionResponse,
     },
-    OIDB {
-        signature: OidbSignature,
+    Keyless {
+        signature: KeylessSignature,
     },
 }
 
@@ -987,8 +987,8 @@ impl AnySignature {
         Self::WebAuthn { signature }
     }
 
-    pub fn oidb(signature: OidbSignature) -> Self {
-        Self::OIDB { signature }
+    pub fn keyless(signature: KeylessSignature) -> Self {
+        Self::Keyless { signature }
     }
 
     pub fn verify<T: Serialize + CryptoHash>(
@@ -1004,8 +1004,8 @@ impl AnySignature {
                 signature.verify(message, public_key)
             },
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
-            (Self::OIDB { signature }, AnyPublicKey::OIDB { public_key: _ }) => {
-                // TODO(oidb): Batch-verify these two signatures
+            (Self::Keyless { signature }, AnyPublicKey::Keyless { public_key: _ }) => {
+                // TODO(keyless): Batch-verify these two signatures
                 match &signature.sig {
                     ZkpOrOpenIdSig::Groth16Zkp(proof) => {
                         proof.verify_non_malleability_sig(&signature.ephemeral_pubkey)?;
@@ -1039,8 +1039,8 @@ pub enum AnyPublicKey {
     Secp256r1Ecdsa {
         public_key: secp256r1_ecdsa::PublicKey,
     },
-    OIDB {
-        public_key: OidbPublicKey,
+    Keyless {
+        public_key: KeylessPublicKey,
     },
 }
 
@@ -1057,8 +1057,8 @@ impl AnyPublicKey {
         Self::Secp256r1Ecdsa { public_key }
     }
 
-    pub fn oidb(public_key: OidbPublicKey) -> Self {
-        Self::OIDB { public_key }
+    pub fn keyless(public_key: KeylessPublicKey) -> Self {
+        Self::Keyless { public_key }
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -1125,8 +1125,8 @@ impl TryFrom<&[u8]> for EphemeralPublicKey {
 mod tests {
     use super::*;
     use crate::{
-        oidb::test_utils::{
-            get_sample_esk, get_sample_oidb_groth16_sig_and_pk, get_sample_oidb_openid_sig_and_pk,
+        keyless::test_utils::{
+            get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk,
         },
         transaction::{webauthn::AssertionSignature, SignedTransaction},
     };
@@ -1666,11 +1666,11 @@ mod tests {
     }
 
     #[test]
-    fn test_oidb_openid_txn() {
+    fn test_keyless_openid_txn() {
         let esk = get_sample_esk();
-        let (mut oidb_sig, oidb_pk) = get_sample_oidb_openid_sig_and_pk();
+        let (mut sig, pk) = get_sample_openid_sig_and_pk();
         let sender_addr =
-            AuthenticationKey::any_key(AnyPublicKey::oidb(oidb_pk.clone())).account_address();
+            AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone())).account_address();
         let mut raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
             sender_addr,
             0,
@@ -1679,10 +1679,10 @@ mod tests {
             None,
             None,
         );
-        oidb_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+        sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
         let single_key_auth =
-            SingleKeyAuthenticator::new(AnyPublicKey::oidb(oidb_pk), AnySignature::oidb(oidb_sig));
+            SingleKeyAuthenticator::new(AnyPublicKey::keyless(pk), AnySignature::keyless(sig));
         let account_auth = AccountAuthenticator::single_key(single_key_auth);
         let signed_txn =
             SignedTransaction::new_single_sender(raw_txn.clone(), account_auth.clone());
@@ -1694,13 +1694,12 @@ mod tests {
         assert!(signed_txn.verify_signature().is_err());
     }
 
-    /// TODO(oidb): Redundancy; a similar test case is in types/src/oidb/
     #[test]
-    fn test_oidb_groth16_txn() {
+    fn test_keyless_groth16_txn() {
         let esk = get_sample_esk();
-        let (mut oidb_sig, oidb_pk) = get_sample_oidb_groth16_sig_and_pk();
+        let (mut sig, pk) = get_sample_groth16_sig_and_pk();
         let sender_addr =
-            AuthenticationKey::any_key(AnyPublicKey::oidb(oidb_pk.clone())).account_address();
+            AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone())).account_address();
         let mut raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
             sender_addr,
             0,
@@ -1709,10 +1708,10 @@ mod tests {
             None,
             None,
         );
-        oidb_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+        sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
         let single_key_auth =
-            SingleKeyAuthenticator::new(AnyPublicKey::oidb(oidb_pk), AnySignature::oidb(oidb_sig));
+            SingleKeyAuthenticator::new(AnyPublicKey::keyless(pk), AnySignature::keyless(sig));
         let account_auth = AccountAuthenticator::single_key(single_key_auth);
         let signed_txn =
             SignedTransaction::new_single_sender(raw_txn.clone(), account_auth.clone());
@@ -1726,11 +1725,11 @@ mod tests {
     }
 
     #[test]
-    fn test_oidb_groth16_txn_fails_non_malleability_check() {
+    fn test_groth16_txn_fails_non_malleability_check() {
         let esk = get_sample_esk();
-        let (mut oidb_sig, oidb_pk) = get_sample_oidb_groth16_sig_and_pk();
+        let (mut sig, pk) = get_sample_groth16_sig_and_pk();
         let sender_addr =
-            AuthenticationKey::any_key(AnyPublicKey::oidb(oidb_pk.clone())).account_address();
+            AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone())).account_address();
         let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
             sender_addr,
             0,
@@ -1739,11 +1738,11 @@ mod tests {
             None,
             None,
         );
-        oidb_sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+        sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
         let tw_sk = Ed25519PrivateKey::generate(&mut thread_rng());
         // Bad non-malleability signature
-        match &mut oidb_sig.sig {
+        match &mut sig.sig {
             ZkpOrOpenIdSig::Groth16Zkp(proof) => {
                 // bad signature using the TW SK rather than the ESK
                 proof.non_malleability_signature =
@@ -1753,7 +1752,7 @@ mod tests {
         }
 
         let single_key_auth =
-            SingleKeyAuthenticator::new(AnyPublicKey::oidb(oidb_pk), AnySignature::oidb(oidb_sig));
+            SingleKeyAuthenticator::new(AnyPublicKey::keyless(pk), AnySignature::keyless(sig));
         let account_auth = AccountAuthenticator::single_key(single_key_auth);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
 
