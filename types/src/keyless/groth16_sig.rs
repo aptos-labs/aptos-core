@@ -12,7 +12,7 @@ use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::{Bn254, Fr};
 use ark_ff::{BigInteger, PrimeField};
 use ark_groth16::{Groth16, PreparedVerifyingKey, Proof};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// NOTE: We do not deserialize these into affine points because we want to avoid doing unnecessary
 /// work, since other validation steps might fail before we even get to the point of deserialization.
@@ -47,11 +47,101 @@ pub struct SignedGroth16Zkp {
 /// This struct is used to wrap together the Groth16 ZKP and the statement it proves so that the
 /// prover service can sign them together. It is only used during signature verification & never
 /// sent over the network.
-#[derive(CryptoHasher, BCSCryptoHash, Serialize, Deserialize)]
+#[derive(Debug, CryptoHasher, BCSCryptoHash, PartialEq, Eq)]
 pub struct Groth16ZkpAndStatement {
     pub proof: Groth16Zkp,
     // TODO(keyless): implement Serialize/Deserialize for Fr and use Fr here directly
     pub public_inputs_hash: [u8; 32],
+}
+
+
+impl<'de> Deserialize<'de> for Groth16ZkpAndStatement {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            // In order to preserve the Serde data model and help analysis tools,
+            // make sure to wrap our value in a container with the same name
+            // as the original type.
+            //
+            // In this case, we use the serde(with = "hex") macro, which causes public_inputs_hash
+            // to deserialize from a hex string.
+            #[derive(::serde::Deserialize)]
+            #[serde(rename = "Groth16ZkpAndStatement")]
+            struct Value {
+                pub proof: Groth16Zkp,
+                #[serde(with = "hex")]
+                pub public_inputs_hash: [u8; 32],
+            }
+
+            let value = Value::deserialize(deserializer)?;
+            Ok(
+                Groth16ZkpAndStatement {
+                    proof: value.proof,
+                    public_inputs_hash: value.public_inputs_hash
+                }
+            )
+        } else {
+
+            // Same as above, except this time we don't use the serde(with = "hex") macro, so that
+            // serde uses default behavior for serialization.
+            #[derive(::serde::Deserialize)]
+            #[serde(rename = "Groth16ZkpAndStatement")]
+            struct Value {
+                pub proof: Groth16Zkp,
+                pub public_inputs_hash: [u8; 32],
+            }
+
+            let value = Value::deserialize(deserializer)?;
+            Ok(
+                Groth16ZkpAndStatement {
+                    proof: value.proof,
+                    public_inputs_hash: value.public_inputs_hash
+                }
+            )
+        }
+    }
+}
+
+impl Serialize for Groth16ZkpAndStatement {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+
+            #[derive(::serde::Serialize)]
+            #[serde(rename = "Groth16ZkpAndStatement")]
+            struct Value {
+                pub proof: Groth16Zkp,
+                #[serde(with = "hex")]
+                pub public_inputs_hash: [u8; 32],
+            }
+
+            let value = Value {
+                proof: self.proof,
+                public_inputs_hash: self.public_inputs_hash
+            };
+
+            value.serialize(serializer)
+        } else {
+
+            #[derive(::serde::Serialize)]
+            #[serde(rename = "Groth16ZkpAndStatement")]
+            struct Value {
+                pub proof: Groth16Zkp,
+                pub public_inputs_hash: [u8; 32],
+            }
+
+            let value = Value {
+                proof: self.proof,
+                public_inputs_hash: self.public_inputs_hash
+            };
+
+            value.serialize(serializer)
+        }
+    }
 }
 
 impl SignedGroth16Zkp {

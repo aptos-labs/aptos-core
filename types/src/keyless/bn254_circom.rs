@@ -14,7 +14,7 @@ use ark_bn254::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_traits::{One, Zero};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_big_array::BigArray;
 
 // TODO(keyless): Some of this stuff, if not all, belongs to the aptos-crypto crate
@@ -47,7 +47,7 @@ pub fn parse_fr_element(s: &str) -> Result<Fr, CryptoMaterialError> {
         .map_err(|_e| CryptoMaterialError::DeserializationError)
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct G1Bytes(pub(crate) [u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
 impl G1Bytes {
@@ -60,6 +60,18 @@ impl G1Bytes {
 
         let bytes: Vec<u8> = serialize!(g1);
         Self::new_from_vec(bytes)
+    }
+
+    // TODO(keyless) Shouldn't this return a result rather than unwrap()ing?
+    pub fn from_hex(hex: &str) -> Self {
+        let bytes = hex::decode(hex).unwrap();
+        let mut extended_bytes = [0u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES];
+        extended_bytes.copy_from_slice(&bytes);
+        Self(extended_bytes)
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
     }
 
     /// Used internally or for testing.
@@ -81,6 +93,42 @@ impl G1Bytes {
     }
 }
 
+impl<'de> Deserialize<'de> for G1Bytes {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let s = <String>::deserialize(deserializer)?;
+            Ok(G1Bytes::from_hex(&s))
+        } else {
+            // In order to preserve the Serde data model and help analysis tools,
+            // make sure to wrap our value in a container with the same name
+            // as the original type.
+            #[derive(::serde::Deserialize)]
+            #[serde(rename = "G1Bytes")]
+            struct Value([u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]);
+
+            let value = Value::deserialize(deserializer)?;
+            Ok(G1Bytes(value.0))
+        }
+    }
+}
+
+impl Serialize for G1Bytes {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            self.to_hex().serialize(serializer)
+        } else {
+            // See comment in deserialize.
+            serializer.serialize_newtype_struct("G1Bytes", &self.0)
+        }
+    }
+}
+
 impl TryInto<G1Projective> for &G1Bytes {
     type Error = CryptoMaterialError;
 
@@ -99,8 +147,8 @@ impl TryInto<G1Affine> for &G1Bytes {
     }
 }
 
-#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct G2Bytes(#[serde(with = "BigArray")] pub(crate) [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]);
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct G2Bytes(pub(crate) [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]);
 
 impl G2Bytes {
     pub fn new_unchecked(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<Self> {
@@ -113,6 +161,19 @@ impl G2Bytes {
         let bytes: Vec<u8> = serialize!(g2);
         Self::new_from_vec(bytes)
     }
+
+    // TODO(keyless) Shouldn't this return a result rather than unwrap()ing?
+    pub fn from_hex(hex: &str) -> Self {
+        let bytes = hex::decode(hex).unwrap();
+        let mut extended_bytes = [0u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES];
+        extended_bytes.copy_from_slice(&bytes);
+        Self(extended_bytes)
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.0)
+    }
+
 
     pub fn new_from_vec(vec: Vec<u8>) -> anyhow::Result<Self> {
         if vec.len() == G2_PROJECTIVE_COMPRESSED_NUM_BYTES {
@@ -131,6 +192,52 @@ impl G2Bytes {
         self.try_into()
     }
 }
+
+impl<'de> Deserialize<'de> for G2Bytes {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let s = <String>::deserialize(deserializer)?;
+            Ok(G2Bytes::from_hex(&s))
+        } else {
+            // In order to preserve the Serde data model and help analysis tools,
+            // make sure to wrap our value in a container with the same name
+            // as the original type.
+            #[derive(::serde::Deserialize)]
+            #[serde(rename = "G2Bytes")]
+            struct Value(#[serde(with = "BigArray")] [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]);
+
+            let value = Value::deserialize(deserializer)?;
+            Ok(G2Bytes(value.0))
+        }
+    }
+}
+
+impl Serialize for G2Bytes {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            self.to_hex().serialize(serializer)
+        } else {
+            // Doing this differently than G1Bytes in order to use serde(with = "BigArray"). This
+            // apparently is needed to correctly deserialize arrays with size greater than 32.
+            #[derive(::serde::Serialize)]
+            #[serde(rename = "G2Bytes")]
+            struct Value(#[serde(with = "BigArray")] [u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]);
+
+            let value = Value(self.0);
+
+            // See comment in deserialize.
+            value.serialize(serializer)
+        }
+    }
+}
+
+
 
 impl TryInto<G2Projective> for &G2Bytes {
     type Error = CryptoMaterialError;

@@ -12,12 +12,17 @@ use crate::{
         },
         Groth16Zkp, KeylessPublicKey, KeylessSignature, OpenIdSig, SignedGroth16Zkp,
         ZkpOrOpenIdSig,
+        Configuration,
+        get_public_inputs_hash,
     },
     transaction::authenticator::EphemeralSignature,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, SigningKey, Uniform};
 use once_cell::sync::Lazy;
 use ring::signature;
+use ark_ff::{BigInteger, PrimeField};
+
+use super::{Groth16ZkpAndStatement, Pepper};
 
 static DUMMY_EPHEMERAL_SIGNATURE: Lazy<EphemeralSignature> = Lazy::new(|| {
     let sk = Ed25519PrivateKey::generate_for_testing();
@@ -37,6 +42,32 @@ pub fn get_sample_iss() -> String {
 
 pub fn get_sample_jwk() -> RSA_JWK {
     SAMPLE_JWK.clone()
+}
+
+pub fn get_sample_pepper() -> Pepper {
+    SAMPLE_PEPPER.clone()
+}
+
+pub fn get_sample_groth16_zkp_and_statement() -> Groth16ZkpAndStatement {
+    let config = Configuration::new_for_testing();
+    let (sig, pk) = get_sample_groth16_sig_and_pk();
+    let public_inputs_hash = get_public_inputs_hash(&sig, &pk, &SAMPLE_JWK, &config)
+        .unwrap()
+        .into_bigint()
+        .to_bytes_le()
+        .try_into()
+        .expect("expected 32-bytes public inputs hash");
+    
+    let proof = match sig.sig {
+        ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp { proof, non_malleability_signature, exp_horizon_secs, extra_field, override_aud_val, training_wheels_signature }) => proof,
+        _ => unreachable!()
+    };
+
+    Groth16ZkpAndStatement { 
+        proof,
+        public_inputs_hash
+    }
+    
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the

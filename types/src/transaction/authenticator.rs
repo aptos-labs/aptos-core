@@ -1201,43 +1201,6 @@ mod tests {
     use rand::thread_rng;
     use serde_json;
 
-    #[test]
-    fn test_epk_serialization() {
-        let ed25519_pk = Ed25519PrivateKey::generate_for_testing().public_key();
-        let epk = EphemeralPublicKey::Ed25519 {
-            public_key: ed25519_pk,
-        };
-
-        assert_eq!(
-            serde_json::from_str::<EphemeralPublicKey>(&serde_json::to_string(&epk).unwrap())
-                .unwrap(),
-            epk
-        );
-        assert_eq!(
-            bcs::from_bytes::<EphemeralPublicKey>(&bcs::to_bytes(&epk).unwrap()).unwrap(),
-            epk
-        );
-
-        // these values were generated as follows:
-        //println!("{:?}", serde_json::to_string(&epk).unwrap());
-        //println!("{:?}", bcs::to_bytes(&epk).unwrap());
-        let epk_str = "\"002020fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144\"";
-        let epk_bytes = [
-            0, 32, 32, 253, 186, 201, 177, 11, 117, 135, 187, 167, 181, 188, 22, 59, 206, 105, 231,
-            150, 215, 30, 78, 212, 76, 16, 252, 180, 72, 134, 137, 247, 161, 68,
-        ];
-
-        assert_eq!(
-            serde_json::to_string(&serde_json::from_str::<EphemeralPublicKey>(epk_str).unwrap())
-                .unwrap()
-                .as_str(),
-            epk_str
-        );
-        assert_eq!(
-            bcs::to_bytes(&bcs::from_bytes::<EphemeralPublicKey>(&epk_bytes).unwrap()).unwrap(),
-            epk_bytes
-        );
-    }
 
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {

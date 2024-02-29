@@ -10,3 +10,4 @@ mod transaction_test;
 mod trusted_state_test;
 mod validator_set_test;
 mod write_set_test;
+mod keyless_serialization_test;
