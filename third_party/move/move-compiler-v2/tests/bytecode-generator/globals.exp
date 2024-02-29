@@ -6,7 +6,7 @@ warning: Unused parameter `x`. Consider removing or prefixing with an underscore
 18 │     fun write(a: address, x: u64): u64 {
    │                           ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::globals {
     struct R {
         f: u64,
@@ -43,7 +43,6 @@ module 0x42::globals {
     }
     spec fun $write(a: address,x: u64): u64;
 } // end 0x42::globals
-
 ============ initial bytecode ================
 
 [variant baseline]

@@ -26,3 +26,47 @@ error: function `0x42::o::bar` cannot be called from function `0x42::n::test` be
    ·
 25 │         assert!(o::foo() == 42, 1);
    │                 -------- from a call inlined at this callsite
+
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    friend fun bar(): u64 {
+        42
+    }
+    spec fun $bar(): u64 {
+        42
+    }
+    spec fun $foo(): u64 {
+        m::$bar()
+    }
+} // end 0x42::m
+module 0x42::o {
+    use 0x42::m; // resolved as: 0x42::m
+    private fun bar(): u64 {
+        42
+    }
+    spec fun $bar(): u64 {
+        42
+    }
+    spec fun $foo(): u64;
+} // end 0x42::o
+module 0x42::n {
+    use 0x42::o; // resolved as: 0x42::o
+    public fun test() {
+        if Eq<u64>({
+          let ();
+          {
+            let ();
+            m::bar()
+          };
+          o::bar()
+        }, 42) {
+          Tuple()
+        } else {
+          Abort(1)
+        };
+        Tuple()
+    }
+    spec fun $test() {
+        Tuple()
+    }
+} // end 0x42::n

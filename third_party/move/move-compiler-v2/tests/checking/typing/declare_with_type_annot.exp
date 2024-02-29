@@ -24,7 +24,7 @@ warning: Unused local variable `f`. Consider removing or prefixing with an under
 7 │         let (x, b, R{f}): (u64, bool, R);
   │                      ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,

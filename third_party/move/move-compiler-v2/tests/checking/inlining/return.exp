@@ -5,3 +5,16 @@ error: Return not currently supported in inline functions
   │
 3 │         return 5
   │         ^^^^^^^^
+
+// -- Model dump before bytecode pipeline
+module 0x42::test {
+    private fun test_inline() {
+        {
+          let ();
+          return 5
+        };
+        Tuple()
+    }
+    spec fun $foo(): u32;
+    spec fun $test_inline();
+} // end 0x42::test

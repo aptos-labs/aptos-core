@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::inline_specs {
     private fun specs(): u64 {
         {
@@ -23,7 +23,6 @@ module 0x42::inline_specs {
         Add(x, 1)
     }
 } // end 0x42::inline_specs
-
 ============ initial bytecode ================
 
 [variant baseline]

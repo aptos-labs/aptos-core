@@ -5,3 +5,26 @@ error: Return not currently supported in inline functions
   │
 3 │     return f(b)
   │     ^^^^^^^^^^^
+
+// -- Model dump before bytecode pipeline
+module 0x42::LambdaReturn {
+    private fun test_lambda_symbol_param() {
+        {
+          let a: u64 = {
+            let (b: u64) = Tuple(3);
+            return {
+              let (x: u64) = Tuple(b);
+              x
+            }
+          };
+          if Eq<u64>(a, 3) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
+    }
+    spec fun $inline_apply2(f: |u64|u64,b: u64): u64;
+    spec fun $test_lambda_symbol_param();
+} // end 0x42::LambdaReturn

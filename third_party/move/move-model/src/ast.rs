@@ -1314,6 +1314,7 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
     SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
+    Closure(ModuleId, FunId),
     Pack(ModuleId, StructId),
     Tuple,
 
@@ -1443,6 +1444,16 @@ impl Pattern {
         let mut result = vec![];
         Self::collect_vars(&mut result, self);
         result
+    }
+
+    /// Flatten a pattern: if its a tuple, return the elements, otherwise
+    /// make a singleton.
+    pub fn flatten(self) -> Vec<Pattern> {
+        if let Pattern::Tuple(_, pats) = self {
+            pats
+        } else {
+            vec![self]
+        }
     }
 
     /// Returns true if this pattern is a simple variable or tuple of variables.
@@ -2151,6 +2162,15 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                 write!(
                     f,
                     "{}",
+                    self.env
+                        .get_function(mid.qualified(*fid))
+                        .get_full_name_str()
+                )
+            },
+            Closure(mid, fid) => {
+                write!(
+                    f,
+                    "closure {}",
                     self.env
                         .get_function(mid.qualified(*fid))
                         .get_full_name_str()

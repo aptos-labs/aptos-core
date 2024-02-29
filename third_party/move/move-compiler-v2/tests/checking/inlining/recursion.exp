@@ -13,3 +13,5 @@ error: cyclic recursion involving only inline functions is not allowed: `Test::f
    ·
 12 │         f()
    │         --- call from `Test::h` to `Test::f`
+
+// -- Model dump before bytecode pipeline
