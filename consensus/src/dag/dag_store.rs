@@ -384,11 +384,11 @@ impl InMemDag {
         self.highest_round() + 1
     }
 
-    pub fn bitmask(&self, target_round: Round) -> DagSnapshotBitmask {
+    pub fn bitmask(&self, latest_commit_round: Round, target_round: Round) -> DagSnapshotBitmask {
         let from_round = if self.is_empty() {
             self.lowest_round()
         } else {
-            target_round
+            latest_commit_round
                 .saturating_sub(self.window_size)
                 .max(self.lowest_incomplete_round())
                 .max(self.lowest_round())
