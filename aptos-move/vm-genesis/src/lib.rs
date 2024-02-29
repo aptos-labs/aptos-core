@@ -255,6 +255,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
+    initialize_jwks(&mut session);
     initialize_keyless_accounts(&mut session, chain_id);
     set_genesis_end(&mut session);
 
@@ -436,6 +437,16 @@ fn initialize_aptos_coin(session: &mut SessionExt) {
         session,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_jwks(session: &mut SessionExt) {
+    exec_function(
+        session,
+        JWKS_MODULE_NAME,
+        "initialize",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
