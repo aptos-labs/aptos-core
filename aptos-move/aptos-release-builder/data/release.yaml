@@ -87,17 +87,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - aggregator_v2_api
-  - name: step_8_enable_concurrent_digital_assets
-    metadata:
-      title: "AIP-43: Enable Concurrent Digital Assets (Token V2)"
-      description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - concurrent_token_v2
-  - name: step_9_enable_aggregator_v2_parallelism
+  - name: step_8_enable_aggregator_v2_parallelism
     metadata:
       title: "AIP-47: Enable Aggregator v2 parallelism"
       description: "AIP-47: This step enables the backend that makes execution of Aggregators V2 parallel."
@@ -107,7 +97,16 @@ proposals:
       - FeatureFlag:
           enabled:
             - aggregator_v2_delayed_fields
-            - resource_groups_split_in_vm_change_set
+            - resource_groups_split_in_vm_change_set            
+  - name: step_9_enable_max_object_nesting_check
+    metadata:
+      title: "Max Object Nesting Check"
+      description: "Enable the max object nesting check, preventing running out of gas due to ownership cycles."
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - max_object_nesting_check
   - name: step_10_enable_validator_txn
     metadata:
       title: "AIP-64: Validator Transaction Type"
@@ -151,29 +150,20 @@ proposals:
       - FeatureFlag:
           enabled:
             - jwk_consensus
-  - name: step_12_enable_keyless_accounts
-    metadata:
-      title: "AIP-61: Keyless accounts"
-      description: "Enable keyless blockchain accounts, allowing users to transact directly using their Web2 accounts instead of managing a secret key"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/297"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - keyless_accounts
-  - name: step_13_start_watching_google_jwks
+  - name: step_12_start_watching_google_jwks
     metadata:
       title: "Start JWK consensus for Google"
       description: "JWK Consensus (AIP-67) for Google enables Google-based keyless accounts (AIP-61)."
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
-  - name: step_14_enable_max_object_nesting_check
+  - name: step_13_enable_concurrent_digital_assets
     metadata:
-      title: "Max Object Nesting Check"
-      description: "Enable the max object nesting check, preventing running out of gas due to ownership cycles."
+      title: "AIP-43: Enable Concurrent Digital Assets (Token V2)"
+      description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - max_object_nesting_check
+            - concurrent_token_v2
