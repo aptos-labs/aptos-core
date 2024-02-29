@@ -88,7 +88,7 @@ pub enum TransactionType {
 
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
-    CreateThenMint { count: usize, creation_balance: u64 },
+    CreateMintBurn { count: usize, creation_balance: u64 },
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -97,9 +97,17 @@ pub enum WorkflowProgress {
     WhenDone { delay_between_stages_s: u64 },
 }
 
+impl WorkflowProgress {
+    pub fn when_done_default() -> Self {
+        Self::WhenDone {
+            delay_between_stages_s: 10,
+        }
+    }
+}
+
 impl Default for TransactionType {
     fn default() -> Self {
-        TransactionTypeArg::CoinTransfer.materialize(1, false)
+        TransactionTypeArg::CoinTransfer.materialize_default()
     }
 }
 

@@ -219,7 +219,8 @@ pub enum EntryPoints {
     TokenV1MintAndStoreFT,
     TokenV1MintAndTransferFT,
 
-    TokenV2AmbassadorMint,
+    TokenV2AmbassadorMint { numbered: bool},
+    TokenV2AmbassadorBurn,
 
     InitializeVectorPicture {
         length: u64,
@@ -275,7 +276,8 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "framework_usecases",
-            EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn => "ambassador_token",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
@@ -322,7 +324,8 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
-            EntryPoints::TokenV2AmbassadorMint => "ambassador",
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn => "ambassador",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. } => "vector_picture",
@@ -533,7 +536,7 @@ impl EntryPoints {
                     bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
                 ])
             },
-            EntryPoints::TokenV2AmbassadorMint => {
+            EntryPoints::TokenV2AmbassadorMint { numbered: true } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
@@ -543,6 +546,24 @@ impl EntryPoints {
                         bcs::to_bytes("superstar #").unwrap(),          // name
                         bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
                     ],
+                )
+            },
+            EntryPoints::TokenV2AmbassadorMint { numbered: false } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("mint_ambassador_token_by_user").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                    ],
+                )
+            },
+            EntryPoints::TokenV2AmbassadorBurn => {
+                get_payload(
+                    module_id,
+                    ident_str!("burn_named_by_user").to_owned(),
+                    vec![],
                 )
             },
             EntryPoints::InitializeVectorPicture { length } => {
@@ -619,7 +640,8 @@ impl EntryPoints {
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
-            EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }
     }
@@ -663,7 +685,8 @@ impl EntryPoints {
             },
             EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => AutomaticArgs::Signer,
-            EntryPoints::TokenV2AmbassadorMint => AutomaticArgs::SignerAndMultiSig,
+            EntryPoints::TokenV2AmbassadorMint { .. }
+            | EntryPoints::TokenV2AmbassadorBurn => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
             EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
                 AutomaticArgs::None

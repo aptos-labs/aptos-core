@@ -5,7 +5,7 @@ use crate::smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder};
 use anyhow::ensure;
 use aptos_forge::{
     args::TransactionTypeArg, EmitJobMode, EmitJobRequest, EntryPoints, NodeExt, Result, Swarm,
-    TransactionType, TxnEmitter, TxnStats,
+    TransactionType, TxnEmitter, TxnStats, WorkflowProgress,
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use rand::{rngs::OsRng, SeedableRng};
@@ -77,7 +77,7 @@ async fn test_txn_emmitter() {
             //     ),
             // ],
             vec![
-                (TransactionTypeArg::NoOp.materialize(100, false), 20),
+                (TransactionTypeArg::NoOp.materialize(100, false, WorkflowProgress::when_done_default()), 20),
                 (
                     TransactionType::CallCustomModules {
                         entry_point: EntryPoints::MakeOrChangeTable {
