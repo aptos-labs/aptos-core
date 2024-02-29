@@ -604,6 +604,8 @@ impl DagBootstrapper {
                 dag_store.clone(),
                 self.time_service.clone(),
                 self.config.fetcher_config.clone(),
+                ledger_info_provider.clone(),
+                self.onchain_config.dag_ordering_causal_history_window as Round,
             );
         let fetch_requester = Arc::new(fetch_requester);
         let (new_round_tx, new_round_rx) = tokio::sync::mpsc::unbounded_channel();
