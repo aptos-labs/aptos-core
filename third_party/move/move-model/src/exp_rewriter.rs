@@ -119,7 +119,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
 #[allow(unused)] // for trait default parameters
 pub trait ExpRewriterFunctions {
     /// Top-level entry for rewriting an expression. Can be re-implemented to do some
-    /// pre/post processing embedding a call to `do_rewrite`.
+    /// pre/post processing embedding a call to `rewrite_exp_descent`.
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         self.rewrite_exp_descent(exp)
     }
