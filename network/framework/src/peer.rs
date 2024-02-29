@@ -50,7 +50,7 @@ where
     let closed = Closer::new();
     let network_id = remote_peer_network_id.network_id();
     handle.spawn(open_outbound_rpc.clone().cleanup(Duration::from_millis(100), closed.clone()));
-    handle.spawn(writer_task(network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type, closed.clone()));
+    handle.spawn(writer_task(remote_peer_network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type, closed.clone()));
     handle.spawn(reader_task(reader, apps, remote_peer_network_id, open_outbound_rpc.clone(), handle.clone(), closed.clone(), role_type));
     let stub = PeerStub::new(sender, sender_high_prio, open_outbound_rpc, closed.clone());
     if let Err(err) = peers_and_metadata.insert_connection_metadata(remote_peer_network_id, connection_metadata.clone()) {
@@ -62,7 +62,8 @@ where
 
 /// state needed in writer_task()
 struct WriterContext<WriteThing: AsyncWrite + Unpin + Send> {
-    network_id: NetworkId,
+    /// Who is on the other end of this connection
+    peer_network_id: PeerNetworkId,
     /// increment for each new fragment stream
     stream_request_id : u32,
     /// remaining payload bytes of curretnly fragmenting large message
@@ -87,7 +88,7 @@ struct WriterContext<WriteThing: AsyncWrite + Unpin + Send> {
 
 impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
     fn new(
-        network_id: NetworkId,
+        peer_network_id: PeerNetworkId,
         to_send: Receiver<(NetworkMessage,u64)>,
         to_send_high_prio: Receiver<(NetworkMessage,u64)>,
         writer: MultiplexMessageSink<WriteThing>,
@@ -95,7 +96,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
         role_type: RoleType,
     ) -> Self {
         Self {
-            network_id,
+            peer_network_id,
             stream_request_id: 0,
             large_message: None,
             large_fragment_id: 0,
@@ -127,7 +128,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
     }
 
     fn start_large(&mut self, msg: NetworkMessage) -> MultiplexMessage {
-        peer_message_large_msg_fragmented(&self.network_id, msg.protocol_id_as_str()).inc();
+        peer_message_large_msg_fragmented(&self.peer_network_id.network_id(), msg.protocol_id_as_str()).inc();
         self.stream_request_id += 1;
         self.send_large = false;
         self.large_fragment_id = 0;
@@ -172,9 +173,9 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
         match self.to_send_high_prio.try_recv() {
             Ok((msg, enqueue_micros)) => {
                 // info!("writer_thread to_send_high_prio {} bytes prot={}", msg.data_len(), msg.protocol_id_as_str());
-                counters::network_application_outbound_traffic(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
+                counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
-                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), queue_micros);
+                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
                 let serialized_len = estimate_serialized_length(&msg);
                 info!("next high prio ser len {:?}", serialized_len);
                 if serialized_len > self.max_frame_size {
@@ -203,9 +204,9 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
         }
         match self.to_send.try_recv() {
             Ok((msg,enqueue_micros)) => {
-                counters::network_application_outbound_traffic(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
+                counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
-                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), queue_micros);
+                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
                 let serialized_len = estimate_serialized_length(&msg);
                 info!("next ser len {:?}", serialized_len);
                 if serialized_len > self.max_frame_size { // TODO: FIXME, serialize msg to find out if it is bigger than max_frame_size?
@@ -249,7 +250,6 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                     match self.try_next_msg() {
                         None => {
                             close_reason = "try_next_msg None";
-                            error!("try_next_msg None where it should be Some");
                             break;
                         }
                         Some(mm) => {mm}
@@ -267,13 +267,12 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                         high_prio = self.to_send_high_prio.recv() => match high_prio {
                             None => {
                                 close_reason = "writer_thread high prio closed";
-                                info!("writer_thread high prio closed");
                                 break;
                             },
                             Some((msg, enqueue_micros)) => {
-                                counters::network_application_outbound_traffic(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
+                                counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
-                                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), queue_micros);
+                                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
                                 // info!("selected high prio for {:?} bytes", estimate_serialized_length(&msg));
                                 if estimate_serialized_length(&msg) > self.max_frame_size {
                                     // start stream
@@ -286,13 +285,12 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                         send_result = self.to_send.recv() => match send_result {
                             None => {
                                 close_reason = "writer_thread source closed";
-                                info!("writer_thread source closed");
                                 break;
                             },
                             Some((msg, enqueue_micros)) => {
-                                counters::network_application_outbound_traffic(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
+                                counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
-                                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), queue_micros);
+                                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
                                 // info!("selected normal for {:?} bytes", estimate_serialized_length(&msg));
                                 if estimate_serialized_length(&msg) > self.max_frame_size {
                                     // start stream
@@ -304,19 +302,13 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                         },
                         // TODO: why does select on close.wait() work below but I did this workaround here?
                         wait_result = closed.done.wait_for(|x| *x) => {
-                            close_reason = "closed done";
-                            info!("writer_thread wait result {:?}", wait_result);
+                            close_reason = "closed done 1";
                             break;
                         },
                     }
                 }
             };
             if let MultiplexMessage::Message(NetworkMessage::Error(ErrorCode::DisconnectCommand)) = &mm {
-                // TODO: clean away "peerclose" logging
-                info!(
-                    op = "writer_thread got DisconnectCommand",
-                    "peerclose"
-                );
                 close_reason = "got DisconnectCommand";
                 break;
             }
@@ -325,8 +317,8 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                 send_result = self.writer.send(&mm) => match send_result {
                     Ok(_) => {
                         // info!("writer_thread ok sent {:?} bytes", data_len);
-                        peer_message_frames_written(&self.network_id).inc();
-                        peer_message_bytes_written(&self.network_id).inc_by(data_len as u64);
+                        peer_message_frames_written(&self.peer_network_id.network_id()).inc();
+                        peer_message_bytes_written(&self.peer_network_id.network_id()).inc_by(data_len as u64);
                     }
                     Err(err) => {
                         // TODO: counter net write err
@@ -336,11 +328,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                     }
                 },
                 _ = closed.wait() => {
-                    close_reason = "closed wait";
-                    info!(
-                        op = "writer_thread peer writer got closed",
-                        "peerclose"
-                    );
+                    close_reason = "closed done 2";
                     break;
                 }
             }
@@ -348,6 +336,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
         info!(
             reason = close_reason,
             op = "writer_thread closing",
+            peer = self.peer_network_id,
             "peerclose"
         );
         closed.close().await;
@@ -388,7 +377,7 @@ pub fn peer_message_large_msg_fragmented(network_id: &NetworkId, protocol_id: &'
 }
 
 async fn writer_task(
-    network_id: NetworkId,
+    peer_network_id: PeerNetworkId,
     to_send: Receiver<(NetworkMessage,u64)>,
     to_send_high_prio: Receiver<(NetworkMessage,u64)>,
     writer: MultiplexMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
@@ -396,7 +385,7 @@ async fn writer_task(
     role_type: RoleType,
     closed: Closer,
 ) {
-    let wt = WriterContext::new(network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type);
+    let wt = WriterContext::new(peer_network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type);
     wt.run(closed).await;
     info!("peer writer exited")
 }
@@ -642,6 +631,7 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
         info!(
             op = "ReadContext::run ext",
             reason = close_reason,
+            peer = self.remote_peer_network_id,
             "peerclose"
         );
         closed.close().await;
