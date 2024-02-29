@@ -274,7 +274,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                                 counters::network_application_outbound_traffic(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
                                 counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), queue_micros);
-                                info!("selected high prio for {:?} bytes", estimate_serialized_length(&msg));
+                                // info!("selected high prio for {:?} bytes", estimate_serialized_length(&msg));
                                 if estimate_serialized_length(&msg) > self.max_frame_size {
                                     // start stream
                                     self.start_large(msg)
@@ -293,7 +293,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                                 counters::network_application_outbound_traffic(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
                                 counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.network_id.as_str(), msg.protocol_id_as_str(), queue_micros);
-                                info!("selected normal for {:?} bytes", estimate_serialized_length(&msg));
+                                // info!("selected normal for {:?} bytes", estimate_serialized_length(&msg));
                                 if estimate_serialized_length(&msg) > self.max_frame_size {
                                     // start stream
                                     self.start_large(msg)
@@ -324,7 +324,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
             tokio::select! {
                 send_result = self.writer.send(&mm) => match send_result {
                     Ok(_) => {
-                        info!("writer_thread ok sent {:?} bytes", data_len);
+                        // info!("writer_thread ok sent {:?} bytes", data_len);
                         peer_message_frames_written(&self.network_id).inc();
                         peer_message_bytes_written(&self.network_id).inc_by(data_len as u64);
                     }
@@ -498,13 +498,13 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                 let protocol_id = request.protocol_id;
                 let data_len = request.raw_request.len() as u64;
                 counters::rpc_message_bytes(self.remote_peer_network_id.network_id(), protocol_id.as_str(), self.role_type, counters::REQUEST_LABEL, counters::INBOUND_LABEL, counters::RECEIVED_LABEL, data_len);
-                if protocol_id == ProtocolId::StorageServiceRpc {
-                    info!(
-                        req_id = request.request_id,
-                        peer = self.remote_peer_network_id.peer_id(),
-                        protocol_id = protocol_id.as_str(),
-                        "RPCT req in");
-                }
+                // if protocol_id == ProtocolId::StorageServiceRpc {
+                //     info!(
+                //         req_id = request.request_id,
+                //         peer = self.remote_peer_network_id.peer_id(),
+                //         protocol_id = protocol_id.as_str(),
+                //         "RPCT req in");
+                // }
                 self.forward(protocol_id, nmsg).await;
             }
             NetworkMessage::RpcResponse(response) => {
@@ -520,13 +520,13 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                     }
                     Some(rpc_state) => {
                         let rx_time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64;
-                        if rpc_state.protocol_id == ProtocolId::StorageServiceRpc {
-                            info!(
-                                peer = self.remote_peer_network_id.peer_id(),
-                                req_id = response.request_id,
-                                protocol_id = rpc_state.protocol_id.as_str(),
-                                "RPCT rsp in");
-                        }
+                        // if rpc_state.protocol_id == ProtocolId::StorageServiceRpc {
+                        //     info!(
+                        //         peer = self.remote_peer_network_id.peer_id(),
+                        //         req_id = response.request_id,
+                        //         protocol_id = rpc_state.protocol_id.as_str(),
+                        //         "RPCT rsp in");
+                        // }
                         self.handle.spawn(complete_rpc(rpc_state, nmsg, rx_time));
                     }
                 }

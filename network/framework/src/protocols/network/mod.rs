@@ -723,13 +723,13 @@ impl<TMessage: Message> NetworkSender<TMessage> {
                         match send_result {
                             Ok(_) => {
                                 counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type, counters::REQUEST_LABEL, counters::OUTBOUND_LABEL, counters::SENT_LABEL, data_len);
-                                if protocol == ProtocolId::StorageServiceRpc {
-                                    info!(
-                                        peer = recipient,
-                                        req_id = request_id,
-                                        protocol_id = protocol.as_str(),
-                                        "RPCT req sent");
-                                }
+                                // if protocol == ProtocolId::StorageServiceRpc {
+                                //     info!(
+                                //         peer = recipient,
+                                //         req_id = request_id,
+                                //         protocol_id = protocol.as_str(),
+                                //         "RPCT req sent");
+                                // }
                                 receiver
                                 // now we wait for rpc reply
                             }

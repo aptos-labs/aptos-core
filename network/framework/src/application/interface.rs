@@ -215,6 +215,7 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
             sample!(
                 SampleRate::Duration(Duration::from_secs(10)),
                 warn!(
+                    protocols = self.direct_send_protocols_and_preferences,
                     "Unavailable peers (without a common network protocol): {:?}",
                     peers_without_a_protocol
                 )
