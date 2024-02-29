@@ -118,7 +118,6 @@ spec aptos_framework::randomness {
         // TODO(tengzhang): complete the aborts_if conditions
         // include n > 1 ==> NextBlobAbortsIf;
         // aborts_if n > 1 && !exists<PerBlockRandomness>(@aptos_framework);
-        aborts_if n == 0;
     }
 
     spec safe_add_mod_for_verification(a: u256, b: u256, m: u256): u256 {

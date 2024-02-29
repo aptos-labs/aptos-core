@@ -25,6 +25,8 @@ module aptos_framework::randomness {
     /// Randomness APIs calls must originate from a private entry function. Otherwise, test-and-abort attacks are possible.
     const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
 
+    const MAX_U256: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+
     /// 32-byte randomness seed unique to every block.
     /// This resource is updated in every block prologue.
     struct PerBlockRandomness has drop, key {
@@ -162,6 +164,11 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u128 = 0;
         while (i < 16) {
+            spec {
+                // TODO: Prove these with proper loop invaraints.
+                assume ret * 256 + 255 <= MAX_U256;
+                assume len(raw) > 0;
+            };
             ret = ret * 256 + (vector::pop_back(&mut raw) as u128);
             i = i + 1;
         };
@@ -183,6 +190,11 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u256 = 0;
         while (i < 32) {
+            spec {
+                // TODO: Prove these with proper loop invaraints.
+                assume ret * 256 + 255 <= MAX_U256;
+                assume len(raw) > 0;
+            };
             ret = ret * 256 + (vector::pop_back(&mut raw) as u256);
             i = i + 1;
         };
