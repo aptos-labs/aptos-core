@@ -142,9 +142,9 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                     epoch = self.epoch_state.epoch,
                     "Found unfinished and current DKG session. Continuing it."
                 );
-                self.setup_deal_broadcast(start_time_us, &metadata)
-                    .await
-                    .expect("[DKG] setup_deal_broadcast() should be infallible");
+                if let Err(e) = self.setup_deal_broadcast(start_time_us, &metadata).await {
+                    error!(epoch = self.epoch_state.epoch, "dkg resumption failed: {e}");
+                }
             } else {
                 info!(
                     cur_epoch = self.epoch_state.epoch,
