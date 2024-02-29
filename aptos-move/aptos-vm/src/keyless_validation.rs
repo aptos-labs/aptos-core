@@ -208,5 +208,6 @@ pub(crate) fn validate_authenticators(
             },
         }
     }
+
     Ok(())
 }
