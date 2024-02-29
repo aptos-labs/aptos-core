@@ -264,6 +264,27 @@ impl PayloadManager {
                 .await?,
                 proof_with_data.max_txns_to_execute,
             )),
+            (
+                PayloadManager::InQuorumStore(batch_reader, _),
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data),
+            ) => Ok((
+                {
+                    let mut all_txns = process_payload(
+                        &proof_with_data.proof_with_data,
+                        batch_reader.clone(),
+                        block,
+                    )
+                    .await?;
+                    all_txns.append(
+                        &mut inline_batches
+                            .iter()
+                            .flat_map(|(_batch_info, txns)| txns.clone())
+                            .collect(),
+                    );
+                    all_txns
+                },
+                proof_with_data.max_txns_to_execute,
+            )),
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,
