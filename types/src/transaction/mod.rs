@@ -11,6 +11,7 @@ use crate::{
     contract_event::{ContractEvent, FEE_STATEMENT_EVENT_TYPE},
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
+    on_chain_config::{FeatureFlag, Features},
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
     state_store::ShardedStateUpdates,
     transaction::authenticator::{
@@ -36,8 +37,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
-    fmt,
-    fmt::{Debug, Display, Formatter},
+    fmt::{self, Debug, Display, Formatter},
 };
 
 pub mod analyzed_transaction;
@@ -971,10 +971,15 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(vm_status: VMStatus, charge_invariant_violation: bool) -> Self {
+    pub fn from_vm_status(
+        vm_status: VMStatus,
+        charge_invariant_violation: bool,
+        features: &Features,
+    ) -> (Self, TransactionAuxiliaryData) {
         let status_code = vm_status.status_code();
+        let txn_aux = TransactionAuxiliaryData::from_vm_status(&vm_status);
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard() {
+        let status = match vm_status.keep_or_discard() {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
@@ -991,6 +996,12 @@ impl TransactionStatus {
                     TransactionStatus::Discard(code)
                 }
             },
+        };
+
+        if features.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH) {
+            (status.remove_error_detail(), txn_aux)
+        } else {
+            (status, txn_aux)
         }
     }
 
@@ -1002,11 +1013,13 @@ impl TransactionStatus {
             _ => self,
         }
     }
-}
 
-impl From<VMStatus> for TransactionStatus {
-    fn from(vm_status: VMStatus) -> Self {
-        TransactionStatus::from_vm_status(vm_status, true)
+    pub fn from_executed_vm_status(vm_status: VMStatus) -> Self {
+        if vm_status == VMStatus::Executed {
+            TransactionStatus::Keep(ExecutionStatus::Success)
+        } else {
+            panic!("Auto-conversion should not be called with non-executed status.")
+        }
     }
 }
 
