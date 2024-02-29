@@ -338,7 +338,10 @@ impl FakeAptosDB {
                             .or_insert(user_txn.sequence_number());
                     }
 
-                    if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata() {
+                    if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata_ext() {
+                        self.latest_block_timestamp
+                            .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
+                    } else if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata() {
                         self.latest_block_timestamp
                             .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
                     }

@@ -34,7 +34,7 @@ pub mod test_utils;
 use crate::keyless::circuit_constants::devnet_prepared_vk;
 pub use bn254_circom::{get_public_inputs_hash, G1Bytes, G2Bytes, g1_projective_str_to_affine, g2_projective_str_to_affine};
 pub use configuration::Configuration;
-pub use groth16_sig::{Groth16Zkp, SignedGroth16Zkp};
+pub use groth16_sig::{Groth16Zkp, Groth16ZkpAndStatement, SignedGroth16Zkp};
 pub use groth16_vk::Groth16VerificationKey;
 pub use openid_sig::{Claims, OpenIdSig};
 
@@ -78,14 +78,14 @@ pub struct KeylessSignature {
     /// `exp_timestamp_secs`.
     pub sig: ZkpOrOpenIdSig,
 
-    /// The base64url-encoded header (no dot at the end), which contains two relevant fields:
+    /// The decoded/plaintext JWT header (i.e., *not* base64url-encoded), with two relevant fields:
     ///  1. `kid`, which indicates which of the OIDC provider's JWKs should be used to verify the
     ///     \[ZKPoK of an\] OpenID signature.,
     ///  2. `alg`, which indicates which type of signature scheme was used to sign the JWT
-    pub jwt_header_b64: String,
+    pub jwt_header_json: String,
 
     /// The expiry time of the `ephemeral_pubkey` represented as a UNIX epoch timestamp in seconds.
-    pub exp_timestamp_secs: u64,
+    pub exp_date_secs: u64,
 
     /// A short lived public key used to verify the `ephemeral_signature`.
     pub ephemeral_pubkey: EphemeralPublicKey,
@@ -120,14 +120,13 @@ impl KeylessSignature {
     pub const MAX_LEN: usize = 4000;
 
     pub fn parse_jwt_header(&self) -> anyhow::Result<JWTHeader> {
-        let jwt_header_json = base64url_decode_as_str(&self.jwt_header_b64)?;
-        let header: JWTHeader = serde_json::from_str(&jwt_header_json)?;
+        let header: JWTHeader = serde_json::from_str(&self.jwt_header_json)?;
         Ok(header)
     }
 
     pub fn verify_expiry(&self, current_time: &CurrentTimeMicroseconds) -> anyhow::Result<()> {
         let block_time = UNIX_EPOCH + Duration::from_micros(current_time.microseconds);
-        let expiry_time = seconds_from_epoch(self.exp_timestamp_secs);
+        let expiry_time = seconds_from_epoch(self.exp_date_secs);
 
         if block_time > expiry_time {
             bail!("Keyless signature is expired");
@@ -343,6 +342,7 @@ pub(crate) fn base64url_encode_bytes(data: &[u8]) -> String {
     base64::encode_config(data, URL_SAFE_NO_PAD)
 }
 
+#[allow(unused)]
 fn base64url_decode_as_str(b64: &str) -> anyhow::Result<String> {
     let decoded_bytes = base64::decode_config(b64, URL_SAFE_NO_PAD)?;
     // Convert the decoded bytes to a UTF-8 string
