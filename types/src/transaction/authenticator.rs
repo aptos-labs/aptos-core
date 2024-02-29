@@ -1067,12 +1067,7 @@ impl AnyPublicKey {
 }
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EphemeralSignature {
-    Ed25519 {
-        signature: Ed25519Signature,
-    },
-    WebAuthn {
-        signature: PartialAuthenticatorAssertionResponse,
-    },
+    Ed25519 { signature: Ed25519Signature },
 }
 
 impl EphemeralSignature {
@@ -1089,12 +1084,6 @@ impl EphemeralSignature {
             (Self::Ed25519 { signature }, EphemeralPublicKey::Ed25519 { public_key }) => {
                 signature.verify(message, public_key)
             },
-            (Self::WebAuthn { signature }, EphemeralPublicKey::Secp256r1Ecdsa { public_key }) => {
-                signature.verify(message, &AnyPublicKey::secp256r1_ecdsa(public_key.clone()))
-            },
-            _ => {
-                bail!("Unsupported ephemeral signature and public key combination");
-            },
         }
     }
 }
@@ -1110,12 +1099,7 @@ impl TryFrom<&[u8]> for EphemeralSignature {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EphemeralPublicKey {
-    Ed25519 {
-        public_key: Ed25519PublicKey,
-    },
-    Secp256r1Ecdsa {
-        public_key: secp256r1_ecdsa::PublicKey,
-    },
+    Ed25519 { public_key: Ed25519PublicKey },
 }
 
 impl EphemeralPublicKey {
