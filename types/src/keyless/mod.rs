@@ -32,7 +32,10 @@ mod openid_sig;
 pub mod test_utils;
 
 use crate::keyless::circuit_constants::devnet_prepared_vk;
-pub use bn254_circom::{get_public_inputs_hash, G1Bytes, G2Bytes, g1_projective_str_to_affine, g2_projective_str_to_affine};
+pub use bn254_circom::{
+    g1_projective_str_to_affine, g2_projective_str_to_affine, get_public_inputs_hash, G1Bytes,
+    G2Bytes,
+};
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Zkp, Groth16ZkpAndStatement, SignedGroth16Zkp};
 pub use groth16_vk::Groth16VerificationKey;
@@ -167,7 +170,7 @@ impl Pepper {
     }
 
     pub fn to_hex(&self) -> String {
-        hex::encode(&self.0)
+        hex::encode(self.0)
     }
 
     // Used for testing. #[cfg(test)] doesn't seem to allow for use in smoke tests.
@@ -209,7 +212,6 @@ impl Serialize for Pepper {
     {
         if serializer.is_human_readable() {
             self.to_hex().serialize(serializer)
-
         } else {
             // See comment in deserialize.
             serializer.serialize_newtype_struct("Pepper", &self.0)
