@@ -99,7 +99,7 @@
 /network/ @gregnazario @joshlind @brianolson
 
 # Owners for the scripts
-/scripts/ @aptos-labs/devinfra
+/scripts/ @aptos-labs/prod-eng
 /scripts/authenticator_regenerate.sh @alinush @hariria @heliuchuan
 /scripts/algebra-gas/ @zjma
 
