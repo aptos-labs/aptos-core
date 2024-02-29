@@ -19,6 +19,7 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct OpenIdSig {
     /// The decoded bytes of the JWS signature in the JWT (https://datatracker.ietf.org/doc/html/rfc7515#section-3)
+    #[serde(with = "serde_bytes")]
     pub jwt_sig: Vec<u8>,
     /// The decoded/plaintext JSON payload of the JWT (https://datatracker.ietf.org/doc/html/rfc7519#section-3)
     pub jwt_payload_json: String,
@@ -113,10 +114,10 @@ impl OpenIdSig {
     }
 
     /// `jwt_header` is the *decoded* JWT header (i.e., *not* base64url-encoded)
-    pub fn verify_jwt_signature(&self, rsa_jwk: &RSA_JWK, jwt_header: &str) -> anyhow::Result<()> {
+    pub fn verify_jwt_signature(&self, rsa_jwk: &RSA_JWK, jwt_header_json: &str) -> anyhow::Result<()> {
         let jwt_b64 = format!(
             "{}.{}.{}",
-            base64url_encode_str(jwt_header),
+            base64url_encode_str(jwt_header_json),
             base64url_encode_str(&self.jwt_payload_json),
             base64url_encode_bytes(&self.jwt_sig)
         );

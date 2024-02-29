@@ -591,8 +591,7 @@ MultisigTransactionPayload:
           TYPENAME: EntryFunction
 OpenIdSig:
   STRUCT:
-    - jwt_sig:
-        SEQ: U8
+    - jwt_sig: BYTES
     - jwt_payload_json: STR
     - uid_key: STR
     - epk_blinder: BYTES
