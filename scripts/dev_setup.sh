@@ -50,6 +50,7 @@ function usage {
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
+  echo "-k should only temporarily used in building with keyless/pepper/service/Dockerfile"
   echo "If no toolchain component is selected with -t, -o, -y, -d, or -p, the behavior is as if -t had been provided."
   echo "This command must be called from the root folder of the Aptos-core project."
 }
@@ -1093,7 +1094,11 @@ fi
 
 install_python3
 if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
-  pip3 install ${IN_DOCKER:+--break-system-packages} pre-commit
+  if [[ "$IN_DOCKER" == "true" ]]; then
+    pip3 install --break-system-packages pre-commit
+  else
+    pip3 install pre-commit
+  fi
   install_libudev-dev
 else
   install_pkg python-pre-commit "$PACKAGE_MANAGER"
