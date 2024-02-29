@@ -1315,6 +1315,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
+ "fail 0.5.1",
  "futures",
  "futures-channel",
  "futures-util",
