@@ -378,7 +378,13 @@ struct SimplifierRewriter<'env> {
     unsafe_variables: BTreeSet<(Symbol, Option<NodeId>)>,
 
     // Tracks constant values from scope.
-    values: ScopedMap<Symbol, Value>,
+    values: ScopedMap<Symbol, SimpleValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+enum SimpleValue {
+    Value(Value),
+    Uninitialized,
 }
 
 impl<'env> SimplifierRewriter<'env> {
@@ -438,8 +444,22 @@ impl<'env> SimplifierRewriter<'env> {
     /// If symbol `sym` has a recorded value that is currently visible, then
     /// build an expression to produce that value.
     fn rewrite_to_recorded_value(&mut self, id: NodeId, sym: &Symbol) -> Option<Exp> {
-        if let Some(val) = self.values.get(sym) {
-            Some(ExpData::Value(id, val.clone()).into_exp())
+        if let Some(simple_value) = self.values.get(sym) {
+            match simple_value {
+                SimpleValue::Value(val) => Some(ExpData::Value(id, val.clone()).into_exp()),
+                SimpleValue::Uninitialized => {
+                    let loc = self.env.get_node_loc(id);
+                    self.env.diag(
+                        Severity::Error,
+                        &loc,
+                        &format!(
+                            "use of unassigned local `{}`",
+                            sym.display(self.env.symbol_pool())
+                        ),
+                    );
+                    None
+                },
+            }
         } else {
             trace!(
                 "Found no value for var {} ",
@@ -450,10 +470,10 @@ impl<'env> SimplifierRewriter<'env> {
     }
 
     // Note that exp has already been rewritten.
-    fn expr_to_simple_value(&mut self, exp: Option<Exp>) -> Option<Value> {
+    fn expr_to_simple_value(&mut self, exp: Option<Exp>) -> Option<SimpleValue> {
         if let Some(exp) = exp {
             match exp.as_ref() {
-                ExpData::Value(_, val) => Some(val.clone()),
+                ExpData::Value(_, val) => Some(SimpleValue::Value(val.clone())),
                 ExpData::LocalVar(_id, sym) => self.values.get(sym).cloned(),
                 ExpData::Temporary(id, idx) => {
                     if let Some(sym) = self.cached_params.get(*idx).map(|p| &p.0) {
@@ -630,7 +650,12 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         } else {
             // Body with no bindings, values are Uninitialized.
             for (_, var) in pat.vars() {
-                new_binding.push((var, None));
+                if self.unsafe_variables.contains(&(var, Some(id))) {
+                    // Ignore RHS, mark this variable as unsafe.
+                    new_binding.push((var, None));
+                } else {
+                    new_binding.push((var, Some(SimpleValue::Uninitialized)))
+                }
             }
         }
         // Newly bound vars block any prior values

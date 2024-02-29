@@ -2618,12 +2618,9 @@ impl<'a> ExpDisplay<'a> {
         ranges
             .iter()
             .map(|(pat, domain)| {
-                let node = pat.node_id();
-                let ty = self.env.get_node_type(node);
                 format!(
-                    "{}: {}: {}",
+                    "{}: {}",
                     pat.display_for_exp(self),
-                    ty.display(&self.type_ctx()),
                     domain.display_cont(self)
                 )
             })
