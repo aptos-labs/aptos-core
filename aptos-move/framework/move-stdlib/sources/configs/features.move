@@ -383,7 +383,7 @@ module std::features {
     /// Whether enable Fungible Asset creation
     /// to create higher throughput concurrent variants.
     /// Lifetime: transient
-    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 49;
+    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 50;
 
     public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
 
