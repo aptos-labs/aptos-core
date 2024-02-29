@@ -103,20 +103,15 @@ pub(crate) fn validate_authenticators(
     features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
-    // Feature gating
     for (_, sig) in authenticators {
-        if !features.is_keyless_enabled() && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. }) {
-            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-        }
-        if (!features.is_keyless_enabled() || !features.is_keyless_zkless_enabled())
-            && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+        // Feature-gating for keyless-but-zkless TXNs: If keyless TXNs *are* enabled, and (1) this
+        // is a ZKless transaction but (2) ZKless TXNs are not yet enabled, discard the TXN from
+        // being put on-chain.
+        if matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+            && !features.is_keyless_zkless_enabled()
         {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
-    }
-
-    if authenticators.is_empty() {
-        return Ok(());
     }
 
     let config = &get_configs_onchain(resolver)?;
