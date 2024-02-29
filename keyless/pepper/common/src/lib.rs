@@ -52,6 +52,7 @@ pub struct BadPepperRequestError {
 /// - The pepper output is the `BLS12381_G1_BLS` VUF output of the input, wrapped in type `PepperResponse`.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PepperRequest {
+    #[serde(rename = "jwt_b64")]
     pub jwt: String,
     #[serde(
         serialize_with = "serialize_epk_to_hex",
