@@ -36,23 +36,11 @@ error: Invalid expression in `const`. Operator shl (<<) result value out of rang
 9 │     const SHL0B: u32 = (1u8 << 8 as u32);
   │                         ^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-  ┌─ tests/folding/unfoldable_constants.move:9:24
-  │
-9 │     const SHL0B: u32 = (1u8 << 8 as u32);
-  │                        ^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator shl (<<) result value out of range for u64
    ┌─ tests/folding/unfoldable_constants.move:10:26
    │
 10 │     const SHL1B: u128 = ((1u64 << 64) as u128);
    │                          ^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:10:25
-   │
-10 │     const SHL1B: u128 = ((1u64 << 64) as u128);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator shl (<<) result value out of range for u128
    ┌─ tests/folding/unfoldable_constants.move:11:26
@@ -60,23 +48,11 @@ error: Invalid expression in `const`. Operator shl (<<) result value out of rang
 11 │     const SHL2B: u256 = ((1u128 << 128) as u256);
    │                          ^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:11:25
-   │
-11 │     const SHL2B: u256 = ((1u128 << 128) as u256);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator shl (<<) result value out of range for u16
    ┌─ tests/folding/unfoldable_constants.move:12:25
    │
 12 │     const SHL3B: u32 = ((1u16 << 16) as u32);
    │                         ^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:12:24
-   │
-12 │     const SHL3B: u32 = ((1u16 << 16) as u32);
-   │                        ^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator shl (<<) result value out of range for u32
    ┌─ tests/folding/unfoldable_constants.move:13:25
@@ -85,9 +61,33 @@ error: Invalid expression in `const`. Operator shl (<<) result value out of rang
    │                         ^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:13:24
+   ┌─ tests/folding/unfoldable_constants.move:21:24
    │
-13 │     const SHL4B: u64 = ((1u32 << 32) as u64);
+21 │     const SHR0B: u32 = ((0u8 >> 8) as u32);
+   │                        ^^^^^^^^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
+   ┌─ tests/folding/unfoldable_constants.move:22:25
+   │
+22 │     const SHR1B: u128 = ((0u64 >> 64) as u128);
+   │                         ^^^^^^^^^^^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
+   ┌─ tests/folding/unfoldable_constants.move:23:25
+   │
+23 │     const SHR2B: u256 = ((0u128 >> 128) as u256);
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
+   ┌─ tests/folding/unfoldable_constants.move:24:24
+   │
+24 │     const SHR3B: u32 = ((0u16 >> 16) as u32);
+   │                        ^^^^^^^^^^^^^^^^^^^^^
+
+error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
+   ┌─ tests/folding/unfoldable_constants.move:25:24
+   │
+25 │     const SHR4B: u64 = ((0u32 >> 32) as u64);
    │                        ^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator div (/) result value out of range for u8
@@ -204,23 +204,11 @@ error: Invalid expression in `const`. Operator add (+) result value out of range
 50 │     const ADD0B: u64 = ((255u8 + 255) as u64);
    │                         ^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:50:24
-   │
-50 │     const ADD0B: u64 = ((255u8 + 255) as u64);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator add (+) result value out of range for u8
    ┌─ tests/folding/unfoldable_constants.move:51:25
    │
 51 │     const ADD0C: u64 = ((255 + 255u8) as u64);
    │                         ^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:51:24
-   │
-51 │     const ADD0C: u64 = ((255 + 255u8) as u64);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator add (+) result value out of range for u8
    ┌─ tests/folding/unfoldable_constants.move:52:25
@@ -228,23 +216,11 @@ error: Invalid expression in `const`. Operator add (+) result value out of range
 52 │     const ADD0D: u64 = ((255u8 + 255u8) as u64);
    │                         ^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:52:24
-   │
-52 │     const ADD0D: u64 = ((255u8 + 255u8) as u64);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator add (+) result value out of range for u64
    ┌─ tests/folding/unfoldable_constants.move:53:26
    │
 53 │     const ADD1B: u128 = ((18446744073709551615u64 + 18446744073709551615) as u128);
    │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:53:25
-   │
-53 │     const ADD1B: u128 = ((18446744073709551615u64 + 18446744073709551615) as u128);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator add (+) result value out of range for u64
    ┌─ tests/folding/unfoldable_constants.move:54:26
@@ -252,23 +228,11 @@ error: Invalid expression in `const`. Operator add (+) result value out of range
 54 │     const ADD1C: u128 = ((18446744073709551615 + 18446744073709551615u64) as u128);
    │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:54:25
-   │
-54 │     const ADD1C: u128 = ((18446744073709551615 + 18446744073709551615u64) as u128);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator add (+) result value out of range for u64
    ┌─ tests/folding/unfoldable_constants.move:55:26
    │
 55 │     const ADD1D: u128 = ((18446744073709551615u64 + 18446744073709551615u64) as u128);
    │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:55:25
-   │
-55 │     const ADD1D: u128 = ((18446744073709551615u64 + 18446744073709551615u64) as u128);
-   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator add (+) result value out of range for u128
    ┌─ tests/folding/unfoldable_constants.move:57:10
@@ -276,23 +240,11 @@ error: Invalid expression in `const`. Operator add (+) result value out of range
 57 │         ((340282366920938463463374607431768211450u128 + 340282366920938463463374607431768211450) as u256);
    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:57:9
-   │
-57 │         ((340282366920938463463374607431768211450u128 + 340282366920938463463374607431768211450) as u256);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator add (+) result value out of range for u128
    ┌─ tests/folding/unfoldable_constants.move:59:10
    │
 59 │         ((340282366920938463463374607431768211450 + 340282366920938463463374607431768211450u128) as u256);
    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:59:9
-   │
-59 │         ((340282366920938463463374607431768211450 + 340282366920938463463374607431768211450u128) as u256);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator add (+) result value out of range for u128
    ┌─ tests/folding/unfoldable_constants.move:61:10
@@ -300,23 +252,11 @@ error: Invalid expression in `const`. Operator add (+) result value out of range
 61 │         ((340282366920938463463374607431768211450u128 + 340282366920938463463374607431768211450u128) as u256);
    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:61:9
-   │
-61 │         ((340282366920938463463374607431768211450u128 + 340282366920938463463374607431768211450u128) as u256);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator add (+) result value out of range for u16
    ┌─ tests/folding/unfoldable_constants.move:62:25
    │
 62 │     const ADD3B: u32 = ((65535u16 + 65535) as u32);
    │                         ^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:62:24
-   │
-62 │     const ADD3B: u32 = ((65535u16 + 65535) as u32);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator add (+) result value out of range for u16
    ┌─ tests/folding/unfoldable_constants.move:63:25
@@ -324,23 +264,11 @@ error: Invalid expression in `const`. Operator add (+) result value out of range
 63 │     const ADD3C: u32 = ((65535 + 65535u16) as u32);
    │                         ^^^^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:63:24
-   │
-63 │     const ADD3C: u32 = ((65535 + 65535u16) as u32);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator add (+) result value out of range for u16
    ┌─ tests/folding/unfoldable_constants.move:64:25
    │
 64 │     const ADD3D: u32 = ((65535u16 + 65535u16) as u32);
    │                         ^^^^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:64:24
-   │
-64 │     const ADD3D: u32 = ((65535u16 + 65535u16) as u32);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator add (+) result value out of range for u32
    ┌─ tests/folding/unfoldable_constants.move:65:25
@@ -348,35 +276,17 @@ error: Invalid expression in `const`. Operator add (+) result value out of range
 65 │     const ADD4B: u64 = ((4294967295u32 + 4294967295) as u64);
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:65:24
-   │
-65 │     const ADD4B: u64 = ((4294967295u32 + 4294967295) as u64);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator add (+) result value out of range for u32
    ┌─ tests/folding/unfoldable_constants.move:66:25
    │
 66 │     const ADD4C: u64 = ((4294967295 + 4294967295u32) as u64);
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:66:24
-   │
-66 │     const ADD4C: u64 = ((4294967295 + 4294967295u32) as u64);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Invalid expression in `const`. Operator add (+) result value out of range for u32
    ┌─ tests/folding/unfoldable_constants.move:67:25
    │
 67 │     const ADD4D: u64 = ((4294967295u32 + 4294967295u32) as u64);
    │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Parameter to unary expression not foldable to constant
-   ┌─ tests/folding/unfoldable_constants.move:67:24
-   │
-67 │     const ADD4D: u64 = ((4294967295u32 + 4294967295u32) as u64);
-   │                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: Invalid expression in `const`. Operator sub (-) result value out of range for u8
    ┌─ tests/folding/unfoldable_constants.move:69:22

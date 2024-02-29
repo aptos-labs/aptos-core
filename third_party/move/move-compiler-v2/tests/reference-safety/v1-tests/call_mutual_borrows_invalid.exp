@@ -27,7 +27,7 @@ error: cannot mutably borrow since immutable references exist
    │         │       mutable borrow attempted here
    │         requirement enforced here
 20 │         let f = id(&s1.f);
-   │                    ----- conflicting reference `s1`used here
+   │                    ----- conflicting reference `s1` used here
 
 error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:21:16
@@ -38,7 +38,7 @@ error: cannot mutably borrow since immutable references exist
    │                 │  previous field borrow
    │                 used by call result
 21 │         id_mut(&mut s1.f); *f;
-   │         -------^^^^^^^^^-  -- conflicting reference `f`used here
+   │         -------^^^^^^^^^-  -- conflicting reference `f` used here
    │         │      │
    │         │      mutable borrow attempted here
    │         requirement enforced here
@@ -74,7 +74,7 @@ error: mutable reference in local `s1` requires exclusive access but is borrowed
 28 │         id_mut(s1);
    │         ^^^^^^^^^^ requirement enforced here
 29 │         *s;
-   │         -- conflicting reference `s`used here
+   │         -- conflicting reference `s` used here
 
 error: mutable reference in local `s1` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/call_mutual_borrows_invalid.move:31:9

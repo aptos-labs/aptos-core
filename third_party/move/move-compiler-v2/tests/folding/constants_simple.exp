@@ -14,18 +14,6 @@ error: Invalid expression in `const`. Operator sub (-) result value out of range
 6 │     const C2: u64 = 0 + 1 * 2 % 3 / 4 - 5 >> 6 << 7;
   │                     ^^^^^^^^^^^^^^^^^^^^^
 
-error: Invalid expression in `const`. Binary expression arguments not both foldable to constant
-  ┌─ tests/folding/constants_simple.move:6:21
-  │
-6 │     const C2: u64 = 0 + 1 * 2 % 3 / 4 - 5 >> 6 << 7;
-  │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-error: Invalid expression in `const`. Binary expression arguments not both foldable to constant
-  ┌─ tests/folding/constants_simple.move:6:21
-  │
-6 │     const C2: u64 = 0 + 1 * 2 % 3 / 4 - 5 >> 6 << 7;
-  │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 error: Not a valid constant expression.
   ┌─ tests/folding/constants_simple.move:7:22
   │

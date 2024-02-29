@@ -31,7 +31,7 @@ error: cannot copy local `p` which is still mutably borrowed
   │             ^ copied here
   ·
 8 │         *a = 0;
-  │         ------ conflicting reference `a`used here
+  │         ------ conflicting reference `a` used here
 
 ============ after AvailableCopiesAnalysisProcessor: ================
 

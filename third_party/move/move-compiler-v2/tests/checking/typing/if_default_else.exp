@@ -7,13 +7,13 @@ module 0x8675309::M {
           Tuple()
         };
         {
-          let () = if cond {
+          let (): () = if cond {
             Tuple()
           } else {
             Tuple()
           };
           {
-            let () = if cond {
+            let (): () = if cond {
               {
                 let x: u64 = 0;
                 x;

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::Test {
     public fun other(a: u64,b: u64): u64 {
         {
@@ -7,7 +7,7 @@ module 0x42::Test {
             if Lt<u64>(a, b) {
               a: u64 = Add<u64>(a, 1);
               sum: u64 = Add<u64>({
-                let (a: u64, b: u64) = Tuple(a, b);
+                let (a: u64, b: u64): (u64, u64) = Tuple(a, b);
                 {
                   let sum: u64 = 0;
                   loop {
@@ -32,17 +32,11 @@ module 0x42::Test {
     }
     public fun test_shadowing() {
         {
-          let a: u64 = 1;
-          {
-            let b: u64 = 4;
-            {
-              let z: u64 = Test::other(a, b);
-              if Eq<u64>(z, 10) {
-                Tuple()
-              } else {
-                Abort(z)
-              }
-            }
+          let z: u64 = Test::other(1, 4);
+          if Eq<u64>(z, 10) {
+            Tuple()
+          } else {
+            Abort(z)
           }
         }
     }

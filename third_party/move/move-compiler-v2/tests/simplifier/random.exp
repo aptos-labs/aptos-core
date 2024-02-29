@@ -6,7 +6,7 @@ warning: Unused local variable `q`. Consider removing or prefixing with an under
 48 │         let q = v;
    │             ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675::M {
     struct S {
         f: u64,
