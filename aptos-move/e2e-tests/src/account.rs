@@ -30,6 +30,8 @@ pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
 ///
 /// Tests will typically create a set of `Account` instances to run transactions on. This type
 /// encodes the logic to operate on and verify operations on any Aptos account.
+///
+/// TODO: This is pleistocene-age code must be brought up to speed, since our accounts are not just Ed25519-based.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
     addr: AccountAddress,
@@ -56,6 +58,17 @@ impl Account {
     pub fn new_from_seed(seed: &mut KeyGen) -> Self {
         let (privkey, pubkey) = seed.generate_ed25519_keypair();
         Self::with_keypair(privkey, pubkey)
+    }
+
+    /// Creates an account with a specific address
+    /// TODO: Currently stores a dummy SK/PK pair.
+    pub fn new_from_addr(addr: AccountAddress) -> Self {
+        let (privkey, pubkey) = KeyGen::from_os_rng().generate_ed25519_keypair();
+        Self {
+            addr,
+            privkey,
+            pubkey,
+        }
     }
 
     /// Creates a new account with the given keypair.

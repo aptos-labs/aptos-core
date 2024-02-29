@@ -28,6 +28,7 @@ aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
 aptos-vm-genesis = { workspace = true }
+ark-ff = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
 hex = { workspace = true }
