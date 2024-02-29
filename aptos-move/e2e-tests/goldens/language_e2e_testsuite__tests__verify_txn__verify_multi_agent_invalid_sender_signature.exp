@@ -13,6 +13,7 @@ Ok(
             status: Discard(
                 INVALID_SIGNATURE,
             ),
+            auxiliary_data: None,
         },
     ],
 )
