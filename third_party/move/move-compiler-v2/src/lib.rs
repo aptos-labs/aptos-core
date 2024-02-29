@@ -8,6 +8,7 @@ mod file_format_generator;
 pub mod flow_insensitive_checkers;
 pub mod function_checker;
 pub mod inliner;
+pub mod lambda_lifter;
 pub mod logging;
 pub mod options;
 pub mod pipeline;

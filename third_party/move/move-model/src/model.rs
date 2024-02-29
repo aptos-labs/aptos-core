@@ -1675,6 +1675,48 @@ impl GlobalEnv {
         data.def = Some(def);
     }
 
+    /// Adds a new function definition.
+    pub fn add_function_def(
+        &mut self,
+        module_id: ModuleId,
+        name: Symbol,
+        loc: Loc,
+        visibility: Visibility,
+        type_params: Vec<TypeParameter>,
+        params: Vec<Parameter>,
+        result_type: Type,
+        def: Exp,
+    ) {
+        let called_funs = def.called_funs();
+        let data = FunctionData {
+            name,
+            loc: loc.clone(),
+            id_loc: loc,
+            def_idx: None,
+            handle_idx: None,
+            visibility,
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params,
+            params,
+            result_type,
+            access_specifiers: None,
+            spec: RefCell::new(Default::default()),
+            def: Some(def),
+            called_funs: Some(called_funs),
+            calling_funs: RefCell::new(None),
+            transitive_closure_of_called_funs: RefCell::new(None),
+        };
+        assert!(self
+            .module_data
+            .get_mut(module_id.to_usize())
+            .expect("module defined")
+            .function_data
+            .insert(FunId::new(name), data)
+            .is_none())
+    }
+
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
@@ -3808,6 +3850,11 @@ impl<'env> FunctionEnv<'env> {
     /// Return true if the function is an inline function
     pub fn is_inline(&self) -> bool {
         self.data.kind == FunctionKind::Inline
+    }
+
+    /// Returns kind of this function.
+    pub fn get_kind(&self) -> FunctionKind {
+        self.data.kind
     }
 
     /// Return the visibility string for this function. Useful for formatted printing.

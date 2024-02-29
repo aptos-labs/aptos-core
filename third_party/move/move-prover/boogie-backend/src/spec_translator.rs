@@ -786,6 +786,7 @@ impl<'env> SpecTranslator<'env> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         match oper {
+            Operation::Closure(..) => unimplemented!("closures in specs"),
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),
