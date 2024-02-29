@@ -91,18 +91,18 @@ pub fn run_move_mutator(
             //TODO: currently we are downsampling the mutants after they are generated. This is not
             // ideal as we are generating all mutants and then removing some of them.
             if let Some(percentage) = mutator_configuration.project.downsampling_ratio_percentage {
-                let to_keep = mutated_sources
+                let no_of_mutants_to_keep = mutated_sources
                     .len()
                     .saturating_sub((mutated_sources.len() * percentage).div_ceil(100));
                 assert!(
-                    to_keep <= mutated_sources.len(),
+                    no_of_mutants_to_keep <= mutated_sources.len(),
                     "Invalid downsampling ratio"
                 );
 
                 // Delete randomly elements from the vector.
                 let mut rng = thread_rng();
                 let chosen_elements: Vec<_> = mutated_sources
-                    .choose_multiple(&mut rng, to_keep)
+                    .choose_multiple(&mut rng, no_of_mutants_to_keep)
                     .cloned()
                     .collect();
 
