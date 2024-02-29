@@ -170,6 +170,15 @@ Event emitted every time a public randomness API in this module is called.
 ## Constants
 
 
+<a id="0x1_randomness_MAX_U256"></a>
+
+
+
+<pre><code><b>const</b> <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+</code></pre>
+
+
+
 <a id="0x1_randomness_DST"></a>
 
 
@@ -482,6 +491,11 @@ Generates an u128 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u128 = 0;
     <b>while</b> (i &lt; 16) {
+        <b>spec</b> {
+            // TODO: Prove these <b>with</b> proper <b>loop</b> invaraints.
+            <b>assume</b> ret * 256 + 255 &lt;= <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
+            <b>assume</b> len(raw) &gt; 0;
+        };
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u128);
         i = i + 1;
     };
@@ -543,6 +557,11 @@ Generates a u256 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u256 = 0;
     <b>while</b> (i &lt; 32) {
+        <b>spec</b> {
+            // TODO: Prove these <b>with</b> proper <b>loop</b> invaraints.
+            <b>assume</b> ret * 256 + 255 &lt;= <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
+            <b>assume</b> len(raw) &gt; 0;
+        };
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u256);
         i = i + 1;
     };
@@ -1239,7 +1258,6 @@ Called in each randomness generation function to ensure certain safety invariant
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>aborts_if</b> n == 0;
 </code></pre>
 
 
@@ -1257,7 +1275,7 @@ Called in each randomness generation function to ensure certain safety invariant
 
 
 <pre><code><b>aborts_if</b> m &lt; b;
-<b>aborts_if</b> a &lt; m - b && a + b &gt; MAX_U256;
+<b>aborts_if</b> a &lt; m - b && a + b &gt; <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
 <b>ensures</b> result == <a href="randomness.md#0x1_randomness_spec_safe_add_mod">spec_safe_add_mod</a>(a, b, m);
 </code></pre>
 
