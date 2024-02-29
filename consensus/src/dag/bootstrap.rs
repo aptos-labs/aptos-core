@@ -442,7 +442,13 @@ impl DagBootstrapper {
                 let election = Arc::new(RoundRobinAnchorElection::new(
                     self.epoch_state.verifier.get_ordered_account_addresses(),
                 ));
-                (election.clone(), election, None)
+                let commit_events = self
+                    .storage
+                    .get_latest_k_committed_events(
+                        (self.onchain_config.dag_ordering_causal_history_window * 3) as u64,
+                    )
+                    .expect("Failed to read commit events from storage");
+                (election.clone(), election, Some(commit_events))
             },
             AnchorElectionMode::LeaderReputation(reputation_type) => {
                 let (commit_events, leader_reputation) = match reputation_type {
@@ -450,7 +456,10 @@ impl DagBootstrapper {
                         let commit_events = self
                             .storage
                             .get_latest_k_committed_events(
-                                config.voter_window_num_validators_multiplier as u64
+                                std::cmp::max(
+                                    config.proposer_window_num_validators_multiplier,
+                                    config.voter_window_num_validators_multiplier,
+                                ) as u64
                                     * self.epoch_state.verifier.len() as u64,
                             )
                             .expect("Failed to read commit events from storage");
