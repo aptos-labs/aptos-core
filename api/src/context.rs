@@ -648,7 +648,9 @@ impl Context {
             .into_iter()
             .map(|t| {
                 // Update the timestamp if the next block occurs
-                if let Some(txn) = t.transaction.try_as_block_metadata() {
+                if let Some(txn) = t.transaction.try_as_block_metadata_ext() {
+                    timestamp = txn.timestamp_usecs();
+                } else if let Some(txn) = t.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                 }
                 let txn = converter.try_into_onchain_transaction(timestamp, t)?;
