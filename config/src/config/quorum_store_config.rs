@@ -44,6 +44,7 @@ impl Default for QuorumStoreBackPressureConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreConfig {
+    pub allow_batches_without_pos_in_proposal: bool,
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
     pub batch_generation_poll_interval_ms: usize,
@@ -76,6 +77,7 @@ pub struct QuorumStoreConfig {
 impl Default for QuorumStoreConfig {
     fn default() -> QuorumStoreConfig {
         QuorumStoreConfig {
+            allow_batches_without_pos_in_proposal: false,
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_generation_poll_interval_ms: 25,

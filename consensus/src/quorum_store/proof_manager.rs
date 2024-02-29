@@ -34,6 +34,7 @@ pub struct ProofManager {
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
     remaining_total_proof_num: u64,
+    allow_batches_without_pos_in_proposal: bool,
 }
 
 impl ProofManager {
@@ -41,6 +42,7 @@ impl ProofManager {
         my_peer_id: PeerId,
         back_pressure_total_txn_limit: u64,
         back_pressure_total_proof_limit: u64,
+        allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(my_peer_id),
@@ -49,6 +51,7 @@ impl ProofManager {
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
             remaining_total_proof_num: 0,
+            allow_batches_without_pos_in_proposal,
         }
     }
 
@@ -62,10 +65,11 @@ impl ProofManager {
     }
 
     pub(crate) fn receive_batches(&mut self, batches: Vec<PersistedValue>) {
-        for mut batch in batches.into_iter() {
-            // TODO: Cloning payload here. Try to avoid this.
-            self.batches_without_proof_of_store
-                .insert(batch.batch_info().clone(), batch.take_payload());
+        if self.allow_batches_without_pos_in_proposal {
+            for mut batch in batches.into_iter() {
+                self.batches_without_proof_of_store
+                    .insert(batch.batch_info().clone(), batch.take_payload());
+            }
         }
     }
 
@@ -115,6 +119,8 @@ impl ProofManager {
                 );
 
                 // TODO: Add a counter in grafana to monitor how many inline transactions/bytes are added
+                let _cur_txns = proof_block.iter().map(|p| p.num_txns()).sum::<u64>();
+                let _cur_bytes = proof_block.iter().map(|p| p.num_bytes()).sum::<u64>();
 
                 let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() {

@@ -74,12 +74,31 @@ impl PayloadManager {
                         Payload::DirectMempool(_) => {
                             unreachable!("InQuorumStore should be used");
                         },
-                        Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
-                        Payload::InQuorumStoreWithLimit(proof_with_status) => {
-                            proof_with_status.proof_with_data.proofs
+                        Payload::InQuorumStore(proof_with_status) => proof_with_status
+                            .proofs
+                            .iter()
+                            .map(|proof| proof.info().clone())
+                            .collect::<Vec<_>>(),
+                        Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
+                            .proof_with_data
+                            .proofs
+                            .iter()
+                            .map(|proof| proof.info().clone())
+                            .collect::<Vec<_>>(),
+                        Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+                            inline_batches
+                                .iter()
+                                .map(|(batch_info, _)| batch_info.clone())
+                                .chain(
+                                    proof_with_status
+                                        .proof_with_data
+                                        .proofs
+                                        .iter()
+                                        .map(|proof| proof.info().clone()),
+                                )
+                                .collect::<Vec<_>>()
                         },
                     })
-                    .map(|proof| proof.info().clone())
                     .collect();
 
                 let mut tx = coordinator_tx.clone();
@@ -119,6 +138,12 @@ impl PayloadManager {
                     request_txns_and_update_status(proof_with_status, batch_reader.clone());
                 },
                 Payload::InQuorumStoreWithLimit(proof_with_data) => {
+                    request_txns_and_update_status(
+                        &proof_with_data.proof_with_data,
+                        batch_reader.clone(),
+                    );
+                },
+                Payload::QuroumStoreInlineHybrid(_, proof_with_data) => {
                     request_txns_and_update_status(
                         &proof_with_data.proof_with_data,
                         batch_reader.clone(),

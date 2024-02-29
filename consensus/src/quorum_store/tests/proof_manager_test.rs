@@ -13,7 +13,7 @@ use futures::channel::oneshot;
 use std::collections::HashSet;
 
 fn create_proof_manager() -> ProofManager {
-    ProofManager::new(PeerId::random(), 10, 10)
+    ProofManager::new(PeerId::random(), 10, 10, true)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {

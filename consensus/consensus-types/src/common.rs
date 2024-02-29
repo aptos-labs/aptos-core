@@ -137,6 +137,24 @@ impl ProofWithData {
             status.as_mut().unwrap().extend(other_data_status);
         }
     }
+
+    pub fn len(&self) -> usize {
+        self.proofs
+            .iter()
+            .map(|proof| proof.num_txns() as usize)
+            .sum()
+    }
+
+    pub fn size(&self) -> usize {
+        self.proofs
+            .iter()
+            .map(|proof| proof.num_bytes() as usize)
+            .sum()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.proofs.is_empty()
+    }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -177,6 +195,12 @@ pub enum Payload {
     DirectMempool(Vec<SignedTransaction>),
     InQuorumStore(ProofWithData),
     InQuorumStoreWithLimit(ProofWithDataWithTxnLimit),
+    // TODO: This is weird. `max_txns_to_execute` for the overall payload is embedded insie `ProofWithData`.
+    // Is that fine or should we change it?
+    QuroumStoreInlineHybrid(
+        Vec<(BatchInfo, Vec<SignedTransaction>)>,
+        ProofWithDataWithTxnLimit,
+    ),
 }
 
 impl Payload {
@@ -185,6 +209,9 @@ impl Payload {
             Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
                 ProofWithDataWithTxnLimit::new(proof_with_status, max_txns_to_execute),
             ),
+            Payload::QuroumStoreInlineHybrid(_, _) => {
+                panic!("Payload is already in quorumStoreV2 format");
+            },
             Payload::InQuorumStoreWithLimit(_) => {
                 panic!("Payload is already in quorumStoreV2 format");
             },
@@ -205,18 +232,21 @@ impl Payload {
     pub fn len(&self) -> usize {
         match self {
             Payload::DirectMempool(txns) => txns.len(),
-            Payload::InQuorumStore(proof_with_status) => proof_with_status
-                .proofs
-                .iter()
-                .map(|proof| proof.num_txns() as usize)
-                .sum(),
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.len(),
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
-                let num_txns = proof_with_status
-                    .proof_with_data
-                    .proofs
-                    .iter()
-                    .map(|proof| proof.num_txns() as usize)
-                    .sum();
+                let num_txns = proof_with_status.proof_with_data.len();
+                if proof_with_status.max_txns_to_execute.is_some() {
+                    min(proof_with_status.max_txns_to_execute.unwrap(), num_txns)
+                } else {
+                    num_txns
+                }
+            },
+            Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+                let num_txns = proof_with_status.proof_with_data.len()
+                    + inline_batches
+                        .iter()
+                        .map(|(_, txns)| txns.len())
+                        .sum::<usize>();
                 if proof_with_status.max_txns_to_execute.is_some() {
                     min(proof_with_status.max_txns_to_execute.unwrap(), num_txns)
                 } else {
@@ -235,6 +265,12 @@ impl Payload {
                     || (proof_with_status.max_txns_to_execute.is_some()
                         && proof_with_status.max_txns_to_execute.unwrap() == 0)
             },
+            Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+                (proof_with_status.max_txns_to_execute.is_some()
+                    && proof_with_status.max_txns_to_execute.unwrap() == 0)
+                    || (proof_with_status.proof_with_data.proofs.is_empty()
+                        && inline_batches.is_empty())
+            },
         }
     }
 
@@ -244,6 +280,13 @@ impl Payload {
             (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => p1.extend(p2),
             (Payload::InQuorumStoreWithLimit(p1), Payload::InQuorumStoreWithLimit(p2)) => {
                 p1.extend(p2)
+            },
+            (
+                Payload::QuroumStoreInlineHybrid(b1, p1),
+                Payload::QuroumStoreInlineHybrid(b2, p2),
+            ) => {
+                b1.extend(b2);
+                p1.extend(p2);
             },
             (_, _) => unreachable!(),
         }
@@ -261,19 +304,19 @@ impl Payload {
                 .with_min_len(100)
                 .map(|txn| txn.raw_txn_bytes_len())
                 .sum(),
-            Payload::InQuorumStore(proof_with_status) => proof_with_status
-                .proofs
-                .iter()
-                .map(|proof| proof.num_bytes() as usize)
-                .sum(),
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.size(),
             // We dedeup, shuffle and finally truncate the txns in the payload to the length == 'max_txns_to_execute'.
             // Hence, it makes sense to pass the full size of the payload here.
-            Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
-                .proof_with_data
-                .proofs
-                .iter()
-                .map(|proof| proof.num_bytes() as usize)
-                .sum(),
+            Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                proof_with_status.proof_with_data.size()
+            },
+            Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+                proof_with_status.proof_with_data.size()
+                    + inline_batches
+                        .iter()
+                        .map(|(batch_info, _)| batch_info.num_bytes() as usize)
+                        .sum::<usize>()
+            },
         }
     }
 
@@ -320,6 +363,17 @@ impl fmt::Display for Payload {
                 write!(
                     f,
                     "InMemory proofs: {}",
+                    proof_with_status.proof_with_data.proofs.len()
+                )
+            },
+            Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+                write!(
+                    f,
+                    "Inline txns: {}, InMemory proofs: {}",
+                    inline_batches
+                        .iter()
+                        .map(|(_, txns)| txns.len())
+                        .sum::<usize>(),
                     proof_with_status.proof_with_data.proofs.len()
                 )
             },
