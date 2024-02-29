@@ -2,7 +2,7 @@ FROM rust:1.75.0 as builder
 ARG GIT_COMMIT
 WORKDIR /app
 COPY . .
-RUN ./scripts/dev_setup.sh -b
+RUN ./scripts/dev_setup.sh -k -b
 RUN cargo build --release -p aptos-keyless-pepper-service
 
 FROM rust:1.75.0
