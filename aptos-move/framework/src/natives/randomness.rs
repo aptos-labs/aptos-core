@@ -39,10 +39,14 @@ pub fn fetch_and_increment_txn_counter(
     _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    println!("0229a");
     // TODO: charge gas?
     let rand_ctxt = context.extensions_mut().get_mut::<RandomnessContext>();
+    println!("0229b");
     let ret = rand_ctxt.txn_local_state.to_vec();
+    println!("0229c");
     rand_ctxt.increment();
+    println!("0229d");
     Ok(smallvec![Value::vector_u8(ret)])
 }
 
