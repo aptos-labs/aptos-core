@@ -610,6 +610,15 @@ Payload:
       InQuorumStoreWithLimit:
         NEWTYPE:
           TYPENAME: ProofWithDataWithTxnLimit
+    3:
+      QuorumStoreInlineHybrid:
+        TUPLE:
+          - SEQ:
+              TUPLE:
+                - TYPENAME: BatchInfo
+                - SEQ:
+                    TYPENAME: SignedTransaction
+          - TYPENAME: ProofWithDataWithTxnLimit
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:

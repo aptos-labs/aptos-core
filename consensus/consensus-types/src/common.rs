@@ -197,7 +197,7 @@ pub enum Payload {
     InQuorumStoreWithLimit(ProofWithDataWithTxnLimit),
     // TODO: This is weird. `max_txns_to_execute` for the overall payload is embedded insie `ProofWithData`.
     // Is that fine or should we change it?
-    QuroumStoreInlineHybrid(
+    QuorumStoreInlineHybrid(
         Vec<(BatchInfo, Vec<SignedTransaction>)>,
         ProofWithDataWithTxnLimit,
     ),
@@ -209,7 +209,7 @@ impl Payload {
             Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
                 ProofWithDataWithTxnLimit::new(proof_with_status, max_txns_to_execute),
             ),
-            Payload::QuroumStoreInlineHybrid(_, _) => {
+            Payload::QuorumStoreInlineHybrid(_, _) => {
                 panic!("Payload is already in quorumStoreV2 format");
             },
             Payload::InQuorumStoreWithLimit(_) => {
@@ -241,7 +241,7 @@ impl Payload {
                     num_txns
                 }
             },
-            Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_status) => {
                 let num_txns = proof_with_status.proof_with_data.len()
                     + inline_batches
                         .iter()
@@ -265,7 +265,7 @@ impl Payload {
                     || (proof_with_status.max_txns_to_execute.is_some()
                         && proof_with_status.max_txns_to_execute.unwrap() == 0)
             },
-            Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_status) => {
                 (proof_with_status.max_txns_to_execute.is_some()
                     && proof_with_status.max_txns_to_execute.unwrap() == 0)
                     || (proof_with_status.proof_with_data.proofs.is_empty()
@@ -282,8 +282,8 @@ impl Payload {
                 p1.extend(p2)
             },
             (
-                Payload::QuroumStoreInlineHybrid(b1, p1),
-                Payload::QuroumStoreInlineHybrid(b2, p2),
+                Payload::QuorumStoreInlineHybrid(b1, p1),
+                Payload::QuorumStoreInlineHybrid(b2, p2),
             ) => {
                 b1.extend(b2);
                 p1.extend(p2);
@@ -310,7 +310,7 @@ impl Payload {
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
                 proof_with_status.proof_with_data.size()
             },
-            Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_status) => {
                 proof_with_status.proof_with_data.size()
                     + inline_batches
                         .iter()
@@ -366,7 +366,7 @@ impl fmt::Display for Payload {
                     proof_with_status.proof_with_data.proofs.len()
                 )
             },
-            Payload::QuroumStoreInlineHybrid(inline_batches, proof_with_status) => {
+            Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_status) => {
                 write!(
                     f,
                     "Inline txns: {}, InMemory proofs: {}",

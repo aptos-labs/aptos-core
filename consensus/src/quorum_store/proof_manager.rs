@@ -176,7 +176,7 @@ impl ProofManager {
                                 .iter()
                                 .map(|(_, txns)| txns.len())
                                 .sum::<usize>();
-                        Payload::QuroumStoreInlineHybrid(
+                        Payload::QuorumStoreInlineHybrid(
                             inline_block,
                             ProofWithDataWithTxnLimit::new(
                                 ProofWithData::new(proof_block),
