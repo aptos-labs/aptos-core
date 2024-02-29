@@ -16,7 +16,7 @@ use ark_groth16::PreparedVerifyingKey;
 use ark_serialize::CanonicalSerialize;
 use base64::URL_SAFE_NO_PAD;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     str,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -143,10 +143,12 @@ impl KeylessSignature {
 ///
 /// This value should **NOT* be changed since on-chain addresses are based on it (e.g.,
 /// hashing with a larger pepper would lead to a different address).
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct Pepper(pub(crate) [u8; poseidon_bn254::BYTES_PACKED_PER_SCALAR]);
 
 impl Pepper {
+    // TODO(keyless) Account address uses Self::LENGTH instead of Self::NUM_BYTES. Consider
+    // renaming to be consistent?
     pub const NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
 
     pub fn new(bytes: [u8; Self::NUM_BYTES]) -> Self {
@@ -157,11 +159,16 @@ impl Pepper {
         &self.0
     }
 
+    // TODO(keyless) Shouldn't this return a result rather than unwrap()ing?
     pub fn from_hex(hex: &str) -> Self {
         let bytes = hex::decode(hex).unwrap();
         let mut extended_bytes = [0u8; Self::NUM_BYTES];
         extended_bytes.copy_from_slice(&bytes);
         Self(extended_bytes)
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(&self.0)
     }
 
     // Used for testing. #[cfg(test)] doesn't seem to allow for use in smoke tests.
@@ -171,6 +178,43 @@ impl Pepper {
         let mut extended_bytes = [0u8; Self::NUM_BYTES];
         extended_bytes[..bytes.len()].copy_from_slice(&bytes);
         Self(extended_bytes)
+    }
+}
+
+impl<'de> Deserialize<'de> for Pepper {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let s = <String>::deserialize(deserializer)?;
+            Ok(Pepper::from_hex(&s))
+        } else {
+            // In order to preserve the Serde data model and help analysis tools,
+            // make sure to wrap our value in a container with the same name
+            // as the original type.
+            #[derive(::serde::Deserialize)]
+            #[serde(rename = "Pepper")]
+            struct Value([u8; Pepper::NUM_BYTES]);
+
+            let value = Value::deserialize(deserializer)?;
+            Ok(Pepper::new(value.0))
+        }
+    }
+}
+
+impl Serialize for Pepper {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            self.to_hex().serialize(serializer)
+
+        } else {
+            // See comment in deserialize.
+            serializer.serialize_newtype_struct("Pepper", &self.0)
+        }
     }
 }
 

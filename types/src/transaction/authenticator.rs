@@ -22,7 +22,7 @@ use aptos_crypto_derive::{CryptoHasher, DeserializeKey, SerializeKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
@@ -1097,7 +1097,7 @@ impl TryFrom<&[u8]> for EphemeralSignature {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum EphemeralPublicKey {
     Ed25519 { public_key: Ed25519PublicKey },
 }
@@ -1107,9 +1107,21 @@ impl EphemeralPublicKey {
         Self::Ed25519 { public_key }
     }
 
-    pub fn to_bytes(&self) -> Vec<u8> {
+     pub fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
     }
+
+    
+    pub fn from_hex(hex: &str) -> Result<Self, CryptoMaterialError> {
+        let bytes = hex::decode(hex)
+            .map_err(|_| CryptoMaterialError::DeserializationError)?;
+        Self::try_from(bytes.as_slice())
+    }
+
+    pub fn to_hex(&self) -> String {
+        hex::encode(self.to_bytes().as_slice())
+    }
+
 }
 
 impl TryFrom<&[u8]> for EphemeralPublicKey {
@@ -1120,6 +1132,59 @@ impl TryFrom<&[u8]> for EphemeralPublicKey {
             .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
+
+impl<'de> Deserialize<'de> for EphemeralPublicKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let s = <String>::deserialize(deserializer)?;
+            EphemeralPublicKey::from_hex(&s)
+                .map_err(serde::de::Error::custom)
+        } else {
+            // In order to preserve the Serde data model and help analysis tools,
+            // make sure to wrap our value in a container with the same name
+            // as the original type.
+            #[derive(::serde::Deserialize)]
+            #[serde(rename = "EphemeralPublicKey")]
+            enum Value {
+                Ed25519 { public_key: Ed25519PublicKey },
+            }
+
+            let value = Value::deserialize(deserializer)?;
+            Ok(match value {
+                Value::Ed25519 { public_key } => EphemeralPublicKey::Ed25519 { public_key }
+            })
+        }
+    }
+}
+
+impl Serialize for EphemeralPublicKey {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            self.to_hex().serialize(serializer)
+
+        } else {
+            // See comment in deserialize.
+            #[derive(::serde::Serialize)]
+            #[serde(rename = "EphemeralPublicKey")]
+            enum Value {
+                Ed25519 { public_key: Ed25519PublicKey },
+            }
+
+            let value = match self {
+                EphemeralPublicKey::Ed25519 { public_key } => Value::Ed25519 { public_key: public_key.clone() } 
+            };
+
+            value.serialize(serializer)
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -1138,6 +1203,29 @@ mod tests {
     };
     use hex::FromHex;
     use rand::thread_rng;
+    use serde_json::{from_str, to_string};
+
+    #[test]
+    fn test_epk_serialization() {
+        let ed25519_pk = Ed25519PrivateKey::generate_for_testing().public_key();
+        let epk = EphemeralPublicKey::Ed25519 { public_key: ed25519_pk };
+
+
+        assert_eq!(serde_json::from_str::<EphemeralPublicKey>(&serde_json::to_string(&epk).unwrap()).unwrap(), epk);
+        assert_eq!(bcs::from_bytes::<EphemeralPublicKey>(&bcs::to_bytes(&epk).unwrap()).unwrap(), epk);
+
+        // these values were generated as follows:
+        //println!("{:?}", serde_json::to_string(&epk).unwrap());
+        //println!("{:?}", bcs::to_bytes(&epk).unwrap());
+        let epk_str = "\"002020fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144\""; 
+        let epk_bytes = [0, 32, 32, 253, 186, 201, 177, 11, 117, 135, 187, 167, 181, 188, 22, 
+                         59, 206, 105, 231, 150, 215, 30, 78, 212, 76, 16, 252, 180, 72, 134, 
+                         137, 247, 161, 68];
+
+        assert_eq!(serde_json::to_string( &serde_json::from_str::<EphemeralPublicKey>(&epk_str).unwrap()).unwrap().as_str(),epk_str);
+        assert_eq!(bcs::to_bytes(&bcs::from_bytes::<EphemeralPublicKey>(&epk_bytes).unwrap()).unwrap(),epk_bytes); 
+    }
+
 
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
