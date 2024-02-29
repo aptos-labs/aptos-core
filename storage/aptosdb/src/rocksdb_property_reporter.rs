@@ -6,7 +6,7 @@ use crate::{
     common::NUM_STATE_SHARDS,
     db_options::{
         event_db_column_families, ledger_db_column_families, ledger_metadata_db_column_families,
-        state_kv_db_column_families, state_merkle_db_column_families,
+        skip_reporting_cf, state_kv_db_column_families, state_merkle_db_column_families,
         transaction_accumulator_db_column_families, transaction_db_column_families,
         transaction_info_db_column_families, write_set_db_column_families,
     },
@@ -73,10 +73,12 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
 });
 
 fn set_property(cf_name: &str, db: &DB) -> Result<()> {
-    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-        ROCKSDB_PROPERTIES
-            .with_label_values(&[cf_name, aptos_rocksdb_property_name])
-            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+    if !skip_reporting_cf(cf_name) {
+        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+            ROCKSDB_PROPERTIES
+                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
+                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+        }
     }
     Ok(())
 }
@@ -87,14 +89,16 @@ fn set_shard_property(
     db_shard_id: usize,
     metrics: &Lazy<IntGaugeVec>,
 ) -> Result<()> {
-    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-        metrics
-            .with_label_values(&[
-                &format!("{db_shard_id}"),
-                cf_name,
-                aptos_rocksdb_property_name,
-            ])
-            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+    if !skip_reporting_cf(cf_name) {
+        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+            metrics
+                .with_label_values(&[
+                    &format!("{db_shard_id}"),
+                    cf_name,
+                    aptos_rocksdb_property_name,
+                ])
+                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+        }
     }
     Ok(())
 }

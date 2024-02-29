@@ -11,6 +11,7 @@ use crate::{
     payload_manager::PayloadManager,
     pipeline::buffer_manager::OrderedBlocks,
     quorum_store::quorum_store_db::MockQuorumStoreDB,
+    rand::rand_gen::storage::in_memory::InMemRandDb,
     test_utils::{mock_execution_client::MockExecutionClient, MockStorage},
     util::time_service::ClockTimeService,
 };
@@ -143,7 +144,7 @@ impl SMRNode {
         let (timeout_sender, timeout_receiver) =
             aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
         let (self_sender, self_receiver) =
-            aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
+            aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
 
         let quorum_store_storage = Arc::new(MockQuorumStoreDB::new());
         let bounded_executor = BoundedExecutor::new(2, playground.handle());
@@ -162,6 +163,7 @@ impl SMRNode {
             bounded_executor,
             aptos_time_service::TimeService::real(),
             vtxn_pool,
+            Arc::new(InMemRandDb::new()),
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);

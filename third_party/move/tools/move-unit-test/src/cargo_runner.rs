@@ -4,6 +4,7 @@
 
 use crate::UnitTestingConfig;
 use move_command_line_common::files::find_filenames;
+use move_core_types::effects::ChangeSet;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use move_vm_test_utils::gas_schedule::CostTable;
 
@@ -13,6 +14,7 @@ pub fn run_tests_with_config_and_filter(
     source_pattern: &str,
     dep_root: Option<&str>,
     native_function_table: Option<NativeFunctionTable>,
+    genesis_state: Option<ChangeSet>,
     cost_table: Option<CostTable>,
 ) {
     let get_files = |root_path, pat| {
@@ -37,6 +39,7 @@ pub fn run_tests_with_config_and_filter(
         .run_and_report_unit_tests(
             test_plan,
             native_function_table,
+            genesis_state,
             cost_table,
             std::io::stdout(),
         )
@@ -56,7 +59,7 @@ macro_rules! register_move_unit_tests {
         #[test]
         fn move_unit_tests() {
             $crate::cargo_runner::run_tests_with_config_and_filter(
-                $config, $root, $pattern, None, None,
+                $config, $root, $pattern, None, None, None, None,
             )
         }
     };
@@ -71,6 +74,8 @@ macro_rules! register_move_unit_tests {
                 $source_pattern,
                 Some($dep_root),
                 $native_function_table,
+                None,
+                None,
             )
         }
     };

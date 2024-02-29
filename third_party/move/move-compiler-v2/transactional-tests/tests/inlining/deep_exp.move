@@ -1,4 +1,5 @@
 //# publish
+// TODO(#12036): should pass once optimizations on by default
 module 0x42::Test {
 
     inline fun f1(x: u64): u64 {

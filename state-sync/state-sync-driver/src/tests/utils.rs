@@ -31,9 +31,9 @@ use aptos_types::{
     },
     state_store::state_value::StateValueChunkWithProof,
     transaction::{
-        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction, TransactionInfo,
-        TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionPayload, TransactionStatus, Version,
+        ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
+        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionPayload, TransactionStatus, Version,
     },
     waypoint::Waypoint,
     write_set::WriteSet,
@@ -255,6 +255,7 @@ pub fn create_transaction_output() -> TransactionOutput {
         vec![create_event(None)],
         0,
         TransactionStatus::Keep(ExecutionStatus::Success),
+        TransactionAuxiliaryData::default(),
     )
 }
 

@@ -203,6 +203,13 @@ HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
 target_directory = "execution/executor-benchmark/src"
 
 
+class CmdExecutionError(Exception):
+    def __init__(self, return_code, output):
+        super().__init__(f"CmdExecutionError with {return_code}")
+        self.return_code = return_code
+        self.output = output
+
+
 def execute_command(command):
     print(f"Executing command:\n\t{command}\nand waiting for it to finish...")
     result = []
@@ -227,7 +234,7 @@ def execute_command(command):
     if p.returncode != 0:
         if HIDE_OUTPUT:
             print(full_result)
-        raise CalledProcessError(p.returncode, p.args)
+        raise CmdExecutionError(p.returncode, full_result)
 
     if " ERROR " in full_result:
         print("ERROR log line in execution")
@@ -428,8 +435,19 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
+    execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+    try:
+        execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
+        move_e2e_benchmark_failed = False
+    except:
+        # for land-blocking (i.e. on PR), fail immediately, for speedy response.
+        # Otherwise run all tests, and fail in the end.
+        if SELECTED_FLOW == Flow.LAND_BLOCKING:
+            print("Move E2E benchmark failed, exiting")
+            exit(1)
+        move_e2e_benchmark_failed = True
 
+    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
     create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
@@ -597,6 +615,12 @@ if warnings:
 if errors:
     print("Errors: ")
     print("\n".join(errors))
+    exit(1)
+
+if move_e2e_benchmark_failed:
+    print(
+        "Move e2e benchmark failed, failing the job. See logs at the beginning for more details."
+    )
     exit(1)
 
 exit(0)

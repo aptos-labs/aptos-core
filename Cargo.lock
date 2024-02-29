@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.4.0"
+version = "2.5.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -881,6 +881,7 @@ dependencies = [
  "aptos-consensus-types",
  "aptos-crypto",
  "aptos-crypto-derive",
+ "aptos-dkg",
  "aptos-enum-conversion-derive",
  "aptos-event-notifications",
  "aptos-executor",
@@ -937,6 +938,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_yaml 0.8.26",
+ "sha3 0.9.1",
  "strum_macros 0.24.3",
  "tempfile",
  "thiserror",
@@ -1311,6 +1313,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
+ "fail 0.5.1",
  "futures",
  "futures-channel",
  "futures-util",
@@ -2715,6 +2718,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-move-e2e-benchmark"
+version = "0.1.0"
+dependencies = [
+ "aptos-language-e2e-tests",
+ "aptos-transaction-generator-lib",
+ "aptos-types",
+ "rand 0.7.3",
+ "serde_json",
+]
+
+[[package]]
 name = "aptos-move-examples"
 version = "0.1.0"
 dependencies = [
@@ -3073,6 +3087,7 @@ dependencies = [
  "hex",
  "jemallocator",
  "maplit",
+ "num_cpus",
  "rand 0.7.3",
  "rayon",
  "rstack-self",
@@ -10676,6 +10691,7 @@ dependencies = [
  "flexi_logger",
  "im",
  "itertools 0.10.5",
+ "lazy_static",
  "log",
  "move-binary-format",
  "move-bytecode-source-map",
@@ -14987,6 +15003,7 @@ dependencies = [
  "aptos-vault-client",
  "aptos-vm",
  "aptos-vm-genesis",
+ "ark-ff",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",

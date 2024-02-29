@@ -45,11 +45,11 @@ fun m::test($t0: u64): u64 {
      var $t7: u64
      var $t8: u64
      # before: {}, after: {$t2 := $t0}
-  0: $t2 := infer($t0)
+  0: $t2 := copy($t0)
      # before: {$t2 := $t0}, after: {$t2 := $t0}
   1: $t4 := 0
      # before: {$t2 := $t0}, after: {$t2 := $t0, $t3 := $t4}
-  2: $t3 := infer($t4)
+  2: $t3 := move($t4)
      # before: {$t2 := $t0}, after: {$t2 := $t0}
   3: label L0
      # before: {$t2 := $t0}, after: {$t2 := $t0}
@@ -61,13 +61,13 @@ fun m::test($t0: u64): u64 {
      # before: {$t2 := $t0}, after: {$t2 := $t0}
   7: label L2
      # before: {$t2 := $t0}, after: {$t2 := $t0}
-  8: $t2 := infer($t0)
+  8: $t2 := copy($t0)
      # before: {$t2 := $t0}, after: {$t2 := $t0}
   9: $t8 := 1
      # before: {$t2 := $t0}, after: {$t2 := $t0}
  10: $t7 := +($t3, $t8)
      # before: {$t2 := $t0}, after: {$t2 := $t0, $t3 := $t7}
- 11: $t3 := infer($t7)
+ 11: $t3 := move($t7)
      # before: {$t2 := $t0, $t3 := $t7}, after: {$t2 := $t0, $t3 := $t7}
  12: goto 15
      # before: {$t2 := $t0}, after: {$t2 := $t0}
@@ -81,7 +81,7 @@ fun m::test($t0: u64): u64 {
      # before: {$t2 := $t0}, after: {$t2 := $t0}
  17: label L1
      # before: {$t2 := $t0}, after: {$t1 := $t2, $t2 := $t0}
- 18: $t1 := infer($t2)
+ 18: $t1 := move($t2)
      # before: {$t1 := $t2, $t2 := $t0}, after: {$t1 := $t2, $t2 := $t0}
  19: return $t1
 }
@@ -98,25 +98,25 @@ fun m::test($t0: u64): u64 {
      var $t6: u64
      var $t7: u64
      var $t8: u64
-  0: $t2 := infer($t0)
+  0: $t2 := copy($t0)
   1: $t4 := 0
-  2: $t3 := infer($t4)
+  2: $t3 := move($t4)
   3: label L0
   4: $t6 := 10
   5: $t5 := <($t3, $t6)
   6: if ($t5) goto 7 else goto 13
   7: label L2
-  8: $t2 := infer($t0)
+  8: $t2 := copy($t0)
   9: $t8 := 1
  10: $t7 := +($t3, $t8)
- 11: $t3 := infer($t7)
+ 11: $t3 := move($t7)
  12: goto 15
  13: label L3
  14: goto 17
  15: label L4
  16: goto 3
  17: label L1
- 18: $t1 := infer($t0)
+ 18: $t1 := move($t0)
  19: return $t0
 }
 
@@ -124,8 +124,8 @@ fun m::test($t0: u64): u64 {
 
 [variant baseline]
 fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
      var $t3: u64
      var $t4: u64
      var $t5: bool
@@ -133,7 +133,7 @@ fun m::test($t0: u64): u64 {
      var $t7: u64
      var $t8: u64
   0: $t4 := 0
-  1: $t3 := infer($t4)
+  1: $t3 := move($t4)
   2: label L0
   3: $t6 := 10
   4: $t5 := <($t3, $t6)
@@ -141,7 +141,7 @@ fun m::test($t0: u64): u64 {
   6: label L2
   7: $t8 := 1
   8: $t7 := +($t3, $t8)
-  9: $t3 := infer($t7)
+  9: $t3 := move($t7)
  10: goto 13
  11: label L3
  12: goto 15

@@ -14,7 +14,7 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::RandGenMessage,
+    rand::rand_gen::network_messages::RandGenMessage,
 };
 use anyhow::{anyhow, bail, ensure};
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
@@ -196,7 +196,7 @@ pub struct NetworkSender {
     consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
     // Self sender and self receivers provide a shortcut for sending the messages to itself.
     // (self sending is not supported by the networking API).
-    self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
+    self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
     validators: ValidatorVerifier,
     time_service: aptos_time_service::TimeService,
 }
@@ -205,7 +205,7 @@ impl NetworkSender {
     pub fn new(
         author: Author,
         consensus_network_client: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
-        self_sender: aptos_channels::Sender<Event<ConsensusMsg>>,
+        self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
         validators: ValidatorVerifier,
     ) -> Self {
         NetworkSender {
@@ -407,6 +407,12 @@ impl NetworkSender {
         self.send_rpc(recipient, msg, Duration::from_millis(500))
             .await
             .map(|_| ())
+    }
+
+    pub async fn broadcast_vote(&self, vote_msg: VoteMsg) {
+        fail_point!("consensus::send::vote", |_| ());
+        let msg = ConsensusMsg::VoteMsg(Box::new(vote_msg));
+        self.broadcast(msg).await
     }
 
     /// Sends the vote to the chosen recipients (typically that would be the recipients that
@@ -611,7 +617,7 @@ impl NetworkTask {
     /// Establishes the initial connections with the peers and returns the receivers.
     pub fn new(
         network_service_events: NetworkServiceEvents<ConsensusMsg>,
-        self_receiver: aptos_channels::Receiver<Event<ConsensusMsg>>,
+        self_receiver: aptos_channels::UnboundedReceiver<Event<ConsensusMsg>>,
     ) -> (NetworkTask, NetworkReceivers) {
         let (consensus_messages_tx, consensus_messages) = aptos_channel::new(
             QueueStyle::FIFO,
