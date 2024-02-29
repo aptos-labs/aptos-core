@@ -213,10 +213,8 @@ impl DagStateSynchronizer {
 
         // Create a new DAG store and Fetch blocks
         let target_round = node.round();
-        let start_round = commit_li
-            .commit_info()
-            .round()
-            .saturating_sub(self.dag_window_size_config);
+        let commit_round = commit_li.commit_info().round();
+        let start_round = commit_round.saturating_sub(self.dag_window_size_config);
         let sync_dag_store = Arc::new(DagStore::new_empty(
             self.epoch_state.clone(),
             self.storage.clone(),
@@ -224,7 +222,7 @@ impl DagStateSynchronizer {
             start_round,
             self.dag_window_size_config,
         ));
-        let bitmask = { sync_dag_store.read().bitmask(target_round) };
+        let bitmask = { sync_dag_store.read().bitmask(commit_round, target_round) };
         let request = RemoteFetchRequest::new(
             self.epoch_state.epoch,
             vec![node.metadata().clone()],

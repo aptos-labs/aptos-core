@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, errors::DagFetchError, DAGRpcResult};
+use super::{
+    adapter::{LedgerInfoProvider, TLedgerInfoProvider},
+    dag_store::DagStore,
+    errors::DagFetchError,
+    DAGRpcResult,
+};
 use crate::{
     dag::{
         dag_network::{RpcResultWithResponder, TDAGNetworkSender},
@@ -152,6 +157,8 @@ pub struct DagFetcherService {
     futures:
         FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<LocalFetchRequest>> + Send>>>,
     max_concurrent_fetches: usize,
+    ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+    dag_window_size_config: Round,
 }
 
 impl DagFetcherService {
@@ -161,6 +168,8 @@ impl DagFetcherService {
         dag: Arc<DagStore>,
         time_service: TimeService,
         config: DagFetcherConfig,
+        ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+        dag_window_size_config: Round,
     ) -> (
         Self,
         FetchRequester,
@@ -180,6 +189,8 @@ impl DagFetcherService {
                 ordered_authors,
                 inflight_requests: HashMap::new(),
                 futures: FuturesUnordered::new(),
+                ledger_info_provider,
+                dag_window_size_config,
             },
             FetchRequester {
                 request_tx,
@@ -243,10 +254,23 @@ impl DagFetcherService {
                 return Ok(async { Ok(()) }.boxed().shared());
             }
 
+            let latest_committed_round = self
+                .ledger_info_provider
+                .get_latest_ledger_info()
+                .commit_info()
+                .round();
+            let target_round = node.round().saturating_sub(1);
+
+            ensure!(
+                latest_committed_round.saturating_sub(self.dag_window_size_config) < target_round,
+                "potentially stale request {:?}",
+                node.metadata()
+            );
+
             RemoteFetchRequest::new(
                 node.metadata().epoch(),
                 missing_parents,
-                dag_reader.bitmask(node.round().saturating_sub(1)),
+                dag_reader.bitmask(latest_committed_round, target_round),
             )
         };
 
