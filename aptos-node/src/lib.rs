@@ -249,10 +249,7 @@ fn load_remote_config(
     info!("merged_config {:?}", merged_config);
 
     let merged_config_name = format!("merged_{}", max_config);
-    let merged_config_path = initial_config_path
-        .parent()
-        .unwrap()
-        .join(merged_config_name);
+    let merged_config_path = config_dir.join(merged_config_name);
     let merged_config_file = fs::File::create(merged_config_path.clone())?;
     serde_yaml::to_writer(merged_config_file, &merged_config)?;
 
