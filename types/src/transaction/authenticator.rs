@@ -1107,21 +1107,18 @@ impl EphemeralPublicKey {
         Self::Ed25519 { public_key }
     }
 
-     pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
     }
 
-    
     pub fn from_hex(hex: &str) -> Result<Self, CryptoMaterialError> {
-        let bytes = hex::decode(hex)
-            .map_err(|_| CryptoMaterialError::DeserializationError)?;
+        let bytes = hex::decode(hex).map_err(|_| CryptoMaterialError::DeserializationError)?;
         Self::try_from(bytes.as_slice())
     }
 
     pub fn to_hex(&self) -> String {
         hex::encode(self.to_bytes().as_slice())
     }
-
 }
 
 impl TryFrom<&[u8]> for EphemeralPublicKey {
@@ -1140,8 +1137,7 @@ impl<'de> Deserialize<'de> for EphemeralPublicKey {
     {
         if deserializer.is_human_readable() {
             let s = <String>::deserialize(deserializer)?;
-            EphemeralPublicKey::from_hex(&s)
-                .map_err(serde::de::Error::custom)
+            EphemeralPublicKey::from_hex(&s).map_err(serde::de::Error::custom)
         } else {
             // In order to preserve the Serde data model and help analysis tools,
             // make sure to wrap our value in a container with the same name
@@ -1154,7 +1150,7 @@ impl<'de> Deserialize<'de> for EphemeralPublicKey {
 
             let value = Value::deserialize(deserializer)?;
             Ok(match value {
-                Value::Ed25519 { public_key } => EphemeralPublicKey::Ed25519 { public_key }
+                Value::Ed25519 { public_key } => EphemeralPublicKey::Ed25519 { public_key },
             })
         }
     }
@@ -1167,7 +1163,6 @@ impl Serialize for EphemeralPublicKey {
     {
         if serializer.is_human_readable() {
             self.to_hex().serialize(serializer)
-
         } else {
             // See comment in deserialize.
             #[derive(::serde::Serialize)]
@@ -1177,14 +1172,15 @@ impl Serialize for EphemeralPublicKey {
             }
 
             let value = match self {
-                EphemeralPublicKey::Ed25519 { public_key } => Value::Ed25519 { public_key: public_key.clone() } 
+                EphemeralPublicKey::Ed25519 { public_key } => Value::Ed25519 {
+                    public_key: public_key.clone(),
+                },
             };
 
             value.serialize(serializer)
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -1208,24 +1204,40 @@ mod tests {
     #[test]
     fn test_epk_serialization() {
         let ed25519_pk = Ed25519PrivateKey::generate_for_testing().public_key();
-        let epk = EphemeralPublicKey::Ed25519 { public_key: ed25519_pk };
+        let epk = EphemeralPublicKey::Ed25519 {
+            public_key: ed25519_pk,
+        };
 
-
-        assert_eq!(serde_json::from_str::<EphemeralPublicKey>(&serde_json::to_string(&epk).unwrap()).unwrap(), epk);
-        assert_eq!(bcs::from_bytes::<EphemeralPublicKey>(&bcs::to_bytes(&epk).unwrap()).unwrap(), epk);
+        assert_eq!(
+            serde_json::from_str::<EphemeralPublicKey>(&serde_json::to_string(&epk).unwrap())
+                .unwrap(),
+            epk
+        );
+        assert_eq!(
+            bcs::from_bytes::<EphemeralPublicKey>(&bcs::to_bytes(&epk).unwrap()).unwrap(),
+            epk
+        );
 
         // these values were generated as follows:
         //println!("{:?}", serde_json::to_string(&epk).unwrap());
         //println!("{:?}", bcs::to_bytes(&epk).unwrap());
-        let epk_str = "\"002020fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144\""; 
-        let epk_bytes = [0, 32, 32, 253, 186, 201, 177, 11, 117, 135, 187, 167, 181, 188, 22, 
-                         59, 206, 105, 231, 150, 215, 30, 78, 212, 76, 16, 252, 180, 72, 134, 
-                         137, 247, 161, 68];
+        let epk_str = "\"002020fdbac9b10b7587bba7b5bc163bce69e796d71e4ed44c10fcb4488689f7a144\"";
+        let epk_bytes = [
+            0, 32, 32, 253, 186, 201, 177, 11, 117, 135, 187, 167, 181, 188, 22, 59, 206, 105, 231,
+            150, 215, 30, 78, 212, 76, 16, 252, 180, 72, 134, 137, 247, 161, 68,
+        ];
 
-        assert_eq!(serde_json::to_string( &serde_json::from_str::<EphemeralPublicKey>(&epk_str).unwrap()).unwrap().as_str(),epk_str);
-        assert_eq!(bcs::to_bytes(&bcs::from_bytes::<EphemeralPublicKey>(&epk_bytes).unwrap()).unwrap(),epk_bytes); 
+        assert_eq!(
+            serde_json::to_string(&serde_json::from_str::<EphemeralPublicKey>(&epk_str).unwrap())
+                .unwrap()
+                .as_str(),
+            epk_str
+        );
+        assert_eq!(
+            bcs::to_bytes(&bcs::from_bytes::<EphemeralPublicKey>(&epk_bytes).unwrap()).unwrap(),
+            epk_bytes
+        );
     }
-
 
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
@@ -1357,52 +1369,52 @@ mod tests {
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap_err();
 
-        let mk_auth_01 = MultiKeyAuthenticator::new(multi_key.clone(), vec![
-            (0, signature0.clone()),
-            (1, signature1.clone()),
-        ])
+        let mk_auth_01 = MultiKeyAuthenticator::new(
+            multi_key.clone(),
+            vec![(0, signature0.clone()), (1, signature1.clone())],
+        )
         .unwrap();
         let single_key_authenticators = mk_auth_01.to_single_key_authenticators().unwrap();
-        assert_eq!(single_key_authenticators, vec![
-            sender0_auth.clone(),
-            sender1_auth.clone()
-        ]);
+        assert_eq!(
+            single_key_authenticators,
+            vec![sender0_auth.clone(), sender1_auth.clone()]
+        );
         let account_auth = AccountAuthenticator::multi_key(mk_auth_01);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap();
 
-        let mk_auth_02 = MultiKeyAuthenticator::new(multi_key.clone(), vec![
-            (0, signature0.clone()),
-            (2, signature1.clone()),
-        ])
+        let mk_auth_02 = MultiKeyAuthenticator::new(
+            multi_key.clone(),
+            vec![(0, signature0.clone()), (2, signature1.clone())],
+        )
         .unwrap();
         let single_key_authenticators = mk_auth_02.to_single_key_authenticators().unwrap();
-        assert_eq!(single_key_authenticators, vec![
-            sender0_auth.clone(),
-            sender1_auth.clone()
-        ]);
+        assert_eq!(
+            single_key_authenticators,
+            vec![sender0_auth.clone(), sender1_auth.clone()]
+        );
         let account_auth = AccountAuthenticator::multi_key(mk_auth_02);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap();
 
-        let mk_auth_12 = MultiKeyAuthenticator::new(multi_key.clone(), vec![
-            (1, signature1.clone()),
-            (2, signature1.clone()),
-        ])
+        let mk_auth_12 = MultiKeyAuthenticator::new(
+            multi_key.clone(),
+            vec![(1, signature1.clone()), (2, signature1.clone())],
+        )
         .unwrap();
         let single_key_authenticators = mk_auth_12.to_single_key_authenticators().unwrap();
-        assert_eq!(single_key_authenticators, vec![
-            sender1_auth.clone(),
-            sender1_auth.clone()
-        ]);
+        assert_eq!(
+            single_key_authenticators,
+            vec![sender1_auth.clone(), sender1_auth.clone()]
+        );
         let account_auth = AccountAuthenticator::multi_key(mk_auth_12);
         let signed_txn = SignedTransaction::new_single_sender(raw_txn.clone(), account_auth);
         signed_txn.verify_signature().unwrap();
 
-        MultiKeyAuthenticator::new(multi_key.clone(), vec![
-            (0, signature0.clone()),
-            (0, signature0.clone()),
-        ])
+        MultiKeyAuthenticator::new(
+            multi_key.clone(),
+            vec![(0, signature0.clone()), (0, signature0.clone())],
+        )
         .unwrap_err();
     }
 
@@ -1660,10 +1672,10 @@ mod tests {
         let second_sender0_auth = AccountAuthenticator::single_key(second_sender0_sk_auth.clone());
         let second_sender1_auth = AccountAuthenticator::single_key(second_sender1_sk_auth.clone());
         let fee_payer_multi_key_auth = AccountAuthenticator::multi_key(
-            MultiKeyAuthenticator::new(multi_key.clone(), vec![
-                (0, fee_payer0_sig.clone()),
-                (1, fee_payer1_sig.clone()),
-            ])
+            MultiKeyAuthenticator::new(
+                multi_key.clone(),
+                vec![(0, fee_payer0_sig.clone()), (1, fee_payer1_sig.clone())],
+            )
             .unwrap(),
         );
 
@@ -1676,21 +1688,27 @@ mod tests {
         );
 
         let authenticators = txn_auth.all_signers();
-        assert_eq!(authenticators, vec![
-            sender_auth,
-            second_sender0_auth,
-            second_sender1_auth,
-            fee_payer_multi_key_auth
-        ]);
+        assert_eq!(
+            authenticators,
+            vec![
+                sender_auth,
+                second_sender0_auth,
+                second_sender1_auth,
+                fee_payer_multi_key_auth
+            ]
+        );
 
         let single_key_authenticators = txn_auth.to_single_key_authenticators().unwrap();
-        assert_eq!(single_key_authenticators, vec![
-            sender_sk_auth,
-            second_sender0_sk_auth,
-            second_sender1_sk_auth,
-            fee_payer0_sk_auth,
-            fee_payer1_sk_auth
-        ]);
+        assert_eq!(
+            single_key_authenticators,
+            vec![
+                sender_sk_auth,
+                second_sender0_sk_auth,
+                second_sender1_sk_auth,
+                fee_payer0_sk_auth,
+                fee_payer1_sk_auth
+            ]
+        );
     }
 
     #[test]
