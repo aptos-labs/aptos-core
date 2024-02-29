@@ -248,34 +248,34 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
         if self.num_base_orders_placed <= 100 || self.num_base_orders_placed % 2 == 0 {
             Arc::new(move |account, package, publisher, txn_factory, rng| {
                 let mut requests = vec![];
-                for market_id in 1..(*num_markets+1) {
-                    let bid_size = rng.gen_range(4, 14);
-                    let ask_size = rng.gen_range(4, 14);
+                let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
 
-                    let bid_price = rng.gen_range(1, 200);
-                    let ask_price = rng.gen_range(201, 400);
+                let bid_size = rng.gen_range(4, 14);
+                let ask_size = rng.gen_range(4, 14);
 
-                    let bid_builder = txn_factory.payload(place_bid_limit_order(package.get_module_id("txn_generator_utils"), bid_size, bid_price, market_id, publisher.address()));
-                    let ask_builder = txn_factory.payload(place_ask_limit_order(package.get_module_id("txn_generator_utils"), ask_size, ask_price, market_id, publisher.address()));
+                let bid_price = rng.gen_range(1, 200);
+                let ask_price = rng.gen_range(201, 400);
 
-                    requests.push(account.sign_with_transaction_builder(bid_builder));
-                    requests.push(account.sign_with_transaction_builder(ask_builder));
-                }
+                let bid_builder = txn_factory.payload(place_bid_limit_order(package.get_module_id("txn_generator_utils"), bid_size, bid_price, market_id, publisher.address()));
+                let ask_builder = txn_factory.payload(place_ask_limit_order(package.get_module_id("txn_generator_utils"), ask_size, ask_price, market_id, publisher.address()));
+
+                requests.push(account.sign_with_transaction_builder(bid_builder));
+                requests.push(account.sign_with_transaction_builder(ask_builder));
                 requests
             })
         } else {
             Arc::new(move |account, package, publisher, txn_factory, rng| {
                 let mut requests = vec![];
-                for market_id in 1..(*num_markets+1) {
-                    let bid_size = rng.gen_range(4, 14);
-                    let ask_size = rng.gen_range(4, 14);
+                let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
 
-                    let bid_builder = txn_factory.payload(place_bid_market_order(package.get_module_id("txn_generator_utils"), bid_size, market_id, publisher.address()));
-                    let ask_builder = txn_factory.payload(place_ask_market_order(package.get_module_id("txn_generator_utils"), ask_size, market_id, publisher.address()));
+                let bid_size = rng.gen_range(4, 14);
+                let ask_size = rng.gen_range(4, 14);
 
-                    requests.push(account.sign_with_transaction_builder(bid_builder));
-                    requests.push(account.sign_with_transaction_builder(ask_builder));
-                }
+                let bid_builder = txn_factory.payload(place_bid_market_order(package.get_module_id("txn_generator_utils"), bid_size, market_id, publisher.address()));
+                let ask_builder = txn_factory.payload(place_ask_market_order(package.get_module_id("txn_generator_utils"), ask_size, market_id, publisher.address()));
+
+                requests.push(account.sign_with_transaction_builder(bid_builder));
+                requests.push(account.sign_with_transaction_builder(ask_builder));
                 requests
             })
         }
@@ -364,12 +364,9 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketUserTransactionGener
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
         Arc::new(move |account, package, publisher, txn_factory, _rng| {
-            let mut requests = vec![];
-            for market_id in 1..(*num_markets+1) {
-                let builder = txn_factory.payload(register_market_accounts(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
-                requests.push(account.sign_with_transaction_builder(builder));
-            }
-            requests
+            let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
+            let builder = txn_factory.payload(register_market_accounts(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
+            vec![account.sign_with_transaction_builder(builder)]
         })
     }
 }
@@ -411,12 +408,9 @@ impl UserModuleTransactionGenerator for EconiaDepositCoinsTransactionGenerator {
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
         Arc::new(move |account, package, publisher, txn_factory, _rng| {
-            let mut requests = vec![];
-            for market_id in 1..(*num_markets+1) {
-                let builder = txn_factory.payload(deposit_coins(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
-                requests.push(account.sign_multi_agent_with_transaction_builder(vec![publisher], builder))
-            }
-            requests
+            let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
+            let builder = txn_factory.payload(deposit_coins(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
+            vec![account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)]
         })
     }
 }

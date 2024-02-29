@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, BypassAccountsPoolWrapperCreator}, call_custom_modules::{CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator}, econia_order_generator::{EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, EconiaRegisterMarketTransactionGenerator, EconiaRegisterMarketUserTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, BypassAccountsPoolWrapperCreator, ReuseAccountsPoolWrapperCreator}, call_custom_modules::{CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator}, econia_order_generator::{EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, EconiaRegisterMarketTransactionGenerator, EconiaRegisterMarketUserTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -411,14 +411,13 @@ impl WorkflowTxnGeneratorCreator {
                     Some(deposit_coins_pool.clone()),
                 )));
 
-                creators.push(Box::new(AccountsPoolWrapperCreator::new(
+                creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                         txn_factory.clone(),
                         packages.clone(),
                         econia_place_orders_worker,
                     )),
                     deposit_coins_pool.clone(),
-                    Some(place_orders_pool.clone()),
                 )));
 
                 let pool_per_stage = if create_accounts {

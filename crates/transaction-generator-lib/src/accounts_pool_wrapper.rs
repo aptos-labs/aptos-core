@@ -95,6 +95,82 @@ impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
 
 
 
+
+
+pub struct ReuseAccountsPoolWrapperGenerator {
+    rng: StdRng,
+    generator: Box<dyn TransactionGenerator>,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+}
+
+impl ReuseAccountsPoolWrapperGenerator {
+    pub fn new(
+        rng: StdRng,
+        generator: Box<dyn TransactionGenerator>,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    ) -> Self {
+        Self {
+            rng,
+            generator,
+            source_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
+    fn generate_transactions(
+        &mut self,
+        _account: &LocalAccount,
+        num_to_create: usize,
+    ) -> Vec<SignedTransaction> {
+        let mut accounts_to_use =
+            self.source_accounts_pool
+                .take_from_pool(num_to_create, true, &mut self.rng);
+        if accounts_to_use.is_empty() {
+            return Vec::new();
+        }
+        let txns = accounts_to_use
+            .iter_mut()
+            .flat_map(|account| self.generator.generate_transactions(account, 1))
+            .collect();
+
+        self.source_accounts_pool.add_to_pool(accounts_to_use);
+        txns
+    }
+}
+
+pub struct ReuseAccountsPoolWrapperCreator {
+    creator: Box<dyn TransactionGeneratorCreator>,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+}
+
+impl ReuseAccountsPoolWrapperCreator {
+    pub fn new(
+        creator: Box<dyn TransactionGeneratorCreator>,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    ) -> Self {
+        Self {
+            creator,
+            source_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGeneratorCreator for ReuseAccountsPoolWrapperCreator {
+    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+        Box::new(ReuseAccountsPoolWrapperGenerator::new(
+            StdRng::from_entropy(),
+            self.creator.create_transaction_generator(),
+            self.source_accounts_pool.clone(),
+        ))
+    }
+}
+
+
+
+
+
+
 pub struct BypassAccountsPoolWrapperGenerator {
     rng: StdRng,
     generator: Box<dyn TransactionGenerator>,
