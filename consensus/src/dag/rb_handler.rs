@@ -33,6 +33,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use claims::assert_some;
 use dashmap::DashSet;
+use mini_moka::sync::Cache;
 use std::{collections::BTreeMap, mem, sync::Arc};
 use tokio::task::JoinHandle;
 
@@ -192,9 +193,14 @@ impl NodeBroadcastHandler {
             }
         }
 
+        let cache = Cache::builder().build();
         ensure!(
             node.payload()
-                .verify(&self.epoch_state.verifier, self.quorum_store_enabled)
+                .verify(
+                    &self.epoch_state.verifier,
+                    &cache,
+                    self.quorum_store_enabled
+                )
                 .is_ok(),
             "invalid payload"
         );

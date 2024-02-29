@@ -177,7 +177,7 @@ impl RemoteNodeConfigProvider {
         for raw_config in file.node_configs {
             let chain_configs = configs_per_chain
                 .entry(raw_config.chain_id)
-                .or_insert_with(|| HashMap::new());
+                .or_insert_with(HashMap::new);
 
             for peer in raw_config.peer_ids {
                 chain_configs.insert((raw_config.node_type, peer), RemoteNodeConfig {
