@@ -2,7 +2,10 @@
 
 use crate::{
     jwks::rsa::RSA_JWK,
-    keyless::{Configuration, IdCommitment, KeylessPublicKey, KeylessSignature, ZkpOrOpenIdSig},
+    keyless::{
+        base64url_encode_str, Configuration, IdCommitment, KeylessPublicKey, KeylessSignature,
+        ZkpOrOpenIdSig,
+    },
     serialize,
 };
 use anyhow::bail;
@@ -180,9 +183,10 @@ pub fn get_public_inputs_hash(
         };
 
         // Add the hash of the jwt_header with the "." separator appended
-        let jwt_header_with_separator = format!("{}.", sig.jwt_header_b64);
+        let jwt_header_b64_with_separator =
+            format!("{}.", base64url_encode_str(sig.jwt_header_json.as_str()));
         let jwt_header_hash = poseidon_bn254::pad_and_hash_string(
-            &jwt_header_with_separator,
+            &jwt_header_b64_with_separator,
             config.max_jwt_header_b64_bytes as usize,
         )?;
 
@@ -198,7 +202,7 @@ pub fn get_public_inputs_hash(
         let idc = Fr::from_le_bytes_mod_order(&pk.idc.0);
 
         // Add the exp_timestamp_secs as a scalar
-        let exp_timestamp_secs = Fr::from(sig.exp_timestamp_secs);
+        let exp_timestamp_secs = Fr::from(sig.exp_date_secs);
 
         // Add the epk lifespan as a scalar
         let exp_horizon_secs = Fr::from(proof.exp_horizon_secs);
