@@ -12,7 +12,10 @@ use crate::{
 };
 use anyhow::{bail, ensure};
 use aptos_bitvec::BitVec;
-use aptos_consensus_types::common::{Author, Payload, Round};
+use aptos_consensus_types::{
+    common::{Author, Payload, Round},
+    dag_batch::{DagBatch, DagBatchInfo},
+};
 use aptos_crypto::{
     bls12381::Signature,
     hash::{CryptoHash, CryptoHasher},
@@ -60,7 +63,7 @@ struct NodeWithoutDigest<'a> {
     author: Author,
     timestamp: u64,
     validator_txns: &'a Vec<ValidatorTransaction>,
-    payload: &'a Payload,
+    payload: &'a DagPayload,
     parents: &'a Vec<NodeCertificate>,
     extensions: &'a Extensions,
 }
@@ -148,12 +151,51 @@ impl Deref for NodeMetadata {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
+pub enum DagPayload {
+    Inline(Payload),
+    Decoupled(DagBatchInfo),
+}
+
+impl DagPayload {
+    pub fn len(&self) -> usize {
+        match self {
+            DagPayload::Inline(payload) => payload.len(),
+            DagPayload::Decoupled(info) => info.len(),
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            DagPayload::Inline(payload) => payload.size(),
+            DagPayload::Decoupled(info) => info.size(),
+        }
+    }
+}
+
+impl Deref for DagPayload {
+    type Target = Payload;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            DagPayload::Inline(payload) => payload,
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl From<Payload> for DagPayload {
+    fn from(payload: Payload) -> Self {
+        Self::Inline(payload)
+    }
+}
+
 /// Node representation in the DAG, parents contain 2f+1 strong links (links to previous round)
 #[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
 pub struct Node {
     metadata: NodeMetadata,
     validator_txns: Vec<ValidatorTransaction>,
-    payload: Payload,
+    payload: DagPayload,
     parents: Vec<NodeCertificate>,
     extensions: Extensions,
 }
@@ -165,7 +207,7 @@ impl Node {
         author: Author,
         timestamp: u64,
         validator_txns: Vec<ValidatorTransaction>,
-        payload: Payload,
+        payload: DagPayload,
         parents: Vec<NodeCertificate>,
         extensions: Extensions,
     ) -> Self {
@@ -200,7 +242,7 @@ impl Node {
     #[cfg(test)]
     pub fn new_for_test(
         metadata: NodeMetadata,
-        payload: Payload,
+        payload: DagPayload,
         parents: Vec<NodeCertificate>,
         extensions: Extensions,
     ) -> Self {
@@ -220,7 +262,7 @@ impl Node {
         author: Author,
         timestamp: u64,
         validator_txns: &Vec<ValidatorTransaction>,
-        payload: &Payload,
+        payload: &DagPayload,
         parents: &Vec<NodeCertificate>,
         extensions: &Extensions,
     ) -> HashValue {
@@ -290,7 +332,7 @@ impl Node {
         self.metadata.round
     }
 
-    pub fn payload(&self) -> &Payload {
+    pub fn payload(&self) -> &DagPayload {
         &self.payload
     }
 
@@ -381,6 +423,70 @@ impl Display for NodeId {
             "NodeId: [epoch: {}, round: {}, author: {}]",
             self.epoch, self.round, self.author
         )
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, CryptoHasher, Debug, PartialEq)]
+pub struct NodeMessage {
+    node: Node,
+    decoupled_batch: Option<DagBatch>,
+}
+
+impl NodeMessage {
+    pub fn new(node: Node, decoupled_batch: Option<DagBatch>) -> Self {
+        Self {
+            node,
+            decoupled_batch,
+        }
+    }
+
+    pub fn node(&self) -> &Node {
+        &self.node
+    }
+
+    pub fn payload(&self) -> Option<&DagBatch> {
+        self.decoupled_batch.as_ref()
+    }
+
+    pub fn unpack(self) -> (Node, Option<DagBatch>) {
+        let Self {
+            node,
+            decoupled_batch: decoupled_payload,
+        } = self;
+        (node, decoupled_payload)
+    }
+
+    pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
+        self.node.verify(sender, verifier)?;
+
+        match self.node.payload() {
+            DagPayload::Inline(_) => {
+                ensure!(
+                    self.decoupled_batch.is_none(),
+                    "decoupled payload present in Inline DagPayload mode"
+                );
+            },
+            DagPayload::Decoupled(info) => {
+                let Some(decoupled_payload) = &self.decoupled_batch else {
+                    bail!("decoupled_payload is None in Decoupled DagPayload mode");
+                };
+                decoupled_payload.verify()?;
+                ensure!(
+                    info.digest() == decoupled_payload.digest(),
+                    "dag payload digest and decoupled payload digest mismatch"
+                );
+            },
+        }
+
+        Ok(())
+    }
+}
+
+impl Deref for NodeMessage {
+    type Target = Node;
+
+    fn deref(&self) -> &Self::Target {
+        &self.node
     }
 }
 

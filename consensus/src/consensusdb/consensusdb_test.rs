@@ -4,10 +4,11 @@
 
 use self::schema::dag::NodeSchema;
 use super::*;
-use crate::dag::{CertifiedNode, Extensions, Node, Vote};
+use crate::dag::{CertifiedNode, Extensions, Node, NodeMessage, Vote};
 use aptos_consensus_types::{
     block::block_test_utils::certificate_for_genesis,
     common::{Author, Payload},
+    dag_batch::DagBatch,
 };
 use aptos_crypto::bls12381::Signature;
 use aptos_temppath::TempPath;
@@ -100,11 +101,14 @@ fn test_dag() {
         Author::random(),
         123,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false).into(),
         vec![],
         Extensions::empty(),
     );
     test_dag_type::<NodeSchema, <NodeSchema as Schema>::Key>((), node.clone(), &db);
+
+    let node_msg = NodeMessage::new(node.clone(), None);
+    test_dag_type::<NodeMsgSchema, <NodeMsgSchema as Schema>::Key>((), node_msg, &db);
 
     let certified_node = CertifiedNode::new(node.clone(), AggregateSignature::empty());
     test_dag_type::<CertifiedNodeSchema, <CertifiedNodeSchema as Schema>::Key>(
@@ -115,4 +119,11 @@ fn test_dag() {
 
     let vote = Vote::new(node.metadata().clone(), Signature::dummy_signature());
     test_dag_type::<DagVoteSchema, <DagVoteSchema as Schema>::Key>(node.id(), vote, &db);
+
+    let dag_batch = DagBatch::new(1, 1, Author::random(), Payload::empty(false));
+    test_dag_type::<DagBatchSchema, <DagBatchSchema as Schema>::Key>(
+        *dag_batch.digest(),
+        dag_batch,
+        &db,
+    );
 }

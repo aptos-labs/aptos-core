@@ -4,7 +4,7 @@ use super::dag_test::MockStorage;
 use crate::dag::{
     dag_fetcher::FetchRequestHandler,
     dag_store::DagStore,
-    tests::helpers::{new_certified_node, MockPayloadManager, TEST_DAG_WINDOW},
+    tests::helpers::{new_certified_node_with_empty_payload, MockPayloadManager, TEST_DAG_WINDOW},
     types::{DagSnapshotBitmask, FetchResponse, RemoteFetchRequest},
     RpcHandler,
 };
@@ -34,13 +34,13 @@ async fn test_dag_fetcher_receiver() {
 
     // Round 1 - nodes 0, 1, 2 links to vec![]
     for signer in &signers[0..3] {
-        let node = new_certified_node(1, signer.author(), vec![]);
+        let node = new_certified_node_with_empty_payload(1, signer.author(), vec![]);
         assert!(dag.add_node(node.clone()).is_ok());
         first_round_nodes.push(node);
     }
 
     // Round 2 - node 0
-    let target_node = new_certified_node(2, signers[0].author(), vec![
+    let target_node = new_certified_node_with_empty_payload(2, signers[0].author(), vec![
         first_round_nodes[0].certificate(),
         first_round_nodes[1].certificate(),
     ]);

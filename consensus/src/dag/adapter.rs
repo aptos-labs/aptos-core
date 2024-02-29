@@ -4,10 +4,13 @@
 use super::{
     dag_store::DagStore,
     observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
+    NodeMessage,
 };
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
-    consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
+    consensusdb::{
+        CertifiedNodeSchema, ConsensusDB, DagBatchSchema, DagVoteSchema, NodeMsgSchema, NodeSchema,
+    },
     counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
@@ -20,6 +23,7 @@ use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, Round},
+    dag_batch::{BatchDigest, DagBatch},
     pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
 };
@@ -40,6 +44,7 @@ use async_trait::async_trait;
 use futures_channel::mpsc::UnboundedSender;
 use std::{
     collections::{BTreeMap, HashMap},
+    ops::Deref,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -145,7 +150,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let mut node_digests = vec![];
         for node in &ordered_nodes {
             validator_txns.extend(node.validator_txns().clone());
-            payload.extend(node.payload().clone());
+            payload.extend(node.payload().deref().clone());
             node_digests.push(node.digest());
         }
         let parent_block_id = self.parent_block_info.read().id();
@@ -326,6 +331,18 @@ impl DAGStorage for StorageAdapter {
         Ok(self.consensus_db.delete::<NodeSchema>(vec![()])?)
     }
 
+    fn save_pending_node_msg(&self, node_msg: &NodeMessage) -> anyhow::Result<()> {
+        Ok(self.consensus_db.put::<NodeMsgSchema>(&(), node_msg)?)
+    }
+
+    fn get_pending_node_msg(&self) -> anyhow::Result<Option<NodeMessage>> {
+        Ok(self.consensus_db.get::<NodeMsgSchema>(&())?)
+    }
+
+    fn delete_pending_node_msg(&self) -> anyhow::Result<()> {
+        Ok(self.consensus_db.delete::<NodeMsgSchema>(vec![()])?)
+    }
+
     fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
         Ok(self.consensus_db.put::<DagVoteSchema>(node_id, vote)?)
     }
@@ -370,6 +387,20 @@ impl DAGStorage for StorageAdapter {
     fn get_latest_ledger_info(&self) -> anyhow::Result<LedgerInfoWithSignatures> {
         // TODO: use callback from notifier to cache the latest ledger info
         Ok(self.aptos_db.get_latest_ledger_info()?)
+    }
+
+    fn save_batch(&self, batch: &DagBatch) -> anyhow::Result<()> {
+        Ok(self
+            .consensus_db
+            .put::<DagBatchSchema>(&batch.digest(), batch)?)
+    }
+
+    fn get_batches(&self) -> anyhow::Result<Vec<(HashValue, DagBatch)>> {
+        Ok(self.consensus_db.get_all::<DagBatchSchema>()?)
+    }
+
+    fn delete_batches(&self, digests: Vec<BatchDigest>) -> anyhow::Result<()> {
+        Ok(self.consensus_db.delete::<DagBatchSchema>(digests)?)
     }
 }
 

@@ -5,10 +5,11 @@ use super::helpers::MockPayloadManager;
 use crate::dag::{
     dag_store::DagStore,
     storage::{CommitEvent, DAGStorage},
-    tests::helpers::{new_certified_node, TEST_DAG_WINDOW},
+    tests::helpers::{new_certified_node_with_empty_payload, TEST_DAG_WINDOW},
     types::{CertifiedNode, DagSnapshotBitmask, Node},
-    NodeId, Vote,
+    NodeId, NodeMessage, Vote,
 };
+use aptos_consensus_types::dag_batch::{BatchDigest, DagBatch};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -59,6 +60,18 @@ impl DAGStorage for MockStorage {
         Ok(())
     }
 
+    fn save_pending_node_msg(&self, _node_msg: &NodeMessage) -> anyhow::Result<()> {
+        todo!()
+    }
+
+    fn get_pending_node_msg(&self) -> anyhow::Result<Option<NodeMessage>> {
+        todo!()
+    }
+
+    fn delete_pending_node_msg(&self) -> anyhow::Result<()> {
+        todo!()
+    }
+
     fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
         self.vote_data.lock().insert(node_id.clone(), vote.clone());
         Ok(())
@@ -107,6 +120,18 @@ impl DAGStorage for MockStorage {
             .clone()
             .ok_or_else(|| anyhow::anyhow!("ledger info not set"))
     }
+
+    fn save_batch(&self, _batch: &DagBatch) -> anyhow::Result<()> {
+        Ok(())
+    }
+
+    fn get_batches(&self) -> anyhow::Result<Vec<(HashValue, DagBatch)>> {
+        Ok(vec![])
+    }
+
+    fn delete_batches(&self, _digests: Vec<BatchDigest>) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 fn setup() -> (
@@ -138,7 +163,7 @@ fn test_dag_insertion_succeed() {
 
     // Round 1 - nodes 0, 1, 2 links to vec![]
     for signer in &signers[0..3] {
-        let node = new_certified_node(1, signer.author(), vec![]);
+        let node = new_certified_node_with_empty_payload(1, signer.author(), vec![]);
         assert!(dag.write().add_node_for_test(node).is_ok());
     }
     let parents = dag
@@ -148,7 +173,7 @@ fn test_dag_insertion_succeed() {
 
     // Round 2 nodes 0, 1, 2 links to 0, 1, 2
     for signer in &signers[0..3] {
-        let node = new_certified_node(2, signer.author(), parents.clone());
+        let node = new_certified_node_with_empty_payload(2, signer.author(), parents.clone());
         assert!(dag.write().add_node_for_test(node).is_ok());
     }
 
@@ -159,7 +184,7 @@ fn test_dag_insertion_succeed() {
         .unwrap();
 
     for signer in &signers[1..3] {
-        let node = new_certified_node(3, signer.author(), parents.clone());
+        let node = new_certified_node_with_empty_payload(3, signer.author(), parents.clone());
         assert!(dag.write().add_node_for_test(node).is_ok());
     }
 
@@ -176,30 +201,31 @@ fn test_dag_insertion_failure() {
 
     // Round 1 - nodes 0, 1, 2 links to vec![]
     for signer in &signers[0..3] {
-        let node = new_certified_node(1, signer.author(), vec![]);
+        let node = new_certified_node_with_empty_payload(1, signer.author(), vec![]);
         assert!(dag.write().add_node_for_test(node.clone()).is_ok());
         // duplicate node
         assert!(dag.write().add_node_for_test(node).is_err());
     }
 
-    let missing_node = new_certified_node(1, signers[3].author(), vec![]);
+    let missing_node = new_certified_node_with_empty_payload(1, signers[3].author(), vec![]);
     let mut parents = dag
         .read()
         .get_strong_links_for_round(1, &epoch_state.verifier)
         .unwrap();
     parents.push(missing_node.certificate());
 
-    let node = new_certified_node(2, signers[0].author(), parents.clone());
+    let node = new_certified_node_with_empty_payload(2, signers[0].author(), parents.clone());
     // parents not exist
     assert!(dag.write().add_node_for_test(node).is_err());
 
-    let node = new_certified_node(3, signers[0].author(), vec![]);
+    let node = new_certified_node_with_empty_payload(3, signers[0].author(), vec![]);
     // round too high
     assert!(dag.write().add_node_for_test(node).is_err());
 
-    let node = new_certified_node(2, signers[0].author(), parents[0..3].to_vec());
+    let node =
+        new_certified_node_with_empty_payload(2, signers[0].author(), parents[0..3].to_vec());
     assert!(dag.write().add_node_for_test(node).is_ok());
-    let node = new_certified_node(2, signers[0].author(), vec![]);
+    let node = new_certified_node_with_empty_payload(2, signers[0].author(), vec![]);
     // equivocation node
     assert!(dag.write().add_node_for_test(node).is_err());
 }
@@ -216,7 +242,8 @@ fn test_dag_recover_from_storage() {
             .get_strong_links_for_round(round, &epoch_state.verifier)
             .unwrap_or_default();
         for signer in &signers[0..3] {
-            let node = new_certified_node(round, signer.author(), parents.clone());
+            let node =
+                new_certified_node_with_empty_payload(round, signer.author(), parents.clone());
             metadatas.push(node.metadata().clone());
             assert!(dag.add_node(node).is_ok());
         }
@@ -266,7 +293,8 @@ fn test_dag_bitmask() {
             assert!(!parents.is_empty());
         }
         for signer in &signers[0..3] {
-            let node = new_certified_node(round, signer.author(), parents.clone());
+            let node =
+                new_certified_node_with_empty_payload(round, signer.author(), parents.clone());
             assert!(dag.write().add_node_for_test(node).is_ok());
         }
     }
@@ -283,7 +311,8 @@ fn test_dag_bitmask() {
         if round > 1 {
             assert!(!parents.is_empty());
         }
-        let node = new_certified_node(round, signers[3].author(), parents.clone());
+        let node =
+            new_certified_node_with_empty_payload(round, signers[3].author(), parents.clone());
         assert!(dag.write().add_node_for_test(node).is_ok());
     }
     assert_eq!(

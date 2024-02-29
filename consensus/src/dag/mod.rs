@@ -29,4 +29,6 @@ pub use commit_signer::DagCommitSigner;
 pub use dag_network::{RpcHandler, RpcWithFallback, TDAGNetworkSender};
 #[cfg(test)]
 pub use types::Extensions;
-pub use types::{CertifiedNode, DAGMessage, DAGNetworkMessage, DAGRpcResult, Node, NodeId, Vote};
+pub use types::{
+    CertifiedNode, DAGMessage, DAGNetworkMessage, DAGRpcResult, Node, NodeId, NodeMessage, Vote,
+};
