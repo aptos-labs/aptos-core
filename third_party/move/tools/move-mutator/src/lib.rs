@@ -22,7 +22,6 @@ use std::path::Path;
 
 use crate::configuration::Configuration;
 use crate::report::Report;
-use move_compiler::parser::ast::ModuleName;
 use move_package::BuildConfig;
 
 /// Runs the Move mutator tool.
@@ -36,6 +35,10 @@ use move_package::BuildConfig;
 ///
 /// # Errors
 /// Any error that occurs during the mutation process will be returned as an `anyhow::Error` with a description of the error.
+///
+/// # Panics
+///
+/// The function will panic if `downsampling_ratio_percentage` is not in the range 0..=100.
 ///
 /// # Returns
 ///
@@ -61,7 +64,7 @@ pub fn run_move_mutator(
 
     trace!("Mutator configuration: {mutator_configuration:?}");
 
-    let (files, ast) = generate_ast(
+    let env = generate_ast(
         &mutator_configuration,
         config,
         mutator_configuration
@@ -71,21 +74,24 @@ pub fn run_move_mutator(
             .as_path(),
     )?;
 
-    trace!("Generated AST: {ast:?}");
+    trace!("Generated AST.");
 
-    let mutants = mutate::mutate(ast, &mutator_configuration, &files)?;
+    let mutants = mutate::mutate(&env, &mutator_configuration)?;
     let output_dir = output::setup_output_dir(&mutator_configuration)?;
     let mut report: Report = Report::new();
 
-    for (hash, (filename, source)) in files {
-        let path = Path::new(filename.as_str());
+    //for (hash, (filename, source)) in files {
+    for fileid in &env.get_source_file_ids() {
+        let source = env.get_file_source(*fileid);
+        let filename = env.get_file(*fileid);
+        let path = Path::new(filename);
 
         trace!("Processing file: {path:?}");
 
         // This `i` must be here as we must iterate over all mutants for a given file (ext and internal loop).
         let mut mutant_file_idx = 0u64;
-        for mutant in mutants.iter().filter(|m| m.get_file_hash() == hash) {
-            let mut mutated_sources = mutant.apply(&source);
+        for mutant in mutants.iter().filter(|m| m.get_file_id() == *fileid) {
+            let mut mutated_sources = mutant.apply(source);
 
             // If the downsample ratio is set, we need to downsample the mutants.
             //TODO: currently we are downsampling the mutants after they are generated. This is not
@@ -139,8 +145,8 @@ pub fn run_move_mutator(
 
                 info!("{} written to {}", mutant, mutant_path.display());
 
-                let mod_name = if let Some(ModuleName(name)) = mutant.get_module_name() {
-                    name.value.to_string()
+                let mod_name = if let Some(name) = mutant.get_module_name() {
+                    name
                 } else {
                     "script".to_owned() // if there is no module name, it is a script
                 };
@@ -151,10 +157,10 @@ pub fn run_move_mutator(
                     mod_name.as_str(),
                     mutant
                         .get_function_name()
-                        .map_or_else(|| "".to_string(), |f| f.to_string())
+                        .map_or_else(String::new, |f| f.to_string())
                         .as_str(),
                     &mutated.mutated_source,
-                    &source,
+                    source,
                 );
 
                 entry.add_modification(mutated.mutation);
