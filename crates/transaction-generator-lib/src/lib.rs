@@ -101,7 +101,9 @@ pub enum WorkflowKind {
     Econia {
         num_users: usize,
         flow_type: EconiaFlowType,
-        num_markets: u64
+        num_markets: u64,
+        // If this is flag is set, the same accounts will be reused for placing multiple orders
+        reuse_accounts_for_orders: bool,
     },
 }
 

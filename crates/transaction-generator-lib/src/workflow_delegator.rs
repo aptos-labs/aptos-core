@@ -294,7 +294,7 @@ impl WorkflowTxnGeneratorCreator {
                     count,
                 )
             },
-            WorkflowKind::Econia { num_users, flow_type, num_markets } => {
+            WorkflowKind::Econia { num_users, flow_type, num_markets, reuse_accounts_for_orders } => {
                 let create_accounts = initial_account_pool.is_none();
                 let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
                 let register_market_pool = Arc::new(ObjectPool::new());
@@ -411,15 +411,26 @@ impl WorkflowTxnGeneratorCreator {
                     Some(deposit_coins_pool.clone()),
                 )));
 
-                creators.push(Box::new(AccountsPoolWrapperCreator::new(
-                    Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                        txn_factory.clone(),
-                        packages.clone(),
-                        econia_place_orders_worker,
-                    )),
-                    deposit_coins_pool.clone(),
-                    Some(place_orders_pool.clone()),
-                )));
+                if reuse_accounts_for_orders {
+                    creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            econia_place_orders_worker,
+                        )),
+                        deposit_coins_pool.clone(),
+                    )));
+                } else {
+                    creators.push(Box::new(AccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            econia_place_orders_worker,
+                        )),
+                        deposit_coins_pool.clone(),
+                        Some(place_orders_pool.clone()),
+                    )));
+                }
 
                 let pool_per_stage = if create_accounts {
                     vec![
