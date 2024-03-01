@@ -121,7 +121,10 @@ fn setup(
 
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
     let mock_ledger_info = generate_ledger_info_with_sig(signers, mock_ledger_info);
-    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
+    let storage = Arc::new(MockStorage::new_with_ledger_info(
+        mock_ledger_info.clone(),
+        epoch_state.clone(),
+    ));
     let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
