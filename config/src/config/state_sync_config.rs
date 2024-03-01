@@ -211,11 +211,16 @@ pub struct DataStreamingServiceConfig {
     /// The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,
 
-    /// Maximum number of concurrent data client requests (per stream).
+    /// Maximum number of in-flight data client requests (per stream).
     pub max_concurrent_requests: u64,
 
-    /// Maximum number of concurrent data client requests (per stream) for state keys/values.
+    /// Maximum number of in-flight data client requests (per stream) for state keys/values.
     pub max_concurrent_state_requests: u64,
+
+    /// Maximum number of in-flight subscription requests (per stream). This
+    /// is only used if dynamic prefetching is enabled, otherwise, we use
+    /// `max_concurrent_requests` above.
+    pub max_concurrent_subscription_requests: u64,
 
     /// Maximum channel sizes for each data stream listener (per stream).
     pub max_data_stream_channel_sizes: u64,
@@ -248,16 +253,17 @@ impl Default for DataStreamingServiceConfig {
     fn default() -> Self {
         Self {
             dynamic_prefetching: DynamicPrefetchingConfig::default(),
-            enable_subscription_streaming: false,
+            enable_subscription_streaming: true,
             global_summary_refresh_interval_ms: 50,
             max_concurrent_requests: MAX_CONCURRENT_REQUESTS,
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
+            max_concurrent_subscription_requests: 10, // At ~4 blocks per second, this should last ~2.5 seconds
             max_data_stream_channel_sizes: 50,
             max_notification_id_mappings: 300,
-            max_num_consecutive_subscriptions: 40, // At ~4 blocks per second, this should last 10 seconds
+            max_num_consecutive_subscriptions: 40, // At ~4 blocks per second, this should last ~10 seconds
             max_pending_requests: 50,
             max_request_retry: 5,
-            max_subscription_stream_lag_secs: 15, // 15 seconds
+            max_subscription_stream_lag_secs: 5, // 5 seconds
             progress_check_interval_ms: 50,
         }
     }
@@ -432,15 +438,15 @@ impl Default for AptosDataClientConfig {
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
-            max_optimistic_fetch_lag_secs: 30, // 30 seconds
+            max_optimistic_fetch_lag_secs: 10, // 10 seconds
             max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_lag_secs: 30, // 30 seconds
+            max_subscription_lag_secs: 10, // 10 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000,        // 5 seconds
             response_timeout_ms: 10_000,              // 10 seconds
-            subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
+            subscription_response_timeout_ms: 10_000, // 10 seconds
             use_compression: true,
         }
     }

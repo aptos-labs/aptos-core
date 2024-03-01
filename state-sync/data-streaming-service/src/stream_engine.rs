@@ -666,7 +666,7 @@ impl ContinuousTransactionStreamEngine {
     /// created will be bound by the specified `max_number_of_requests`.
     fn create_subscription_stream_requests(
         &mut self,
-        max_number_of_requests: u64,
+        mut max_number_of_requests: u64,
     ) -> Result<Vec<DataClientRequest>, Error> {
         // Get the active subscription stream
         let mut active_subscription_stream = match self.active_subscription_stream.take() {
@@ -682,6 +682,15 @@ impl ContinuousTransactionStreamEngine {
         // Get the highest known version and epoch at stream start
         let (known_version, known_epoch) =
             active_subscription_stream.get_known_version_and_epoch_at_stream_start();
+
+        // If dynamic prefetching is enabled, then we should bound the number of
+        // requests created by the max number of subscriptions requests.
+        if self.data_streaming_config.dynamic_prefetching.enable_dynamic_prefetching {
+            max_number_of_requests = cmp::min(
+                max_number_of_requests,
+                self.data_streaming_config.max_concurrent_subscription_requests,
+            );
+        };
 
         // Create the subscription stream requests
         let mut subscription_stream_requests = vec![];
