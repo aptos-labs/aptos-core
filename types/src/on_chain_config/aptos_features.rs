@@ -65,6 +65,7 @@ pub enum FeatureFlag {
     REFUNDABLE_BYTES = 51,
     OBJECT_CODE_DEPLOYMENT = 52,
     MAX_OBJECT_NESTING_CHECK = 53,
+    DELEGATION_POOL_ALLOWLISTING = 54,
 }
 
 impl FeatureFlag {
