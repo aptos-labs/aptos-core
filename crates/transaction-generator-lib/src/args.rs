@@ -61,6 +61,9 @@ pub enum TransactionTypeArg {
     EconiaBasic1Market,
     EconiaAdvanced1Market,
     EconiaAdvanced10Market,
+    EconiaBasic1MarketReuseAccounts
+    EconiaAdvanced1MarketReuseAccounts,
+    EconiaAdvanced10MarketReuseAccounts,
 }
 
 impl TransactionTypeArg {
