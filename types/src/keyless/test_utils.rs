@@ -1,5 +1,6 @@
 // Copyright © Aptos Foundation
 
+use super::{Groth16ZkpAndStatement, Pepper};
 use crate::{
     jwks::rsa::RSA_JWK,
     keyless::{
@@ -10,12 +11,13 @@ use crate::{
             SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_JWT_PAYLOAD_JSON, SAMPLE_PEPPER,
             SAMPLE_PK, SAMPLE_PROOF, SAMPLE_UID_KEY,
         },
-        Groth16Zkp, KeylessPublicKey, KeylessSignature, OpenIdSig, SignedGroth16Zkp,
-        ZkpOrOpenIdSig,
+        get_public_inputs_hash, Configuration, Groth16Zkp, KeylessPublicKey, KeylessSignature,
+        OpenIdSig, SignedGroth16Zkp, ZkpOrOpenIdSig,
     },
     transaction::authenticator::EphemeralSignature,
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, SigningKey, Uniform};
+use ark_ff::{BigInteger, PrimeField};
 use once_cell::sync::Lazy;
 use ring::signature;
 
@@ -37,6 +39,38 @@ pub fn get_sample_iss() -> String {
 
 pub fn get_sample_jwk() -> RSA_JWK {
     SAMPLE_JWK.clone()
+}
+
+pub fn get_sample_pepper() -> Pepper {
+    SAMPLE_PEPPER.clone()
+}
+
+pub fn get_sample_groth16_zkp_and_statement() -> Groth16ZkpAndStatement {
+    let config = Configuration::new_for_testing();
+    let (sig, pk) = get_sample_groth16_sig_and_pk();
+    let public_inputs_hash = get_public_inputs_hash(&sig, &pk, &SAMPLE_JWK, &config)
+        .unwrap()
+        .into_bigint()
+        .to_bytes_le()
+        .try_into()
+        .expect("expected 32-bytes public inputs hash");
+
+    let proof = match sig.sig {
+        ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
+            proof,
+            non_malleability_signature: _,
+            exp_horizon_secs: _,
+            extra_field: _,
+            override_aud_val: _,
+            training_wheels_signature: _,
+        }) => proof,
+        _ => unreachable!(),
+    };
+
+    Groth16ZkpAndStatement {
+        proof,
+        public_inputs_hash,
+    }
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
