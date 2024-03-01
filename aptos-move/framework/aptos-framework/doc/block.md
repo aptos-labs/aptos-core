@@ -24,6 +24,7 @@ This module defines a struct storing the metadata of the block and new block eve
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
     -  [Resource `BlockResource`](#@Specification_1_BlockResource)
+    -  [Resource `CommitHistory`](#@Specification_1_CommitHistory)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `update_epoch_interval_microsecs`](#@Specification_1_update_epoch_interval_microsecs)
     -  [Function `get_epoch_interval_secs`](#@Specification_1_get_epoch_interval_secs)
@@ -284,6 +285,16 @@ Epoch interval cannot be 0.
 
 
 
+<a id="0x1_block_EZERO_MAX_CAPACITY"></a>
+
+The maximum capacity of the commit history cannot be 0.
+
+
+<pre><code><b>const</b> <a href="block.md#0x1_block_EZERO_MAX_CAPACITY">EZERO_MAX_CAPACITY</a>: u64 = 3;
+</code></pre>
+
+
+
 <a id="0x1_block_initialize"></a>
 
 ## Function `initialize`
@@ -343,6 +354,7 @@ Initialize the commit history resource if it's not in genesis.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="block.md#0x1_block_initialize_commit_history">initialize_commit_history</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, max_capacity: u32) {
+    <b>assert</b>!(max_capacity &gt; 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="block.md#0x1_block_EZERO_MAX_CAPACITY">EZERO_MAX_CAPACITY</a>));
     <b>move_to</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(fx, <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> {
         max_capacity,
         next_idx: 0,
@@ -550,6 +562,9 @@ Emit the event and update height and global timestamp
             <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_remove">table_with_length::remove</a>(&<b>mut</b> commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx);
         };
         <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_add">table_with_length::add</a>(&<b>mut</b> commit_history_ref.<a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>, idx, <b>copy</b> new_block_event);
+        <b>spec</b> {
+            <b>assume</b> idx + 1 &lt;= MAX_U32;
+        };
         commit_history_ref.next_idx = (idx + 1) % commit_history_ref.max_capacity;
     };
     <a href="timestamp.md#0x1_timestamp_update_global_time">timestamp::update_global_time</a>(vm, new_block_event.proposer, new_block_event.time_microseconds);
@@ -716,6 +731,7 @@ new block event for WriteSetPayload.
 
 
 <pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(@aptos_framework);
+<b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(@aptos_framework);
 </code></pre>
 
 
@@ -765,6 +781,44 @@ new block event for WriteSetPayload.
 
 
 
+<a id="@Specification_1_CommitHistory"></a>
+
+### Resource `CommitHistory`
+
+
+<pre><code><b>struct</b> <a href="block.md#0x1_block_CommitHistory">CommitHistory</a> <b>has</b> key
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code>max_capacity: u32</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>next_idx: u32</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><a href="../../aptos-stdlib/doc/table.md#0x1_table">table</a>: <a href="../../aptos-stdlib/doc/table_with_length.md#0x1_table_with_length_TableWithLength">table_with_length::TableWithLength</a>&lt;u32, <a href="block.md#0x1_block_NewBlockEvent">block::NewBlockEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>invariant</b> max_capacity &gt; 0;
+</code></pre>
+
+
+
 <a id="@Specification_1_initialize"></a>
 
 ### Function `initialize`
@@ -804,7 +858,9 @@ The number of new events created does not exceed MAX_U64.
     <b>aborts_if</b> addr != @aptos_framework;
     <b>aborts_if</b> epoch_interval_microsecs == 0;
     <b>aborts_if</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(addr);
     <b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr);
+    <b>ensures</b> <b>exists</b>&lt;<a href="block.md#0x1_block_CommitHistory">CommitHistory</a>&gt;(addr);
     <b>ensures</b> <b>global</b>&lt;<a href="block.md#0x1_block_BlockResource">BlockResource</a>&gt;(addr).height == 0;
 }
 </code></pre>
@@ -986,7 +1042,8 @@ The Configuration existed under the @aptos_framework.
 The CurrentTimeMicroseconds existed under the @aptos_framework.
 
 
-<pre><code><b>include</b> <a href="block.md#0x1_block_EmitWritesetBlockEvent">EmitWritesetBlockEvent</a>;
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="block.md#0x1_block_EmitWritesetBlockEvent">EmitWritesetBlockEvent</a>;
 </code></pre>
 
 
