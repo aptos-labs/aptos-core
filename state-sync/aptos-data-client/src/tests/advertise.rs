@@ -15,6 +15,7 @@ use aptos_storage_service_types::{
     requests::{DataRequest, TransactionsWithProofRequest},
     responses::{CompleteDataRange, DataResponse, StorageServerSummary, StorageServiceResponse},
 };
+use aptos_time_service::MockTimeService;
 use aptos_types::transaction::{TransactionListWithProof, Version};
 use claims::assert_matches;
 use std::time::Duration;
@@ -134,22 +135,30 @@ async fn update_global_data_summary() {
             .response_sender
             .send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
 
-        // Advance time so the poller updates the global data summary
-        utils::advance_polling_timer(&mut mock_time, &data_client_config).await;
-
         // Verify that the advertised data ranges are valid
-        verify_advertised_transaction_data(&client, peer_version, index + 1, true);
+        verify_advertised_transaction_data(
+            &data_client_config,
+            &client,
+            &mut mock_time,
+            peer_version,
+            index + 1,
+            true,
+        )
+        .await;
     }
 
     // Verify that the advertised data ranges are all present
     for (index, peer_version) in advertised_peer_versions.iter().enumerate() {
         let is_highest_version = index == advertised_peer_versions.len() - 1;
         verify_advertised_transaction_data(
+            &data_client_config,
             &client,
+            &mut mock_time,
             *peer_version,
             advertised_peer_versions.len(),
             is_highest_version,
-        );
+        )
+        .await;
     }
 }
 
@@ -340,23 +349,39 @@ async fn fetch_transactions_and_verify_failure(
 }
 
 /// Verifies that the advertised transaction data is valid
-fn verify_advertised_transaction_data(
+async fn verify_advertised_transaction_data(
+    data_client_config: &AptosDataClientConfig,
     client: &AptosDataClient,
+    mock_time: &mut MockTimeService,
     advertised_version: Version,
     expected_num_advertisements: usize,
     is_highest_version: bool,
 ) {
     // Get the advertised data
-    let global_data_summary = client.get_global_data_summary();
-    let advertised_data = global_data_summary.advertised_data;
 
-    // Verify the number of advertised entries
-    assert_eq!(
-        advertised_data.transactions.len(),
-        expected_num_advertisements
-    );
+    // Wait for the advertised data to be updated
+    timeout(Duration::from_secs(10), async {
+        loop {
+            // Check if the number of advertised entries has been updated
+            let global_data_summary = client.get_global_data_summary();
+            let advertised_transactions = global_data_summary.advertised_data.transactions;
+            if advertised_transactions.len() == expected_num_advertisements {
+                return; // The advertised data has been updated correctly
+            }
+
+            // Advance time so the poller updates the global data summary
+            utils::advance_polling_timer(mock_time, data_client_config).await;
+
+            // Sleep for a while before retrying
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .expect("The advertised transactions were not updated! Timed out!");
 
     // Verify that the advertised transaction data contains an entry for the given version
+    let global_data_summary = client.get_global_data_summary();
+    let advertised_data = global_data_summary.advertised_data;
     assert!(advertised_data
         .transactions
         .contains(&CompleteDataRange::new(0, advertised_version).unwrap()));
