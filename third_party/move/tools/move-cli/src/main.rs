@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use move_core_types::{account_address::AccountAddress, errmap::ErrorMapping};
+use move_core_types::{account_address::AccountAddress, effects::ChangeSet, errmap::ErrorMapping};
 use move_stdlib::natives::{all_natives, nursery_natives, GasParameters, NurseryGasParameters};
 
 fn main() -> Result<()> {
@@ -15,5 +15,5 @@ fn main() -> Result<()> {
         .chain(nursery_natives(addr, NurseryGasParameters::zeros()))
         .collect();
 
-    move_cli::move_cli(natives, cost_table, &error_descriptions)
+    move_cli::move_cli(natives, ChangeSet::new(), cost_table, &error_descriptions)
 }

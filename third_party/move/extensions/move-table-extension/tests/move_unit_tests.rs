@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, effects::ChangeSet};
 use move_table_extension::{table_natives, GasParameters};
 use move_unit_test::UnitTestingConfig;
 use std::path::PathBuf;
@@ -28,6 +28,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         },
         UnitTestingConfig::default_with_bound(Some(100_000)),
         natives,
+        ChangeSet::new(),
         None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),

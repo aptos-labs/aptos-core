@@ -517,8 +517,8 @@ KeylessSignature:
   STRUCT:
     - sig:
         TYPENAME: ZkpOrOpenIdSig
-    - jwt_header_b64: STR
-    - exp_timestamp_secs: U64
+    - jwt_header_json: STR
+    - exp_date_secs: U64
     - ephemeral_pubkey:
         TYPENAME: EphemeralPublicKey
     - ephemeral_signature:
@@ -581,8 +581,8 @@ MultisigTransactionPayload:
           TYPENAME: EntryFunction
 OpenIdSig:
   STRUCT:
-    - jwt_sig_b64: STR
-    - jwt_payload_b64: STR
+    - jwt_sig: BYTES
+    - jwt_payload_json: STR
     - uid_key: STR
     - epk_blinder: BYTES
     - pepper:
