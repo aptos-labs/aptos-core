@@ -7,6 +7,7 @@ use aptos_framework::natives::{
     code::NativeCodeContext,
     cryptography::{algebra::AlgebraContext, ristretto255_point::NativeRistrettoPointContext},
     event::NativeEventContext,
+    randomness::RandomnessContext,
     state_storage::NativeStateStorageContext,
     transaction_context::NativeTransactionContext,
 };
@@ -201,6 +202,7 @@ impl MoveVmExt {
         extensions.add(NativeRistrettoPointContext::new());
         extensions.add(AlgebraContext::new());
         extensions.add(NativeAggregatorContext::new(txn_hash, resolver, resolver));
+        extensions.add(RandomnessContext::new());
         extensions.add(NativeTransactionContext::new(
             txn_hash.to_vec(),
             session_id.into_script_hash(),

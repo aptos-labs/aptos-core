@@ -814,8 +814,11 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    /// Updates the major version to a larger version.
-    /// This can be called by on chain governance.
+    /// Deprecated by `set_for_next_epoch()`.
+    ///
+    /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+    ///
+    /// TODO: update all the tests that reference this function, then disable this function.
     VersionSetVersion {
         major: u64,
     },
@@ -3748,8 +3751,11 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
-/// Updates the major version to a larger version.
-/// This can be called by on chain governance.
+/// Deprecated by `set_for_next_epoch()`.
+///
+/// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+///
+/// TODO: update all the tests that reference this function, then disable this function.
 pub fn version_set_version(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
