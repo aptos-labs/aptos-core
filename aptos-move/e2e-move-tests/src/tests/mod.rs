@@ -20,6 +20,7 @@ mod generate_upgrade_script;
 mod governance_updates;
 mod infinite_loop;
 mod init_module;
+mod keyless_feature_gating;
 mod lazy_natives;
 mod max_loop_depth;
 mod memory_quota;
