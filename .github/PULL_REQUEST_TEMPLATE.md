@@ -4,6 +4,9 @@ Please include a summary of the change, including which issue it fixes or what f
 ## Type of Change
 - [ ] Bug fix
 - [ ] New feature
+- [ ] Performance improvement
+- [ ] Refactoring
+- [ ] Dependency update
 - [ ] Documentation update
 
 ## Which Component or System Does This Change Impact?
