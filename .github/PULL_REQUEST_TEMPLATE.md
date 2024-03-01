@@ -2,8 +2,8 @@
 Please include a summary of the change, including which issue it fixes or what feature it adds. Include relevant motivation, context and documentation as appropriate. List dependencies that are required for this change, if any.
 
 ## Type of Change
-- [ ] Bug fix
 - [ ] New feature
+- [ ] Bug fix
 - [ ] Performance improvement
 - [ ] Refactoring
 - [ ] Dependency update
