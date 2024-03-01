@@ -2499,6 +2499,85 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-keyless-pepper-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-bn254",
+ "ark-ec",
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
+ "base64 0.13.1",
+ "bcs 0.1.4",
+ "byteorder",
+ "curve25519-dalek",
+ "ff 0.13.0",
+ "group 0.13.0",
+ "hex",
+ "jsonwebtoken 8.3.0",
+ "num-bigint 0.3.3",
+ "once_cell",
+ "poseidon-ark",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "sha2 0.10.8",
+ "sha3 0.9.1",
+]
+
+[[package]]
+name = "aptos-keyless-pepper-example-client-rust"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-keyless-pepper-common",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-serialize",
+ "bcs 0.1.4",
+ "hex",
+ "rand 0.7.3",
+ "reqwest",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-keyless-pepper-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-keyless-pepper-common",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-ec",
+ "ark-ff",
+ "ark-serialize",
+ "bcs 0.1.4",
+ "byteorder",
+ "dashmap",
+ "env_logger",
+ "group 0.13.0",
+ "hex",
+ "hyper",
+ "jsonwebtoken 8.3.0",
+ "jwt",
+ "log",
+ "once_cell",
+ "rand 0.7.3",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha3 0.9.1",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-language-e2e-tests"
 version = "0.1.0"
 dependencies = [
@@ -2787,7 +2866,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "chrono",
 ]
@@ -8828,6 +8907,9 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "hex-literal"
@@ -9623,6 +9705,21 @@ dependencies = [
  "serde",
  "serde_json",
  "simple_asn1 0.6.2",
+]
+
+[[package]]
+name = "jwt"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6204285f77fe7d9784db3fdc449ecce1a0114927a51d5a41c4c7a292011c015f"
+dependencies = [
+ "base64 0.13.1",
+ "crypto-common",
+ "digest 0.10.7",
+ "hmac 0.12.1",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
 ]
 
 [[package]]
@@ -13017,11 +13114,11 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "ahash 0.8.8",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352)",
  "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=5d1cefad0ea0d37fb08e9aec7847080745c83f9c)",
  "async-trait",
  "base64 0.13.1",
@@ -14626,7 +14723,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "anyhow",
  "async-trait",
