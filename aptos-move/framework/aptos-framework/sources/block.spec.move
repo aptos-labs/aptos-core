@@ -44,11 +44,17 @@ spec aptos_framework::block {
         use aptos_framework::chain_status;
         // After genesis, `BlockResource` exist.
         invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
+        // After genesis, `CommitHistory` exist.
+        invariant [suspendable] chain_status::is_operating() ==> exists<CommitHistory>(@aptos_framework);
     }
 
     spec BlockResource {
         /// [high-level-req-3.2]
         invariant epoch_interval > 0;
+    }
+
+    spec CommitHistory {
+        invariant max_capacity > 0;
     }
 
     spec block_prologue {
@@ -128,7 +134,9 @@ spec aptos_framework::block {
         aborts_if addr != @aptos_framework;
         aborts_if epoch_interval_microsecs == 0;
         aborts_if exists<BlockResource>(addr);
+        aborts_if exists<CommitHistory>(addr);
         ensures exists<BlockResource>(addr);
+        ensures exists<CommitHistory>(addr);
         ensures global<BlockResource>(addr).height == 0;
     }
 
@@ -181,6 +189,8 @@ spec aptos_framework::block {
     /// The Configuration existed under the @aptos_framework.
     /// The CurrentTimeMicroseconds existed under the @aptos_framework.
     spec emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) {
+        use aptos_framework::chain_status;
+        requires chain_status::is_operating();
         include EmitWritesetBlockEvent;
     }
 
