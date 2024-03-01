@@ -80,6 +80,7 @@ pub struct GenesisConfiguration {
     pub voting_power_increase_limit: u64,
     pub employee_vesting_start: u64,
     pub employee_vesting_period_duration: u64,
+    pub initial_features_override: Option<Features>,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -140,7 +141,13 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         &execution_config,
         &gas_schedule,
     );
-    initialize_features(&mut session);
+    initialize_features(
+        &mut session,
+        genesis_config
+            .initial_features_override
+            .clone()
+            .map(Features::into_flag_vec),
+    );
     initialize_aptos_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
@@ -249,7 +256,13 @@ pub fn encode_genesis_change_set(
         execution_config,
         gas_schedule,
     );
-    initialize_features(&mut session);
+    initialize_features(
+        &mut session,
+        genesis_config
+            .initial_features_override
+            .clone()
+            .map(Features::into_flag_vec),
+    );
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
@@ -472,8 +485,9 @@ pub fn default_features() -> Vec<FeatureFlag> {
     ]
 }
 
-fn initialize_features(session: &mut SessionExt) {
-    let features: Vec<u64> = default_features()
+fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<FeatureFlag>>) {
+    let features: Vec<u64> = features_override
+        .unwrap_or_else(default_features)
         .into_iter()
         .map(|feature| feature as u64)
         .collect();
@@ -930,6 +944,7 @@ pub fn generate_test_genesis(
             voting_power_increase_limit: 50,
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
+            initial_features_override: None,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -977,6 +992,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         voting_power_increase_limit: 30,
         employee_vesting_start: 1663456089,
         employee_vesting_period_duration: 5 * 60, // 5 minutes
+        initial_features_override: None,
     }
 }
 
