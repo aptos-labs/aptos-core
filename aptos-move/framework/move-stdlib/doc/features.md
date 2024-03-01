@@ -298,7 +298,7 @@ to create higher throughput concurrent variants.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>: u64 = 49;
+<pre><code><b>const</b> <a href="features.md#0x1_features_CONCURRENT_FUNGIBLE_ASSETS">CONCURRENT_FUNGIBLE_ASSETS</a>: u64 = 50;
 </code></pre>
 
 

@@ -77,6 +77,11 @@ impl LiveVarInfoAtCodeOffset {
         result
     }
 
+    /// Check whether temp is used after bc
+    pub fn is_temp_used_after(&self, temp: &TempIndex, bc: &Bytecode) -> bool {
+        self.after.contains_key(temp) && !bc.dests().contains(temp)
+    }
+
     /// Creates a set of the temporaries alive before this program point.
     pub fn before_set(&self) -> BTreeSet<TempIndex> {
         self.before.keys().cloned().collect()
