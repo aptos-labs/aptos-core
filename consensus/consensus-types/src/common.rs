@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use crate::proof_of_store::{BatchInfo, ProofCache, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
@@ -280,6 +280,7 @@ impl Payload {
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
@@ -289,12 +290,12 @@ impl Payload {
                     .proofs
                     .par_iter()
                     .with_min_len(4)
-                    .try_for_each(|proof| proof.verify(validator))?;
+                    .try_for_each(|proof| proof.verify(validator, proof_cache))?;
                 Ok(())
             },
             (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
                 for proof in proof_with_status.proof_with_data.proofs.iter() {
-                    proof.verify(validator)?;
+                    proof.verify(validator, proof_cache)?;
                 }
                 Ok(())
             },

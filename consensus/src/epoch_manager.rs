@@ -58,6 +58,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
     epoch_retrieval::EpochRetrievalRequest,
+    proof_of_store::{BatchInfo, ProofCache},
 };
 use aptos_event_notifications::ReconfigNotificationListener;
 use aptos_global_constants::CONSENSUS_KEY;
@@ -88,6 +89,7 @@ use futures::{
     SinkExt, StreamExt,
 };
 use itertools::Itertools;
+use mini_moka::sync::Cache;
 use std::{
     cmp::Ordering,
     collections::HashMap,
@@ -151,6 +153,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_shutdown_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     dag_config: DagConsensusConfig,
     payload_manager: Arc<PayloadManager>,
+    proof_cache: ProofCache,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -207,6 +210,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             aptos_time_service,
             dag_config,
             payload_manager: Arc::new(PayloadManager::DirectMempool),
+            proof_cache: Cache::builder()
+                .max_capacity(10_000)
+                .initial_capacity(1_000)
+                .time_to_live(Duration::from_secs(10))
+                .build(),
         }
     }
 
@@ -648,6 +656,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.storage.aptos_db().clone(),
                 network_sender,
                 epoch_state.verifier.clone(),
+                self.proof_cache.clone(),
                 self.config.safety_rules.backend.clone(),
                 self.quorum_store_storage.clone(),
                 !consensus_config.is_dag_enabled(),
@@ -1083,6 +1092,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             }
             // same epoch -> run well-formedness + signature check
             let epoch_state = self.epoch_state.clone().unwrap();
+            let proof_cache = self.proof_cache.clone();
             let quorum_store_enabled = self.quorum_store_enabled;
             let quorum_store_msg_tx = self.quorum_store_msg_tx.clone();
             let buffered_proposal_tx = self.buffered_proposal_tx.clone();
@@ -1101,6 +1111,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                             unverified_event.clone().verify(
                                 peer_id,
                                 &epoch_state.verifier,
+                                &proof_cache,
                                 quorum_store_enabled,
                                 peer_id == my_peer_id,
                                 max_num_batches,

@@ -75,7 +75,7 @@ impl PeerSetCacheUpdater {
         url.set_query(Some(&format!("{}", now.as_millis())));
         let result = reqwest::get(url)
             .map_err(|err| anyhow::anyhow!(err))
-            .and_then(|res| Self::error_for_status_with_body(res))
+            .and_then(Self::error_for_status_with_body)
             .and_then(|res| async move {
                 let res_bytes = res.bytes().await?;
                 Ok(serde_yaml::from_slice(&res_bytes)?)

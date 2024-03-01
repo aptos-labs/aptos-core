@@ -34,7 +34,7 @@ use aptos_consensus_types::{
     block_data::BlockType,
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
-    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
+    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     sync_info::SyncInfo,
@@ -80,6 +80,7 @@ impl UnverifiedEvent {
         self,
         peer_id: PeerId,
         validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
         quorum_store_enabled: bool,
         self_message: bool,
         max_num_batches: usize,
@@ -90,7 +91,7 @@ impl UnverifiedEvent {
             //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
-                    p.verify(validator, quorum_store_enabled)?;
+                    p.verify(validator, proof_cache, quorum_store_enabled)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proposal"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -133,7 +134,7 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 if !self_message {
-                    p.verify(max_num_batches, validator)?;
+                    p.verify(max_num_batches, validator, proof_cache)?;
                     counters::VERIFY_MSG
                         .with_label_values(&["proof_of_store"])
                         .observe(start_time.elapsed().as_secs_f64());
