@@ -17,6 +17,8 @@ use aptos_storage_service_types::{
 };
 use aptos_types::transaction::{TransactionListWithProof, Version};
 use claims::assert_matches;
+use std::time::Duration;
+use tokio::time::timeout;
 
 #[tokio::test]
 async fn request_works_only_when_data_available() {
@@ -79,12 +81,7 @@ async fn request_works_only_when_data_available() {
         });
 
         // Verify the peer's state has been updated
-        let peer_state = peer_to_states.get(&peer).unwrap().value().clone();
-        let peer_storage_summary = peer_state
-            .get_storage_summary_if_not_ignored()
-            .unwrap()
-            .clone();
-        assert_eq!(peer_storage_summary, storage_summary);
+        verify_peer_state(&client, peer, storage_summary).await;
 
         // Request transactions and verify the request succeeds
         let request_timeout = data_client_config.response_timeout_ms;
@@ -190,7 +187,7 @@ async fn update_peer_states() {
     tokio::task::yield_now().await;
 
     // Verify that the high priority peer's state has been updated
-    verify_peer_state(&client, high_priority_peer, high_priority_storage_summary);
+    verify_peer_state(&client, high_priority_peer, high_priority_storage_summary).await;
 
     // Add a medium priority peer
     let (medium_priority_peer, medium_priority_network) =
@@ -215,12 +212,13 @@ async fn update_peer_states() {
     tokio::task::yield_now().await;
 
     // Verify that the peer's states have been set
-    verify_peer_state(&client, high_priority_peer, high_priority_storage_summary);
+    verify_peer_state(&client, high_priority_peer, high_priority_storage_summary).await;
     verify_peer_state(
         &client,
         medium_priority_peer,
         medium_priority_storage_summary,
-    );
+    )
+    .await;
 
     // Add a low priority peer
     let (low_priority_peer, low_priority_network) =
@@ -250,13 +248,14 @@ async fn update_peer_states() {
     tokio::task::yield_now().await;
 
     // Verify that the peer's states have been set
-    verify_peer_state(&client, high_priority_peer, high_priority_storage_summary);
+    verify_peer_state(&client, high_priority_peer, high_priority_storage_summary).await;
     verify_peer_state(
         &client,
         medium_priority_peer,
         medium_priority_storage_summary,
-    );
-    verify_peer_state(&client, low_priority_peer, low_priority_storage_summary);
+    )
+    .await;
+    verify_peer_state(&client, low_priority_peer, low_priority_storage_summary).await;
 }
 
 #[tokio::test]
@@ -372,20 +371,29 @@ fn verify_advertised_transaction_data(
     }
 }
 
-/// Verifies that the peer's state is valid (i.e., the storage summary is correct)
-fn verify_peer_state(
+/// Verifies that the peer's state is updated to the correct value
+async fn verify_peer_state(
     client: &AptosDataClient,
     peer: PeerNetworkId,
     expected_storage_summary: StorageServerSummary,
 ) {
-    // Get the peer's state
-    let peer_to_states = client.get_peer_states().get_peer_to_states();
-    let peer_state = peer_to_states.get(&peer).unwrap().value().clone();
+    // Wait for the peer's state to be updated to the expected storage summary
+    timeout(Duration::from_secs(10), async {
+        loop {
+            // Check if the peer's state has been updated
+            let peer_to_states = client.get_peer_states().get_peer_to_states();
+            if let Some(peer_state) = peer_to_states.get(&peer) {
+                if let Some(storage_summary) = peer_state.get_storage_summary_if_not_ignored() {
+                    if storage_summary == &expected_storage_summary {
+                        return; // The peer's state has been updated correctly
+                    }
+                }
+            }
 
-    // Verify that the peer's storage summary is valid
-    let peer_storage_summary = peer_state
-        .get_storage_summary_if_not_ignored()
-        .unwrap()
-        .clone();
-    assert_eq!(peer_storage_summary, expected_storage_summary);
+            // Sleep for a while before retrying
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .expect("The peer state was not updated to the expected storage summary! Timed out!");
 }
