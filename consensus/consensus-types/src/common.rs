@@ -286,10 +286,18 @@ impl Payload {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
-                proof_with_status
+                let unverified: Vec<_> = proof_with_status
                     .proofs
+                    .iter()
+                    .filter(|proof| {
+                        proof_cache.get(proof.info()).map_or(true, |cached_proof| {
+                            cached_proof != *proof.multi_signature()
+                        })
+                    })
+                    .collect();
+                unverified
                     .par_iter()
-                    .with_min_len(4)
+                    .with_min_len(2)
                     .try_for_each(|proof| proof.verify(validator, proof_cache))?;
                 Ok(())
             },
