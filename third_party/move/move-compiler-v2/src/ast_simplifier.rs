@@ -1,9 +1,43 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-/// AST Simplifier
-///
-/// Simplify the AST before conversion to bytecode
+//! AST Simplifier
+//!
+//! Simplify the AST before conversion to bytecode.
+//! - flow-insensitive constant propagation and folding
+//! - simple expression simplification
+//!
+//! More details:
+//! - Do flow-insensitive constant propagation:
+//!   - identify "unsafe" symbols which may have more than one value
+//!   - for safe symbols whose value is a constant value, propagate
+//!     the value to the use site to enable simplifying code:
+//!     - inline a constant value
+//!     - flag uses of uninitialized and unassigned variables
+//! - Implement ExpRewriterFunctions to allow bottom-up replacement
+//!   of some complex expressions by "simpler" ones:
+//!   - Constant folding of operations with constant parameters
+//!   - Eliminate unused variables (with a warning)
+//!   - Eliminate used variables whose uses are all eliminated by
+//!     constant folding
+//!   - Eliminate unused value expressions which are side-effect-free.
+//!   - Unwrap trivial compound expressions:
+//!     - a Sequence of 1 expression
+//!     - a Block with no variable binding
+//!   - Simple call rewriting: (one example)
+//!     - eliminate cast to same type as parameter
+//!
+//! - Optionally do some simplifications that may eliminate dead
+//!   code and hide some warnings:
+//!     - eliminate side-effect-free expressions with ignored value
+//!       in a `Sequence` instruction.
+//!     - eliminate unused variable assignments in a `let` statement,
+//!       and unassigned values expressions from `let` RHS which are
+//!       side-effect-free.
+//!     - use constant folding on if predicates to eliminate dead
+//!       then or else branches (currently disabled by local constant,
+//!       as it may eliminate some useful code diagnostics).
+
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::{debug, log_enabled, trace, Level};
@@ -25,6 +59,8 @@ use std::{
 
 static DISABLE_IFELSE_SIMPLIFICATION: bool = true;
 
+/// Run the AST simplification pass on all target functions in the `env`.
+/// Optionally do some aggressive simplfications that may eliminate code.
 pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
     let mut rewriter = SimplifierRewriter::new(env, eliminate_code);
     let mut new_definitions = Vec::new(); // Avoid borrowing issues for env.
@@ -58,8 +94,25 @@ pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
     }
 }
 
+/// ScopedMap<K, V> provides a simple sort of
+/// `BTreeMap<K, V>` which can be checkpointed
+/// and restored, as when descending function scopes.
+/// - Operations `new()`, `clear()`, `insert(K, V)`,
+///   `remove(K)`, `get(&K)`, and `contains_key(&K)`
+///    act like operations on `BTreeMap`.
+/// - `enter_scope()` checkpoints the current map state
+///   on a stack of scopes.
+/// - `exit_scope()` restores map to the corresponding
+///   previous state.
 #[derive(Debug)]
 struct ScopedMap<K, V> {
+    // The implementation uses a stack of maps, with
+    // `get` operation checking maps in order, stopping
+    // when a value is found.
+    //
+    // The maps use `Option<V>` as the value so that
+    // `remove(K)` can hide values saved in outer scopes
+    // by setting the current scope value to `None`.
     maps: Vec<BTreeMap<K, Option<V>>>,
 }
 
@@ -824,5 +877,83 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             r.display_verbose(self.env)
         );
         r
+    }
+}
+
+#[test]
+fn test_scoped_map() {
+    let mut testmaps = Vec::new();
+    let k = 6;
+
+    // Initialize a set of maps to write to the scoped map.
+    for i in 0..k {
+        let mut testmap: BTreeMap<usize, usize> = BTreeMap::new();
+        for j in 0..(k * 5) {
+            if (j % (i + 2)) != 0 {
+                testmap.insert(j, j + i);
+            }
+        }
+        testmaps.push(testmap);
+    }
+
+    let mut smap: ScopedMap<usize, usize> = ScopedMap::new();
+
+    // Scope 0
+    for (key, value) in &testmaps[0] {
+        smap.insert(*key, *value);
+    }
+    // check what we wrote to the smap
+    for j in 0..(k * 5) {
+        if (j % 2) != 0 {
+            assert!(smap.get(&j) == Some(&(j + 0)));
+        } else {
+            assert!(smap.get(&j).is_none());
+        }
+    }
+
+    // Entering scope 1 .. k-1
+    for i in 1..k {
+        smap.enter_scope();
+
+        let lastmap = &testmaps[i - 1];
+        let testmap = &testmaps[i];
+        for key in lastmap.keys() {
+            if !testmap.contains_key(key) {
+                smap.remove(*key)
+            }
+        }
+        for (key, value) in testmap {
+            smap.insert(*key, *value);
+        }
+
+        // check that our inserts and removes yielded what we thought
+        for j in 0..(k * 5) {
+            if (j % (i + 2)) != 0 {
+                assert!(smap.get(&j) == Some(&(j + i)));
+            } else {
+                assert!(smap.get(&j).is_none());
+            }
+        }
+    }
+
+    // Exiting scopes k-1. .. 1
+    for i in (1..k).rev() {
+        // check that the scope at each level is what we had before
+        for j in 0..(k * 5) {
+            if (j % (i + 2)) != 0 {
+                assert!(smap.get(&j) == Some(&(j + i)));
+            } else {
+                assert!(smap.get(&j).is_none());
+            }
+        }
+        smap.exit_scope();
+    }
+    // scope 0
+    for j in 0..(k * 5) {
+        if (j % 2) != 0 {
+            assert!(smap.get(&j) == Some(&(j + 0)));
+        } else {
+            assert!(smap.get(&j).is_none());
+        }
     }
 }
