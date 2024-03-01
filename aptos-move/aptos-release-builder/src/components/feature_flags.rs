@@ -169,13 +169,13 @@ pub fn generate_feature_upgrade_proposal(
             if is_testnet && next_execution_hash.is_empty() {
                 emitln!(
                     writer,
-                    "features::change_feature_flags_for_next_epoch(framework_signer, enabled_blob, disabled_blob);"
+                    "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
                 );
                 emitln!(writer, "aptos_governance::reconfigure(framework_signer);");
             } else {
                 emitln!(
                     writer,
-                    "features::change_feature_flags_for_next_epoch(&framework_signer, enabled_blob, disabled_blob);"
+                    "features::change_feature_flags(&framework_signer, enabled_blob, disabled_blob);"
                 );
                 emitln!(writer, "aptos_governance::reconfigure(&framework_signer);");
             }
