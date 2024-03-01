@@ -541,7 +541,7 @@ group = "0.13"
 guppy = "0.17.0"
 handlebars = "4.2.2"
 heck = "0.4.1"
-hex = "0.4.3"
+hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.10.0"
 hostname = "0.3.1"
 http = "0.2.9"

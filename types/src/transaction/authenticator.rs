@@ -22,7 +22,7 @@ use aptos_crypto_derive::{CryptoHasher, DeserializeKey, SerializeKey};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use rand::{rngs::OsRng, Rng};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
 
@@ -1097,7 +1097,7 @@ impl TryFrom<&[u8]> for EphemeralSignature {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum EphemeralPublicKey {
     Ed25519 { public_key: Ed25519PublicKey },
 }
@@ -1118,6 +1118,61 @@ impl TryFrom<&[u8]> for EphemeralPublicKey {
     fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
         bcs::from_bytes::<EphemeralPublicKey>(bytes)
             .map_err(|_e| CryptoMaterialError::DeserializationError)
+    }
+}
+
+impl<'de> Deserialize<'de> for EphemeralPublicKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            let s = <String>::deserialize(deserializer)?;
+            EphemeralPublicKey::try_from(
+                hex::decode(s).map_err(serde::de::Error::custom)?.as_slice(),
+            )
+            .map_err(serde::de::Error::custom)
+        } else {
+            // In order to preserve the Serde data model and help analysis tools,
+            // make sure to wrap our value in a container with the same name
+            // as the original type.
+            #[derive(::serde::Deserialize)]
+            #[serde(rename = "EphemeralPublicKey")]
+            enum Value {
+                Ed25519 { public_key: Ed25519PublicKey },
+            }
+
+            let value = Value::deserialize(deserializer)?;
+            Ok(match value {
+                Value::Ed25519 { public_key } => EphemeralPublicKey::Ed25519 { public_key },
+            })
+        }
+    }
+}
+
+impl Serialize for EphemeralPublicKey {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if serializer.is_human_readable() {
+            hex::encode(self.to_bytes().as_slice()).serialize(serializer)
+        } else {
+            // See comment in deserialize.
+            #[derive(::serde::Serialize)]
+            #[serde(rename = "EphemeralPublicKey")]
+            enum Value {
+                Ed25519 { public_key: Ed25519PublicKey },
+            }
+
+            let value = match self {
+                EphemeralPublicKey::Ed25519 { public_key } => Value::Ed25519 {
+                    public_key: public_key.clone(),
+                },
+            };
+
+            value.serialize(serializer)
+        }
     }
 }
 
