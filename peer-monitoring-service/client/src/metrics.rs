@@ -3,26 +3,20 @@
 
 use aptos_config::network_id::PeerNetworkId;
 use aptos_metrics_core::{
-    histogram_opts, register_histogram_vec, register_int_counter_vec, register_int_gauge_vec,
-    HistogramVec, IntCounterVec, IntGaugeVec,
+    exponential_buckets, histogram_opts, register_histogram_vec, register_int_counter_vec,
+    register_int_gauge_vec, HistogramVec, IntCounterVec, IntGaugeVec,
 };
 use once_cell::sync::Lazy;
 
 /// The special label TOTAL_COUNT stores the sum of all values in the counter
 pub const TOTAL_COUNT_LABEL: &str = "TOTAL_COUNT";
 
-// Histogram buckets for tracking average ping latencies (secs)
-const AVERAGE_PING_LATENCY_BUCKETS: &[f64] = &[
-    0.005, 0.01, 0.02, 0.03, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 15.0, 20.0, 30.0,
-    40.0, 60.0, // Max is a minute
-];
-
 /// Counter for tracking the average ping latencies
 pub static AVERAGE_PING_LATENCIES: Lazy<HistogramVec> = Lazy::new(|| {
     let histogram_opts = histogram_opts!(
         "peer_monitoring_client_average_ping_latencies",
         "Counters related to average ping latencies (secs)",
-        AVERAGE_PING_LATENCY_BUCKETS.to_vec()
+        exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 15).unwrap(),
     );
     register_histogram_vec!(histogram_opts, &["network_id"]).unwrap()
 });
