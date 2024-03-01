@@ -31,7 +31,7 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
             .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
             .header(ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
-            .header(ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type, Authorization")
+            .header(ACCESS_CONTROL_ALLOW_HEADERS, "*")
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(ABOUT_JSON.as_str()))
             .expect("Response should build"),
@@ -40,7 +40,7 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
             .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
             .header(ACCESS_CONTROL_ALLOW_METHODS, "GET, POST, OPTIONS")
-            .header(ACCESS_CONTROL_ALLOW_HEADERS, "Content-Type, Authorization")
+            .header(ACCESS_CONTROL_ALLOW_HEADERS, "*")
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(PEPPER_V0_VUF_VERIFICATION_KEY_JSON.as_str()))
             .expect("Response should build"),
