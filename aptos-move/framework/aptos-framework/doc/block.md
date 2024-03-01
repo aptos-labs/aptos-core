@@ -7,6 +7,7 @@ This module defines a struct storing the metadata of the block and new block eve
 
 
 -  [Resource `BlockResource`](#0x1_block_BlockResource)
+-  [Resource `SomeNewStruct`](#0x1_block_SomeNewStruct)
 -  [Resource `CommitHistory`](#0x1_block_CommitHistory)
 -  [Struct `NewBlockEvent`](#0x1_block_NewBlockEvent)
 -  [Struct `UpdateEpochIntervalEvent`](#0x1_block_UpdateEpochIntervalEvent)
@@ -88,6 +89,34 @@ Should be in-sync with BlockResource rust struct in new_block.rs
 </dd>
 <dt>
 <code>update_epoch_interval_events: <a href="event.md#0x1_event_EventHandle">event::EventHandle</a>&lt;<a href="block.md#0x1_block_UpdateEpochIntervalEvent">block::UpdateEpochIntervalEvent</a>&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_block_SomeNewStruct"></a>
+
+## Resource `SomeNewStruct`
+
+Some new struct.
+
+
+<pre><code><b>struct</b> <a href="block.md#0x1_block_SomeNewStruct">SomeNewStruct</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>some_new_field: u64</code>
 </dt>
 <dd>
 

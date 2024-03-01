@@ -30,6 +30,11 @@ module aptos_framework::block {
         update_epoch_interval_events: EventHandle<UpdateEpochIntervalEvent>,
     }
 
+    /// Some new struct.
+    struct SomeNewStruct has key {
+        some_new_field: u64,
+    }
+
     /// Store new block events as a move resource, internally using a circular buffer.
     struct CommitHistory has key {
         max_capacity: u32,
