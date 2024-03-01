@@ -64,6 +64,7 @@ futures-channel = { workspace = true }
 hex = { workspace = true }
 itertools = { workspace = true }
 maplit = { workspace = true }
+mini-moka = { workspace = true }
 mirai-annotations = { workspace = true }
 move-core-types = { workspace = true }
 num-derive = { workspace = true }
