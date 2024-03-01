@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     keyless::{test_utils, Groth16ZkpAndStatement, Pepper},
     transaction::authenticator::EphemeralPublicKey,
