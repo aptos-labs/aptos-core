@@ -1,0 +1,1 @@
+export LD_LIBRARY_PATH=/home/rex_fernando_aptoslabs_com/coding/rust_rapidsnark/rapidsnark/package/lib

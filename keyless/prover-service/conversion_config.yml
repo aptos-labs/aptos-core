@@ -1,0 +1,64 @@
+global_input_max_lengths:
+  jwt: 1536
+  jwt_header_with_separator: 300
+  jwt_payload: 1472
+  jwt_payload_without_sha_padding: 1472
+  jwt_len_bit_encoded: 8
+  padding_without_len: 64
+  temp_pubkey: 3
+field_check_inputs:
+- circuit_input_signal_prefix: iss
+  jwt_key:
+    type: Fixed
+    name: iss
+  has_value_inputs: true
+  max_whole_field_length: 140
+  max_name_length: 40
+  max_value_length: 120
+- circuit_input_signal_prefix: extra
+  jwt_key:
+    type: Variable
+  has_value_inputs: false
+  max_whole_field_length: 350
+  max_name_length: 34
+  max_value_length: 115
+- circuit_input_signal_prefix: ev
+  jwt_key:
+    type: Fixed
+    name: email_verified
+  has_value_inputs: true
+  max_whole_field_length: 30
+  max_name_length: 20
+  max_value_length: 10
+- circuit_input_signal_prefix: nonce
+  jwt_key:
+    type: Fixed
+    name: nonce
+  has_value_inputs: true
+  max_whole_field_length: 105
+  max_name_length: 10
+  max_value_length: 100
+- circuit_input_signal_prefix: aud
+  jwt_key:
+    type: Fixed
+    name: aud
+  has_value_inputs: true
+  max_whole_field_length: 140
+  max_name_length: 40
+  max_value_length: 120
+- circuit_input_signal_prefix: iat
+  jwt_key:
+    type: Fixed
+    name: iat
+  has_value_inputs: true
+  max_whole_field_length: 50
+  max_name_length: 10
+  max_value_length: 45
+- circuit_input_signal_prefix: uid
+  jwt_key:
+    type: Variable
+  has_value_inputs: true
+  max_whole_field_length: 350
+  max_name_length: 30
+  max_value_length: 330
+

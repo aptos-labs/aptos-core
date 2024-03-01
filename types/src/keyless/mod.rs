@@ -14,7 +14,7 @@ use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use ark_serialize::CanonicalSerialize;
-use base64::URL_SAFE_NO_PAD;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -330,16 +330,16 @@ pub fn get_authenticators(
 }
 
 pub(crate) fn base64url_encode_str(data: &str) -> String {
-    base64::encode_config(data.as_bytes(), URL_SAFE_NO_PAD)
+    URL_SAFE_NO_PAD.encode(data.as_bytes())
 }
 
 pub(crate) fn base64url_encode_bytes(data: &[u8]) -> String {
-    base64::encode_config(data, URL_SAFE_NO_PAD)
+    URL_SAFE_NO_PAD.encode(data)
 }
 
 #[allow(unused)]
 fn base64url_decode_as_str(b64: &str) -> anyhow::Result<String> {
-    let decoded_bytes = base64::decode_config(b64, URL_SAFE_NO_PAD)?;
+    let decoded_bytes = URL_SAFE_NO_PAD.decode(b64)?;
     // Convert the decoded bytes to a UTF-8 string
     let str = String::from_utf8(decoded_bytes)?;
     Ok(str)

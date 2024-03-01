@@ -133,6 +133,8 @@ members = [
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "keyless/pepper/common", "keyless/pepper/example-client-rust", "keyless/pepper/service",
+    "keyless/rust-rapidsnark",
+    "keyless/prover-service",
     "mempool",
     "network/benchmark",
     "network/builder",
@@ -439,6 +441,7 @@ aptos-vm-validator = { path = "vm-validator" }
 aptos-warp-webserver = { path = "crates/aptos-warp-webserver" }
 aptos-writeset-generator = { path = "aptos-move/writeset-transaction-generator" }
 aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
+rust-rapidsnark = { path = "keyless/rust-rapidsnark" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
@@ -464,8 +467,8 @@ async-mutex = "1.4.0"
 async-recursion = "1.0.5"
 async-stream = "0.3"
 async-trait = "0.1.53"
-axum = "0.5.16"
-base64 = "0.13.0"
+axum = "0.7.4"
+base64 = "0.21.7"
 base64-url = "2.0.1"
 backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
@@ -550,7 +553,7 @@ heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.10.0"
 hostname = "0.3.1"
-http = "0.2.9"
+http = "1.0.0"
 httpmock = "0.6.8"
 hyper = { version = "0.14.18", features = ["full"] }
 hyper-tls = "0.5.0"
@@ -591,7 +594,7 @@ num-derive = "0.3.3"
 num-integer = "0.1.42"
 num-traits = "0.2.15"
 number_range = "0.3.2"
-once_cell = "1.10.0"
+once_cell = "1.19.0"
 ordered-float = "3.9.1"
 ouroboros = "0.15.6"
 owo-colors = "3.5.0"

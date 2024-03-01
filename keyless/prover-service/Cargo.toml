@@ -1,0 +1,55 @@
+[package]
+name = "prover-service"
+version = "0.1.0"
+edition = { workspace = true }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rust-rapidsnark = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-types = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+bcs = { workspace = true }
+base64.workspace = true
+anyhow = { workspace = true }
+figment = { version = "0.10.14", features = ["yaml", "env"] }
+yaml = "0.3.0"
+env = "0.0.0"
+tracing = { workspace = true }
+prometheus = { workspace = true }
+tracing-subscriber = { workspace = true }
+init-tracing-opentelemetry = { version = "0.14.1", features = ["otlp", "tracing_subscriber_ext"] }
+num-bigint = { workspace = true }
+serde_yaml = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ff = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-ec = { workspace = true }
+ark-groth16 = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
+hex = { workspace = true }
+
+jsonwebtoken = { workspace = true }
+rsa = { workspace = true }
+lazy_static = { workspace = true }
+tower-http = { version = "0.5.1", features = ["cors"] }
+http = "1.0.0"
+tower = "0.4.13"
+axum-server = { version = "0.6.0", features = ["rustls", "rustls-pemfile", "tls-rustls"] }
+dashmap = "5.5.3"
+reqwest = { workspace = true }
+once_cell = "1.19.0"
+thiserror = { workspace = true }
+
+
+
+
+
