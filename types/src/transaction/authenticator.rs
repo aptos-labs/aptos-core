@@ -1199,8 +1199,6 @@ mod tests {
     };
     use hex::FromHex;
     use rand::thread_rng;
-    use serde_json;
-
 
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {

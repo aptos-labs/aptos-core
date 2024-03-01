@@ -54,7 +54,6 @@ pub struct Groth16ZkpAndStatement {
     pub public_inputs_hash: [u8; 32],
 }
 
-
 impl<'de> Deserialize<'de> for Groth16ZkpAndStatement {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
@@ -76,14 +75,11 @@ impl<'de> Deserialize<'de> for Groth16ZkpAndStatement {
             }
 
             let value = Value::deserialize(deserializer)?;
-            Ok(
-                Groth16ZkpAndStatement {
-                    proof: value.proof,
-                    public_inputs_hash: value.public_inputs_hash
-                }
-            )
+            Ok(Groth16ZkpAndStatement {
+                proof: value.proof,
+                public_inputs_hash: value.public_inputs_hash,
+            })
         } else {
-
             // Same as above, except this time we don't use the serde(with = "hex") macro, so that
             // serde uses default behavior for serialization.
             #[derive(::serde::Deserialize)]
@@ -94,12 +90,10 @@ impl<'de> Deserialize<'de> for Groth16ZkpAndStatement {
             }
 
             let value = Value::deserialize(deserializer)?;
-            Ok(
-                Groth16ZkpAndStatement {
-                    proof: value.proof,
-                    public_inputs_hash: value.public_inputs_hash
-                }
-            )
+            Ok(Groth16ZkpAndStatement {
+                proof: value.proof,
+                public_inputs_hash: value.public_inputs_hash,
+            })
         }
     }
 }
@@ -110,7 +104,6 @@ impl Serialize for Groth16ZkpAndStatement {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-
             #[derive(::serde::Serialize)]
             #[serde(rename = "Groth16ZkpAndStatement")]
             struct Value {
@@ -121,12 +114,11 @@ impl Serialize for Groth16ZkpAndStatement {
 
             let value = Value {
                 proof: self.proof,
-                public_inputs_hash: self.public_inputs_hash
+                public_inputs_hash: self.public_inputs_hash,
             };
 
             value.serialize(serializer)
         } else {
-
             #[derive(::serde::Serialize)]
             #[serde(rename = "Groth16ZkpAndStatement")]
             struct Value {
@@ -136,7 +128,7 @@ impl Serialize for Groth16ZkpAndStatement {
 
             let value = Value {
                 proof: self.proof,
-                public_inputs_hash: self.public_inputs_hash
+                public_inputs_hash: self.public_inputs_hash,
             };
 
             value.serialize(serializer)

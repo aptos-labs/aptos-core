@@ -174,7 +174,6 @@ impl G2Bytes {
         hex::encode(self.0)
     }
 
-
     pub fn new_from_vec(vec: Vec<u8>) -> anyhow::Result<Self> {
         if vec.len() == G2_PROJECTIVE_COMPRESSED_NUM_BYTES {
             let mut bytes = [0; G2_PROJECTIVE_COMPRESSED_NUM_BYTES];
@@ -236,8 +235,6 @@ impl Serialize for G2Bytes {
         }
     }
 }
-
-
 
 impl TryInto<G2Projective> for &G2Bytes {
     type Error = CryptoMaterialError;
