@@ -27,7 +27,7 @@ Please ensure that the functionality introduced by this change is well tested an
 ## Key Areas to Review
 - Identify any critical parts of the code that require special attention or understanding. Explain why these parts are crucial to the functionality or architecture of the project.
 - Point out any areas where complex logic has been implemented. Provide a brief explanation of the logic and your approach to make it easier for reviewers to follow.
-- Highlight any areas where you are particularly concerned or unsure about the code's impact on the project. This can include potential performance or security issues, or compatibility with existing features.
+- Highlight any areas where you are particularly concerned or unsure about the code's impact on the change. This can include potential performance or security issues, or compatibility with existing features.
 
 ## Checklist
 - [ ] I have read and followed the [CONTRIBUTING](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) doc
