@@ -504,10 +504,9 @@ impl<T: AptosDataClientInterface + Send + Clone + 'static> DataStream<T> {
                         self.send_data_notification_to_client(client_request, client_response)
                             .await?;
 
-                        // If the request is for specific data, increase the prefetching limit.
-                        // Note: we don't increase the limit for new data requests because
-                        // those don't invoke the prefetcher (as we're already up-to-date).
-                        if !client_request.is_new_data_request() {
+                        // If the request is an optimistic fetch request, we don't increase
+                        // the prefetching limit.
+                        if !client_request.is_optimistic_fetch_request() {
                             self.dynamic_prefetching_state
                                 .increase_max_concurrent_requests();
                         }
