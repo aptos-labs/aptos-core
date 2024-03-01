@@ -50,7 +50,7 @@ function usage {
   echo "-v verbose mode"
   echo "-i installs an individual tool by name"
   echo "-n will target the /opt/ dir rather than the $HOME dir.  /opt/bin/, /opt/rustup/, and /opt/dotnet/ rather than $HOME/bin/, $HOME/.rustup/, and $HOME/.dotnet/"
-  echo "-k should only temporarily used in building with keyless/pepper/service/Dockerfile"
+  echo "-k skip pre-commit"
   echo "If no toolchain component is selected with -t, -o, -y, -d, or -p, the behavior is as if -t had been provided."
   echo "This command must be called from the root folder of the Aptos-core project."
 }
@@ -848,7 +848,7 @@ INSTALL_INDIVIDUAL=false
 INSTALL_PACKAGES=()
 INSTALL_DIR="${HOME}/bin/"
 OPT_DIR="false"
-IN_DOCKER=false
+SKIP_PRE_COMMIT=false
 
 #parse args
 while getopts "btoprvydaPJh:i:nk" arg; do
@@ -895,7 +895,7 @@ while getopts "btoprvydaPJh:i:nk" arg; do
     OPT_DIR="true"
     ;;
   k)
-    IN_DOCKER="true"
+    SKIP_PRE_COMMIT="true"
     ;;
   *)
     usage
@@ -1093,18 +1093,14 @@ if [[ "$INSTALL_JSTS" == "true" ]]; then
 fi
 
 install_python3
-if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
-  if [[ "$IN_DOCKER" == "true" ]]; then
-    pip3 install --break-system-packages pre-commit
-  else
+if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
+  if [[ "$PACKAGE_MANAGER" != "pacman" ]]; then
     pip3 install pre-commit
+    install_libudev-dev
+  else
+    install_pkg python-pre-commit "$PACKAGE_MANAGER"
   fi
-  install_libudev-dev
-else
-  install_pkg python-pre-commit "$PACKAGE_MANAGER"
-fi
 
-if [[ -z $IN_DOCKER ]]; then
   # For now best effort install, will need to improve later
   if command -v pre-commit; then
     pre-commit install
