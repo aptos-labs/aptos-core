@@ -56,6 +56,10 @@ impl TransactionsByStatus {
             self.to_retry,
         )
     }
+
+    pub fn to_commit(&self) -> &TransactionsWithParsedOutput {
+        &self.to_commit
+    }
 }
 
 #[derive(Default)]
@@ -90,6 +94,10 @@ impl StateCheckpointOutput {
 
     pub fn txns_to_commit_len(&self) -> usize {
         self.txns.to_commit.len()
+    }
+
+    pub fn txns(&self) -> &TransactionsByStatus {
+        &self.txns
     }
 
     pub fn into_inner(

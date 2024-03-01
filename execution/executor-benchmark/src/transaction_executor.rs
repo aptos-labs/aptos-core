@@ -7,8 +7,10 @@ use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::{BlockExecutor, TransactionBlockExecutor};
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_types::block_executor::{
-    config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
+use aptos_types::{
+    block_executor::{
+        config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
+    }, transaction::TransactionOutputProvider,
 };
 use std::{
     sync::{mpsc, Arc},
@@ -87,6 +89,11 @@ where
         if !self.allow_retries {
             assert_eq!(output.txns_to_commit_len(), num_txns + 1);
         }
+        let parsed_outputs = output.txns().to_commit().parsed_outputs();
+        let events = parsed_outputs.iter().map(|parsed_output| {
+            parsed_output.get_transaction_output().events()
+        }).flatten().collect::<Vec<_>>();
+        println!("\n\n\nevents: {:?}\n\n\n", events);
 
         let msg = LedgerUpdateMessage {
             current_block_start_time,
