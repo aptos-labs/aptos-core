@@ -197,6 +197,9 @@ module aptos_framework::block {
                 table_with_length::remove(&mut commit_history_ref.table, idx);
             };
             table_with_length::add(&mut commit_history_ref.table, idx, copy new_block_event);
+            spec {
+                assume idx + 1 <= MAX_U32;
+            };
             commit_history_ref.next_idx = (idx + 1) % commit_history_ref.max_capacity;
         };
         timestamp::update_global_time(vm, new_block_event.proposer, new_block_event.time_microseconds);
