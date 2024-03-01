@@ -5,10 +5,14 @@ module aptos_framework::block {
     use std::vector;
     use std::option;
     use aptos_std::table_with_length::{Self, TableWithLength};
+    use std::option::Option;
+    use aptos_framework::randomness;
 
     use aptos_framework::account;
+    use aptos_framework::dkg;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
+    use aptos_framework::reconfiguration_with_dkg;
     use aptos_framework::stake;
     use aptos_framework::state_storage;
     use aptos_framework::system_addresses;
@@ -122,10 +126,9 @@ module aptos_framework::block {
         borrow_global<BlockResource>(@aptos_framework).epoch_interval / 1000000
     }
 
-    /// Set the metadata for the current block.
-    /// The runtime always runs this before executing the transactions in a block.
-    fun block_prologue(
-        vm: signer,
+
+    fun block_prologue_common(
+        vm: &signer,
         hash: address,
         epoch: u64,
         round: u64,
@@ -133,9 +136,9 @@ module aptos_framework::block {
         failed_proposer_indices: vector<u64>,
         previous_block_votes_bitvec: vector<u8>,
         timestamp: u64
-    ) acquires BlockResource, CommitHistory {
+    ): u64 acquires BlockResource, CommitHistory {
         // Operational constraint: can only be invoked by the VM.
-        system_addresses::assert_vm(&vm);
+        system_addresses::assert_vm(vm);
 
         // Blocks can only be produced by a valid proposer or by the VM itself for Nil blocks (no user txs).
         assert!(
@@ -161,7 +164,7 @@ module aptos_framework::block {
             failed_proposer_indices,
             time_microseconds: timestamp,
         };
-        emit_new_block_event(&vm, &mut block_metadata_ref.new_block_events, new_block_event);
+        emit_new_block_event(vm, &mut block_metadata_ref.new_block_events, new_block_event);
 
         if (features::collect_and_distribute_gas_fees()) {
             // Assign the fees collected from the previous block to the previous block proposer.
@@ -177,9 +180,55 @@ module aptos_framework::block {
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
         state_storage::on_new_block(reconfiguration::current_epoch());
 
-        if (timestamp - reconfiguration::last_reconfiguration_time() >= block_metadata_ref.epoch_interval) {
+        block_metadata_ref.epoch_interval
+    }
+
+    /// Set the metadata for the current block.
+    /// The runtime always runs this before executing the transactions in a block.
+    fun block_prologue(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64
+    ) acquires BlockResource, CommitHistory {
+        let epoch_interval = block_prologue_common(&vm, hash, epoch, round, proposer, failed_proposer_indices, previous_block_votes_bitvec, timestamp);
+        randomness::on_new_block(&vm, epoch, round, option::none());
+        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration::reconfigure();
         };
+    }
+
+    /// `block_prologue()` but trigger reconfiguration with DKG after epoch timed out.
+    fun block_prologue_ext(
+        vm: signer,
+        hash: address,
+        epoch: u64,
+        round: u64,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        previous_block_votes_bitvec: vector<u8>,
+        timestamp: u64,
+        randomness_seed: Option<vector<u8>>,
+    ) acquires BlockResource, CommitHistory {
+        let epoch_interval = block_prologue_common(
+            &vm,
+            hash,
+            epoch,
+            round,
+            proposer,
+            failed_proposer_indices,
+            previous_block_votes_bitvec,
+            timestamp
+        );
+        randomness::on_new_block(&vm, epoch, round, randomness_seed);
+
+        if (!dkg::in_progress() && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+            reconfiguration_with_dkg::try_start();
+        }
     }
 
     #[view]

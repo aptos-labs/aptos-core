@@ -56,6 +56,10 @@ const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
 const OIDB_MODULE_NAME: &str = "openid_account";
 const JWKS_MODULE_NAME: &str = "jwks";
+const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
+const DKG_MODULE_NAME: &str = "dkg";
+const RANDOMNESS_MODULE_NAME: &str = "randomness";
+const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -251,6 +255,10 @@ pub fn encode_genesis_change_set(
     } else {
         initialize_aptos_coin(&mut session);
     }
+    initialize_config_buffer(&mut session);
+    initialize_dkg(&mut session);
+    initialize_reconfiguration_state(&mut session);
+    initialize_randomness(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
@@ -457,7 +465,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
         FeatureFlag::OIDB_SIGNATURE,
         FeatureFlag::OIDB_ZKLESS_SIGNATURE,
-        FeatureFlag::JWK_CONSENSUS,
+        // FeatureFlag::JWK_CONSENSUS,
         FeatureFlag::REFUNDABLE_BYTES,
         FeatureFlag::OBJECT_CODE_DEPLOYMENT,
         FeatureFlag::MAX_OBJECT_NESTING_CHECK,
@@ -488,6 +496,56 @@ fn initialize_aptos_coin(session: &mut SessionExt) {
         session,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_config_buffer(session: &mut SessionExt) {
+    exec_function(
+        session,
+        CONFIG_BUFFER_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_dkg(session: &mut SessionExt) {
+    exec_function(
+        session,
+        DKG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_randomness(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RANDOMNESS_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_reconfiguration_state(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RECONFIGURATION_STATE_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_jwks(session: &mut SessionExt) {
+    exec_function(
+        session,
+        JWKS_MODULE_NAME,
+        "initialize",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
@@ -561,19 +619,6 @@ fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
             ]),
         );
     }
-    exec_function(
-        session,
-        JWKS_MODULE_NAME,
-        "upsert_oidc_provider",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            "https://accounts.google.com".to_string().as_move_value(),
-            "https://accounts.google.com/.well-known/openid-configuration"
-                .to_string()
-                .as_move_value(),
-        ]),
-    );
 }
 
 fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
