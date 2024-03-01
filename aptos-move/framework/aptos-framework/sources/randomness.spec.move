@@ -15,6 +15,14 @@ spec aptos_framework::randomness {
 
     spec fun spec_fetch_and_increment_txn_counter(): vector<u8>;
 
+    spec is_safe_call(): bool {
+        pragma opaque;
+        aborts_if [abstract] false;
+        ensures [abstract] result == spec_is_safe_call();
+    }
+
+    spec fun spec_is_safe_call(): bool;
+
     spec initialize(framework: &signer) {
         use std::option;
         use std::signer;
@@ -47,6 +55,7 @@ spec aptos_framework::randomness {
     spec schema NextBlobAbortsIf {
         let randomness = global<PerBlockRandomness>(@aptos_framework);
         aborts_if option::spec_is_none(randomness.seed);
+        aborts_if !spec_is_safe_call();
         aborts_if !exists<PerBlockRandomness>(@aptos_framework);
     }
 

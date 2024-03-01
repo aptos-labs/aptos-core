@@ -45,6 +45,7 @@ On-chain randomness utils.
     -  [Function `permutation`](#@Specification_1_permutation)
     -  [Function `safe_add_mod_for_verification`](#@Specification_1_safe_add_mod_for_verification)
     -  [Function `fetch_and_increment_txn_counter`](#@Specification_1_fetch_and_increment_txn_counter)
+    -  [Function `is_safe_call`](#@Specification_1_is_safe_call)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
@@ -880,6 +881,7 @@ Called in each randomness generation function to ensure certain safety invariant
 <pre><code><b>schema</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a> {
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
+    <b>aborts_if</b> !<a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>();
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
 }
 </code></pre>
@@ -1128,6 +1130,33 @@ Called in each randomness generation function to ensure certain safety invariant
 
 
 <pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_fetch_and_increment_txn_counter">spec_fetch_and_increment_txn_counter</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_safe_call"></a>
+
+### Function `is_safe_call`
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(): bool
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>();
+</code></pre>
+
+
+
+
+<a id="0x1_randomness_spec_is_safe_call"></a>
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>(): bool;
 </code></pre>
 
 
