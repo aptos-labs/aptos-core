@@ -1110,15 +1110,6 @@ impl EphemeralPublicKey {
     pub fn to_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(self).expect("Only unhandleable errors happen here.")
     }
-
-    pub fn from_hex(hex: &str) -> Result<Self, CryptoMaterialError> {
-        let bytes = hex::decode(hex).map_err(|_| CryptoMaterialError::DeserializationError)?;
-        Self::try_from(bytes.as_slice())
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.to_bytes().as_slice())
-    }
 }
 
 impl TryFrom<&[u8]> for EphemeralPublicKey {
@@ -1137,7 +1128,10 @@ impl<'de> Deserialize<'de> for EphemeralPublicKey {
     {
         if deserializer.is_human_readable() {
             let s = <String>::deserialize(deserializer)?;
-            EphemeralPublicKey::from_hex(&s).map_err(serde::de::Error::custom)
+            EphemeralPublicKey::try_from(
+                hex::decode(s).map_err(serde::de::Error::custom)?.as_slice(),
+            )
+            .map_err(serde::de::Error::custom)
         } else {
             // In order to preserve the Serde data model and help analysis tools,
             // make sure to wrap our value in a container with the same name
@@ -1162,7 +1156,7 @@ impl Serialize for EphemeralPublicKey {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            self.to_hex().serialize(serializer)
+            hex::encode(self.to_bytes().as_slice()).serialize(serializer)
         } else {
             // See comment in deserialize.
             #[derive(::serde::Serialize)]
