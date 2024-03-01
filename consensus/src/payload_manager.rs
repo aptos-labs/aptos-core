@@ -278,6 +278,7 @@ impl PayloadManager {
                     all_txns.append(
                         &mut inline_batches
                             .iter()
+                            // TODO: Can clone be avoid here?
                             .flat_map(|(_batch_info, txns)| txns.clone())
                             .collect(),
                     );

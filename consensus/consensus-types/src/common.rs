@@ -209,9 +209,16 @@ impl Payload {
             Payload::InQuorumStore(proof_with_status) => Payload::InQuorumStoreWithLimit(
                 ProofWithDataWithTxnLimit::new(proof_with_status, max_txns_to_execute),
             ),
-            Payload::QuorumStoreInlineHybrid(_, _) => {
-                panic!("Payload is already in quorumStoreV2 format");
-            },
+            Payload::QuorumStoreInlineHybrid(
+                inline_batches,
+                ProofWithDataWithTxnLimit {
+                    proof_with_data,
+                    max_txns_to_execute: _,
+                },
+            ) => Payload::QuorumStoreInlineHybrid(
+                inline_batches,
+                ProofWithDataWithTxnLimit::new(proof_with_data, max_txns_to_execute),
+            ),
             Payload::InQuorumStoreWithLimit(_) => {
                 panic!("Payload is already in quorumStoreV2 format");
             },

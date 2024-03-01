@@ -336,8 +336,8 @@ impl ProposalGenerator {
                     max_block_txns,
                     max_block_bytes,
                     // TODO: Set max_inline_txns and max_inline_bytes correctly
-                    10,
-                    20000,
+                    30,
+                    50000,
                     validator_txn_filter,
                     payload_filter,
                     wait_callback,

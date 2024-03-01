@@ -77,7 +77,7 @@ pub struct QuorumStoreConfig {
 impl Default for QuorumStoreConfig {
     fn default() -> QuorumStoreConfig {
         QuorumStoreConfig {
-            allow_batches_without_pos_in_proposal: false,
+            allow_batches_without_pos_in_proposal: true,
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_generation_poll_interval_ms: 25,
