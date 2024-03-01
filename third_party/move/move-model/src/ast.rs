@@ -2167,6 +2167,15 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
                         .get_full_name_str()
                 )
             },
+            Closure(mid, fid) => {
+                write!(
+                    f,
+                    "closure {}",
+                    self.env
+                        .get_function(mid.qualified(*fid))
+                        .get_full_name_str()
+                )
+            },
             Global(label_opt) => {
                 write!(f, "global")?;
                 if let Some(label) = label_opt {

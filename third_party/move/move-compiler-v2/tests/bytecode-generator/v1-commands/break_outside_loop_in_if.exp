@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {
         if true {
@@ -15,7 +15,6 @@ module <SELF>_0 {
         }
     }
 } // end <SELF>_0
-
 
 Diagnostics:
 error: missing enclosing loop statement

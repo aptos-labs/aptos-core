@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::m {
     private fun invalid<T>(addr: address) {
         if exists<T>(addr) {
@@ -14,7 +14,6 @@ module 0x42::m {
     }
     spec fun $invalid<T>(addr: address);
 } // end 0x42::m
-
 
 Diagnostics:
 error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: 'T'

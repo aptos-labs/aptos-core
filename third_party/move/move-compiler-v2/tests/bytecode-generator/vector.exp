@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::vector {
     private fun create(): vector<u64> {
         Vector<u64>(1, 2, 3)
@@ -7,7 +7,6 @@ module 0x42::vector {
         Vector<u64>(1, 2, 3)
     }
 } // end 0x42::vector
-
 ============ initial bytecode ================
 
 [variant baseline]

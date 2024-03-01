@@ -5,3 +5,26 @@ error: Return not currently supported in function-typed arguments (lambda expres
    │
 13 │             return adder(x, y)
    │             ^^^^^^^^^^^^^^^^^^
+
+// -- Model dump before bytecode pipeline
+module 0x42::Test {
+    public fun main(): u64 {
+        {
+          let (x: u64, y: u64) = Tuple(10, 100);
+          {
+            let (x: u64, y: u64) = Tuple(x, y);
+            return {
+              let (x: u64, y: u64) = Tuple(x, y);
+              Add<u64>(x, y)
+            }
+          }
+        }
+    }
+    spec fun $adder(x: u64,y: u64): u64 {
+        Add(x, y)
+    }
+    spec fun $apply(f: |(u64, u64)|u64,x: u64,y: u64): u64 {
+        (f)(x, y)
+    }
+    spec fun $main(): u64;
+} // end 0x42::Test

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::borrow {
     struct S {
         f: u64,
@@ -20,7 +20,6 @@ module 0x42::borrow {
     spec fun $mut_expr(x: u64): u64;
     spec fun $mut_field(s: &borrow::S): u64;
 } // end 0x42::borrow
-
 ============ initial bytecode ================
 
 [variant baseline]

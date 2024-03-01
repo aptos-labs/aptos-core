@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::pack_unpack {
     struct S {
         f1: u8,
@@ -90,7 +90,6 @@ module 0x42::pack_unpack {
         }
     }
 } // end 0x42::pack_unpack
-
 ============ initial bytecode ================
 
 [variant baseline]

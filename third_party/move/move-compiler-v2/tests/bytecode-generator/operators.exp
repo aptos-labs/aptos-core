@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::operators {
     private fun arithm(x: u64,y: u64): u64 {
         Add<u64>(x, Mod<u64>(Mul<u64>(Div<u64>(y, Sub<u64>(x, y)), y), x))
@@ -37,7 +37,6 @@ module 0x42::operators {
         And(And(And(Lt(x, y), Le(x, y)), Not(Gt(x, y))), Not(Ge(x, y)))
     }
 } // end 0x42::operators
-
 ============ initial bytecode ================
 
 [variant baseline]

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::LambdaTest1 {
     spec fun $inline_apply(f: |u64|u64,b: u64): u64 {
         (f)(b)

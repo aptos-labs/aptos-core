@@ -4,7 +4,7 @@
 //! This module implements lambda lifting, rewriting function definitions
 //! in the global environment.
 //!
-//! Currently lambda lifting is performed only in selected cases:
+//! Currently, lambda lifting is performed only in selected cases:
 //!
 //! - Inside of specification expressions;
 //! - For a lambda argument of a regular (not inline) function
@@ -16,7 +16,7 @@
 //! ```
 //! let c = 1;
 //! vec.any(|x| x > c)
-//! ~~~>
+//! ==>
 //! let c = 1;
 //! vec.any(Closure(lifted, c))
 //! where
@@ -29,7 +29,7 @@
 //! ```
 //! let c = 1;
 //! vec.any(|S{x}| x > c)
-//! ~~~>
+//! ==>
 //! let c = 1;
 //! vec.any(Closure(lifted, c))
 //! where
@@ -40,7 +40,7 @@ use itertools::Itertools;
 use move_binary_format::file_format::Visibility;
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex},
-    exp_rewriter::ExpRewriterFunctions,
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
     ty::Type,
@@ -53,7 +53,7 @@ use std::{
 #[derive(Debug, Clone, Default)]
 pub struct LambdaLiftingOptions {
     /// Whether to include inline functions, both definitions and arguments of calls.
-    include_inline_functions: bool,
+    pub include_inline_functions: bool,
 }
 
 /// Performs lambda lifting for all target modules in the environment.
@@ -121,7 +121,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
 /// Structure which is used to rewrite one function definition,
 /// using the `ExpRewriterFunctions` trait. During
 /// traversal of an expression, on ascent all the used but
-/// so far unbound parameters and locals are stored here.
+/// so far unbound parameters and locals are found here.
 /// These are the ones which need to be captured in a closure.
 struct LambdaLifter<'a> {
     /// The options for lambda lifting.
@@ -152,12 +152,21 @@ struct ClosureFunction {
 }
 
 impl<'a> LambdaLifter<'a> {
-    fn gen_local_name(&mut self) -> Symbol {
-        unimplemented!()
+    fn gen_parameter_name(&self, parameter_pos: usize) -> Symbol {
+        self.fun_env
+            .module_env
+            .env
+            .symbol_pool()
+            .make(&format!("param${}", parameter_pos))
     }
 
     fn gen_closure_function_name(&mut self) -> Symbol {
-        unimplemented!()
+        let env = self.fun_env.module_env.env;
+        env.symbol_pool().make(&format!(
+            "{}$lambda${}",
+            self.fun_env.get_name().display(env.symbol_pool()),
+            self.lifted.len() + 1
+        ))
     }
 
     fn bind(&self, mut bindings: Vec<(Pattern, Exp)>, exp: Exp) -> Exp {
@@ -178,20 +187,30 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
     fn rewrite_exp(&mut self, exp: Exp) -> Exp {
         // Intercept descent and compute lambdas being exempted from lifting, currently
         // those passed as parameters to inline functions.
-        if self.options.include_inline_functions {
-            return exp;
-        }
-        if let ExpData::Call(_, Operation::MoveFunction(mid, fid), args) = exp.as_ref() {
-            let env = self.fun_env.module_env.env;
-            if env.get_function(mid.qualified(*fid)).is_inline() {
-                for arg in args {
-                    if matches!(arg.as_ref(), ExpData::Lambda(..)) {
-                        self.exempted_lambdas.insert(arg.node_id());
+        if !self.options.include_inline_functions {
+            if let ExpData::Call(_, Operation::MoveFunction(mid, fid), args) = exp.as_ref() {
+                let env = self.fun_env.module_env.env;
+                if env.get_function(mid.qualified(*fid)).is_inline() {
+                    for arg in args {
+                        if matches!(arg.as_ref(), ExpData::Lambda(..)) {
+                            self.exempted_lambdas.insert(arg.node_id());
+                        }
                     }
                 }
             }
         }
-        self.rewrite_exp_descent(exp)
+        // Also if this is a lambda, before descent, clear any usages from siblings in the
+        // context, so we get the isolated usage information for the lambda's body.
+        if matches!(exp.as_ref(), ExpData::Lambda(..)) {
+            let mut curr_free_params = mem::take(&mut self.free_params);
+            let mut curr_free_locals = mem::take(&mut self.free_locals);
+            let result = self.rewrite_exp_descent(exp);
+            self.free_params.append(&mut curr_free_params);
+            self.free_locals.append(&mut curr_free_locals);
+            result
+        } else {
+            self.rewrite_exp_descent(exp)
+        }
     }
 
     fn rewrite_enter_scope<'b>(&mut self, vars: impl Iterator<Item = &'b (NodeId, Symbol)>) {
@@ -200,9 +219,9 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
     }
 
     fn rewrite_exit_scope(&mut self) {
-        let scope = self.scopes.pop().expect("stack balanced");
-        // Remove all locals which are bound in this scope
-        self.free_locals.retain(|name, _| !scope.contains(name));
+        let exiting = self.scopes.pop().expect("stack balanced");
+        // Remove all locals which are bound in the scope we are exiting.
+        self.free_locals.retain(|name, _| !exiting.contains(name));
     }
 
     fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
@@ -224,14 +243,20 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         let env = self.fun_env.module_env.env;
         let mut params = vec![];
         let mut closure_args = vec![];
-        // Add captured parameters
-        for (param, node_id) in mem::take(&mut self.free_params) {
+        // Add captured parameters. We also need to record a mapping of
+        // parameter indices in the lambda context to indices in the lifted
+        // functions (courtesy of #12317)
+        let mut param_index_mapping = BTreeMap::new();
+        for (used_param_count, (param, node_id)) in
+            mem::take(&mut self.free_params).into_iter().enumerate()
+        {
             let name = self.fun_env.get_local_name(param);
             let ty = env.get_node_type(node_id);
             let loc = env.get_node_loc(node_id);
             params.push(Parameter(name, ty.clone(), loc.clone()));
             let new_id = env.new_node(loc, ty);
-            closure_args.push(ExpData::Temporary(new_id, param).into_exp())
+            closure_args.push(ExpData::Temporary(new_id, param).into_exp());
+            param_index_mapping.insert(param, used_param_count);
         }
         // Add captured locals
         for (name, node_id) in mem::take(&mut self.free_locals) {
@@ -243,15 +268,15 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         }
         // Add lambda args. For dealing with patterns in lambdas (`|S{..}|e`) we need
         // to collect a list of bindings.
-        let mut bindings = vec![]; //
-        for arg in pat.clone().flatten() {
+        let mut bindings = vec![];
+        for (i, arg) in pat.clone().flatten().into_iter().enumerate() {
             let id = arg.node_id();
             let ty = env.get_node_type(id);
             let loc = env.get_node_loc(id);
             if let Pattern::Var(_, name) = arg {
                 params.push(Parameter(name, ty, loc))
             } else {
-                let name = self.gen_local_name();
+                let name = self.gen_parameter_name(i);
                 params.push(Parameter(name, ty.clone(), loc.clone()));
                 let new_id = env.new_node(loc, ty);
                 bindings.push((arg.clone(), ExpData::LocalVar(new_id, name).into_exp()))
@@ -266,13 +291,22 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         } else {
             Type::Error // type error reported
         };
+        // Rewrite references to Temporary in the new functions body (#12317)
+        let mut replacer = |id: NodeId, target: RewriteTarget| {
+            if let RewriteTarget::Temporary(temp) = target {
+                let new_temp = param_index_mapping.get(&temp).cloned().unwrap_or(temp);
+                return Some(ExpData::Temporary(id, new_temp).into_exp());
+            }
+            None
+        };
+        let body = ExpRewriter::new(env, &mut replacer).rewrite_exp(body.clone());
         self.lifted.push(ClosureFunction {
             loc: lambda_loc.clone(),
             fun_id: FunId::new(fun_name),
             type_params: self.fun_env.get_type_parameters(),
             params,
             result_type,
-            def: self.bind(bindings, body.clone()),
+            def: self.bind(bindings, body),
         });
         // Return closure expression
         let id = env.new_node(lambda_loc, lambda_type);

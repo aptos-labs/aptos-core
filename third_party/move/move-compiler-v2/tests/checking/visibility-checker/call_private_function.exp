@@ -8,3 +8,27 @@ error: function `0xdeadbeef::M::foo` cannot be called from function `0xdeadbeef:
   ·
 9 │         0xdeadbeef::M::foo() + my_foo()
   │         -------------------- called here
+
+// -- Model dump before bytecode pipeline
+module 0xdeadbeef::M {
+    private fun foo(): u64 {
+        1
+    }
+    spec fun $foo(): u64 {
+        1
+    }
+} // end 0xdeadbeef::M
+module 0xdeadbeef::N {
+    private fun calls_foo(): u64 {
+        Add<u64>(M::foo(), N::my_foo())
+    }
+    private fun my_foo(): u64 {
+        2
+    }
+    spec fun $calls_foo(): u64 {
+        Add(M::$foo(), N::$my_foo())
+    }
+    spec fun $my_foo(): u64 {
+        2
+    }
+} // end 0xdeadbeef::N
