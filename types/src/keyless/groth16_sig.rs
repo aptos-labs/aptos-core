@@ -187,6 +187,18 @@ impl Groth16Zkp {
         Groth16Zkp { a, b, c }
     }
 
+    pub fn get_a(&self) -> G1Bytes {
+        self.a
+    }
+
+    pub fn get_b(&self) -> G2Bytes {
+        self.b
+    }
+
+    pub fn get_c(&self) -> G1Bytes {
+        self.c
+    }
+
     /// NOTE: For testing only. (And used in `testsuite/generate-format`.)
     pub fn dummy_proof() -> Self {
         Groth16Zkp {

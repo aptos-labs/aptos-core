@@ -62,18 +62,6 @@ impl G1Bytes {
         Self::new_from_vec(bytes)
     }
 
-    // TODO(keyless) Shouldn't this return a result rather than unwrap()ing?
-    pub fn from_hex(hex: &str) -> Self {
-        let bytes = hex::decode(hex).unwrap();
-        let mut extended_bytes = [0u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES];
-        extended_bytes.copy_from_slice(&bytes);
-        Self(extended_bytes)
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.0)
-    }
-
     /// Used internally or for testing.
     pub fn new_from_vec(vec: Vec<u8>) -> anyhow::Result<Self> {
         if vec.len() == G1_PROJECTIVE_COMPRESSED_NUM_BYTES {
@@ -100,7 +88,8 @@ impl<'de> Deserialize<'de> for G1Bytes {
     {
         if deserializer.is_human_readable() {
             let s = <String>::deserialize(deserializer)?;
-            Ok(G1Bytes::from_hex(&s))
+            let bytes = hex::decode(s).map_err(serde::de::Error::custom)?;
+            G1Bytes::new_from_vec(bytes).map_err(serde::de::Error::custom)
         } else {
             // In order to preserve the Serde data model and help analysis tools,
             // make sure to wrap our value in a container with the same name
@@ -121,7 +110,7 @@ impl Serialize for G1Bytes {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            self.to_hex().serialize(serializer)
+            hex::encode(self.0).serialize(serializer)
         } else {
             // See comment in deserialize.
             serializer.serialize_newtype_struct("G1Bytes", &self.0)
@@ -162,18 +151,6 @@ impl G2Bytes {
         Self::new_from_vec(bytes)
     }
 
-    // TODO(keyless) Shouldn't this return a result rather than unwrap()ing?
-    pub fn from_hex(hex: &str) -> Self {
-        let bytes = hex::decode(hex).unwrap();
-        let mut extended_bytes = [0u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES];
-        extended_bytes.copy_from_slice(&bytes);
-        Self(extended_bytes)
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.0)
-    }
-
     pub fn new_from_vec(vec: Vec<u8>) -> anyhow::Result<Self> {
         if vec.len() == G2_PROJECTIVE_COMPRESSED_NUM_BYTES {
             let mut bytes = [0; G2_PROJECTIVE_COMPRESSED_NUM_BYTES];
@@ -199,7 +176,8 @@ impl<'de> Deserialize<'de> for G2Bytes {
     {
         if deserializer.is_human_readable() {
             let s = <String>::deserialize(deserializer)?;
-            Ok(G2Bytes::from_hex(&s))
+            let bytes = hex::decode(s).map_err(serde::de::Error::custom)?;
+            G2Bytes::new_from_vec(bytes).map_err(serde::de::Error::custom)
         } else {
             // In order to preserve the Serde data model and help analysis tools,
             // make sure to wrap our value in a container with the same name
@@ -220,7 +198,7 @@ impl Serialize for G2Bytes {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            self.to_hex().serialize(serializer)
+            hex::encode(self.0).serialize(serializer)
         } else {
             // Doing this differently than G1Bytes in order to use serde(with = "BigArray"). This
             // apparently is needed to correctly deserialize arrays with size greater than 32.

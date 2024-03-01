@@ -34,7 +34,7 @@ pub mod test_utils;
 use crate::keyless::circuit_constants::devnet_prepared_vk;
 pub use bn254_circom::{
     g1_projective_str_to_affine, g2_projective_str_to_affine, get_public_inputs_hash, G1Bytes,
-    G2Bytes,
+    G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
 };
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Zkp, Groth16ZkpAndStatement, SignedGroth16Zkp};
@@ -161,18 +161,6 @@ impl Pepper {
         &self.0
     }
 
-    // TODO(keyless) Shouldn't this return a result rather than unwrap()ing?
-    pub fn from_hex(hex: &str) -> Self {
-        let bytes = hex::decode(hex).unwrap();
-        let mut extended_bytes = [0u8; Self::NUM_BYTES];
-        extended_bytes.copy_from_slice(&bytes);
-        Self(extended_bytes)
-    }
-
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.0)
-    }
-
     // Used for testing. #[cfg(test)] doesn't seem to allow for use in smoke tests.
     pub fn from_number(num: u128) -> Self {
         let big_int = num_bigint::BigUint::from(num);
@@ -190,7 +178,12 @@ impl<'de> Deserialize<'de> for Pepper {
     {
         if deserializer.is_human_readable() {
             let s = <String>::deserialize(deserializer)?;
-            Ok(Pepper::from_hex(&s))
+            let bytes = hex::decode(s)
+                .map_err(serde::de::Error::custom)?
+                .try_into()
+                .map_err(|e| serde::de::Error::custom(format!("{:?}", e)))?;
+
+            Ok(Pepper::new(bytes))
         } else {
             // In order to preserve the Serde data model and help analysis tools,
             // make sure to wrap our value in a container with the same name
@@ -211,7 +204,7 @@ impl Serialize for Pepper {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            self.to_hex().serialize(serializer)
+            hex::encode(self.0).serialize(serializer)
         } else {
             // See comment in deserialize.
             serializer.serialize_newtype_struct("Pepper", &self.0)
