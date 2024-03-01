@@ -212,7 +212,10 @@ fn verify_simple_payment() {
         .max_gas_amount(100_000)
         .gas_unit_price(1)
         .raw()
-        .sign(&sender.account().privkey, sender.account().pubkey.as_ed25519().unwrap())
+        .sign(
+            &sender.account().privkey,
+            sender.account().pubkey.as_ed25519().unwrap(),
+        )
         .unwrap()
         .into_inner();
 
