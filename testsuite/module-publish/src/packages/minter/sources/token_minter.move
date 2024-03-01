@@ -15,7 +15,6 @@ module token_minter::token_minter {
     use std::signer;
     use std::string::{String, utf8};
     use std::vector;
-    use std::debug;
 
     /// Current version of the token minter
     const VERSION: u64 = 1;
@@ -79,7 +78,7 @@ module token_minter::token_minter {
     }
 
     fun init_module(deployer: &signer) {
-        let obj = init_token_minter_object(
+        init_token_minter_object(
             deployer,
             utf8(b"Collection description"),
             option::none(),
@@ -98,8 +97,6 @@ module token_minter::token_minter {
             false,
             false,
         );
-        debug::print(&b"here");
-        debug::print(&obj)
     }
 
     public entry fun init_token_minter(
@@ -180,14 +177,12 @@ module token_minter::token_minter {
             soulbound,
         );
 
-        let obj = init_token_minter_object_object(
+        init_token_minter_object_object(
             &object_signer,
             &constructor_ref,
             object::object_from_constructor_ref(collection_constructor_ref),
             creator_mint_only,
-        );
-        debug::print(&obj);
-        obj
+        )
     }
 
     public entry fun mint_tokens(

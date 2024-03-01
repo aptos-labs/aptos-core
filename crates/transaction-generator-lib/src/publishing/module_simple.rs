@@ -594,15 +594,13 @@ impl EntryPoints {
                 let properties_keys: [[String; 0]; 1] = [[]];
                 let properties_types: [[String; 0]; 1] = [[]];
                 let properties_values: [[String; 0]; 1] = [[]];
-                let random_address = AccountAddress::from_bytes(
-                    &rng.gen_range(0u64, 2147483646u64).to_be_bytes()
-                ).unwrap();
-                let recipient_addrs: [AccountAddress; 1] = [random_address];
+                let random_addr_string = format!("0x{:0>64}", format!("{:x}", rng.gen_range(0u64, 2147483646u64)));
+                let recipient_addrs: [AccountAddress; 1] = [AccountAddress::from_hex_literal(&random_addr_string).unwrap()];
                 get_payload(
                     module_id,
                     ident_str!("mint_tokens").to_owned(),
                     vec![
-                        bcs::to_bytes(&AccountAddress::from_hex_literal("0x80187c4e29f64b0098908644d905a872b4ed1f0835fb52aae0cc7cbcba269b66").unwrap()).unwrap(),
+                        bcs::to_bytes(&AccountAddress::from_hex_literal("0xa27a573cecb8f3b9ec5850f04f843c96fd99c2005c1a6d686b846b7cd45c5aaf").unwrap()).unwrap(),
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
                         bcs::to_bytes("superstar #").unwrap(),          // name
                         bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
