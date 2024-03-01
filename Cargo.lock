@@ -2786,7 +2786,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "chrono",
 ]
@@ -13016,11 +13016,11 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "ahash 0.8.8",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352)",
  "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=5d1cefad0ea0d37fb08e9aec7847080745c83f9c)",
  "async-trait",
  "base64 0.13.1",
@@ -14625,7 +14625,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "anyhow",
  "async-trait",
