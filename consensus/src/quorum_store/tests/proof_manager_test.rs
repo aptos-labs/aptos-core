@@ -83,6 +83,7 @@ fn assert_payload_response(
             }
             assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
         },
+        // TODO: Check how to update this for Payload::QuorumStoreInlineHybrid
         _ => panic!("Unexpected variant"),
     }
 }
