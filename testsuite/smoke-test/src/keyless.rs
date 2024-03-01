@@ -22,11 +22,15 @@ use aptos_types::{
             get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk,
             get_sample_openid_sig_and_pk,
         },
-        Configuration, Groth16VerificationKey, Groth16ZkpAndStatement, KeylessPublicKey,
-        KeylessSignature, ZkpOrOpenIdSig, KEYLESS_ACCOUNT_MODULE_NAME,
+        Configuration, Groth16VerificationKey, Groth16Zkp, Groth16ZkpAndStatement,
+        KeylessPublicKey, KeylessSignature, TransactionAndGroth16Zkp, ZkpOrOpenIdSig,
+        KEYLESS_ACCOUNT_MODULE_NAME,
     },
     transaction::{
-        authenticator::{AnyPublicKey, EphemeralSignature},
+        authenticator::{
+            AccountAuthenticator, AnyPublicKey, AnySignature, EphemeralSignature,
+            TransactionAuthenticator,
+        },
         SignedTransaction,
     },
 };
@@ -119,18 +123,11 @@ async fn test_keyless_groth16_verifies() {
 #[tokio::test]
 async fn test_keyless_groth16_with_mauled_proof() {
     let (tw_sk, config, jwk, mut swarm) = setup_local_net().await;
-    let (mut sig, pk) = get_sample_groth16_sig_and_pk();
-
-    match &mut sig.sig {
-        ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-            proof.non_malleability_signature =
-                EphemeralSignature::ed25519(tw_sk.sign(&proof.proof).unwrap()); // bad signature using the TW SK rather than the ESK
-        },
-        ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
-    }
+    let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
     let signed_txn = sign_transaction(&mut info, sig, pk, &jwk, &config, &tw_sk).await;
+    let signed_txn = maul_groth16_zkp_signature(signed_txn);
 
     info!("Submit keyless Groth16 transaction");
     let result = info
@@ -193,7 +190,6 @@ async fn sign_transaction<'a>(
         .build();
 
     let esk = get_sample_esk();
-    sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
 
     let public_inputs_hash: Option<[u8; 32]> = if let ZkpOrOpenIdSig::Groth16Zkp(_) = &sig.sig {
         // This will only calculate the hash if it's needed, avoiding unnecessary computation.
@@ -209,6 +205,11 @@ async fn sign_transaction<'a>(
         None
     };
 
+    let mut txn_and_zkp = TransactionAndGroth16Zkp {
+        message: raw_txn.clone(),
+        proof: None,
+    };
+
     // Compute the training wheels signature if not present
     match &mut sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(proof) => {
@@ -220,10 +221,56 @@ async fn sign_transaction<'a>(
             proof.training_wheels_signature = Some(EphemeralSignature::ed25519(
                 tw_sk.sign(&proof_and_statement).unwrap(),
             ));
+
+            txn_and_zkp.proof = Some(proof.proof);
         },
         ZkpOrOpenIdSig::OpenIdSig(_) => {},
     }
 
+    sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
+
+    SignedTransaction::new_keyless(raw_txn, pk, sig)
+}
+
+fn maul_groth16_zkp_signature(txn: SignedTransaction) -> SignedTransaction {
+    // extract the keyless PK and signature
+    let (pk, mut sig) = match txn.authenticator() {
+        TransactionAuthenticator::SingleSender {
+            sender: AccountAuthenticator::SingleKey { authenticator },
+        } => match (authenticator.public_key(), authenticator.signature()) {
+            (AnyPublicKey::Keyless { public_key }, AnySignature::Keyless { signature }) => {
+                (public_key.clone(), signature.clone())
+            },
+            _ => panic!("Expected keyless authenticator"),
+        },
+        _ => panic!("Expected keyless authenticator"),
+    };
+
+    // disassemble the txn
+    let raw_txn = txn.into_raw_transaction();
+    let mut txn_and_zkp = TransactionAndGroth16Zkp {
+        message: raw_txn.clone(),
+        proof: None,
+    };
+
+    // maul ephemeral signature to be over a different proof: (a, b, a) instead of (a, b, c)
+    match &mut sig.sig {
+        ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+            let old_proof = proof.proof;
+
+            txn_and_zkp.proof = Some(Groth16Zkp::new(
+                *old_proof.get_a(),
+                *old_proof.get_b(),
+                *old_proof.get_a(),
+            ));
+
+            let esk = get_sample_esk();
+            sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
+        },
+        ZkpOrOpenIdSig::OpenIdSig(_) => {},
+    };
+
+    // reassemble TXN
     SignedTransaction::new_keyless(raw_txn, pk, sig)
 }
 

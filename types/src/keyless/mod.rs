@@ -11,6 +11,7 @@ use crate::{
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use ark_serialize::CanonicalSerialize;
@@ -92,8 +93,17 @@ pub struct KeylessSignature {
 
     /// A short lived public key used to verify the `ephemeral_signature`.
     pub ephemeral_pubkey: EphemeralPublicKey,
-    /// The signature of the transaction signed by the private key of the `ephemeral_pubkey`.
+
+    /// A signature ove the transaction and, if present, the ZKP, under `ephemeral_pubkey`.
+    /// The ZKP is included in this signature to prevent malleability attacks.
     pub ephemeral_signature: EphemeralSignature,
+}
+
+/// This struct wraps the transaction and optional ZKP that is signed with the ephemeral secret key.
+#[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
+pub struct TransactionAndGroth16Zkp<T> {
+    pub message: T,
+    pub proof: Option<Groth16Zkp>,
 }
 
 impl TryFrom<&[u8]> for KeylessSignature {

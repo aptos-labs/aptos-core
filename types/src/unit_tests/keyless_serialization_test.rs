@@ -160,12 +160,12 @@ fn test_g1_bytes_serialization() {
     let g1_bytes = groth16_zkp_and_statement.proof.get_a();
 
     assert_eq!(
-        serde_json::from_str::<G1Bytes>(&serde_json::to_string(&g1_bytes).unwrap()).unwrap(),
-        g1_bytes
+        serde_json::from_str::<G1Bytes>(&serde_json::to_string(g1_bytes).unwrap()).unwrap(),
+        *g1_bytes
     );
     assert_eq!(
-        bcs::from_bytes::<G1Bytes>(&bcs::to_bytes(&g1_bytes).unwrap()).unwrap(),
-        g1_bytes
+        bcs::from_bytes::<G1Bytes>(&bcs::to_bytes(g1_bytes).unwrap()).unwrap(),
+        *g1_bytes
     );
 
     // these values were generated as follows:
@@ -203,12 +203,12 @@ fn test_g2_bytes_serialization() {
     let g2_bytes = groth16_zkp_and_statement.proof.get_b();
 
     assert_eq!(
-        serde_json::from_str::<G2Bytes>(&serde_json::to_string(&g2_bytes).unwrap()).unwrap(),
-        g2_bytes
+        serde_json::from_str::<G2Bytes>(&serde_json::to_string(g2_bytes).unwrap()).unwrap(),
+        *g2_bytes
     );
     assert_eq!(
-        bcs::from_bytes::<G2Bytes>(&bcs::to_bytes(&g2_bytes).unwrap()).unwrap(),
-        g2_bytes
+        bcs::from_bytes::<G2Bytes>(&bcs::to_bytes(g2_bytes).unwrap()).unwrap(),
+        *g2_bytes
     );
 
     // these values were generated as follows:

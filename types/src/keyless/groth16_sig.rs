@@ -28,8 +28,6 @@ pub struct Groth16Zkp {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct SignedGroth16Zkp {
     pub proof: Groth16Zkp,
-    /// A signature on the proof (via the ephemeral SK) to prevent malleability attacks.
-    pub non_malleability_signature: EphemeralSignature,
     /// The expiration horizon that the circuit should enforce on the expiration date committed in
     /// the nonce. This must be <= `Configuration::max_expiration_horizon_secs`.
     pub exp_horizon_secs: u64,
@@ -137,10 +135,6 @@ impl Serialize for Groth16ZkpAndStatement {
 }
 
 impl SignedGroth16Zkp {
-    pub fn verify_non_malleability_sig(&self, pub_key: &EphemeralPublicKey) -> anyhow::Result<()> {
-        self.non_malleability_signature.verify(&self.proof, pub_key)
-    }
-
     pub fn verify_training_wheels_sig(
         &self,
         pub_key: &EphemeralPublicKey,
@@ -187,16 +181,16 @@ impl Groth16Zkp {
         Groth16Zkp { a, b, c }
     }
 
-    pub fn get_a(&self) -> G1Bytes {
-        self.a
+    pub fn get_a(&self) -> &G1Bytes {
+        &self.a
     }
 
-    pub fn get_b(&self) -> G2Bytes {
-        self.b
+    pub fn get_b(&self) -> &G2Bytes {
+        &self.b
     }
 
-    pub fn get_c(&self) -> G1Bytes {
-        self.c
+    pub fn get_c(&self) -> &G1Bytes {
+        &self.c
     }
 
     /// NOTE: For testing only. (And used in `testsuite/generate-format`.)

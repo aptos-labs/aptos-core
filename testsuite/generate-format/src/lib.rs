@@ -95,9 +95,6 @@ pub(crate) fn trace_keyless_structs(
     let keyless_signature = keyless::KeylessSignature {
         sig: ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof: Groth16Zkp::dummy_proof(),
-            non_malleability_signature: EphemeralSignature::Ed25519 {
-                signature: signature.clone(),
-            },
             exp_horizon_secs: 0,
             extra_field: None,
             override_aud_val: None,

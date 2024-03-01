@@ -58,7 +58,6 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ZkpAndStatement {
     let proof = match sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
             proof,
-            non_malleability_signature: _,
             exp_horizon_secs: _,
             extra_field: _,
             override_aud_val: _,
@@ -80,7 +79,6 @@ pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
     let groth16zkp = SignedGroth16Zkp {
         proof,
-        non_malleability_signature: EphemeralSignature::ed25519(SAMPLE_ESK.sign(&proof).unwrap()),
         extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
         exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
         override_aud_val: None,
