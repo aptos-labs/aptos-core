@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 pub fn primary_store(address: &AccountAddress) -> AccountAddress {
     let mut bytes = address.to_vec();
-    bytes.append(&mut AccountAddress::ONE.to_vec());
+    bytes.append(&mut AccountAddress::TEN.to_vec());
     bytes.push(0xFC);
     AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
 }

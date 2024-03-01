@@ -328,7 +328,7 @@ module aptos_framework::transaction_fee {
         aptos_account::create_account(alice_addr);
         aptos_account::create_account(bob_addr);
         aptos_account::create_account(carol_addr);
-        assert!(object::object_address(&ensure_paired_metadata<AptosCoin>()) == @aptos_framework, 0);
+        assert!(object::object_address(&ensure_paired_metadata<AptosCoin>()) == @aptos_fungible_asset, 0);
         coin::deposit(alice_addr, coin::mint(10000, &mint_cap));
         coin::deposit(bob_addr, coin::mint(10000, &mint_cap));
         coin::deposit(carol_addr, coin::mint(10000, &mint_cap));
