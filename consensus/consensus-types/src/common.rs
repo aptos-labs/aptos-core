@@ -348,6 +348,13 @@ impl Payload {
                 }
                 Ok(())
             },
+            (true, Payload::QuorumStoreInlineHybrid(_inline_batches, proof_with_status)) => {
+                for proof in proof_with_status.proof_with_data.proofs.iter() {
+                    proof.verify(validator)?;
+                }
+                // TODO: Do we need to make any checks to verify inline_batches?
+                Ok(())
+            },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,
