@@ -1,27 +1,47 @@
 use crate::operator::{MutantInfo, MutationOperator};
+use crate::operators::ExpLoc;
 use crate::report::{Mutation, Range};
-use move_command_line_common::files::FileHash;
-use move_compiler::parser::ast::UnaryOp;
+use codespan::FileId;
+use move_model::ast::Operation;
+use move_model::model::Loc;
 use std::fmt;
 
 pub const OPERATOR_NAME: &str = "unary_operator_replacement";
 
 /// Represents a unary operator mutation.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Unary {
-    op: UnaryOp,
+    operation: Operation,
+    loc: Loc,
+    exps: Vec<ExpLoc>,
 }
 
 impl Unary {
-    pub fn new(op: UnaryOp) -> Self {
-        Self { op }
+    pub fn new(operation: Operation, loc: Loc, exps: Vec<ExpLoc>) -> Self {
+        Self {
+            operation,
+            loc,
+            exps,
+        }
     }
 }
 
 impl MutationOperator for Unary {
     fn apply(&self, source: &str) -> Vec<MutantInfo> {
-        let start = self.op.loc.start() as usize;
-        let end = self.op.loc.end() as usize;
+        if self.exps.len() != 1 {
+            warn!(
+                "UnaryOperator: Expected exactly one expression, got {}",
+                self.exps.len()
+            );
+            return vec![];
+        }
+
+        let start = self.loc.span().start().to_usize();
+        // Adjust start to omit whitespaces before the operator
+        let start = source[start..]
+            .find(|c: char| !c.is_whitespace())
+            .map_or(start, |i| start + i);
+        let end = self.loc.span().end().to_usize();
         let cur_op = &source[start..end];
 
         // For unary operator mutations, we only need to replace the operator with a space (to ensure the same file length).
@@ -43,8 +63,8 @@ impl MutationOperator for Unary {
             .collect()
     }
 
-    fn get_file_hash(&self) -> FileHash {
-        self.op.loc.file_hash()
+    fn get_file_id(&self) -> FileId {
+        self.loc.file_id()
     }
 
     fn name(&self) -> String {
@@ -56,11 +76,11 @@ impl fmt::Display for Unary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "UnaryOperator({}, location: file hash: {}, index start: {}, index stop: {})",
-            self.op.value,
-            self.op.loc.file_hash(),
-            self.op.loc.start(),
-            self.op.loc.end()
+            "UnaryOperator({:?}, location: file id: {:?}, index start: {}, index stop: {})",
+            self.operation,
+            self.loc.file_id(),
+            self.loc.span().start(),
+            self.loc.span().end()
         )
     }
 }
@@ -68,18 +88,19 @@ impl fmt::Display for Unary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_command_line_common::files::FileHash;
-    use move_compiler::parser::ast::{UnaryOp, UnaryOp_};
-    use move_ir_types::location::Loc;
+    use codespan::Files;
+    use move_model::ast::{ExpData, Value};
+    use move_model::model::NodeId;
 
     #[test]
     fn test_apply_unary_operator() {
-        let loc = Loc::new(FileHash::new(""), 0, 1);
-        let unary_op = UnaryOp {
-            value: UnaryOp_::Not,
-            loc,
-        };
-        let operator = Unary::new(unary_op);
+        let mut files = Files::new();
+        let fid = files.add("test", "test");
+        let loc = Loc::new(fid, codespan::Span::new(0, 1));
+        let e1 = ExpData::Value(NodeId::new(1), Value::Bool(true));
+        let exp = ExpLoc::new(e1.into_exp(), loc.clone());
+
+        let operator = Unary::new(Operation::Not, loc, vec![exp]);
         let source = "!";
         let expected = vec![" "];
         let result = operator.apply(source);
@@ -90,13 +111,11 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_hash() {
-        let loc = Loc::new(FileHash::new(""), 0, 0);
-        let unary_op = UnaryOp {
-            value: UnaryOp_::Not,
-            loc,
-        };
-        let operator = Unary::new(unary_op);
-        assert_eq!(operator.get_file_hash(), FileHash::new(""));
+    fn test_get_file_id() {
+        let mut files = Files::new();
+        let fid = files.add("test", "test");
+        let loc = Loc::new(fid, codespan::Span::new(0, 0));
+        let operator = Unary::new(Operation::Not, loc, vec![]);
+        assert_eq!(operator.get_file_id(), fid);
     }
 }

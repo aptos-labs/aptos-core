@@ -1,4 +1,4 @@
-module Test::Cond {
+module 0xCAFE::Cond {
     fun main() {
         let a = true;
         if (a) {

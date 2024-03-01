@@ -1,3 +1,4 @@
+use anyhow::bail;
 use either::Either;
 use move_command_line_common::address::NumericalAddress;
 use move_command_line_common::parser::NumberFormat;
@@ -7,13 +8,9 @@ use std::{fs, io};
 
 use crate::configuration::Configuration;
 use itertools::Itertools;
-use move_compiler::diagnostics::FilesSourceText;
-use move_compiler::{
-    attr_derivation,
-    command_line::compiler::{Compiler, PASS_TYPING},
-    diagnostics::unwrap_or_report_diagnostics,
-    shared::Flags,
-};
+use move_compiler::{attr_derivation, shared::Flags};
+use move_compiler_v2::run_checker;
+use move_model::model::GlobalEnv;
 use move_package::compilation::compiled_package::make_source_and_deps_for_compiler;
 use move_package::resolution::resolution_graph::ResolvedTable;
 use move_package::source_package::layout::SourcePackageLayout;
@@ -23,9 +20,7 @@ use move_symbol_pool::Symbol;
 
 /// Generate the AST from the Move sources.
 ///
-/// Generation of the AST is done by the Move compiler. Move compiler is stepped compiler, which means that
-/// it is possible to get the intermediate results of the compilation. This function uses it to get the AST
-/// right after the parsing phase.
+/// Generation of the AST is done by the Move model package.
 ///
 /// Generated AST contains all the information for all the Move files provided in the package or Move sources vector
 /// present in the mutator configuration.
@@ -50,12 +45,12 @@ use move_symbol_pool::Symbol;
 ///
 /// # Returns
 ///
-/// * `Result<(FilesSourceText, move_compiler::typing::ast::Program), anyhow::Error>` - tuple of `FilesSourceText` and Program if successful, or an error if any error occurs.
+/// * `Result<GlobalEnv, anyhow::Error>` - `GlobalEnv` if successful, or an error if any error occurs.
 pub fn generate_ast(
     mutator_config: &Configuration,
     config: &BuildConfig,
     package_path: &Path,
-) -> Result<(FilesSourceText, move_compiler::typing::ast::Program), anyhow::Error> {
+) -> Result<GlobalEnv, anyhow::Error> {
     trace!("Generating AST for package: {package_path:?} and config: {config:?}");
 
     let source_files = mutator_config
@@ -65,23 +60,22 @@ pub fn generate_ast(
         .map(|p| p.to_str().expect("source path contains invalid characters"))
         .collect::<Vec<_>>();
 
+    let package = source_files.is_empty();
+
     // If the `-m` option is specified, we should use only `move_sources`. Using Move source means we won't
     // check for deps or resolve names as there might be no standard package layout. That means we can mutate
     // only quite simple files.
-    let compiler = if source_files.is_empty() {
+    let options = if package {
         prepare_compiler_for_package(config, package_path)?
     } else {
-        prepare_compiler_for_files(config, source_files)
+        prepare_compiler_for_files(config, source_files.as_slice())
     };
 
-    let (files, res) = compiler.run::<PASS_TYPING>()?;
-
-    let (_, stepped) = unwrap_or_report_diagnostics(&files, res);
-    let (_, ast) = stepped.into_ast();
+    let env = run_checker(options.clone())?;
 
     trace!("Sources parsed successfully, AST generated");
 
-    Ok((files, ast))
+    Ok(env)
 }
 
 /// Prepare the compiler for the given package.
@@ -102,10 +96,10 @@ pub fn generate_ast(
 /// # Returns
 ///
 /// * `Result<Compiler<'a>, anyhow::Error>` - the prepared compiler if successful, or an error if any error occurs.
-fn prepare_compiler_for_package<'a>(
+fn prepare_compiler_for_package(
     config: &BuildConfig,
     package_path: &Path,
-) -> Result<Compiler<'a>, anyhow::Error> {
+) -> Result<move_compiler_v2::Options, anyhow::Error> {
     let mut compilation_msg = vec![];
     let resolved_graph = config
         .clone()
@@ -115,35 +109,30 @@ fn prepare_compiler_for_package<'a>(
 
     let immediate_dependencies_names = root_package.immediate_dependencies(&resolved_graph);
 
-    let transitive_dependencies: Vec<(
-        /* name */ Symbol,
-        /* is immediate */ bool,
-        /* source paths */ Vec<Symbol>,
-        /* address mapping */ &ResolvedTable,
-        /* whether source is available */ bool,
-    )> = root_package
-        .transitive_dependencies(&resolved_graph)
-        .into_iter()
-        .map(|package_name| {
-            let dep_package = resolved_graph.package_table.get(&package_name).unwrap();
-            let mut dep_source_paths = dep_package
-                .get_sources(&resolved_graph.build_options)
-                .unwrap();
-            let mut source_available = true;
-            // If source is empty, search bytecode(mv) files
-            if dep_source_paths.is_empty() {
-                dep_source_paths = dep_package.get_bytecodes().unwrap();
-                source_available = false;
-            }
-            (
-                package_name,
-                immediate_dependencies_names.contains(&package_name),
-                dep_source_paths,
-                &dep_package.resolution_table,
-                source_available,
-            )
-        })
-        .collect();
+    let transitive_dependencies: Vec<(Symbol, bool, Vec<Symbol>, &ResolvedTable, bool)> =
+        root_package
+            .transitive_dependencies(&resolved_graph)
+            .into_iter()
+            .map(|package_name| {
+                let dep_package = resolved_graph.package_table.get(&package_name).unwrap();
+                let mut dep_source_paths = dep_package
+                    .get_sources(&resolved_graph.build_options)
+                    .unwrap();
+                let mut source_available = true;
+                // If source is empty, search bytecode(mv) files
+                if dep_source_paths.is_empty() {
+                    dep_source_paths = dep_package.get_bytecodes().unwrap();
+                    source_available = false;
+                }
+                (
+                    package_name,
+                    immediate_dependencies_names.contains(&package_name),
+                    dep_source_paths,
+                    &dep_package.resolution_table,
+                    source_available,
+                )
+            })
+            .collect();
 
     let transitive_dependencies = transitive_dependencies
         .into_iter()
@@ -187,12 +176,48 @@ fn prepare_compiler_for_package<'a>(
     let mut paths = src_deps;
     paths.push(sources_package_paths.clone());
 
-    Ok(Compiler::from_package_paths(
-        paths,
-        bytecode_deps,
-        flags,
-        &known_attributes,
-    ))
+    let to_str_vec = |ps: &[Symbol]| {
+        ps.iter()
+            .map(move |s| s.as_str().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let mut global_address_map = BTreeMap::new();
+    for pack in paths.iter().chain(bytecode_deps.iter()) {
+        for (name, val) in &pack.named_address_map {
+            if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val) {
+                if old != *val {
+                    let pack_name = pack
+                        .name
+                        .map_or_else(|| "<unnamed>".to_owned(), |s| s.as_str().to_owned());
+                    bail!(
+                        "found remapped address alias `{}` (`{} != {}`) in package `{}`\
+                                    , please use unique address aliases across dependencies",
+                        name,
+                        old,
+                        val,
+                        pack_name
+                    )
+                }
+            }
+        }
+    }
+
+    let options = move_compiler_v2::Options {
+        sources: paths.iter().flat_map(|x| to_str_vec(&x.paths)).collect(),
+        dependencies: bytecode_deps
+            .iter()
+            .flat_map(|x| to_str_vec(&x.paths))
+            .collect(),
+        named_address_mapping: global_address_map
+            .into_iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect(),
+        skip_attribute_checks: config.compiler_config.skip_attribute_checks,
+        known_attributes: known_attributes.clone(),
+        ..Default::default()
+    };
+
+    Ok(options)
 }
 
 /// Prepare the compiler for the given source files.
@@ -209,7 +234,10 @@ fn prepare_compiler_for_package<'a>(
 /// # Returns
 ///
 /// * `Result<Compiler<'a>, anyhow::Error>` - the prepared compiler if successful, or an error if any error occurs.
-fn prepare_compiler_for_files<'a>(config: &BuildConfig, source_files: Vec<&str>) -> Compiler<'a> {
+fn prepare_compiler_for_files(
+    config: &BuildConfig,
+    source_files: &[&str],
+) -> move_compiler_v2::Options {
     debug!("Source files and folders: {source_files:?}");
 
     let named_addr_map = config
@@ -224,15 +252,22 @@ fn prepare_compiler_for_files<'a>(config: &BuildConfig, source_files: Vec<&str>)
         })
         .collect::<BTreeMap<_, _>>();
 
-    let flags = Flags::empty();
+    let known_attributes = config.compiler_config.known_attributes.clone();
 
-    Compiler::from_files(
-        source_files,
-        vec![],
-        named_addr_map,
-        flags,
-        &config.compiler_config.known_attributes,
-    )
+    move_compiler_v2::Options {
+        sources: source_files
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect(),
+        dependencies: vec![],
+        named_address_mapping: named_addr_map
+            .into_iter()
+            .map(|(k, v)| format!("{k}={v}"))
+            .collect(),
+        skip_attribute_checks: config.compiler_config.skip_attribute_checks,
+        known_attributes: known_attributes.clone(),
+        ..Default::default()
+    }
 }
 
 /// Verify the mutant.
@@ -303,7 +338,7 @@ pub fn verify_mutant(
     //TODO: It might be better to use the different compiler stage to speed up the whole
     // process. For the verification purposes it might be suffcient some earlier stage,
     // e.g. type-checking.
-    working_config.compile_package(tempdir.path(), &mut compilation_msg)?;
+    working_config.compile_package_no_exit(tempdir.path(), &mut compilation_msg)?;
 
     info!(
         "Compilation status: {}",
@@ -324,6 +359,10 @@ pub fn verify_mutant(
 /// # Errors
 ///
 /// * If any error occurs during the rewrite, the appropriate error is returned using anyhow.
+///
+/// # Panics
+///
+/// This function panics if dependency paths contain no Unicode characters.
 ///
 /// # Returns
 ///

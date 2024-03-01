@@ -1,4 +1,4 @@
-module 0x2::Collection {
+module 0xCAFE::Collection {
     struct Item has store {}
 
     struct Collection has key {

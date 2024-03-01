@@ -6,7 +6,7 @@ use crate::operators::ifelse::IfElse;
 use crate::operators::literal::Literal;
 use crate::operators::unary::Unary;
 use crate::report::Mutation;
-use move_command_line_common::files::FileHash;
+use codespan::FileId;
 use std::fmt;
 use std::fmt::Debug;
 
@@ -46,8 +46,8 @@ pub trait MutationOperator {
     /// * `Vec<MutantInfo>` - A vector of `MutantInfo` instances representing the mutated source code.
     fn apply(&self, source: &str) -> Vec<MutantInfo>;
 
-    /// Returns the file hash of the file that this mutation operator is in.
-    fn get_file_hash(&self) -> FileHash;
+    /// Returns the id of the file that this mutation operator is in.
+    fn get_file_id(&self) -> FileId;
 
     /// Returns the name of the mutation operator.
     fn name(&self) -> String;
@@ -80,15 +80,15 @@ impl MutationOperator for MutationOp {
         }
     }
 
-    fn get_file_hash(&self) -> FileHash {
+    fn get_file_id(&self) -> FileId {
         match self {
-            MutationOp::BinaryOp(bin_op) => bin_op.get_file_hash(),
-            MutationOp::UnaryOp(unary_op) => unary_op.get_file_hash(),
-            MutationOp::BreakContinue(break_continue) => break_continue.get_file_hash(),
-            MutationOp::Literal(literal) => literal.get_file_hash(),
-            MutationOp::IfElse(if_else) => if_else.get_file_hash(),
-            MutationOp::DeleteStmt(delete_stmt) => delete_stmt.get_file_hash(),
-            MutationOp::BinarySwap(binary_swap) => binary_swap.get_file_hash(),
+            MutationOp::BinaryOp(bin_op) => bin_op.get_file_id(),
+            MutationOp::UnaryOp(unary_op) => unary_op.get_file_id(),
+            MutationOp::BreakContinue(break_continue) => break_continue.get_file_id(),
+            MutationOp::Literal(literal) => literal.get_file_id(),
+            MutationOp::IfElse(if_else) => if_else.get_file_id(),
+            MutationOp::DeleteStmt(delete_stmt) => delete_stmt.get_file_id(),
+            MutationOp::BinarySwap(binary_swap) => binary_swap.get_file_id(),
         }
     }
 
@@ -122,35 +122,16 @@ impl fmt::Display for MutationOp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_command_line_common::files::FileHash;
-    use move_compiler::parser::ast::{BinOp, BinOp_};
-    use move_ir_types::location::Loc;
+    use codespan::Files;
+    use move_model::ast::Operation;
+    use move_model::model::Loc;
 
     #[test]
-    fn test_apply_binary_operator() {
-        let loc = Loc::new(FileHash::new(""), 0, 1);
-        let bin_op = BinOp {
-            value: BinOp_::Mul,
-            loc,
-        };
-        let operator = MutationOp::BinaryOp(Binary::new(bin_op));
-        let source = "*";
-        let expected = vec!["+", "-", "/", "%"];
-        let result = operator.apply(source);
-        assert_eq!(result.len(), expected.len());
-        for (i, r) in result.iter().enumerate() {
-            assert_eq!(r.mutated_source, expected[i]);
-        }
-    }
-
-    #[test]
-    fn test_get_file_hash() {
-        let loc = Loc::new(FileHash::new(""), 0, 0);
-        let bin_op = BinOp {
-            value: BinOp_::Add,
-            loc,
-        };
-        let operator = MutationOp::BinaryOp(Binary::new(bin_op));
-        assert_eq!(operator.get_file_hash(), FileHash::new(""));
+    fn test_get_file_id() {
+        let mut files = Files::new();
+        let fid = files.add("test", "test");
+        let loc = Loc::new(fid, codespan::Span::new(0, 0));
+        let operator = MutationOp::BinaryOp(Binary::new(Operation::Add, loc, vec![]));
+        assert_eq!(operator.get_file_id(), fid);
     }
 }

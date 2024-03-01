@@ -1,4 +1,4 @@
-module Test::Sub {
+module 0xCAFE::Sub {
     fun sub(x: u128, y: u128): u128 {
         let sub_r = x - y;
         spec {
