@@ -176,7 +176,7 @@ class Test(unittest.IsolatedAsyncioTestCase):
         )
         patcher.start()
 
-        rest_client = RestClient("https://fullnode.devnet.aptoslabs.com/v1")
+        rest_client = RestClient("https://api.devnet.aptoslabs.com/v1")
         account_sequence_number = AccountSequenceNumber(
             rest_client, AccountAddress.from_str("0xf")
         )

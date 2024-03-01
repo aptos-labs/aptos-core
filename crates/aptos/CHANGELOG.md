@@ -12,7 +12,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [2.4.0] - 2024/01/05
 - Hide the V2 compiler from input options until the V2 compiler is ready for release
 - Updated CLI source compilation to use rust toolchain version 1.74.1 (from 1.72.1).
-- Added `for` loop. 
+- Added `for` loop.
   - Syntax: `for (iter in lower_bound..upper_bound) { loop_body }` with integer bounds.
   - Documentation: https://aptos.dev/move/book/loops
 - Upgraded indexer processors for local testnet from 2d5cb211a89a8705674e9e1e741c841dd899c558 to 4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf. Upgraded Hasura metadata accordingly.
@@ -23,7 +23,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## [2.3.1] - 2023/11/07
 ### Updated
-- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to 2d5cb211a89a8705674e9e1e741c841dd899c558. 
+- Updated processor code from https://github.com/aptos-labs/aptos-indexer-processors for the local testnet to 2d5cb211a89a8705674e9e1e741c841dd899c558.
 - Improved reliability of inter-container networking with local testnet.
 
 ## [2.3.0] - 2023/10/25
@@ -55,7 +55,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 ## [2.1.1] - 2023/09/27
 ### Added
 - Added an option `--print-metadata` to the command `aptos move download` to print out the metadata of the package to be downloaded.
-  - Example: `aptos move download  --account 0x1 --package AptosFramework --url https://mainnet.aptoslabs.com/v1 --print-metadata`
+  - Example: `aptos move download  --account 0x1 --package AptosFramework --url https://api.mainnet.aptoslabs.com/v1 --print-metadata`
 ### Updated
 - The `--with-faucet` flag has been removed from `aptos node run-local-testnet`, we now run a faucet by default. To disable the faucet use the `--no-faucet` flag.
 - **Breaking change**: When using `aptos node run-local-testnet` we now expose a transaction stream. Learn more about the transaction stream service here: https://aptos.dev/indexer/txn-stream/. Opt out of this with `--no-txn-stream`. This is marked as a breaking change since the CLI now uses a port (50051 by default) that it didn't used to. If you need this port, you can tell the CLI to use a different port with `--txn-stream-port`.

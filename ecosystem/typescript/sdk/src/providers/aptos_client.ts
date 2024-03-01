@@ -60,7 +60,7 @@ export interface PaginationArgs {
 
 /**
  * Provides methods for retrieving data from Aptos node.
- * For more detailed API specification see {@link https://fullnode.devnet.aptoslabs.com/v1/spec}
+ * For more detailed API specification see {@link https://api.devnet.aptoslabs.com/v1/spec}
  */
 export class AptosClient {
   readonly nodeUrl: string;

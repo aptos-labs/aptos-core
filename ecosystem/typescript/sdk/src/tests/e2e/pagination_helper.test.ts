@@ -13,12 +13,12 @@ test(
   async () => {
     try {
       const modules = await get<{}, Gen.MoveModuleBytecode[]>({
-        url: "https://fullnode.testnet.aptoslabs.com/v1",
+        url: "https://api.testnet.aptoslabs.com/v1",
         endpoint: "accounts/0x1/modules",
         params: { limit: 9999 },
       });
       const paginateOut = await paginateWithCursor<{}, Gen.MoveModuleBytecode[]>({
-        url: "https://fullnode.testnet.aptoslabs.com/v1",
+        url: "https://api.testnet.aptoslabs.com/v1",
         endpoint: "accounts/0x1/modules",
         params: { limit: 20 },
       });
