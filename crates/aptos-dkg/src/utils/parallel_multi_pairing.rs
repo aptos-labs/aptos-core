@@ -1,13 +1,12 @@
 // Copyright © Aptos Foundation
 
-use blst::{blst_final_exp, blst_fp12, blst_fp12_mul, blst_fp12_one, blst_miller_loop};
+use blst::blst_fp12;
 use blstrs::{Fp12, G1Affine, G2Affine, Gt};
 use group::prime::PrimeCurveAffine;
 use rayon::{prelude::*, ThreadPool};
 
-/// Computes $$\sum_{i=1}^n \textbf{ML}(a_i, b_i)$$ given a series of terms
-/// $$(a_1, b_1), (a_2, b_2), ..., (a_n, b_n).$$
-pub fn parallel_multi_miller_loop_and_final_exp(
+/// Computes a multi-pairing $$\prod_{i=1}^n e(a_i, b_i)$$ using multiple threads from `pool`.
+pub fn parallel_multi_pairing_slice(
     terms: &[(&G1Affine, &G2Affine)],
     pool: &ThreadPool,
     min_length: usize,

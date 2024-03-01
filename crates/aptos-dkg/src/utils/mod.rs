@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::utils::{
-    parallel_multi_pairing::parallel_multi_miller_loop_and_final_exp,
-    random::random_scalar_from_uniform_bytes,
+    parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
 };
 use blstrs::{
     pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt, Scalar,
@@ -112,7 +111,7 @@ where
     I1: Iterator<Item = &'a G1Projective>,
     I2: Iterator<Item = &'a G2Projective>,
 {
-    parallel_multi_miller_loop_and_final_exp(
+    parallel_multi_pairing_slice(
         lhs.zip(rhs)
             .map(|(g1, g2)| (g1.to_affine(), g2.to_affine()))
             .collect::<Vec<(G1Affine, G2Affine)>>()
