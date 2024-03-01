@@ -269,7 +269,7 @@ mod test {
 
     #[test]
     fn test_get_max_concurrent_requests_disabled() {
-        // Create a data streaming service config with dynamic prefetching disabled
+        // Create a data streaming service config with dynamic prefetching disabled.
         let max_concurrent_requests = 10;
         let dynamic_prefetching_config = DynamicPrefetchingConfig {
             enable_dynamic_prefetching: false,
