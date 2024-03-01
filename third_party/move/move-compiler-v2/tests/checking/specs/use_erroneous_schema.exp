@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: undeclared `M::x`
+error: undeclared `x`
   ┌─ tests/checking/specs/use_erroneous_schema.move:5:17
   │
 5 │         ensures x > 0;

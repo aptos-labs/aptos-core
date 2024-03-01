@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: undeclared `M::x`
+error: undeclared `x`
   ┌─ tests/checking/specs/schemas_err.move:4:17
   │
 4 │         ensures x > 0;

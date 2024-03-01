@@ -1,4 +1,4 @@
-error: undeclared `M::x`
+error: undeclared `x`
   ┌─ tests/sources/schemas_err.move:4:17
   │
 4 │         ensures x > 0;

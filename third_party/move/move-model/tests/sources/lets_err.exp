@@ -1,4 +1,4 @@
-error: undeclared `M::one`
+error: undeclared `one`
   ┌─ tests/sources/lets_err.move:6:16
   │
 6 │     let zero = one;

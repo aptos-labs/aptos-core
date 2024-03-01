@@ -2471,10 +2471,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 vec![global_access.into_exp()],
             );
         }
-
         self.error(
             loc,
-            &format!("undeclared `{}`", global_var_sym.display(self.env())),
+            &format!("undeclared `{}`", global_var_sym.display_simple(self.env())),
         );
         self.new_error_exp()
     }
@@ -3737,7 +3736,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     loc,
                     &format!(
                         "`{}` is a function and not a macro",
-                        qsym.display(self.env())
+                        qsym.display_simple(self.env())
                     ),
                 );
             } else {

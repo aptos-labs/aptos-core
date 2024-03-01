@@ -6,19 +6,19 @@ error: missing fields `y`
 11 │         let T { i, x, b: flag } = t;
    │             ^^^^^^^^^^^^^^^^^^^
 
-error: undeclared `Test::i`
+error: undeclared `i`
    ┌─ tests/checking/typing/v1-commands/unpack_missing_binding.move:12:10
    │
 12 │         (i, x, flag)
    │          ^
 
-error: undeclared `Test::x`
+error: undeclared `x`
    ┌─ tests/checking/typing/v1-commands/unpack_missing_binding.move:12:13
    │
 12 │         (i, x, flag)
    │             ^
 
-error: undeclared `Test::flag`
+error: undeclared `flag`
    ┌─ tests/checking/typing/v1-commands/unpack_missing_binding.move:12:16
    │
 12 │         (i, x, flag)

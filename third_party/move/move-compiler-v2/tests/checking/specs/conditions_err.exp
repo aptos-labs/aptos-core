@@ -12,7 +12,7 @@ error: expected `bool` but found a value of type `num`
 7 │     ensures old(x) + x; // Type of condition not bool.
   │             ^^^^^^^^^^
 
-error: undeclared `M::result_1`
+error: undeclared `result_1`
   ┌─ tests/checking/specs/conditions_err.move:8:13
   │
 8 │     ensures result_1 == 0; // Using result which does not exist.
