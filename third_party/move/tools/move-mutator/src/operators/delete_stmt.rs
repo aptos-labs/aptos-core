@@ -1,9 +1,9 @@
 use crate::operator::{MutantInfo, MutationOperator};
 use crate::operators::MOVE_EMPTY_STMT;
 use crate::report::{Mutation, Range};
-use move_command_line_common::files::FileHash;
-use move_compiler::typing::ast;
-use move_compiler::typing::ast::BuiltinFunction_;
+use codespan::FileId;
+use move_model::ast::Exp;
+use move_model::model::Loc;
 use std::fmt;
 use std::fmt::Debug;
 
@@ -14,37 +14,24 @@ pub const OPERATOR_NAME: &str = "delete_statement";
 /// properly.
 #[derive(Debug, Clone)]
 pub struct DeleteStmt {
-    operation: ast::Exp,
+    operation: Exp,
+    loc: Loc,
 }
 
 impl DeleteStmt {
     /// Creates a new instance of the delete mutation operator.
     #[must_use]
-    pub fn new(operation: ast::Exp) -> Self {
-        Self { operation }
+    pub fn new(operation: Exp, loc: Loc) -> Self {
+        Self { operation, loc }
     }
 }
 
 impl MutationOperator for DeleteStmt {
     fn apply(&self, source: &str) -> Vec<MutantInfo> {
-        let (start, end) = match &self.operation.exp.value {
-            ast::UnannotatedExp_::Builtin(f, _) => {
-                match &f.value {
-                    // move_to can be changed to the empty statement as it does not return anything
-                    BuiltinFunction_::MoveTo(_) => (
-                        self.operation.exp.loc.start() as usize,
-                        self.operation.exp.loc.end() as usize,
-                    ),
-                    _ => {
-                        return vec![];
-                    },
-                }
-            },
-            _ => {
-                return vec![];
-            },
-        };
-
+        let (start, end) = (
+            self.loc.span().start().to_usize(),
+            self.loc.span().end().to_usize(),
+        );
         let cur_op = &source[start..end];
 
         let ops: Vec<&str> = vec![MOVE_EMPTY_STMT];
@@ -66,8 +53,8 @@ impl MutationOperator for DeleteStmt {
             .collect()
     }
 
-    fn get_file_hash(&self) -> FileHash {
-        self.operation.exp.loc.file_hash()
+    fn get_file_id(&self) -> FileId {
+        self.loc.file_id()
     }
 
     fn name(&self) -> String {
@@ -79,11 +66,11 @@ impl fmt::Display for DeleteStmt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "DeleteStmtOperator({:?}, location: file hash: {}, index start: {}, index stop: {})",
-            self.operation.exp.value,
-            self.operation.exp.loc.file_hash(),
-            self.operation.exp.loc.start(),
-            self.operation.exp.loc.end()
+            "DeleteStmtOperator({:?}, location: file hash: {:?}, index start: {}, index stop: {})",
+            self.operation,
+            self.loc.file_id(),
+            self.loc.span().start(),
+            self.loc.span().end()
         )
     }
 }

@@ -113,29 +113,25 @@ application layer with crucial components used to generate mutants:
 
 The functions in the `mutate.rs` are responsible for traversing the Abstract
 Syntax Tree (AST) of the Move source code and searching for places where
-potential mutation operators can be applied. It has been AST from the `typing`
-Move compiler module used, but it may not be a big change to traverse other
-trees (unless the locations pointed by the appropriate structs will match the
-source code). The `typing` tree has been used because it's close enough to
-the original source file, but it offers more information about expression 
-types, which may be needed by some mutation operators.
+potential mutation operators can be applied. It has been AST from the 
+`move-model` package (compiler v2 used).
 
 The idea behind that search is as follows: there is a `mutate` function, which
 is the entry point. It takes the AST of a Move program as input and returns
 a list of mutants (not yet generated). It does this by iterating over the
 source definitions in the AST and calling the appropriate function to traverse
-each definition based on its type (Address, Module, or Script). There are
-several functions to go through different types of AST nodes. 
+each definition based on its type (Address, Module, or Script). The traversal
+is done in the pre-order manner.
 
-The main parsing function is the `parse_expression`. It checks the type of the
-expression and marks that place as the appropriate for the mutation operator to
-be applied (e.g., binary or unary expressions). Sub-expressions are parsed
-recursively.
+The main parsing function is the `parse_expression_and_find_mutants`. It checks
+the type of the expression and marks that place as the appropriate for the 
+mutation operator to be applied (e.g., binary or unary expressions). 
+Sub-expressions are parsed recursively.
 
 When a new place for mutation is found, a new mutant is created. The mutation
 operator is passed as an argument containing the appropriate AST node. As each
-node has its own location (`Spanned` structure with `Loc`) it's possible to
-pass the node without any additional overhead.
+node has its own location it's possible to pass the node without any additional
+overhead.
 
 This process continues recursively until all nodes in the AST have been visited
 and all possible mutants have been generated. The mutate function then returns

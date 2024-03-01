@@ -1,48 +1,81 @@
 use crate::operator::{MutantInfo, MutationOperator};
+use crate::operators::ExpLoc;
 use crate::report::{Mutation, Range};
-use move_command_line_common::files::FileHash;
-use move_compiler::parser::ast::{BinOp, BinOp_};
+use codespan::FileId;
+use move_model::ast::Operation;
+use move_model::model::Loc;
 use std::fmt;
 
 pub const OPERATOR_NAME: &str = "binary_operator_replacement";
 
 /// The binary mutation operator.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Binary {
-    operation: BinOp,
+    operation: Operation,
+    loc: Loc,
+    exps: Vec<ExpLoc>,
 }
 
 impl Binary {
-    pub fn new(operation: BinOp) -> Self {
-        Self { operation }
+    pub fn new(operation: Operation, loc: Loc, exps: Vec<ExpLoc>) -> Self {
+        Self {
+            operation,
+            loc,
+            exps,
+        }
     }
 }
 
 impl MutationOperator for Binary {
     fn apply(&self, source: &str) -> Vec<MutantInfo> {
-        let start = self.operation.loc.start() as usize;
-        let end = self.operation.loc.end() as usize;
+        if self.exps.len() != 2 {
+            warn!(
+                "BinaryOperator: Expected exactly two expressions, got {}",
+                self.exps.len()
+            );
+            return vec![];
+        }
+
+        // We need to extract operator position, but we must use the positions of expressions to avoid
+        // extracting the operator of a different binary expression.
+        let left = &self.exps[0].loc;
+        let right = &self.exps[1].loc;
+        let start = left.span().end().to_usize();
+        // Adjust start to omit whitespaces before the operator
+        let start = source[start..]
+            .find(|c: char| !c.is_whitespace())
+            .map_or(start, |i| start + i);
+        let end = right.span().start().to_usize();
+        // Adjust end to omit whitespaces after the operator
+        let end = source[..end]
+            .rfind(|c: char| !c.is_whitespace())
+            .map_or(end, |i| i + 1);
         let cur_op = &source[start..end];
 
         // Group of exchangeable binary operators - we only want to replace the operator with a different one
         // within the same group.
-        let ops: Vec<&str> = match self.operation.value {
-            BinOp_::Add | BinOp_::Sub | BinOp_::Mul | BinOp_::Div | BinOp_::Mod => {
+        let ops: Vec<&str> = match self.operation {
+            Operation::Add | Operation::Sub | Operation::Mul | Operation::Div | Operation::Mod => {
                 vec!["+", "-", "*", "/", "%"]
             },
-            BinOp_::BitOr | BinOp_::BitAnd | BinOp_::Xor => {
+            Operation::BitOr | Operation::BitAnd | Operation::Xor => {
                 vec!["|", "&", "^"]
             },
-            BinOp_::Shl | BinOp_::Shr => {
+            Operation::Shl | Operation::Shr => {
                 vec!["<<", ">>"]
             },
-            BinOp_::Or | BinOp_::And => {
+            Operation::Or | Operation::And => {
                 vec!["||", "&&"]
             },
-            BinOp_::Eq | BinOp_::Neq | BinOp_::Lt | BinOp_::Gt | BinOp_::Le | BinOp_::Ge => {
+            Operation::Eq
+            | Operation::Neq
+            | Operation::Lt
+            | Operation::Gt
+            | Operation::Le
+            | Operation::Ge => {
                 vec!["==", "!=", "<", ">", "<=", ">="]
             },
-            BinOp_::Range | BinOp_::Iff | BinOp_::Implies => {
+            _ => {
                 vec![]
             },
         };
@@ -65,8 +98,8 @@ impl MutationOperator for Binary {
             .collect()
     }
 
-    fn get_file_hash(&self) -> FileHash {
-        self.operation.loc.file_hash()
+    fn get_file_id(&self) -> FileId {
+        self.loc.file_id()
     }
 
     fn name(&self) -> String {
@@ -78,11 +111,11 @@ impl fmt::Display for Binary {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "BinaryOperator({}, location: file hash: {}, index start: {}, index stop: {})",
-            self.operation.value,
-            self.operation.loc.file_hash(),
-            self.operation.loc.start(),
-            self.operation.loc.end()
+            "BinaryOperator({:?}, location: file id: {:?}, index start: {}, index stop: {})",
+            self.operation,
+            self.loc.file_id(),
+            self.loc.span().start(),
+            self.loc.span().end()
         )
     }
 }
@@ -90,20 +123,25 @@ impl fmt::Display for Binary {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use move_command_line_common::files::FileHash;
-    use move_compiler::parser::ast::{BinOp, BinOp_};
-    use move_ir_types::location::Loc;
+    use codespan::Files;
+    use move_model::ast::{ExpData, Value};
+    use move_model::model::NodeId;
 
     #[test]
     fn test_apply_binary_operator() {
-        let loc = Loc::new(FileHash::new(""), 0, 1);
-        let bin_op = BinOp {
-            value: BinOp_::Add,
-            loc,
-        };
-        let operator = Binary::new(bin_op);
-        let source = "+";
-        let expected = vec!["-", "*", "/", "%"];
+        let mut files = Files::new();
+        let fid = files.add("test", "test");
+        let loc = Loc::new(fid, codespan::Span::new(0, 3));
+        let loc2 = Loc::new(fid, codespan::Span::new(0, 1));
+        let loc3 = Loc::new(fid, codespan::Span::new(2, 3));
+        let e1 = ExpData::Value(NodeId::new(1), Value::Bool(true));
+        let e2 = ExpData::Value(NodeId::new(2), Value::Bool(false));
+        let exp1 = ExpLoc::new(e1.into_exp(), loc2);
+        let exp2 = ExpLoc::new(e2.into_exp(), loc3);
+
+        let operator = Binary::new(Operation::Add, loc, vec![exp1, exp2]);
+        let source = "5+2";
+        let expected = vec!["5-2", "5*2", "5/2", "5%2"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -112,13 +150,11 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_hash() {
-        let loc = Loc::new(FileHash::new(""), 0, 0);
-        let bin_op = BinOp {
-            value: BinOp_::Add,
-            loc,
-        };
-        let operator = Binary::new(bin_op);
-        assert_eq!(operator.get_file_hash(), FileHash::new(""));
+    fn test_get_file_id() {
+        let mut files = Files::new();
+        let fid = files.add("test", "test");
+        let loc = Loc::new(fid, codespan::Span::new(0, 0));
+        let operator = Binary::new(Operation::Add, loc, vec![]);
+        assert_eq!(operator.get_file_id(), fid);
     }
 }

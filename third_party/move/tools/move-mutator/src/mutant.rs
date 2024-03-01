@@ -1,6 +1,5 @@
 use crate::operator::{MutantInfo, MutationOp, MutationOperator};
-use move_command_line_common::files::FileHash;
-use move_compiler::parser::ast::{FunctionName, ModuleName};
+use codespan::FileId;
 use std::fmt;
 
 /// A mutant is a piece of code that has been mutated by the mutation operator.
@@ -8,8 +7,8 @@ use std::fmt;
 #[derive(Debug, Clone)]
 pub struct Mutant {
     operator: MutationOp,
-    module_name: Option<ModuleName>,
-    function_name: Option<FunctionName>,
+    module_name: Option<String>,
+    function_name: Option<String>,
 }
 
 impl Mutant {
@@ -25,8 +24,8 @@ impl Mutant {
     }
 
     /// Returns the file hash of the file that this mutant is in.
-    pub fn get_file_hash(&self) -> FileHash {
-        self.operator.get_file_hash()
+    pub fn get_file_id(&self) -> FileId {
+        self.operator.get_file_id()
     }
 
     /// Applies the mutation operator to the given source code, by calling the mutation operator's apply method.
@@ -37,22 +36,22 @@ impl Mutant {
     }
 
     /// Returns the module name that this mutant is in.
-    pub fn get_module_name(&self) -> Option<ModuleName> {
-        self.module_name
+    pub fn get_module_name(&self) -> Option<String> {
+        self.module_name.clone()
     }
 
     /// Sets the module name that this mutant is in.
-    pub fn set_module_name(&mut self, module_name: ModuleName) {
+    pub fn set_module_name(&mut self, module_name: String) {
         self.module_name = Some(module_name);
     }
 
     /// Returns the function name that this mutant is in.
-    pub fn get_function_name(&self) -> Option<FunctionName> {
-        self.function_name
+    pub fn get_function_name(&self) -> Option<String> {
+        self.function_name.clone()
     }
 
     /// Sets the function name that this mutant is in.
-    pub fn set_function_name(&mut self, function_name: FunctionName) {
+    pub fn set_function_name(&mut self, function_name: String) {
         self.function_name = Some(function_name);
     }
 }
@@ -67,42 +66,50 @@ impl fmt::Display for Mutant {
 mod tests {
     use super::*;
     use crate::operators::binary::Binary;
-    use move_command_line_common::files::FileHash;
-    use move_compiler::parser::ast::{BinOp, BinOp_};
-    use move_ir_types::location::Loc;
+    use crate::operators::ExpLoc;
+    use codespan::Files;
+    use move_model::ast::{ExpData, Operation, Value};
+    use move_model::model::{Loc, NodeId};
 
     #[test]
     fn test_new() {
-        let loc = Loc::new(FileHash::new(""), 0, 0);
-        let operator = MutationOp::BinaryOp(Binary::new(BinOp {
-            value: BinOp_::Add,
-            loc,
-        }));
+        let mut files = Files::new();
+        let fid = files.add("test", "test");
+        let loc = move_model::model::Loc::new(fid, codespan::Span::new(0, 0));
+        let operator = MutationOp::BinaryOp(Binary::new(Operation::Add, loc, vec![]));
+
         let mutant = Mutant::new(operator);
-        assert_eq!(format!("{}", mutant), "Mutant: BinaryOperator(+, location: file hash: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, index start: 0, index stop: 0)");
+        assert_eq!(format!("{}", mutant), "Mutant: BinaryOperator(Add, location: file id: FileId(1), index start: 0, index stop: 0)");
     }
 
     #[test]
     fn test_get_file_hash() {
-        let loc = Loc::new(FileHash::new(""), 0, 0);
-        let operator = MutationOp::BinaryOp(Binary::new(BinOp {
-            value: BinOp_::Add,
-            loc,
-        }));
+        let mut files = Files::new();
+        let fid = files.add("test", "test");
+        let loc = move_model::model::Loc::new(fid, codespan::Span::new(0, 0));
+        let operator = MutationOp::BinaryOp(Binary::new(Operation::Add, loc, vec![]));
+
         let mutant = Mutant::new(operator);
-        assert_eq!(mutant.get_file_hash(), FileHash::new(""));
+        assert_eq!(mutant.get_file_id(), fid);
     }
 
     #[test]
     fn test_apply() {
-        let loc = Loc::new(FileHash::new(""), 0, 1);
-        let operator = MutationOp::BinaryOp(Binary::new(BinOp {
-            value: BinOp_::Add,
-            loc,
-        }));
+        let mut files = Files::new();
+        let fid = files.add("test", "test");
+        let loc = Loc::new(fid, codespan::Span::new(0, 3));
+        let loc2 = Loc::new(fid, codespan::Span::new(0, 1));
+        let loc3 = Loc::new(fid, codespan::Span::new(2, 3));
+        let e1 = ExpData::Value(NodeId::new(1), Value::Bool(true));
+        let e2 = ExpData::Value(NodeId::new(2), Value::Bool(false));
+        let exp1 = ExpLoc::new(e1.into_exp(), loc2);
+        let exp2 = ExpLoc::new(e2.into_exp(), loc3);
+
+        let operator = MutationOp::BinaryOp(Binary::new(Operation::Add, loc, vec![exp1, exp2]));
+
         let mutant = Mutant::new(operator);
-        let source = "+";
-        let expected = vec!["-", "*", "/", "%"];
+        let source = "2+1";
+        let expected = vec!["2-1", "2*1", "2/1", "2%1"];
         let result = mutant.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
