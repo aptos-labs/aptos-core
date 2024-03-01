@@ -19,27 +19,14 @@ pub fn parallel_multi_miller_loop_and_final_exp(
             .map(|(p, q)| {
                 if (p.is_identity() | q.is_identity()).into() {
                     // Define pairing with zero as one, matching what `pairing` does.
-                    unsafe { *blst_fp12_one() }
+                    blst_fp12::default()
                 } else {
-                    unsafe {
-                        let mut tmp = blst_fp12::default();
-                        blst_miller_loop(&mut tmp, q.as_ref(), p.as_ref());
-                        tmp
-                    }
+                    blst_fp12::miller_loop(q.as_ref(), p.as_ref())
                 }
             })
-            .reduce(
-                || unsafe { *blst_fp12_one() },
-                |mut acc, val| {
-                    unsafe {
-                        blst_fp12_mul(&mut acc, &acc, &val);
-                    }
-                    acc
-                },
-            )
+            .reduce(|| blst_fp12::default(), |acc, val| acc * val)
     });
 
-    let mut out = blst_fp12::default();
-    unsafe { blst_final_exp(&mut out, &res) };
+    let out = blst_fp12::final_exp(&res);
     Fp12::from(out).into()
 }
