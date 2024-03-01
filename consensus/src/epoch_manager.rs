@@ -8,7 +8,7 @@ use crate::{
         BlockStore,
     },
     counters,
-    dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
+    dag::{DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},
     liveness::{
         cached_proposer_election::CachedProposerElection,
@@ -28,7 +28,7 @@ use crate::{
     metrics_safety_rules::MetricsSafetyRules,
     monitor,
     network::{
-        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest, IncomingDAGRequest,
+        IncomingBatchRetrievalRequest, IncomingBlockRetrievalRequest,
         IncomingRpcRequest, NetworkReceivers, NetworkSender,
     },
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
@@ -105,9 +105,6 @@ const PROPOSER_ELECTION_CACHING_WINDOW_ADDITION: usize = 3;
 /// Number of rounds we expect storage to be ahead of the proposer round,
 /// used for fetching data from DB.
 const PROPOSER_ROUND_BEHIND_STORAGE_BUFFER: usize = 10;
-
-// TODO: move to config
-const BOLT_ENABLED: bool = true;
 
 #[allow(clippy::large_enum_variant)]
 pub enum LivenessStorageData {

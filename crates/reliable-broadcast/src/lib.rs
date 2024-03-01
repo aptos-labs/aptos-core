@@ -26,7 +26,7 @@ pub trait RBNetworkSender<Req: RBMessage, Res: RBMessage = Req>: Send + Sync {
 
 pub trait BroadcastStatus<Req: RBMessage, Res: RBMessage = Req>: Send + Sync + Clone {
     type Aggregated: Send;
-    type Message: Into<Req> + TryFrom<Req> + Clone;
+    type Message: Into<Req> + TryFrom<Req> + Clone + Send;
     type Response: Into<Res> + TryFrom<Res> + Clone;
 
     fn add(

@@ -4,6 +4,7 @@
 use super::{dag_store::DagStore, health::HealthBackoff, types::NodeCertificate};
 use crate::{
     dag::{
+        shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet},
         adapter::TLedgerInfoProvider,
         dag_fetcher::TFetchRequester,
         errors::DagDriverError,
@@ -42,6 +43,7 @@ use futures::{
 use futures_channel::oneshot;
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
+use tokio::sync::mpsc::Sender;
 
 pub(crate) struct DagDriver {
     dag_id: u8,
@@ -61,6 +63,7 @@ pub(crate) struct DagDriver {
     payload_config: DagPayloadConfig,
     health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
+    broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
 }
 
 impl DagDriver {
@@ -82,6 +85,7 @@ impl DagDriver {
         payload_config: DagPayloadConfig,
         health_backoff: HealthBackoff,
         quorum_store_enabled: bool,
+        broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -107,6 +111,7 @@ impl DagDriver {
             payload_config,
             health_backoff,
             quorum_store_enabled,
+            broadcast_sender,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -121,7 +126,7 @@ impl DagDriver {
                 .round_state
                 .set_current_round(node.round())
                 .expect("must succeed");
-            driver.broadcast_node(node);
+            block_on(driver.broadcast_node(node));
         } else {
             // kick start a new round
             if !driver.dag.read().is_empty() {
@@ -298,12 +303,12 @@ impl DagDriver {
         self.storage
             .save_pending_node(&new_node)
             .expect("node must be saved");
-        self.broadcast_node(new_node);
+        block_on(self.broadcast_node(new_node));
     }
 
-    fn broadcast_node(&self, node: Node) {
-        let rb = self.reliable_broadcast.clone();
-        let rb2 = self.reliable_broadcast.clone();
+    pub async fn broadcast_node(&self, node: Node) {
+        let rb = self.broadcast_sender.clone();
+        let rb2 = self.broadcast_sender.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         let (tx, rx) = oneshot::channel();
         let signature_builder =
@@ -314,32 +319,75 @@ impl DagDriver {
         let round = node.round();
         let node_clone = node.clone();
         let timestamp = node.timestamp();
-        let node_broadcast = async move {
-            debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
+        let dag_id = self.dag_id;
 
-            defer!( observe_round(timestamp, RoundStage::NodeBroadcasted); );
-            rb.broadcast(node, signature_builder).await
+
+        let node_broadcast = async move {
+            debug!("[Bolt] broadcast node task was spawned for dag_id: {}", dag_id);
+            let (tx, rx) = oneshot::channel();
+            if let Err(_) = rb
+                .clone()
+                .send((tx, BoltBCParms::Node(node.clone(), signature_builder)))
+                .await
+            {
+                error!("[Bolt] channel closed before sending node");
+            }
+            debug!("[Bolt] node sent to broadcast, dag_id: {} for round {}", dag_id, node.round());
+
+            match rx.await {
+                Ok(bolt_ret) => match bolt_ret {
+                    BoltBCRet::Node(ret) => {
+                        debug!("[Bolt] node broadcast done, dag_id: {}", dag_id);
+                        ret.await
+                    },
+                    _ => unreachable!(),
+                },
+                Err(_) => {
+                    error!("[Bolt] node broadcast failed, dag_id: {}", dag_id);
+                    return
+                },
+            };
         };
+
         let certified_broadcast = async move {
             let Ok(certificate) = rx.await else {
-                error!("channel closed before receiving ceritifcate");
+                error!("channel closed before receiving certificate");
                 return;
             };
+            let round = node_clone.round();
 
-            debug!(
-                LogSchema::new(LogEvent::BroadcastCertifiedNode),
-                id = node_clone.id()
-            );
-
-            defer!( observe_round(timestamp, RoundStage::CertifiedNodeBroadcasted); );
+            debug!("[Bolt] certified broadcast task was spawned for dag_id: {}", dag_id);
             let certified_node =
                 CertifiedNode::new(node_clone, certificate.signatures().to_owned());
             let certified_node_msg = CertifiedNodeMessage::new(
                 certified_node,
                 latest_ledger_info.get_latest_ledger_info(),
             );
-            rb2.broadcast(certified_node_msg, cert_ack_set).await
+            let (tx, rx) = oneshot::channel();
+            if let Err(_) = rb2
+                .send((
+                    tx,
+                    BoltBCParms::CertifiedNode(certified_node_msg, cert_ack_set),
+                ))
+                .await
+            {
+                error!("[Bolt] channel closed before sending certified node");
+            }
+
+            debug!("[Bolt] node certificate sent to broadcast, dag_id: {} for round {}", dag_id, round);
+            match rx.await {
+                Ok(bolt_ret) => match bolt_ret {
+                    BoltBCRet::CertifiedNode(ret) => ret.await,
+                    _ => unreachable!(),
+                },
+                Err(_) => {
+                    error!("[Bolt] channel closed before receiving certificate ack");
+                    return
+                },
+            }
+            debug!("[Bolt] node certificate acks done, dag_id: {} for round {}", dag_id, round);
         };
+
         let core_task = join(node_broadcast, certified_broadcast);
         let author = self.author;
         let task = async move {

@@ -65,7 +65,9 @@ use tokio::{
     select,
     task::{block_in_place, JoinHandle},
 };
+use tokio::sync::mpsc::Sender;
 use tokio_retry::strategy::ExponentialBackoff;
+use crate::dag::shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet};
 
 #[derive(Clone)]
 struct BootstrapBaseState {
@@ -337,6 +339,8 @@ pub struct DagBootstrapper {
     vtxn_config: ValidatorTxnConfig,
     executor: BoundedExecutor,
     features: Features,
+    rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+    broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
 }
 
 impl DagBootstrapper {
@@ -361,6 +365,8 @@ impl DagBootstrapper {
         vtxn_config: ValidatorTxnConfig,
         executor: BoundedExecutor,
         features: Features,
+        rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+        broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
     ) -> Self {
         Self {
             dag_id,
@@ -382,6 +388,8 @@ impl DagBootstrapper {
             vtxn_config,
             executor,
             features,
+            rb,
+            broadcast_sender
         }
     }
 
@@ -541,22 +549,22 @@ impl DagBootstrapper {
         &self,
         base_state: &BootstrapBaseState,
     ) -> (NetworkHandler, DagFetcherService) {
-        let validators = self.epoch_state.verifier.get_ordered_account_addresses();
-        let rb_config = self.config.rb_config.clone();
+        // let validators = self.epoch_state.verifier.get_ordered_account_addresses();
+        // let rb_config = self.config.rb_config.clone();
         let round_state_config = self.config.round_state_config.clone();
 
         // A backoff policy that starts at _base_*_factor_ ms and multiplies by _base_ each iteration.
-        let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
-            .factor(rb_config.backoff_policy_factor)
-            .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
-        let rb = Arc::new(ReliableBroadcast::new(
-            validators.clone(),
-            self.rb_network_sender.clone(),
-            rb_backoff_policy,
-            self.time_service.clone(),
-            Duration::from_millis(rb_config.rpc_timeout_ms),
-            self.executor.clone(),
-        ));
+        // let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
+        //     .factor(rb_config.backoff_policy_factor)
+        //     .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
+        // let rb = Arc::new(ReliableBroadcast::new(
+        //     validators.clone(),
+        //     self.rb_network_sender.clone(),
+        //     rb_backoff_policy,
+        //     self.time_service.clone(),
+        //     Duration::from_millis(rb_config.rpc_timeout_ms),
+        //     self.executor.clone(),
+        // ));
 
         let BootstrapBaseState {
             dag_store,
@@ -615,7 +623,7 @@ impl DagBootstrapper {
             self.epoch_state.clone(),
             dag_store.clone(),
             self.payload_client.clone(),
-            rb,
+            self.rb.clone(),
             self.time_service.clone(),
             self.storage.clone(),
             order_rule.clone(),
@@ -626,6 +634,7 @@ impl DagBootstrapper {
             self.config.node_payload_config.clone(),
             health_backoff.clone(),
             self.quorum_store_enabled,
+            self.broadcast_sender.clone(),
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag_store.clone(),
@@ -716,6 +725,8 @@ pub(super) fn bootstrap_dag_for_test(
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
     execution_client: Arc<dyn TExecutionClient>,
+    rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+    broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
 ) -> (
     JoinHandle<SyncOutcome>,
     JoinHandle<()>,
@@ -745,6 +756,8 @@ pub(super) fn bootstrap_dag_for_test(
         ValidatorTxnConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
         features,
+        rb,
+        broadcast_sender,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
