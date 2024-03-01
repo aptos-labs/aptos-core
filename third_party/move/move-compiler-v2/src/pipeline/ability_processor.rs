@@ -165,8 +165,9 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
             !ty.is_primitive()
         };
         // Only temps which are used after or borrowed need a copy
-        let temp_needs_copy =
-            |temp| live_var.after.contains_key(temp) || lifetime.before.is_borrowed(*temp);
+        let temp_needs_copy = |temp, instr| {
+            live_var.is_temp_used_after(temp, instr) || lifetime.before.is_borrowed(*temp)
+        };
         // References always need to be dropped to satisfy bytecode verifier borrow analysis, other values
         // only if this execution path can return.
         let temp_needs_drop = |temp: &TempIndex| {
@@ -174,7 +175,7 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
         };
         match instr {
             Assign(_, _, src, AssignKind::Inferred) => {
-                if temp_needs_copy(src) {
+                if temp_needs_copy(src, instr) {
                     state.needs_copy.insert(*src);
                 } else {
                     state.moved.insert(*src);
@@ -196,7 +197,8 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
                 // point, is again used in the argument list. Also, in difference to assign inference, we only need
                 // to copy the argument if its not primitive.
                 for (i, src) in srcs.iter().enumerate() {
-                    if (temp_needs_copy(src) || srcs[i + 1..].contains(src)) && type_needs_copy(src)
+                    if (temp_needs_copy(src, instr) || srcs[i + 1..].contains(src))
+                        && type_needs_copy(src)
                     {
                         state.needs_copy.insert(*src);
                     } else {

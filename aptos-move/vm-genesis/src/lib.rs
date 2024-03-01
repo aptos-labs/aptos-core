@@ -21,9 +21,9 @@ use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
+    keyless,
+    keyless::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME},
     move_utils::as_move_value::AsMoveValue,
-    oidb,
-    oidb::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
@@ -54,7 +54,6 @@ const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
-const OIDB_MODULE_NAME: &str = "openid_account";
 const JWKS_MODULE_NAME: &str = "jwks";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
@@ -256,7 +255,8 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
-    initialize_oidb(&mut session, chain_id);
+    initialize_jwks(&mut session);
+    initialize_keyless_accounts(&mut session, chain_id);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -442,6 +442,16 @@ fn initialize_aptos_coin(session: &mut SessionExt) {
     );
 }
 
+fn initialize_jwks(session: &mut SessionExt) {
+    exec_function(
+        session,
+        JWKS_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
 fn set_genesis_end(session: &mut SessionExt) {
     exec_function(
         session,
@@ -485,11 +495,11 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
     );
 }
 
-fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
-    let config = oidb::Configuration::new_for_devnet();
+fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
+    let config = keyless::Configuration::new_for_devnet();
     exec_function(
         session,
-        OIDB_MODULE_NAME,
+        KEYLESS_ACCOUNT_MODULE_NAME,
         "update_configuration",
         vec![],
         serialize_values(&vec![
@@ -501,7 +511,7 @@ fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
         let vk = Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone());
         exec_function(
             session,
-            OIDB_MODULE_NAME,
+            KEYLESS_ACCOUNT_MODULE_NAME,
             "update_groth16_verification_key",
             vec![],
             serialize_values(&vec![
@@ -510,19 +520,6 @@ fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
             ]),
         );
     }
-    exec_function(
-        session,
-        JWKS_MODULE_NAME,
-        "upsert_oidc_provider",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            "https://accounts.google.com".to_string().as_move_value(),
-            "https://accounts.google.com/.well-known/openid-configuration"
-                .to_string()
-                .as_move_value(),
-        ]),
-    );
 }
 
 fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {

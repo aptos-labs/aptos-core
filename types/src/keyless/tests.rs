@@ -1,20 +1,19 @@
 // Copyright © Aptos Foundation
 
-use crate::oidb::{
-    base64url_encode_str,
+use crate::keyless::{
     bn254_circom::get_public_inputs_hash,
     circuit_testcases::*,
-    test_utils::{get_sample_oidb_groth16_sig_and_pk, get_sample_oidb_openid_sig_and_pk},
+    test_utils::{get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk},
     Configuration, ZkpOrOpenIdSig, DEVNET_VERIFICATION_KEY,
 };
 use std::ops::{AddAssign, Deref};
 
-// TODO(oidb): Add instructions on how to produce this test case.
+// TODO(keyless): Add instructions on how to produce this test case.
 #[test]
-fn test_oidb_groth16_proof_verification() {
+fn test_keyless_groth16_proof_verification() {
     let config = Configuration::new_for_devnet();
 
-    let (zk_sig, zk_pk) = get_sample_oidb_groth16_sig_and_pk();
+    let (zk_sig, zk_pk) = get_sample_groth16_sig_and_pk();
     let proof = match &zk_sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(proof) => proof.clone(),
         ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
@@ -23,7 +22,7 @@ fn test_oidb_groth16_proof_verification() {
     let public_inputs_hash = get_public_inputs_hash(&zk_sig, &zk_pk, &SAMPLE_JWK, &config).unwrap();
 
     println!(
-        "OIDB Groth16 test public inputs hash: {}",
+        "Keyless Groth16 test public inputs hash: {}",
         public_inputs_hash
     );
 
@@ -33,27 +32,22 @@ fn test_oidb_groth16_proof_verification() {
 }
 
 #[test]
-fn test_oidb_oidc_sig_verifies() {
+fn test_keyless_oidc_sig_verifies() {
     // Verification should succeed
     let config = Configuration::new_for_testing();
-    let (oidb_sig, oidb_pk) = get_sample_oidb_openid_sig_and_pk();
+    let (sig, pk) = get_sample_openid_sig_and_pk();
 
-    let oidc_sig = match &oidb_sig.sig {
+    let oidc_sig = match &sig.sig {
         ZkpOrOpenIdSig::Groth16Zkp(_) => panic!("Internal inconsistency"),
         ZkpOrOpenIdSig::OpenIdSig(oidc_sig) => oidc_sig.clone(),
     };
 
     oidc_sig
-        .verify_jwt_claims(
-            oidb_sig.exp_timestamp_secs,
-            &oidb_sig.ephemeral_pubkey,
-            &oidb_pk,
-            &config,
-        )
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap();
 
     oidc_sig
-        .verify_jwt_signature(&SAMPLE_JWK, &oidb_sig.jwt_header_b64)
+        .verify_jwt_signature(&SAMPLE_JWK, &sig.jwt_header_json)
         .unwrap();
 
     // Maul the pepper; verification should fail
@@ -62,12 +56,7 @@ fn test_oidb_oidc_sig_verifies() {
     assert_ne!(bad_oidc_sig.pepper, oidc_sig.pepper);
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(
-            oidb_sig.exp_timestamp_secs,
-            &oidb_sig.ephemeral_pubkey,
-            &oidb_pk,
-            &config,
-        )
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("IDC verification failed"));
 
@@ -76,8 +65,8 @@ fn test_oidb_oidc_sig_verifies() {
     let e = bad_oidc_sig
         .verify_jwt_claims(
             SAMPLE_JWT_PARSED.oidc_claims.iat + config.max_exp_horizon_secs,
-            &oidb_sig.ephemeral_pubkey,
-            &oidb_pk,
+            &sig.ephemeral_pubkey,
+            &pk,
             &config,
         )
         .unwrap_err();
@@ -87,16 +76,10 @@ fn test_oidb_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.sub = format!("{}+1", SAMPLE_JWT_PARSED.oidc_claims.sub);
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(
-            oidb_sig.exp_timestamp_secs,
-            &oidb_sig.ephemeral_pubkey,
-            &oidb_pk,
-            &config,
-        )
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("IDC verification failed"));
 
@@ -104,16 +87,10 @@ fn test_oidb_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.nonce = "bad nonce".to_string();
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(
-            oidb_sig.exp_timestamp_secs,
-            &oidb_sig.ephemeral_pubkey,
-            &oidb_pk,
-            &config,
-        )
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("'nonce' claim"));
 
@@ -121,16 +98,10 @@ fn test_oidb_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.iss = "bad iss".to_string();
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(
-            oidb_sig.exp_timestamp_secs,
-            &oidb_sig.ephemeral_pubkey,
-            &oidb_pk,
-            &config,
-        )
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("'iss' claim "));
 }

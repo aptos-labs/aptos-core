@@ -32,6 +32,16 @@ Ok(
                     ),
                 ),
             ),
+            auxiliary_data: V1(
+                TransactionAuxiliaryDataV1 {
+                    detail_error_message: Some(
+                        VMErrorDetail {
+                            status_code: TYPE_MISMATCH,
+                            message: None,
+                        },
+                    ),
+                },
+            ),
         },
     ],
 )
