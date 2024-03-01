@@ -35,7 +35,7 @@ use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
 use move_model::{
     ast::TempIndex,
     exp_generator::ExpGenerator,
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, StructId, TypeParameterKind},
+    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, Parameter, StructId, TypeParameterKind},
     ty,
     ty::{gen_get_ty_param_kinds, Type},
 };
@@ -99,6 +99,29 @@ impl FunctionTargetProcessor for AbilityProcessor {
             lifetime,
             exit_state,
         };
+
+        // Check whether unused parameters may be dropped
+        let live_vars = live_var.get_info_at(0).before_set();
+        if exit_state.get_state_at(0).may_return() {
+            let type_params = fun_env.get_type_parameters();
+            for (i, Parameter(sym, atype, loc)) in fun_env.get_parameters().iter().enumerate() {
+                // If parameter at `i` is not alive and its type is either a type parameter, a struct or a vector of struct
+                // we need to check its drop ability
+                if !live_vars.contains(&i)
+                    && (atype.is_type_parameter() || atype.is_struct_or_vector_of_struct())
+                {
+                    let ability = fun_env.module_env.env.type_abilities(atype, &type_params);
+                    if !ability.has_ability(Ability::Drop) {
+                        let msg = format!(
+                            "Unused parameter `{}` does not have the `drop` ability",
+                            sym.display(fun_env.module_env.env.symbol_pool()),
+                        );
+                        fun_env.module_env.env.diag(Severity::Error, loc, &msg);
+                    }
+                }
+            }
+        }
+
         let state_map = analyzer.analyze_function(CopyDropState::default(), &code, &cfg);
         let copy_drop =
             analyzer.state_per_instruction_with_default(state_map, &code, &cfg, |_, after| {
