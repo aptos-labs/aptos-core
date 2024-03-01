@@ -153,6 +153,7 @@ fn test_basic_fungible_token() {
     assert_eq!(alice_store, bob_store);
 }
 
+// A simple test to verify gas paying still work for prologue and epilogue.
 #[test]
 fn test_coin_to_fungible_asset_migration() {
     let mut h = MoveHarness::new();

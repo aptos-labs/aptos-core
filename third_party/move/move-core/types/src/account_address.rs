@@ -30,6 +30,8 @@ impl AccountAddress {
     pub const TWO: Self = Self::get_hex_address_two();
     /// Hex address: 0x0
     pub const ZERO: Self = Self([0u8; Self::LENGTH]);
+    /// Hex address: 0xA
+    pub const TEN: Self = Self::get_hex_address_ten();
 
     pub const fn new(address: [u8; Self::LENGTH]) -> Self {
         Self(address)
@@ -44,6 +46,11 @@ impl AccountAddress {
     const fn get_hex_address_two() -> Self {
         let mut addr = [0u8; AccountAddress::LENGTH];
         addr[AccountAddress::LENGTH - 1] = 2u8;
+        Self(addr)
+    }
+    const fn get_hex_address_ten() -> Self {
+        let mut addr = [0u8; AccountAddress::LENGTH];
+        addr[AccountAddress::LENGTH - 1] = 10u8;
         Self(addr)
     }
 

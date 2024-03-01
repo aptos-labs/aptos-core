@@ -186,9 +186,9 @@ spec aptos_framework::staking_contract {
     /// Account is not frozen and sufficient to withdraw.
     /// Staking_contract exists the stacker/operator pair.
     spec add_stake(staker: &signer, operator: address, amount: u64) {
+        use aptos_framework::reconfiguration_state;
         // TODO(fa_migration)
         pragma verify = false;
-        use aptos_framework::reconfiguration_state;
         pragma verify_duration_estimate = 120;
         // TODO: this function times out
         include stake::ResourceRequirement;
