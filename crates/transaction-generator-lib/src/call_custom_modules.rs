@@ -23,7 +23,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &LocalAccount,
         &TransactionFactory,
         &mut StdRng,
-    ) -> Option<SignedTransaction>
+    ) -> Vec<SignedTransaction>
     + Send
     + Sync;
 
@@ -48,7 +48,7 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
     /// If you need to send any additional initialization transactions
     /// (like creating and funding additional accounts), you can do so by using provided txn_executor
     async fn create_generator_fn(
-        &self,
+        &mut self,
         root_account: &mut LocalAccount,
         txn_factory: &TransactionFactory,
         txn_executor: &dyn ReliableTransactionSubmitter,
@@ -83,24 +83,35 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
     fn generate_transactions(
         &mut self,
         account: &LocalAccount,
-        num_to_create: usize,
+        _num_to_create: usize,
     ) -> Vec<SignedTransaction> {
-        let mut requests = Vec::with_capacity(num_to_create);
+        let mut all_requests = Vec::with_capacity(self.packages.len());
 
-        for _ in 0..num_to_create {
-            let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
-            let request = (self.txn_generator)(
+        for (package, publisher) in self.packages.iter() {
+            let mut requests = (self.txn_generator)(
                 account,
                 package,
                 publisher,
                 &self.txn_factory,
                 &mut self.rng,
             );
-            if let Some(request) = request {
-                requests.push(request);
-            }
+            all_requests.append(&mut requests);
         }
-        requests
+        // for _ in 0..num_to_create {
+        //     let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
+        //     let mut requests = (self.txn_generator)(
+        //         account,
+        //         package,
+        //         publisher,
+        //         &self.txn_factory,
+        //         &mut self.rng,
+        //     );
+        //     all_requests.append(&mut requests);
+        //     // if let Some(request) = request {
+        //     //     all_requests.push(request);
+        //     // }
+        // }
+        all_requests
     }
 }
 

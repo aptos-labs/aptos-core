@@ -70,7 +70,7 @@ impl ModuleStorage for ModuleCache {
     }
 
     fn fetch_module(&self, module_id: &ModuleId) -> Option<Arc<Module>> {
-        self.0.read().get(module_id).map(Arc::clone)
+        self.0.read().get(module_id).cloned()
     }
 }
 
@@ -138,10 +138,11 @@ impl ModuleStorageAdapter {
         func_name: &IdentStr,
         module_id: &ModuleId,
     ) -> PartialVMResult<Arc<Function>> {
-        match self.modules.fetch_module(module_id).and_then(|module| {
+        let result =  self.modules.fetch_module(module_id).and_then(|module| {
             let idx = module.function_map.get(func_name)?;
-            module.function_defs.get(*idx).map(Arc::clone)
-        }) {
+            module.function_defs.get(*idx).cloned()
+        });
+        match result {
             Some(func) => Ok(func),
             None => Err(
                 PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(format!(

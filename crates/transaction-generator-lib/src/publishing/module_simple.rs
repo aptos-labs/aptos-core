@@ -235,6 +235,12 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    EconiaRegisterMarket,
+    EconiaRegisterMarketUser,
+    EconiaDepositCoins,
+    EconiaPlaceBidLimitOrder,
+    EconiaPlaceAskLimitOrder,
+    EconiaPlaceRandomLimitOrder,
 }
 
 impl EntryPoints {
@@ -281,6 +287,12 @@ impl EntryPoints {
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::EconiaRegisterMarket
+            | EntryPoints::EconiaRegisterMarketUser
+            | EntryPoints::EconiaDepositCoins
+            | EntryPoints::EconiaPlaceBidLimitOrder
+            | EntryPoints::EconiaPlaceAskLimitOrder
+            | EntryPoints::EconiaPlaceRandomLimitOrder => "econia",
         }
     }
 
@@ -329,6 +341,12 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::EconiaRegisterMarket
+            | EntryPoints::EconiaRegisterMarketUser
+            | EntryPoints::EconiaDepositCoins
+            | EntryPoints::EconiaPlaceBidLimitOrder
+            | EntryPoints::EconiaPlaceAskLimitOrder
+            | EntryPoints::EconiaPlaceRandomLimitOrder => "txn_generator_utils",
         }
     }
 
@@ -592,6 +610,70 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
+            EntryPoints::EconiaRegisterMarket => {
+                get_payload(module_id, ident_str!("register_market").to_owned(), vec![])
+            },
+            EntryPoints::EconiaRegisterMarketUser => get_payload(
+                module_id,
+                ident_str!("register_market_accounts").to_owned(),
+                vec![
+                    bcs::to_bytes(&1).unwrap(), //market id
+                ],
+            ),
+            EntryPoints::EconiaDepositCoins => {
+                get_payload(module_id, ident_str!("deposit_coins").to_owned(), vec![
+                    bcs::to_bytes(&1).unwrap(), // market id
+                ])
+            },
+            EntryPoints::EconiaPlaceBidLimitOrder => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("place_bid_limit_order").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
+                        bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
+                        bcs::to_bytes(&1).unwrap(), // market id
+                    ],
+                )
+            },
+            EntryPoints::EconiaPlaceAskLimitOrder => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("place_ask_limit_order").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
+                        bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
+                        bcs::to_bytes(&1).unwrap(), //market id
+                    ],
+                )
+            },
+            EntryPoints::EconiaPlaceRandomLimitOrder => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let is_bid: bool = rng.gen();
+                if is_bid {
+                    get_payload(
+                        module_id,
+                        ident_str!("place_bid_limit_order").to_owned(),
+                        vec![
+                            bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
+                            bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
+                            bcs::to_bytes(&1).unwrap(), // market id
+                        ],
+                    )
+                } else {
+                    get_payload(
+                        module_id,
+                        ident_str!("place_ask_limit_order").to_owned(),
+                        vec![
+                            bcs::to_bytes(&rng.gen_range(1u64, 5u64)).unwrap(),  // size
+                            bcs::to_bytes(&rng.gen_range(0u64, 30u64)).unwrap(), // amount
+                            bcs::to_bytes(&1).unwrap(), // market id
+                        ],
+                    )
+                }
+            },
         }
     }
 
@@ -619,7 +701,9 @@ impl EntryPoints {
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
-            EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
+            EntryPoints::TokenV2AmbassadorMint | EntryPoints::EconiaDepositCoins => {
+                MultiSigConfig::Publisher
+            },
             _ => MultiSigConfig::None,
         }
     }

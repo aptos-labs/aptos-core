@@ -44,7 +44,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
     }
 
     async fn create_generator_fn(
-        &self,
+        &mut self,
         root_account: &mut LocalAccount,
         txn_factory: &TransactionFactory,
         txn_executor: &dyn ReliableTransactionSubmitter,
@@ -88,7 +88,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             );
             let builder = txn_factory.payload(payload);
 
-            Some(match entry_point.multi_sig_additional_num() {
+            vec![match entry_point.multi_sig_additional_num() {
                 MultiSigConfig::None => account.sign_with_transaction_builder(builder),
                 MultiSigConfig::Random(_) => account.sign_multi_agent_with_transaction_builder(
                     additional_signers.as_ref().unwrap().iter().collect(),
@@ -97,7 +97,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                 MultiSigConfig::Publisher => {
                     account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)
                 },
-            })
+            }]
         })
     }
 }
