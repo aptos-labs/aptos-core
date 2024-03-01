@@ -168,19 +168,11 @@ impl ProofManager {
                             inline_block.len()
                         );
                         // TODO: Need to calcuale max_txns_to_execute correctly here.
-                        let max_txns_to_execute: usize = proof_block
-                            .iter()
-                            .map(|p| p.info().num_txns() as usize)
-                            .sum::<usize>()
-                            + inline_block
-                                .iter()
-                                .map(|(_, txns)| txns.len())
-                                .sum::<usize>();
                         Payload::QuorumStoreInlineHybrid(
                             inline_block,
                             ProofWithDataWithTxnLimit::new(
                                 ProofWithData::new(proof_block),
-                                Some(max_txns_to_execute),
+                                Some(max_txns as usize),
                             ),
                         )
                     },
