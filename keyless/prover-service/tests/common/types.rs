@@ -1,17 +1,14 @@
-use aptos_types::keyless::Pepper;
-use jsonwebtoken::{self, Algorithm, Header};
-
-use aptos_types::{jwks::rsa::RSA_JWK, transaction::authenticator::EphemeralPublicKey};
-use ark_ff::{BigInteger, PrimeField};
-use prover_service::api::{EphemeralPublicKeyBlinder, FromFr};
-use serde::{Deserialize, Serialize};
-use prover_service::input_conversion::compute_nonce;
-use prover_service::{
-    input_conversion::{config::CircuitConfig, rsa::RsaPrivateKey},
-    api::RequestInput,
-};
-
 use super::{gen_test_ephemeral_pk, gen_test_ephemeral_pk_blinder, get_test_pepper};
+use aptos_types::{
+    jwks::rsa::RSA_JWK, keyless::Pepper, transaction::authenticator::EphemeralPublicKey,
+};
+use ark_ff::{BigInteger, PrimeField};
+use jsonwebtoken::{self, Algorithm, Header};
+use prover_service::{
+    api::{EphemeralPublicKeyBlinder, FromFr, RequestInput},
+    input_conversion::{compute_nonce, config::CircuitConfig, rsa::RsaPrivateKey},
+};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TestJWTPayload {
@@ -105,8 +102,7 @@ impl DefaultTestJWKKeyPair {
 
 impl TestJWKKeyPair for DefaultTestJWKKeyPair {
     fn pubkey_mod_b64(&self) -> String {
-        prover_service::input_conversion::rsa::RsaPublicKey::from(&self.private_key)
-            .as_mod_b64()
+        prover_service::input_conversion::rsa::RsaPublicKey::from(&self.private_key).as_mod_b64()
     }
 
     fn kid(&self) -> &str {
@@ -133,7 +129,6 @@ impl TestJWKKeyPair for DefaultTestJWKKeyPair {
     }
 }
 
-
 #[derive(Clone)]
 pub struct ProofTestCase<T: Serialize + WithNonce + Clone> {
     pub jwt_payload: T,
@@ -147,10 +142,7 @@ pub struct ProofTestCase<T: Serialize + WithNonce + Clone> {
     pub aud_override: Option<String>,
 }
 
-
 impl<T: Serialize + WithNonce + Clone> ProofTestCase<T> {
-
-
     #[allow(clippy::all)]
     #[allow(dead_code)]
     pub fn new_with_test_epk_and_blinder(
@@ -196,13 +188,18 @@ impl<T: Serialize + WithNonce + Clone> ProofTestCase<T> {
             epk_expiry_horizon_secs: 100,
             extra_field: Some(String::from("name")),
             uid_key: String::from("email"),
-            aud_override: None
+            aud_override: None,
         }
     }
 
-
     pub fn compute_nonce(self, config: &CircuitConfig) -> Self {
-        let nonce = compute_nonce(self.epk_expiry_time_secs, &self.epk, self.epk_blinder_fr, config).unwrap();
+        let nonce = compute_nonce(
+            self.epk_expiry_time_secs,
+            &self.epk,
+            self.epk_blinder_fr,
+            config,
+        )
+        .unwrap();
         let payload_with_nonce = self.jwt_payload.with_nonce(&nonce.to_string());
 
         Self {

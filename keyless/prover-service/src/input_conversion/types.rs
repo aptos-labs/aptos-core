@@ -1,13 +1,11 @@
-use std::collections::HashMap;
-use std::ops::{Add, AddAssign};
-
-use anyhow::{Error, anyhow};
+use super::bits::Bits;
+use anyhow::{anyhow, Error};
 use aptos_types::transaction::authenticator::EphemeralPublicKey;
 use ark_bn254::Fr;
-
-use super::bits::Bits;
-
-
+use std::{
+    collections::HashMap,
+    ops::{Add, AddAssign},
+};
 
 #[derive(Debug)]
 pub struct Input {
@@ -19,21 +17,15 @@ pub struct Input {
     pub variable_keys: HashMap<String, String>,
     pub exp_horizon_secs: u64,
     pub use_extra_field: bool,
-    // TODO add jwk field 
+    // TODO add jwk field
     // TODO jwk_b64 -> jwt_parts
 }
-
-
-
-
-
 
 /// Type for "ascii" byte representation during conversion.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Ascii {
-    pub(crate) bytes: Vec<u8>
+    pub(crate) bytes: Vec<u8>,
 }
-
 
 impl Default for Ascii {
     fn default() -> Self {
@@ -45,11 +37,12 @@ impl Ascii {
     pub fn new() -> Self {
         Ascii { bytes: Vec::new() }
     }
-    
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        Ascii { bytes: Vec::from(bytes) }
-    }
 
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        Ascii {
+            bytes: Vec::from(bytes),
+        }
+    }
 
     pub fn push(&mut self, c: u8) {
         self.bytes.push(c);
@@ -64,29 +57,34 @@ impl Ascii {
         self.bytes.as_slice()
     }
 
-    pub fn pad(self, max_size : usize) -> Result<Self, anyhow::Error> {
+    pub fn pad(self, max_size: usize) -> Result<Self, anyhow::Error> {
         let mut bytes = self.bytes;
         if max_size < bytes.len() {
-            Err(anyhow!("max_size exceeded: {} is too long for max size {}", String::from_utf8(bytes).unwrap(), max_size))
+            Err(anyhow!(
+                "max_size exceeded: {} is too long for max size {}",
+                String::from_utf8(bytes).unwrap(),
+                max_size
+            ))
         } else {
-            bytes.extend([0].repeat(max_size-bytes.len()));
+            bytes.extend([0].repeat(max_size - bytes.len()));
             Ok(Self { bytes })
         }
     }
 
-    /// Note: this panics on invalid utf-8. 
+    /// Note: this panics on invalid utf-8.
     pub fn find(&self, s: &str) -> Option<usize> {
-        String::from_utf8(self.bytes.clone()).expect("Should always decode valid utf-8").find(s)
-
+        String::from_utf8(self.bytes.clone())
+            .expect("Should always decode valid utf-8")
+            .find(s)
     }
-    
-    /// Note: this panics on invalid utf-8. 
+
+    /// Note: this panics on invalid utf-8.
     pub fn find_starting_at(&self, i: usize, s: &str) -> Option<usize> {
-        Some(String::from_utf8(self.bytes.clone())
-             .expect("Should always decode valid utf-8")[i..]
-             .find(s)?
-             + i
-            )
+        Some(
+            String::from_utf8(self.bytes.clone()).expect("Should always decode valid utf-8")[i..]
+                .find(s)?
+                + i,
+        )
     }
 
     pub fn first_non_space_char_starting_at(&self, i: usize) -> Option<usize> {
@@ -94,103 +92,116 @@ impl Ascii {
         while pos < self.bytes.len() && self.bytes[pos] == b' ' {
             pos += 1;
         }
-        if pos < self.bytes.len() { Some(pos) } else { None }
+        if pos < self.bytes.len() {
+            Some(pos)
+        } else {
+            None
+        }
     }
 
     pub fn value_starting_at(&self, i: usize) -> Option<(String, usize)> {
         if self.bytes[i] == b'"' {
             // handle quoted values
-            let mut pos = i+1;
+            let mut pos = i + 1;
             while pos < self.bytes.len() && self.bytes[pos] != b'"' {
                 pos += 1;
             }
-            if pos < self.bytes.len() { 
-                Some(
-                    (
-                        String::from_utf8(
-                            Vec::from(
-                                &self.bytes[i+1..pos]))
+            if pos < self.bytes.len() {
+                Some((
+                    String::from_utf8(Vec::from(&self.bytes[i + 1..pos]))
                         .expect("Should always decode valid utf-8"),
-                        pos
-                    ))
-            } else { None }
+                    pos,
+                ))
+            } else {
+                None
+            }
         } else {
             // handle unquoted values
             let mut pos = i;
-            while pos < self.bytes.len() 
-                && self.bytes[pos] != b' ' 
-                && self.bytes[pos] != b',' 
-                && self.bytes[pos] != b'}' {
+            while pos < self.bytes.len()
+                && self.bytes[pos] != b' '
+                && self.bytes[pos] != b','
+                && self.bytes[pos] != b'}'
+            {
                 pos += 1;
             }
-            if pos < self.bytes.len() { 
-                Some(
-                    (
-                        String::from_utf8(
-                            Vec::from(
-                                &self.bytes[i..pos]))
+            if pos < self.bytes.len() {
+                Some((
+                    String::from_utf8(Vec::from(&self.bytes[i..pos]))
                         .expect("Should always decode valid utf-8"),
-                        pos-1
-                    ))
-            } else { None }
+                    pos - 1,
+                ))
+            } else {
+                None
+            }
         }
     }
 
     pub fn whole_field(&self, start: usize, value_end: usize) -> Option<String> {
-        let next_non_space = self.first_non_space_char_starting_at(value_end+1)?;
-        if self.bytes[next_non_space] != b',' &&
-           self.bytes[next_non_space] != b'}' {
+        let next_non_space = self.first_non_space_char_starting_at(value_end + 1)?;
+        if self.bytes[next_non_space] != b',' && self.bytes[next_non_space] != b'}' {
             None
         } else {
             Some(
-                String::from_utf8(
-                    Vec::from(
-                        &self.bytes[start..next_non_space+1]
-                        ))
-                .expect("Should always decode valid utf-8"))
+                String::from_utf8(Vec::from(&self.bytes[start..next_non_space + 1]))
+                    .expect("Should always decode valid utf-8"),
+            )
         }
     }
 
-
     pub fn header_with_dot(&self) -> Result<Ascii, Error> {
-        let first_dot = self.bytes
-                            .iter()
-                            .position(|c| c == &b'.').ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
+        let first_dot = self
+            .bytes
+            .iter()
+            .position(|c| c == &b'.')
+            .ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
 
-        Ok(Ascii { bytes: Vec::from( &self.bytes[..first_dot+1] ) })
+        Ok(Ascii {
+            bytes: Vec::from(&self.bytes[..first_dot + 1]),
+        })
     }
 
     pub fn payload(&self) -> Result<Ascii, Error> {
-        let first_dot = self.bytes
-                            .iter()
-                            .position(|c| c == &b'.').ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
+        let first_dot = self
+            .bytes
+            .iter()
+            .position(|c| c == &b'.')
+            .ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
 
-        Ok(Ascii { bytes: Vec::from( &self.bytes[first_dot+1..] ) })
+        Ok(Ascii {
+            bytes: Vec::from(&self.bytes[first_dot + 1..]),
+        })
     }
 }
 
 impl From<&str> for Ascii {
     fn from(bytes: &str) -> Self {
-        Ascii { bytes: Vec::from(bytes) }
+        Ascii {
+            bytes: Vec::from(bytes),
+        }
     }
 }
 
-
 impl TryFrom<Bits> for Ascii {
-    type Error = anyhow::Error; //put something sane here
+    type Error = anyhow::Error;
+
+    //put something sane here
 
     /// Input: Bits in BIG-ENDIAN order
     /// Output: Ascii bytes in BIG_ENDIAN order
     fn try_from(value: Bits) -> Result<Self, Self::Error> {
         if value.b.len() % 8 != 0 {
-            Err(anyhow!("Tried to convert bits to bytes, where bit length is not divisible by 8"))
+            Err(anyhow!(
+                "Tried to convert bits to bytes, where bit length is not divisible by 8"
+            ))
         } else {
-            let mut bytes  = Vec::new();
+            let mut bytes = Vec::new();
 
-            for i in 0..(value.b.len()/8) {
-                let idx = i*8;
-                let bits_for_chunk : &str = &value[idx..idx+8];
-                let chunk_byte = u8::from_str_radix(bits_for_chunk, 2).expect("Binary string should parse");
+            for i in 0..(value.b.len() / 8) {
+                let idx = i * 8;
+                let bits_for_chunk: &str = &value[idx..idx + 8];
+                let chunk_byte =
+                    u8::from_str_radix(bits_for_chunk, 2).expect("Binary string should parse");
 
                 bytes.push(chunk_byte);
             }
@@ -216,18 +227,9 @@ impl Add<Ascii> for Ascii {
     }
 }
 
-
-
-
-
-
-
-
-
 #[cfg(test)]
 mod tests {
     use crate::input_conversion::types::Ascii;
-
 
     #[test]
     fn test_ascii_find() {

@@ -1,13 +1,11 @@
- use std::collections::BTreeMap;
- use serde::{Serialize, Deserialize};
-
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Serialize, Deserialize)]
 pub struct CircuitConfig {
-    pub global_input_max_lengths : BTreeMap<String, usize>,
+    pub global_input_max_lengths: BTreeMap<String, usize>,
     pub field_check_inputs: FieldCheckInputConfigs,
 }
-
 
 #[derive(Serialize, Deserialize)]
 pub struct FieldCheckInputConfigs(Vec<FieldCheckInputConfig>);
@@ -16,42 +14,39 @@ impl FieldCheckInputConfigs {
     pub fn max_name_length(&self, name: &str) -> Option<usize> {
         Some(
             self.0
-            .iter()
-            .find(|field_config| field_config.circuit_input_signal_prefix == name)?
-            .max_name_length
-            )
+                .iter()
+                .find(|field_config| field_config.circuit_input_signal_prefix == name)?
+                .max_name_length,
+        )
     }
+
     pub fn max_value_length(&self, name: &str) -> Option<usize> {
         Some(
             self.0
-            .iter()
-            .find(|field_config| field_config.circuit_input_signal_prefix == name)?
-            .max_value_length
-            )
+                .iter()
+                .find(|field_config| field_config.circuit_input_signal_prefix == name)?
+                .max_value_length,
+        )
     }
+
     pub fn max_whole_field_length(&self, name: &str) -> Option<usize> {
         Some(
             self.0
-            .iter()
-            .find(|field_config| field_config.circuit_input_signal_prefix == name)?
-            .max_whole_field_length
-            )
+                .iter()
+                .find(|field_config| field_config.circuit_input_signal_prefix == name)?
+                .max_whole_field_length,
+        )
     }
 }
 
-
 impl<'a> IntoIterator for &'a FieldCheckInputConfigs {
-    type Item = <&'a Vec<FieldCheckInputConfig> as IntoIterator>::Item;
-
     type IntoIter = <&'a Vec<FieldCheckInputConfig> as IntoIterator>::IntoIter;
+    type Item = <&'a Vec<FieldCheckInputConfig> as IntoIterator>::Item;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.iter()
     }
 }
-
-
-
 
 #[derive(Serialize, Deserialize)]
 pub struct FieldCheckInputConfig {

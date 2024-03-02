@@ -1,21 +1,22 @@
-
-use std::{net::SocketAddr, sync::{Arc, Mutex}, time::Duration};
-
-use rust_rapidsnark::FullProver;
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use axum::{
-    routing::{post, get},
+    routing::{get, post},
     Router,
 };
-use aptos_crypto::ed25519::Ed25519PublicKey;
-use figment::{Figment, providers::{Format, Yaml, Env}};
-
-use tower_http::cors::{Any, CorsLayer};
+use figment::{
+    providers::{Env, Format, Yaml},
+    Figment,
+};
 use http::Method;
+use prover_service::{config::*, *};
+use rust_rapidsnark::FullProver;
+use std::{
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tower::ServiceBuilder;
-
-use prover_service::config::*;
-use prover_service::*;
-
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() {
@@ -31,8 +32,8 @@ async fn main() {
     logging::init_tracing().expect("Couldn't init tracing.");
 
     // read config and secret key
-    let ProverServerConfig { 
-        zkey_path, 
+    let ProverServerConfig {
+        zkey_path,
         witness_gen_binary_folder_path,
         test_verification_key_path: _,
         oidc_providers,
@@ -40,25 +41,30 @@ async fn main() {
         port,
         metrics_port: _,
     } = Figment::new()
-    .merge(Yaml::file(config::CONFIG_FILE_PATH))
-    .merge(Env::raw())
-        .extract().expect("Couldn't load config");
+        .merge(Yaml::file(config::CONFIG_FILE_PATH))
+        .merge(Env::raw())
+        .extract()
+        .expect("Couldn't load config");
 
-    let ProverServerSecrets {
-        private_key
-    } = Figment::new()
-    .merge(Env::raw())
-        .extract().expect("Couldn't load private key from environment variable PRIVATE_KEY");
-
-
+    let ProverServerSecrets { private_key } = Figment::new()
+        .merge(Env::raw())
+        .extract()
+        .expect("Couldn't load private key from environment variable PRIVATE_KEY");
 
     // init state
-    let public_key : Ed25519PublicKey = (&private_key).into();
-    let full_prover = FullProver::new(&zkey_path, &witness_gen_binary_folder_path).expect("failed to initialize rapidsnark prover");
+    let public_key: Ed25519PublicKey = (&private_key).into();
+    let full_prover = FullProver::new(&zkey_path, &witness_gen_binary_folder_path)
+        .expect("failed to initialize rapidsnark prover");
     let metrics = metrics::ProverServerMetrics::new();
-    let state = Arc::new(Mutex::new(ProverServerState { full_prover, public_key, private_key, metrics }));
+    let state = Arc::new(Mutex::new(ProverServerState {
+        full_prover,
+        public_key,
+        private_key,
+        metrics,
+    }));
 
-    jwk_fetching::init_jwk_fetching(&oidc_providers, Duration::from_secs(jwk_refresh_rate_secs)).await;
+    jwk_fetching::init_jwk_fetching(&oidc_providers, Duration::from_secs(jwk_refresh_rate_secs))
+        .await;
 
     // init axum and serve
     let app = Router::new()
@@ -67,13 +73,9 @@ async fn main() {
         .route("/healthcheck", get(handlers::healthcheck_handler))
         .fallback(handlers::fallback_handler)
         .with_state(state)
-        .layer(
-        ServiceBuilder::new()
-            .layer(cors));
-
+        .layer(ServiceBuilder::new().layer(cors));
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
-

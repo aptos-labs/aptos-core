@@ -1,21 +1,16 @@
-use std::env;
 use axum::http::StatusCode;
-use tracing_subscriber::fmt::format::FmtSpan;
-
-
 use init_tracing_opentelemetry::tracing_subscriber_ext::{
     build_loglevel_filter_layer, build_otel_layer,
 };
-use tracing::{info,warn,error};
+use std::env;
+use tracing::{error, info, warn};
 use tracing_subscriber::{
     fmt::{
-        format::{Format, Json, JsonFields},
+        format::{FmtSpan, Format, Json, JsonFields},
         Layer,
     },
     prelude::*,
 };
-
-
 
 pub fn init_tracing() -> anyhow::Result<()> {
     //setup a temporary subscriber to log output during setup
@@ -55,16 +50,16 @@ fn build_json_log_layer<S>() -> Layer<S, JsonFields, Format<Json>> {
 pub fn do_tracing(e: anyhow::Error, code: StatusCode, message: &str) {
     match code {
         StatusCode::BAD_REQUEST => {
-            let e_box : Box<dyn std::error::Error> = e.into();
+            let e_box: Box<dyn std::error::Error> = e.into();
             warn!(message, error = e_box)
         },
         StatusCode::INTERNAL_SERVER_ERROR => {
-            let e_box : Box<dyn std::error::Error> = e.into();
+            let e_box: Box<dyn std::error::Error> = e.into();
             error!(message, error = e_box)
         },
         _ => {
-            let e_box : Box<dyn std::error::Error> = e.into();
+            let e_box: Box<dyn std::error::Error> = e.into();
             error!(message, error = e_box)
-        }
+        },
     };
 }

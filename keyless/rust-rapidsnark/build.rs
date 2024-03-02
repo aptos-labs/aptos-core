@@ -1,20 +1,22 @@
-use std::env;
-use std::path::PathBuf;
-use std::process::Command;
+use std::{env, path::PathBuf, process::Command};
 
 fn main() {
-    println!("{}", env::current_dir().expect("Couldn't get working dir.").to_str().expect("couldn't convert pathbuf to str."));
+    println!(
+        "{}",
+        env::current_dir()
+            .expect("Couldn't get working dir.")
+            .to_str()
+            .expect("couldn't convert pathbuf to str.")
+    );
 
-
-    println!("{:?}", Command::new("bash")
-        .arg("-c")
-        .arg("cd rapidsnark && ./build_lib.sh")
-        .output()
-        .expect("Failed to build c++ library"));
-
-
-
-
+    println!(
+        "{:?}",
+        Command::new("bash")
+            .arg("-c")
+            .arg("cd rapidsnark && ./build_lib.sh")
+            .output()
+            .expect("Failed to build c++ library")
+    );
 
     // Tell cargo to tell rustc to link the system `clang`
     // shared library.
@@ -23,8 +25,6 @@ fn main() {
     println!("cargo:rerun-if-env-changed=OPENMP_LIBRARY_PATH");
 
     println!("cargo:rerun-if-env-changed=LIBCLANG_DYNAMIC_PATH");
-
-
 
     if let Ok(libclang_path) = env::var("LIBCLANG_PATH") {
         println!("cargo:rustc-link-search=native={}", libclang_path);
@@ -37,12 +37,11 @@ fn main() {
 
     println!("cargo:rustc-link-lib=dylib=gmp");
 
-
     let libdir_path = PathBuf::from("rapidsnark/package/lib")
-    // Canonicalize the path as `rustc-link-search` requires an absolute
-    // path.
-    .canonicalize()
-    .expect("cannot canonicalize libdir path");
+        // Canonicalize the path as `rustc-link-search` requires an absolute
+        // path.
+        .canonicalize()
+        .expect("cannot canonicalize libdir path");
     // Tell cargo to look for shared libraries in the specified directory
     println!("cargo:rustc-link-search={}", libdir_path.to_str().unwrap());
 
@@ -50,17 +49,12 @@ fn main() {
     // shared library.
     println!("cargo:rustc-link-lib=static=rapidsnark-fr-fq");
 
-                                
     os_specific_printlns();
-
-
-
 
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let bindings = build_bindings();
-
 
     // Write the bindings to the $OUT_DIR/bindings.rs file.
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -86,13 +80,11 @@ fn os_specific_printlns() {
 
 #[cfg(not(target_os = "linux"))]
 fn build_bindings() -> bindgen::Bindings {
-
-
     let include_path = PathBuf::from("wrapper.hpp")
-    // Canonicalize the path as `rustc-link-search` requires an absolute
-    // path.
-    .canonicalize()
-    .expect("cannot canonicalize include path");
+        // Canonicalize the path as `rustc-link-search` requires an absolute
+        // path.
+        .canonicalize()
+        .expect("cannot canonicalize include path");
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
@@ -120,7 +112,6 @@ fn build_bindings() -> bindgen::Bindings {
         .allowlist_type("ProverResponseType")
         .allowlist_type("ProverError")
         .allowlist_type("ProverResponseMetrics")
-
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.
@@ -131,13 +122,11 @@ fn build_bindings() -> bindgen::Bindings {
 
 #[cfg(target_os = "linux")]
 fn build_bindings() -> bindgen::Bindings {
-
-
     let include_path = PathBuf::from("wrapper.hpp")
-    // Canonicalize the path as `rustc-link-search` requires an absolute
-    // path.
-    .canonicalize()
-    .expect("cannot canonicalize include path");
+        // Canonicalize the path as `rustc-link-search` requires an absolute
+        // path.
+        .canonicalize()
+        .expect("cannot canonicalize include path");
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
     // the resulting bindings.
@@ -170,7 +159,6 @@ fn build_bindings() -> bindgen::Bindings {
         .allowlist_type("ProverResponseType")
         .allowlist_type("ProverError")
         .allowlist_type("ProverResponseMetrics")
-
         // Finish the builder and generate the bindings.
         .generate()
         // Unwrap the Result and panic on failure.

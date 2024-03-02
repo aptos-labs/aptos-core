@@ -1,10 +1,8 @@
+use crate::common::get_test_circuit_config;
 use common::{
     convert_prove_and_verify,
     types::{ProofTestCase, TestJWTPayload},
 };
-
-
-use crate::common::get_test_circuit_config;
 use serial_test::serial;
 
 mod common;

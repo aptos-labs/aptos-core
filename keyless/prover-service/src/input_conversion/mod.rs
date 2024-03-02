@@ -5,66 +5,53 @@
 // python:
 // <jwt> + "1" +
 
+pub mod bits;
 pub mod circuit_input_signals;
 pub mod config;
 pub mod encoding;
 pub mod field_check_input;
+pub mod field_parser;
+pub mod preprocess;
 pub mod public_inputs_hash;
 pub mod rsa;
 pub mod sha;
-pub mod bits;
 pub mod types;
-pub mod field_parser;
-pub mod preprocess;
 
-use self::circuit_input_signals::Padded;
-
-use self::public_inputs_hash::compute_public_inputs_hash;
-use crate::input_conversion::circuit_input_signals::CircuitInputSignals;
-use crate::input_conversion::encoding::*;
-use crate::input_conversion::encoding::JwtParts;
-use crate::input_conversion::encoding::UnsignedJwtPartsWithPadding;
-use crate::input_conversion::types::Input;
-
+use self::{circuit_input_signals::Padded, public_inputs_hash::compute_public_inputs_hash};
+use super::jwk_fetching;
+use crate::input_conversion::{
+    circuit_input_signals::CircuitInputSignals,
+    encoding::{JwtParts, UnsignedJwtPartsWithPadding, *},
+    types::Input,
+};
+use anyhow::Result;
 use aptos_crypto::poseidon_bn254;
-use aptos_types::jwks::rsa::RSA_JWK;
-use aptos_types::keyless::Configuration;
-use aptos_types::transaction::authenticator::EphemeralPublicKey;
+use aptos_types::{
+    jwks::rsa::RSA_JWK, keyless::Configuration, transaction::authenticator::EphemeralPublicKey,
+};
 use ark_bn254::{self, Fr};
-
-
-use ark_ff::{PrimeField};
-use encoding::As64BitLimbs;
-use encoding::{FromB64};
+use ark_ff::PrimeField;
+use encoding::{As64BitLimbs, FromB64};
 use field_check_input::padded_field_check_input_signals;
 use hex;
-
-use sha::{jwt_bit_len_binary, compute_sha_padding_without_len, with_sha_padding_bytes};
+use sha::{compute_sha_padding_without_len, jwt_bit_len_binary, with_sha_padding_bytes};
+use std::{sync::Arc, time::Instant};
 use tracing::info_span;
-
-
-
-use std::sync::Arc;
-use std::time::Instant;
-
-use anyhow::Result;
-use super::jwk_fetching;
-
-
 
 // TODO highest-impact cleanup tasks:
 // 1. Separate types.rs into multiple files (plan in types.rs)
-// 2. Separate out encoding via  RequestInput -> Input 
+// 2. Separate out encoding via  RequestInput -> Input
 // 3. Rewrite field_check_input.rs
-
 
 // TODO this works when I have it here, but doesn't when I move it to encoding.rs. Why?
 impl FromHex for Fr {
-    fn from_hex(s: &str) -> Result<Self> where Self: Sized {
+    fn from_hex(s: &str) -> Result<Self>
+    where
+        Self: Sized,
+    {
         Ok(Fr::from_le_bytes_mod_order(&hex::decode(s)?))
     }
 }
-
 
 pub fn derive_circuit_input_signals(
     // TODO: input should not have any hex-encoded anything. Should have conversion from
@@ -74,13 +61,9 @@ pub fn derive_circuit_input_signals(
     config: &config::CircuitConfig,
     maybe_jwk: Option<&RSA_JWK>,
 ) -> Result<(CircuitInputSignals<Padded>, Fr), anyhow::Error> {
-
-  
-
     // TODO add metrics instead of just printing out elapsed time
     let _start_time = Instant::now();
     let _span = info_span!("Running input conversion");
-
 
     let jwt_parts = JwtParts::from_b64(&input.jwt_b64)?;
 
@@ -88,31 +71,25 @@ pub fn derive_circuit_input_signals(
     let signature = jwt_parts.signature()?;
 
     let header_decoded = jwt_parts.header_decoded()?;
-    let header_struct : JwtHeader = serde_json::from_str(&header_decoded)?;
+    let header_struct: JwtHeader = serde_json::from_str(&header_decoded)?;
     println!("{:?}", header_decoded);
 
-
-
     let payload_decoded = jwt_parts.payload_decoded()?;
-    let payload_struct : JwtPayload = serde_json::from_str(&payload_decoded)?;
+    let payload_struct: JwtPayload = serde_json::from_str(&payload_decoded)?;
 
     let jwk = match maybe_jwk {
         Some(x) => Arc::new(x.clone()),
-        None => jwk_fetching::cached_decoding_key(&payload_struct.iss, &header_struct.kid)?
+        None => jwk_fetching::cached_decoding_key(&payload_struct.iss, &header_struct.kid)?,
     };
 
     // Check the signature verifies.
     jwk.verify_signature(&input.jwt_b64)?;
 
-
     // TODO pepper should have a type and should have from_hex method. Can use Pepper from
     // aptos-types?
     // TODO EphemeralPublicKey should have from_hex as well.
     println!("pepper: {}", &input.pepper_fr.to_string());
-    println!(
-        "payload decoded: {}",
-        payload_decoded
-    );
+    println!("payload decoded: {}", payload_decoded);
 
     // TODO do this inside compute_public_inputs_hash?
     let temp_pubkey_frs_with_len = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
@@ -141,9 +118,8 @@ pub fn derive_circuit_input_signals(
         )
         .bytes_input(
             "jwt_payload",
-            &UnsignedJwtPartsWithPadding::from_b64_bytes_with_padding(
-                &unsigned_jwt_with_padding
-                ).payload_with_padding()?
+            &UnsignedJwtPartsWithPadding::from_b64_bytes_with_padding(&unsigned_jwt_with_padding)
+                .payload_with_padding()?,
         )
         .str_input(
             "jwt_payload_without_sha_padding",
@@ -160,7 +136,7 @@ pub fn derive_circuit_input_signals(
         )
         .bytes_input(
             "jwt_len_bit_encoded",
-            &jwt_bit_len_binary(&jwt_parts.unsigned_undecoded()).as_bytes()?
+            &jwt_bit_len_binary(&jwt_parts.unsigned_undecoded()).as_bytes()?,
         )
         .bytes_input(
             "padding_without_len",
@@ -209,32 +185,27 @@ pub fn compute_nonce(
     Ok(nonce_fr)
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::input_conversion::config::{CircuitConfig, Key};
-    use crate::input_conversion::encoding::{FromB64, JwtParts};
-
-    
-    
-    use crate::input_conversion::{compute_nonce, derive_circuit_input_signals};
-    use crate::input_conversion::types::Input;
-    use aptos_crypto::ed25519::Ed25519PublicKey;
-    use aptos_crypto::poseidon_bn254;
-    use aptos_crypto::{ed25519::Ed25519PrivateKey, encoding_type::EncodingType};
-    use aptos_types::jwks::rsa::RSA_JWK;
-    use aptos_types::keyless::Configuration;
-    use aptos_types::transaction::authenticator::EphemeralPublicKey;
+    use crate::input_conversion::{
+        compute_nonce,
+        config::{CircuitConfig, Key},
+        derive_circuit_input_signals,
+        encoding::{FromB64, JwtParts},
+        types::Input,
+    };
+    use aptos_crypto::{
+        ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+        encoding_type::EncodingType,
+        poseidon_bn254,
+    };
+    use aptos_types::{
+        jwks::rsa::RSA_JWK, keyless::Configuration, transaction::authenticator::EphemeralPublicKey,
+    };
     use ark_bn254;
-    
-    
-    
     use serde_json;
     use serde_yaml;
-    use std::collections::HashMap;
-    
-    use std::fs;
-    use std::str::FromStr;
+    use std::{collections::HashMap, fs, str::FromStr};
 
     #[test]
     fn test_epk_packing() {
@@ -266,9 +237,7 @@ mod tests {
 
         println!(
             "pubkey frs: {} {} {}",
-            temp_pubkey_frs[0],
-            temp_pubkey_frs[1],
-            temp_pubkey_frs[2]
+            temp_pubkey_frs[0], temp_pubkey_frs[1], temp_pubkey_frs[2]
         );
         assert!(temp_pubkey_frs[0] == ark_bn254::Fr::from_str(temp_pubkey_0).unwrap());
         assert!(temp_pubkey_frs[1] == ark_bn254::Fr::from_str(temp_pubkey_1).unwrap());
@@ -306,7 +275,6 @@ mod tests {
             exp_horizon_secs: 100255944,
         };
 
-
         let expected_json: serde_json::Value = serde_json::from_str(
             &fs::read_to_string("tests/input.json").expect("Unable to read file"),
         )
@@ -321,7 +289,8 @@ mod tests {
         //
         let jwt_parts = JwtParts::from_b64(&input.jwt_b64).unwrap();
         let _payload_decoded = jwt_parts.payload_decoded().unwrap();
-        let _computed_nonce = compute_nonce(input.exp_date_secs, &input.epk, epk_blinder, &config).unwrap();
+        let _computed_nonce =
+            compute_nonce(input.exp_date_secs, &input.epk, epk_blinder, &config).unwrap();
         //let parsed_nonce = parse_field(&Ascii::from(payload_decoded.as_str()), "nonce").unwrap();
         //assert!(computed_nonce.to_string() == parsed_nonce.value);
 
@@ -380,7 +349,6 @@ b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5
         println!("{:?}", keys);
         println!("{:?}", expected_keys);
 
-
         // TODO this should go in field_check_input.rs
         for field_config in &config.field_check_inputs {
             let name = &field_config.circuit_input_signal_prefix;
@@ -413,7 +381,7 @@ b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5
                         converted[String::from(name) + "_name_len"]
                             == expected_json[String::from(name) + "_name_len"]
                     );
-                } 
+                }
 
                 assert!(
                     converted[String::from(name) + "_colon_index"]
@@ -429,8 +397,11 @@ b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5
                 );
 
                 if name != "aud" {
-                    println!("{} {}", converted[String::from(name) + "_value_len"],
-                            expected_json[String::from(name) + "_value_len"]);
+                    println!(
+                        "{} {}",
+                        converted[String::from(name) + "_value_len"],
+                        expected_json[String::from(name) + "_value_len"]
+                    );
                     assert!(
                         converted[String::from(name) + "_value_len"]
                             == expected_json[String::from(name) + "_value_len"]

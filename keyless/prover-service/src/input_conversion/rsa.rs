@@ -1,16 +1,11 @@
-use std::str::FromStr;
-
-
-use rsa;
+use anyhow::Result;
+use num_bigint::BigUint;
 use rsa::{
+    self,
     pkcs1::{EncodeRsaPrivateKey, LineEnding},
     traits::PublicKeyParts,
 };
-
-use num_bigint::BigUint;
-
-
-use anyhow::{Result};
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct RsaPublicKey {
@@ -18,7 +13,6 @@ pub struct RsaPublicKey {
 }
 
 impl RsaPublicKey {
-
     #[allow(clippy::all)]
     pub fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         Ok(Self {
@@ -29,9 +23,11 @@ impl RsaPublicKey {
     pub fn to_64bit_limbs(&self) -> Vec<u64> {
         self.modulus.to_u64_digits()
     }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         self.modulus.to_bytes_be()
     }
+
     pub fn from_bytes(bytes: &[u8]) -> Self {
         Self {
             modulus: BigUint::from_bytes_be(bytes),
@@ -54,7 +50,6 @@ pub struct RsaPrivateKey {
 }
 
 impl RsaPrivateKey {
-
     pub fn new_with_exp<R>(
         rng: &mut R,
         bit_size: usize,
@@ -72,21 +67,21 @@ impl RsaPrivateKey {
     pub fn as_encoding_key(&self) -> jsonwebtoken::EncodingKey {
         let encoding_key = jsonwebtoken::EncodingKey::from_rsa_pem(
             self.internal_private_key
-            .to_pkcs1_pem(LineEnding::LF)
-            .unwrap()
-            .as_bytes(),
-            )
-            .unwrap();
+                .to_pkcs1_pem(LineEnding::LF)
+                .unwrap()
+                .as_bytes(),
+        )
+        .unwrap();
         encoding_key
     }
-
 }
 
 impl From<&RsaPrivateKey> for RsaPublicKey {
     fn from(value: &RsaPrivateKey) -> Self {
         RsaPublicKey {
-            modulus: num_bigint::BigUint::from_bytes_be(&value.internal_private_key.n().to_bytes_be())
+            modulus: num_bigint::BigUint::from_bytes_be(
+                &value.internal_private_key.n().to_bytes_be(),
+            ),
         }
     }
 }
-

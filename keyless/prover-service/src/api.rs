@@ -1,22 +1,11 @@
-
-
-use serde::{Serialize, Deserialize};
-use aptos_crypto::ed25519::{Ed25519Signature};
-
+use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_types::{
     keyless::{Groth16Zkp, Pepper},
-    transaction::authenticator::EphemeralPublicKey
+    transaction::authenticator::EphemeralPublicKey,
 };
-
-
-
-
-
-use ark_ff::{PrimeField, BigInteger};
 use ark_bn254::{self, Fr};
-
-
-
+use ark_ff::{BigInteger, PrimeField};
+use serde::{Deserialize, Serialize};
 
 //#[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 //pub struct EphemeralPublicKeyBlinder(pub(crate) Vec<u8>);
@@ -25,7 +14,6 @@ pub type EphemeralPublicKeyBlinder = Vec<u8>;
 
 // TODO can I wrap this in a struct while preserving serialization format?
 pub type PoseidonHash = [u8; 32];
-
 
 // TODO move to encoding.rs?
 pub trait AsFr {
@@ -66,26 +54,19 @@ impl AsFr for Pepper {
     }
 }
 
-
-
-
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ProverServerResponse {
     Success {
-        proof: Groth16Zkp,   
+        proof: Groth16Zkp,
         #[serde(with = "hex")]
-        public_inputs_hash: PoseidonHash,  
-        training_wheels_signature: Ed25519Signature
+        public_inputs_hash: PoseidonHash,
+        training_wheels_signature: Ed25519Signature,
     },
     Error {
-        message: String
-    }
+        message: String,
+    },
 }
-
-
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RequestInput {
@@ -98,7 +79,5 @@ pub struct RequestInput {
     pub pepper: Pepper,
     pub uid_key: String,
     pub extra_field: Option<String>,
-    pub aud_override: Option<String>, 
+    pub aud_override: Option<String>,
 }
-
-

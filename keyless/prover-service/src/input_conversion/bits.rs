@@ -1,9 +1,5 @@
+use anyhow::{bail, Result};
 use std::ops::{self, Add, AddAssign};
-use anyhow::Result;
-use anyhow::bail;
-
-
-
 
 /// Type for bit representation during conversion. Represents bits using strings, for easy
 /// manipulation:
@@ -16,7 +12,7 @@ use anyhow::bail;
 /// This struct is mainly used for the sha padding computation.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Bits {
-    pub(crate) b: String
+    pub(crate) b: String,
 }
 
 impl Default for Bits {
@@ -36,12 +32,13 @@ impl Bits {
         if self.b.len() % 8 != 0 {
             bail!("Tried to convert bits to bytes, where bit length is not divisible by 8")
         } else {
-            let mut bytes  = Vec::new();
+            let mut bytes = Vec::new();
 
-            for i in 0..(self.b.len()/8) {
-                let idx = i*8;
-                let bits_for_chunk : &str = &self[idx..idx+8];
-                let chunk_byte = u8::from_str_radix(bits_for_chunk, 2).expect("Binary string should parse");
+            for i in 0..(self.b.len() / 8) {
+                let idx = i * 8;
+                let bits_for_chunk: &str = &self[idx..idx + 8];
+                let chunk_byte =
+                    u8::from_str_radix(bits_for_chunk, 2).expect("Binary string should parse");
 
                 bytes.push(chunk_byte);
             }
@@ -63,9 +60,9 @@ impl Bits {
     }
 }
 
-
 impl ops::Index<ops::Range<usize>> for Bits {
     type Output = str;
+
     fn index(&self, index: ops::Range<usize>) -> &str {
         self.b.index(index)
     }
@@ -81,7 +78,7 @@ impl Add<Bits> for Bits {
     type Output = Bits;
 
     fn add(self, rhs: Bits) -> Self::Output {
-        Bits { b : self.b + &rhs.b }
+        Bits { b: self.b + &rhs.b }
     }
 }
 

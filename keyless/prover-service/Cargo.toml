@@ -2,52 +2,51 @@
 name = "prover-service"
 version = "0.1.0"
 edition = { workspace = true }
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rust-rapidsnark = { workspace = true }
-axum = "0.7.4"
-tokio = { workspace = true }
-aptos-crypto = { workspace = true }
-aptos-types = { workspace = true }
-aptos-crypto-derive = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-rand = { workspace = true }
-rand_core = { workspace = true }
-bcs = { workspace = true }
-base64.workspace = true
 anyhow = { workspace = true }
-tracing = { workspace = true }
-prometheus = { workspace = true }
-tracing-subscriber = { workspace = true }
-num-bigint = { workspace = true }
-serde_yaml = { workspace = true }
-ark-bn254 = { workspace = true }
-ark-ff = { workspace = true }
+aptos-crypto = { workspace = true }
+aptos-crypto-derive = { workspace = true }
+aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
+ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
+axum = "0.7.4"
+base64 =  { workspace = true }
+bcs = { workspace = true }
 hex = { workspace = true }
-
-jsonwebtoken = { workspace = true }
-rsa = { workspace = true }
-lazy_static = { workspace = true }
-figment = { workspace = true }
-env = { workspace = true }
-tower-http = { workspace = true }
-init-tracing-opentelemetry = { workspace = true }
-http = "1.0.0"
-tower = { workspace = true }
+num-bigint = { workspace = true }
+prometheus = { workspace = true }
+rand = { workspace = true }
+rand_core = { workspace = true }
+rust-rapidsnark = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 axum-server = { workspace = true }
 dashmap = { workspace = true }
+env = { workspace = true }
+figment = { workspace = true }
+http = "1.0.0"
+init-tracing-opentelemetry = { workspace = true }
+
+jsonwebtoken = { workspace = true }
+lazy_static = { workspace = true }
 once_cell = { workspace = true }
 reqwest = { workspace = true }
-thiserror = { workspace = true }
+rsa = { workspace = true }
 serial_test = "3.0.0"
+thiserror = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
 
 
 

@@ -1,34 +1,24 @@
-use axum::{extract::State, Json};
-use std::{
-    str::FromStr,
-    sync::{Arc, Mutex},
-};
-
-use anyhow::anyhow;
-use anyhow::Result;
-use aptos_crypto::{
-    ed25519::Ed25519PublicKey,
-    traits::{Signature, SigningKey},
-};
-use aptos_types::keyless::Groth16ZkpAndStatement;
-use aptos_types::{
-    keyless::{G1Bytes, G2Bytes, Groth16Zkp},
-};
-
-
-use axum::http::StatusCode;
-
-use serde_json::value::Value;
-use std::fs;
-use std::time::Instant;
-use tracing::info_span;
-
 use crate::{
     api::{FromFr, PoseidonHash, ProverServerResponse, RequestInput},
     config::*,
     error,
-    input_conversion::{preprocess, config::CircuitConfig, derive_circuit_input_signals},
+    input_conversion::{config::CircuitConfig, derive_circuit_input_signals, preprocess},
 };
+use anyhow::{anyhow, Result};
+use aptos_crypto::{
+    ed25519::Ed25519PublicKey,
+    traits::{Signature, SigningKey},
+};
+use aptos_types::keyless::{G1Bytes, G2Bytes, Groth16Zkp, Groth16ZkpAndStatement};
+use axum::{extract::State, http::StatusCode, Json};
+use serde_json::value::Value;
+use std::{
+    fs,
+    str::FromStr,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
+use tracing::info_span;
 
 pub async fn prove_handler(
     State(state): State<Arc<Mutex<ProverServerState>>>,

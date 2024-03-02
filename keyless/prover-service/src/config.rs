@@ -1,14 +1,9 @@
-
-
-use serde::{Serialize, Deserialize};
-use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
-
-use rust_rapidsnark::FullProver;
-
 use crate::metrics;
+use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
+use rust_rapidsnark::FullProver;
+use serde::{Deserialize, Serialize};
 
-
-pub const CONFIG_FILE_PATH : &str = "config.yml";
+pub const CONFIG_FILE_PATH: &str = "config.yml";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProverServerConfig {
@@ -29,14 +24,12 @@ pub struct OidcProvider {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProverServerSecrets {
-    pub private_key : Ed25519PrivateKey,
+    pub private_key: Ed25519PrivateKey,
 }
 
 pub struct ProverServerState {
     pub full_prover: FullProver,
-    pub public_key : Ed25519PublicKey,
-    pub private_key : Ed25519PrivateKey,
-    pub metrics: metrics::ProverServerMetrics
+    pub public_key: Ed25519PublicKey,
+    pub private_key: Ed25519PrivateKey,
+    pub metrics: metrics::ProverServerMetrics,
 }
-
-

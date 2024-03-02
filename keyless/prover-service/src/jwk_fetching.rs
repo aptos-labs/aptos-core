@@ -1,18 +1,14 @@
+use crate::config::OidcProvider;
 use anyhow::{anyhow, Result};
 use aptos_types::jwks::rsa::RSA_JWK;
 use dashmap::DashMap;
-
-use tracing::{info, warn};
 use once_cell::sync::Lazy;
-use std::{sync::Arc, thread::sleep, time::Duration};
 use serde_json::*;
-
-use crate::config::OidcProvider;
+use std::{sync::Arc, thread::sleep, time::Duration};
+use tracing::{info, warn};
 
 pub type Issuer = String;
 pub type KeyID = String;
-
-
 
 // TODO: this is a duplicate of the jwk fetching in the pepper service, with changes b/c the
 // DecodingKey type that the pepper service uses is too opaque to use here. We should unify.
@@ -32,27 +28,25 @@ pub async fn fetch_jwks(jwk_url: &str) -> Result<DashMap<KeyID, Arc<RSA_JWK>>> {
         .map_err(|e| anyhow!("error while getting response as text: {}", e))?;
     let endpoint_response_val = serde_json::from_str::<Value>(text.as_str())
         .map_err(|e| anyhow!("error while parsing json: {}", e))?;
-    let keys : &Vec<Value> = endpoint_response_val["keys"]
+    let keys: &Vec<Value> = endpoint_response_val["keys"]
         .as_array()
         .ok_or(anyhow!("Error while parsing jwk json: \"keys\" not found"))?;
     let key_map: DashMap<KeyID, Arc<RSA_JWK>> = keys
         .iter()
-        .filter_map(
-            |jwk_val| match RSA_JWK::try_from(jwk_val) {
-                Ok(jwk) => {
-                    if jwk.e != "AQAB" {
-                        warn!("Unsupported RSA modulus for jwk: {}", jwk_val);
-                        None
-                    } else {
-                        Some((jwk.kid.clone(), Arc::new(jwk)))
-                    }
-                }
-                Err(e) => {
-                    warn!("error while parsing for jwk {}: {e}", jwk_val);
+        .filter_map(|jwk_val| match RSA_JWK::try_from(jwk_val) {
+            Ok(jwk) => {
+                if jwk.e != "AQAB" {
+                    warn!("Unsupported RSA modulus for jwk: {}", jwk_val);
                     None
-                },
+                } else {
+                    Some((jwk.kid.clone(), Arc::new(jwk)))
+                }
             },
-        )
+            Err(e) => {
+                warn!("error while parsing for jwk {}: {e}", jwk_val);
+                None
+            },
+        })
         .collect();
     Ok(key_map)
 }
@@ -68,7 +62,7 @@ pub async fn populate_jwk_cache(issuer: &str, jwk_url: &str) {
             info!(
                 "Updated key set of issuer {}. Num of keys: {}.",
                 issuer, num_keys
-                );
+            );
         },
         Err(msg) => {
             warn!("{}", msg);
@@ -110,27 +104,13 @@ pub fn cached_decoding_key(issuer: &String, kid: &String) -> Result<Arc<RSA_JWK>
     Ok(key.clone())
 }
 
-
-pub async fn init_jwk_fetching(
-    oidc_providers: &Vec<OidcProvider>,
-    jwk_refresh_rate: Duration
-    ) {
-    for provider in oidc_providers { 
+pub async fn init_jwk_fetching(oidc_providers: &Vec<OidcProvider>, jwk_refresh_rate: Duration) {
+    for provider in oidc_providers {
         // Do initial jwk cache population non-async, so that we don't handle requests before this is
         // populated
-        populate_jwk_cache(
-            &provider.iss,
-            &provider.endpoint_url
-            ).await;
+        populate_jwk_cache(&provider.iss, &provider.endpoint_url).await;
 
         // init jwk polling job for this provider
-        start_jwk_refresh_loop(
-            &provider.iss,
-            &provider.endpoint_url,
-            jwk_refresh_rate
-            );
+        start_jwk_refresh_loop(&provider.iss, &provider.endpoint_url, jwk_refresh_rate);
     }
 }
-
-
-

@@ -1,24 +1,22 @@
-use crate::{
-    api::ProverServerResponse, logging
-};
-use axum::{
-    http::StatusCode,
-    Json
-};
+use crate::{api::ProverServerResponse, logging};
+use axum::{http::StatusCode, Json};
 use rust_rapidsnark::ProverError;
 
-
-
-pub fn make_error(e: anyhow::Error, code: StatusCode, message: &str) -> (StatusCode, Json<ProverServerResponse>) {
+pub fn make_error(
+    e: anyhow::Error,
+    code: StatusCode,
+    message: &str,
+) -> (StatusCode, Json<ProverServerResponse>) {
     logging::do_tracing(e, code, message);
-    (code, 
-     Json(ProverServerResponse::Error { 
-         message: String::from(message)
-     })
+    (
+        code,
+        Json(ProverServerResponse::Error {
+            message: String::from(message),
+        }),
     )
 }
 
-pub fn handle_prover_lib_error(e : ProverError) -> (StatusCode, Json<ProverServerResponse>) {
+pub fn handle_prover_lib_error(e: ProverError) -> (StatusCode, Json<ProverServerResponse>) {
     match e {
         ProverError::ProverNotReady => make_error(e.into(), StatusCode::SERVICE_UNAVAILABLE, "Prover is not ready"),
         ProverError::InvalidInput => make_error(e.into(), StatusCode::BAD_REQUEST, "Input is invalid or malformatted"),

@@ -1,19 +1,10 @@
-
-
-
-
+use aptos_crypto::poseidon_bn254;
 use serde::{Deserialize, Serialize};
-
-
-use aptos_crypto::{poseidon_bn254};
-
-
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct Pepper(
-    #[serde(with = "hex::serde")]
-    pub(crate) [u8; poseidon_bn254::BYTES_PACKED_PER_SCALAR]
-    );
+    #[serde(with = "hex::serde")] pub(crate) [u8; poseidon_bn254::BYTES_PACKED_PER_SCALAR],
+);
 
 impl Pepper {
     pub const NUM_BYTES: usize = poseidon_bn254::BYTES_PACKED_PER_SCALAR;
@@ -69,20 +60,29 @@ fn test_hex_serialization() {
         bytes: Vec<u8>,
     }
 
-    println!("{}",
-        serde_json::to_string(
-            &T1 { bytes: [1, 2, 3, 4] }
-            ).unwrap());
-    println!("{}", serde_json::to_string(
-            &T2 { bytes: Vec::from([1, 2, 3, 4]) }
-            ).unwrap());
+    println!(
+        "{}",
+        serde_json::to_string(&T1 {
+            bytes: [1, 2, 3, 4]
+        })
+        .unwrap()
+    );
+    println!(
+        "{}",
+        serde_json::to_string(&T2 {
+            bytes: Vec::from([1, 2, 3, 4])
+        })
+        .unwrap()
+    );
 
     assert_eq!(
-        serde_json::to_string(
-            &T1 { bytes: [1, 2, 3, 4] }
-            ).unwrap(),
-        serde_json::to_string(
-            &T2 { bytes: Vec::from([1, 2, 3, 4]) }
-            ).unwrap()
-        );
+        serde_json::to_string(&T1 {
+            bytes: [1, 2, 3, 4]
+        })
+        .unwrap(),
+        serde_json::to_string(&T2 {
+            bytes: Vec::from([1, 2, 3, 4])
+        })
+        .unwrap()
+    );
 }

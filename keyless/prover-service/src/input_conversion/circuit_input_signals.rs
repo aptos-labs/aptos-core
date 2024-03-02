@@ -1,7 +1,5 @@
 use super::config::CircuitConfig;
-use anyhow::anyhow;
-use anyhow::bail;
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use ark_bn254::{self, Fr};
 use serde_json::Value;
 use std::{collections::BTreeMap, marker::PhantomData};
@@ -140,7 +138,7 @@ fn pad_if_needed(
 
         CircuitInputSignal::Bytes(b) => {
             CircuitInputSignal::Bytes(pad_bytes(&b, global_input_max_lengths[k])?)
-        }
+        },
     })
 }
 
@@ -209,8 +207,6 @@ impl CircuitInputSignals<Padded> {
         })
     }
 
-
-
     pub fn bytes_input_padded(mut self, signal_name: &str, signal_value: &[u8]) -> Self {
         self.signals.insert(
             String::from(signal_name),
@@ -267,17 +263,9 @@ impl CircuitInputSignals<Padded> {
         self
     }
 
-
-
-
-
-
-
     pub fn to_json_value(self) -> serde_json::Value {
         Value::from(serde_json::Map::from_iter(
-            self.signals
-                .into_iter()
-                .map(|(k, v)| (k, stringify(v))),
+            self.signals.into_iter().map(|(k, v)| (k, stringify(v))),
         ))
     }
 }
