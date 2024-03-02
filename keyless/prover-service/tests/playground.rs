@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use aptos_crypto::poseidon_bn254;
 use serde::{Deserialize, Serialize};
 

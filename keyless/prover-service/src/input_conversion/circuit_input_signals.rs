@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use super::config::CircuitConfig;
 use anyhow::{anyhow, bail, Result};
 use ark_bn254::{self, Fr};

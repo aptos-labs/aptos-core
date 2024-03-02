@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::metrics;
 use aptos_crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey};
 use rust_rapidsnark::FullProver;

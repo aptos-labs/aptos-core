@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use std::{iter::Peekable, str::CharIndices};
 use thiserror::Error;
 

@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use anyhow::{anyhow, Result};
 use aptos_types::{jwks::rsa::RSA_JWK, transaction::authenticator::EphemeralPublicKey};
 use num_bigint::BigUint;

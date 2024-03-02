@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use axum::http::StatusCode;
 use init_tracing_opentelemetry::tracing_subscriber_ext::{
     build_loglevel_filter_layer, build_otel_layer,

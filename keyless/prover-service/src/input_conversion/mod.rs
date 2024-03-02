@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 // my understanding of what circuit expects
 // <jwt> + "1" + "0"*K + <jwt_bit_len_encoded_for_sha(jwt)> + "0"s until padded to max length for
 // this array

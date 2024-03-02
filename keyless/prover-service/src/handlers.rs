@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{
     api::{FromFr, PoseidonHash, ProverServerResponse, RequestInput},
     config::*,

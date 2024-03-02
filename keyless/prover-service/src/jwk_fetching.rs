@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::config::OidcProvider;
 use anyhow::{anyhow, Result};
 use aptos_types::jwks::rsa::RSA_JWK;

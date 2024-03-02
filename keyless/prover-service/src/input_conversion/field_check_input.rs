@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use super::{
     circuit_input_signals::{CircuitInputSignals, Padded},
     field_parser::FieldCheckInput,

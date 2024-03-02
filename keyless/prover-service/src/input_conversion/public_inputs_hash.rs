@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use super::{encoding::JwtParts, field_parser::FieldParser};
 use crate::input_conversion::{config::CircuitConfig, types::Input};
 use anyhow::anyhow;

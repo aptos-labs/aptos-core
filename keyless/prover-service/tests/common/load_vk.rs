@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use aptos_types::keyless::{g1_projective_str_to_affine, g2_projective_str_to_affine};
 use ark_bn254::Bn254;
 use ark_groth16::{PreparedVerifyingKey, VerifyingKey};

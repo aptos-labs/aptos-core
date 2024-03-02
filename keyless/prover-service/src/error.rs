@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::{api::ProverServerResponse, logging};
 use axum::{http::StatusCode, Json};
 use rust_rapidsnark::ProverError;

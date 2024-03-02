@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use self::types::{DefaultTestJWKKeyPair, TestJWKKeyPair, WithNonce};
 use crate::common::types::ProofTestCase;
 use aptos_crypto::{

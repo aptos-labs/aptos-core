@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::input_conversion::{config, types::Input};
 use anyhow::Result;
 use aptos_types::jwks::rsa::RSA_JWK;

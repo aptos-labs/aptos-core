@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use prometheus::{Encoder, Histogram, HistogramOpts, IntCounter, Registry, TextEncoder};
 
 pub struct ProverServerMetrics {

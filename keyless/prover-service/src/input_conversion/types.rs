@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use super::bits::Bits;
 use anyhow::{anyhow, Error};
 use aptos_types::transaction::authenticator::EphemeralPublicKey;

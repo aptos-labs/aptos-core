@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use anyhow::Result;
 use num_bigint::BigUint;
 use rsa::{

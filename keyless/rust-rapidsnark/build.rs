@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use std::{env, path::PathBuf, process::Command};
 
 fn main() {

@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use axum::{
     routing::{get, post},

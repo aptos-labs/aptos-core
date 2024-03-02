@@ -1,3 +1,7 @@
+// Copyright © Aptos Foundation
+
+// Copyright © Aptos Foundation
+
 use aptos_crypto::ed25519::Ed25519Signature;
 use aptos_types::{
     keyless::{Groth16Zkp, Pepper},

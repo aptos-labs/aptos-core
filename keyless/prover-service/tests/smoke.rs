@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use crate::common::get_test_circuit_config;
 use common::{
     convert_prove_and_verify,

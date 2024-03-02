@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use super::types::Input;
 use crate::api::{AsFr as _, RequestInput};
 use anyhow::bail;

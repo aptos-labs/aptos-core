@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+
 use anyhow::{bail, Result};
 use std::ops::{self, Add, AddAssign};
 
