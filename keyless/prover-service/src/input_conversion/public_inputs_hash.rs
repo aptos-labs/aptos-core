@@ -201,7 +201,7 @@ b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5
 
         let input = Input {
             jwt_b64: jwt_b64.into(),
-            epk: epk,
+            epk,
             epk_blinder_fr: Fr::from_str("42").unwrap(),
             exp_date_secs: 1900255944,
             exp_horizon_secs: 100255944,
@@ -220,10 +220,10 @@ b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5
         let _signature = jwt_parts.signature().unwrap();
         let payload_decoded = jwt_parts.payload_decoded().unwrap();
 
-        let temp_pubkey_frs = Vec::from(poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
-            &input.epk.to_bytes().as_slice(),
+        let temp_pubkey_frs = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
+            input.epk.to_bytes().as_slice(),
             Configuration::new_for_testing().max_commited_epk_bytes as usize, // TODO put my own thing here
-        ).unwrap());
+        ).unwrap();
         
         let config : CircuitConfig = serde_yaml::from_str(&fs::read_to_string("conversion_config.yml").expect("Unable to read file")).expect("should parse correctly");
 
@@ -233,7 +233,7 @@ b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5
 
         let hash = compute_public_inputs_hash(&input,
                                               &config,
-                                              input.pepper_fr.clone(),
+                                              input.pepper_fr,
                                               &jwt_parts,
                                               &jwk,
                                               &temp_pubkey_frs[..3],

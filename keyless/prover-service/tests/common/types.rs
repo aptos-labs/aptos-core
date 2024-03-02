@@ -152,6 +152,7 @@ impl<T: Serialize + WithNonce + Clone> ProofTestCase<T> {
 
 
     #[allow(clippy::all)]
+    #[allow(dead_code)]
     pub fn new_with_test_epk_and_blinder(
         jwt_payload: T,
         pepper: Pepper,
@@ -201,7 +202,7 @@ impl<T: Serialize + WithNonce + Clone> ProofTestCase<T> {
 
 
     pub fn compute_nonce(self, config: &CircuitConfig) -> Self {
-        let nonce = compute_nonce(self.epk_expiry_time_secs, &self.epk, self.epk_blinder_fr, &config).unwrap();
+        let nonce = compute_nonce(self.epk_expiry_time_secs, &self.epk, self.epk_blinder_fr, config).unwrap();
         let payload_with_nonce = self.jwt_payload.with_nonce(&nonce.to_string());
 
         Self {

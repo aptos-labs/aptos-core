@@ -236,7 +236,7 @@ mod tests {
         let a2 = Ascii::from("offset test test");
         assert!(a2.find("test") == Some(7));
         let a3 = Ascii::from("est");
-        assert!(a3.find("test") == None);
+        assert!(a3.find("test").is_none());
     }
 
     #[test]
@@ -246,6 +246,6 @@ mod tests {
         let a2 = Ascii::from("test test");
         assert!(a2.find_starting_at(5, "test") == Some(5));
         let a3 = Ascii::from("test test");
-        assert!(a3.find_starting_at(6, "test") == None);
+        assert!(a3.find_starting_at(6, "test").is_none());
     }
 }

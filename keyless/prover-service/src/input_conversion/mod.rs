@@ -215,7 +215,7 @@ mod tests {
     use crate::input_conversion::config::{CircuitConfig, Key};
     use crate::input_conversion::encoding::{FromB64, JwtParts};
 
-    use crate::input_conversion;
+    
     
     use crate::input_conversion::{compute_nonce, derive_circuit_input_signals};
     use crate::input_conversion::types::Input;
@@ -266,9 +266,9 @@ mod tests {
 
         println!(
             "pubkey frs: {} {} {}",
-            temp_pubkey_frs[0].to_string(),
-            temp_pubkey_frs[1].to_string(),
-            temp_pubkey_frs[2].to_string()
+            temp_pubkey_frs[0],
+            temp_pubkey_frs[1],
+            temp_pubkey_frs[2]
         );
         assert!(temp_pubkey_frs[0] == ark_bn254::Fr::from_str(temp_pubkey_0).unwrap());
         assert!(temp_pubkey_frs[1] == ark_bn254::Fr::from_str(temp_pubkey_1).unwrap());
@@ -294,7 +294,7 @@ mod tests {
 
         let input = Input {
             jwt_b64: jwt_b64.into(),
-            epk: epk,
+            epk,
             epk_blinder_fr: epk_blinder,
             exp_date_secs: 1900255944,
             pepper_fr: ark_bn254::Fr::from_str("76").unwrap(),
@@ -413,8 +413,7 @@ b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5
                         converted[String::from(name) + "_name_len"]
                             == expected_json[String::from(name) + "_name_len"]
                     );
-                } else {
-                }
+                } 
 
                 assert!(
                     converted[String::from(name) + "_colon_index"]
