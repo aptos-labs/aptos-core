@@ -1,5 +1,5 @@
 use crate::{
-    api::ProverServerResponse, logging, types::*
+    api::ProverServerResponse, logging
 };
 use axum::{
     http::StatusCode,

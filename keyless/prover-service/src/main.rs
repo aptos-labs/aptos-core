@@ -14,7 +14,7 @@ use tower_http::cors::{Any, CorsLayer};
 use http::Method;
 use tower::ServiceBuilder;
 
-use prover_service::types::*;
+use prover_service::config::*;
 use prover_service::*;
 
 

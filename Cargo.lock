@@ -359,7 +359,7 @@ dependencies = [
  "async-mutex",
  "bcs 0.1.4",
  "futures",
- "http 1.0.0",
+ "http 0.2.11",
  "hyper 0.14.28",
  "lazy_static",
  "mime",

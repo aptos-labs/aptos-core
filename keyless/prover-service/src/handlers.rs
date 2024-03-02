@@ -28,7 +28,8 @@ use aptos_types::keyless::Groth16ZkpAndStatement;
 
 
 use crate::{
-    api::{FromFr, PoseidonHash, ProverServerResponse, RequestInput}, error, input_conversion::{self, config::CircuitConfig, derive_circuit_input_signals}, jwk_fetching, types::*, verify_input
+    config::*,
+    api::{FromFr, PoseidonHash, ProverServerResponse, RequestInput}, error, input_conversion::{self, config::CircuitConfig, derive_circuit_input_signals}, jwk_fetching, verify_input
 };
 
 

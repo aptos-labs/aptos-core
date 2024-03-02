@@ -14,7 +14,7 @@ use serde_json::Value;
 use std::{fs, str::FromStr};
 use prover_service::{
     handlers::encode_proof, input_conversion::{
-        config::CircuitConfig, derive_circuit_input_signals}, types::ProverServerConfig};
+        config::CircuitConfig, derive_circuit_input_signals}, config::ProverServerConfig};
 
 
 use crate::common::types::{ProofTestCase, TestJWTPayload};

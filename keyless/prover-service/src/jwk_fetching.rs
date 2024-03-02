@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 use std::{sync::Arc, thread::sleep, time::Duration};
 use serde_json::*;
 
-use crate::types::OidcProvider;
+use crate::config::OidcProvider;
 
 pub type Issuer = String;
 pub type KeyID = String;
