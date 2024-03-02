@@ -97,25 +97,3 @@ impl Drop for FullProver {
 
 
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-
-    #[test]
-    fn sanity_test() {
-        let arg1 = "/home/rex_fernando_aptoslabs_com/main_c.zkey";
-        let arg2 = "/home/rex_fernando_aptoslabs_com/main_c_cpp";
-        let input = fs::read_to_string("/home/rex_fernando_aptoslabs_com/input.json").expect("reading input.json failed");
-        unsafe { 
-            println!("starting test");
-            println!("calling constructor");
-            let mut full_prover = FullProver::new(arg1, arg2).expect("full_prover::new failed");
-            println!("calling prove method");
-            let response = full_prover.prove(input.as_str());
-            println!("response: {:?}", response);
-        }
-        
-    }
-}

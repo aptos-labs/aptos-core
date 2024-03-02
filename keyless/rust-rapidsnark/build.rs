@@ -15,16 +15,6 @@ fn main() {
 
 
 
-    let libdir_path = PathBuf::from("rapidsnark/package/lib")
-    // Canonicalize the path as `rustc-link-search` requires an absolute
-    // path.
-    .canonicalize()
-    .expect("cannot canonicalize libdir path");
-    let include_path = PathBuf::from("wrapper.hpp")
-    // Canonicalize the path as `rustc-link-search` requires an absolute
-    // path.
-    .canonicalize()
-    .expect("cannot canonicalize include path");
 
     // Tell cargo to tell rustc to link the system `clang`
     // shared library.
@@ -48,6 +38,11 @@ fn main() {
     println!("cargo:rustc-link-lib=dylib=gmp");
 
 
+    let libdir_path = PathBuf::from("rapidsnark/package/lib")
+    // Canonicalize the path as `rustc-link-search` requires an absolute
+    // path.
+    .canonicalize()
+    .expect("cannot canonicalize libdir path");
     // Tell cargo to look for shared libraries in the specified directory
     println!("cargo:rustc-link-search={}", libdir_path.to_str().unwrap());
 
@@ -93,11 +88,6 @@ fn os_specific_printlns() {
 fn build_bindings() -> bindgen::Bindings {
 
 
-    let libdir_path = PathBuf::from("rapidsnark/package/lib")
-    // Canonicalize the path as `rustc-link-search` requires an absolute
-    // path.
-    .canonicalize()
-    .expect("cannot canonicalize libdir path");
     let include_path = PathBuf::from("wrapper.hpp")
     // Canonicalize the path as `rustc-link-search` requires an absolute
     // path.
@@ -140,14 +130,9 @@ fn build_bindings() -> bindgen::Bindings {
 }
 
 #[cfg(target_os = "linux")]
-fn asdf() -> bindgen::Bindings {
+fn build_bindings() -> bindgen::Bindings {
 
 
-    let libdir_path = PathBuf::from("rapidsnark/package/lib")
-    // Canonicalize the path as `rustc-link-search` requires an absolute
-    // path.
-    .canonicalize()
-    .expect("cannot canonicalize libdir path");
     let include_path = PathBuf::from("wrapper.hpp")
     // Canonicalize the path as `rustc-link-search` requires an absolute
     // path.
