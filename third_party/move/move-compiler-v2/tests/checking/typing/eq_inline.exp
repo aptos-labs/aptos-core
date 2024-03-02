@@ -15,7 +15,7 @@ module 0x42::m {
         };
         Tuple()
     }
-    spec fun $foo(f: |&u64|()) {
+    spec fun $foo(f: |&u64|) {
         Tuple()
     }
     spec fun $g();
