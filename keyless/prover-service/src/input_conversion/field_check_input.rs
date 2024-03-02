@@ -2,7 +2,7 @@
 use crate::input_conversion::config::{CircuitConfig, FieldCheckInputConfig, Key};
 use crate::input_conversion::field_parser::FieldParser;
 use crate::input_conversion::types::Ascii;
-use crate::api::Input;
+use crate::input_conversion::types::Input;
 use std::collections::HashMap;
 use anyhow::Result;
 use anyhow::anyhow;

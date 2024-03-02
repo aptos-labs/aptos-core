@@ -3,7 +3,6 @@
 use crate::{keyless::Claims, move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::poseidon_bn254;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
@@ -61,7 +60,7 @@ impl RSA_JWK {
 
     // TODO(keyless): Move this to aptos-crypto so other services can use this
     pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
-        let mut modulus = URL_SAFE_NO_PAD.decode(&self.n)?;
+        let mut modulus = base64::decode_config(&self.n, base64::URL_SAFE_NO_PAD)?;
         // The circuit only supports RSA256
         if modulus.len() != Self::RSA_MODULUS_BYTES {
             bail!(

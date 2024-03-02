@@ -1,8 +1,6 @@
 use std::str::FromStr;
 
 use aptos_types::jwks::rsa::RSA_JWK;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use base64::Engine as _;
 use rsa;
 use rsa::{
     pkcs1::{EncodeRsaPrivateKey, LineEnding},
@@ -44,12 +42,12 @@ impl RsaPublicKey {
 
     // TODO test from and as below
     pub fn from_mod_b64(modulus_b64: &str) -> Result<Self, anyhow::Error> {
-        let modulus_bytes = URL_SAFE_NO_PAD.decode(&modulus_b64)?;
+        let modulus_bytes = base64::decode_config(&modulus_b64, base64::URL_SAFE_NO_PAD)?;
         Ok(RsaPublicKey::from_bytes(&modulus_bytes))
     }
 
     pub fn as_mod_b64(&self) -> String {
-        URL_SAFE_NO_PAD.encode(self.modulus.to_bytes_be())
+        base64::encode_config(self.modulus.to_bytes_be(), base64::URL_SAFE_NO_PAD)
     }
 }
 

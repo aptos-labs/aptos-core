@@ -6,7 +6,7 @@ use crate::input_conversion::{
     config::CircuitConfig,
     types::Ascii,
 };
-use crate::api::Input;
+use crate::input_conversion::types::Input;
 use anyhow::anyhow;
 use super::encoding::JwtParts;
 use super::field_parser::FieldParser;
@@ -159,7 +159,8 @@ mod tests {
         ed25519::Ed25519PrivateKey,
         encoding_type::EncodingType
     };
-    use crate::api::{EphemeralPublicKeyBlinder, FromFr, Input, RequestInput};
+    use crate::api::{EphemeralPublicKeyBlinder, FromFr, RequestInput};
+    use crate::input_conversion::types::Input;
     use crate::input_conversion::derive_circuit_input_signals;
     use std::collections::HashMap;
     use std::fs;
@@ -197,20 +198,21 @@ mod tests {
        let ephemeral_public_key_unwrapped : Ed25519PublicKey = Ed25519PublicKey::from(&ephemeral_private_key);
        let epk =  EphemeralPublicKey::ed25519(ephemeral_public_key_unwrapped);
 
-       let rqi = RequestInput {
+
+        let input = Input {
             jwt_b64: jwt_b64.into(),
             epk: epk,
-            epk_blinder: EphemeralPublicKeyBlinder::from_fr(&ark_bn254::Fr::from_str("42").unwrap()),
+            epk_blinder_fr: Fr::from_str("42").unwrap(),
             exp_date_secs: 1900255944,
             exp_horizon_secs: 100255944,
-            pepper: Pepper::from_number(76),
-            uid_key: String::from("sub"),
-            extra_field: Some(String::from("family_name")),
-            aud_override: None
-       };
-       println!("{}", serde_json::to_string(&rqi).unwrap());
+            pepper_fr: Fr::from_str("76").unwrap(),
+            variable_keys: HashMap::from([
+                (String::from("uid"), String::from("sub")),
+                (String::from("extra"), String::from("family_name")),
+            ]),
+            use_extra_field: true,
+        };
 
-        let input = rqi.decode().unwrap();
         let jwt_parts = JwtParts::from_b64(&input.jwt_b64).unwrap();
         let unsigned_jwt_no_padding = jwt_parts.unsigned_undecoded();
     //let jwt_parts: Vec<&str> = input.jwt_b64.split(".").collect();

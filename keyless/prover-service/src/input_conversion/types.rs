@@ -1,11 +1,27 @@
+use std::collections::HashMap;
 use std::ops::{Add, AddAssign};
 use std::ops;
 use anyhow::{Error, anyhow};
-use base64::prelude::*;
+use aptos_types::transaction::authenticator::EphemeralPublicKey;
+use ark_bn254::Fr;
 
 use super::bits::Bits;
 
 
+
+#[derive(Debug)]
+pub struct Input {
+    pub jwt_b64: String,
+    pub epk: EphemeralPublicKey,
+    pub epk_blinder_fr: Fr,
+    pub exp_date_secs: u64,
+    pub pepper_fr: Fr,
+    pub variable_keys: HashMap<String, String>,
+    pub exp_horizon_secs: u64,
+    pub use_extra_field: bool,
+    // TODO add jwk field 
+    // TODO jwk_b64 -> jwt_parts
+}
 
 
 

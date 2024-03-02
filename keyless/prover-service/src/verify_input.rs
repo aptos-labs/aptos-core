@@ -1,7 +1,7 @@
 use anyhow::Result;
 use aptos_types::jwks::rsa::RSA_JWK;
 
-use crate::{input_conversion::config, api::Input};
+use crate::{input_conversion::config, input_conversion::types::Input};
 
 pub fn verify_input(
     input : Input,

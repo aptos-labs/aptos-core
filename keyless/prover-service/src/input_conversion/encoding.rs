@@ -10,7 +10,6 @@ use anyhow::anyhow;
 use ark_ff::{PrimeField, Fp};
 use serde::{Serialize, Deserialize};
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 
 
 pub type RsaSignature = BigUint;
@@ -26,7 +25,7 @@ pub trait FromB64 {
 impl FromB64 for RsaSignature {
     /// JWT signature is encoded in big-endian.
     fn from_b64(s: &str) -> Result<Self> {
-        Ok(BigUint::from_bytes_be(&URL_SAFE_NO_PAD.decode(s)?))
+        Ok(BigUint::from_bytes_be(&base64::decode_config(s, base64::URL_SAFE_NO_PAD)?))
     }
 }
 
@@ -84,11 +83,11 @@ impl JwtParts {
     }
 
     pub fn header_decoded(&self) -> Result<String> {
-        Ok(String::from_utf8(URL_SAFE_NO_PAD.decode(&self.header)?)?)
+        Ok(String::from_utf8(base64::decode_config(&self.header, base64::URL_SAFE_NO_PAD)?)?)
     }
 
     pub fn payload_decoded(&self) -> Result<String> {
-        Ok(String::from_utf8(URL_SAFE_NO_PAD.decode(&self.payload)?)?)
+        Ok(String::from_utf8(base64::decode_config(&self.payload, base64::URL_SAFE_NO_PAD)?)?)
     }
 
     pub fn signature(&self) -> Result<RsaSignature> {
@@ -133,7 +132,7 @@ pub trait As64BitLimbs {
 
 impl As64BitLimbs for RSA_JWK {
     fn as_64bit_limbs(&self) -> Vec<u64> {
-        let modulus_bytes = URL_SAFE_NO_PAD.decode(&self.n).expect("JWK should always have a properly-encoded modulus");
+        let modulus_bytes = base64::decode_config(&self.n, base64::URL_SAFE_NO_PAD).expect("JWK should always have a properly-encoded modulus");
         // JWKs encode modulus in big-endian order
         let modulus_biguint : BigUint = BigUint::from_bytes_be(&modulus_bytes);
         modulus_biguint.to_u64_digits()

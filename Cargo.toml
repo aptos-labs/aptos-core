@@ -578,7 +578,7 @@ tower-http = { version = "0.5.1", features = ["cors"] }
 init-tracing-opentelemetry = { version = "0.14.1", features = ["otlp", "tracing_subscriber_ext"] }
 tower = "0.4.13"
 axum-server = { version = "0.6.0", features = ["rustls", "rustls-pemfile", "tls-rustls"] }
-base64 = "0.21.7"
+base64 = "0.13.0"
 jwt = "0.16.0"
 lazy_static = "1.4.0"
 libc = "0.2.147"

@@ -14,6 +14,7 @@ use serde_json::Value;
 use std::{fs, str::FromStr};
 use prover_service::{
     handlers::encode_proof, input_conversion::{
+        preprocess,
         config::CircuitConfig, derive_circuit_input_signals}, config::ProverServerConfig};
 
 
@@ -104,7 +105,7 @@ pub fn convert_prove_and_verify(testcase: &ProofTestCase<impl Serialize + WithNo
     println!("Prover request: {}", serde_json::to_string_pretty(&prover_request_input).unwrap());
 
     let (circuit_input_signals, public_inputs_hash) = derive_circuit_input_signals(
-        prover_request_input.decode().unwrap(),
+        preprocess::decode_and_add_jwk(prover_request_input).unwrap(),
         &circuit_config,
         Some(&jwk_keypair.into_rsa_jwk()),
     )
