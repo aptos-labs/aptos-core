@@ -45,6 +45,8 @@ fn test_transcript_aggregation_state() {
         dealer_epoch: 999,
         dealer_validator_set: validator_consensus_info_move_structs.clone(),
         target_validator_set: validator_consensus_info_move_structs.clone(),
+        block_dkg: false,
+        block_randomness: false,
     });
     let epoch_state = Arc::new(EpochState { epoch, verifier });
     let trx_agg_state = Arc::new(TranscriptAggregationState::<DummyDKG>::new(

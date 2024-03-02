@@ -403,9 +403,11 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                 },
 
             }
-            let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
-            if !maybe_ready_blocks.is_empty() {
-                self.process_ready_blocks(maybe_ready_blocks);
+            if !self.config.block_randomness {
+                let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
+                if !maybe_ready_blocks.is_empty() {
+                    self.process_ready_blocks(maybe_ready_blocks);
+                }
             }
         }
         info!("RandManager stopped");

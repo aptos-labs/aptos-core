@@ -13,11 +13,21 @@ module aptos_framework::dkg {
     const EDKG_IN_PROGRESS: u64 = 1;
     const EDKG_NOT_IN_PROGRESS: u64 = 2;
 
+    /// If this resource is present under 0x1, validators should not do DKG (so the epoch change get stuck).
+    /// This is test-only.
+    struct FailureInjectionBlockDKG has key {}
+
+    /// If this resource is present under 0x1, validators should not provider randomness to block (so the execution get stuck).
+    /// This is test-only.
+    struct FailureInjectionBlockRandomness has key {}
+
     /// This can be considered as the public input of DKG.
     struct DKGSessionMetadata has copy, drop, store {
         dealer_epoch: u64,
         dealer_validator_set: vector<ValidatorConsensusInfo>,
         target_validator_set: vector<ValidatorConsensusInfo>,
+        block_dkg: bool,
+        block_randomness: bool,
     }
 
     #[event]
@@ -38,6 +48,20 @@ module aptos_framework::dkg {
     struct DKGState has key {
         last_completed: Option<DKGSessionState>,
         in_progress: Option<DKGSessionState>,
+    }
+
+    public fun block_dkg(framework: &signer) {
+        system_addresses::assert_aptos_framework(framework);
+        if (!exists<FailureInjectionBlockDKG>(@aptos_framework)) {
+            move_to(framework, FailureInjectionBlockDKG {})
+        }
+    }
+
+    public fun block_randomness(framework: &signer) {
+        system_addresses::assert_aptos_framework(framework);
+        if (!exists<FailureInjectionBlockDKG>(@aptos_framework)) {
+            move_to(framework, FailureInjectionBlockRandomness {})
+        }
     }
 
     /// Called in genesis to initialize on-chain states.
@@ -65,6 +89,8 @@ module aptos_framework::dkg {
             dealer_epoch,
             dealer_validator_set,
             target_validator_set,
+            block_dkg: exists<FailureInjectionBlockDKG>(@aptos_framework),
+            block_randomness: exists<FailureInjectionBlockRandomness>(@aptos_framework),
         };
         let start_time_us = timestamp::now_microseconds();
         dkg_state.in_progress = std::option::some(DKGSessionState {

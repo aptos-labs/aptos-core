@@ -86,6 +86,8 @@ async fn test_dkg_state_transition() {
             dealer_epoch: 999,
             dealer_validator_set: validator_consensus_info_move_structs.clone(),
             target_validator_set: validator_consensus_info_move_structs.clone(),
+            block_dkg: false,
+            block_randomness: false,
         },
         start_time_us: start_time_1.as_micros() as u64,
     };
