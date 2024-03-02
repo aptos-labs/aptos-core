@@ -14,7 +14,9 @@ DKG on-chain states and helper functions.
 -  [Resource `DKGState`](#0x1_dkg_DKGState)
 -  [Constants](#@Constants_0)
 -  [Function `block_dkg`](#0x1_dkg_block_dkg)
+-  [Function `unblock_dkg`](#0x1_dkg_unblock_dkg)
 -  [Function `block_randomness`](#0x1_dkg_block_randomness)
+-  [Function `unblock_randomness`](#0x1_dkg_unblock_randomness)
 -  [Function `initialize`](#0x1_dkg_initialize)
 -  [Function `start`](#0x1_dkg_start)
 -  [Function `finish`](#0x1_dkg_finish)
@@ -44,7 +46,7 @@ If this resource is present under 0x1, validators should not do DKG (so the epoc
 This is test-only.
 
 
-<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_FailureInjectionBlockDKG">FailureInjectionBlockDKG</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_FailureInjectionBlockDKG">FailureInjectionBlockDKG</a> <b>has</b> drop, key
 </code></pre>
 
 
@@ -73,7 +75,7 @@ If this resource is present under 0x1, validators should not provider randomness
 This is test-only.
 
 
-<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_FailureInjectionBlockRandomness">FailureInjectionBlockRandomness</a> <b>has</b> key
+<pre><code><b>struct</b> <a href="dkg.md#0x1_dkg_FailureInjectionBlockRandomness">FailureInjectionBlockRandomness</a> <b>has</b> drop, key
 </code></pre>
 
 
@@ -305,6 +307,33 @@ The completed and in-progress DKG sessions.
 
 </details>
 
+<a id="0x1_dkg_unblock_dkg"></a>
+
+## Function `unblock_dkg`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_unblock_dkg">unblock_dkg</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_unblock_dkg">unblock_dkg</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="dkg.md#0x1_dkg_FailureInjectionBlockDKG">FailureInjectionBlockDKG</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+    <b>if</b> (<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_FailureInjectionBlockDKG">FailureInjectionBlockDKG</a>&gt;(@aptos_framework)) {
+        <b>move_from</b>&lt;<a href="dkg.md#0x1_dkg_FailureInjectionBlockDKG">FailureInjectionBlockDKG</a>&gt;(@aptos_framework);
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_dkg_block_randomness"></a>
 
 ## Function `block_randomness`
@@ -322,8 +351,35 @@ The completed and in-progress DKG sessions.
 
 <pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_block_randomness">block_randomness</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
-    <b>if</b> (!<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_FailureInjectionBlockDKG">FailureInjectionBlockDKG</a>&gt;(@aptos_framework)) {
+    <b>if</b> (!<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_FailureInjectionBlockRandomness">FailureInjectionBlockRandomness</a>&gt;(@aptos_framework)) {
         <b>move_to</b>(framework, <a href="dkg.md#0x1_dkg_FailureInjectionBlockRandomness">FailureInjectionBlockRandomness</a> {})
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_dkg_unblock_randomness"></a>
+
+## Function `unblock_randomness`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_unblock_randomness">unblock_randomness</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_unblock_randomness">unblock_randomness</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="dkg.md#0x1_dkg_FailureInjectionBlockRandomness">FailureInjectionBlockRandomness</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(framework);
+    <b>if</b> (!<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_FailureInjectionBlockRandomness">FailureInjectionBlockRandomness</a>&gt;(@aptos_framework)) {
+        <b>move_from</b>&lt;<a href="dkg.md#0x1_dkg_FailureInjectionBlockRandomness">FailureInjectionBlockRandomness</a>&gt;(@aptos_framework);
     }
 }
 </code></pre>

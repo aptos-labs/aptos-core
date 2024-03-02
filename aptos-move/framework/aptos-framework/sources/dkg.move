@@ -15,11 +15,11 @@ module aptos_framework::dkg {
 
     /// If this resource is present under 0x1, validators should not do DKG (so the epoch change get stuck).
     /// This is test-only.
-    struct FailureInjectionBlockDKG has key {}
+    struct FailureInjectionBlockDKG has drop, key {}
 
     /// If this resource is present under 0x1, validators should not provider randomness to block (so the execution get stuck).
     /// This is test-only.
-    struct FailureInjectionBlockRandomness has key {}
+    struct FailureInjectionBlockRandomness has drop, key {}
 
     /// This can be considered as the public input of DKG.
     struct DKGSessionMetadata has copy, drop, store {
@@ -57,10 +57,24 @@ module aptos_framework::dkg {
         }
     }
 
+    public fun unblock_dkg(framework: &signer) acquires FailureInjectionBlockDKG {
+        system_addresses::assert_aptos_framework(framework);
+        if (exists<FailureInjectionBlockDKG>(@aptos_framework)) {
+            move_from<FailureInjectionBlockDKG>(@aptos_framework);
+        }
+    }
+
     public fun block_randomness(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
-        if (!exists<FailureInjectionBlockDKG>(@aptos_framework)) {
+        if (!exists<FailureInjectionBlockRandomness>(@aptos_framework)) {
             move_to(framework, FailureInjectionBlockRandomness {})
+        }
+    }
+
+    public fun unblock_randomness(framework: &signer) acquires FailureInjectionBlockRandomness {
+        system_addresses::assert_aptos_framework(framework);
+        if (!exists<FailureInjectionBlockRandomness>(@aptos_framework)) {
+            move_from<FailureInjectionBlockRandomness>(@aptos_framework);
         }
     }
 
