@@ -17,7 +17,7 @@ use move_core_types::{
 use serde::{Deserialize, Serialize};
 
 /// Reflection of aptos_framework::keyless_account::Configuration
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Configuration {
     pub override_aud_vals: Vec<String>,
     pub max_signatures_per_txn: u16,

@@ -30,6 +30,7 @@ return true.
 
 
 -  [Resource `Features`](#0x1_features_Features)
+-  [Resource `PendingFeatures`](#0x1_features_PendingFeatures)
 -  [Constants](#@Constants_0)
 -  [Function `code_dependency_check_enabled`](#0x1_features_code_dependency_check_enabled)
 -  [Function `treat_friend_as_private`](#0x1_features_treat_friend_as_private)
@@ -86,6 +87,8 @@ return true.
 -  [Function `commission_change_delegation_pool_enabled`](#0x1_features_commission_change_delegation_pool_enabled)
 -  [Function `get_bn254_strutures_feature`](#0x1_features_get_bn254_strutures_feature)
 -  [Function `bn254_structures_enabled`](#0x1_features_bn254_structures_enabled)
+-  [Function `get_reconfigure_with_dkg_feature`](#0x1_features_get_reconfigure_with_dkg_feature)
+-  [Function `reconfigure_with_dkg_enabled`](#0x1_features_reconfigure_with_dkg_enabled)
 -  [Function `get_keyless_accounts_feature`](#0x1_features_get_keyless_accounts_feature)
 -  [Function `keyless_accounts_enabled`](#0x1_features_keyless_accounts_enabled)
 -  [Function `get_keyless_but_zkless_accounts_feature`](#0x1_features_get_keyless_but_zkless_accounts_feature)
@@ -98,22 +101,31 @@ return true.
 -  [Function `get_max_object_nesting_check_feature`](#0x1_features_get_max_object_nesting_check_feature)
 -  [Function `max_object_nesting_check_enabled`](#0x1_features_max_object_nesting_check_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
+-  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
+-  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
 -  [Function `is_enabled`](#0x1_features_is_enabled)
 -  [Function `set`](#0x1_features_set)
 -  [Function `contains`](#0x1_features_contains)
+-  [Function `apply_diff`](#0x1_features_apply_diff)
+-  [Function `ensure_vm_or_framework_signer`](#0x1_features_ensure_vm_or_framework_signer)
 -  [Specification](#@Specification_1)
     -  [Resource `Features`](#@Specification_1_Features)
+    -  [Resource `PendingFeatures`](#@Specification_1_PendingFeatures)
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
     -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
     -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
     -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
+    -  [Function `change_feature_flags_for_next_epoch`](#@Specification_1_change_feature_flags_for_next_epoch)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
     -  [Function `set`](#@Specification_1_set)
     -  [Function `contains`](#@Specification_1_contains)
+    -  [Function `apply_diff`](#@Specification_1_apply_diff)
 
 
 <pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="signer.md#0x1_signer">0x1::signer</a>;
+<b>use</b> <a href="vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 
@@ -126,6 +138,35 @@ The enabled features, represented by a bitset stored on chain.
 
 
 <pre><code><b>struct</b> <a href="features.md#0x1_features_Features">Features</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code><a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_features_PendingFeatures"></a>
+
+## Resource `PendingFeatures`
+
+This resource holds the feature vec updates received in the current epoch.
+On epoch change, the updates take effect and this buffer is cleared.
+
+
+<pre><code><b>struct</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> <b>has</b> key
 </code></pre>
 
 
@@ -413,7 +454,7 @@ Lifetime: permanent
 
 <a id="0x1_features_KEYLESS_ACCOUNTS"></a>
 
-Whether keyless accounts are enabled, possibly with the ZK-less verification mode.
+Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
 
 Lifetime: transient
 
@@ -527,6 +568,18 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_PERIODICAL_REWARD_RATE_DECREASE">PERIODICAL_REWARD_RATE_DECREASE</a>: u64 = 16;
+</code></pre>
+
+
+
+<a id="0x1_features_RECONFIGURE_WITH_DKG"></a>
+
+The on-chain randomness feature.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 45;
 </code></pre>
 
 
@@ -1944,6 +1997,52 @@ Lifetime: transient
 
 </details>
 
+<a id="0x1_features_get_reconfigure_with_dkg_feature"></a>
+
+## Function `get_reconfigure_with_dkg_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_reconfigure_with_dkg_feature">get_reconfigure_with_dkg_feature</a>(): u64 { <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_reconfigure_with_dkg_enabled"></a>
+
+## Function `reconfigure_with_dkg_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_reconfigure_with_dkg_enabled">reconfigure_with_dkg_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_get_keyless_accounts_feature"></a>
 
 ## Function `get_keyless_accounts_feature`
@@ -2235,6 +2334,85 @@ Function to enable and disable features. Can only be called by a signer of @std.
 
 </details>
 
+<a id="0x1_features_change_feature_flags_for_next_epoch"></a>
+
+## Function `change_feature_flags_for_next_epoch`
+
+Enable and disable features *for the next epoch*.
+
+NOTE: when it takes effects depend on feature <code><a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a></code>.
+See <code>aptos_framework::aptos_governance::reconfigure()</code> for more details.
+
+Can only be called by a signer of @std.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) <b>acquires</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>, <a href="features.md#0x1_features_Features">Features</a> {
+    <b>assert</b>!(<a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) == @std, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
+
+    // Figure out the baseline feature vec that the diff will be applied <b>to</b>.
+    <b>let</b> new_feature_vec = <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
+        // If there is a buffered feature vec, <b>use</b> it <b>as</b> the baseline.
+        <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
+        <a href="features.md#0x1_features">features</a>
+    } <b>else</b> <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std)) {
+        // Otherwise, <b>use</b> the currently effective feature flag vec <b>as</b> the baseline, <b>if</b> it <b>exists</b>.
+        <b>borrow_global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>
+    } <b>else</b> {
+        // Otherwise, <b>use</b> an empty feature vec.
+        <a href="vector.md#0x1_vector">vector</a>[]
+    };
+
+    // Apply the diff and save it <b>to</b> the buffer.
+    <a href="features.md#0x1_features_apply_diff">apply_diff</a>(&<b>mut</b> new_feature_vec, enable, disable);
+    <b>move_to</b>(framework, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a>: new_feature_vec });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_on_new_epoch"></a>
+
+## Function `on_new_epoch`
+
+Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
+
+While the scope is public, it can only be usd in system transactions like <code>block_prologue</code> and governance proposals,
+who have permission to set the flag that's checked in <code>extract()</code>.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a>, <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> {
+    <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(vm_or_framework);
+    <b>if</b> (<b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std)) {
+        <b>let</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> { <a href="features.md#0x1_features">features</a> } = <b>move_from</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std);
+        <b>borrow_global_mut</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a> = <a href="features.md#0x1_features">features</a>;
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_is_enabled"></a>
 
 ## Function `is_enabled`
@@ -2323,6 +2501,60 @@ Helper to check whether a feature flag is enabled.
 
 </details>
 
+<a id="0x1_features_apply_diff"></a>
+
+## Function `apply_diff`
+
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;) {
+    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(enable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>true</b>);
+    });
+    <a href="vector.md#0x1_vector_for_each">vector::for_each</a>(disable, |feature| {
+        <a href="features.md#0x1_features_set">set</a>(<a href="features.md#0x1_features">features</a>, feature, <b>false</b>);
+    });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_ensure_vm_or_framework_signer"></a>
+
+## Function `ensure_vm_or_framework_signer`
+
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_ensure_vm_or_framework_signer">ensure_vm_or_framework_signer</a>(account: &<a href="signer.md#0x1_signer">signer</a>) {
+    <b>let</b> addr = <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(account);
+    <b>assert</b>!(addr == @std || addr == @vm, <a href="error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="features.md#0x1_features_EFRAMEWORK_SIGNER_NEEDED">EFRAMEWORK_SIGNER_NEEDED</a>));
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="@Specification_1"></a>
 
 ## Specification
@@ -2334,6 +2566,32 @@ Helper to check whether a feature flag is enabled.
 
 
 <pre><code><b>struct</b> <a href="features.md#0x1_features_Features">Features</a> <b>has</b> key
+</code></pre>
+
+
+
+<dl>
+<dt>
+<code><a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+
+<pre><code><b>pragma</b> bv=b"0";
+</code></pre>
+
+
+
+<a id="@Specification_1_PendingFeatures"></a>
+
+### Resource `PendingFeatures`
+
+
+<pre><code><b>struct</b> <a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a> <b>has</b> key
 </code></pre>
 
 
@@ -2433,6 +2691,55 @@ Helper to check whether a feature flag is enabled.
 <pre><code><b>pragma</b> opaque;
 <b>modifies</b> <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
 <b>aborts_if</b> <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) != @std;
+</code></pre>
+
+
+
+<a id="@Specification_1_change_feature_flags_for_next_epoch"></a>
+
+### Function `change_feature_flags_for_next_epoch`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags_for_next_epoch">change_feature_flags_for_next_epoch</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(framework) != @std;
+</code></pre>
+
+
+
+
+<a id="0x1_features_spec_contains"></a>
+
+
+<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_contains">spec_contains</a>(<a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64): bool {
+   ((int2bv((((1 <b>as</b> u8) &lt;&lt; ((feature % (8 <b>as</b> u64)) <b>as</b> u64)) <b>as</b> u8)) <b>as</b> u8) & <a href="features.md#0x1_features">features</a>[feature/8] <b>as</b> u8) &gt; (0 <b>as</b> u8)
+       && (feature / 8) &lt; len(<a href="features.md#0x1_features">features</a>)
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_on_new_epoch"></a>
+
+### Function `on_new_epoch`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_on_new_epoch">on_new_epoch</a>(vm_or_framework: &<a href="signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> addr = <a href="signer.md#0x1_signer_address_of">signer::address_of</a>(vm_or_framework);
+<b>aborts_if</b> addr != @std && addr != @vm;
+<b>aborts_if</b> <b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std) && !<b>exists</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std);
+<b>let</b> features_pending = <b>global</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
+<b>let</b> <b>post</b> features_std = <b>global</b>&lt;<a href="features.md#0x1_features_Features">Features</a>&gt;(@std).<a href="features.md#0x1_features">features</a>;
+<b>ensures</b> <b>exists</b>&lt;<a href="features.md#0x1_features_PendingFeatures">PendingFeatures</a>&gt;(@std) ==&gt; features_std == features_pending;
 </code></pre>
 
 
@@ -2546,14 +2853,22 @@ Helper to check whether a feature flag is enabled.
 
 
 
+<a id="@Specification_1_apply_diff"></a>
 
-<a id="0x1_features_spec_contains"></a>
+### Function `apply_diff`
 
 
-<pre><code><b>fun</b> <a href="features.md#0x1_features_spec_contains">spec_contains</a>(<a href="features.md#0x1_features">features</a>: <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, feature: u64): bool {
-   ((int2bv((((1 <b>as</b> u8) &lt;&lt; ((feature % (8 <b>as</b> u64)) <b>as</b> u64)) <b>as</b> u8)) <b>as</b> u8) & <a href="features.md#0x1_features">features</a>[feature/8] <b>as</b> u8) &gt; (0 <b>as</b> u8)
-       && (feature / 8) &lt; len(<a href="features.md#0x1_features">features</a>)
-}
+<pre><code><b>fun</b> <a href="features.md#0x1_features_apply_diff">apply_diff</a>(<a href="features.md#0x1_features">features</a>: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;u8&gt;, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] <b>forall</b> i in disable: !<a href="features.md#0x1_features_spec_contains">spec_contains</a>(<a href="features.md#0x1_features">features</a>, i);
+<b>ensures</b> [abstract] <b>forall</b> i in enable: !<a href="vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(disable, i)
+    ==&gt; <a href="features.md#0x1_features_spec_contains">spec_contains</a>(<a href="features.md#0x1_features">features</a>, i);
+<b>pragma</b> opaque;
 </code></pre>
 
 

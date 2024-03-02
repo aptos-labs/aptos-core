@@ -57,27 +57,26 @@ spec aptos_framework::block {
         invariant max_capacity > 0;
     }
 
+    spec block_prologue_common {
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
+        include BlockRequirement;
+        aborts_if false;
+    }
+
     spec block_prologue {
-        use aptos_framework::chain_status;
-        use aptos_framework::coin::CoinInfo;
-        use aptos_framework::aptos_coin::AptosCoin;
-        use aptos_framework::transaction_fee;
-        use aptos_framework::staking_config;
 
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
-
-        requires chain_status::is_operating();
-        requires system_addresses::is_vm(vm);
-        /// [high-level-req-4]
-        requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
         requires timestamp >= reconfiguration::last_reconfiguration_time();
-        requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
-        requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
-        requires exists<stake::ValidatorFees>(@aptos_framework);
-        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        include staking_config::StakingRewardsConfigRequirement;
+        include BlockRequirement;
+        aborts_if false;
+    }
 
+    spec block_prologue_ext {
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
+        requires timestamp >= reconfiguration::last_reconfiguration_time();
+        include BlockRequirement;
+        include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         aborts_if false;
     }
 
@@ -122,6 +121,34 @@ spec aptos_framework::block {
         let addr = signer::address_of(aptos_framework);
         let account = global<account::Account>(addr);
         aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
+    }
+
+    spec schema BlockRequirement {
+        use aptos_framework::chain_status;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::transaction_fee;
+        use aptos_framework::staking_config;
+
+        vm: signer;
+        hash: address;
+        epoch: u64;
+        round: u64;
+        proposer: address;
+        failed_proposer_indices: vector<u64>;
+        previous_block_votes_bitvec: vector<u8>;
+        timestamp: u64;
+
+        requires chain_status::is_operating();
+        requires system_addresses::is_vm(vm);
+        /// [high-level-req-4]
+        requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
+        requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
+        requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        include staking_config::StakingRewardsConfigRequirement;
     }
 
     spec schema Initialize {
