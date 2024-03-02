@@ -7,9 +7,9 @@ use crate::{
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
-use aptos_types::on_chain_config::{FeatureFlag, Features};
 
 /// Chain should not be blocked by failing validator txns.
 #[tokio::test]
