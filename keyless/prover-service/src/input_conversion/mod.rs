@@ -311,7 +311,7 @@ mod tests {
 
 
         let expected_json: serde_json::Value = serde_json::from_str(
-            &fs::read_to_string("test/input.json").expect("Unable to read file"),
+            &fs::read_to_string("tests/input.json").expect("Unable to read file"),
         )
         .expect("should parse correctly");
 
