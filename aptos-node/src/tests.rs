@@ -109,11 +109,11 @@ fn test_create_single_node_test_config() {
         merged_config
             .state_sync
             .state_sync_driver
-            .bootstrapping_mode,
+            .continuous_syncing_mode,
         default_node_config
             .state_sync
             .state_sync_driver
-            .bootstrapping_mode
+            .continuous_syncing_mode
     );
 }
 
