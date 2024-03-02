@@ -1,91 +1,67 @@
 
 Diagnostics:
-error: no matching declaration of `!=`
-   ┌─ tests/checking/typing/neq_invalid.move:13:9
+error: cannot use `u128` with an operator which expects a value of type `u8`
+   ┌─ tests/checking/typing/neq_invalid.move:13:21
    │
 13 │         (0: u8) != (1: u128);
-   │         ^^^^^^^^^^^^^^^^^^^^
-   │
-   = outruled candidate `!=(&#0, &#0): bool` (expected `&?3` but found `u8` for argument 1)
-   = outruled candidate `!=(#0, #0): bool` (expected `u8` but found `u128` for argument 2)
+   │                     ^
 
-error: no matching declaration of `!=`
-   ┌─ tests/checking/typing/neq_invalid.move:14:9
+error: cannot use `bool` with an operator which expects a value of type `integer`
+   ┌─ tests/checking/typing/neq_invalid.move:14:14
    │
 14 │         0 != false;
-   │         ^^^^^^^^^^
-   │
-   = outruled candidate `!=(&#0, &#0): bool` (expected `&?9` but found `integer` for argument 1)
-   = outruled candidate `!=(#0, #0): bool` (expected `integer` but found `bool` for argument 2)
+   │              ^^^^^
 
-error: no matching declaration of `!=`
-   ┌─ tests/checking/typing/neq_invalid.move:15:9
+error: cannot use `integer` with an operator which expects a value of type `&integer`
+   ┌─ tests/checking/typing/neq_invalid.move:15:15
    │
 15 │         &0 != 1;
-   │         ^^^^^^^
-   │
-   = outruled candidate `!=(&#0, &#0): bool` (expected `&?17` but found `integer` for argument 2)
-   = outruled candidate `!=(#0, #0): bool` (expected `&integer` but found `integer` for argument 2)
+   │               ^
 
-error: no matching declaration of `!=`
-   ┌─ tests/checking/typing/neq_invalid.move:16:9
+error: cannot use `&integer` with an operator which expects a value of type `integer`
+   ┌─ tests/checking/typing/neq_invalid.move:16:14
    │
 16 │         1 != &0;
-   │         ^^^^^^^
-   │
-   = outruled candidate `!=(&#0, &#0): bool` (expected `&?25` but found `integer` for argument 1)
-   = outruled candidate `!=(#0, #0): bool` (expected `integer` but found `&integer` for argument 2)
+   │              ^^
 
-error: no matching declaration of `!=`
-   ┌─ tests/checking/typing/neq_invalid.move:17:9
+error: cannot use `&S` with an operator which expects a value of type `S`
+   ┌─ tests/checking/typing/neq_invalid.move:17:14
    │
 17 │         s != s_ref;
-   │         ^^^^^^^^^^
-   │
-   = outruled candidate `!=(&#0, &#0): bool` (expected `&?30` but found `M::S` for argument 1)
-   = outruled candidate `!=(#0, #0): bool` (expected `M::S` but found `&M::S` for argument 2)
+   │              ^^^^^
 
-error: no matching declaration of `!=`
-   ┌─ tests/checking/typing/neq_invalid.move:18:9
+error: cannot use `S` with an operator which expects a value of type `&mut S`
+   ┌─ tests/checking/typing/neq_invalid.move:18:18
    │
 18 │         s_mut != s;
-   │         ^^^^^^^^^^
-   │
-   = outruled candidate `!=(&#0, &#0): bool` (expected `&M::S` but found `M::S` for argument 2)
-   = outruled candidate `!=(#0, #0): bool` (expected `&mut M::S` but found `M::S` for argument 2)
+   │                  ^
 
-error: unable to infer type: `M::G0<?4>`
+error: unable to infer instantiation of type `G0<_>` (consider providing type arguments or annotating the type)
    ┌─ tests/checking/typing/neq_invalid.move:26:9
    │
 26 │         G0{} != G0{};
    │         ^^^^
 
-error: unable to infer type: `M::G1<?11>`
+error: unable to infer instantiation of type `G1<_>` (consider providing type arguments or annotating the type)
    ┌─ tests/checking/typing/neq_invalid.move:27:9
    │
 27 │         G1{} != G1{};
    │         ^^^^
 
-error: unable to infer type: `M::G2<?18>`
+error: unable to infer instantiation of type `G2<_>` (consider providing type arguments or annotating the type)
    ┌─ tests/checking/typing/neq_invalid.move:28:9
    │
 28 │         G2{} != G2{};
    │         ^^^^
 
-error: no matching declaration of `!=`
-   ┌─ tests/checking/typing/neq_invalid.move:34:9
+error: the operator takes 2 arguments but 3 were provided
+   ┌─ tests/checking/typing/neq_invalid.move:34:22
    │
 34 │         (1, 2, 3) != (0, 1);
-   │         ^^^^^^^^^^^^^^^^^^^
-   │
-   = outruled candidate `!=(&#0, &#0): bool` (expected `&?31` but found `(integer, integer, integer)` for argument 1)
-   = outruled candidate `!=(#0, #0): bool` (tuples have different arity (3 != 2) for argument 2)
+   │                      ^^^^^^
 
-error: no matching declaration of `!=`
-   ┌─ tests/checking/typing/neq_invalid.move:35:9
+error: the operator takes 3 arguments but 2 were provided
+   ┌─ tests/checking/typing/neq_invalid.move:35:19
    │
 35 │         (0, 1) != (1, 2, 3);
-   │         ^^^^^^^^^^^^^^^^^^^
-   │
-   = outruled candidate `!=(&#0, &#0): bool` (expected `&?46` but found `(integer, integer)` for argument 1)
-   = outruled candidate `!=(#0, #0): bool` (tuples have different arity (2 != 3) for argument 2)
+   │                   ^^^^^^^^^

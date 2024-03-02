@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: unable to infer type: `?2`
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
   ┌─ tests/checking/specs/expressions_inference_err.move:6:16
   │
 6 │       let f = |x|x; // Incomplete types.

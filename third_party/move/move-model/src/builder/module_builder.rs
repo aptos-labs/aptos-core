@@ -32,7 +32,7 @@ use crate::{
         CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{PrimitiveType, Type, BOOL_TYPE},
+    ty::{ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -339,8 +339,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .new_node(self.parent.to_loc(&v.loc), Type::Tuple(vec![]));
                 let v = match &v.value {
                     EA::AttributeValue_::Value(val) => {
-                        let val = if let Some((val, _)) =
-                            ExpTranslator::new(self).translate_value_free(val)
+                        let val = if let Some((val, _)) = ExpTranslator::new(self)
+                            .translate_value_free(val, &ErrorMessageContext::General)
                         {
                             val
                         } else {
@@ -1365,7 +1365,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 } else {
                     None
                 };
-                let mut result = et.translate_seq(&loc, seq, &result_type);
+                let mut result =
+                    et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
                 et.finalize_types();
                 result = et.post_process_body(result.into_exp()).into();
                 (result, access_specifiers)
@@ -1718,7 +1719,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             None => PropertyValue::Value(Value::Bool(true)),
             Some(EA::PragmaValue::Literal(ev)) => {
                 let mut et = ExpTranslator::new(self);
-                match et.translate_value_free(ev) {
+                match et.translate_value_free(ev, &ErrorMessageContext::General) {
                     None => {
                         // Error reported
                         return;
@@ -2473,7 +2474,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 for Parameter(n, ty, loc) in params {
                     et.define_local(&loc, n, ty, None, None);
                 }
-                let translated = et.translate_seq(&loc, seq, &result_type);
+                let translated =
+                    et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
                 et.finalize_types();
                 self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
             },
@@ -3003,10 +3005,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     loc,
                     &ty,
                     &entry.type_,
-                    &format!(
-                        "for `{}` included from schema",
-                        name.display(et.symbol_pool())
-                    ),
+                    &ErrorMessageContext::SchemaInclusion(*name),
                 );
                 // Put into argument map.
                 let node_id = et.new_node_id_with_type_loc(&entry.type_, loc);

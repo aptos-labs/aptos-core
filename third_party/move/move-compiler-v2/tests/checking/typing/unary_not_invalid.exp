@@ -1,48 +1,48 @@
 
 Diagnostics:
-error: invalid call of `!`: expected `bool` but found `&bool` for argument 1
+error: cannot use `&bool` with an operator which expects a value of type `bool`
   ┌─ tests/checking/typing/unary_not_invalid.move:7:10
   │
 7 │         !&true;
   │          ^^^^^
 
-error: invalid call of `!`: expected `bool` but found `&bool` for argument 1
+error: cannot use `&bool` with an operator which expects a value of type `bool`
   ┌─ tests/checking/typing/unary_not_invalid.move:8:10
   │
 8 │         !&false;
   │          ^^^^^^
 
-error: invalid call of `!`: expected `bool` but found `integer` for argument 1
+error: cannot use `integer` with an operator which expects a value of type `bool`
   ┌─ tests/checking/typing/unary_not_invalid.move:9:10
   │
 9 │         !0;
   │          ^
 
-error: invalid call of `!`: expected `bool` but found `integer` for argument 1
+error: cannot use `integer` with an operator which expects a value of type `bool`
    ┌─ tests/checking/typing/unary_not_invalid.move:10:10
    │
 10 │         !1;
    │          ^
 
-error: invalid call of `!`: expected `bool` but found `M::R` for argument 1
+error: cannot use `R` with an operator which expects a value of type `bool`
    ┌─ tests/checking/typing/unary_not_invalid.move:11:10
    │
 11 │         !r;
    │          ^
 
-error: invalid call of `!`: expected `bool` but found `M::R` for argument 1
+error: cannot use `R` with an operator which expects a value of type `bool`
    ┌─ tests/checking/typing/unary_not_invalid.move:12:10
    │
 12 │         !r;
    │          ^
 
-error: invalid call of `!`: expected `bool` but found `(integer, bool)` for argument 1
+error: cannot use `(integer, bool)` with an operator which expects a value of type `bool`
    ┌─ tests/checking/typing/unary_not_invalid.move:13:10
    │
 13 │         !(0, false);
    │          ^^^^^^^^^^
 
-error: invalid call of `!`: expected `bool` but found `()` for argument 1
+error: cannot use `()` with an operator which expects a value of type `bool`
    ┌─ tests/checking/typing/unary_not_invalid.move:14:10
    │
 14 │         !();

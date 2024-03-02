@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `bool` but found `num`
+error: expected `bool` but found a value of type `num`
   ┌─ tests/checking/specs/invariants_err.move:9:15
   │
 9 │     invariant x + 1;
