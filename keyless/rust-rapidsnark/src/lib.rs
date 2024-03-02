@@ -2,6 +2,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(dead_code)]
+
 
 mod cpp {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
@@ -47,11 +49,13 @@ pub struct FullProver {
 
 impl FullProver {
     pub fn new(zkey_path : &str, witness_gen_binary_folder_path : &str) -> Result<FullProver, ProverInitError> {
+        let zkey_path_cstr = CString::new(zkey_path).expect("CString::new failed");
+        let witness_gen_binary_folder_path_cstr = CString::new(witness_gen_binary_folder_path).expect("CString::new failed");
         let full_prover = unsafe { 
             FullProver { 
                 _full_prover: cpp::FullProver::new(
-                                  CString::new(zkey_path).expect("CString::new failed").as_ptr(),
-                                  CString::new(witness_gen_binary_folder_path).expect("CString::new failed").as_ptr()
+                                  zkey_path.as_ptr(),
+                                  witness_gen_binary_folder_path_cstr.as_ptr()
                                   )
             }
         };
@@ -64,8 +68,9 @@ impl FullProver {
     }
 
     pub fn prove(&mut self, input: &str) -> Result<(&str, cpp::ProverResponseMetrics), ProverError> {
+        let input_cstr = CString::new(input).expect("CString::new failed");
         let response = unsafe {
-            self._full_prover.prove(CString::new(input).expect("CString::new failed").as_ptr())
+            self._full_prover.prove(input_cstr.as_ptr())
         };
         match response.type_ {
             cpp::ProverResponseType_SUCCESS => unsafe { Ok((CStr::from_ptr(response.raw_json).to_str().expect("CStr::to_str failed"), response.metrics)) },
