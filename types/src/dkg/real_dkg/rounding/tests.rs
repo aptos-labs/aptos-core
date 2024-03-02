@@ -12,7 +12,7 @@ fn compute_mainnet_rounding() {
     let validator_stakes = MAINNET_STAKES.to_vec();
     let dkg_rounding =
         DKGRounding::new(&validator_stakes, SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD);
-    // println!("mainnet rounding profile: {:?}", dkg_rounding.profile);
+    println!("mainnet rounding profile: {:?}", dkg_rounding.profile);
     // Result:
     // mainnet rounding profile: total_weight: 437, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.5859020899996102, reconstruct_threshold_in_weights: 237, validator_weights: [10, 1, 9, 9, 1, 1, 9, 9, 1, 7, 8, 5, 2, 1, 9, 7, 1, 2, 1, 9, 2, 1, 1, 9, 1, 8, 10, 1, 1, 9, 1, 1, 1, 7, 9, 1, 1, 9, 1, 9, 1, 3, 1, 8, 1, 1, 7, 10, 3, 2, 1, 9, 1, 9, 1, 3, 8, 1, 10, 1, 1, 1, 9, 3, 8, 8, 3, 10, 1, 1, 7, 9, 2, 5, 2, 9, 9, 1, 4, 1, 1, 1, 1, 1, 2, 10, 1, 1, 9, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 9, 8, 1, 1, 9, 2, 1]
 
@@ -152,7 +152,7 @@ fn test_rounding_zipf_distribution() {
 }
 
 #[cfg(test)]
-pub const MAINNET_STAKES: [u64; 112] = [
+pub const MAINNET_STAKES: [u64; 100] = [
     210500217584363000,
     19015034427309200,
     190269409955015000,
@@ -253,16 +253,16 @@ pub const MAINNET_STAKES: [u64; 112] = [
     25112384536164900,
     22886710016497000,
     10602439528909000,
-    10602834493124000,
-    10602101852821800,
-    16812894183934200,
-    46140391561066400,
-    16579223362042600,
-    191035150659780000,
-    169268334324248000,
-    10600667662818000,
-    10625918567828000,
-    180685941615229000,
-    38221788594331900,
-    10516889883063100,
+    // 10602834493124000,
+    // 10602101852821800,
+    // 16812894183934200,
+    // 46140391561066400,
+    // 16579223362042600,
+    // 191035150659780000,
+    // 169268334324248000,
+    // 10600667662818000,
+    // 10625918567828000,
+    // 180685941615229000,
+    // 38221788594331900,
+    // 10516889883063100,
 ];

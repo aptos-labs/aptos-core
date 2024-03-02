@@ -602,12 +602,95 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "realistic_env_max_load" => realistic_env_max_load_test_for_randomness_mainnet_simulation(duration, test_cmd, 90, 0),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
     };
     Some(test)
+}
+
+// For randomness mainnet simulation
+fn realistic_env_max_load_test_for_randomness_mainnet_simulation(
+    duration: Duration,
+    test_cmd: &TestCommand,
+    num_validators: usize,
+    num_fullnodes: usize,
+) -> ForgeConfig {
+    // Check if HAProxy is enabled
+    let ha_proxy = if let TestCommand::K8sSwarm(k8s) = test_cmd {
+        k8s.enable_haproxy
+    } else {
+        false
+    };
+
+    // Determine if this is a long running test
+    let duration_secs = duration.as_secs();
+    let long_running = duration_secs >= 2400;
+
+    // Calculate the max CPU threshold
+    let max_cpu_threshold = if num_validators >= 10 { 30 } else { 70 };
+
+    // Create the test
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
+        .with_initial_fullnode_count(num_fullnodes)
+        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+            inner_traffic: EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 50 })
+                .init_gas_price_multiplier(20),
+            inner_success_criteria: SuccessCriteria::new(if ha_proxy { 0 } else { 0 }),
+        }))
+        .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
+            // Have single epoch change in land blocking, and a few on long-running
+            helm_values["chain"]["epoch_duration_secs"] =
+                (if long_running { 180 } else { 180 }).into();
+        }))
+        // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 50 })
+                // .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
+                .latency_polling_interval(Duration::from_millis(100)),
+        )
+        .with_success_criteria(
+            SuccessCriteria::new(95)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(
+                    // Give at least 60s for catchup, give 10% of the run for longer durations.
+                    (duration.as_secs() / 10).max(60),
+                )
+                .add_system_metrics_threshold(SystemMetricsThreshold::new(
+                    // Check that we don't use more than 16 CPU cores for 30% of the time.
+                    MetricsThreshold::new(16.0, max_cpu_threshold),
+                    // Check that we don't use more than 10 GB of memory for 30% of the time.
+                    MetricsThreshold::new_gb(10.0, 30),
+                ))
+                .add_latency_threshold(3.4, LatencyType::P50)
+                .add_latency_threshold(4.5, LatencyType::P90)
+                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
+                    vec![
+                        (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+                        // only reaches close to threshold during epoch change
+                        (
+                            LatencyBreakdownSlice::QsPosToProposal,
+                            if ha_proxy { 0.7 } else { 0.6 },
+                        ),
+                        // can be adjusted down if less backpressure
+                        (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+                        // can be adjusted down if less backpressure
+                        (
+                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
+                            if ha_proxy { 1.3 } else { 0.75 },
+                        ),
+                    ],
+                    5,
+                ))
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 10.0,
+                    max_round_gap: 4,
+                }),
+        )
 }
 
 /// Attempts to match the test name to a network benchmark test

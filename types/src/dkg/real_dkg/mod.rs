@@ -6,13 +6,7 @@ use crate::{
 };
 use anyhow::{anyhow, ensure};
 use aptos_crypto::{bls12381, bls12381::PrivateKey};
-use aptos_dkg::{
-    pvss,
-    pvss::{
-        traits::{Convert, Reconstructable, Transcript},
-        Player,
-    },
-};
+use aptos_dkg::pvss::{self, traits::{Convert, Reconstructable, Transcript}, Player, WeightedConfig};
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
 use rounding::{RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD};
@@ -73,6 +67,12 @@ pub fn build_dkg_pvss_config(
         .collect::<Vec<_>>();
 
     let wconfig = dkg_rounding.wconfig.clone();
+
+    // 1k shares in total
+    let weights: Vec<usize> = vec![11; next_validators.len()];
+    let total_weights = weights.iter().sum::<usize>();
+    let threshold_weight = ((total_weights as f64) * RECONSTRUCT_THRESHOLD) as usize;
+    let wconfig = WeightedConfig::new(threshold_weight, weights).unwrap();
 
     let pp = DkgPP::default_with_bls_base();
 
