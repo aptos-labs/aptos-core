@@ -17,7 +17,7 @@ use aptos_types::on_chain_config::ConfigurationResource;
 
 /// Disable on-chain randomness by only disabling validator transactions.
 #[tokio::test]
-async fn disable_feature_1() {
+async fn failure_indicator_block_randomness() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
