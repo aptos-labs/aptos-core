@@ -590,25 +590,26 @@ impl EntryPoints {
             ),
 =======
             EntryPoints::TokenMinterMint => {
+                let module_id = ModuleId::new(
+                    AccountAddress::from_hex_literal("0x0fbcdf3888f673c2860b9b7a6e68deb6606a950e7b4865d905d6886f0890e222").unwrap(),
+                    Identifier::new("token_minter").unwrap()
+                );
+                let token_minter_addr = "0x274a3e6501314014e1d6c3fe0016d2383ae336c5c11d8caff3755a15ccf729d7";
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
-                let properties_keys: [[String; 0]; 1] = [[]];
-                let properties_types: [[String; 0]; 1] = [[]];
-                let properties_values: [[String; 0]; 1] = [[]];
                 let random_addr_string = format!("0x{:0>64}", format!("{:x}", rng.gen_range(0u64, 2147483646u64)));
-                let recipient_addrs: [AccountAddress; 1] = [AccountAddress::from_hex_literal(&random_addr_string).unwrap()];
+                let mut recipient_addr  = AccountAddress::from_hex_literal(&random_addr_string).unwrap();
+                let mut recipient_addrs = vec![1u8];
+                recipient_addrs.append(&mut bcs::to_bytes(&recipient_addr).unwrap());
                 get_payload(
-                    module_id,
-                    ident_str!("mint_tokens").to_owned(),
+                        module_id,
+                    ident_str!("mint_tokens_simple").to_owned(),
                     vec![
-                        bcs::to_bytes(&AccountAddress::from_hex_literal("0xa27a573cecb8f3b9ec5850f04f843c96fd99c2005c1a6d686b846b7cd45c5aaf").unwrap()).unwrap(),
+                        bcs::to_bytes(&AccountAddress::from_hex_literal(token_minter_addr).unwrap()).unwrap(),
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
                         bcs::to_bytes("superstar #").unwrap(),          // name
                         bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
-                        bcs::to_bytes(&1u64).unwrap(),
-                        bcs::to_bytes(&properties_keys).unwrap(),
-                        bcs::to_bytes(&properties_types).unwrap(),
-                        bcs::to_bytes(&properties_values).unwrap(),
-                        bcs::to_bytes(&recipient_addrs).unwrap(),
+                        bcs::to_bytes(&1u64).unwrap(),                  // amount
+                        recipient_addrs,
                     ],
                 )
             },
