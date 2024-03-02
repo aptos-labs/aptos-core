@@ -2273,31 +2273,6 @@ module econia::incentives {
             TAKER_FEE_DIVISOR, &integrator_fee_store_tiers, false);
     }
 
-    /// Initialize incentives with `UC` utility coin type.
-    public fun init_setup(publisher: &signer)
-    acquires
-        IncentiveParameters
-    {
-        assets::init_setup(publisher); // Initialize coin types.
-        // Vectorize fee store tier parameters.
-        let integrator_fee_store_tiers = vector[
-            vector[
-                FEE_SHARE_DIVISOR_0,
-                TIER_ACTIVATION_FEE_0,
-                WITHDRAWAL_FEE_0
-            ],
-            vector[
-                FEE_SHARE_DIVISOR_1,
-                TIER_ACTIVATION_FEE_1,
-                WITHDRAWAL_FEE_1
-            ]
-        ];
-        // Initialize incentives with mock utility coin.
-        set_incentive_parameters<UC>(publisher, MARKET_REGISTRATION_FEE,
-            UNDERWRITER_REGISTRATION_FEE, CUSTODIAN_REGISTRATION_FEE,
-            TAKER_FEE_DIVISOR, &integrator_fee_store_tiers, false);
-    }
-
     #[test_only]
     /// Return `true` if `integrator` has an `IntegratorFeeStore` for
     /// given `QuoteCoinType` and `market_id`.

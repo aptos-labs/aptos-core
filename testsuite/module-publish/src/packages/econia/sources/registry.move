@@ -1717,12 +1717,6 @@ module econia::registry {
         econia // Return signer.
     }
 
-    /// Initialize registry for testing.
-    public fun init_setup(publisher: &signer) {
-        init_module(publisher); // Init registry.
-        incentives::init_setup(publisher); // Init incentives.
-    }
-
     #[test_only]
     /// Register pure coin and generic markets, returning market info.
     public fun register_markets_test(): (

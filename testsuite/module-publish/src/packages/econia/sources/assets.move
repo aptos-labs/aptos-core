@@ -202,17 +202,6 @@ module econia::assets {
         if (!exists<CoinCapabilities<XC>>(address_of(account))) init_coin_type<XC>(account, b"X Coin", b"XC", 10); // Initialize X coin
     }
 
-    public fun init_setup(
-        account: &signer
-    ) {
-        if (!exists<CoinCapabilities<BC>>(address_of(account))) init_coin_type<BC>(account, BASE_COIN_NAME, BASE_COIN_SYMBOL,
-            BASE_COIN_DECIMALS); // Initialize mock base coin.
-        if (!exists<CoinCapabilities<QC>>(address_of(account))) init_coin_type<QC>(account, QUOTE_COIN_NAME, QUOTE_COIN_SYMBOL,
-            QUOTE_COIN_DECIMALS); // Initialize mock quote coin.
-        if (!exists<CoinCapabilities<UC>>(address_of(account))) init_coin_type<UC>(account, UTILITY_COIN_NAME, UTILITY_COIN_SYMBOL,
-            UTILITY_COIN_DECIMALS); // Initialize mock utility coin.
-    }
-
     // Private functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     // Test-only functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -235,21 +224,6 @@ module econia::assets {
         coin::destroy_mint_cap(mint_cap);
     }
 
-    /// Wrapper for `init_module()`
-    /// Similarly initializes the Aptos coin, destroying capabilities.
-    public fun init_coin_types_setup(publisher: &signer) {
-        // Initialize Econia test coin types.
-        init_module(publisher);
-        // // Initialize Aptos coin type, storing capabilities.
-        // let (burn_cap, mint_cap) = aptos_coin::initialize_for_test(
-        //     &account::create_signer_with_capability(
-        //         &account::create_test_signer_cap(@aptos_framework)));
-        // // Destroy Aptos coin burn capability.
-        // coin::destroy_burn_cap(burn_cap);
-        // // Destroy Aptos coin mint capability.
-        // coin::destroy_mint_cap(mint_cap);
-    }
-
    #[test_only]
     /// Wrapper for `mint()`, not requiring signature.
     public fun mint_test<CoinType>(
@@ -263,17 +237,6 @@ module econia::assets {
         if (!exists<CoinCapabilities<CoinType>>(@econia)) init_module(&econia);
         mint(&econia, amount) // Mint and return amount.
     }
-
-    // /// Wrapper for `mint()`.
-    // public fun mint_test<CoinType>(
-    //     user: &signer,
-    //     amount: u64
-    // ): coin::Coin<CoinType>
-    // acquires CoinCapabilities {
-    //     // Initialize coin types if they have not been initialized yet.
-    //     if (!exists<CoinCapabilities<CoinType>>(signer::address_of(user))) init_module(user);
-    //     mint(user, amount) // Mint and return amount.
-    // }
 
     // Test-only functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
