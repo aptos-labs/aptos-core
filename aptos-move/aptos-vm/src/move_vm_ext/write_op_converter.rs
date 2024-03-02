@@ -18,6 +18,7 @@ use move_core_types::{
     effects::Op as MoveStorageOp, language_storage::StructTag, value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_types::delayed_values::error::code_invariant_error;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct WriteOpConverter<'r> {
@@ -60,12 +61,7 @@ fn decrement_size_for_remove_tag(
     old_tagged_resource_size: u64,
 ) -> PartialVMResult<()> {
     match size {
-        ResourceGroupSize::Concrete(_) => Err(PartialVMError::new(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-        )
-        .with_message(
-            "Unexpected ResourceGroupSize::Concrete in decrement_size_for_remove_tag".to_string(),
-        )),
+        ResourceGroupSize::Concrete(_) => Err(code_invariant_error("Unexpected ResourceGroupSize::Concrete in decrement_size_for_remove_tag").into()),
         ResourceGroupSize::Combined {
             num_tagged_resources,
             all_tagged_resources_size,
@@ -251,7 +247,7 @@ impl<'r> WriteOpConverter<'r> {
         Ok(GroupWrite::new(
             self.convert(state_value_metadata, metadata_op, false)?,
             inner_ops,
-            post_group_size.get(),
+            post_group_size,
             pre_group_size.get(),
         ))
     }
@@ -457,7 +453,7 @@ mod tests {
         let expected_new_size = bcs::serialized_size(&mock_tag_1()).unwrap()
             + bcs::serialized_size(&mock_tag_2()).unwrap()
             + 7; // values bytes size: 2 + 5
-        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size as u64);
+        assert_some_eq!(group_write.maybe_group_op_size().map(ResourceGroupSize::get), expected_new_size as u64);
         assert_eq!(group_write.inner_ops().len(), 2);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_0()),
@@ -505,7 +501,7 @@ mod tests {
             + bcs::serialized_size(&mock_tag_1()).unwrap()
             + bcs::serialized_size(&mock_tag_2()).unwrap()
             + 6; // values bytes size: 1 + 2 + 3.
-        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size as u64);
+        assert_some_eq!(group_write.maybe_group_op_size().map(ResourceGroupSize::get), expected_new_size as u64);
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_2()),
@@ -531,7 +527,7 @@ mod tests {
 
         assert!(group_write.metadata_op().metadata().is_none());
         let expected_new_size = bcs::serialized_size(&mock_tag_1()).unwrap() + 2;
-        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size as u64);
+        assert_some_eq!(group_write.maybe_group_op_size().map(ResourceGroupSize::get), expected_new_size as u64);
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_1()),

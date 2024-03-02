@@ -86,7 +86,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 
         Ok(RespawnedSessionBuilder {
             executor_view,
-            resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
+            resolver_builder: |executor_view| vm.as_move_resolver_with_group_view(executor_view),
             session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
             storage_refund,
         }
@@ -356,10 +356,27 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
 
     fn resource_group_size(
         &self,
-        _group_key: &Self::GroupKey,
+        group_key: &Self::GroupKey,
     ) -> PartialVMResult<ResourceGroupSize> {
-        // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
-        Ok(ResourceGroupSize::zero_concrete())
+        use AbstractResourceWriteOp::*;
+
+        if let Some(size) = self
+        .change_set
+        .resource_write_set()
+        .get(group_key)
+        .and_then(|write| match write {
+            WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
+            ResourceGroupInPlaceDelayedFieldChange(_) => None,
+            Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                // There should be no colisions, we cannot have group key refer to a resource.
+                Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
+            },
+        })
+        .transpose()? {
+            return Ok(size);
+        }
+
+        self.base_resource_group_view.resource_group_size(group_key)
     }
 
     fn get_resource_from_group(
@@ -399,6 +416,10 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         &self,
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
         unreachable!("Must not be called by RespawnedSession finish");
+    }
+
+    fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
+        self.base_resource_group_view.is_resource_groups_split_in_change_set_capable()
     }
 }
 
