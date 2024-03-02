@@ -9,12 +9,23 @@ use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
+use aptos_types::on_chain_config::{FeatureFlag, Features};
 
+/// Chain should not be blocked by failing validator txns.
 #[tokio::test]
 async fn dummy_validator_txns() {
     let swarm = SwarmBuilder::new_local(4)
         .with_init_config(Arc::new(|_, config, _| {
             config.api.failpoints_enabled = true;
+        }))
+        .with_init_genesis_config(Arc::new(move |conf| {
+            // start with vtxn disabled.
+            conf.consensus_config.disable_validator_txns();
+
+            // start with dkg enabled.
+            let mut features = Features::default();
+            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
+            conf.initial_features_override = Some(features);
         }))
         .with_aptos()
         .build()
