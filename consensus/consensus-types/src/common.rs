@@ -293,9 +293,12 @@ impl Payload {
                 Ok(())
             },
             (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
-                for proof in proof_with_status.proof_with_data.proofs.iter() {
-                    proof.verify(validator)?;
-                }
+                proof_with_status
+                    .proof_with_data
+                    .proofs
+                    .par_iter()
+                    .with_min_len(4)
+                    .try_for_each(|proof| proof.verify(validator))?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
