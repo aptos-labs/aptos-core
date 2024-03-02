@@ -714,7 +714,7 @@ module aptos_framework::fungible_asset {
         move_to(&metadata_object_signer, supply);
     }
 
-    /// Upgrade a known `FungibleStore` to have `ConcurrentFungibleBalance`.
+    /// Ensure a known `FungibleStore` has `ConcurrentFungibleBalance`.
     inline fun ensure_store_upgraded_to_concurrent_internal(
         fungible_store_address: address,
     ) {

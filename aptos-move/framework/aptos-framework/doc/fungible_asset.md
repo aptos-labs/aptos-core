@@ -2395,7 +2395,7 @@ Decrease the supply of a fungible asset by burning.
 
 ## Function `ensure_store_upgraded_to_concurrent_internal`
 
-Upgrade a known <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a></code> to have <code><a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a></code>.
+Ensure a known <code><a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a></code> has <code><a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a></code>.
 
 
 <pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(fungible_store_address: <b>address</b>)
