@@ -4,14 +4,6 @@ use std::process::Command;
 
 fn main() {
     println!("{}", env::current_dir().expect("Couldn't get working dir.").to_str().expect("couldn't convert pathbuf to str."));
-    println!("Hi!");
-    println!("Hi!");
-    println!("Hi!");
-    println!("Hi!");
-    println!("Hi!");
-    println!("Hi!");
-    println!("Hi!");
-    println!("Hi!");
 
 
     println!("{:?}", Command::new("bash")
@@ -89,8 +81,8 @@ fn main() {
         .clang_arg("-L/usr/lib/llvm-14/lib")
         .clang_arg("-I./rapidsnark/package/include")
         .clang_arg("-I/usr/lib/llvm-14/lib/clang/14.0.6/include")
-        .clang_arg(format!("-I/usr/include/c++/12/"))
-        .clang_arg(format!("-I/usr/include/x86_64-linux-gnu/c++/12/"))
+        .clang_arg("-I/usr/include/c++/12/")
+        .clang_arg("-I/usr/include/x86_64-linux-gnu/c++/12/")
         .clang_arg("-I./rapidsnark/depends/json/single_include")
         .clang_arg("-I./rapidsnark/depends/ffiasm/c")
         .clang_arg("-I./rapidsnark/build")
