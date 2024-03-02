@@ -37,7 +37,6 @@ use aptos_types::{
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
 use async_trait::async_trait;
-use futures_channel::mpsc::UnboundedSender;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
@@ -91,7 +90,7 @@ pub(crate) fn compute_initial_block_and_ledger_info(
 }
 
 pub(super) struct OrderedNotifierAdapter {
-    executor_channel: UnboundedSender<OrderedBlocks>,
+    executor_channel: tokio::sync::mpsc::UnboundedSender<OrderedBlocks>,
     dag: Arc<DagStore>,
     parent_block_info: Arc<RwLock<BlockInfo>>,
     epoch_state: Arc<EpochState>,
@@ -101,7 +100,7 @@ pub(super) struct OrderedNotifierAdapter {
 
 impl OrderedNotifierAdapter {
     pub(super) fn new(
-        executor_channel: UnboundedSender<OrderedBlocks>,
+        executor_channel: tokio::sync::mpsc::UnboundedSender<OrderedBlocks>,
         dag: Arc<DagStore>,
         epoch_state: Arc<EpochState>,
         parent_block_info: BlockInfo,
@@ -221,7 +220,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         };
         if self
             .executor_channel
-            .unbounded_send(blocks_to_send)
+            .send(blocks_to_send)
             .is_err()
         {
             error!("[DAG] execution pipeline closed");

@@ -56,7 +56,6 @@ use aptos_types::{
 use async_trait::async_trait;
 use enum_dispatch::enum_dispatch;
 use futures_channel::{
-    mpsc::{UnboundedReceiver, UnboundedSender},
     oneshot,
 };
 use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
@@ -65,7 +64,9 @@ use tokio::{
     select,
     task::{block_in_place, JoinHandle},
 };
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::mpsc::Sender;
+use tokio_retry::Action;
 use tokio_retry::strategy::ExponentialBackoff;
 use crate::dag::shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet};
 
@@ -553,19 +554,6 @@ impl DagBootstrapper {
         // let rb_config = self.config.rb_config.clone();
         let round_state_config = self.config.round_state_config.clone();
 
-        // A backoff policy that starts at _base_*_factor_ ms and multiplies by _base_ each iteration.
-        // let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
-        //     .factor(rb_config.backoff_policy_factor)
-        //     .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
-        // let rb = Arc::new(ReliableBroadcast::new(
-        //     validators.clone(),
-        //     self.rb_network_sender.clone(),
-        //     rb_backoff_policy,
-        //     self.time_service.clone(),
-        //     Duration::from_millis(rb_config.rpc_timeout_ms),
-        //     self.executor.clone(),
-        // ));
-
         let BootstrapBaseState {
             dag_store,
             ledger_info_provider,
@@ -731,9 +719,9 @@ pub(super) fn bootstrap_dag_for_test(
     JoinHandle<SyncOutcome>,
     JoinHandle<()>,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
-    UnboundedReceiver<OrderedBlocks>,
+    tokio::sync::mpsc::UnboundedReceiver<OrderedBlocks>,
 ) {
-    let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
+    let (ordered_nodes_tx, ordered_nodes_rx) = tokio::sync::mpsc::unbounded_channel();
     let mut features = Features::default();
     features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let bootstraper = DagBootstrapper::new(

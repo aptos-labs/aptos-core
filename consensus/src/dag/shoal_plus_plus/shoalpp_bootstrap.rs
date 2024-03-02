@@ -19,6 +19,7 @@ use aptos_types::validator_signer::ValidatorSigner;
 use crate::dag::{DagBootstrapper, DAGMessage, DAGRpcResult, ProofNotifier, TDAGNetworkSender};
 use crate::dag::shoal_plus_plus::shoalpp_broadcast_sync::{BoltBroadcastSync, BroadcastSync};
 use crate::dag::shoal_plus_plus::shoalpp_handler::BoltHandler;
+use crate::dag::shoal_plus_plus::shoalpp_order_notifier::{ShoalppOrderNotifier};
 use crate::dag::shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet};
 use crate::dag::storage::DAGStorage;
 use crate::network::IncomingShoalppRequest;
@@ -33,6 +34,7 @@ pub struct ShoalppBootstrapper {
     dags: Vec<DagBootstrapper>,
     receivers: Vec<Receiver<(oneshot::Sender<BoltBCRet>, BoltBCParms)>>,
     rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
+    shoalpp_order_notifier: ShoalppOrderNotifier,
 }
 
 
@@ -73,10 +75,13 @@ impl ShoalppBootstrapper {
         ));
         let mut dags = Vec::new();
         let mut receiver_vec = Vec::new();
+        let mut receiver_ordered_nodes_vec = Vec::new();
 
         for dag_id in 0..3 {
+            let (order_nodes_tx, ordered_node_rx) =  tokio::sync::mpsc::unbounded_channel();
             let (broadcast_sender, broadcast_receiver) = channel(100);
             receiver_vec.push(broadcast_receiver);
+            receiver_ordered_nodes_vec.push(ordered_node_rx);
             let dag_bootstrapper = DagBootstrapper::new(
                 dag_id,
                 self_peer,
@@ -91,7 +96,7 @@ impl ShoalppBootstrapper {
                 time_service.clone(),
                 payload_manager.clone(),
                 payload_client.clone(),
-                ordered_nodes_tx.clone(),
+                order_nodes_tx,
                 execution_client.clone(),
                 quorum_store_enabled,
                 vtxn_config.clone(),
@@ -107,6 +112,7 @@ impl ShoalppBootstrapper {
             dags,
             receivers: receiver_vec,
             rb,
+            shoalpp_order_notifier: ShoalppOrderNotifier::new(ordered_nodes_tx, receiver_ordered_nodes_vec),
         }
     }
 
@@ -129,6 +135,9 @@ impl ShoalppBootstrapper {
                 dag_shutdown_rx,
             ));
         });
+
+        tokio::spawn(self.shoalpp_order_notifier.run());
+
         let bolt_handler = BoltHandler::new(self.epoch_state.clone());
         tokio::spawn(bolt_handler.run(
             shoalpp_rpc_rx,
