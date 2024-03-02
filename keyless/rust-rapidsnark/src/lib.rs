@@ -50,12 +50,12 @@ pub struct FullProver {
 impl FullProver {
     pub fn new(zkey_path : &str, witness_gen_binary_folder_path : &str) -> Result<FullProver, ProverInitError> {
         let zkey_path_cstr = CString::new(zkey_path).expect("CString::new failed");
-        let witness_gen_binary_folder_path_cstr = CString::new(witness_gen_binary_folder_path).expect("CString::new failed");
+        let wgbfp_cstr = CString::new(witness_gen_binary_folder_path).expect("CString::new failed");
         let full_prover = unsafe { 
             FullProver { 
                 _full_prover: cpp::FullProver::new(
-                                  zkey_path.as_ptr(),
-                                  witness_gen_binary_folder_path_cstr.as_ptr()
+                                  zkey_path_cstr.as_ptr(),
+                                  wgbfp_cstr.as_ptr()
                                   )
             }
         };
