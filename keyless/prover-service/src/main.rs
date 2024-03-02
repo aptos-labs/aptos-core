@@ -1,6 +1,6 @@
 
 use std::{net::SocketAddr, sync::{Arc, Mutex}, time::Duration};
-use tracing::info;
+
 use rust_rapidsnark::FullProver;
 use axum::{
     routing::{post, get},

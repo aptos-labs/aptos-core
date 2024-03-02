@@ -18,38 +18,38 @@ pub mod field_parser;
 pub mod preprocess;
 
 use self::circuit_input_signals::Padded;
-use self::config::CircuitConfig;
+
 use self::public_inputs_hash::compute_public_inputs_hash;
 use crate::input_conversion::circuit_input_signals::CircuitInputSignals;
 use crate::input_conversion::encoding::*;
 use crate::input_conversion::encoding::JwtParts;
 use crate::input_conversion::encoding::UnsignedJwtPartsWithPadding;
 use crate::input_conversion::types::Input;
-use anyhow::anyhow;
+
 use aptos_crypto::poseidon_bn254;
 use aptos_types::jwks::rsa::RSA_JWK;
 use aptos_types::keyless::Configuration;
 use aptos_types::transaction::authenticator::EphemeralPublicKey;
-use ark_bn254::{self, Bn254, Fr};
-use ark_ff::Fp;
-use ark_ff::FpConfig;
-use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_bn254::{self, Fr};
+
+
+use ark_ff::{PrimeField};
 use encoding::As64BitLimbs;
-use encoding::{FromB64, RsaSignature};
+use encoding::{FromB64};
 use field_check_input::padded_field_check_input_signals;
 use hex;
-use serde_json::{json, Map, Value};
+
 use sha::{jwt_bit_len_binary, compute_sha_padding_without_len, with_sha_padding_bytes};
 use tracing::info_span;
-use std::collections::HashMap;
-use std::fmt::Display;
-use std::str::FromStr;
+
+
+
 use std::sync::Arc;
 use std::time::Instant;
-use types::Ascii;
+
 use anyhow::Result;
 use super::jwk_fetching;
-use tracing::info;
+
 
 
 // TODO highest-impact cleanup tasks:
@@ -81,8 +81,8 @@ pub fn derive_circuit_input_signals(
   
 
     // TODO add metrics instead of just printing out elapsed time
-    let start_time = Instant::now();
-    let span = info_span!("Running input conversion");
+    let _start_time = Instant::now();
+    let _span = info_span!("Running input conversion");
 
 
     let jwt_parts = JwtParts::from_b64(&input.jwt_b64)?;
@@ -215,11 +215,11 @@ pub fn compute_nonce(
 
 #[cfg(test)]
 mod tests {
-    use crate::input_conversion::config::{CircuitConfig, FieldCheckInputConfig, Key};
+    use crate::input_conversion::config::{CircuitConfig, Key};
     use crate::input_conversion::encoding::{FromB64, JwtParts};
 
     use crate::input_conversion;
-    use crate::input_conversion::types::Ascii;
+    
     use crate::input_conversion::{compute_nonce, derive_circuit_input_signals};
     use crate::input_conversion::types::Input;
     use aptos_crypto::ed25519::Ed25519PublicKey;
@@ -229,13 +229,13 @@ mod tests {
     use aptos_types::keyless::Configuration;
     use aptos_types::transaction::authenticator::EphemeralPublicKey;
     use ark_bn254;
-    use ark_ff::Fp;
-    use ark_ff::FpConfig;
-    use ark_ff::{BigInteger, FftField, Field, PrimeField};
+    
+    
+    
     use serde_json;
     use serde_yaml;
     use std::collections::HashMap;
-    use std::fmt::Display;
+    
     use std::fs;
     use std::str::FromStr;
 
@@ -265,7 +265,7 @@ mod tests {
             "242984842061174104272170180221318235913385474778206477109637294427650138112";
         let temp_pubkey_1 = "4497911";
         let temp_pubkey_2 = "0";
-        let temp_pubkey_len = "34";
+        let _temp_pubkey_len = "34";
 
         println!(
             "pubkey frs: {} {} {}",
@@ -323,8 +323,8 @@ mod tests {
         //
         //
         let jwt_parts = JwtParts::from_b64(&input.jwt_b64).unwrap();
-        let payload_decoded = jwt_parts.payload_decoded().unwrap();
-        let computed_nonce = compute_nonce(input.exp_date_secs, &input.epk, epk_blinder, &config).unwrap();
+        let _payload_decoded = jwt_parts.payload_decoded().unwrap();
+        let _computed_nonce = compute_nonce(input.exp_date_secs, &input.epk, epk_blinder, &config).unwrap();
         //let parsed_nonce = parse_field(&Ascii::from(payload_decoded.as_str()), "nonce").unwrap();
         //assert!(computed_nonce.to_string() == parsed_nonce.value);
 

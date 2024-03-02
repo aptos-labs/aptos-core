@@ -208,7 +208,7 @@ impl<T: Serialize + WithNonce + Clone> ProofTestCase<T> {
     }
 
     pub fn convert_to_prover_request(&self, jwk_keypair: &impl TestJWKKeyPair) -> RequestInput {
-        let epk_blinder_hex_string = hex::encode(self.epk_blinder_fr.into_bigint().to_bytes_le());
+        let _epk_blinder_hex_string = hex::encode(self.epk_blinder_fr.into_bigint().to_bytes_le());
 
         RequestInput {
             jwt_b64: jwk_keypair.sign(&self.jwt_payload),

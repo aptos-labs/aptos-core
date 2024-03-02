@@ -18,7 +18,7 @@ use prover_service::{
         config::CircuitConfig, derive_circuit_input_signals}, config::ProverServerConfig};
 
 
-use crate::common::types::{ProofTestCase, TestJWTPayload};
+use crate::common::types::{ProofTestCase};
 
 use self::types::{DefaultTestJWKKeyPair, TestJWKKeyPair, WithNonce};
 

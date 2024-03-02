@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::{Add, AddAssign};
-use std::ops;
+
 use anyhow::{Error, anyhow};
 use aptos_types::transaction::authenticator::EphemeralPublicKey;
 use ark_bn254::Fr;

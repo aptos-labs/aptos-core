@@ -2,7 +2,7 @@ use std::ops::{self, Add, AddAssign};
 use anyhow::Result;
 use anyhow::bail;
 
-use super::types::Ascii;
+
 
 
 /// Type for bit representation during conversion. Represents bits using strings, for easy

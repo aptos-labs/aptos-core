@@ -2,7 +2,7 @@ use common::{
     convert_prove_and_verify,
     types::{ProofTestCase, TestJWTPayload},
 };
-use core::str::FromStr;
+
 
 use crate::common::get_test_circuit_config;
 use serial_test::serial;

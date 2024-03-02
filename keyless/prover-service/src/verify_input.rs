@@ -5,7 +5,7 @@ use crate::{input_conversion::config, input_conversion::types::Input};
 
 pub fn verify_input(
     input : Input,
-    config : &config::CircuitConfig,
+    _config : &config::CircuitConfig,
     jwk: &RSA_JWK,
     ) -> Result<()> {
     jwk.verify_signature(&input.jwt_b64)?;

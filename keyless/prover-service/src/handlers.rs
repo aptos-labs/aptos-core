@@ -12,13 +12,12 @@ use aptos_crypto::{
 };
 use aptos_types::keyless::Groth16ZkpAndStatement;
 use aptos_types::{
-    jwks::rsa::RSA_JWK,
     keyless::{G1Bytes, G2Bytes, Groth16Zkp},
 };
-use ark_bn254::{Bn254, G1Affine, G2Affine};
-use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
+
+
 use axum::http::StatusCode;
-use serde::{Deserialize, Serialize};
+
 use serde_json::value::Value;
 use std::fs;
 use std::time::Instant;
@@ -28,8 +27,7 @@ use crate::{
     api::{FromFr, PoseidonHash, ProverServerResponse, RequestInput},
     config::*,
     error,
-    input_conversion::{self, preprocess, config::CircuitConfig, derive_circuit_input_signals},
-    jwk_fetching, verify_input,
+    input_conversion::{preprocess, config::CircuitConfig, derive_circuit_input_signals},
 };
 
 pub async fn prove_handler(
@@ -67,7 +65,7 @@ pub async fn prove_handler(
             )
         })?;
     let formatted_input_str = serde_json::to_string(&circuit_input_signals.to_json_value())
-        .map_err(|e| {
+        .map_err(|_e| {
             error::make_error(
                 anyhow!(""),
                 StatusCode::INTERNAL_SERVER_ERROR,

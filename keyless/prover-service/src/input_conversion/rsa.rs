@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use aptos_types::jwks::rsa::RSA_JWK;
+
 use rsa;
 use rsa::{
     pkcs1::{EncodeRsaPrivateKey, LineEnding},
@@ -10,7 +10,7 @@ use rsa::{
 use num_bigint::BigUint;
 
 
-use anyhow::{Error, Result};
+use anyhow::{Result};
 const MAX: u64 = 2048;
 const BASE: u64 = 64;
 

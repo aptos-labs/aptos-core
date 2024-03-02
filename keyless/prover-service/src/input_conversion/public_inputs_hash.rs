@@ -1,22 +1,21 @@
 use aptos_types::jwks::rsa::RSA_JWK;
 use aptos_types::keyless::IdCommitment;
 use ark_bn254::Fr;
-use ark_ff::{BigInteger, FftField, Field, PrimeField};
+
 use crate::input_conversion::{
     config::CircuitConfig,
-    types::Ascii,
 };
 use crate::input_conversion::types::Input;
 use anyhow::anyhow;
 use super::encoding::JwtParts;
 use super::field_parser::FieldParser;
-use super::rsa::RsaPublicKey;
+
 use aptos_crypto::poseidon_bn254;
-use ark_ff::Fp;
-use ark_ff::FpConfig;
-use std::fmt::Display;
+
+
+
 use ark_bn254;
-use std::str::FromStr;
+
 
 
 /// End goal: replace this module with the one in aptos-core. 
@@ -145,37 +144,36 @@ pub fn compute_public_inputs_hash(
 
 #[cfg(test)]
 mod tests {
-    use crate::input_conversion::config::{CircuitConfig, FieldCheckInputConfig, Key};
+    use crate::input_conversion::config::{CircuitConfig};
     use crate::input_conversion::encoding::{FromB64, JwtParts};
-    use crate::input_conversion::rsa::RsaPublicKey;
+    
 
     use aptos_crypto::ed25519::Ed25519PublicKey;
     use aptos_types::jwks::rsa::RSA_JWK;
     use aptos_types::{
         transaction::authenticator::EphemeralPublicKey,
-        keyless::Pepper,
     };
     use aptos_crypto::{
         ed25519::Ed25519PrivateKey,
         encoding_type::EncodingType
     };
-    use crate::api::{EphemeralPublicKeyBlinder, FromFr, RequestInput};
+    
     use crate::input_conversion::types::Input;
-    use crate::input_conversion::derive_circuit_input_signals;
+    
     use std::collections::HashMap;
     use std::fs;
-    use serde_json;
+    
     use serde_yaml;
     use std::str::FromStr;
     use aptos_crypto::poseidon_bn254;
     use aptos_types::keyless::Configuration;
-    use ark_ff::Fp;
-    use ark_ff::FpConfig;
-    use std::fmt::Display;
-    use ark_ff::{BigInteger, FftField, Field, PrimeField};
-    use crate::input_conversion::types::Ascii;
-    use ark_bn254::{self, Bn254, Fr};
-    use crate::input_conversion::sha::{compute_sha_padding_without_len, jwt_bit_len_binary, with_sha_padding_bytes
+    
+    
+    
+    
+    
+    use ark_bn254::{self, Fr};
+    use crate::input_conversion::sha::{with_sha_padding_bytes
     };
     use crate::input_conversion::{michael_pk_mod_str, michael_pk_kid_str};
 
@@ -214,10 +212,10 @@ mod tests {
         };
 
         let jwt_parts = JwtParts::from_b64(&input.jwt_b64).unwrap();
-        let unsigned_jwt_no_padding = jwt_parts.unsigned_undecoded();
+        let _unsigned_jwt_no_padding = jwt_parts.unsigned_undecoded();
     //let jwt_parts: Vec<&str> = input.jwt_b64.split(".").collect();
-        let unsigned_jwt_with_padding = with_sha_padding_bytes(&jwt_parts.unsigned_undecoded());
-        let signature = jwt_parts.signature().unwrap();
+        let _unsigned_jwt_with_padding = with_sha_padding_bytes(&jwt_parts.unsigned_undecoded());
+        let _signature = jwt_parts.signature().unwrap();
         let payload_decoded = jwt_parts.payload_decoded().unwrap();
 
         let temp_pubkey_frs = Vec::from(poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
@@ -225,7 +223,7 @@ mod tests {
             Configuration::new_for_testing().max_commited_epk_bytes as usize, // TODO put my own thing here
         ).unwrap());
         
-        let mut config : CircuitConfig = serde_yaml::from_str(&fs::read_to_string("conversion_config.yml").expect("Unable to read file")).expect("should parse correctly");
+        let config : CircuitConfig = serde_yaml::from_str(&fs::read_to_string("conversion_config.yml").expect("Unable to read file")).expect("should parse correctly");
 
 
         println!("full jwt: {}", jwt_b64);

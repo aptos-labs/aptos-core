@@ -1,10 +1,7 @@
 use anyhow::{anyhow, Result};
 use aptos_types::jwks::rsa::RSA_JWK;
 use dashmap::DashMap;
-use jsonwebtoken::{
-    jwk::{Jwk, JwkSet},
-    DecodingKey,
-};
+
 use tracing::{info, warn};
 use once_cell::sync::Lazy;
 use std::{sync::Arc, thread::sleep, time::Duration};

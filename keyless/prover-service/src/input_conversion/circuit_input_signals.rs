@@ -95,7 +95,7 @@ impl CircuitInputSignals<Unpadded> {
         self
     }
 
-    pub fn pad(mut self, config: &CircuitConfig) -> Result<CircuitInputSignals<Padded>> {
+    pub fn pad(self, config: &CircuitConfig) -> Result<CircuitInputSignals<Padded>> {
         let padded_signals_vec: Result<Vec<(String, CircuitInputSignal)>> = self
             .signals
             .into_iter()
@@ -176,7 +176,7 @@ impl CircuitInputSignals<Padded> {
         Ok(self)
     }
 
-    pub fn merge_foreach<T, U>(mut self, i: U, mapper: impl Fn(T) -> Result<Self>) -> Result<Self>
+    pub fn merge_foreach<T, U>(self, i: U, mapper: impl Fn(T) -> Result<Self>) -> Result<Self>
     where
         U: IntoIterator<Item = T>,
     {

@@ -2,12 +2,12 @@
 use crate::input_conversion::config::{CircuitConfig, FieldCheckInputConfig, Key};
 use crate::input_conversion::field_parser::FieldParser;
 use crate::input_conversion::types::Ascii;
-use crate::input_conversion::types::Input;
+
 use std::collections::HashMap;
 use anyhow::Result;
 use anyhow::anyhow;
 
-use super::circuit_input_signals::{CircuitInputSignal, CircuitInputSignals, Padded};
+use super::circuit_input_signals::{CircuitInputSignals, Padded};
 use super::field_parser::FieldCheckInput;
 
 //#[derive(Debug)]
@@ -52,7 +52,7 @@ use super::field_parser::FieldCheckInput;
 pub fn padded_field_check_input_signals
 (
     jwt_payload: &str, 
-    global_config: &CircuitConfig, 
+    _global_config: &CircuitConfig, 
     config: &FieldCheckInputConfig, 
     variable_keys: &HashMap<String, String>
 )
@@ -90,7 +90,7 @@ pub fn padded_field_check_input_signals
     }
 
 
-    let name_string = String::from(name);
+    let _name_string = String::from(name);
     let mut result : CircuitInputSignals<Padded> = CircuitInputSignals::new_padded()
         .bytes_input_padded(&(String::from(name) + "_field"), 
             Ascii::from(parsed_input.whole_field.as_str()).pad(config.max_whole_field_length)?.as_bytes())
