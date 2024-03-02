@@ -5,6 +5,7 @@ use common::{
 use core::str::FromStr;
 
 use crate::common::get_test_circuit_config;
+use serial_test::serial;
 
 mod common;
 
@@ -13,6 +14,7 @@ mod common;
 // TODO write function that loads verification_key.json into a PreparedVerifyingKey<Bn254>
 
 #[test]
+#[serial]
 fn default_request() {
     let testcase = ProofTestCase::default_with_payload(TestJWTPayload::default())
         .compute_nonce(&get_test_circuit_config());
@@ -21,6 +23,7 @@ fn default_request() {
 }
 
 #[test]
+#[serial]
 fn request_with_email() {
     let jwt_payload = TestJWTPayload {
         ..TestJWTPayload::default()
@@ -35,6 +38,7 @@ fn request_with_email() {
 }
 
 #[test]
+#[serial]
 #[should_panic]
 fn request_sub_is_required_in_jwt() {
     let jwt_payload = TestJWTPayload {
@@ -51,6 +55,7 @@ fn request_sub_is_required_in_jwt() {
 }
 
 #[test]
+#[serial]
 fn request_with_sub() {
     let jwt_payload = TestJWTPayload {
         email: None,
@@ -66,6 +71,7 @@ fn request_with_sub() {
 }
 
 #[test]
+#[serial]
 fn request_with_sub_no_email_verified() {
     let jwt_payload = TestJWTPayload {
         email: None,
@@ -82,6 +88,7 @@ fn request_with_sub_no_email_verified() {
 }
 
 #[test]
+#[serial]
 #[should_panic]
 fn request_with_wrong_uid_key() {
     let jwt_payload = TestJWTPayload {
@@ -99,6 +106,7 @@ fn request_with_wrong_uid_key() {
 }
 
 #[test]
+#[serial]
 #[should_panic]
 fn request_with_invalid_exp_date() {
     let jwt_payload = TestJWTPayload {
@@ -116,6 +124,7 @@ fn request_with_invalid_exp_date() {
 }
 
 #[test]
+#[serial]
 fn request_jwt_exp_field_does_not_matter() {
     let jwt_payload = TestJWTPayload {
         exp: 234342342428348284,
