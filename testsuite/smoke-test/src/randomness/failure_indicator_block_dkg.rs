@@ -9,9 +9,9 @@ use aptos_types::{
 };
 use std::{sync::Arc, time::Duration};
 
-/// The presence of `FailureInjectionBlockRandomness` should block execution.
+/// The presence of `FailureInjectionBlockDKG` should block DKG.
 #[tokio::test]
-async fn failure_indicator_block_randomness() {
+async fn failure_indicator_block_dkg() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
@@ -50,7 +50,7 @@ script {{
     use aptos_framework::dkg;
     fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        dkg::block_randomness(&framework_signer);
+        dkg::block_dkg(&framework_signer);
     }}
 }}
 "#;
@@ -60,10 +60,18 @@ script {{
         .expect("Txn execution error.");
     debug!("txn_summary={:?}", txn_summary);
 
-    info!("Chain should be stuck at the beginning of epoch 4.");
+    info!("Chain should be stuck at the end of epoch 3.");
     tokio::time::sleep(Duration::from_secs(60)).await;
     let config_resource = get_on_chain_resource::<ConfigurationResource>(&client).await;
-    assert_eq!(4, config_resource.epoch());
+    assert_eq!(3, config_resource.epoch());
     let dkg_state = get_on_chain_resource::<DKGState>(&client).await;
-    assert!(dkg_state.in_progress.is_none());
+    assert_eq!(
+        3,
+        dkg_state
+            .in_progress
+            .as_ref()
+            .unwrap()
+            .metadata
+            .dealer_epoch
+    );
 }
