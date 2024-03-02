@@ -105,12 +105,16 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
             match conn_fut.await {
                 Ok(mut connection) => {
                     let ok = self.check_new_inbound_connection(&connection);
-                    info!("listener_thread got connection {:?}, ok={:?}", remote_addr, ok);
                     if !ok {
-                        // conted and logged inside check function above, just close here and be done.
+                        info!("listener_thread got connection {:?}, failed", remote_addr);
+                        // counted and logged inside check function above, just close here and be done.
                         _ = connection.socket.close().await;
                         continue;
                     }
+                    info!(
+                        peer = connection.metadata.remote_peer_id,
+                        "listener_thread got connection {:?}, ok!", remote_addr,
+                    );
                     let remote_peer_network_id = PeerNetworkId::new(self.network_context.network_id(), connection.metadata.remote_peer_id);
                     peer::start_peer(
                         &self.config,
