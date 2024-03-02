@@ -45,14 +45,14 @@ async fn failure_indicator_block_randomness() {
 
     info!("Now in epoch 3. Set flag to block randomness.");
     let script = r#"
-script {{
+script {
     use aptos_framework::aptos_governance;
     use aptos_framework::dkg;
-    fun main(core_resources: &signer) {{
+    fun main(core_resources: &signer) {
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
         dkg::block_randomness(&framework_signer);
-    }}
-}}
+    }
+}
 "#;
     let txn_summary = cli
         .run_script(root_idx, script)
