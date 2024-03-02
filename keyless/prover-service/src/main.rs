@@ -41,7 +41,7 @@ async fn main() {
         port,
         metrics_port: _,
     } = Figment::new()
-    .merge(Yaml::file("config.yml"))
+    .merge(Yaml::file(config::CONFIG_FILE_PATH))
     .merge(Env::raw())
         .extract().expect("Couldn't load config");
 

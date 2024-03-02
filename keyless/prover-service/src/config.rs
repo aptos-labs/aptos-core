@@ -8,6 +8,8 @@ use rust_rapidsnark::FullProver;
 use crate::metrics;
 
 
+pub const CONFIG_FILE_PATH : &'static str = "config.yml";
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProverServerConfig {
     pub zkey_path: String,
@@ -36,4 +38,5 @@ pub struct ProverServerState {
     pub private_key : Ed25519PrivateKey,
     pub metrics: metrics::ProverServerMetrics
 }
+
 
