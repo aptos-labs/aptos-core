@@ -236,6 +236,8 @@ impl WorkflowTxnGeneratorCreator {
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
     ) -> Self {
+        assert_eq!(num_modules, 1, "Only one module is supported for now");
+
         let stage_tracking = match progress_type {
             WorkflowProgress::MoveByPhases => StageTracking::ExternallySet(cur_phase),
             WorkflowProgress::WhenDone {
