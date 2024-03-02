@@ -188,38 +188,6 @@ fn val_to_str_vec<'a>(a: &'a Value) -> [&'a str; 2] {
     [a[0], a[1]]
 }
 
-fn encode_proof_points(proof_old: &Value) -> Value {
-    let mut proof = proof_old.clone();
-    let pi_a = proof.get_mut("pi_a").unwrap();
-    let pi_a_array = pi_a.as_array().unwrap();
-    let new_pi_a = G1Bytes::new_unchecked(
-        pi_a_array[0].as_str().unwrap(),
-        pi_a_array[1].as_str().unwrap(),
-    )
-    .unwrap();
-    *pi_a = Value::String(hex::encode(bcs::to_bytes(&new_pi_a).unwrap()));
-
-    let pi_b = proof.get_mut("pi_b").unwrap();
-    let pi_b_array = pi_b.as_array().unwrap();
-    let new_pi_b = G2Bytes::new_unchecked(
-        val_to_str_vec(&pi_b_array[0]),
-        val_to_str_vec(&pi_b_array[1]),
-    )
-    .unwrap();
-    *pi_b = Value::String(hex::encode(bcs::to_bytes(&new_pi_b).unwrap()));
-
-    let pi_c = proof.get_mut("pi_c").unwrap();
-    let pi_c_array = pi_c.as_array().unwrap();
-    let new_pi_c = G1Bytes::new_unchecked(
-        pi_c_array[0].as_str().unwrap(),
-        pi_c_array[1].as_str().unwrap(),
-    )
-    .unwrap();
-    *pi_c = Value::String(hex::encode(bcs::to_bytes(&new_pi_c).unwrap()));
-
-    proof
-}
-
 pub fn encode_proof(proof: &Value) -> Groth16Zkp {
     let pi_a = proof.get("pi_a").unwrap();
     let pi_a_array = pi_a.as_array().unwrap();

@@ -11,10 +11,6 @@ use num_bigint::BigUint;
 
 
 use anyhow::{Result};
-const MAX: u64 = 2048;
-const BASE: u64 = 64;
-
-
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct RsaPublicKey {

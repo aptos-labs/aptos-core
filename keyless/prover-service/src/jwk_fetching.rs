@@ -51,10 +51,6 @@ pub async fn fetch_jwks(jwk_url: &str) -> Result<DashMap<KeyID, Arc<RSA_JWK>>> {
                     warn!("error while parsing for jwk {}: {e}", jwk_val);
                     None
                 },
-                _ => {
-                    warn!("Ignoring a kid-less jwk: {}", jwk_val);
-                    None
-                },
             },
         )
         .collect();

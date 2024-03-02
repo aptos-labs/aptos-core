@@ -66,9 +66,6 @@ impl FromHex for Fr {
 }
 
 
-pub const michael_pk_mod_str: &'static str =      "6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw";
-pub const michael_pk_kid_str: &'static str = "test_jwk";
-
 pub fn derive_circuit_input_signals(
     // TODO: input should not have any hex-encoded anything. Should have conversion from
     // RequestInput also decode all these values. Can even have that function get the jwk.

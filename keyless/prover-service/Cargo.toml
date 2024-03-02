@@ -7,7 +7,7 @@ edition = { workspace = true }
 
 [dependencies]
 rust-rapidsnark = { workspace = true }
-axum = { workspace = true }
+axum = "0.7.4"
 tokio = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true }
