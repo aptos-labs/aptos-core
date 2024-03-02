@@ -19,6 +19,7 @@ module 0x42::assign {
         }
     }
 } // end 0x42::assign
+
 ============ initial bytecode ================
 
 [variant baseline]

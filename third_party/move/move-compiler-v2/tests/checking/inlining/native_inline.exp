@@ -5,15 +5,3 @@ error: Inline function `foo` must not be native
   │
 3 │     public native inline fun foo();
   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-// -- Model dump before bytecode pipeline
-module 0x42::Test {
-    public inline native fun foo();
-    public fun test() {
-        Test::foo()
-    }
-    spec fun $foo();
-    spec fun $test() {
-        Test::$foo()
-    }
-} // end 0x42::Test

@@ -37,6 +37,7 @@ module 0x42::if_else {
         }
     }
 } // end 0x42::if_else
+
 ============ initial bytecode ================
 
 [variant baseline]

@@ -87,6 +87,7 @@ module 0x42::borrow {
         }
     }
 } // end 0x42::borrow
+
 ============ initial bytecode ================
 
 [variant baseline]

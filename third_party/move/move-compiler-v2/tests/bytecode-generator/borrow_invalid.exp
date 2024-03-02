@@ -20,6 +20,7 @@ module 0x42::borrow {
     spec fun $mut_expr(x: u64): u64;
     spec fun $mut_field(s: &borrow::S): u64;
 } // end 0x42::borrow
+
 ============ initial bytecode ================
 
 [variant baseline]

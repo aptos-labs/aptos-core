@@ -26,6 +26,7 @@ module 0x42::pack_unpack {
         }
     }
 } // end 0x42::pack_unpack
+
 ============ initial bytecode ================
 
 [variant baseline]

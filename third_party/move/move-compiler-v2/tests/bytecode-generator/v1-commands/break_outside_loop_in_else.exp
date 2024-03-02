@@ -11,6 +11,7 @@ module <SELF>_0 {
     spec fun $main();
 } // end <SELF>_0
 
+
 Diagnostics:
 error: missing enclosing loop statement
   ┌─ tests/bytecode-generator/v1-commands/break_outside_loop_in_else.move:3:24

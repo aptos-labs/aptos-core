@@ -14,6 +14,7 @@ module 0x42::m {
         select m::E.k(vector::$borrow<m::E>(select m::S.data(v), 0))
     }
 } // end 0x42::m
+
 ============ initial bytecode ================
 
 [variant baseline]

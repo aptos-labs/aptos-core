@@ -4012,11 +4012,11 @@ impl<'env> FunctionEnv<'env> {
     /// Get the name to be used for a local by index, if available.
     /// Otherwise generate a unique name.
     pub fn get_local_name(&self, idx: usize) -> Symbol {
+        if idx < self.data.params.len() {
+            return self.data.params[idx].0;
+        }
         if let Some(source_map) = &self.module_env.data.source_map {
             // Try to obtain user name from source map
-            if idx < self.data.params.len() {
-                return self.data.params[idx].0;
-            }
             if let Some(fmap) = self
                 .data
                 .def_idx

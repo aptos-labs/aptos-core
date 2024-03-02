@@ -26,6 +26,7 @@ module 0x42::loop_invalid {
     spec fun $misplaced_continue(x: u64): u64;
 } // end 0x42::loop_invalid
 
+
 Diagnostics:
 error: missing enclosing loop statement
   ┌─ tests/bytecode-generator/loop_invalid.move:7:9

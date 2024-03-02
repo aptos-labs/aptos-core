@@ -14,6 +14,7 @@ module 0x42::fields {
     spec fun $write_ref(x: &fields::S);
 } // end 0x42::fields
 
+
 Diagnostics:
 error: expected `&mut` but found `&fields::S`
    ┌─ tests/bytecode-generator/fields_invalid.move:13:9

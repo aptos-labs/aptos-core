@@ -18,6 +18,7 @@ module 0x42::reference_conversion {
     }
     spec fun $use_it(): u64;
 } // end 0x42::reference_conversion
+
 ============ initial bytecode ================
 
 [variant baseline]

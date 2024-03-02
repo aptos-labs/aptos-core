@@ -80,10 +80,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
         }
     }
 
-    fn rewrite_pattern(&mut self, _pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
-        if !entering_scope {
-            panic!("ExpRewriter won't work correctly on code with `Assign` operation.");
-        }
+    fn rewrite_pattern(&mut self, _pat: &Pattern, _entering_scope: bool) -> Option<Pattern> {
         None
     }
 
@@ -155,6 +152,9 @@ pub trait ExpRewriterFunctions {
         None
     }
     fn rewrite_call(&mut self, id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
+        None
+    }
+    fn rewrite_assign(&mut self, id: NodeId, lhs: &Pattern, rhs: &Exp) -> Option<Exp> {
         None
     }
     fn rewrite_invoke(&mut self, id: NodeId, target: &Exp, args: &[Exp]) -> Option<Exp> {
@@ -405,7 +405,9 @@ pub trait ExpRewriterFunctions {
                 let (id_changed, new_id) = self.internal_rewrite_id(id);
                 let (rhs_changed, new_rhs) = self.internal_rewrite_exp(rhs);
                 let (lhs_changed, new_lhs) = self.internal_rewrite_pattern(lhs, false);
-                if id_changed || lhs_changed || rhs_changed {
+                if let Some(new_exp) = self.rewrite_assign(new_id, &new_lhs, &new_rhs) {
+                    new_exp
+                } else if id_changed || lhs_changed || rhs_changed {
                     Assign(new_id, new_lhs, new_rhs).into_exp()
                 } else {
                     exp

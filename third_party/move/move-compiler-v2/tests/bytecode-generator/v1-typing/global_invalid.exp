@@ -15,6 +15,7 @@ module 0x42::m {
     spec fun $invalid<T>(addr: address);
 } // end 0x42::m
 
+
 Diagnostics:
 error: Expected a struct type. Global storage operations are restricted to struct types declared in the current module. Found: 'T'
   ┌─ tests/bytecode-generator/v1-typing/global_invalid.move:4:17

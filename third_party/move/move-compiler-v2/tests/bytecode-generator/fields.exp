@@ -75,6 +75,7 @@ module 0x42::fields {
     spec fun $write_param(x: &mut fields::S);
     spec fun $write_val(x: fields::S): fields::S;
 } // end 0x42::fields
+
 ============ initial bytecode ================
 
 [variant baseline]

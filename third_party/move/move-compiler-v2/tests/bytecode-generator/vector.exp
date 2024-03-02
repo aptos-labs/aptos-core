@@ -7,6 +7,7 @@ module 0x42::vector {
         Vector<u64>(1, 2, 3)
     }
 } // end 0x42::vector
+
 ============ initial bytecode ================
 
 [variant baseline]

@@ -37,6 +37,7 @@ module 0x42::m {
         select m::Object.inner(m::$make())
     }
 } // end 0x42::m
+
 ============ initial bytecode ================
 
 [variant baseline]

@@ -391,7 +391,7 @@ impl TestConfig {
             } else {
                 self.env_pipeline.run(&mut env);
                 ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
-                if self.dump_ast == AstDumpLevel::EndStage {
+                if ok && self.dump_ast == AstDumpLevel::EndStage {
                     test_output.borrow_mut().push_str(&format!(
                         "// -- Model dump before bytecode pipeline\n{}\n",
                         env.dump_env()

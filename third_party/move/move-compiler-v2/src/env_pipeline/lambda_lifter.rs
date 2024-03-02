@@ -13,7 +13,7 @@
 //! of *closures*. A closure refers to a function and contains a partial list
 //! of arguments for that function, essentially currying it. Example:
 //!
-//! ```
+//! ```ignore
 //! let c = 1;
 //! vec.any(|x| x > c)
 //! ==>
@@ -26,7 +26,7 @@
 //! The lambda lifting in this module also takes care of patterns as lambda arguments.
 //! Example:
 //!
-//! ```
+//! ```ignore
 //! let c = 1;
 //! vec.any(|S{x}| x > c)
 //! ==>
@@ -43,7 +43,7 @@ use move_model::{
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, TypeParameter},
     symbol::Symbol,
-    ty::Type,
+    ty::{ReferenceKind, Type},
 };
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -133,12 +133,19 @@ struct LambdaLifter<'a> {
     /// Local name scopes.
     scopes: Vec<BTreeSet<Symbol>>,
     /// Any unbound parameters names used so far.
-    free_params: BTreeMap<TempIndex, NodeId>,
+    free_params: BTreeMap<TempIndex, VarInfo>,
     /// Any unbound locals used so far.
-    free_locals: BTreeMap<Symbol, NodeId>,
+    free_locals: BTreeMap<Symbol, VarInfo>,
     /// NodeId's of lambdas which are parameters to inline functions
     /// if those should be exempted. Pushed down during descend.
     exempted_lambdas: BTreeSet<NodeId>,
+}
+
+struct VarInfo {
+    /// The node were this variable was found.
+    node_id: NodeId,
+    /// Whether the variable is modified
+    modified: bool,
 }
 
 /// A new function to be created in the global env.
@@ -224,15 +231,52 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         self.free_locals.retain(|name, _| !exiting.contains(name));
     }
 
-    fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
+    fn rewrite_local_var(&mut self, node_id: NodeId, sym: Symbol) -> Option<Exp> {
         // duplicates are OK -- they are all the same local at different locations
-        self.free_locals.insert(sym, id);
+        self.free_locals.entry(sym).or_insert(VarInfo {
+            node_id,
+            modified: false,
+        });
         None
     }
 
-    fn rewrite_temporary(&mut self, id: NodeId, idx: TempIndex) -> Option<Exp> {
+    fn rewrite_temporary(&mut self, node_id: NodeId, idx: TempIndex) -> Option<Exp> {
         // duplicates are OK -- they are all the same parameter at different locations
-        self.free_params.insert(idx, id);
+        self.free_params.entry(idx).or_insert(VarInfo {
+            node_id,
+            modified: false,
+        });
+        None
+    }
+
+    fn rewrite_assign(&mut self, _node_id: NodeId, lhs: &Pattern, _rhs: &Exp) -> Option<Exp> {
+        for (node_id, name) in lhs.vars() {
+            self.free_locals.insert(name, VarInfo {
+                node_id,
+                modified: true,
+            });
+        }
+        None
+    }
+
+    fn rewrite_call(&mut self, _node_id: NodeId, oper: &Operation, args: &[Exp]) -> Option<Exp> {
+        if matches!(oper, Operation::Borrow(ReferenceKind::Mutable)) {
+            match args[0].as_ref() {
+                ExpData::LocalVar(node_id, name) => {
+                    self.free_locals.insert(*name, VarInfo {
+                        node_id: *node_id,
+                        modified: true,
+                    });
+                },
+                ExpData::Temporary(node_id, param) => {
+                    self.free_params.insert(*param, VarInfo {
+                        node_id: *node_id,
+                        modified: true,
+                    });
+                },
+                _ => {},
+            }
+        }
         None
     }
 
@@ -247,21 +291,39 @@ impl<'a> ExpRewriterFunctions for LambdaLifter<'a> {
         // parameter indices in the lambda context to indices in the lifted
         // functions (courtesy of #12317)
         let mut param_index_mapping = BTreeMap::new();
-        for (used_param_count, (param, node_id)) in
+        for (used_param_count, (param, var_info)) in
             mem::take(&mut self.free_params).into_iter().enumerate()
         {
             let name = self.fun_env.get_local_name(param);
-            let ty = env.get_node_type(node_id);
-            let loc = env.get_node_loc(node_id);
+            let ty = env.get_node_type(var_info.node_id);
+            let loc = env.get_node_loc(var_info.node_id);
+            if var_info.modified {
+                env.error(
+                    &loc,
+                    &format!(
+                        "captured variable `{}` cannot be modified inside of a lambda",
+                        name.display(env.symbol_pool())
+                    ),
+                );
+            }
             params.push(Parameter(name, ty.clone(), loc.clone()));
             let new_id = env.new_node(loc, ty);
             closure_args.push(ExpData::Temporary(new_id, param).into_exp());
             param_index_mapping.insert(param, used_param_count);
         }
         // Add captured locals
-        for (name, node_id) in mem::take(&mut self.free_locals) {
-            let ty = env.get_node_type(node_id);
-            let loc = env.get_node_loc(node_id);
+        for (name, var_info) in mem::take(&mut self.free_locals) {
+            let ty = env.get_node_type(var_info.node_id);
+            let loc = env.get_node_loc(var_info.node_id);
+            if var_info.modified {
+                env.error(
+                    &loc,
+                    &format!(
+                        "captured variable `{}` cannot be modified inside of a lambda",
+                        name.display(env.symbol_pool())
+                    ),
+                );
+            }
             params.push(Parameter(name, ty.clone(), loc.clone()));
             let new_id = env.new_node(loc, ty);
             closure_args.push(ExpData::LocalVar(new_id, name).into_exp())

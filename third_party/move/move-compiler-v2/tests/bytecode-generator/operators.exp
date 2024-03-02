@@ -37,6 +37,7 @@ module 0x42::operators {
         And(And(And(Lt(x, y), Le(x, y)), Not(Gt(x, y))), Not(Ge(x, y)))
     }
 } // end 0x42::operators
+
 ============ initial bytecode ================
 
 [variant baseline]
