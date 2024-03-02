@@ -491,6 +491,11 @@ Generates an u128 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u128 = 0;
     <b>while</b> (i &lt; 16) {
+        <b>spec</b> {
+            // TODO: Prove these <b>with</b> proper <b>loop</b> invaraints.
+            <b>assume</b> ret * 256 + 255 &lt;= <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
+            <b>assume</b> len(raw) &gt; 0;
+        };
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u128);
         i = i + 1;
     };
@@ -552,6 +557,11 @@ Generates a u256 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u256 = 0;
     <b>while</b> (i &lt; 32) {
+        <b>spec</b> {
+            // TODO: Prove these <b>with</b> proper <b>loop</b> invaraints.
+            <b>assume</b> ret * 256 + 255 &lt;= <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
+            <b>assume</b> len(raw) &gt; 0;
+        };
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u256);
         i = i + 1;
     };
