@@ -7,7 +7,7 @@ use crate::{
         ResourceGroupInPlaceDelayedFieldChangeOp, WriteWithDelayedFieldsOp,
     },
     check_change_set::CheckChangeSet,
-    resolver::ExecutorView,
+    resolver::{ExecutorView, ResourceGroupSize},
 };
 use aptos_aggregator::{
     delayed_change::DelayedChange,
@@ -40,9 +40,7 @@ use std::{
     collections::{
         btree_map::Entry::{Occupied, Vacant},
         BTreeMap,
-    },
-    hash::Hash,
-    sync::Arc,
+    }, f64::consts::E, hash::Hash, sync::Arc
 };
 
 /// Sporadically checks if the given two input type layouts match.
@@ -785,7 +783,18 @@ impl VMChangeSet {
                                 materialized_size: additional_materialized_size,
                                 ..
                             }),
-                        )
+                        ) => {
+                            // newer read should've read the original write and contain all info from it,
+                            // Delayed field writes cannot change the size
+                            if materialized_size != &Some(*additional_materialized_size) {
+                                return Err(code_invariant_error(format!(
+                                    "Trying to squash writes where read has different size: {:?}: {:?}",
+                                    materialized_size,
+                                    additional_materialized_size
+                                )));
+                            }
+                            (false, false)
+                        },
                         | (
                             WriteResourceGroup(GroupWrite {
                                 maybe_group_op_size: materialized_size,
@@ -799,8 +808,14 @@ impl VMChangeSet {
                             ),
                         ) => {
                             // newer read should've read the original write and contain all info from it,
-                            // but could have additional delayed field writes, that change the size.
-                            *materialized_size = Some(*additional_materialized_size);
+                            // Delayed field writes cannot change the size
+                            if materialized_size.map(|v| v.get()) != Some(*additional_materialized_size) {
+                                return Err(code_invariant_error(format!(
+                                    "Trying to squash group writes where read has different size: {:?}: {:?}",
+                                    materialized_size,
+                                    additional_materialized_size
+                                )));
+                            }
                             (false, false)
                         },
                         // If previous value is a read, newer value overwrites it
