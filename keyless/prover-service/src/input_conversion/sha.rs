@@ -21,9 +21,9 @@ pub fn jwt_bit_len(jwt: &str) -> usize {
 /// output: length of bit representation of jwt, encoded in big-endian as 8 bits.
 pub fn jwt_bit_len_binary(jwt_unsigned: &str) -> Bits {
     let L = jwt_bit_len(jwt_unsigned);
-    let L_binary_BE = Bits::raw(&format!("{L:064b}"));
+    
 
-    L_binary_BE
+    Bits::raw(&format!("{L:064b}"))
 }
 
 

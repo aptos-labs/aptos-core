@@ -59,9 +59,9 @@ pub struct JwtPayload {
 
 impl FromB64 for JwtParts {
     fn from_b64(s: &str) -> Result<Self> where Self: Sized {
-        let jwt_parts: Vec<&str> = s.split(".").collect();
+        let jwt_parts: Vec<&str> = s.split('.').collect();
         Ok(Self {
-            header: String::from(*jwt_parts.get(0).ok_or(anyhow!("JWT did not parse correctly"))?),
+            header: String::from(*jwt_parts.first().ok_or(anyhow!("JWT did not parse correctly"))?),
             payload: String::from(*jwt_parts.get(1).ok_or(anyhow!("JWT did not parse correctly"))?),
             signature: String::from(*jwt_parts.get(2).ok_or(anyhow!("JWT did not parse correctly"))?),
         })
@@ -111,7 +111,7 @@ impl UnsignedJwtPartsWithPadding {
     pub fn payload_with_padding(&self) -> Result<Vec<u8>> {
         let first_dot = self.b
                             .iter()
-                            .position(|c| c == &('.' as u8)).ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
+                            .position(|c| c == &b'.').ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
 
         Ok(Vec::from( &self.b[first_dot+1..]))
     }

@@ -81,7 +81,7 @@ pub async fn prove_handler(
         let full_prover = &mut state_unlocked.full_prover;
         let (json, internal_metrics) = full_prover
             .prove(&formatted_input_str)
-            .map_err(|e| error::handle_prover_lib_error(e))?;
+            .map_err(error::handle_prover_lib_error)?;
         let json = String::from(json);
         (json, internal_metrics)
     };
@@ -171,18 +171,18 @@ fn verify_response_signature(
         ProverServerResponse::Error {..} => panic!("Should never call verify_response_signature on a response of type ProverServerResponse::Error"),
         ProverServerResponse::Success {  proof, public_inputs_hash, training_wheels_signature } => training_wheels_signature.verify(
             &Groth16ZkpAndStatement {
-                proof: proof.clone(),
-                public_inputs_hash: public_inputs_hash.clone()
+                proof: *proof,
+                public_inputs_hash: *public_inputs_hash
             }
-            , &pub_key)
+            , pub_key)
     }
 }
 
-fn val_to_str_vec<'a>(a: &'a Value) -> [&'a str; 2] {
+fn val_to_str_vec(a: &Value) -> [&str; 2] {
     let a: Vec<&str> = a
         .as_array()
         .unwrap()
-        .into_iter()
+        .iter()
         .map(|x| x.as_str().unwrap())
         .collect();
     [a[0], a[1]]

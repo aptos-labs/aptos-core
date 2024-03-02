@@ -8,7 +8,7 @@ use rust_rapidsnark::FullProver;
 use crate::metrics;
 
 
-pub const CONFIG_FILE_PATH : &'static str = "config.yml";
+pub const CONFIG_FILE_PATH : &str = "config.yml";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProverServerConfig {

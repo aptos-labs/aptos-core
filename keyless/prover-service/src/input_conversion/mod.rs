@@ -61,7 +61,7 @@ use super::jwk_fetching;
 // TODO this works when I have it here, but doesn't when I move it to encoding.rs. Why?
 impl FromHex for Fr {
     fn from_hex(s: &str) -> Result<Self> where Self: Sized {
-        Ok(Fr::from_le_bytes_mod_order(&hex::decode(&s)?))
+        Ok(Fr::from_le_bytes_mod_order(&hex::decode(s)?))
     }
 }
 
@@ -116,14 +116,14 @@ pub fn derive_circuit_input_signals(
 
     // TODO do this inside compute_public_inputs_hash?
     let temp_pubkey_frs_with_len = poseidon_bn254::pad_and_pack_bytes_to_scalars_with_len(
-        &input.epk.to_bytes().as_slice(),
+        input.epk.to_bytes().as_slice(),
         Configuration::new_for_devnet().max_commited_epk_bytes as usize, // TODO should put this in my local config
     )?;
 
     let public_inputs_hash = compute_public_inputs_hash(
         &input,
         config,
-        input.pepper_fr.clone(),
+        input.pepper_fr,
         &jwt_parts,
         &jwk,
         &temp_pubkey_frs_with_len[..3],
@@ -177,13 +177,13 @@ pub fn derive_circuit_input_signals(
         .bool_input("use_extra_field", input.use_extra_field)
         .fr_input("public_inputs_hash", public_inputs_hash)
         // add padding for global inputs
-        .pad(&config)?
+        .pad(config)?
         // field check inputs
         .merge_foreach(&config.field_check_inputs, |field_check_input_config| {
             padded_field_check_input_signals(
                 &payload_decoded,
-                &config,
-                &field_check_input_config,
+                config,
+                field_check_input_config,
                 &input.variable_keys,
             )
         })?;

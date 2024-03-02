@@ -62,10 +62,10 @@ pub fn compute_public_inputs_hash(
     let iss_field = FieldParser::find_and_parse_field(&jwt_parts.payload_decoded()?, "iss")?;
     let extra_field = FieldParser::find_and_parse_field(&jwt_parts.payload_decoded()?, &input.variable_keys["extra"])?;
 
-    let override_aud_val_hashed;
-    let use_override_aud;
-    use_override_aud = ark_bn254::Fr::from(0);
-    override_aud_val_hashed =
+    
+    
+    let use_override_aud = ark_bn254::Fr::from(0);
+    let override_aud_val_hashed =
         poseidon_bn254::pad_and_hash_string("", IdCommitment::MAX_AUD_VAL_BYTES)?;
 
     // Add the epk as padded and packed scalars
@@ -74,7 +74,7 @@ pub fn compute_public_inputs_hash(
     frs.push(temp_pubkey_len);
 
     // Add the id_commitment as a scalar
-    let addr_idc_fr = compute_idc_hash(input, &config, pepper_fr, &jwt_parts.payload_decoded()?)?;
+    let addr_idc_fr = compute_idc_hash(input, config, pepper_fr, &jwt_parts.payload_decoded()?)?;
     frs.push(addr_idc_fr);
 
     // Add the exp_timestamp_secs as a scalar

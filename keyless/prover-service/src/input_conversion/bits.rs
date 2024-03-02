@@ -19,6 +19,12 @@ pub struct Bits {
     pub(crate) b: String
 }
 
+impl Default for Bits {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Bits {
     pub fn new() -> Self {
         Bits { b: String::new() }

@@ -9,6 +9,12 @@ pub struct ProverServerMetrics {
     pub registry: Registry
 }
 
+impl Default for ProverServerMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProverServerMetrics {
     pub fn new() -> Self {
         let request_counter = IntCounter::new("request_counter", "Total number of requests").unwrap();

@@ -38,7 +38,7 @@ impl RsaPublicKey {
 
     // TODO test from and as below
     pub fn from_mod_b64(modulus_b64: &str) -> Result<Self, anyhow::Error> {
-        let modulus_bytes = base64::decode_config(&modulus_b64, base64::URL_SAFE_NO_PAD)?;
+        let modulus_bytes = base64::decode_config(modulus_b64, base64::URL_SAFE_NO_PAD)?;
         Ok(RsaPublicKey::from_bytes(&modulus_bytes))
     }
 

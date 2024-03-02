@@ -36,7 +36,7 @@ pub async fn fetch_jwks(jwk_url: &str) -> Result<DashMap<KeyID, Arc<RSA_JWK>>> {
         .as_array()
         .ok_or(anyhow!("Error while parsing jwk json: \"keys\" not found"))?;
     let key_map: DashMap<KeyID, Arc<RSA_JWK>> = keys
-        .into_iter()
+        .iter()
         .filter_map(
             |jwk_val| match RSA_JWK::try_from(jwk_val) {
                 Ok(jwk) => {

@@ -35,6 +35,12 @@ pub struct Ascii {
 }
 
 
+impl Default for Ascii {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ascii {
     pub fn new() -> Self {
         Ascii { bytes: Vec::new() }
@@ -53,14 +59,14 @@ impl Ascii {
         self.bytes.len()
     }
 
-    pub fn as_bytes<'a>(&'a self) -> &'a[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_slice()
     }
 
     pub fn pad(self, max_size : usize) -> Result<Self, anyhow::Error> {
         let mut bytes = self.bytes;
         if max_size < bytes.len() {
-            Err(anyhow!("max_size exceeded: {} is too long for max size {}", String::from_utf8(Vec::from(bytes)).unwrap(), max_size))
+            Err(anyhow!("max_size exceeded: {} is too long for max size {}", String::from_utf8(bytes).unwrap(), max_size))
         } else {
             bytes.extend([0].repeat(max_size-bytes.len()));
             Ok(Self { bytes })
@@ -69,7 +75,7 @@ impl Ascii {
 
     /// Note: this panics on invalid utf-8. 
     pub fn find(&self, s: &str) -> Option<usize> {
-        String::from_utf8(self.bytes.clone()).expect("Should always decode valid utf-8").find(&s)
+        String::from_utf8(self.bytes.clone()).expect("Should always decode valid utf-8").find(s)
 
     }
     
@@ -77,24 +83,24 @@ impl Ascii {
     pub fn find_starting_at(&self, i: usize, s: &str) -> Option<usize> {
         Some(String::from_utf8(self.bytes.clone())
              .expect("Should always decode valid utf-8")[i..]
-             .find(&s)?
+             .find(s)?
              + i
             )
     }
 
     pub fn first_non_space_char_starting_at(&self, i: usize) -> Option<usize> {
         let mut pos = i;
-        while pos < self.bytes.len() && self.bytes[pos] == (' ' as u8) {
+        while pos < self.bytes.len() && self.bytes[pos] == b' ' {
             pos += 1;
         }
         if pos < self.bytes.len() { Some(pos) } else { None }
     }
 
     pub fn value_starting_at(&self, i: usize) -> Option<(String, usize)> {
-        if self.bytes[i] == ('"' as u8) {
+        if self.bytes[i] == b'"' {
             // handle quoted values
             let mut pos = i+1;
-            while pos < self.bytes.len() && self.bytes[pos] != ('"' as u8) {
+            while pos < self.bytes.len() && self.bytes[pos] != b'"' {
                 pos += 1;
             }
             if pos < self.bytes.len() { 
@@ -111,9 +117,9 @@ impl Ascii {
             // handle unquoted values
             let mut pos = i;
             while pos < self.bytes.len() 
-                && self.bytes[pos] != (' ' as u8) 
-                && self.bytes[pos] != (',' as u8) 
-                && self.bytes[pos] != ('}' as u8) {
+                && self.bytes[pos] != b' ' 
+                && self.bytes[pos] != b',' 
+                && self.bytes[pos] != b'}' {
                 pos += 1;
             }
             if pos < self.bytes.len() { 
@@ -131,8 +137,8 @@ impl Ascii {
 
     pub fn whole_field(&self, start: usize, value_end: usize) -> Option<String> {
         let next_non_space = self.first_non_space_char_starting_at(value_end+1)?;
-        if self.bytes[next_non_space] != (',' as u8) &&
-           self.bytes[next_non_space] != ('}' as u8) {
+        if self.bytes[next_non_space] != b',' &&
+           self.bytes[next_non_space] != b'}' {
             None
         } else {
             Some(
@@ -148,7 +154,7 @@ impl Ascii {
     pub fn header_with_dot(&self) -> Result<Ascii, Error> {
         let first_dot = self.bytes
                             .iter()
-                            .position(|c| c == &('.' as u8)).ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
+                            .position(|c| c == &b'.').ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
 
         Ok(Ascii { bytes: Vec::from( &self.bytes[..first_dot+1] ) })
     }
@@ -156,7 +162,7 @@ impl Ascii {
     pub fn payload(&self) -> Result<Ascii, Error> {
         let first_dot = self.bytes
                             .iter()
-                            .position(|c| c == &('.' as u8)).ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
+                            .position(|c| c == &b'.').ok_or(anyhow!("Not a valid jwt; has no \".\""))?;
 
         Ok(Ascii { bytes: Vec::from( &self.bytes[first_dot+1..] ) })
     }

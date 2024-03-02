@@ -15,32 +15,26 @@ pub struct FieldCheckInputConfigs(Vec<FieldCheckInputConfig>);
 impl FieldCheckInputConfigs {
     pub fn max_name_length(&self, name: &str) -> Option<usize> {
         Some(
-            *(
-            &self.0
+            self.0
             .iter()
             .find(|field_config| &field_config.circuit_input_signal_prefix == name)?
             .max_name_length
             )
-            )
     }
     pub fn max_value_length(&self, name: &str) -> Option<usize> {
         Some(
-            *(
-            &self.0
+            self.0
             .iter()
             .find(|field_config| &field_config.circuit_input_signal_prefix == name)?
             .max_value_length
             )
-            )
     }
     pub fn max_whole_field_length(&self, name: &str) -> Option<usize> {
         Some(
-            *(
-            &self.0
+            self.0
             .iter()
             .find(|field_config| &field_config.circuit_input_signal_prefix == name)?
             .max_whole_field_length
-            )
             )
     }
 }
@@ -52,7 +46,7 @@ impl<'a> IntoIterator for &'a FieldCheckInputConfigs {
     type IntoIter = <&'a Vec<FieldCheckInputConfig> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).into_iter()
+        (&self.0).iter()
     }
 }
 

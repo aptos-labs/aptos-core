@@ -7,7 +7,7 @@ use anyhow::bail;
 
 
 pub fn decode_and_add_jwk(rqi: RequestInput) -> Result<Input, anyhow::Error> {
-    if let Some(_) = rqi.aud_override {
+    if rqi.aud_override.is_some() {
         bail!("aud_override is unsupported for now")
     } else {
         let extra_field_jwt_key = match &rqi.extra_field { Some(x) => String::from(x), None => String::from("") };
@@ -23,7 +23,7 @@ pub fn decode_and_add_jwk(rqi: RequestInput) -> Result<Input, anyhow::Error> {
                                          (String::from("extra"), extra_field_jwt_key),
             ]),
             exp_horizon_secs: rqi.exp_horizon_secs,
-            use_extra_field: match rqi.extra_field { Some(_) => true, None => false }
+            use_extra_field: rqi.extra_field.is_some()
         })
     }
 }

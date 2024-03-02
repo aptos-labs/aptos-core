@@ -23,6 +23,12 @@ pub struct CircuitInputSignals<T> {
     t: PhantomData<T>,
 }
 
+impl Default for CircuitInputSignals<Unpadded> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CircuitInputSignals<Unpadded> {
     pub fn new() -> Self {
         Self {
@@ -66,7 +72,7 @@ impl CircuitInputSignals<Unpadded> {
     pub fn u64_input(mut self, signal_name: &str, signal_value: u64) -> Self {
         self.signals.insert(
             String::from(signal_name),
-            CircuitInputSignal::U64(signal_value as u64),
+            CircuitInputSignal::U64(signal_value),
         );
         self
     }
@@ -108,7 +114,7 @@ impl CircuitInputSignals<Unpadded> {
             .collect();
 
         let padded_signals: BTreeMap<String, CircuitInputSignal> =
-            BTreeMap::from_iter(padded_signals_vec?.into_iter());
+            BTreeMap::from_iter(padded_signals_vec?);
 
         Ok(CircuitInputSignals {
             signals: padded_signals,
@@ -189,7 +195,7 @@ impl CircuitInputSignals<Padded> {
     }
 
     pub fn merge(mut self, to_merge: CircuitInputSignals<Padded>) -> Result<Self> {
-        for (key, _) in (&self.signals).into_iter() {
+        for (key, _) in (&self.signals).iter() {
             if to_merge.signals.contains_key(key) {
                 bail!("Cannot redefine a signal input that is already defined.")
             }
@@ -232,7 +238,7 @@ impl CircuitInputSignals<Padded> {
     pub fn u64_input_padded(mut self, signal_name: &str, signal_value: u64) -> Self {
         self.signals.insert(
             String::from(signal_name),
-            CircuitInputSignal::U64(signal_value as u64),
+            CircuitInputSignal::U64(signal_value),
         );
         self
     }
@@ -271,17 +277,17 @@ impl CircuitInputSignals<Padded> {
         Value::from(serde_json::Map::from_iter(
             self.signals
                 .into_iter()
-                .map(|(k, v)| (String::from(k), stringify(v))),
+                .map(|(k, v)| (k, stringify(v))),
         ))
     }
 }
 
 fn stringify_vec<T: ToString>(v: &[T]) -> Vec<String> {
-    v.into_iter().map(|num| num.to_string()).collect()
+    v.iter().map(|num| num.to_string()).collect()
 }
 
 fn stringify_vec_fr(v: &[Fr]) -> Vec<String> {
-    v.into_iter().map(|num| fr_to_string(num)).collect()
+    v.iter().map(fr_to_string).collect()
 }
 
 fn stringify(input: CircuitInputSignal) -> Value {
@@ -297,7 +303,7 @@ fn stringify(input: CircuitInputSignal) -> Value {
 /// Annoyingly, Fr serializes 0 to the empty string. Mitigate this here
 fn fr_to_string(fr: &Fr) -> String {
     let s = fr.to_string();
-    if s == "" {
+    if s.is_empty() {
         String::from("0")
     } else {
         s
