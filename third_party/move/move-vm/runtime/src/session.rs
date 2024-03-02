@@ -349,6 +349,24 @@ impl<'r, 'l> Session<'r, 'l> {
         Ok(instantiation)
     }
 
+    /// Note: Cannot return a `Function` struct here due to its `pub(crate)` visibility.
+    pub fn load_function_def_is_friend_or_private(
+        &self,
+        module_id: &ModuleId,
+        function_name: &IdentStr,
+        type_arguments: &[TypeTag],
+    ) -> VMResult<bool> {
+        let (_, func, _) = self.move_vm.runtime.loader().load_function(
+            module_id,
+            function_name,
+            type_arguments,
+            &self.data_cache,
+            &self.module_store,
+        )?;
+
+        Ok(func.is_friend_or_private())
+    }
+
     /// Load a module, a function, and all of its types into cache
     pub fn load_function_with_type_arg_inference(
         &self,

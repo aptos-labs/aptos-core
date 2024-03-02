@@ -31,6 +31,8 @@ mod keyless;
 #[cfg(test)]
 mod network;
 #[cfg(test)]
+mod randomness;
+#[cfg(test)]
 mod rest_api;
 #[cfg(test)]
 mod rosetta;

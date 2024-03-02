@@ -21,7 +21,10 @@ use crate::{
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
-use aptos_framework::{natives::code::PublishRequest, RuntimeModuleMetadataV1};
+use aptos_framework::{
+    natives::{code::PublishRequest, transaction_context::NativeTransactionContext},
+    RuntimeModuleMetadataV1,
+};
 use aptos_gas_algebra::{Gas, GasQuantity, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{AptosGasParameters, VMGasParameters};
@@ -699,6 +702,18 @@ impl AptosVM {
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
     ) -> Result<SerializedReturnValues, VMStatus> {
+        let is_friend_or_private = session.load_function_def_is_friend_or_private(
+            entry_fn.module(),
+            entry_fn.function(),
+            entry_fn.ty_args(),
+        )?;
+        if is_friend_or_private {
+            let txn_context = session
+                .get_native_extensions()
+                .get_mut::<NativeTransactionContext>();
+            txn_context.set_is_friend_or_private_entry_func();
+        }
+
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -1320,7 +1335,20 @@ impl AptosVM {
 
         let authenticators = aptos_types::keyless::get_authenticators(transaction)
             .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
-        keyless_validation::validate_authenticators(&authenticators, self.features(), resolver)?;
+
+        // If there are keyless TXN authenticators, validate them all.
+        if !authenticators.is_empty() {
+            // Feature-gating keyless TXNs: if they are *not* enabled, return `FEATURE_UNDER_GATING`,
+            // which will discard the TXN from being put on-chain.
+            if !self.features().is_keyless_enabled() {
+                return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+            }
+            keyless_validation::validate_authenticators(
+                &authenticators,
+                self.features(),
+                resolver,
+            )?;
+        }
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
