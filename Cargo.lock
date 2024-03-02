@@ -13747,7 +13747,6 @@ dependencies = [
  "tower-http 0.5.2",
  "tracing",
  "tracing-subscriber 0.3.18",
- "yaml",
 ]
 
 [[package]]
@@ -17821,16 +17820,6 @@ dependencies = [
  "libc",
  "linux-raw-sys 0.4.12",
  "rustix 0.38.28",
-]
-
-[[package]]
-name = "yaml"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3e836575769aa7afe82989d8e66e4a3aa501b2cdb34cf91fc3bbe2b46de80c"
-dependencies = [
- "libc",
- "regex",
 ]
 
 [[package]]

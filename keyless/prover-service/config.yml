@@ -1,9 +1,9 @@
 %YAML 1.2
 ---
 
-zkey_path: "/home/rex_fernando_aptoslabs_com/devnet-groth16-keys/main_c.zkey"
-witness_gen_binary_folder_path: "/home/rex_fernando_aptoslabs_com/devnet-groth16-keys/main_c_cpp"
-test_verification_key_path: "/home/rex_fernando_aptoslabs_com/devnet-groth16-keys/verification_key.json"
+zkey_path: "/Users/rex/devnet-groth16-keys/main_c.zkey"
+witness_gen_binary_folder_path: "/Users/rex/devnet-groth16-keys/main_c_cpp"
+test_verification_key_path: "/Users/rex/devnet-groth16-keys/verification_key.json"
 oidc_providers:
   - iss: "https://accounts.google.com"
     endpoint_url: "https://www.googleapis.com/oauth2/v3/certs"
