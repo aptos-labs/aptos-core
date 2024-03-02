@@ -688,10 +688,8 @@ impl ExpData {
                     .entry(*sym)
                     .and_modify(|curr| *curr += 1)
                     .or_insert(1);
-            } else {
-                if let Some(x) = shadow_map.get_mut(sym) {
-                    *x -= 1;
-                }
+            } else if let Some(x) = shadow_map.get_mut(sym) {
+                *x -= 1;
             }
         }
 
@@ -706,7 +704,7 @@ impl ExpData {
         }
 
         fn for_syms_in_ranges_shadow_or_unshadow(
-            ranges: &Vec<(Pattern, Exp)>,
+            ranges: &[(Pattern, Exp)],
             entering: bool,
             shadow_map: &mut BTreeMap<Symbol, usize>,
         ) {
@@ -1895,7 +1893,7 @@ impl<'a> PatDisplay<'a> {
                     f,
                     "{}: {}",
                     sym.display(self.env.symbol_pool()),
-                    node_type.display(&type_ctx)
+                    node_type.display(type_ctx)
                 )?;
                 showed_type = true;
             },
@@ -1948,7 +1946,7 @@ impl<'a> PatDisplay<'a> {
             Error(_) => write!(f, "Pattern::Error")?,
         }
         if show_type && !showed_type {
-            write!(f, ": {}", node_type.display(&type_ctx))
+            write!(f, ": {}", node_type.display(type_ctx))
         } else {
             Ok(())
         }
@@ -2065,52 +2063,112 @@ impl Operation {
         )
     }
 
-    /// Determines whether this op is side-effect free.
+    /// Determines whether this op is side-effect free, so if the value is unused the
+    /// operation could be removed without affecting the program.
+    ///
+    /// We treat Specs and expressions that might yield errors or assertions as having side-effects.
     pub fn is_side_effect_free(&self) -> bool {
         use Operation::*;
-        matches!(
-            self,
-            Pack(..)
-                | Tuple
-                | Select(..)
-                | Result(..)
-                // | Index // probably could be OOB
-                // | Slice // probably could be OOB
-                // | Range
-                // | Implies
-                // | Iff
-                | Identical
-                // | Add   // can overflow
-                // | Sub   // can overflow
-                // | Mul   // can overflow
-                // | Mod   // can overflow
-                // | Div   // can overflow
-                | BitOr
-                | BitAnd
-                | Xor
-                // | Shl   // can overflow
-                // | Shr   // can overflow
-                | And
-                | Or
-                | Eq
-                | Neq
-                | Lt
-                | Gt
-                | Le
-                | Ge
-                | Copy
-                | Not
-                // | Cast  // can overflow
-                | Exists(..)
-                | Deref
-                | Vector
-                | Len
-                | TypeValue
-                | TypeDomain
-                | ResourceDomain
-                | CanModify
-                | NoOp
-        )
+        match self {
+            MoveFunction(..) => false, // could abort
+            SpecFunction(..) => false, // Spec
+            Pack(..) => false,         // Could yield an undroppable value
+            Tuple => true,
+
+            // Specification specific
+            Select(..) => false,      // Spec
+            UpdateField(..) => false, // Spec
+            Result(..) => false,      // Spec
+            Index => false,           // Spec
+            Slice => false,           // Spec
+            Range => false,           // Spec
+            Implies => false,         // Spec
+            Iff => false,             // Spec
+            Identical => false,       // Spec
+
+            // Binary operators
+            Add => false, // can overflow
+            Sub => false, // can overflow
+            Mul => false, // can overflow
+            Mod => false, // can overflow
+            Div => false, // can overflow
+            BitOr => true,
+            BitAnd => true,
+            Xor => true,
+            Shl => false, // can overflow
+            Shr => false, // can overflow
+            And => false, // can overflow
+            Or => true,
+            Eq => true,
+            Neq => true,
+            Lt => true,
+            Gt => true,
+            Le => true,
+            Ge => true,
+
+            // Copy and Move
+            Copy => false, // Could yield an undroppable value
+            Move => false, // Move-related
+
+            // Unary operators
+            Not => true,
+            Cast => false, // can overflow
+
+            // Builtin functions (impl and spec)
+            Exists(..) => false, // Spec
+
+            // Builtin functions (impl only)
+            BorrowGlobal(..) => false, // Move-related
+            Borrow(..) => false,       // Move-related
+            Deref => false,            // Move-related
+            MoveTo => false,           // Move-related
+            MoveFrom => false,         // Move-related
+            Freeze => false,           // Move-related
+            Abort => false,            // Move-related
+            Vector => false,           // Move-related
+
+            // Builtin functions (spec only)
+            Len => false,            // Spec
+            TypeValue => false,      // Spec
+            TypeDomain => false,     // Spec
+            ResourceDomain => false, // Spec
+            Global(..) => false,     // Spec
+            CanModify => false,      // Spec
+            Old => false,            // Spec
+            Trace(..) => false,      // Spec
+
+            EmptyVec => false,     // Spec
+            SingleVec => false,    // Spec
+            UpdateVec => false,    // Spec
+            ConcatVec => false,    // Spec
+            IndexOfVec => false,   // Spec
+            ContainsVec => false,  // Spec
+            InRangeRange => false, // Spec
+            InRangeVec => false,   // Spec
+            RangeVec => false,     // Spec
+            MaxU8 => false,        // Spec
+            MaxU16 => false,       // Spec
+            MaxU32 => false,       // Spec
+            MaxU64 => false,       // Spec
+            MaxU128 => false,      // Spec
+            MaxU256 => false,      // Spec
+            Bv2Int => false,       // Spec
+            Int2Bv => false,       // Spec
+
+            // Functions which support the transformation and translation process.
+            AbortFlag => false,            // Spec
+            AbortCode => false,            // Spec
+            WellFormed => false,           // Spec
+            BoxValue => false,             // Spec
+            UnboxValue => false,           // Spec
+            EmptyEventStore => false,      // Spec
+            ExtendEventStore => false,     // Spec
+            EventStoreIncludes => false,   // Spec
+            EventStoreIncludedIn => false, // Spec
+
+            // Operation with no effect
+            NoOp => true,
+        }
     }
 
     /// Whether the operation allows to take reference parameters instead of values. This applies

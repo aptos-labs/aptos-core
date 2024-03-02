@@ -5,8 +5,11 @@ module 0xcafe::vectors {
         {
           let flipsref5: &vector<u8> = Borrow(Immutable)(flips);
           {
-            let x: &vector<u8> = flipsref5;
-            vector::length<u8>(x)
+            let _: vector<u8> = Copy(flips);
+            {
+              let x: &vector<u8> = flipsref5;
+              vector::length<u8>(x)
+            }
           }
         }
     }
