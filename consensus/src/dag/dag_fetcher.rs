@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    adapter::{LedgerInfoProvider, TLedgerInfoProvider},
-    dag_store::DagStore,
-    errors::DagFetchError,
-    DAGRpcResult,
+    adapter::TLedgerInfoProvider, dag_store::DagStore, errors::DagFetchError, DAGRpcResult,
 };
 use crate::{
     dag::{
@@ -373,7 +370,7 @@ impl TDagFetcher for DagFetcher {
                         let bounded_executor = bounded_executor.clone();
                         async move {
                             let nodes = response.certified_nodes();
-                            let epoch = epoch_state.epoch;
+                            let _epoch = epoch_state.epoch;
                             ensure!(
                                 stream::iter(nodes.clone())
                                     .concurrent_map(bounded_executor.clone(), move |node| {

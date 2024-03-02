@@ -354,7 +354,7 @@ impl SyncModeMessageHandler {
         dag_message_result: anyhow::Result<DAGMessage>,
         epoch: u64,
         author: Author,
-        responder: RpcResponder,
+        _responder: RpcResponder,
         buffer: &mut Vec<DAGMessage>,
     ) -> anyhow::Result<Option<CertifiedNodeMessage>> {
         match dag_message_result {

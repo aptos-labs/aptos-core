@@ -62,7 +62,7 @@ use aptos_consensus_types::{
     common::{Author, Round},
     delayed_qc_msg::DelayedQcMsg,
     epoch_retrieval::EpochRetrievalRequest,
-    proof_of_store::{BatchInfo, ProofCache},
+    proof_of_store::ProofCache,
 };
 use aptos_crypto::bls12381;
 use aptos_dkg::{

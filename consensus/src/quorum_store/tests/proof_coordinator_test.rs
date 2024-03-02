@@ -11,7 +11,7 @@ use crate::{
     test_utils::{create_vec_signed_transactions, mock_quorum_store_sender::MockQuorumStoreSender},
 };
 use aptos_consensus_types::proof_of_store::{
-    BatchId, ProofOfStore, SignedBatchInfo, SignedBatchInfoMsg,
+    BatchId, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoMsg,
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
@@ -51,6 +51,7 @@ async fn test_proof_coordinator_basic() {
             peer: signers[0].author(),
         }),
         tx,
+        ProofCache::new(64), //TODO: i'm only making it build...
         true,
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
@@ -79,7 +80,8 @@ async fn test_proof_coordinator_basic() {
         msg => panic!("Expected LocalProof but received: {:?}", msg),
     };
     // check normal path
-    assert!(proof_msg.verify(100, &verifier).is_ok());
+    let cache = ProofCache::new(64); //TODO: i'm only making it build...
+    assert!(proof_msg.verify(100, &verifier, &cache).is_ok());
     let proofs = proof_msg.take();
     assert_eq!(proofs[0].digest(), digest);
 }

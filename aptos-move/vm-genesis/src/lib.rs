@@ -277,6 +277,7 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
+    initialize_jwks(&mut session);
     initialize_oidb(&mut session, chain_id);
     set_genesis_end(&mut session);
 
