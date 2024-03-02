@@ -56,6 +56,7 @@ group "all" {
     "faucet",
     "forge",
     "telemetry-service",
+    "keyless-pepper-service",
     "indexer-grpc",
     "validator-testing",
     "nft-metadata-crawler",
@@ -128,9 +129,9 @@ target "indexer-builder" {
 
 target "_common" {
   contexts = {
-    debian-base   = "target:debian-base"
-    node-builder  = "target:aptos-node-builder"
-    tools-builder = "target:tools-builder"
+    debian-base     = "target:debian-base"
+    node-builder    = "target:aptos-node-builder"
+    tools-builder   = "target:tools-builder"
     indexer-builder = "target:indexer-builder"
   }
   labels = {
@@ -218,6 +219,15 @@ target "telemetry-service" {
   cache-from = generate_cache_from("telemetry-service")
   cache-to   = generate_cache_to("telemetry-service")
   tags       = generate_tags("telemetry-service")
+}
+
+target "keyless-pepper-service" {
+  inherits   = ["_common"]
+  dockerfile = "docker/builder/keyless-pepper-service.Dockerfile"
+  target     = "keyless-pepper-service"
+  cache-from = generate_cache_from("keyless-pepper-service")
+  cache-to   = generate_cache_to("keyless-pepper-service")
+  tags       = generate_tags("keyless-pepper-service")
 }
 
 target "indexer-grpc" {
