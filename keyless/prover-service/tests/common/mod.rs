@@ -43,10 +43,8 @@ pub fn init_test_full_prover() -> FullProver {
         metrics_port: _,
     } = prover_server_config;
 
-    let full_prover = FullProver::new(&zkey_path, &witness_gen_binary_folder_path)
-        .expect("failed to initialize rapidsnark prover");
-
-    full_prover
+    FullProver::new(&zkey_path, &witness_gen_binary_folder_path)
+        .expect("failed to initialize rapidsnark prover")
 }
 
 pub fn get_test_circuit_config() -> CircuitConfig {
@@ -65,8 +63,7 @@ pub fn gen_test_ephemeral_pk() -> EphemeralPublicKey {
         .unwrap();
     let ephemeral_public_key_unwrapped: Ed25519PublicKey =
         Ed25519PublicKey::from(&ephemeral_private_key);
-    let epk = EphemeralPublicKey::ed25519(ephemeral_public_key_unwrapped);
-    epk
+    EphemeralPublicKey::ed25519(ephemeral_public_key_unwrapped)
 }
 
 
@@ -76,11 +73,9 @@ pub fn gen_test_ephemeral_pk_blinder() -> ark_bn254::Fr {
 
 pub fn gen_test_jwk_keypair() -> impl TestJWKKeyPair {
     let mut rng = rsa::rand_core::OsRng;
-    let jwk_keypair =
         DefaultTestJWKKeyPair::new_with_kid_and_exp(&mut rng, 
                                                     "tesk_jwk",
-                                                    num_bigint::BigUint::from_str("65537").unwrap()).unwrap();
-    jwk_keypair
+                                                    num_bigint::BigUint::from_str("65537").unwrap()).unwrap()
 }
 
 pub fn get_test_pepper() -> Pepper {

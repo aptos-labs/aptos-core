@@ -325,12 +325,15 @@ mod tests {
         //let parsed_nonce = parse_field(&Ascii::from(payload_decoded.as_str()), "nonce").unwrap();
         //assert!(computed_nonce.to_string() == parsed_nonce.value);
 
+        let michael_pk_mod_str: &'static str =      "6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLh
+b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw";
+        let michael_pk_kid_str: &'static str = "test_jwk";
         let (signals, _) = derive_circuit_input_signals(
             input,
             &config,
             Some(&RSA_JWK::new_256_aqab(
-                input_conversion::michael_pk_kid_str,
-                input_conversion::michael_pk_mod_str,
+                michael_pk_kid_str,
+                michael_pk_mod_str,
             )),
         )
         .expect("should convert successfully");

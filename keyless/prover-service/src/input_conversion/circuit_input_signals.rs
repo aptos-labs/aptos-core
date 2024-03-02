@@ -195,7 +195,7 @@ impl CircuitInputSignals<Padded> {
     }
 
     pub fn merge(mut self, to_merge: CircuitInputSignals<Padded>) -> Result<Self> {
-        for (key, _) in (&self.signals).iter() {
+        for (key, _) in self.signals.iter() {
             if to_merge.signals.contains_key(key) {
                 bail!("Cannot redefine a signal input that is already defined.")
             }

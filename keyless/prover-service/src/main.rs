@@ -6,7 +6,6 @@ use axum::{
     routing::{post, get},
     Router,
 };
-use tokio;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use figment::{Figment, providers::{Format, Yaml, Env}};
 

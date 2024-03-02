@@ -18,6 +18,8 @@ pub struct RsaPublicKey {
 }
 
 impl RsaPublicKey {
+
+    #[allow(clippy::all)]
     pub fn from_str(s: &str) -> Result<Self, anyhow::Error> {
         Ok(Self {
             modulus: BigUint::from_str(s)?,

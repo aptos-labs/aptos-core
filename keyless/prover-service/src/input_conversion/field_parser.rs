@@ -89,6 +89,7 @@ impl<'a> FieldParser<'a>
         }
     }
 
+    #[allow(clippy::all)]
     pub fn next(&mut self) -> ConsumeResultChar {
         self.char_indices.next()
             .ok_or(self.eos_error())
@@ -171,7 +172,7 @@ impl<'a> FieldParser<'a>
         -> Result<FieldCheckInput<usize>, FieldParserError> 
     {
 
-        let key_in_quotes = String::from("\"") + &key + "\"";
+        let key_in_quotes = String::from("\"") + key + "\"";
 
         let index = jwt_payload
             .find(&key_in_quotes)

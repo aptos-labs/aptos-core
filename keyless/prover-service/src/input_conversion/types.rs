@@ -55,6 +55,7 @@ impl Ascii {
         self.bytes.push(c);
     }
 
+    #[allow(clippy::all)]
     pub fn len(&self) -> usize {
         self.bytes.len()
     }

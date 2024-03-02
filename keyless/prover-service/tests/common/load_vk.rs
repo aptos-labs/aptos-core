@@ -22,6 +22,7 @@ use ark_groth16::{PreparedVerifyingKey, VerifyingKey};
 
 
 
+#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
 struct RawVK {
     vk_alpha_1: Vec<String>,

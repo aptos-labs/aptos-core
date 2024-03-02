@@ -78,6 +78,7 @@ pub trait TestJWKKeyPair {
     fn pubkey_mod_b64(&self) -> String;
     fn kid(&self) -> &str;
     fn sign(&self, payload: &impl Serialize) -> String;
+    #[allow(clippy::all)]
     fn into_rsa_jwk(&self) -> RSA_JWK;
 }
 
@@ -112,6 +113,7 @@ impl TestJWKKeyPair for DefaultTestJWKKeyPair {
         &self.kid
     }
 
+    #[allow(clippy::all)]
     fn sign(&self, payload: &impl Serialize) -> String {
         let mut header = Header::default();
         header.alg = Algorithm::RS256;
@@ -149,6 +151,7 @@ pub struct ProofTestCase<T: Serialize + WithNonce + Clone> {
 impl<T: Serialize + WithNonce + Clone> ProofTestCase<T> {
 
 
+    #[allow(clippy::all)]
     pub fn new_with_test_epk_and_blinder(
         jwt_payload: T,
         pepper: Pepper,
@@ -162,7 +165,7 @@ impl<T: Serialize + WithNonce + Clone> ProofTestCase<T> {
         let epk = gen_test_ephemeral_pk();
         let epk_blinder = gen_test_ephemeral_pk_blinder();
 
-        let nonce = compute_nonce(exp_date, &epk, epk_blinder, &config).unwrap();
+        let nonce = compute_nonce(exp_date, &epk, epk_blinder, config).unwrap();
         let payload_with_nonce = jwt_payload.with_nonce(&nonce.to_string());
 
         Self {

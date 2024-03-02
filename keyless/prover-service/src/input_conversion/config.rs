@@ -17,7 +17,7 @@ impl FieldCheckInputConfigs {
         Some(
             self.0
             .iter()
-            .find(|field_config| &field_config.circuit_input_signal_prefix == name)?
+            .find(|field_config| field_config.circuit_input_signal_prefix == name)?
             .max_name_length
             )
     }
@@ -25,7 +25,7 @@ impl FieldCheckInputConfigs {
         Some(
             self.0
             .iter()
-            .find(|field_config| &field_config.circuit_input_signal_prefix == name)?
+            .find(|field_config| field_config.circuit_input_signal_prefix == name)?
             .max_value_length
             )
     }
@@ -33,7 +33,7 @@ impl FieldCheckInputConfigs {
         Some(
             self.0
             .iter()
-            .find(|field_config| &field_config.circuit_input_signal_prefix == name)?
+            .find(|field_config| field_config.circuit_input_signal_prefix == name)?
             .max_whole_field_length
             )
     }
@@ -46,7 +46,7 @@ impl<'a> IntoIterator for &'a FieldCheckInputConfigs {
     type IntoIter = <&'a Vec<FieldCheckInputConfig> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).iter()
+        self.0.iter()
     }
 }
 
