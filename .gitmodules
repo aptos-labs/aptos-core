@@ -1,6 +1,3 @@
 [submodule "ecosystem/indexer-grpc/indexer-grpc-parser/aptos-indexer-processors"]
 	path = ecosystem/indexer-grpc/indexer-grpc-parser/aptos-indexer-processors
 	url = https://github.com/aptos-labs/aptos-indexer-processors.git
-[submodule "keyless/rust-rapidsnark/rapidsnark"]
-	path = keyless/rust-rapidsnark/rapidsnark
-	url = git@github.com:aptos-labs/rapidsnark
