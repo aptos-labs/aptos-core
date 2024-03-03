@@ -82,6 +82,8 @@ pub struct DKGSessionMetadata {
     pub dealer_epoch: u64,
     pub dealer_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
     pub target_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
+    pub block_dkg: bool,
+    pub block_randomness: bool,
 }
 
 impl DKGSessionMetadata {

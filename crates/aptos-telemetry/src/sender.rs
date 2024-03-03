@@ -412,7 +412,7 @@ impl TelemetrySender {
                         .expect("unable to build telemetry path for config/node"),
                 ),
             )
-            .and_then(|res| error_for_status_with_body(res))
+            .and_then(error_for_status_with_body)
             .and_then(|res| async move { Ok(res.json::<Option<RemoteNodeConfig>>().await?) })
             .await;
         debug!("get remote config response {:?}", response);

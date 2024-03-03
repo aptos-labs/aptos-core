@@ -192,7 +192,7 @@ fn load_remote_config(
         warn!("{:?} is not a dir. using initial config", config_dir);
         return Ok(None);
     }
-    let mut entries = fs::read_dir(config_dir.clone())?
+    let entries = fs::read_dir(config_dir.clone())?
         .filter_map(|res| {
             let Ok(entry) = res else {
                 return None;
