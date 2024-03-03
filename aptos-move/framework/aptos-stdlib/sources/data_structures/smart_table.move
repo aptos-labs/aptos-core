@@ -33,6 +33,8 @@ module aptos_std::smart_table {
     /// Invalid vector index within a bucket.
     const EINVALID_VECTOR_INDEX: u64 = 9;
 
+    const ALL_KEYS: u64 = 0xffffffffffffffff;
+
     /// SmartTable entry contains both the key and value.
     struct Entry<K, V> has copy, drop, store {
         hash: u64,
@@ -184,6 +186,11 @@ module aptos_std::smart_table {
         res
     }
 
+    public fun keys<K: store + copy + drop, V: store + copy>(table: &SmartTable<K, V>): vector<K> {
+        let (keys, _, _) = keys_paginated(table, 0, 0, ALL_KEYS);
+        keys
+    }
+
     public fun keys_paginated<K: store + copy + drop, V: store + copy>(
         table: &SmartTable<K, V>,
         starting_bucket_index: u64,
@@ -197,36 +204,36 @@ module aptos_std::smart_table {
         let keys = vector[];
         if (num_keys_to_get > 0) {
             let num_buckets = table.num_buckets;
-            if (num_buckets > 0) {
-                let num_keys_checked = 0;
-                let buckets_ref = &table.buckets;
-                let bucket_index = starting_bucket_index;
+            let num_keys_checked = 0;
+            let buckets_ref = &table.buckets;
+            let bucket_index = starting_bucket_index;
+            if (starting_bucket_index != 0) {
                 assert!(starting_bucket_index < num_buckets, EINVALID_BUCKET_INDEX);
-                let bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
-                let bucket_length = vector::length(bucket_ref);
-                let vector_index = starting_vector_index;
-                if (starting_vector_index != 0) {
-                    assert!(starting_vector_index < bucket_length, EINVALID_VECTOR_INDEX);
-                };
-                while (bucket_index < num_buckets) {
-                    bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
-                    bucket_length = vector::length(bucket_ref);
-                    while (vector_index < bucket_length) {
-                        vector::push_back(&mut keys, vector::borrow(bucket_ref, vector_index).key);
-                        num_keys_checked = num_keys_checked + 1;
-                        vector_index = vector_index + 1;
-                        if (num_keys_checked == num_keys_to_get) {
-                            if (vector_index == bucket_length) {
-                                vector_index = 0;
-                                bucket_index = bucket_index + 1;
-                                bucket_index = if (bucket_index < num_buckets) bucket_index else 0;
-                            };
-                            return (keys, bucket_index, vector_index)
+            };
+            let bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
+            let bucket_length = vector::length(bucket_ref);
+            let vector_index = starting_vector_index;
+            if (starting_vector_index != 0) {
+                assert!(starting_vector_index < bucket_length, EINVALID_VECTOR_INDEX);
+            };
+            while (bucket_index < num_buckets) {
+                bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
+                bucket_length = vector::length(bucket_ref);
+                while (vector_index < bucket_length) {
+                    vector::push_back(&mut keys, vector::borrow(bucket_ref, vector_index).key);
+                    num_keys_checked = num_keys_checked + 1;
+                    vector_index = vector_index + 1;
+                    if (num_keys_checked == num_keys_to_get) {
+                        if (vector_index == bucket_length) {
+                            vector_index = 0;
+                            bucket_index = bucket_index + 1;
+                            bucket_index = if (bucket_index < num_buckets) bucket_index else 0;
                         };
+                        return (keys, bucket_index, vector_index)
                     };
-                    bucket_index = bucket_index + 1;
-                    vector_index = 0;
                 };
+                bucket_index = bucket_index + 1;
+                vector_index = 0;
             };
         };
         (keys, 0, 0)
@@ -591,6 +598,92 @@ module aptos_std::smart_table {
             i = i + 1;
         };
         assert!(table.size == 200, 0);
+        destroy(table);
+    }
+
+    #[test]
+    fun test_keys() {
+        let i = 0;
+        let table = new();
+        let expected_keys = vector[];
+        let keys = keys(&table);
+        assert!(vector::is_empty(&keys), 0);
+        let starting_bucket_index = 0;
+        let starting_vector_index = 0;
+        (keys, starting_bucket_index, starting_vector_index) = keys_paginated(
+            &table,
+            starting_bucket_index,
+            starting_vector_index,
+            0
+        );
+        assert!(starting_bucket_index == 0, 0);
+        assert!(starting_vector_index == 0, 0);
+        assert!(vector::is_empty(&keys), 0);
+        while (i < 100) {
+            add(&mut table, i, 0);
+            vector::push_back(&mut expected_keys, i);
+            i = i + 1;
+        };
+        let keys = keys(&table);
+        assert!(vector::length(&keys) == vector::length(&expected_keys), 0);
+        vector::for_each_ref(&keys, |e_ref| {
+            assert!(vector::contains(&expected_keys, e_ref), 0);
+        });
+        let keys = vector[];
+        let starting_bucket_index = 0;
+        let starting_vector_index = 0;
+        let returned_keys = vector[];
+        vector::length(&returned_keys); // To eliminate erroneous compiler "unused" warning
+        loop {
+            (returned_keys, starting_bucket_index, starting_vector_index) = keys_paginated(
+                &table,
+                starting_bucket_index,
+                starting_vector_index,
+                15
+            );
+            vector::append(&mut keys, returned_keys);
+            if (starting_bucket_index == 0 && starting_vector_index == 0) break;
+        };
+        assert!(vector::length(&keys) == vector::length(&expected_keys), 0);
+        vector::for_each_ref(&keys, |e_ref| {
+            assert!(vector::contains(&expected_keys, e_ref), 0);
+        });
+        destroy(table);
+        table = new();
+        add(&mut table, 1, 0);
+        add(&mut table, 2, 0);
+        (keys, starting_bucket_index, starting_vector_index) = keys_paginated(&table, 0, 0, 1);
+        (returned_keys, starting_bucket_index, starting_vector_index) = keys_paginated(
+            &table,
+            starting_bucket_index,
+            starting_vector_index,
+            1,
+        );
+        vector::append(&mut keys, returned_keys);
+        assert!(keys == vector[1, 2] || keys == vector[2, 1], 0);
+        assert!(starting_bucket_index == 0, 0);
+        assert!(starting_vector_index == 0, 0);
+        (keys, starting_bucket_index, starting_vector_index) = keys_paginated(&table, 0, 0, 0);
+        assert!(keys == vector[], 0);
+        assert!(starting_bucket_index == 0, 0);
+        assert!(starting_vector_index == 0, 0);
+        destroy(table);
+    }
+
+    #[test, expected_failure(abort_code = EINVALID_BUCKET_INDEX)]
+    fun test_keys_invalid_bucket_index() {
+        let table = new();
+        add(&mut table, 1, 0);
+        let num_buckets = table.num_buckets;
+        keys_paginated(&table, num_buckets + 1, 0, 1);
+        destroy(table);
+    }
+
+    #[test, expected_failure(abort_code = EINVALID_VECTOR_INDEX)]
+    fun test_keys_invalid_vector_index() {
+        let table = new();
+        add(&mut table, 1, 0);
+        keys_paginated(&table, 0, 1, 1);
         destroy(table);
     }
 }
