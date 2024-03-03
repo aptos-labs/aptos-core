@@ -1,0 +1,139 @@
+
+<%= montgomeryBuilder.buildMul(name+"_rawMMul", q) %>
+<%= montgomeryBuilder.buildSquare(name+"_rawMSquare", q) %>
+<%= montgomeryBuilder.buildMul1(name+"_rawMMul1", q) %>
+<%= montgomeryBuilder.buildFromMontgomery(name+"_rawFromMontgomery", q) %>
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawToMontgomery
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a number to Montgomery
+;   rdi <= Pointer destination element
+;   rsi <= Pointer to src element
+;;;;;;;;;;;;;;;;;;;;
+<%=name%>_rawToMontgomery:
+    push    rdx
+    lea     rdx, [R2]
+    call    <%=name%>_rawMMul
+    pop     rdx
+    ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; toMontgomery
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a number to Montgomery
+;   rdi <= Destination
+;   rdi <= Pointer element to convert
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;
+<%=name%>_toMontgomery:
+    mov     rax, [rsi]
+    bt      rax, 62                     ; check if montgomery
+    jc      toMontgomery_doNothing
+    bt      rax, 63
+    jc      toMontgomeryLong
+
+toMontgomeryShort:
+    movsx   rdx, eax
+    mov     [rdi], rdx
+    add     rdi, 8
+    lea     rsi, [R2]
+    cmp     rdx, 0
+    js      negMontgomeryShort
+posMontgomeryShort:
+    call    <%=name%>_rawMMul1
+    sub     rdi, 8
+    <%=     global.setTypeDest("0x40"); %>
+    ret
+
+negMontgomeryShort:
+    neg     rdx              ; Do the multiplication positive and then negate the result.
+    call    <%=name%>_rawMMul1
+    mov     rsi, rdi
+    call    rawNegL
+    sub     rdi, 8
+    <%=     global.setTypeDest("0x40"); %>
+    ret
+
+
+toMontgomeryLong:
+    mov     [rdi], rax
+    add     rdi, 8
+    add     rsi, 8
+    lea     rdx, [R2]
+    call    <%=name%>_rawMMul
+    sub     rsi, 8
+    sub     rdi, 8
+    <%=     global.setTypeDest("0xC0"); %>
+    ret
+
+
+toMontgomery_doNothing:
+    call   <%=name%>_copy
+    ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; toNormal
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a number from Montgomery
+;   rdi <= Destination
+;   rsi <= Pointer element to convert
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;
+<%=name%>_toNormal:
+    mov     rax, [rsi]
+    bt      rax, 62                     ; check if montgomery
+    jnc     toNormal_doNothing
+    bt      rax, 63                     ; if short, it means it's converted
+    jnc     toNormal_doNothing
+
+toNormalLong:
+    add     rdi, 8
+    add     rsi, 8
+    call    <%=name%>_rawFromMontgomery
+    sub     rsi, 8
+    sub     rdi, 8
+    <%=     global.setTypeDest("0x80"); %>
+    ret
+
+toNormal_doNothing:
+    call   <%=name%>_copy
+    ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; toLongNormal
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a number to long normal
+;   rdi <= Destination
+;   rsi <= Pointer element to convert
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;
+<%=name%>_toLongNormal:
+    mov     rax, [rsi]
+    bt      rax, 63                     ; check if long
+    jnc     toLongNormal_fromShort
+    bt      rax, 62                     ; check if montgomery
+    jc      toLongNormal_fromMontgomery
+    call    <%=name%>_copy              ; It is already long
+    ret
+
+toLongNormal_fromMontgomery:
+    add     rdi, 8
+    add     rsi, 8
+    call    <%=name%>_rawFromMontgomery
+    sub     rsi, 8
+    sub     rdi, 8
+    <%=     global.setTypeDest("0x80"); %>
+    ret
+
+toLongNormal_fromShort:
+    mov     r8, rsi                     ; save rsi
+    movsx   rsi, eax
+    call    rawCopyS2L
+    mov     rsi, r8                     ; recover rsi
+    <%=     global.setTypeDest("0x80"); %>
+    ret
+

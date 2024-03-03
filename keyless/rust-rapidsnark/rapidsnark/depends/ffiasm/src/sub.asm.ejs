@@ -1,0 +1,350 @@
+<% function subS1S2() { %>
+        xor    rdx, rdx
+        mov    edx, eax
+        sub    edx, ecx
+        jo     sub_manageOverflow   ; rsi already is the 64bits result
+
+        mov    [rdi], rdx       ; not necessary to adjust so just save and return
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+
+sub_manageOverflow:                 ; Do the operation in 64 bits
+        push   rsi
+        movsx  rsi, eax
+        movsx  rdx, ecx
+        sub    rsi, rdx
+        call   rawCopyS2L
+        pop    rsi
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+<% } %>
+
+<% function subL1S2(t) { %>
+        add rsi, 8
+        movsx rdx, ecx
+        add rdi, 8
+        cmp rdx, 0
+        <% const rawSubLabel = global.tmpLabel() %>
+        jns <%= rawSubLabel %>
+        neg rdx
+        call rawAddLS
+        sub rdi, 8
+        sub rsi, 8
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+<%= rawSubLabel %>:
+        call rawSubLS
+        sub rdi, 8
+        sub rsi, 8
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+<% } %>
+
+
+<% function subS1L2(t) { %>
+        cmp eax, 0
+        <% const s1NegLabel = global.tmpLabel() %>
+        js <%= s1NegLabel %>
+
+        ; First Operand is positive
+        push rsi
+        add rdi, 8
+        movsx rsi, eax
+        add rdx, 8
+        call rawSubSL
+        sub rdi, 8
+        pop rsi
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+
+<%= s1NegLabel %>:   ; First operand is negative
+        push rsi
+        lea rsi, [rdx + 8]
+        movsx rdx, eax
+        add rdi, 8
+        neg rdx
+        call rawNegLS
+        sub rdi, 8
+        pop rsi
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+<% } %>
+
+
+<% function subL1L2(t) { %>
+        add rdi, 8
+        add rsi, 8
+        add rdx, 8
+        call rawSubLL
+        sub rdi, 8
+        sub rsi, 8
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+<% } %>
+
+;;;;;;;;;;;;;;;;;;;;;;
+; sub
+;;;;;;;;;;;;;;;;;;;;;;
+; Substracts two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result
+; Modified Registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_sub:
+        push   rbp
+        push   rsi
+        push   rdx
+        mov    rbp, rsp
+        mov    rax, [rsi]
+        mov    rcx, [rdx]
+        bt     rax, 63          ; Check if is long first operand
+        jc     sub_l1
+        bt     rcx, 63          ; Check if is long second operand
+        jc     sub_s1l2
+
+sub_s1s2:                       ; Both operands are short
+<%=     subS1S2()       %>
+sub_l1:
+        bt     rcx, 63          ; Check if is short second operand
+        jc     sub_l1l2
+
+;;;;;;;;
+sub_l1s2:
+        bt     rax, 62          ; check if montgomery first
+        jc     sub_l1ms2
+sub_l1ns2:
+<%=     global.setTypeDest("0x80"); %>
+<%=     subL1S2(); %>
+
+sub_l1ms2:
+        bt     rcx, 62          ; check if montgomery second
+        jc     sub_l1ms2m
+sub_l1ms2n:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     global.toMont_b()       %>
+<%=     subL1L2()         %>
+
+sub_l1ms2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     subL1L2()         %>
+
+
+;;;;;;;;
+sub_s1l2:
+        bt     rcx, 62          ; check if montgomery first
+        jc     sub_s1l2m
+sub_s1l2n:
+<%=     global.setTypeDest("0x80"); %>
+<%=     subS1L2(); %>
+
+sub_s1l2m:
+        bt     rax, 62          ; check if montgomery second
+        jc     sub_s1ml2m
+sub_s1nl2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     global.toMont_a()       %>
+<%=     subL1L2()         %>
+
+sub_s1ml2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     subL1L2()         %>
+
+;;;;
+sub_l1l2:
+        bt     rax, 62          ; check if montgomery first
+        jc     sub_l1ml2
+sub_l1nl2:
+        bt     rcx, 62          ; check if montgomery second
+        jc     sub_l1nl2m
+sub_l1nl2n:
+<%=     global.setTypeDest("0x80"); %>
+<%=     subL1L2()         %>
+
+sub_l1nl2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     global.toMont_a(); %>
+<%=     subL1L2()         %>
+
+sub_l1ml2:
+        bt     rcx, 62          ; check if montgomery seconf
+        jc     sub_l1ml2m
+sub_l1ml2n:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     global.toMont_b(); %>
+<%=     subL1L2()         %>
+
+sub_l1ml2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     subL1L2()         %>
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawSubLS
+;;;;;;;;;;;;;;;;;;;;;;
+; Substracts a short element from the long element
+; Params:
+;   rdi <= Pointer to the long data of result
+;   rsi <= Pointer to the long data of element 1 where will be substracted
+;   rdx <= Value to be substracted
+;   [rdi] = [rsi] - rdx
+; Modified Registers:
+;    rax
+;;;;;;;;;;;;;;;;;;;;;;
+rawSubLS:
+        ; Substract first digit
+
+        mov rax, [rsi]
+        sub rax, rdx
+        mov [rdi] ,rax
+        mov rdx, 0
+<% for (let i=1; i<n64; i++) { %>
+        mov rax, [rsi + <%=i*8%>]
+        sbb rax, rdx
+        mov [rdi + <%=i*8%>], rax
+<% } %>
+        jnc rawSubLS_done   ; if overflow, add q
+
+        ; Add q
+rawSubLS_aq:
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [q + <%=i*8%>]
+        <%= i==0 ? "add" : "adc" %> [rdi + <%=i*8%>], rax
+<% } %>
+rawSubLS_done:
+        ret
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawSubSL
+;;;;;;;;;;;;;;;;;;;;;;
+; Substracts a long element from a short element
+; Params:
+;   rdi <= Pointer to the long data of result
+;   rsi <= Value from where will bo substracted
+;   rdx <= Pointer to long of the value to be substracted
+;
+;   [rdi] = rsi - [rdx]
+; Modified Registers:
+;    rax
+;;;;;;;;;;;;;;;;;;;;;;
+rawSubSL:
+        ; Substract first digit
+        sub rsi, [rdx]
+        mov [rdi] ,rsi
+
+<% for (let i=1; i<n64; i++) { %>
+        mov rax, 0
+        sbb rax, [rdx + <%=i*8%>]
+        mov [rdi + <%=i*8%>], rax
+<% } %>
+        jnc rawSubSL_done   ; if overflow, add q
+
+        ; Add q
+rawSubSL_aq:
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [q + <%=i*8%>]
+        <%= i==0 ? "add" : "adc" %> [rdi + <%=i*8%>], rax
+<% } %>
+rawSubSL_done:
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawSubLL
+;;;;;;;;;;;;;;;;;;;;;;
+; Substracts a long element from a short element
+; Params:
+;   rdi <= Pointer to the long data of result
+;   rsi <= Pointer to long from where substracted
+;   rdx <= Pointer to long of the value to be substracted
+;
+;   [rdi] = [rsi] - [rdx]
+; Modified Registers:
+;    rax
+;;;;;;;;;;;;;;;;;;;;;;
+rawSubLL:
+<%=name%>_rawSub:
+        ; Substract first digit
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [rsi + <%=i*8%>]
+        <%= i==0 ? "sub" : "sbb" %> rax, [rdx + <%=i*8%>]
+        mov [rdi + <%=i*8%>], rax
+<% } %>
+        jnc rawSubLL_done   ; if overflow, add q
+
+        ; Add q
+rawSubLL_aq:
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [q + <%=i*8%>]
+        <%= i==0 ? "add" : "adc" %> [rdi + <%=i*8%>], rax
+<% } %>
+rawSubLL_done:
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawNegLS
+;;;;;;;;;;;;;;;;;;;;;;
+; Substracts a long element and a short element form 0
+; Params:
+;   rdi <= Pointer to the long data of result
+;   rsi <= Pointer to long from where substracted
+;   rdx <= short value to be substracted too
+;
+;   [rdi] = -[rsi] - rdx
+; Modified Registers:
+;    rax
+;;;;;;;;;;;;;;;;;;;;;;
+rawNegLS:
+        mov rax, [q]
+        sub rax, rdx
+        mov [rdi], rax
+<% for (let i=1; i<n64; i++) { %>
+        mov rax, [q + <%=i*8%> ]
+        sbb rax, 0
+        mov [rdi + <%=i*8%>], rax
+<% } %>
+        setc dl
+
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [rdi + <%=i*8%> ]
+        <%= i==0 ? "sub" : "sbb" %> rax, [rsi + <%=i*8%>]
+        mov [rdi + <%=i*8%>], rax
+<% } %>
+
+        setc dh
+        or dl, dh
+        jz rawNegSL_done
+
+        ; it is a negative value, so add q
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [q + <%=i*8%>]
+        <%= i==0 ? "add" : "adc" %> [rdi + <%=i*8%>], rax
+<% } %>
+
+rawNegSL_done:
+        ret
+
+

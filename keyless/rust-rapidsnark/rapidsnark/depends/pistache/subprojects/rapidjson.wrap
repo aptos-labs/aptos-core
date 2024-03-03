@@ -1,0 +1,14 @@
+# SPDX-FileCopyrightText: 2021 Andrea Pappacoda
+#
+# SPDX-License-Identifier: CC0-1.0
+
+[wrap-file]
+directory = rapidjson-1.1.0
+
+source_url = https://github.com/Tencent/rapidjson/archive/v1.1.0.zip
+source_filename = rapidjson-1.1.0.zip
+source_hash = 8e00c38829d6785a2dfb951bb87c6974fa07dfe488aa5b25deec4b8bc0f6a3ab
+
+patch_url = https://wrapdb.mesonbuild.com/v1/projects/rapidjson/1.1.0/1/get_zip
+patch_filename = rapidjson-1.1.0-1-wrap.zip
+patch_hash = 7e651680dc74da51b4d0ca4bd3de5d1cf2143dd6d81421b97a43d67536a84486

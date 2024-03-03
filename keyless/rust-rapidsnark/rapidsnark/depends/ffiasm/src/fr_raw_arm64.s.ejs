@@ -1,0 +1,57 @@
+    .global <%=name%>_rawAdd
+    .global <%=name%>_rawAddLS
+    .global <%=name%>_rawSub
+    .global <%=name%>_rawSubRegular
+    .global <%=name%>_rawNeg
+    .global <%=name%>_rawNegLS
+    .global <%=name%>_rawSubSL
+    .global <%=name%>_rawSubLS
+    .global <%=name%>_rawMMul
+    .global <%=name%>_rawMMul1
+    .global <%=name%>_rawFromMontgomery
+    .global <%=name%>_rawCopy
+    .global <%=name%>_rawSwap
+    .global <%=name%>_rawIsEq
+    .global <%=name%>_rawIsZero
+    .global <%=name%>_rawCopyS2L
+    .global <%=name%>_rawCmp
+    .global <%=name%>_rawAnd
+    .global <%=name%>_rawOr
+    .global <%=name%>_rawXor
+    .global <%=name%>_rawShr
+    .global <%=name%>_rawShl
+    .global <%=name%>_rawNot
+
+    .global _<%=name%>_rawAdd
+    .global _<%=name%>_rawAddLS
+    .global _<%=name%>_rawSub
+    .global _<%=name%>_rawSubRegular
+    .global _<%=name%>_rawNeg
+    .global _<%=name%>_rawNegLS
+    .global _<%=name%>_rawSubSL
+    .global _<%=name%>_rawSubLS
+    .global _<%=name%>_rawMMul
+    .global _<%=name%>_rawMMul1
+    .global _<%=name%>_rawFromMontgomery
+    .global _<%=name%>_rawCopy
+    .global _<%=name%>_rawSwap
+    .global _<%=name%>_rawIsEq
+    .global _<%=name%>_rawIsZero
+    .global _<%=name%>_rawCopyS2L
+    .global _<%=name%>_rawCmp
+    .global _<%=name%>_rawAnd
+    .global _<%=name%>_rawOr
+    .global _<%=name%>_rawXor
+    .global _<%=name%>_rawShr
+    .global _<%=name%>_rawShl
+    .global _<%=name%>_rawNot
+
+    .text
+    .align 4
+
+<%= armBuilder.genFuncs(name, q) %>
+
+    .align 8
+<%=name%>_rawq:    .quad <%= constantElement(q) %>
+<%=name%>_np:      .quad 0x<%= (bigInt.one.shiftLeft(64)).minus(q.modInv(bigInt.one.shiftLeft(64))).toString(16) %>
+<%=name%>_lboMask: .quad 0x<%= bigInt("10000000000000000",16).shiftRight(n64*64 - q.bitLength()).minus(bigInt.one).toString(16) %>

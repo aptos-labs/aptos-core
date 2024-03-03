@@ -1,0 +1,72 @@
+<% global.setTypeDest = function (t) {
+return (
+`        mov r11b, ${t}
+        shl r11d, 24
+        mov [rdi+4], r11d`);
+} %>
+
+
+<% global.toMont_a = function () {
+return (
+`        push rdi
+        mov  rdi, rsi
+        mov  rsi, rdx
+        call ${name}_toMontgomery
+        mov  rdx, rsi
+        mov  rsi, rdi
+        pop  rdi`);
+} %>
+
+<% global.toMont_b = function() {
+return (
+`        push rdi
+        mov  rdi, rdx
+        call ${name}_toMontgomery
+        mov  rdx, rdi
+        pop  rdi`);
+} %>
+
+<% global.fromMont_a = function () {
+return (
+`        push rdi
+        mov  rdi, rsi
+        mov  rsi, rdx
+        call ${name}_toNormal
+        mov  rdx, rsi
+        mov  rsi, rdi
+        pop  rdi`);
+} %>
+
+<% global.fromMont_b = function() {
+return (
+`        push rdi
+        mov  rdi, rdx
+        call ${name}_toNormal
+        mov  rdx, rdi
+        pop  rdi`);
+} %>
+
+<% global.toLong_a = function () {
+return (
+`        push  rdi
+        push  rdx
+        mov   rdi, rsi
+        movsx rsi, r8d
+        call  rawCopyS2L
+        mov   rsi, rdi
+        pop   rdx
+        pop   rdi`);
+} %>
+
+<% global.toLong_b = function() {
+return (
+`        push  rdi
+        push   rsi
+        mov   rdi, rdx
+        movsx rsi, r9d
+        call  rawCopyS2L
+        mov   rdx, rdi
+        pop   rsi
+        pop   rdi`);
+} %>
+

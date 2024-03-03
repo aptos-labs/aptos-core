@@ -1,0 +1,139 @@
+;;;;;;;;;;;;;;;;;;;;;;
+; copy
+;;;;;;;;;;;;;;;;;;;;;;
+; Copies
+; Params:
+;   rsi <= the src
+;   rdi <= the dest
+;
+; Nidified registers:
+;   rax
+;;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_copy:
+<% for (let i=0; i<=n64; i++) { %>
+        mov     rax, [rsi + <%= i*8 %>]
+        mov     [rdi + <%= i*8 %>], rax
+<% } %>
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; copy an array of integers
+;;;;;;;;;;;;;;;;;;;;;;
+; Copies
+; Params:
+;   rsi <= the src
+;   rdi <= the dest
+;   rdx <= number of integers to copy
+;
+; Nidified registers:
+;   rax
+;;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_copyn:
+<%=name%>_copyn_loop:
+        mov     r8, rsi
+        mov     r9, rdi
+        mov     rax, <%= n64+1 %>
+        mul     rdx
+        mov     rcx, rax
+        cld
+   rep  movsq
+        mov     rsi, r8
+        mov     rdi, r9
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawCopyS2L
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a 64 bit integer to a long format field element
+; Params:
+;   rsi <= the integer
+;   rdi <= Pointer to the overwritted element
+;
+; Nidified registers:
+;   rax
+;;;;;;;;;;;;;;;;;;;;;;;
+
+rawCopyS2L:
+        mov     al, 0x80
+        shl     rax, 56
+        mov     [rdi], rax    ; set the result to LONG normal
+
+        cmp     rsi, 0
+        js      u64toLong_adjust_neg
+
+        mov     [rdi + 8], rsi
+        xor     rax, rax
+<% for (let i=1; i<n64; i++) { %>
+        mov     [rdi + <%= 8+i*8 %>], rax
+<% } %>
+        ret
+
+u64toLong_adjust_neg:
+        add    rsi, [q]         ; Set the first digit
+        mov    [rdi + 8], rsi   ;
+
+        mov    rsi, -1          ; all ones
+<% for (let i=1; i<n64; i++) { %>
+        mov    rax, rsi                       ; Add to q
+        adc    rax, [q + <%= i*8 %> ]
+        mov    [rdi + <%= (i+1)*8 %>], rax
+<% } %>
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; toInt
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a 64 bit integer to a long format field element
+; Params:
+;   rsi <= Pointer to the element
+; Returs:
+;   rax <= The value
+;;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_toInt:
+        mov     rax, [rdi]
+        bt      rax, 63
+        jc      <%=name%>_long
+        movsx   rax, eax
+        ret
+
+<%=name%>_long:
+        bt      rax, 62
+        jnc     <%=name%>_longNormal
+<%=name%>_longMontgomery:
+        call    <%=name%>_toLongNormal
+
+<%=name%>_longNormal:
+        mov     rax, [rdi + 8]
+        mov     rcx, rax
+        shr     rcx, 31
+        jnz     <%=name%>_longNeg
+<% for (let i=1; i< n64; i++) { %>
+        mov     rcx, [rdi + <%= i*8+8 %>]
+        test    rcx, rcx
+        jnz     <%=name%>_longNeg
+<% } %>
+        ret
+
+<%=name%>_longNeg:
+        mov     rax, [rdi + 8]
+        sub     rax, [q]
+        jnc     <%=name%>_longErr
+<% for (let i=1; i<n64; i++) { %>
+        mov     rcx, [rdi + <%= i*8+8 %>]
+        sbb     rcx, [q + <%= i*8 %>]
+        jnc     <%=name%>_longErr
+<% } %>
+        mov     rcx, rax
+        sar     rcx, 31
+        add     rcx, 1
+        jnz     <%=name%>_longErr
+        ret
+
+<%=name%>_longErr:
+        push    rdi
+        mov     rdi, 0
+        call    <%=name%>_fail
+        pop     rdi
+
+
+

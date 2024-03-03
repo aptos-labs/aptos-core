@@ -1,0 +1,21 @@
+/*
+ * SPDX-FileCopyrightText: 2019 Kip Warner
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/* version.h
+   Kip Warner, 25 May 2019
+
+   Version constants
+*/
+
+#pragma once
+
+namespace Pistache::Version {
+
+    static constexpr int Major = @VERSION_MAJOR@;
+    static constexpr int Minor = @VERSION_MINOR@;
+    static constexpr int Patch = @VERSION_PATCH@;
+    static constexpr int Git   = @VERSION_GIT_DATE@;
+} // namespace Pistache::Version

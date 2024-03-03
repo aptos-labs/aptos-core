@@ -1,0 +1,79 @@
+<% function negS() { %>
+        neg    eax
+        jo     neg_manageOverflow   ; Check if overflow. (0x80000000 is the only case)
+
+        mov    [rdi], rax           ; not necessary to adjust so just save and return
+        ret
+
+neg_manageOverflow:                 ; Do the operation in 64 bits
+        push   rsi
+        movsx  rsi, eax
+        neg    rsi
+        call   rawCopyS2L
+        pop    rsi
+        ret
+<% } %>
+
+<% function negL() { %>
+        add rdi, 8
+        add rsi, 8
+        call rawNegL
+        sub rdi, 8
+        sub rsi, 8
+        ret
+<% } %>
+
+;;;;;;;;;;;;;;;;;;;;;;
+; neg
+;;;;;;;;;;;;;;;;;;;;;;
+; Adds two elements of any kind
+; Params:
+;   rsi <= Pointer to element to be negated
+;   rdi <= Pointer to result
+;   [rdi] = -[rsi]
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_neg:
+        mov    rax, [rsi]
+        bt     rax, 63          ; Check if is short first operand
+        jc     neg_l
+
+neg_s:                          ; Operand is short
+<%=     negS()       %>
+
+
+neg_l:
+        mov [rdi], rax          ; Copy the type
+<%=     negL()       %>
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawNeg
+;;;;;;;;;;;;;;;;;;;;;;
+; Negates a value
+; Params:
+;   rdi <= Pointer to the long data of result
+;   rsi <= Pointer to the long data of element 1
+;
+;   [rdi] = - [rsi]
+;;;;;;;;;;;;;;;;;;;;;;
+rawNegL:
+<%=name%>_rawNeg:
+        ; Compare is zero
+
+        xor rax, rax
+<% for (let i=0; i<n64; i++) { %>
+        cmp [rsi + <%=i*8%>], rax
+        jnz doNegate
+<% } %>
+        ; it's zero so just set to zero
+<% for (let i=0; i<n64; i++) { %>
+        mov [rdi + <%=i*8%>], rax
+<% } %>
+        ret
+doNegate:
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [q + <%=i*8%>]
+        <%= i==0 ? "sub" : "sbb" %> rax, [rsi + <%=i*8%>]
+        mov [rdi + <%=i*8%>], rax
+<% } %>
+        ret

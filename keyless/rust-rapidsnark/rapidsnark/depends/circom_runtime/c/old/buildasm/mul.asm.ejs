@@ -1,0 +1,275 @@
+<% function mulS1S2() { %>
+        xor    rax, rax
+        mov    eax, r8d
+        imul   r9d
+        jo     mul_manageOverflow   ; rsi already is the 64bits result
+
+        mov    [rdi], rax       ; not necessary to adjust so just save and return
+
+mul_manageOverflow:                 ; Do the operation in 64 bits
+        push   rsi
+        movsx  rax, r8d
+        movsx  rcx, r9d
+        imul   rcx
+        mov    rsi, rax
+        call   rawCopyS2L
+        pop    rsi
+<% } %>
+
+<% function squareS1() { %>
+        xor    rax, rax
+        mov    eax, r8d
+        imul   eax
+        jo     square_manageOverflow   ; rsi already is the 64bits result
+
+        mov    [rdi], rax       ; not necessary to adjust so just save and return
+
+square_manageOverflow:                 ; Do the operation in 64 bits
+        push   rsi
+        movsx  rax, r8d
+        imul   rax
+        mov    rsi, rax
+        call   rawCopyS2L
+        pop    rsi
+<% } %>
+
+
+<% function mulL1S2(t) { %>
+        push rsi
+        add rsi, 8
+        movsx rdx, r9d
+        add rdi, 8
+        cmp rdx, 0
+        <% const rawPositiveLabel = global.tmpLabel() %>
+        jns <%= rawPositiveLabel %>
+        neg rdx
+        call rawMontgomeryMul1
+        mov rsi, rdi
+        call rawNegL
+        sub rdi, 8
+        pop rsi
+        <% const done = global.tmpLabel() %>
+        jmp <%= done %>
+<%= rawPositiveLabel %>:
+        call rawMontgomeryMul1
+        sub rdi, 8
+        pop rsi
+<%= done %>:
+
+<% } %>
+
+<% function mulS1L2() { %>
+        push rsi
+        lea rsi, [rdx + 8]
+        movsx rdx, r8d
+        add rdi, 8
+        cmp rdx, 0
+        <% const rawPositiveLabel = global.tmpLabel() %>
+        jns <%= rawPositiveLabel %>
+        neg rdx
+        call rawMontgomeryMul1
+        mov rsi, rdi
+        call rawNegL
+        sub rdi, 8
+        pop rsi
+        <% const done = global.tmpLabel() %>
+        jmp <%= done %>
+<%= rawPositiveLabel %>:
+        call rawMontgomeryMul1
+        sub rdi, 8
+        pop rsi
+<%= done %>:
+
+<% } %>
+
+<% function mulL1L2() { %>
+        add rdi, 8
+        add rsi, 8
+        add rdx, 8
+        call rawMontgomeryMul
+        sub rdi, 8
+        sub rsi, 8
+<% } %>
+
+
+<% function squareL1() { %>
+        add rdi, 8
+        add rsi, 8
+        call rawMontgomerySquare
+        sub rdi, 8
+        sub rsi, 8
+<% } %>
+
+<% function mulR3() { %>
+        push rsi
+        add rdi, 8
+        mov rsi, rdi
+        lea rdx, [R3]
+        call rawMontgomeryMul
+        sub rdi, 8
+        pop rsi
+<% } %>
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; square
+;;;;;;;;;;;;;;;;;;;;;;
+; Squares a field element
+; Params:
+;   rsi <= Pointer to element 1
+;   rdi <= Pointer to result
+;   [rdi] = [rsi] * [rsi]
+; Modified Registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_square:
+        mov    r8, [rsi]
+        bt     r8, 63          ; Check if is short first operand
+        jc     square_l1
+
+square_s1:                       ; Both operands are short
+<%=     squareS1()       %>
+        ret
+
+square_l1:
+        bt     r8, 62          ; check if montgomery first
+        jc     square_l1m
+square_l1n:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     squareL1()         %>
+<%=     mulR3()         %>
+        ret
+
+square_l1m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     squareL1()         %>
+        ret
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; mul
+;;;;;;;;;;;;;;;;;;;;;;
+; Multiplies two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result
+;   [rdi] = [rsi] * [rdi]
+; Modified Registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_mul:
+        mov    r8, [rsi]
+        mov    r9, [rdx]
+        bt     r8, 63          ; Check if is short first operand
+        jc     mul_l1
+        bt     r9, 63          ; Check if is short second operand
+        jc     mul_s1l2
+
+mul_s1s2:                       ; Both operands are short
+<%=     mulS1S2()       %>
+        ret
+
+mul_l1:
+        bt     r9, 63          ; Check if is short second operand
+        jc     mul_l1l2
+
+;;;;;;;;
+mul_l1s2:
+        bt     r8, 62          ; check if montgomery first
+        jc     mul_l1ms2
+mul_l1ns2:
+        bt     r9, 62          ; check if montgomery first
+        jc     mul_l1ns2m
+mul_l1ns2n:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     mulL1S2()       %>
+<%=     mulR3()         %>
+        ret
+
+
+mul_l1ns2m:
+<%=     global.setTypeDest("0x80"); %>
+<%=     mulL1L2()       %>
+        ret
+
+
+mul_l1ms2:
+        bt     r9, 62          ; check if montgomery second
+        jc     mul_l1ms2m
+mul_l1ms2n:
+<%=     global.setTypeDest("0x80"); %>
+<%=     mulL1S2()       %>
+        ret
+
+mul_l1ms2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     mulL1L2()         %>
+        ret
+
+
+;;;;;;;;
+mul_s1l2:
+        bt     r8, 62          ; check if montgomery first
+        jc     mul_s1ml2
+mul_s1nl2:
+        bt     r9, 62          ; check if montgomery first
+        jc     mul_s1nl2m
+mul_s1nl2n:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     mulS1L2()       %>
+<%=     mulR3()         %>
+        ret
+
+mul_s1nl2m:
+<%=     global.setTypeDest("0x80"); %>
+<%=     mulS1L2(); %>
+        ret
+
+mul_s1ml2:
+        bt     r9, 62          ; check if montgomery first
+        jc     mul_s1ml2m
+mul_s1ml2n:
+<%=     global.setTypeDest("0x80"); %>
+<%=     mulL1L2()         %>
+        ret
+
+mul_s1ml2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     mulL1L2()         %>
+        ret
+
+;;;;
+mul_l1l2:
+        bt     r8, 62          ; check if montgomery first
+        jc     mul_l1ml2
+mul_l1nl2:
+        bt     r9, 62          ; check if montgomery second
+        jc     mul_l1nl2m
+mul_l1nl2n:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     mulL1L2()         %>
+<%=     mulR3()         %>
+        ret
+
+mul_l1nl2m:
+<%=     global.setTypeDest("0x80"); %>
+<%=     mulL1L2()         %>
+        ret
+
+mul_l1ml2:
+        bt     r9, 62          ; check if montgomery seconf
+        jc     mul_l1ml2m
+mul_l1ml2n:
+<%=     global.setTypeDest("0x80"); %>
+<%=     mulL1L2()         %>
+        ret
+
+mul_l1ml2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     mulL1L2()         %>
+        ret
+
+

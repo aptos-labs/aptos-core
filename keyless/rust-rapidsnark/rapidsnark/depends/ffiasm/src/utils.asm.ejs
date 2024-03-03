@@ -1,0 +1,115 @@
+<% global.setTypeDest = function (t) {
+return (
+`        mov r11b, ${t}
+        shl r11d, 24
+        mov [rdi+4], r11d`);
+} %>
+
+
+<% global.toMont_a = function () {
+return (
+`
+        mov  r8, rdi
+        sub  rsp, ${ (n64+1)*8 }
+        mov  rdi, rsp
+        push rdx
+        push r8
+        call ${name}_toMontgomery
+        mov  rsi, rdi
+        pop  rdi
+        pop  rdx
+`);
+} %>
+
+<% global.toMont_b = function() {
+return (
+`
+        mov  r8, rdi
+        sub  rsp, ${ (n64+1)*8 }
+        mov  rdi, rsp
+        push rsi
+        mov  rsi, rdx
+        push r8
+        call ${name}_toMontgomery
+        mov  rdx, rdi
+        pop  rdi
+        pop  rsi
+`);
+} %>
+
+<% global.fromMont_a = function () {
+return (
+`
+        mov  r8, rdi
+        sub  rsp, ${ (n64+1)*8 }
+        mov  rdi, rsp
+        push rdx
+        push r8
+        call ${name}_toNormal
+        mov  rsi, rdi
+        pop  rdi
+        pop  rdx
+`);
+} %>
+
+
+
+<% global.fromMont_b = function() {
+return (
+`
+        mov  r8, rdi
+        sub  rsp, ${ (n64+1)*8 }
+        mov  rdi, rsp
+        push rsi
+        mov  rsi, rdx
+        push r8
+        call ${name}_toNormal
+        mov  rdx, rdi
+        pop  rdi
+        pop  rsi
+`);
+} %>
+
+<% global.fromMont_r = function () {
+return (
+`
+        sub  rsp, ${ (n64+1)*8 }
+        push rsi
+        mov  rsi, rdi
+        mov  rdi, rsp
+        call ${name}_toNormal
+        pop  rsi
+`);
+} %>
+
+<% global.toLong_a = function () {
+return (
+`
+        mov  r8, rdi
+        sub  rsp, ${ (n64+1)*8 }
+        mov  rdi, rsp
+        push rdx
+        push r8
+        call ${name}_toLongNormal
+        mov  rsi, rdi
+        pop  rdi
+        pop  rdx
+`);
+} %>
+
+<% global.toLong_b = function() {
+return (
+`
+        mov  r8, rdi
+        sub  rsp, ${ (n64+1)*8 }
+        mov  rdi, rsp
+        push rsi
+        mov  rsi, rdx
+        push r8
+        call ${name}_toLongNormal
+        mov  rdx, rdi
+        pop  rdi
+        pop  rsi
+`);
+} %>
+

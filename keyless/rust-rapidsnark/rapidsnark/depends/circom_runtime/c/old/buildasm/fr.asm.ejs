@@ -1,0 +1,53 @@
+
+
+        global <%=name%>_copy
+        global <%=name%>_copyn
+        global <%=name%>_add
+        global <%=name%>_sub
+        global <%=name%>_neg
+        global <%=name%>_mul
+        global <%=name%>_square
+        global <%=name%>_band
+        global <%=name%>_bor
+        global <%=name%>_bxor
+        global <%=name%>_bnot
+        global <%=name%>_eq
+        global <%=name%>_neq
+        global <%=name%>_lt
+        global <%=name%>_gt
+        global <%=name%>_leq
+        global <%=name%>_geq
+        global <%=name%>_land
+        global <%=name%>_lor
+        global <%=name%>_lnot
+        global <%=name%>_toNormal
+        global <%=name%>_toLongNormal
+        global <%=name%>_toMontgomery
+        global <%=name%>_toInt
+        global <%=name%>_isTrue
+        global <%=name%>_q
+        extern <%=name%>_fail
+        DEFAULT REL
+
+        section .text
+<%- include('utils.asm.ejs'); %>
+<%- include('copy.asm.ejs'); %>
+<%- include('montgomery.asm.ejs'); %>
+<%- include('add.asm.ejs'); %>
+<%- include('sub.asm.ejs'); %>
+<%- include('neg.asm.ejs'); %>
+<%- include('mul.asm.ejs'); %>
+<%- include('binops.asm.ejs'); %>
+<%- include('cmpops.asm.ejs'); %>
+<%- include('logicalops.asm.ejs'); %>
+
+        section .data
+<%=name%>_q:
+        dd      0
+        dd      0x80000000
+q       dq      <%= constantElement(q) %>
+half    dq      <%= constantElement(q.shiftRight(1)) %>
+R2      dq      <%= constantElement(bigInt.one.shiftLeft(n64*64*2).mod(q)) %>
+R3      dq      <%= constantElement(bigInt.one.shiftLeft(n64*64*3).mod(q)) %>
+lboMask dq      0x<%= bigInt("10000000000000000",16).shiftRight(n64*64 - q.bitLength()).minus(bigInt.one).toString(16) %>
+

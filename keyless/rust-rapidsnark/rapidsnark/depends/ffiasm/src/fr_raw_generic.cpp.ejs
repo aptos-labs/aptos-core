@@ -1,0 +1,362 @@
+#include "<%=name.toLowerCase()+"_element.hpp"%>"
+#include <gmp.h>
+#include <cstring>
+
+static uint64_t     <%=name%>_rawq[] = {<%= constantElement(q) %>, 0};
+static <%=name%>RawElement <%=name%>_rawR2  = {<%= constantElement(bigInt.one.shiftLeft(n64*64*2).mod(q)) %>};
+static uint64_t     <%=name%>_np     = 0x<%= (bigInt.one.shiftLeft(64)).minus(q.modInv(bigInt.one.shiftLeft(64))).toString(16) %>;
+static uint64_t     lboMask   = 0x<%= bigInt("10000000000000000",16).shiftRight(n64*64 - q.bitLength()).minus(bigInt.one).toString(16) %>;
+static <%=name%>RawElement zero      = {0};
+
+
+void <%=name%>_rawAdd(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB)
+{
+    uint64_t carry = mpn_add_n(pRawResult, pRawA, pRawB, <%=name%>_N64);
+
+    if(carry || mpn_cmp(pRawResult, <%=name%>_rawq, <%=name%>_N64) >= 0)
+    {
+        mpn_sub_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawAddLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB)
+{
+    uint64_t carry = mpn_add_1(pRawResult, pRawA, <%=name%>_N64, rawB);
+
+    if(carry || mpn_cmp(pRawResult, <%=name%>_rawq, <%=name%>_N64) >= 0)
+    {
+        mpn_sub_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawSub(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB)
+{
+    uint64_t carry = mpn_sub_n(pRawResult, pRawA, pRawB, <%=name%>_N64);
+
+    if(carry)
+    {
+        mpn_add_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawSubRegular(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB)
+{
+    mpn_sub_n(pRawResult, pRawA, pRawB, <%=name%>_N64);
+}
+
+void <%=name%>_rawSubSL(<%=name%>RawElement pRawResult, uint64_t rawA, <%=name%>RawElement pRawB)
+{
+    <%=name%>RawElement pRawA = {rawA};
+
+    uint64_t carry = mpn_sub_n(pRawResult, pRawA, pRawB, <%=name%>_N64);
+
+    if(carry)
+    {
+        mpn_add_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawSubLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB)
+{
+    uint64_t carry = mpn_sub_1(pRawResult, pRawA, <%=name%>_N64, rawB);
+
+    if(carry)
+    {
+        mpn_add_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawNeg(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA)
+{
+    if (mpn_cmp(pRawA, zero, <%=name%>_N64) != 0)
+    {
+        mpn_sub_n(pRawResult, <%=name%>_rawq, pRawA, <%=name%>_N64);
+    }
+    else
+    {
+        mpn_copyi(pRawResult, zero, <%=name%>_N64);
+    }
+}
+
+//  Substracts a long element and a short element form 0
+void <%=name%>_rawNegLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB)
+{
+    uint64_t carry1 = mpn_sub_1(pRawResult, <%=name%>_rawq, <%=name%>_N64, rawB);
+    uint64_t carry2 = mpn_sub_n(pRawResult, pRawResult, pRawA, <%=name%>_N64);
+
+    if (carry1 || carry2)
+    {
+        mpn_add_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawCopy(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA)
+{
+    memcpy(pRawResult, pRawA, sizeof(<%=name%>RawElement));
+}
+
+int <%=name%>_rawIsEq(const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB)
+{
+    return mpn_cmp(pRawA, pRawB, <%=name%>_N64) == 0;
+}
+
+void <%=name%>_rawMMul(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB)
+{
+    const mp_size_t  N = <%=name%>_N64+1;
+    const uint64_t  *mq = <%=name%>_rawq;
+<% if (!canOptimizeConsensys) { %>
+    uint64_t  c = 0;
+<% } -%>
+    uint64_t  np0;
+<% for (let i=0; i<n64; i++) { -%>
+    uint64_t  product<%=i%>[N] = {0};
+<% } %>
+    product0[N-1] = mpn_mul_1(product0, pRawB, <%=name%>_N64, pRawA[0]);
+<% if (!canOptimizeConsensys) { -%>
+<% for (let i=0; i<n64-1; i++) { %>
+    np0 = <%=name%>_np * product<%=i%>[0];
+    product<%=i+1%>[N-1] += mpn_addmul_1(product<%=i%>, mq, N, np0);
+
+    product<%=i+1%>[N-1] += mpn_addmul_1(product<%=i+1%>, pRawB, <%=name%>_N64, pRawA[<%=i+1%>]);
+<% if (i == n64-2) { -%>
+    c = mpn_add(product<%=i+1%>, product<%=i+1%>, N, product<%=i%>+1, N-1);
+<% } else { -%>
+    product<%=i+2%>[N-1] = mpn_add(product<%=i+1%>, product<%=i+1%>, N, product<%=i%>+1, N-1);
+<% } -%>
+<% } %>
+<% } else { -%>
+<% for (let i=0; i<n64-1; i++) { %>
+    np0 = <%=name%>_np * product<%=i%>[0];
+    product<%=i+1%>[1] = mpn_addmul_1(product<%=i%>, mq, N, np0);
+
+    product<%=i+1%>[N-1] = mpn_addmul_1(product<%=i+1%>, pRawB, <%=name%>_N64, pRawA[<%=i+1%>]);
+    mpn_add(product<%=i+1%>, product<%=i+1%>, N, product<%=i%>+1, N-1);
+<% } %>
+<% } -%>
+    np0 = <%=name%>_np * product<%=n64-1%>[0];
+<% if (!canOptimizeConsensys) { -%>
+    c += mpn_addmul_1(product<%=n64-1%>, mq, N, np0);
+
+    mpn_copyi(pRawResult,  product<%=n64-1%>+1, <%=name%>_N64);
+
+    if (c || mpn_cmp(pRawResult, mq, <%=name%>_N64) >= 0)
+<% } else { -%>
+    mpn_addmul_1(product<%=n64-1%>, mq, N, np0);
+
+    mpn_copyi(pRawResult,  product<%=n64-1%>+1, <%=name%>_N64);
+
+    if (mpn_cmp(pRawResult, mq, <%=name%>_N64) >= 0)
+<% } -%>
+    {
+        mpn_sub_n(pRawResult, pRawResult, mq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawMSquare(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA)
+{
+    <%=name%>_rawMMul(pRawResult, pRawA, pRawA);
+}
+
+void <%=name%>_rawMMul1(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, uint64_t pRawB)
+{
+    const mp_size_t  N = <%=name%>_N64+1;
+    const uint64_t  *mq = <%=name%>_rawq;
+<% if (!canOptimizeConsensys) { %>
+    uint64_t  c = 0;
+<% } -%>
+    uint64_t  np0;
+<% for (let i=0; i<n64; i++) { -%>
+    uint64_t  product<%=i%>[N] = {0};
+<% } %>
+    product0[N-1] = mpn_mul_1(product0, pRawA, <%=name%>_N64, pRawB);
+<% for (let i=0; i<n64-1; i++) { %>
+    np0 = <%=name%>_np * product<%=i%>[0];
+<% if (!canOptimizeConsensys) { -%>
+    product<%=i+1%>[N-1] = mpn_addmul_1(product<%=i%>, mq, N, np0);
+<% } else { -%>
+    product<%=i+1%>[1] = mpn_addmul_1(product<%=i%>, mq, N, np0);
+<% } -%>
+    mpn_add(product<%=i+1%>, product<%=i+1%>, N, product<%=i%>+1, N-1);
+<% } %>
+    np0 = <%=name%>_np * product<%=n64-1%>[0];
+<% if (!canOptimizeConsensys) { -%>
+    c = mpn_addmul_1(product<%=n64-1%>, mq, N, np0);
+
+    mpn_copyi(pRawResult,  product<%=n64-1%>+1, <%=name%>_N64);
+
+    if (c || mpn_cmp(pRawResult, mq, <%=name%>_N64) >= 0)
+<% } else { -%>
+    mpn_addmul_1(product<%=n64-1%>, mq, N, np0);
+
+    mpn_copyi(pRawResult,  product<%=n64-1%>+1, <%=name%>_N64);
+
+    if (mpn_cmp(pRawResult, mq, <%=name%>_N64) >= 0)
+<% } -%>
+    {
+        mpn_sub_n(pRawResult, pRawResult, mq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawToMontgomery(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA)
+{
+    <%=name%>_rawMMul(pRawResult, pRawA, <%=name%>_rawR2);
+}
+
+void <%=name%>_rawFromMontgomery(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA)
+{
+    const mp_size_t  N = <%=name%>_N64+1;
+    const uint64_t  *mq = <%=name%>_rawq;
+<% if (!canOptimizeConsensys) { %>
+    uint64_t  c = 0;
+<% } -%>
+    uint64_t  np0;
+    uint64_t  product0[N];
+<% for (let i=1; i<n64; i++) { -%>
+    uint64_t  product<%=i%>[N] = {0};
+<% } %>
+    mpn_copyi(product0, pRawA, <%=name%>_N64); product0[N-1] = 0;
+<% for (let i=0; i<n64-1; i++) { %>
+    np0 = <%=name%>_np * product<%=i%>[0];
+<% if (!canOptimizeConsensys) { -%>
+    product<%=i+1%>[N-1] = mpn_addmul_1(product<%=i%>, mq, N, np0);
+<% } else { -%>
+    product<%=i+1%>[1] = mpn_addmul_1(product<%=i%>, mq, N, np0);
+<% } -%>
+    mpn_add(product<%=i+1%>, product<%=i+1%>, N, product<%=i%>+1, N-1);
+<% } %>
+    np0 = <%=name%>_np * product<%=n64-1%>[0];
+<% if (!canOptimizeConsensys) { -%>
+    c = mpn_addmul_1(product<%=n64-1%>, mq, N, np0);
+
+    mpn_copyi(pRawResult,  product<%=n64-1%>+1, <%=name%>_N64);
+
+    if (c || mpn_cmp(pRawResult, mq, <%=name%>_N64) >= 0)
+<% } else { -%>
+    mpn_addmul_1(product<%=n64-1%>, mq, N, np0);
+
+    mpn_copyi(pRawResult,  product<%=n64-1%>+1, <%=name%>_N64);
+
+    if (mpn_cmp(pRawResult, mq, <%=name%>_N64) >= 0)
+<% } -%>
+    {
+        mpn_sub_n(pRawResult, pRawResult, mq, <%=name%>_N64);
+    }
+}
+
+int <%=name%>_rawIsZero(const <%=name%>RawElement rawA)
+{
+    return mpn_zero_p(rawA, <%=name%>_N64) ? 1 : 0;
+}
+
+int <%=name%>_rawCmp(<%=name%>RawElement pRawA, <%=name%>RawElement pRawB)
+{
+    return mpn_cmp(pRawA, pRawB, <%=name%>_N64);
+}
+
+void <%=name%>_rawSwap(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA)
+{
+    <%=name%>RawElement temp;
+
+    <%=name%>_rawCopy(temp, pRawResult);
+    <%=name%>_rawCopy(pRawResult, pRawA);
+    <%=name%>_rawCopy(pRawA, temp);
+}
+
+void <%=name%>_rawCopyS2L(<%=name%>RawElement pRawResult, int64_t val)
+{
+    pRawResult[0] = val;
+<% for (let i=1; i<n64; i++) { %>
+    pRawResult[<%= i %>] = 0;<% } %>
+
+    if (val < 0) {
+<% for (let i=1; i<n64; i++) { %>
+        pRawResult[<%= i %>] = -1;<% } %>
+
+        mpn_add_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawAnd(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB)
+{
+    mpn_and_n(pRawResult, pRawA, pRawB, <%=name%>_N64);
+
+    pRawResult[<%= n64 - 1 %>] &= lboMask;
+
+    if (mpn_cmp(pRawResult, <%=name%>_rawq, <%=name%>_N64) >= 0)
+    {
+        mpn_sub_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawOr(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB)
+{
+    mpn_ior_n(pRawResult, pRawA, pRawB, <%=name%>_N64);
+
+    pRawResult[<%= n64 - 1 %>] &= lboMask;
+
+    if (mpn_cmp(pRawResult, <%=name%>_rawq, <%=name%>_N64) >= 0)
+    {
+        mpn_sub_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawXor(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB)
+{
+    mpn_xor_n(pRawResult, pRawA, pRawB, <%=name%>_N64);
+
+    pRawResult[<%= n64 - 1 %>] &= lboMask;
+
+    if (mpn_cmp(pRawResult, <%=name%>_rawq, <%=name%>_N64) >= 0)
+    {
+        mpn_sub_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawShl(<%=name%>RawElement r, <%=name%>RawElement a, uint64_t b)
+{
+    uint64_t bit_shift  = b % 64;
+    uint64_t word_shift = b / 64;
+    uint64_t word_count = <%=name%>_N64 - word_shift;
+
+    mpn_copyi(r + word_shift, a, word_count);
+    std::memset(r, 0, word_shift * sizeof(uint64_t));
+
+    if (bit_shift)
+    {
+        mpn_lshift(r, r, <%=name%>_N64, bit_shift);
+    }
+
+    r[<%= n64 - 1 %>] &= lboMask;
+
+    if (mpn_cmp(r, <%=name%>_rawq, <%=name%>_N64) >= 0)
+    {
+        mpn_sub_n(r, r, <%=name%>_rawq, <%=name%>_N64);
+    }
+}
+
+void <%=name%>_rawShr(<%=name%>RawElement r, <%=name%>RawElement a, uint64_t b)
+{
+    const uint64_t bit_shift  = b % 64;
+    const uint64_t word_shift = b / 64;
+    const uint64_t word_count = <%=name%>_N64 - word_shift;
+
+    mpn_copyi(r, a + word_shift, word_count);
+    std::memset(r + word_count, 0, word_shift * sizeof(uint64_t));
+
+    if (bit_shift)
+    {
+        mpn_rshift(r, r, <%=name%>_N64, bit_shift);
+    }
+}
+
+void <%=name%>_rawNot(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA)
+{
+    mpn_com(pRawResult, pRawA, <%=name%>_N64);
+
+    pRawResult[<%= n64 - 1 %>] &= lboMask;
+
+    if (mpn_cmp(pRawResult, <%=name%>_rawq, <%=name%>_N64) >= 0)
+    {
+        mpn_sub_n(pRawResult, pRawResult, <%=name%>_rawq, <%=name%>_N64);
+    }
+}

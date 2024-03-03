@@ -1,0 +1,251 @@
+
+;;;;;;;;;;;;;;;;;;;;;;
+; mul Montgomery
+;;;;;;;;;;;;;;;;;;;;;;
+mulM:
+<%
+let r0, r1, r2;
+function setR(step) {
+    if ((step % 3) == 0) {
+        r0 = "r8";
+        r1 = "r9";
+        r2 = "r10";
+    } else if ((step % 3) == 1) {
+        r0 = "r9";
+        r1 = "r10";
+        r2 = "r8";
+    } else {
+        r0 = "r10";
+        r1 = "r8";
+        r2 = "r9";
+    }
+}
+
+const base = bigInt.one.shiftLeft(64);
+const np64 = base.minus(q.modInv(base));
+%>
+        sub     rsp, <%= n64*8 %>  ; Reserve space for ms
+        mov     rcx, rdx            ; rdx is needed for multiplications so keep it in cx
+        mov     r11, 0x<%= np64.toString(16) %> ; np
+        xor     r8,r8
+        xor     r9,r9
+        xor     r10,r10
+<%
+// Main loop
+for (let i=0; i<n64*2; i++) {
+    setR(i);
+%>
+<%
+    // Same Digit
+    for (let o1=Math.max(0, i-n64+1); (o1<=i)&&(o1<n64); o1++) {
+        const o2= i-o1;
+%>
+        mov     rax, [rsi + <%= 8*o1 %>]
+        mul     qword [rcx + <%= 8*o2 %>]
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%
+    } // Same digit
+%>
+
+
+<%
+    for (let j=i-1; j>=0; j--) { // All ms
+        if (((i-j)<n64)&&(j<n64)) {
+%>
+        mov     rax, [rsp + <%= j*8 %>]
+        mul     qword [q + <%= (i-j)*8 %>]
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%
+        }
+    } // ms
+%>
+
+<%
+    if (i<n64) {
+%>
+        mov     rax, <%= r0 %>
+        mul     r11
+        mov     [rsp + <%= i*8 %>], rax
+        mul     qword [q]
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%
+    } else {
+%>
+        mov     [rdi + <%= (i-n64)*8 %> ], <%= r0 %>
+        xor     <%= r0 %>,<%= r0 %>
+<%
+    }
+%>
+
+<%
+}   // Main Loop
+%>
+        cmp     <%= r1 %>, 0x0
+        jne     mulM_sq
+        ; Compare with q
+<%
+for (let i=0; i<n64; i++) {
+%>
+        mov rax, [rdi + <%= (n64-i-1)*8 %>]
+        cmp rax, [q + <%= (n64-i-1)*8 %>]
+        jg mulM_sq
+        jl mulM_done
+<%
+}
+%>
+        ; If equal substract q
+
+mulM_sq:
+<%
+for (let i=0; i<n64; i++) {
+%>
+        mov rax, [q + <%= i*8 %>]
+        <%= i==0 ? "sub" : "sbb" %> [rdi + <%= i*8 %>], rax
+<%
+}
+%>
+
+mulM_done:
+        add rsp, <%= n64*8 %>   ; recover rsp
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; mul MontgomeryShort
+;;;;;;;;;;;;;;;;;;;;;;
+mulSM:
+
+;;;;;;;;;;;;;;;;;;;;;;
+; mul
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_mul:
+        mov    rax, [rsi]
+        bt     rax, 63
+        jc     l1
+        mov    rcx, [rdx]
+        bt     rcx, 63
+        jc     s1l2
+s1s2:                       ; short first and second
+        mul    ecx
+        jc     rs2l         ; If if doesn't feed in 32 bits convert the result to long
+
+        ; The shorts multiplication is done. copy the val to destination and return
+        mov    [rdi], rax
+        ret
+
+rs2l:                       ; The result in the multiplication doen't feed
+                            ; we have the result in edx:eax we need to convert it to long
+        shl    rdx, 32
+        mov    edx, eax     ; pack edx:eax to rdx
+
+        xor    rax, rax     ; Set the format to long
+        bts    rax, 63
+        mov    [rdi], rax       ; move the first digit
+
+        cmp    rdx, 0       ; check if redx is negative.
+        jl     rs2ln
+
+        ; edx is positive.
+        mov    [rdi + 8], rdx   ; Set the firs digit
+
+        xor    rax, rax     ; Set the remaining digits to 0
+<% for (let i=1; i<n64; i++) { %>
+        mov [rdi + <%= (i+1)*8 %>], rax
+<% } %>
+        ret
+
+        ; edx is negative.
+rs2ln:
+
+        add    rdx, [q]         ; Set the firs digit
+        mov    [rdi + 8], rdx   ;
+
+        mov    rdx, -1          ; all ones
+<% for (let i=1; i<n64; i++) { %>
+        mov    rax, rdx                       ; Add to q
+        adc    rax, [q + <%= i*8 %> ]
+        mov    [rdi + <%= (i+1)*8 %>], rax
+<% } %>
+        ret
+
+l1:
+        mov    rcx, [rdx]
+        bt     rcx, 63
+        jc     ll
+
+l1s2:
+        xor rdx, rdx
+        mov edx, ecx
+        bt  rax, 62
+        jc  lsM
+        jmp lsN
+
+s1l2:
+        mov rsi, rdx
+        xor rdx, rdx
+        mov edx, eax
+        bt  rcx, 62
+        jc  lsM
+        jmp lsN
+
+
+lsN:
+        mov byte [rdi + 7], 0xC0    ; set the result to montgomery
+        add rsi, 8
+        add rdi, 8
+        call mulSM
+        mov rsi, rdi
+        lea rdx, [R3]
+        call mulM
+        ret
+
+lsM:
+        mov byte [rdi + 7], 0x80    ; set the result to long normal
+        add rsi, 8
+        add rdi, 8
+        call mulSM
+        ret
+
+
+ll:
+
+        bt rax, 62
+        jc lml
+        bt rcx, 62
+        jc lnlm
+
+lnln:
+        mov byte [rdi + 7], 0xC0    ; set the result to long montgomery
+        add rsi, 8
+        add rdi, 8
+        add rdx, 8
+        call mulM
+        mov rsi, rdi
+        lea rdx, [R3]
+        call mulM
+        ret
+
+lml:
+        bt rcx, 62
+        jc lmlm
+
+lnlm:
+        mov byte [rdi + 7], 0x80    ; set the result to long normal
+        add rsi, 8
+        add rdi, 8
+        add rdx, 8
+        call mulM
+        ret
+
+lmlm:
+        mov byte [rdi + 7], 0xC0    ; set the result to long montgomery
+        add rsi, 8
+        add rdi, 8
+        add rdx, 8
+        call mulM
+        ret

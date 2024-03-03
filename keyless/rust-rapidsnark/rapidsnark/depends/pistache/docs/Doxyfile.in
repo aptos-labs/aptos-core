@@ -1,0 +1,27 @@
+# SPDX-FileCopyrightText: 2019 Arthur de Araújo Farias
+# 
+# SPDX-License-Identifier: Apache-2.0
+
+OUTPUT_DIRECTORY       = @CURRENT_BUILD_DIR@/docs/
+INPUT                  = @SOURCE_DIR@/README.md @SOURCE_DIR@/src/ @SOURCE_DIR@/include/ @SOURCE_DIR@/examples/ @SOURCE_DIR@/docs/
+USE_MDFILE_AS_MAINPAGE = @SOURCE_DIR@/README.md
+EXCLUDE_PATTERNS       = */.git/*
+EXCLUDE_PATTERNS      += */subprojects/*
+EXCLUDE_PATTERNS      += */tests/*
+
+DOXYFILE_ENCODING      = UTF-8
+PROJECT_NAME           = @PROJECT_NAME@
+TYPEDEF_HIDES_STRUCT   = YES
+EXTRACT_ALL            = YES
+EXTRACT_LOCAL_CLASSES  = YES
+SHOW_INCLUDE_FILES     = YES
+INLINE_INFO            = YES
+SORT_MEMBER_DOCS       = YES
+GENERATE_TODOLIST      = YES
+GENERATE_BUGLIST       = YES
+GENERATE_DEPRECATEDLIST = YES
+SHOW_USED_FILES        = YES
+SHOW_FILES             = YES
+SHOW_NAMESPACES        = YES
+INPUT_ENCODING         = UTF-8
+RECURSIVE              = YES

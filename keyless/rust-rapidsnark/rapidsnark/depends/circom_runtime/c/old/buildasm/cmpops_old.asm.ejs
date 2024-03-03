@@ -1,0 +1,108 @@
+
+<% function retOne() { %>
+        mov qword [rdi], 1
+        add rsp, <%= (n64+1)*8 %>
+        ret
+<% } %>
+
+<% function retZero() { %>
+        mov qword [rdi], 0
+        add rsp, <%= (n64+1)*8 %>
+        ret
+<% } %>
+
+<% function cmpLong(op, eq) { %>
+
+<%
+    if (eq==true) {
+        if (["leq","geq"].indexOf(op) >= 0) retOne();
+        if (["lt","gt"].indexOf(op) >= 0) retZero();
+    }
+%>
+
+
+<%   const label_gt = global.tmpLabel() %>
+<%   const label_lt = global.tmpLabel() %>
+<%   for (let i=n64-1; i>=0; i--) { %>
+        mov     rax, [rsp + <%= 8+(i*8) %>]
+        cmp     [half + <%= (i*8) %>], rax     ; comare with (q-1)/2
+        jc <%=label_lt%>                           ; half<rax => e1-e2 is neg => e1 < e2
+        jnz <%=label_gt%>                       ; half>rax => e1 -e2 is pos => e1 > e2
+<%   } %>
+                                                ; half == rax => e1-e2 is pos => e1 > e2
+<%=label_gt%>:
+<%   if (["geq","gt"].indexOf(op) >= 0) retOne(); else retZero(); %>
+<%=label_lt%>:
+<%   if (["leq","lt"].indexOf(op) >= 0) retOne(); else retZero(); %>
+<% } // cmpLong%>
+
+<% function cmpOp(op) { %>
+;;;;;;;;;;;;;;;;;;;;;;
+; <%= op %>
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result can be zero or one.
+; Modified Registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_<%=op%>:
+    sub     rsp, <%= (n64+1)*8 %>  ; Save space for the result of the substraction
+    push    rdi                    ; Save rdi
+    lea     rdi, [rsp+8]           ; We pushed rdi so we need to add 8
+    call    <%=name%>_sub          ; Do a substraction
+    call    <%=name%>_toNormal     ; Convert it to normal
+    pop     rdi
+
+    mov     rax, [rsp]             ; We already poped do no need to add 8
+    bt      rax, 63                ; check is result is long
+    jc      <%=op%>_longCmp
+
+<%=op%>_shortCmp:
+    cmp     eax, 0
+    je      <%=op%>_s_eq
+    js      <%=op%>_s_lt
+<%=op%>_s_gt:
+<%   if (["geq","gt", "neq"].indexOf(op) >= 0) retOne(); else retZero(); %>
+<%=op%>_s_lt:
+<%   if (["leq","lt", "neq"].indexOf(op) >= 0) retOne(); else retZero(); %>
+<%=op%>_s_eq:
+<%   if (["eq","geq", "leq"].indexOf(op) >= 0) retOne(); else retZero(); %>
+
+<%=op%>_longCmp:
+
+<% for (let i=n64-1; i>=0; i--) { %>
+    cmp     qword [rsp + <%= 8+(i*8) %>], 0
+    jnz <%=op%>_neq
+<% } %>
+<%=op%>_eq:
+<% if (op == "eq") {
+        retOne();
+   } else if (op == "neq") {
+        retZero();
+   } else {
+        cmpLong(op, true);
+   }
+%>
+<%=op%>_neq:
+<% if (op == "neq") {
+        retOne();
+   } else if (op == "eq") {
+        retZero();
+   } else {
+        cmpLong(op, false);
+   }
+%>
+
+
+<% } %>
+
+<%= cmpOp("eq") %>
+<%= cmpOp("neq") %>
+<%= cmpOp("lt") %>
+<%= cmpOp("gt") %>
+<%= cmpOp("leq") %>
+<%= cmpOp("geq") %>
+

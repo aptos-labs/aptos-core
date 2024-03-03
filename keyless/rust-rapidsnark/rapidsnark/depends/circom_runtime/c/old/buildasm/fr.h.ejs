@@ -1,0 +1,67 @@
+#ifndef __<%=name.toUpperCase()%>_H
+#define __<%=name.toUpperCase()%>_H
+
+#include <stdint.h>
+#define <%=name%>_N64 <%= n64 %>
+#define <%=name%>_SHORT 0x00000000
+#define <%=name%>_LONG 0x80000000
+#define <%=name%>_LONGMONTGOMERY 0xC0000000
+typedef struct __attribute__((__packed__)) {
+    int32_t shortVal;
+    uint32_t type;
+    uint64_t longVal[<%=name%>_N64];
+} <%=name%>Element;
+typedef <%=name%>Element *P<%=name%>Element;
+extern <%=name%>Element <%=name%>_q;
+extern "C" void <%=name%>_copy(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_copyn(P<%=name%>Element r, P<%=name%>Element a, int n);
+extern "C" void <%=name%>_add(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_sub(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_neg(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_mul(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_square(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_band(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_bor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_bxor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_bnot(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_eq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_neq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_lt(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_gt(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_leq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_geq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_land(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_lor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_lnot(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_toNormal(P<%=name%>Element pE);
+extern "C" void <%=name%>_toLongNormal(P<%=name%>Element pE);
+extern "C" void <%=name%>_toMontgomery(P<%=name%>Element pE);
+
+extern "C" int <%=name%>_isTrue(P<%=name%>Element pE);
+extern "C" int <%=name%>_toInt(P<%=name%>Element pE);
+
+extern "C" void <%=name%>_fail();
+
+extern <%=name%>Element <%=name%>_q;
+
+// Pending functions to convert
+
+void <%=name%>_str2element(P<%=name%>Element pE, char const*s);
+char *<%=name%>_element2str(P<%=name%>Element pE);
+void <%=name%>_idiv(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_mod(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_inv(P<%=name%>Element r, P<%=name%>Element a);
+void <%=name%>_div(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_shl(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_shr(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_pow(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+
+
+void <%=name%>_init();
+
+
+
+#endif // __<%=name.toUpperCase()%>_H
+
+
+

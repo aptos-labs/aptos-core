@@ -1,0 +1,97 @@
+
+
+<% function isTrue(resReg, srcPtrReg) { %>
+<% const longIsZero = global.tmpLabel() %>
+<% const retOne = global.tmpLabel("retOne") %>
+<% const retZero = global.tmpLabel("retZero") %>
+<% const done = global.tmpLabel("done") %>
+
+    mov     rax, [<%=srcPtrReg%>]
+    bt      rax, 63
+    jc      <%= longIsZero %>
+
+    test    eax, eax
+    jz      <%= retZero %>
+    jmp     <%= retOne %>
+
+<%= longIsZero %>:
+<%   for (let i=0; i<n64; i++) { %>
+    mov     rax, [<%= srcPtrReg + " + " +(i*8+8) %>]
+    test    rax, rax
+    jnz     <%= retOne %>
+<%   } %>
+
+<%= retZero %>:
+    mov     qword <%=resReg%>, 0
+    jmp     <%= done %>
+
+<%= retOne %>:
+    mov     qword <%=resReg%>, 1
+
+<%= done %>:
+<% } %>
+
+
+
+
+<% function logicalOp(op) { %>
+;;;;;;;;;;;;;;;;;;;;;;
+; l<%= op %>
+;;;;;;;;;;;;;;;;;;;;;;
+; Logical <%= op %> between two elements
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result zero or one
+; Modified Registers:
+;    rax, rcx, r8
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_l<%=op%>:
+<%=     isTrue("r8", "rsi") %>
+<%=     isTrue("rcx", "rdx") %>
+        <%=op%> rcx, r8
+        mov [rdi], rcx
+        ret
+<% } %>
+
+<% logicalOp("and"); %>
+<% logicalOp("or"); %>
+
+;;;;;;;;;;;;;;;;;;;;;;
+; lnot
+;;;;;;;;;;;;;;;;;;;;;;
+; Do the logical not of an element
+; Params:
+;   rsi <= Pointer to element to be tested
+;   rdi <= Pointer to result one if element1 is zero and zero otherwise
+; Modified Registers:
+;    rax, rax, r8
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_lnot:
+<%=     isTrue("rcx", "rsi") %>
+        test rcx, rcx
+
+        jz lnot_retOne
+lnot_retZero:
+        mov qword [rdi], 0
+        ret
+lnot_retOne:
+        mov qword [rdi], 1
+        ret
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; isTrue
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a 64 bit integer to a long format field element
+; Params:
+;   rsi <= Pointer to the element
+; Returs:
+;   rax <= 1 if true 0 if false
+;;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_isTrue:
+        <%=     isTrue("rax", "rdi") %>
+        ret
+
+
+

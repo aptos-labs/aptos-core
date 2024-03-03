@@ -1,0 +1,26 @@
+# SPDX-FileCopyrightText: 2021 Andrea Pappacoda
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: conventional-commits
+
+on: pull_request
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: ${{ github.event.pull_request.commits }} + 1
+
+      - uses: actions/setup-node@v2
+
+      - name: Install commitlint cli
+        run: |
+          yarn global add @commitlint/cli @commitlint/config-conventional
+          echo "module.exports = { extends: ['@commitlint/config-conventional'] }" > commitlint.config.js
+
+      - name: Commitlint
+        run: commitlint --from HEAD~${{ github.event.pull_request.commits }} --to HEAD

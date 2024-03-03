@@ -1,0 +1,105 @@
+# SPDX-FileCopyrightText: 2022 Andrea Pappacoda
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: linux
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
+defaults:
+  run:
+    shell: sh
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ 'debian:stable', 'debian:testing', 'registry.access.redhat.com/ubi8/ubi-minimal', 'registry.access.redhat.com/ubi9/ubi-minimal' ]
+        compiler: [ 'gcc', 'clang' ]
+        sanitizer: [ 'address', 'undefined', 'none' ] # ThreadSanitizer reports errors
+        tls: [ 'true', 'false' ]
+        exclude:
+          - os: 'registry.access.redhat.com/ubi8/ubi-minimal'
+            sanitizer: 'address'
+          - os: 'registry.access.redhat.com/ubi8/ubi-minimal'
+            sanitizer: 'thread'
+          - os: 'registry.access.redhat.com/ubi8/ubi-minimal'
+            sanitizer: 'undefined'
+          - os: 'registry.access.redhat.com/ubi9/ubi-minimal'
+            sanitizer: 'address'
+          - os: 'registry.access.redhat.com/ubi9/ubi-minimal'
+            sanitizer: 'thread'
+          - os: 'registry.access.redhat.com/ubi9/ubi-minimal'
+            sanitizer: 'undefined'
+
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.os }}
+
+    steps:
+    # llvm-dev is required because it contains LLVMgold.so in Debian 11
+    # To conditionally install packages I use apt-patterns(7). The first
+    # pattern installs a package named "libhowardhinnant-date-dev" if found,
+    # the second installs "libgmock-dev" if its version is greater than 1.11
+    - name: Install dependencies (Debian)
+      if: contains(matrix.os, 'debian')
+      run: |
+        if [ ${{ matrix.compiler }} = gcc ]; then compiler=g++; else compiler="clang lld ?exact-name(libclang-rt-dev)"; fi
+        apt -y update
+        apt -y install $compiler meson pkg-config cmake rapidjson-dev libssl-dev '?exact-name(libhowardhinnant-date-dev)' '?exact-name(libgmock-dev) (?version([1-9]\.[1-9][1-9]) | ?version([1-9]\.[2-9][0-9]))' '?exact-name(libcpp-httplib-dev)' libcurl4-openssl-dev git ca-certificates curl gpg gpgv gpg-agent lcov llvm-dev --no-install-recommends
+
+    - name: Install dependencies (Red Hat)
+      if: contains(matrix.os, 'redhat')
+      run: |
+        if [ ${{ matrix.compiler }} = gcc ]; then compiler=gcc-c++; else compiler=llvm-toolset; fi
+        microdnf -y install $compiler pkgconf cmake openssl-devel libcurl-devel git python3-pip unzip
+        curl -LO https://github.com/ninja-build/ninja/releases/latest/download/ninja-linux.zip
+        unzip ninja-linux.zip
+        mv ninja /usr/local/bin
+        rm ninja-linux.zip
+        pip3 install meson
+
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+
+    - name: Configure Meson
+      run: |
+        if [ ${{ matrix.compiler }} = gcc ]; then CXX=g++; else CXX=clang++ CXX_LD=lld; fi
+        export CXX CXX_LD
+        meson setup build -DPISTACHE_BUILD_TESTS=true -DPISTACHE_USE_SSL=${{ matrix.tls }} --buildtype=debug -Db_coverage=true -Db_sanitize=${{ matrix.sanitizer }} -Db_lundef=false
+      env:
+        CC: ${{ matrix.compiler }}
+
+    - name: Build
+      run: ninja -C build
+
+    - name: Test
+      run: meson test -C build --verbose
+
+    - name: Coverage
+      if: ${{ !contains(matrix.os, 'redhat') }}
+      run: |
+        mkdir -p $HOME/.local/bin
+        if [ "${{ matrix.compiler }}" = 'clang' ]; then printf 'llvm-cov gcov "$@"' > $HOME/.local/bin/cov.sh; else printf 'gcov "$@"' > $HOME/.local/bin/cov.sh; fi && chmod +x $HOME/.local/bin/cov.sh
+        lcov --capture --output-file coverage.info --directory . --gcov-tool $HOME/.local/bin/cov.sh --exclude '/usr/*' --exclude "${HOME}"'/.cache/*' --exclude '*/tests/*' --exclude '*/subprojects/*'
+        lcov --list coverage.info
+        curl https://keybase.io/codecovsecurity/pgp_keys.asc | gpg --no-default-keyring --keyring trustedkeys.gpg --import
+        curl --silent --remote-name https://uploader.codecov.io/latest/linux/codecov
+        curl --silent --remote-name https://uploader.codecov.io/latest/linux/codecov.SHA256SUM
+        curl --silent --remote-name https://uploader.codecov.io/latest/linux/codecov.SHA256SUM.sig
+        gpgv codecov.SHA256SUM.sig codecov.SHA256SUM
+        sha256sum --check codecov.SHA256SUM
+        chmod +x codecov
+        ./codecov

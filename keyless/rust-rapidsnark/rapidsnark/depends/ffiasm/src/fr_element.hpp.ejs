@@ -1,0 +1,23 @@
+#ifndef <%=name.toUpperCase()%>_ELEMENT_HPP
+#define <%=name.toUpperCase()%>_ELEMENT_HPP
+
+#include <cstdint>
+
+#define <%=name%>_N64 <%= n64 %>
+#define <%=name%>_SHORT           0x00000000
+#define <%=name%>_MONTGOMERY      0x40000000
+#define <%=name%>_SHORTMONTGOMERY 0x40000000
+#define <%=name%>_LONG            0x80000000
+#define <%=name%>_LONGMONTGOMERY  0xC0000000
+
+typedef uint64_t <%=name%>RawElement[<%=name%>_N64];
+
+typedef struct __attribute__((__packed__)) {
+    int32_t shortVal;
+    uint32_t type;
+    <%=name%>RawElement longVal;
+} <%=name%>Element;
+
+typedef <%=name%>Element *P<%=name%>Element;
+
+#endif // <%=name.toUpperCase()%>_ELEMENT_HPP

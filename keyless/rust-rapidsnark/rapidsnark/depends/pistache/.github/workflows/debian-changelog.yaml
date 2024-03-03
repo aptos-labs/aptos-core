@@ -1,0 +1,43 @@
+# SPDX-FileCopyrightText: 2023 Andrea Pappacoda
+# SPDX-License-Identifier: Apache-2.0
+
+name: debian-changelog
+
+on:
+  push:
+    branches: [ master ]
+    paths: version.txt
+
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  debian-changelog:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Install dependencies
+      run: |
+        apt update
+        apt -y install --no-install-recommends devscripts git
+
+    - uses: actions/checkout@v3
+
+    - name: Update debian/changelog
+      run: |
+        git switch debian
+        git checkout master -- version.txt
+        export DEBFULLNAME=$(grep '^Maintainer:' control | cut -d : -f 2 | cut -d '<' -f 1 | xargs echo)
+        export DEBEMAIL=$(grep '^Maintainer:' control | cut -d '<' -f 2 | tr -d '>')
+        xargs -I version dch -v version-1 -c changelog '' < version.txt
+      env:
+        TZ: UTC0
+
+    - name: Push updated changelog
+      run: |
+        git config user.name "$GITHUB_ACTOR"
+        git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+        xargs -I version git commit -m 'changelog: update to version' changelog < version.txt
+        git push

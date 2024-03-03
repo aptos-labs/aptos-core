@@ -1,0 +1,245 @@
+<% function addS1S2() { %>
+        xor    rdx, rdx
+        mov    edx, eax
+        add    edx, ecx
+        jo     add_manageOverflow   ; rsi already is the 64bits result
+
+        mov    [rdi], rdx       ; not necessary to adjust so just save and return
+        ret
+
+add_manageOverflow:                 ; Do the operation in 64 bits
+        push   rsi
+        movsx  rsi, eax
+        movsx  rdx, ecx
+        add    rsi, rdx
+        call   rawCopyS2L
+        pop    rsi
+        ret
+<% } %>
+
+
+
+<% function addL1S2() { %>
+        add rsi, 8
+        movsx rdx, ecx
+        add rdi, 8
+        cmp rdx, 0
+        <% const rawAddLabel = global.tmpLabel() %>
+        jns <%= rawAddLabel %>
+        neg rdx
+        call rawSubLS
+        sub rdi, 8
+        sub rsi, 8
+        ret
+<%= rawAddLabel %>:
+        call rawAddLS
+        sub rdi, 8
+        sub rsi, 8
+        ret
+
+<% } %>
+
+<% function addS1L2() { %>
+        lea rsi, [rdx + 8]
+        movsx rdx, eax
+        add rdi, 8
+        cmp rdx, 0
+        <% const rawAddLabel = global.tmpLabel() %>
+        jns <%= rawAddLabel %>
+        neg rdx
+        call rawSubLS
+        sub rdi, 8
+        sub rsi, 8
+        ret
+<%= rawAddLabel %>:
+        call rawAddLS
+        sub rdi, 8
+        sub rsi, 8
+        ret
+<% } %>
+
+<% function addL1L2() { %>
+        add rdi, 8
+        add rsi, 8
+        add rdx, 8
+        call rawAddLL
+        sub rdi, 8
+        sub rsi, 8
+        ret
+<% } %>
+
+;;;;;;;;;;;;;;;;;;;;;;
+; add
+;;;;;;;;;;;;;;;;;;;;;;
+; Adds two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result
+; Modified Registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_add:
+        mov    rax, [rsi]
+        mov    rcx, [rdx]
+        bt     rax, 63          ; Check if is short first operand
+        jc     add_l1
+        bt     rcx, 63          ; Check if is short second operand
+        jc     add_s1l2
+
+add_s1s2:                       ; Both operands are short
+<%=     addS1S2()       %>
+add_l1:
+        bt     rcx, 63          ; Check if is short second operand
+        jc     add_l1l2
+
+;;;;;;;;
+add_l1s2:
+        bt     rax, 62          ; check if montgomery first
+        jc     add_l1ms2
+add_l1ns2:
+<%=     global.setTypeDest("0x80"); %>
+<%=     addL1S2(); %>
+
+add_l1ms2:
+        bt     rcx, 62          ; check if montgomery second
+        jc     add_l1ms2m
+add_l1ms2n:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     global.toMont_b()       %>
+<%=     addL1L2()         %>
+
+add_l1ms2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     addL1L2()         %>
+
+
+;;;;;;;;
+add_s1l2:
+        bt     rcx, 62          ; check if montgomery second
+        jc     add_s1l2m
+add_s1l2n:
+<%=     global.setTypeDest("0x80"); %>
+<%=     addS1L2(); %>
+
+add_s1l2m:
+        bt     rax, 62          ; check if montgomery first
+        jc     add_s1ml2m
+add_s1nl2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     global.toMont_a()       %>
+<%=     addL1L2()         %>
+
+add_s1ml2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     addL1L2()         %>
+
+;;;;
+add_l1l2:
+        bt     rax, 62          ; check if montgomery first
+        jc     add_l1ml2
+add_l1nl2:
+        bt     rcx, 62          ; check if montgomery second
+        jc     add_l1nl2m
+add_l1nl2n:
+<%=     global.setTypeDest("0x80"); %>
+<%=     addL1L2()         %>
+
+add_l1nl2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     global.toMont_a(); %>
+<%=     addL1L2()         %>
+
+add_l1ml2:
+        bt     rcx, 62          ; check if montgomery seconf
+        jc     add_l1ml2m
+add_l1ml2n:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     global.toMont_b(); %>
+<%=     addL1L2()         %>
+
+add_l1ml2m:
+<%=     global.setTypeDest("0xC0"); %>
+<%=     addL1L2()         %>
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawAddLL
+;;;;;;;;;;;;;;;;;;;;;;
+; Adds two elements of type long
+; Params:
+;   rsi <= Pointer to the long data of element 1
+;   rdx <= Pointer to the long data of element 2
+;   rdi <= Pointer to the long data of result
+; Modified Registers:
+;    rax
+;;;;;;;;;;;;;;;;;;;;;;
+rawAddLL:
+        ; Add component by component with carry
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [rsi + <%=i*8%>]
+        <%= i==0 ? "add" : "adc" %> rax, [rdx + <%=i*8%>]
+        mov [rdi + <%=i*8%>], rax
+<% } %>
+        jc rawAddLL_sq   ; if overflow, substract q
+
+        ; Compare with q
+<% for (let i=0; i<n64; i++) { %>
+<%    if (i>0) { %>
+        mov rax, [rdi + <%= (n64-i-1)*8 %>]
+<%    } %>
+        cmp rax, [q + <%= (n64-i-1)*8 %>]
+        jc rawAddLL_done        ; q is bigget so done.
+        jnz rawAddLL_sq         ; q is lower
+<% } %>
+        ; If equal substract q
+rawAddLL_sq:
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [q + <%=i*8%>]
+        <%= i==0 ? "sub" : "sbb" %> [rdi + <%=i*8%>], rax
+<% } %>
+rawAddLL_done:
+        ret
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawAddLS
+;;;;;;;;;;;;;;;;;;;;;;
+; Adds two elements of type long
+; Params:
+;   rdi <= Pointer to the long data of result
+;   rsi <= Pointer to the long data of element 1
+;   rdx <= Value to be added
+;;;;;;;;;;;;;;;;;;;;;;
+rawAddLS:
+        ; Add component by component with carry
+
+        add rdx, [rsi]
+        mov [rdi] ,rdx
+<% for (let i=1; i<n64; i++) { %>
+        mov rdx, 0
+        adc rdx, [rsi + <%=i*8%>]
+        mov [rdi + <%=i*8%>], rdx
+<% } %>
+        jc rawAddLS_sq   ; if overflow, substract q
+
+        ; Compare with q
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [rdi + <%= (n64-i-1)*8 %>]
+        cmp rax, [q + <%= (n64-i-1)*8 %>]
+        jc rawAddLS_done        ; q is bigget so done.
+        jnz rawAddLS_sq         ; q is lower
+<% } %>
+        ; If equal substract q
+rawAddLS_sq:
+<% for (let i=0; i<n64; i++) { %>
+        mov rax, [q + <%=i*8%>]
+        <%= i==0 ? "sub" : "sbb" %> [rdi + <%=i*8%>], rax
+<% } %>
+rawAddLS_done:
+        ret
+
+
+
+

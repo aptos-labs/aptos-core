@@ -1,0 +1,528 @@
+<% function signL(reg, label_pos, label_neg) { %>
+<%   for (let i=n64-1; i>=0; i--) { %>
+        mov     rax, [<%=reg%> + <%= 8+(i*8) %>]
+        cmp     [half + <%= (i*8) %>], rax     ; comare with (q-1)/2
+        jc <%=label_neg%>                           ; half<rax => e1-e2 is neg => e1 < e2
+<%     if (i>0) { %>
+        jnz <%=label_pos%>                       ; half>rax => e1 -e2 is pos => e1 > e2
+<%     } else { %>
+        jmp <%=label_pos%>
+<%     } %>
+<%   } %>
+<% } %>
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rgt - Raw Greater Than
+;;;;;;;;;;;;;;;;;;;;;;
+; returns in ax 1 id *rsi > *rdx
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rax <= Return 1 or 0
+; Modified Registers:
+;    r8, r9, rax
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_rgt:
+        push   rbp
+        push   rsi
+        push   rdx
+        mov    rbp, rsp
+        mov    r8, [rsi]
+        mov    r9, [rdx]
+        bt     r8, 63          ; Check if is short first operand
+        jc     rgt_l1
+        bt     r9, 63          ; Check if is short second operand
+        jc     rgt_s1l2
+
+rgt_s1s2:                       ; Both operands are short
+        cmp    r8d, r9d
+        jg     rgt_ret1
+        jmp    rgt_ret0
+
+
+rgt_l1:
+        bt     r9, 63          ; Check if is short second operand
+        jc     rgt_l1l2
+
+;;;;;;;;
+rgt_l1s2:
+        bt     r8, 62          ; check if montgomery first
+        jc     rgt_l1ms2
+rgt_l1ns2:
+<%=     global.toLong_b() %>
+        jmp rgtL1L2
+
+rgt_l1ms2:
+<%=     global.toLong_b()       %>
+<%=     global.fromMont_a()     %>
+        jmp rgtL1L2
+
+
+;;;;;;;;
+rgt_s1l2:
+        bt     r9, 62          ; check if montgomery second
+        jc     rgt_s1l2m
+rgt_s1l2n:
+<%=     global.toLong_a()       %>
+        jmp rgtL1L2
+
+rgt_s1l2m:
+<%=     global.toLong_a()       %>
+<%=     global.fromMont_b()     %>
+        jmp rgtL1L2
+
+;;;;
+rgt_l1l2:
+        bt     r8, 62          ; check if montgomery first
+        jc     rgt_l1ml2
+rgt_l1nl2:
+        bt     r9, 62          ; check if montgomery second
+        jc     rgt_l1nl2m
+rgt_l1nl2n:
+        jmp rgtL1L2
+
+rgt_l1nl2m:
+<%=     global.fromMont_b()       %>
+        jmp rgtL1L2
+
+rgt_l1ml2:
+        bt     r9, 62          ; check if montgomery second
+        jc     rgt_l1ml2m
+rgt_l1ml2n:
+<%=     global.fromMont_a()       %>
+        jmp rgtL1L2
+
+rgt_l1ml2m:
+<%=     global.fromMont_a()       %>
+<%=     global.fromMont_b()       %>
+        jmp rgtL1L2
+
+
+;;;;;;
+; rgtL1L2
+;;;;;;
+
+rgtL1L2:
+<%=     signL("rsi", "rgtl1l2_p1", "rgtl1l2_n1") %>
+rgtl1l2_p1:
+<%=     signL("rdx", "rgtRawL1L2", "rgt_ret1") %>
+
+rgtl1l2_n1:
+<%=     signL("rdx", "rgt_ret0", "rgtRawL1L2") %>
+
+
+rgtRawL1L2:
+<%   for (let i=n64-1; i>=0; i--) { %>
+        mov     rax, [rsi + <%= 8+(i*8) %>]
+        cmp     [rdx + <%= 8+(i*8) %>], rax     ; comare with (q-1)/2
+        jc rgt_ret1                      ; rsi<rdx => 1st > 2nd
+<%     if (i>0) { %>
+        jnz rgt_ret0
+<%     }  %>
+<%   } %>
+
+rgt_ret0:
+        xor    rax, rax
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+rgt_ret1:
+        mov    rax, 1
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rlt - Raw Less Than
+;;;;;;;;;;;;;;;;;;;;;;
+; returns in ax 1 id *rsi > *rdx
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rax <= Return 1 or 0
+; Modified Registers:
+;    r8, r9, rax
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_rlt:
+        push   rbp
+        push   rsi
+        push   rdx
+        mov    rbp, rsp
+        mov    r8, [rsi]
+        mov    r9, [rdx]
+        bt     r8, 63          ; Check if is short first operand
+        jc     rlt_l1
+        bt     r9, 63          ; Check if is short second operand
+        jc     rlt_s1l2
+
+rlt_s1s2:                       ; Both operands are short
+        cmp    r8d, r9d
+        jl     rlt_ret1
+        jmp    rlt_ret0
+
+
+rlt_l1:
+        bt     r9, 63          ; Check if is short second operand
+        jc     rlt_l1l2
+
+;;;;;;;;
+rlt_l1s2:
+        bt     r8, 62          ; check if montgomery first
+        jc     rlt_l1ms2
+rlt_l1ns2:
+<%=     global.toLong_b() %>
+        jmp rltL1L2
+
+rlt_l1ms2:
+<%=     global.toLong_b()       %>
+<%=     global.fromMont_a()     %>
+        jmp rltL1L2
+
+
+;;;;;;;;
+rlt_s1l2:
+        bt     r9, 62          ; check if montgomery second
+        jc     rlt_s1l2m
+rlt_s1l2n:
+<%=     global.toLong_a()       %>
+        jmp rltL1L2
+
+rlt_s1l2m:
+<%=     global.toLong_a()       %>
+<%=     global.fromMont_b()     %>
+        jmp rltL1L2
+
+;;;;
+rlt_l1l2:
+        bt     r8, 62          ; check if montgomery first
+        jc     rlt_l1ml2
+rlt_l1nl2:
+        bt     r9, 62          ; check if montgomery second
+        jc     rlt_l1nl2m
+rlt_l1nl2n:
+        jmp rltL1L2
+
+rlt_l1nl2m:
+<%=     global.fromMont_b()       %>
+        jmp rltL1L2
+
+rlt_l1ml2:
+        bt     r9, 62          ; check if montgomery second
+        jc     rlt_l1ml2m
+rlt_l1ml2n:
+<%=     global.fromMont_a()       %>
+        jmp rltL1L2
+
+rlt_l1ml2m:
+<%=     global.fromMont_a()       %>
+<%=     global.fromMont_b()       %>
+        jmp rltL1L2
+
+
+;;;;;;
+; rltL1L2
+;;;;;;
+
+rltL1L2:
+<%=     signL("rsi", "rltl1l2_p1", "rltl1l2_n1") %>
+rltl1l2_p1:
+<%=     signL("rdx", "rltRawL1L2", "rlt_ret0") %>
+
+rltl1l2_n1:
+<%=     signL("rdx", "rlt_ret1", "rltRawL1L2") %>
+
+
+rltRawL1L2:
+<%   for (let i=n64-1; i>=0; i--) { %>
+        mov     rax, [rsi + <%= 8+(i*8) %>]
+        cmp     [rdx + <%= 8+(i*8) %>], rax     ; comare with (q-1)/2
+        jc rlt_ret0                      ; rsi<rdx => 1st > 2nd
+        jnz rlt_ret1
+<%   } %>
+
+rlt_ret0:
+        xor    rax, rax
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+rlt_ret1:
+        mov    rax, 1
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; req - Raw Eq
+;;;;;;;;;;;;;;;;;;;;;;
+; returns in ax 1 id *rsi == *rdx
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rax <= Return 1 or 0
+; Modified Registers:
+;    r8, r9, rax
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_req:
+        push   rbp
+        push   rsi
+        push   rdx
+        mov    rbp, rsp
+        mov    r8, [rsi]
+        mov    r9, [rdx]
+        bt     r8, 63          ; Check if is short first operand
+        jc     req_l1
+        bt     r9, 63          ; Check if is short second operand
+        jc     req_s1l2
+
+req_s1s2:                       ; Both operands are short
+        cmp    r8d, r9d
+        je     req_ret1
+        jmp    req_ret0
+
+
+req_l1:
+        bt     r9, 63          ; Check if is short second operand
+        jc     req_l1l2
+
+;;;;;;;;
+req_l1s2:
+        bt     r8, 62          ; check if montgomery first
+        jc     req_l1ms2
+req_l1ns2:
+<%=     global.toLong_b() %>
+        jmp reqL1L2
+
+req_l1ms2:
+<%=     global.toMont_b()       %>
+        jmp reqL1L2
+
+
+;;;;;;;;
+req_s1l2:
+        bt     r9, 62          ; check if montgomery second
+        jc     req_s1l2m
+req_s1l2n:
+<%=     global.toLong_a()       %>
+        jmp reqL1L2
+
+req_s1l2m:
+<%=     global.toMont_a()       %>
+        jmp reqL1L2
+
+;;;;
+req_l1l2:
+        bt     r8, 62          ; check if montgomery first
+        jc     req_l1ml2
+req_l1nl2:
+        bt     r9, 62          ; check if montgomery second
+        jc     req_l1nl2m
+req_l1nl2n:
+        jmp reqL1L2
+
+req_l1nl2m:
+<%=     global.toMont_a()       %>
+        jmp reqL1L2
+
+req_l1ml2:
+        bt     r9, 62          ; check if montgomery second
+        jc     req_l1ml2m
+req_l1ml2n:
+<%=     global.toMont_b()       %>
+        jmp reqL1L2
+
+req_l1ml2m:
+        jmp reqL1L2
+
+
+;;;;;;
+; eqL1L2
+;;;;;;
+
+reqL1L2:
+<%   for (let i=0; i<n64; i++) { %>
+        mov     rax, [rsi + <%= 8+(i*8) %>]
+        cmp     [rdx + <%= 8+(i*8) %>], rax
+        jne     req_ret0                      ; rsi<rdi => 1st > 2nd
+<%   } %>
+
+req_ret1:
+        mov    rax, 1
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+
+req_ret0:
+        xor    rax, rax
+        mov rsp, rbp
+        pop rdx
+        pop rsi
+        pop rbp
+        ret
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; gt
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result can be zero or one.
+; Modified Registers:
+;    rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_gt:
+        call <%=name%>_rgt
+        mov [rdi], rax
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; lt
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result can be zero or one.
+; Modified Registers:
+;    rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_lt:
+        call <%=name%>_rlt
+        mov [rdi], rax
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; eq
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result can be zero or one.
+; Modified Registers:
+;    rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_eq:
+        call <%=name%>_req
+        mov [rdi], rax
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; neq
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result can be zero or one.
+; Modified Registers:
+;    rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_neq:
+        call <%=name%>_req
+        xor rax, 1
+        mov [rdi], rax
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; geq
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result can be zero or one.
+; Modified Registers:
+;    rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_geq:
+        call <%=name%>_rlt
+        xor rax, 1
+        mov [rdi], rax
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; leq
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rsi <= Pointer to element 1
+;   rdx <= Pointer to element 2
+;   rdi <= Pointer to result can be zero or one.
+; Modified Registers:
+;    rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_leq:
+        call <%=name%>_rgt
+        xor rax, 1
+        mov [rdi], rax
+        ret
+
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawIsEq
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rdi <= Pointer to element 1
+;   rsi <= Pointer to element 2
+; Returns
+;   ax <= 1 if are equal 0, otherwise
+; Modified Registers:
+;   rax
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_rawIsEq:
+<%   for (let i=0; i<n64; i++) { %>
+        mov     rax, [rsi + <%= (i*8) %>]
+        cmp     [rdi + <%= (i*8) %>], rax
+        jne     rawIsEq_ret0
+<%   } %>
+rawIsEq_ret1:
+        mov    rax, 1
+        ret
+
+rawIsEq_ret0:
+        xor    rax, rax
+        ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawIsZero
+;;;;;;;;;;;;;;;;;;;;;;
+; Compares two elements of any kind
+; Params:
+;   rdi <= Pointer to element 1
+; Returns
+;   ax <= 1 if is 0, otherwise
+; Modified Registers:
+;   rax
+;;;;;;;;;;;;;;;;;;;;;;
+<%=name%>_rawIsZero:
+<%   for (let i=0; i<n64; i++) { %>
+        cmp     qword [rdi + <%= (i*8) %>], $0
+        jne     rawIsZero_ret0
+<%   } %>
+
+rawIsZero_ret1:
+        mov    rax, 1
+        ret
+
+rawIsZero_ret0:
+        xor    rax, rax
+        ret

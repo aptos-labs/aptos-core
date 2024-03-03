@@ -1,0 +1,66 @@
+# SPDX-FileCopyrightText: 2022 Andrea Pappacoda <andrea@pappacoda.it>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: abidiff
+
+on:
+  push:
+    paths-ignore: pistache.io/**
+  pull_request:
+    paths-ignore: pistache.io/**
+
+# This ensures that jobs get canceled when force-pushing
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# The default Debian shell (dash) is faster than bash at running scripts,
+# and using bash when it is not needed doesn't make sense.
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  abi:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:testing
+
+    steps:
+    - name: Install dependencies
+      run: |
+        apt -y update
+        apt -y install abigail-tools g++ meson pkg-config cmake libhowardhinnant-date-dev libssl-dev rapidjson-dev git ca-certificates --no-install-recommends
+
+    - uses: actions/checkout@v2
+      with:
+        path: current
+
+    - uses: actions/checkout@v2
+      with:
+        path: previous
+        fetch-depth: 2
+
+    - name: Checkout previous
+      working-directory: previous
+      run: git checkout HEAD^
+
+    - name: Build current
+      working-directory: current
+      run: |
+        meson setup build --buildtype=debug
+        meson compile -C build
+
+    - name: Build previous
+      working-directory: previous
+      run: |
+        meson setup build --buildtype=debug
+        meson compile -C build
+
+    - name: Run abidiff
+      run: abidiff
+        --headers-dir1 previous/include/pistache
+        --headers-dir2 current/include/pistache
+        previous/build/src/libpistache.so
+        current/build/src/libpistache.so

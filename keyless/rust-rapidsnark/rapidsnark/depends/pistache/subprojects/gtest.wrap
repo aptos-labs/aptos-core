@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2021 Andrea Pappacoda
+#
+# SPDX-License-Identifier: CC0-1.0
+
+[wrap-file]
+directory = googletest-release-1.11.0
+source_url = https://github.com/google/googletest/archive/release-1.11.0.tar.gz
+source_filename = gtest-1.11.0.tar.gz
+source_hash = b4870bf121ff7795ba20d20bcdd8627b8e088f2d1dab299a031c1034eddc93d5
+patch_filename = gtest_1.11.0-2_patch.zip
+patch_url = https://wrapdb.mesonbuild.com/v2/gtest_1.11.0-2/get_patch
+patch_hash = 764530d812ac161c9eab02a8cfaec67c871fcfc5548e29fd3d488070913d4e94
+
+[provide]
+gtest = gtest_dep
+gtest_main = gtest_main_dep
+gmock = gmock_dep
+gmock_main = gmock_main_dep

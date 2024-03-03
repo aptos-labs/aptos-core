@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2022 Andrea Pappacoda <andrea@pappacoda.it>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+language: cpp
+
+os: linux
+# jammy is currently only available on amd64
+#dist: jammy
+#arch: [ amd64, arm64, ppc64le, s390x ]
+
+# Use an explicit job list until jammy is supported on all archs
+jobs:
+  include:
+  - dist: jammy
+    arch: amd64
+  - dist: focal
+    arch: arm64
+  - dist: focal
+    arch: ppc64le
+  - dist: focal
+    arch: s390x
+
+branches:
+  only: master
+
+addons:
+  apt:
+    update: true
+    packages:
+    - meson
+    - pkg-config
+    - cmake
+    - rapidjson-dev
+    - libssl-dev
+    - '"?name(libhowardhinnant-date-dev)"'
+    - '"?name(libgmock-dev) (?version([1-9]\.[1-9][1-9]) | ?version([1-9]\.[2-9][0-9]))"'
+    - '"?name(libcpp-httplib-dev)"'
+    - libcurl4-openssl-dev
+
+script:
+- meson setup build -DPISTACHE_BUILD_TESTS=true
+- ninja -C build -j2
+- meson test -C build --verbose

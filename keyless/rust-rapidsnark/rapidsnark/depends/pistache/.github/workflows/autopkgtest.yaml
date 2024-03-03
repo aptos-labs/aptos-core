@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: 2021 Andrea Pappacoda <andrea@pappacoda.it>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: autopkgtest
+
+on:
+  push:
+    paths-ignore: pistache.io/**
+  pull_request:
+    paths-ignore: pistache.io/**
+
+# This ensures that jobs get canceled when force-pushing
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# The default Debian shell (dash) is faster than bash at running scripts,
+# and using bash when it is not needed doesn't make sense.
+defaults:
+  run:
+    shell: sh
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:testing
+
+    steps:
+    - name: Install dependencies
+      run: |
+        apt -y update
+        apt -y install autopkgtest dpkg-dev --no-install-recommends
+
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Checkout Debian data
+      uses: actions/checkout@v3
+      with:
+        repository: pistacheio/pistache
+        ref: debian
+        path: debian
+
+    - name: Create .orig tarball
+      run: |
+        repo_name=$(echo ${{ github.repository }} | cut -d / -f 2)
+        debian_version=$(dpkg-parsechangelog --show-field Version | awk -F - 'sub(FS $NF,x)')
+        cd ..
+        tar --exclude-vcs --exclude=debian -cvzf pistache_"$debian_version".orig.tar.gz "$repo_name"
+
+    - name: Build Debian package source
+      run: dpkg-source --build .
+
+    - name: Run autopkgtest
+      run: |
+        exit_code=0
+        autopkgtest ../pistache_*.dsc -- null || exit_code=$?
+        if [ $exit_code -eq 16 ]
+        then
+          echo "::warning::autopkgtest failed, but it's not your fault"
+        else
+          exit $exit_code
+        fi

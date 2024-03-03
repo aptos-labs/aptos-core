@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# SPDX-FileCopyrightText: 2021 Andrea Pappacoda
+#
+# SPDX-License-Identifier: Apache-2.0
+
+for file in $(git diff-index --cached --name-only HEAD | grep -E '\.(cpp|cc|hpp|h)$') ; do
+    clang-format --dry-run --Werror "$file" >/dev/null 2>&1 || (echo 'Run ninja clang-format before committing' 1>&2 && false)
+done
+
+grep -q "$(date +%Y%m%d)" version.txt || (echo 'Update the commit date in version.txt before committing' 1>&2 && false)

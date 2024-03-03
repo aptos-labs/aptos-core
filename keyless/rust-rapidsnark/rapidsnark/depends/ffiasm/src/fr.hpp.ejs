@@ -1,0 +1,278 @@
+#ifndef __<%=name.toUpperCase()%>_H
+#define __<%=name.toUpperCase()%>_H
+
+#include "<%=name.toLowerCase()%>_element.hpp"
+#include <cstdint>
+#include <string>
+#include <gmp.h>
+
+extern <%=name%>Element <%=name%>_q;
+extern <%=name%>Element <%=name%>_R2;
+extern <%=name%>Element <%=name%>_R3;
+
+#ifdef USE_ASM
+
+#if defined(ARCH_X86_64)
+
+extern "C" void <%=name%>_copy(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_copyn(P<%=name%>Element r, P<%=name%>Element a, int n);
+extern "C" void <%=name%>_add(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_sub(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_neg(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_mul(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_square(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_band(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_bor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_bxor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_bnot(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_shl(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_shr(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_eq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_neq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_lt(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_gt(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_leq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_geq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_land(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_lor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+extern "C" void <%=name%>_lnot(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_toNormal(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_toLongNormal(P<%=name%>Element r, P<%=name%>Element a);
+extern "C" void <%=name%>_toMontgomery(P<%=name%>Element r, P<%=name%>Element a);
+
+extern "C" int <%=name%>_isTrue(P<%=name%>Element pE);
+extern "C" int <%=name%>_toInt(P<%=name%>Element pE);
+
+extern "C" void <%=name%>_rawCopy(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawSwap(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawAdd(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawSub(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawNeg(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawMMul(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawMSquare(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawMMul1(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, uint64_t pRawB);
+extern "C" void <%=name%>_rawToMontgomery(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawFromMontgomery(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" int <%=name%>_rawIsEq(<%=name%>RawElement const pRawA, const <%=name%>RawElement pRawB);
+extern "C" int <%=name%>_rawIsZero(const <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawShl(<%=name%>RawElement r, <%=name%>RawElement a, uint64_t b);
+extern "C" void <%=name%>_rawShr(<%=name%>RawElement r, <%=name%>RawElement a, uint64_t b);
+
+extern "C" void <%=name%>_fail();
+
+#elif defined(ARCH_ARM64)
+
+           void <%=name%>_copy(P<%=name%>Element r, P<%=name%>Element a);
+           void <%=name%>_mul(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_toNormal(P<%=name%>Element r, P<%=name%>Element a);
+
+           void <%=name%>_toLongNormal(P<%=name%>Element r, P<%=name%>Element a);
+           int  <%=name%>_isTrue(P<%=name%>Element pE);
+           void <%=name%>_copyn(P<%=name%>Element r, P<%=name%>Element a, int n);
+           void <%=name%>_lt(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           int  <%=name%>_toInt(P<%=name%>Element pE);
+           void <%=name%>_shr(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_shl(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_band(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_bor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_bxor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_bnot(P<%=name%>Element r, P<%=name%>Element a);
+           void <%=name%>_sub(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_eq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_neq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_add(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_gt(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_leq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_geq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_lor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_lnot(P<%=name%>Element r, P<%=name%>Element a);
+           void <%=name%>_land(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+           void <%=name%>_neg(P<%=name%>Element r, P<%=name%>Element a);
+           void <%=name%>_toMontgomery(P<%=name%>Element r, P<%=name%>Element a);
+           void <%=name%>_square(P<%=name%>Element r, P<%=name%>Element a);
+
+extern "C" void <%=name%>_rawCopy(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawSwap(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawAdd(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawSub(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawNeg(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawMMul(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+           void <%=name%>_rawMSquare(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawMMul1(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, uint64_t pRawB);
+           void <%=name%>_rawToMontgomery(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawFromMontgomery(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+extern "C" int  <%=name%>_rawIsEq(const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+extern "C" int  <%=name%>_rawIsZero(const <%=name%>RawElement pRawB);
+           void <%=name%>_rawZero(<%=name%>RawElement pRawResult);
+extern "C" void <%=name%>_rawCopyS2L(<%=name%>RawElement pRawResult, int64_t val);
+extern "C" void <%=name%>_rawAddLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB);
+extern "C" void <%=name%>_rawSubSL(<%=name%>RawElement pRawResult, uint64_t rawA, <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawSubLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB);
+extern "C" void <%=name%>_rawNegLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB);
+extern "C" int  <%=name%>_rawCmp(<%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawAnd(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawOr(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawXor(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+extern "C" void <%=name%>_rawShl(<%=name%>RawElement r, <%=name%>RawElement a, uint64_t b);
+extern "C" void <%=name%>_rawShr(<%=name%>RawElement r, <%=name%>RawElement a, uint64_t b);
+extern "C" void <%=name%>_rawNot(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA);
+extern "C" void <%=name%>_rawSubRegular(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+
+           void <%=name%>_fail();
+           void <%=name%>_longErr();
+
+#endif
+
+#else
+
+
+void <%=name%>_copy(P<%=name%>Element r, P<%=name%>Element a);
+void <%=name%>_mul(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_toNormal(P<%=name%>Element r, P<%=name%>Element a);
+
+void <%=name%>_toLongNormal(P<%=name%>Element r, P<%=name%>Element a);
+int <%=name%>_isTrue(P<%=name%>Element pE);
+void <%=name%>_copyn(P<%=name%>Element r, P<%=name%>Element a, int n);
+void <%=name%>_lt(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+int <%=name%>_toInt(P<%=name%>Element pE);
+void <%=name%>_shl(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_shr(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_band(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_bor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_bxor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_bnot(P<%=name%>Element r, P<%=name%>Element a);
+void <%=name%>_sub(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_eq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_neq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_add(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_gt(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_leq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_geq(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_lor(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_lnot(P<%=name%>Element r, P<%=name%>Element a);
+void <%=name%>_land(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_neg(P<%=name%>Element r, P<%=name%>Element a);
+void <%=name%>_toMontgomery(P<%=name%>Element r, P<%=name%>Element a);
+void <%=name%>_square(P<%=name%>Element r, P<%=name%>Element a);
+
+void <%=name%>_rawCopy(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+void <%=name%>_rawSwap(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA);
+void <%=name%>_rawAdd(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+void <%=name%>_rawSub(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+void <%=name%>_rawNeg(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+void <%=name%>_rawMMul(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+void <%=name%>_rawMSquare(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+void <%=name%>_rawMMul1(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA, uint64_t pRawB);
+void <%=name%>_rawToMontgomery(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+void <%=name%>_rawFromMontgomery(<%=name%>RawElement pRawResult, const <%=name%>RawElement pRawA);
+int <%=name%>_rawIsEq(const <%=name%>RawElement pRawA, const <%=name%>RawElement pRawB);
+int <%=name%>_rawIsZero(const <%=name%>RawElement pRawB);
+void <%=name%>_rawZero(<%=name%>RawElement pRawResult);
+void <%=name%>_rawCopyS2L(<%=name%>RawElement pRawResult, int64_t val);
+void <%=name%>_rawAddLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB);
+void <%=name%>_rawSubSL(<%=name%>RawElement pRawResult, uint64_t rawA, <%=name%>RawElement pRawB);
+void <%=name%>_rawSubLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB);
+void <%=name%>_rawNegLS(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, uint64_t rawB);
+int  <%=name%>_rawCmp(<%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+void <%=name%>_rawAnd(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+void <%=name%>_rawOr(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+void <%=name%>_rawXor(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+void <%=name%>_rawShl(<%=name%>RawElement r, <%=name%>RawElement a, uint64_t b);
+void <%=name%>_rawShr(<%=name%>RawElement r, <%=name%>RawElement a, uint64_t b);
+void <%=name%>_rawNot(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA);
+void <%=name%>_rawSubRegular(<%=name%>RawElement pRawResult, <%=name%>RawElement pRawA, <%=name%>RawElement pRawB);
+
+void <%=name%>_fail();
+void <%=name%>_longErr();
+
+#endif
+
+// Pending functions to convert
+
+void <%=name%>_str2element(P<%=name%>Element pE, char const*s);
+char *<%=name%>_element2str(P<%=name%>Element pE);
+void <%=name%>_idiv(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_mod(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_inv(P<%=name%>Element r, P<%=name%>Element a);
+void <%=name%>_div(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+void <%=name%>_pow(P<%=name%>Element r, P<%=name%>Element a, P<%=name%>Element b);
+
+class Raw<%=name%> {
+
+public:
+    const static int N64 = <%=name%>_N64;
+    const static int MaxBits = <%= q.bitLength() %>;
+
+
+    struct Element {
+        <%=name%>RawElement v;
+    };
+
+private:
+    Element fZero;
+    Element fOne;
+    Element fNegOne;
+
+public:
+
+    Raw<%=name%>();
+    ~Raw<%=name%>();
+
+    const Element &zero() { return fZero; }
+    const Element &one() { return fOne; }
+    const Element &negOne() { return fNegOne; }
+    Element set(int value);
+    void set(Element &r, int value);
+
+    void fromString(Element &r, const std::string &n, uint32_t radix = 10);
+    std::string toString(const Element &a, uint32_t radix = 10);
+
+    void inline copy(Element &r, const Element &a) { <%=name%>_rawCopy(r.v, a.v); }
+    void inline swap(Element &a, Element &b) { <%=name%>_rawSwap(a.v, b.v); }
+    void inline add(Element &r, const Element &a, const Element &b) { <%=name%>_rawAdd(r.v, a.v, b.v); }
+    void inline sub(Element &r, const Element &a, const Element &b) { <%=name%>_rawSub(r.v, a.v, b.v); }
+    void inline mul(Element &r, const Element &a, const Element &b) { <%=name%>_rawMMul(r.v, a.v, b.v); }
+
+    Element inline add(const Element &a, const Element &b) { Element r; <%=name%>_rawAdd(r.v, a.v, b.v); return r;}
+    Element inline sub(const Element &a, const Element &b) { Element r; <%=name%>_rawSub(r.v, a.v, b.v); return r;}
+    Element inline mul(const Element &a, const Element &b) { Element r; <%=name%>_rawMMul(r.v, a.v, b.v); return r;}
+
+    Element inline neg(const Element &a) { Element r; <%=name%>_rawNeg(r.v, a.v); return r; }
+    Element inline square(const Element &a) { Element r; <%=name%>_rawMSquare(r.v, a.v); return r; }
+
+    Element inline add(int a, const Element &b) { return add(set(a), b);}
+    Element inline sub(int a, const Element &b) { return sub(set(a), b);}
+    Element inline mul(int a, const Element &b) { return mul(set(a), b);}
+
+    Element inline add(const Element &a, int b) { return add(a, set(b));}
+    Element inline sub(const Element &a, int b) { return sub(a, set(b));}
+    Element inline mul(const Element &a, int b) { return mul(a, set(b));}
+
+    void inline mul1(Element &r, const Element &a, uint64_t b) { <%=name%>_rawMMul1(r.v, a.v, b); }
+    void inline neg(Element &r, const Element &a) { <%=name%>_rawNeg(r.v, a.v); }
+    void inline square(Element &r, const Element &a) { <%=name%>_rawMSquare(r.v, a.v); }
+    void inv(Element &r, const Element &a);
+    void div(Element &r, const Element &a, const Element &b);
+    void exp(Element &r, const Element &base, uint8_t* scalar, unsigned int scalarSize);
+
+    void inline toMontgomery(Element &r, const Element &a) { <%=name%>_rawToMontgomery(r.v, a.v); }
+    void inline fromMontgomery(Element &r, const Element &a) { <%=name%>_rawFromMontgomery(r.v, a.v); }
+    int inline eq(const Element &a, const Element &b) { return <%=name%>_rawIsEq(a.v, b.v); }
+    int inline isZero(const Element &a) { return <%=name%>_rawIsZero(a.v); }
+
+    void toMpz(mpz_t r, const Element &a);
+    void fromMpz(Element &a, const mpz_t r);
+
+    int toRprBE(const Element &element, uint8_t *data, int bytes);
+    int fromRprBE(Element &element, const uint8_t *data, int bytes);
+
+    int bytes ( void ) { return <%=name%>_N64 * 8; }
+
+
+    void fromUI(Element &r, unsigned long int v);
+
+    static Raw<%=name%> field;
+
+};
+
+#endif // __<%=name.toUpperCase()%>_H

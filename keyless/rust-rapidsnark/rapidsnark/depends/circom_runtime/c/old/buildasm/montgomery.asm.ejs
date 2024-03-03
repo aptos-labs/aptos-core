@@ -1,0 +1,350 @@
+
+
+
+<%
+//////////////////////
+// montgomeryTemplate
+//////////////////////
+// This function creates functions with the montgomery transformation
+// applied
+// the round hook allows to add diferent code in the iteration
+//
+//  All the montgomery functions modifies:
+//  r8, r9, 10, r11, rax, rcx
+//////////////////////
+function montgomeryTemplate(fnName, round) {
+    let r0, r1, r2;
+    function setR(step) {
+        if ((step % 3) == 0) {
+            r0 = "r8";
+            r1 = "r9";
+            r2 = "r10";
+        } else if ((step % 3) == 1) {
+            r0 = "r9";
+            r1 = "r10";
+            r2 = "r8";
+        } else {
+            r0 = "r10";
+            r1 = "r8";
+            r2 = "r9";
+        }
+    }
+
+    const base = bigInt.one.shiftLeft(64);
+    const np64 = base.minus(q.modInv(base));
+%>
+<%=fnName%>:
+        sub     rsp, <%= n64*8 %>  ; Reserve space for ms
+        mov     rcx, rdx            ; rdx is needed for multiplications so keep it in cx
+        mov     r11, 0x<%= np64.toString(16) %> ; np
+        xor     r8,r8
+        xor     r9,r9
+        xor     r10,r10
+<%
+    // Main loop
+    for (let i=0; i<n64*2; i++) {
+        setR(i);
+        round(i, r0, r1, r2);
+%>
+
+<%
+        for (let j=i-1; j>=0; j--) { // All ms
+            if (((i-j)<n64)&&(j<n64)) {
+%>
+        mov     rax, [rsp + <%= j*8 %>]
+        mul     qword [q + <%= (i-j)*8 %>]
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%
+            }
+        } // ms
+%>
+
+<%
+        if (i<n64) {
+%>
+        mov     rax, <%= r0 %>
+        mul     r11
+        mov     [rsp + <%= i*8 %>], rax
+        mul     qword [q]
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%
+        } else {
+%>
+        mov     [rdi + <%= (i-n64)*8 %> ], <%= r0 %>
+        xor     <%= r0 %>,<%= r0 %>
+<%
+        }
+%>
+
+<%
+    }   // Main Loop
+%>
+        test    <%= r1 %>, <%= r1 %>
+        jnz     <%=fnName%>_mulM_sq
+        ; Compare with q
+<%
+    for (let i=0; i<n64; i++) {
+%>
+        mov rax, [rdi + <%= (n64-i-1)*8 %>]
+        cmp rax, [q + <%= (n64-i-1)*8 %>]
+        jc <%=fnName%>_mulM_done        ; q is bigget so done.
+        jnz <%=fnName%>_mulM_sq         ; q is lower
+<%
+    }
+%>
+        ; If equal substract q
+
+<%=fnName%>_mulM_sq:
+<%
+    for (let i=0; i<n64; i++) {
+%>
+        mov rax, [q + <%= i*8 %>]
+        <%= i==0 ? "sub" : "sbb" %> [rdi + <%= i*8 %>], rax
+<%
+    }
+%>
+
+<%=fnName%>_mulM_done:
+        mov rdx, rcx            ; recover rdx to its original place.
+        add rsp, <%= n64*8 %>   ; recover rsp
+        ret
+
+<%
+}   // Template
+%>
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawMontgomeryMul
+;;;;;;;;;;;;;;;;;;;;;;
+; Multiply two elements in montgomery form
+; Params:
+;   rsi <= Pointer to the long data of element 1
+;   rdx <= Pointer to the long data of element 2
+;   rdi <= Pointer to the long data of result
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%
+montgomeryTemplate("rawMontgomeryMul", function(i, r0, r1, r2) {
+    // Same Digit
+    for (let o1=Math.max(0, i-n64+1); (o1<=i)&&(o1<n64); o1++) {
+    const o2= i-o1;
+%>
+        mov     rax, [rsi + <%= 8*o1 %>]
+        mul     qword [rcx + <%= 8*o2 %>]
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%
+    } // Same digit
+})
+%>
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawMontgomerySquare
+;;;;;;;;;;;;;;;;;;;;;;
+; Square an element
+; Params:
+;   rsi <= Pointer to the long data of element 1
+;   rdi <= Pointer to the long data of result
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%
+montgomeryTemplate("rawMontgomerySquare", function(i, r0, r1, r2) {
+    // Same Digit
+    for (let o1=Math.max(0, i-n64+1); (o1<((i+1)>>1) )&&(o1<n64); o1++) {
+    const o2= i-o1;
+%>
+        mov     rax, [rsi + <%= 8*o1 %>]
+        mul     qword [rsi + <%= 8*o2 %>]
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%
+    } // Same digit
+%>
+
+<%  if (i%2 == 0) { %>
+        mov     rax, [rsi + <%= 8*(i/2) %>]
+        mul     rax
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%  } %>
+
+<%
+})
+%>
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawMontgomeryMul1
+;;;;;;;;;;;;;;;;;;;;;;
+; Multiply two elements in montgomery form
+; Params:
+;   rsi <= Pointer to the long data of element 1
+;   rdx <= second operand
+;   rdi <= Pointer to the long data of result
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%
+montgomeryTemplate("rawMontgomeryMul1", function(i, r0, r1, r2) {
+    // Same Digit
+    if (i<n64) {
+%>
+        mov     rax, [rsi + <%= 8*i %>]
+        mul     rcx
+        add     <%= r0 %>, rax
+        adc     <%= r1 %>, rdx
+        adc     <%= r2 %>, 0x0
+<%
+    } // Same digit
+})
+%>
+
+
+;;;;;;;;;;;;;;;;;;;;;;
+; rawFromMontgomery
+;;;;;;;;;;;;;;;;;;;;;;
+; Multiply two elements in montgomery form
+; Params:
+;   rsi <= Pointer to the long data of element 1
+;   rdi <= Pointer to the long data of result
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;;;
+<%
+montgomeryTemplate("rawFromMontgomery", function(i, r0, r1, r2) {
+    // Same Digit
+    if (i<n64) {
+%>
+        add     <%= r0 %>, [rdi + <%= 8*i %>]
+        adc     <%= r1 %>, 0x0
+        adc     <%= r2 %>, 0x0
+<%
+    } // Same digit
+})
+%>
+
+;;;;;;;;;;;;;;;;;;;;;;
+; toMontgomery
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a number to Montgomery
+;   rdi <= Pointer element to convert
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;
+<%=name%>_toMontgomery:
+    mov     rax, [rdi]
+    bt      rax, 62                     ; check if montgomery
+    jc      toMontgomery_doNothing
+    bt      rax, 63
+    jc      toMontgomeryLong
+
+toMontgomeryShort:
+    add     rdi, 8
+    push    rsi
+    push    rdx
+    lea     rsi, [R2]
+    movsx   rdx, eax
+    cmp     rdx, 0
+    js      negMontgomeryShort
+posMontgomeryShort:
+    call    rawMontgomeryMul1
+    pop     rdx
+    pop     rsi
+    sub     rdi, 8
+    <%=     global.setTypeDest("0x40"); %>
+    ret
+
+negMontgomeryShort:
+    neg     rdx              ; Do the multiplication positive and then negate the result.
+    call    rawMontgomeryMul1
+    mov     rsi, rdi
+    call    rawNegL
+    pop     rdx
+    pop     rsi
+    sub     rdi, 8
+    <%=     global.setTypeDest("0x40"); %>
+    ret
+
+
+toMontgomeryLong:
+    mov     [rdi], rax
+    add     rdi, 8
+    push    rsi
+    mov     rdx, rdi
+    lea     rsi, [R2]
+    call    rawMontgomeryMul
+    pop     rsi
+    sub     rdi, 8
+    <%=     global.setTypeDest("0xC0"); %>
+
+
+toMontgomery_doNothing:
+    ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; toNormal
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a number from Montgomery
+;   rdi <= Pointer element to convert
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;
+<%=name%>_toNormal:
+    mov     rax, [rdi]
+    bt      rax, 62                     ; check if montgomery
+    jnc     toNormal_doNothing
+    bt      rax, 63                     ; if short, it means it's converted
+    jnc     toNormal_doNothing
+
+toNormalLong:
+    add     rdi, 8
+    call    rawFromMontgomery
+    sub     rdi, 8
+    <%=     global.setTypeDest("0x80"); %>
+
+toNormal_doNothing:
+    ret
+
+;;;;;;;;;;;;;;;;;;;;;;
+; toLongNormal
+;;;;;;;;;;;;;;;;;;;;;;
+; Convert a number to long normal
+;   rdi <= Pointer element to convert
+; Modified registers:
+;    r8, r9, 10, r11, rax, rcx
+;;;;;;;;;;;;;;;;;;;;
+<%=name%>_toLongNormal:
+    mov     rax, [rdi]
+    bt      rax, 62                     ; check if montgomery
+    jc      toLongNormal_fromMontgomery
+    bt      rax, 63                     ; check if long
+    jnc     toLongNormal_fromShort
+    ret                                 ; It is already long
+
+toLongNormal_fromMontgomery:
+    add     rdi, 8
+    call    rawFromMontgomery
+    sub     rdi, 8
+    <%=     global.setTypeDest("0x80"); %>
+    ret
+
+toLongNormal_fromShort:
+    mov     r8, rsi                     ; save rsi
+    movsx   rsi, eax
+    call    rawCopyS2L
+    mov     rsi, r8                     ; recover rsi
+    <%=     global.setTypeDest("0x80"); %>
+    ret
+

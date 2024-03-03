@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2015 Mathieu Stefani
+#
+# SPDX-License-Identifier: CC0-1.0
+
+# Build files
+/*build*/
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# Ignoring IDE files
+
+.vscode
+.idea
+
+# Clangd cache
+/.cache/clangd
+
+# Meson Wrap DB cache
+/subprojects/*
+!/subprojects/*.wrap
+
+!/subprojects/cpp-httplib
+!/subprojects/hinnant-date
