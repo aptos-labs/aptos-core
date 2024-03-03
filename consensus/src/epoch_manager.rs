@@ -972,6 +972,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             vuf_pp,
             keys,
             dkg_pub_params.pvss_config.wconfig.clone(),
+            dkg_session.metadata.block_randomness,
         );
 
         Ok(rand_config)

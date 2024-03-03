@@ -27,6 +27,8 @@ mod e2e_correctness;
 mod enable_feature_0;
 mod enable_feature_1;
 mod enable_feature_2;
+mod failure_indicator_block_dkg;
+mod failure_indicator_block_randomness;
 mod validator_restart_during_dkg;
 
 #[allow(dead_code)]

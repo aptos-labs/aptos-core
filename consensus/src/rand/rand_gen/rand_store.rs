@@ -345,6 +345,8 @@ mod tests {
                 dealer_epoch: 999,
                 dealer_validator_set: consensus_info_move_structs.clone(),
                 target_validator_set: consensus_info_move_structs.clone(),
+                block_dkg: false,
+                block_randomness: false,
             };
             let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session_metadata);
             let input_secret = <DefaultDKG as DKGTrait>::InputSecret::generate_for_testing();
@@ -384,6 +386,7 @@ mod tests {
                 vuf_pub_params,
                 rand_keys,
                 weighted_config,
+                false,
             );
 
             Self {

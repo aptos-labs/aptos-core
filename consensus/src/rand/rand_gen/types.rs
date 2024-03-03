@@ -459,6 +459,8 @@ pub struct RandConfig {
     pub keys: Arc<RandKeys>,
     // weighted config for weighted VUF
     pub wconfig: WeightedConfig,
+    /// If set, do not perform dequeue (so execution is blocked). This is test-only.
+    pub block_randomness: bool,
 }
 
 impl Debug for RandConfig {
@@ -479,6 +481,7 @@ impl RandConfig {
         vuf_pp: WvufPP,
         keys: RandKeys,
         wconfig: WeightedConfig,
+        block_randomness: bool,
     ) -> Self {
         Self {
             author,
@@ -487,6 +490,7 @@ impl RandConfig {
             vuf_pp,
             keys: Arc::new(keys),
             wconfig,
+            block_randomness,
         }
     }
 

@@ -97,6 +97,8 @@ fn test_dummy_dkg_correctness() {
         dealer_epoch: 999,
         dealer_validator_set: dealer_infos.clone(),
         target_validator_set: new_validator_infos.clone(),
+        block_dkg: false,
+        block_randomness: false,
     };
 
     let pub_params = DummyDKG::new_public_params(&dkg_session_metadata);

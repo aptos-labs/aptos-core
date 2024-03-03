@@ -55,6 +55,7 @@ const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
 const OIDB_MODULE_NAME: &str = "openid_account";
+#[allow(dead_code)]
 const JWKS_MODULE_NAME: &str = "jwks";
 const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
 const DKG_MODULE_NAME: &str = "dkg";
@@ -556,6 +557,7 @@ fn initialize_reconfiguration_state(session: &mut SessionExt) {
     );
 }
 
+#[allow(dead_code)]
 fn initialize_jwks(session: &mut SessionExt) {
     exec_function(
         session,

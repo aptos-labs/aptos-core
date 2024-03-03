@@ -292,6 +292,9 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             matches!(&self.state, InnerState::NotStarted),
             "transcript already dealt"
         );
+        if dkg_session_metadata.block_dkg {
+            bail!("DKG aborted per config");
+        }
         let dkg_start_time = Duration::from_micros(start_time_us);
         let deal_start = duration_since_epoch();
         let secs_since_dkg_start = deal_start.as_secs_f64() - dkg_start_time.as_secs_f64();
