@@ -68,7 +68,6 @@ tmp
 *.sublime-workspace
 CMakeLists.txt.user
 
-depends/gmp*
 
 build_prover
 package*

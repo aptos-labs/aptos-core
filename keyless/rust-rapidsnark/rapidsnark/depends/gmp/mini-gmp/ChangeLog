@@ -1,0 +1,673 @@
+2020-11-10 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/run-tests: Update WINEPATH, instead of overwriting it.
+
+2020-10-25 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-mpq.c (mpq_canonical_sign): Use the correct type for size.
+
+2020-10-18 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-mpq.c (mpq_out_str): Return 0 when base is out of range.
+	* mini-gmp.c (mpz_out_str): Likewise. (spotted by Paul Eggert)
+
+	* tests/t-str.c: Test out-of-range bases for mpz_out_str.
+	* tests/t-mpq_str.c: Likewise, for mpq_out_str.
+
+2020-10-06  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/run-tests: Better support for make check on wine or cygwin.
+
+2020-09-10 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-mpq_double.c (mpq_get_d_exact_p): Cleanup.
+
+	* mini-gmp.h: Update FILE tests from gmp-h (tx Vincent Lefèvre).
+
+2020-05-21  Torbjörn Granlund  <tg@gmplib.org>
+
+	* tests/t-mpq_muldiv_2exp.c (testmain): Cast printf args to right type.
+
+	* tests/t-double.c: Provide default M_PI definition.
+
+2020-05-19  Torbjörn Granlund  <tg@gmplib.org>
+
+	* tests/hex-random.h (enum hex_random_op): Remove final ",".
+
+2019-12-04 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp/mini-gmp.c (mpn_invert_3by2): Remove shortcuts.
+
+2019-11-19 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp/mini-gmp.c (mpn_invert_3by2): Shortcut for short limbs.
+
+2019-11-09 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp/mini-gmp.c (gmp_clz, gmp_popcount_limb, mpz_export):
+	Avoid undefined behaviour with small limb sizes.
+
+2019-09-30  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-gcd.c (gcdext_valid_p): Stricter checks for gcdext
+	corner cases.
+
+2018-12-21 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp/mini-gmp.c: Support for micro-gmp.
+
+2018-11-07 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp/mini-gmp.c: Silence a couple of warnings.
+
+2018-10-30 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_probab_prime_p): BPSW test for primality.
+
+	* tests/hex-random.c (hex_random_lucm_op): New function.
+	* tests/hex-random.h: Declare it.
+	* tests/mini-random.c (mini_random_lucm_op): New function.
+	* tests/mini-random.h: Declare it.
+	* mini-gmp/tests/t-lucm.c: New test
+	* mini-gmp/tests/Makefile (CHECK_PROGRAMS): Add t-lucm.
+
+2018-09-07  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-div.c (testmain): Add missing const declarations.
+
+2018-05-20 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_get_d): Convert a fixed number of
+	bits (GMP_DBL_MANT_BITS) to avoid rounding.
+
+	* mini-mpq.c (mpq_mul): Use mpq_nan_init.
+
+	* tests/t-double.c (test_matissa): Tests converted bits.
+
+2018-04-26 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-mpq.c: New file, mini-implementation of mpq_t.
+	* mini-mpq.h: New file, definitions for mpq_t.
+	* tests/t-mpq_addsub: New tests for mpq_add and sub.
+	* tests/t-mpq_muldiv: New tests for mpq_mul and div.
+	* tests/t-mpq_muldiv_2exp: New tests for mpq_*_2exp.
+
+2018-03-11  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (mpn_div_qr_2_preinv): Drop separate rp argument.
+	Clobber input np, and store remainder in np[0] and np[1]. This is
+	all the current caller needs, and it eliminates one allocation in
+	the common case of un-normalized d.
+	(mpn_div_qr_2): Delete #if:ed out function.
+	(mpn_div_qr_preinv): Update the only call site for
+	mpn_div_qr_2_preinv.
+
+2018-02-10  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (mpn_div_qr_1_preinv): When qp is non-NULL, reuse
+	area for shifted input, to avoid an allocation.
+
+2018-01-15 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (gmp_popcount_limb): Micro-optimisations.
+	* tests/t-comb.c (checkWilson): Check also mpz_2fac_ui.
+
+2017-12-30 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_mfac_ui, mpz_2fac_ui): New functions.
+	* mini-gmp.h: Declare them.
+	* mini-gmp.c (mpz_fac_ui): Use mpz_mfac_ui.
+
+2017-07-23  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (GMP_MPN_OVERLAP_P): New macro, copy of
+	MPN_OVERLAP_P, from gmp-impl.h.
+	(mpn_mul): Assert that output area doesn't overlap with the input.
+
+2017-02-03 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_sizeinbase, mpz_get_str, mpz_set_str): Support
+	bases up to 62.
+	* tests/t-str.c: Update tests accordingly.
+
+2016-11-27 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_get_si): fewer branches, safer forumla for negatives.
+
+	* tests/t-signed.c: Removed a typo
+
+2016-11-24  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/hex-random.c (mkseed): Produce a 48-bit mpz_t value,
+	regardless of word size.
+	(hex_random_init): Use gmp_randseed instead of gmp_randseed_ui,
+	and support seeds exceeding an unsigned long.
+
+	* tests/hex-random.c (mkseed): New function, using /dev/urandom
+	for random seed when available.
+	(hex_random_init): Use it.
+
+2016-11-23  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (GMP_CMP): New macro.
+	(mpz_sgn, mpz_cmp_si, mpz_cmp_ui, mpz_cmpabs_ui): Use it.
+
+2016-11-22  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-invert.c (test_3by2, test_2by1): New functions,
+	extracted from testmain.
+	(testmain): Add test with inputs which triggered the
+	mpn_invert_3by2 bug (see 2016-11-16 entry).
+
+2016-11-21 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-signed.c: compare different signs, and after overflow.
+
+2016-11-20  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-signed.c: Reorganize testcase, to avoid undefined
+	behaviour with signed overflow.
+
+2016-11-19  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/run-tests: Set up LD_LIBRARY_PATH and DYLD_LIBRARY_PATH
+	for tests only, based on TEST_LIBRARY_PATH.
+
+	* tests/mini-random.h: Use name "../mini-gmp.h" for include, so we
+	don't need any -I options to the compiler.
+
+	* tests/Makefile: Pass CFLAGS to the linker, as
+	recommended by the GNU coding standard.
+	(CPPFLAGS): New variable, with empty default value.
+	(CFLAGS): Remove the -I flag involving MINI_GMP_DIR, to leave free
+	for overriding on make command line.
+	(EXTRA_CFLAGS): Deleted variable, no longer needed.
+
+2016-11-18  Torbjörn Granlund  <tg@gmplib.org>
+
+	* tests/Makefile: Pass EXTRA_CFLAGS to linker as a intermediate fix.
+
+2016-11-17 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-str.c: free a pointer to avoid memory leaks.
+
+2016-11-16  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (mpn_invert_3by2): Fix arithmetic overflow
+	bug, and improve documentation of the algorithm.
+
+2016-11-15  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-limbs.c (testmain): Skip tests with zero product.
+
+	* tests/hex-random.c (hex_random_init): Added fflush call.
+
+2016-11-15  Torbjörn Granlund  <tg@gmplib.org>
+
+	* tests/Makefile (TESTS): New variable, allowing separation of
+	compilation and running of tests.
+	* tests/run-tests: Allow empty tests list.
+
+2016-11-14 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-str.c: Some more test cases.
+	* tests/t-pprime_p.c: Use shorter operands, with different sizes.
+
+2016-11-01  Torbjörn Granlund  <tg@gmplib.org>
+
+	* tests/hex-random.c: Reinstate gmp.h inclusion.
+
+2016-08-22  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (mpn_set_str_other): Always return size >= 1, with
+	unnormalized result in the case the input digits are all zero.
+	Fixes crash on a large number of leading zeros, reported by Axel
+	Miller.
+	(mpz_set_str): Normalize as needed, after above change. Return
+	failure for inputs string with no digits, i.e., empty except for
+	optional sign, base prefix and white space.
+
+2016-01-01 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: Silence warnings due to (un)signed types.
+	* tests/testutils.c: Likewise.
+	* tests/t-logops.c: Likewise.
+	* tests/t-cmp_d.c: Likewise.
+	* tests/t-reuse.c: Likewise.
+	* tests/t-cong.c: Likewise.
+
+2015-11-13 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: Lazy allocation for mpz_t.
+	(mpz_rootrem): Exploit lazy allocation to avoid init2.
+
+2015-11-06 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpn_com, mpn_neg): New functions.
+	* mini-gmp.h: Declare them.
+	* mini-gmp.c (mpz_div_r_2exp): Use mpn_neg.
+
+2015-10-29 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: Removed a typo (spotted by Paul Zimmermann).
+
+2015-05-30 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.h: Declare mpn_zero_p.
+	* mini-gmp.c: Define mpn_zero_p as a function, not a macro.
+
+2014-08-27  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (mpz_abs_sub_bit): Do full normalization,
+	needed if mpz_clrbit clears the most significant one bit.
+
+2014-07-28 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: Remove some useless variables.
+
+2014-05-20 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: +1 in the init2 argument before setbit.
+
+2014-05-15 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: Micro-optimisations.
+
+2014-03-12 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_probab_prime_p): Micro-optimisation.
+
+2014-03-06  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (gmp_millerrabin): New internal function.
+	(mpz_probab_prime_p): New function.
+	* mini-gmp.h (mpz_probab_prime_p): Declare it.
+	* tests/t-pprime_p.c: New test program.
+	* tests/Makefile (CHECK_PROGRAMS): Added t-pprime_p.
+
+2014-03-03  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (mpz_congruent_p): New function.
+	* mini-gmp.h: Declare it.
+	* tests/t-cong.c: New file, based on tests/mpz/t-cong.c.
+	* tests/Makefile (CHECK_PROGRAMS): Added t-cong.
+
+	* tests/testutils.c (dump): New function. Deleted static
+	functions in other files.
+	(mpz_set_str_or_abort): Moved function here, from...
+	* tests/t-cmp_d.c: ... old location.
+
+	* tests/t-reuse.c (dump3): Renamed, from ...
+	(dump): ...old name.
+
+2014-02-21 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpn_sqrtrem): New function.
+	* mini-gmp.h: Declare it.
+	* tests/t-sqrt.c: Test it.
+
+2014-02-15 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_div_qr): init + set = init_set .
+
+2014-02-10 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-limbs.c: New test for mpz_limbs_*.
+	* tests/Makefile (CHECK_PROGRAMS): Add it.
+
+2014-02-08 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_realloc2, mpz_limbs_read, mpz_limbs_modify
+	mpz_limbs_write, mpz_limbs_finish, mpz_roinit_n): New functions.
+	(mpn_perfect_square_p): New function.
+	* mini-gmp.h: Declare them.
+
+	* tests/t-mul.c: Use roinit and limbs_read to test mpn.
+	* tests/t-sqrt.c: Test also mpn_perfect_square_p.
+
+2014-02-03 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpn_rootrem): Allow NULL argument.
+
+	* mini-gmp.c (mpn_zero): New function.
+	(mpz_perfect_square_p): New function.
+	* mini-gmp.h: Declare them.
+
+	* tests/t-sqrt.c: Test mpz_perfect_square_p.
+	* tests/t-root.c: Test also 1-th root, allow perfect powers.
+
+2014-01-23 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-aorsmul.c: New file, test for mpz_{add,sub}mul{,_ui}
+	* tests/Makefile: Add t-aorsmul.
+
+2014-01-19 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpn_popcount): New function.
+	(mpz_popcount): Use it.
+	(mpz_addmul_ui, mpz_addmul, mpz_submul_ui, mpz_submul): Added.
+	* mini-gmp.h: Declare them.
+
+2014-01-16  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (mp_bits_per_limb): New const value.
+	* mini-gmp.h: Declare it.
+
+2013-03-13 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: Write loops in a cleaner way.
+
+2013-02-27 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_div_q_2exp): Adjust only if needed.
+	(mpn_common_scan): New service function to unify scan loops.
+	(mpz_scan0, mpz_scan1): Simplify by using mpn_common_scan.
+	(mpz_make_odd): Simplify, assume in-place operation on positive.
+	(mpn_scan0, mpn_scan1): New functions.
+	* mini-gmp.h (mpn_scan0, mpn_scan1): New declarations.
+	* tests/t-scan.c: Test also mpn_scan0 and mpn_scan1.
+
+2013-02-25  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-double.c (testmain): Declare double variables as
+	volatile, to drop extended precision.
+
+	* tests/testutils.c (testfree): New function. Use it everywhere
+	where test programs deallocate storage allocated via the mini-gmp
+	allocation functions, including uses of mpz_get_str for various
+	test failure messages.
+
+2013-02-19 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: Move asserts to work-around a compiler bug.
+	(mpz_export): Reorder branches.
+	(mpz_mul_ui): Avoid temporary allocation (mpn_mul_1 can work in-place).
+
+	* tests/t-reuse.c: Fix typo causing the same negation condition to
+	be applied to all operands. (See 2013-02-03, Torbjorn)
+
+2013-02-17 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_mul): Read sizes just once.
+	(mpn_set_str_other): Remove a redundant variable.
+	(mpz_abs_add): Use SWAP once, to order sizes.
+	(mpz_mul_ui): Micro-optimisation.
+	(mpz_rootrem): Use _init2 before _setbit.
+	(mpz_set_str): Optimise-out a variable.
+	(mpz_import): Normalise only if needed.
+	(mpn_div_qr_1): Speed-up the d=1 case, delaying a branch.
+
+2013-02-12 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (fac_ui, bin_uiui): Use shorter and faster code.
+
+	* mini-gmp.c: Reduce branches.
+
+2013-01-23 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_cmpabs_d, mpz_cmp_d): Simplify.
+	(mpz_set_str): Behaviour more adherent to the real GMP.
+
+	* tests/t-str.c: Cast size_t to unsigned long, for printf.
+	* tests/t-import.c: Likewise.
+	* tests/t-comb.c: Remove an unused var.
+	* tests/t-div.c: Remove unused args passed to fprintf.
+	* tests/t-double.c: Use float immediates with float vars.
+
+2013-01-22  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp.c (mpz_cmp_d): Simplified, just sort out signs, then
+	call mpz_cmpabs_d.
+
+	* tests/testutils.h: Include stdio.h and stdlib.h.
+	(numberof): New define.
+
+	* tests/t-cmp_d.c: New file, copied from tests/mpz/t-cmp_d.c with
+	minor changes.
+	* tests/Makefile (CHECK_PROGRAMS): Added t-cmp_d,
+
+	* mini-gmp.c (mpz_cmpabs_d): New function.
+	* mini-gmp.h: Declare it.
+
+2013-01-21  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-str.c (testmain): Test mpz_out_str, using
+	the tmpfile function for i/o.
+
+2013-01-20 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/testutils.c (testhalves): New function, test default
+	memory functions.
+	* tests/testutils.h (testhalves): Declare it
+	* tests/t-logops.c: Use testhalves.
+
+	* mini-gmp.c (mpz_init_set_str): New function.
+	* mini-gmp.h (mpz_init_set_str): Declare it.
+	* tests/t-str.c: Test mpz_init_set_str.
+
+2013-01-19 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-double.c (testmain): Get the current free
+	function using mp_get_memory_functions.
+	* tests/t-str.c (testmain): Likewise.
+
+	* tests/testutils.h (tu_free): Remove declaration.
+
+	* tests/testutils.c (block_check, tu_free): Mark static.
+
+2013-01-18  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-str.c (test_small): New function, exercising
+	parsing of whitespace and base prefixes.
+	(testmain): Call it.
+
+	* tests/t-gcd.c (gcdext_valid_p): Fixed memory leak.
+
+	* tests/t-double.c (testmain): Call tu_free rather than
+	free, for storage allocated by mpz_get_str.
+	* tests/t-str.c (testmain): Likewise.
+
+	* tests/testutils.c (block_init, block_check): New functions.
+	(tu_alloc, tu_realloc, tu_free): New functions.
+	(main): Use mp_set_memory_functions.
+	* tests/testutils.h (tu_free): Declare.
+
+	* tests/testutils.h: New file, declarations for test programs.
+
+	* tests/testutils.c (main): New file, with shared main
+	function for all the test programs. Also includes mini-gmp.c.
+	Calls testmain after initialization. All other test programs
+	updated to define testmain rather than main.
+
+2013-01-18 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-signed.c: Slightly larger coverage.
+	* tests/t-double.c: Test also mpz_init_set_d.
+
+2013-01-18  Torbjorn Granlund  <tege@gmplib.org>
+
+	* tests/t-div.c: Test mpz_divisible_p and mpz_divisible_ui_p.
+
+	* tests/t-div.c: Test also mpz_mod, mpz_mod_ui.  Compare
+	mpz_divisible_p just to ceil, to save time.
+
+	* mini-gmp.c: Prefix some names with GMP_.
+
+2013-01-16 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-double.c: Test mpz_cmp_d.
+	* mini-gmp.c (mpz_cmp_d): Correct multiword comparison.
+
+	* mini-gmp.c (mpz_set_str): Handle the empty string.
+	* tests/t-str.c: Test base <= 0.
+
+2013-01-15  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-str.c (main): Use x->_mp_d rather than x[0]._mp_d.
+	* tests/t-invert.c (main): Likewise.
+
+	* tests/t-mul.c (main): Test mpn_mul_n and mpn_sqr.
+
+	* tests/hex-random.h (enum hex_random_op): New value OP_SQR.
+
+	* tests/mini-random.c (mini_random_op3): Renamed, from...
+	(mini_random_op): ... old name. Updated callers.
+	(mini_random_op2): New function.
+
+	* tests/hex-random.c (hex_random_op3): Renamed, from...
+	(hex_random_op): ... old name. Updated callers.
+	(hex_random_op2): New function.
+
+2013-01-15 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-logops.c: Improve popcount/hamdist testing.
+	* tests/t-signed.c: Test more cases.
+
+2013-01-14  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-str.c (main): Added tests for mpn_get_str and
+	mpn_set_str.
+
+2013-01-11 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-comb.c: New test program, testing both
+	mpz_fac_ui and mpz_bin_uiui.
+	* tests/Makefile (CHECK_PROGRAMS): Added t-comb.
+
+	* mini-gmp.c (mpz_mul_si): Simplify.
+	(mpz_mul_ui, mpz_mul, mpz_div_qr): Replace init+REALLOC with init2.
+
+	* mini-gmp.c (NEG_CAST): New macro.
+	(mpz_mul_si, mpz_set_si, mpz_cmp_si): Use NEG_CAST.
+
+	* mini-gmp.c (mpz_set_si, mpz_cmp_si): Simplify by using
+	the _ui variant.
+
+	* tests/t-root.c: Use mpz_ui_pow_ui, when base fits an ui.
+
+	* tests/t-mul.c: Test also mpz_mul_si.
+	* tests/t-sub.c: Test also mpz_ui_sub.
+
+	* mini-gmp.c (mpz_fits_slong_p): Correct range.
+	* tests/t-signed.c: New test program, for get/set/cmp_si.
+	* tests/Makefile (CHECK_PROGRAMS): Added t-signed.
+
+	* mini-gmp.c (mpz_hamdist): Handle different sizes.
+	* tests/t-logops.c: Test also popcount and hamdist.
+
+2013-01-10 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_export, mpz_import): Less restrictive ASSERTs.
+	* tests/t-import.c: Test also size=0 or count=0.
+
+2013-01-10  Torbjorn Granlund  <tege@gmplib.org>
+
+	* tests/t-import.c (main): Don't drop off function end.
+
+2013-01-09 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_export): Support op=0 countp=NULL.
+
+2013-01-08  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/t-import.c: New test program, testing both
+	mpz_import and mpz_export.
+	* tests/Makefile (CHECK_PROGRAMS): Added t-import.
+
+	* tests/mini-random.c (mini_rrandomb_export): New function.
+	* tests/mini-random.h: Declare it.
+	* tests/hex-random.c (hex_rrandomb_export): New function.
+	* tests/hex-random.h: Declare it.
+
+	* mini-gmp.c (mpz_export): Compute accurate word count up
+	front, to avoid generating any high zero words.
+
+2013-01-07 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* README: Document base limitation for conversions.
+	* mini-gmp.c (mpz_set_str): Remove goto.
+	(mpz_import, mpz_export): Correctly use order/endianness.
+
+2013-01-04 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	From shuax:
+	* mini-gmp.c (mpz_import): Reset limb after storing it.
+
+2012-11-22  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/run-tests: Copied latest version from GNU Nettle.
+	Minor fix to the use of $EMULATOR, and proper copyright notice.
+
+2012-06-24 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_div_r_2exp, mpz_div_q_2exp): Improve
+	adjustment condition.
+
+2012-06-08 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_realloc): remove a branch.
+
+2012-05-25 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* tests/t-div.c: Test all _qr, _q, _r variants.
+	* tests/t-lcm.c: Test the _ui variant.
+
+	* mini-gmp.c (mpz_mod, mpz_mod_ui): New functions.
+	* mini-gmp.h (mpz_mod, mpz_mod_ui): Prototypes.
+
+2012-05-09 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c: merge mpz_rootrem and mpz_sqrtrem.
+
+2012-04-13 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.h (mpz_fac_ui, mpz_bin_uiui): New definitions.
+	* mini-gmp.c (mpz_fac_ui, mpz_bin_uiui): Trivial implementation.
+
+2012-04-11 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.h (mpz_root, mpz_rootrem): define (correctly).
+	* mini-gmp.c (mpz_rootrem): Extended code from _root.
+	(mpz_root): Use mpz_rootrem.
+	(mpz_mul_ui): Correctly handle negative operands.
+
+	* tests/Makefile (CHECK_PROGRAMS): add t-root.
+	* tests/t-root.c: New file.
+	* tests/t-reuse.c: Enable root{,rem} tests.
+
+2012-04-10 Marco Bodrato <bodrato@mail.dm.unipi.it>
+
+	* mini-gmp.c (mpz_root): New, support negative operands.
+	* mini-gmp.h (mpz_root): define.
+	(mpz_out_str): Test also __STDIO_LOADED (for VMS).
+	* mpz/2fac_ui.c: Cosmetic change.
+
+	* tests/t-reuse.c: New test case, based on tests/mpz/reuse.c.
+
+	* mini-gmp.c (mpz_cdiv_r_ui): New function.
+	(mpz_fdiv_r_ui): New function.
+	(mpz_tdiv_r_ui): New function.
+	(mpz_powm_ui): New function.
+	(mpz_pow_ui): New function.
+	(mpz_ui_pow_ui): Use mpz_pow_ui.
+	(mpz_gcdext): Fixed input/output overlap, for the case of one
+	input being zero.
+	(mpz_sqrtrem): Fix for the case r NULL, U zero.
+
+2012-02-28  Niels Möller  <nisse@lysator.liu.se>
+
+	* tests/Makefile (srcdir, MINI_GMP_DIR): New make variables. These
+	can be overridden when using a separate build directory.
+	(EXTRA_CFLAGS): Renamed, was OPTFLAGS.
+
+	* mini-gmp.c (mpz_abs_add): Don't cache limb pointers
+	over MPZ_REALLOC, since that breaks in-place operation. Bug
+	spotted by Torbjörn.
+	(mpz_and, mpz_ior, mpz_xor): Likewise.
+	(mpz_cmp): Fixed comparison of negative numbers.
+
+2012-02-26  Niels Möller  <nisse@lysator.liu.se>
+
+	* mini-gmp: New subdirectory. For use by GMP bootstrap, and as a
+	fallback for applications needing bignums but not high
+	performance.
