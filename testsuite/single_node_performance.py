@@ -7,6 +7,7 @@ import re
 import os
 import tempfile
 import json
+import itertools
 from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
@@ -274,27 +275,9 @@ def get_only(values):
 
 
 def extract_run_results(
-    output: str, execution_only: bool, create_db: bool = False
+    output: str, prefix: str, create_db: bool = False
 ) -> RunResults:
-    if execution_only:
-        tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
-        gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
-        effective_gps = float(
-            re.findall(r"Overall execution effectiveGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        io_gps = float(
-            re.findall(r"Overall execution ioGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        execution_gps = float(
-            re.findall(r"Overall execution executionGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        gpt = float(
-            re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
-        )
-        output_bps = float(
-            re.findall(r"Overall execution output: (\d+\.?\d*) bytes/s", output)[-1]
-        )
-    elif create_db:
+    if create_db:
         tps = float(
             get_only(
                 re.findall(
@@ -309,38 +292,37 @@ def extract_run_results(
         execution_gps = 0
         gpt = 0
         output_bps = 0
-    else:
-        tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
-        gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
-        effective_gps = float(
-            get_only(re.findall(r"Overall effectiveGPS: (\d+\.?\d*) gas/s", output))
-        )
-        io_gps = float(
-            get_only(re.findall(r"Overall ioGPS: (\d+\.?\d*) gas/s", output))
-        )
-        execution_gps = float(
-            get_only(re.findall(r"Overall executionGPS: (\d+\.?\d*) gas/s", output))
-        )
-        gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
-        output_bps = float(
-            re.findall(r"Overall output: (\d+\.?\d*) bytes/s", output)[-1]
-        )
-
-    if create_db:
         fraction_in_execution = 0
         fraction_of_execution_in_vm = 0
         fraction_in_commit = 0
     else:
+        tps = float(get_only(re.findall(prefix + r" TPS: (\d+\.?\d*) txn/s", output)))
+        gps = float(get_only(re.findall(prefix + r" GPS: (\d+\.?\d*) gas/s", output)))
+        effective_gps = float(
+            get_only(re.findall(prefix + r" effectiveGPS: (\d+\.?\d*) gas/s", output))
+        )
+        io_gps = float(
+            get_only(re.findall(prefix + r" ioGPS: (\d+\.?\d*) gas/s", output))
+        )
+        execution_gps = float(
+            get_only(re.findall(prefix + r" executionGPS: (\d+\.?\d*) gas/s", output))
+        )
+        gpt = float(get_only(re.findall(prefix + r" GPT: (\d+\.?\d*) gas/txn", output)))
+        output_bps = float(
+            get_only(re.findall(prefix + r" output: (\d+\.?\d*) bytes/s", output))
+        )
         fraction_in_execution = float(
-            re.findall(r"Overall fraction of total: (\d+\.?\d*) in execution", output)[
-                -1
-            ]
+            re.findall(
+                prefix + r" fraction of total: (\d+\.?\d*) in execution", output
+            )[-1]
         )
         fraction_of_execution_in_vm = float(
-            re.findall(r"Overall fraction of execution (\d+\.?\d*) in VM", output)[-1]
+            re.findall(prefix + r" fraction of execution (\d+\.?\d*) in VM", output)[-1]
         )
         fraction_in_commit = float(
-            re.findall(r"Overall fraction of total: (\d+\.?\d*) in commit", output)[-1]
+            re.findall(prefix + r" fraction of total: (\d+\.?\d*) in commit", output)[
+                -1
+            ]
         )
 
     return RunResults(
@@ -457,9 +439,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     results.append(
         RunGroupInstance(
             key=RunGroupKey("warmup"),
-            single_node_result=extract_run_results(
-                output, execution_only=False, create_db=True
-            ),
+            single_node_result=extract_run_results(output, "Overall", create_db=True),
             number_of_threads_results={},
             block_size=MAX_BLOCK_SIZE,
             expected_tps=0,
@@ -510,13 +490,21 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
-                output, execution_only=True
+                output, "Overall execution"
             )
 
         test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
-        single_node_result = extract_run_results(output, execution_only=False)
+        single_node_result = extract_run_results(output, "Overall")
+        stage_node_results = []
+
+        for i in itertools.count():
+            prefix = f"Staged execution: stage {i}:"
+            if prefix in output:
+                stage_node_results.append((i, extract_run_results(output, prefix)))
+            else:
+                break
 
         results.append(
             RunGroupInstance(
@@ -527,6 +515,22 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 expected_tps=test.expected_tps,
             )
         )
+
+        for stage, stage_node_result in stage_node_results:
+            results.append(
+                RunGroupInstance(
+                    key=RunGroupKey(
+                        transaction_type=test.key.transaction_type
+                        + f" [stage {stage}]",
+                        module_working_set_size=test.key.module_working_set_size,
+                        executor_type=test.key.executor_type,
+                    ),
+                    single_node_result=stage_node_result,
+                    number_of_threads_results=number_of_threads_results,
+                    block_size=cur_block_size,
+                    expected_tps=test.expected_tps,
+                )
+            )
 
         # line to be able to aggreate and visualize in Humio
         print(
