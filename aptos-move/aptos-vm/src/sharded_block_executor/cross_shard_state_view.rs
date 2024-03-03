@@ -26,7 +26,7 @@ impl<'a, S: StateView + Sync + Send> CrossShardStateView<'a, S> {
     pub fn new(cross_shard_keys: HashSet<StateKey>, base_view: &'a S) -> Self {
         let mut cross_shard_data = HashMap::new();
         trace!(
-            "Initalizing cross shard state view with {} keys",
+            "Initializing cross shard state view with {} keys",
             cross_shard_keys.len(),
         );
         for key in cross_shard_keys {

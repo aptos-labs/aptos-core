@@ -99,7 +99,7 @@ fn test_create_single_node_test_config() {
     )
     .unwrap();
 
-    // overriden configs
+    // overridden configs
     assert!(merged_config.storage.enable_indexer);
     assert!(merged_config.indexer_grpc.enabled);
     // default config is unchanged
