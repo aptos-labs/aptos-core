@@ -1,14 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod aptos_debug_natives;
-pub mod coverage;
-mod disassembler;
-mod manifest;
-pub mod package_hooks;
-mod show;
-pub mod stored_package;
-
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
     common::{
@@ -26,8 +18,8 @@ use crate::{
     },
     governance::CompileScriptFunction,
     move_tool::{
+        bytecode::{Decompile, Disassemble},
         coverage::SummaryCoverage,
-        disassembler::Disassemble,
         manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     },
     CliCommand, CliResult,
@@ -69,6 +61,14 @@ use std::{
 pub use stored_package::*;
 use tokio::task;
 
+mod aptos_debug_natives;
+mod bytecode;
+pub mod coverage;
+mod manifest;
+pub mod package_hooks;
+mod show;
+pub mod stored_package;
+
 /// Tool for Move related operations
 ///
 /// This tool lets you compile, test, and publish Move code, in addition
@@ -86,6 +86,7 @@ pub enum MoveTool {
     UpgradeObjectPackage(UpgradeObjectPackage),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
     Disassemble(Disassemble),
+    Decompile(Decompile),
     Document(DocumentPackage),
     Download(DownloadPackage),
     Init(InitPackage),
@@ -117,6 +118,7 @@ impl MoveTool {
                 tool.execute_serialized_success().await
             },
             MoveTool::Disassemble(tool) => tool.execute_serialized().await,
+            MoveTool::Decompile(tool) => tool.execute_serialized().await,
             MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
@@ -254,7 +256,7 @@ pub struct InitPackage {
     /// Example: alice=0x1234,bob=0x5678,greg=_
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, value_parser = crate::common::utils::parse_map::<String, MoveManifestAccountWrapper>, default_value = "")]
+    #[clap(long, value_parser = crate::common::utils::parse_map::< String, MoveManifestAccountWrapper >, default_value = "")]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
     #[clap(flatten)]
@@ -989,7 +991,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
             .url(&self.txn_options.profile_options)?;
 
         // Get the `PackageRegistry` at the given object address.
-        let registry = CachedPackageRegistry::create(url, self.object_address).await?;
+        let registry = CachedPackageRegistry::create(url, self.object_address, false).await?;
         let package = registry
             .get_package(built_package.name())
             .await
@@ -1158,6 +1160,10 @@ pub struct DownloadPackage {
     #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
 
+    /// Whether to download the bytecode of the package.
+    #[clap(long, short)]
+    pub bytecode: bool,
+
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
@@ -1175,7 +1181,7 @@ impl CliCommand<&'static str> for DownloadPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let registry = CachedPackageRegistry::create(url, self.account, self.bytecode).await?;
         let output_dir = dir_default_to_current(self.output_dir)?;
 
         let package = registry
@@ -1196,6 +1202,13 @@ impl CliCommand<&'static str> for DownloadPackage {
         package
             .save_package_to_disk(package_path.as_path())
             .map_err(|e| CliError::UnexpectedError(format!("Failed to save package: {}", e)))?;
+        if self.bytecode {
+            for module in package.module_names() {
+                if let Some(bytecode) = registry.get_bytecode(module).await? {
+                    package.save_bytecode_to_disk(package_path.as_path(), module, bytecode)?
+                }
+            }
+        };
         println!(
             "Saved package with {} module(s) to `{}`",
             package.module_names().len(),
@@ -1253,7 +1266,7 @@ impl CliCommand<&'static str> for VerifyPackage {
 
         // Now pull the compiled package
         let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let registry = CachedPackageRegistry::create(url, self.account, false).await?;
         let package = registry
             .get_package(pack.name())
             .await
@@ -1326,7 +1339,7 @@ impl CliCommand<&'static str> for ListPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let registry = CachedPackageRegistry::create(url, self.account, false).await?;
         match self.query {
             MoveListQuery::Packages => {
                 for name in registry.package_names() {
@@ -1639,20 +1652,21 @@ impl FromStr for FunctionArgType {
             "u128" => Ok(FunctionArgType::U128),
             "u256" => Ok(FunctionArgType::U256),
             "raw" => Ok(FunctionArgType::Raw),
-            str => {Err(CliError::CommandArgumentError(format!(
-                "Invalid arg type '{}'.  Must be one of: ['{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}']",
-                str,
-                FunctionArgType::Address,
-                FunctionArgType::Bool,
-                FunctionArgType::Hex,
-                FunctionArgType::String,
-                FunctionArgType::U8,
-                FunctionArgType::U16,
-                FunctionArgType::U32,
-                FunctionArgType::U64,
-                FunctionArgType::U128,
-                FunctionArgType::U256,
-                FunctionArgType::Raw)))
+            str => {
+                Err(CliError::CommandArgumentError(format!(
+                    "Invalid arg type '{}'.  Must be one of: ['{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}']",
+                    str,
+                    FunctionArgType::Address,
+                    FunctionArgType::Bool,
+                    FunctionArgType::Hex,
+                    FunctionArgType::String,
+                    FunctionArgType::U8,
+                    FunctionArgType::U16,
+                    FunctionArgType::U32,
+                    FunctionArgType::U64,
+                    FunctionArgType::U128,
+                    FunctionArgType::U256,
+                    FunctionArgType::Raw)))
             }
         }
     }

@@ -898,6 +898,7 @@ impl CliTestFramework {
             package,
             output_dir: Some(output_dir),
             print_metadata: false,
+            bytecode: true,
         }
         .execute()
         .await

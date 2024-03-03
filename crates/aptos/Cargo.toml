@@ -75,9 +75,10 @@ move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
-move-unit-test = { workspace = true, features = [ "debugging" ] }
-move-vm-runtime = { workspace = true, features = [ "testing" ] }
+move-unit-test = { workspace = true, features = ["debugging"] }
+move-vm-runtime = { workspace = true, features = ["testing"] }
 once_cell = { workspace = true }
+pathsearch = { workspace = true }
 poem = { workspace = true }
 processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "d44b2d209f57872ac593299c34751a5531b51352" }
 rand = { workspace = true }

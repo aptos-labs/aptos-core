@@ -428,6 +428,22 @@ pub fn read_line(input_name: &'static str) -> CliTypedResult<String> {
     Ok(input_buf)
 }
 
+/// Lists the content of a directory
+pub fn read_dir_files(
+    path: &Path,
+    predicate: impl Fn(&Path) -> bool,
+) -> CliTypedResult<Vec<PathBuf>> {
+    let to_cli_err = |err| CliError::IO(path.display().to_string(), err);
+    let mut result = vec![];
+    for entry in std::fs::read_dir(path).map_err(to_cli_err)? {
+        let path = entry.map_err(to_cli_err)?.path();
+        if predicate(path.as_path()) {
+            result.push(path)
+        }
+    }
+    Ok(result)
+}
+
 /// Fund account (and possibly create it) from a faucet. This function waits for the
 /// transaction on behalf of the caller.
 pub async fn fund_account(
