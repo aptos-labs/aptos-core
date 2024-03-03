@@ -2471,10 +2471,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 vec![global_access.into_exp()],
             );
         }
-        self.error(
-            loc,
-            &format!("undeclared `{}`", global_var_sym.display_simple(self.env())),
-        );
+        // If a qualified name is not explicitly specified, do not print it out
+        let qualified_display = if let EA::ModuleAccess_::ModuleAccess(..) = maccess.value {
+            global_var_sym.display(self.env())
+        } else {
+            global_var_sym.display_simple(self.env())
+        };
+        self.error(loc, &format!("undeclared `{}`", qualified_display));
+
         self.new_error_exp()
     }
 
