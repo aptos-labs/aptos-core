@@ -122,7 +122,7 @@ normal <code><a href="../../../framework/aptos-framework/doc/coin.md#0x1_coin_Co
 resource account.
 
 Later on, when someone wants to convert their <code><a href="veiled_coin.md#0x1337_veiled_coin_VeiledCoin">VeiledCoin</a>&lt;T&gt;</code> into a normal <code><a href="../../../framework/aptos-framework/doc/coin.md#0x1_coin_Coin">coin::Coin</a>&lt;T&gt;</code>,
-the resource account can be used to transfer out the normal from its coin store. Transfering out a coin like this
+the resource account can be used to transfer out the normal from its coin store. Transferring out a coin like this
 requires a <code><a href="../../../framework/aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a></code> for the resource account, which the <code><a href="veiled_coin.md#0x1337_veiled_coin">veiled_coin</a></code> module can obtain via a <code>SignerCapability</code>.
 
 

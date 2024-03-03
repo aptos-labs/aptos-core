@@ -85,7 +85,7 @@ pub fn output(out: &mut dyn Write, abis: &[EntryABI], local_types: bool) -> Resu
 struct RustEmitter<T> {
     /// Writer.
     out: IndentedWriter<T>,
-    /// Whether we are targetting the Aptos repository itself (as opposed to generated Aptos types).
+    /// Whether we are targeting the Aptos repository itself (as opposed to generated Aptos types).
     local_types: bool,
 }
 

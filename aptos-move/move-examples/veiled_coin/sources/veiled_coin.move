@@ -97,7 +97,7 @@
 /// resource account.
 ///
 /// Later on, when someone wants to convert their `VeiledCoin<T>` into a normal `coin::Coin<T>`,
-/// the resource account can be used to transfer out the normal from its coin store. Transfering out a coin like this
+/// the resource account can be used to transfer out the normal from its coin store. Transferring out a coin like this
 /// requires a `signer` for the resource account, which the `veiled_coin` module can obtain via a `SignerCapability`.
 ///
 /// ## References
