@@ -382,20 +382,17 @@ fn find_possibly_modified_vars(
                 _ => {},
             },
             Assign(_loc, pat, _) => {
-                match pos {
-                    VisitorPosition::Pre => {
-                        // add vars in pat to modified vars
-                        for (_pat_var_id, sym) in pat.vars() {
-                            let current_binding_id = visiting_binding.get(&sym);
-                            trace!(
-                                "Var {} in assignment {:?} is unsafe",
-                                sym.display(env.symbol_pool()),
-                                current_binding_id
-                            );
-                            unsafe_variables.insert((sym, current_binding_id.copied()));
-                        }
-                    },
-                    _ => {},
+                if let VisitorPosition::Pre = pos {
+                    // add vars in pat to modified vars
+                    for (_pat_var_id, sym) in pat.vars() {
+                        let current_binding_id = visiting_binding.get(&sym);
+                        trace!(
+                            "Var {} in assignment {:?} is unsafe",
+                            sym.display(env.symbol_pool()),
+                            current_binding_id
+                        );
+                        unsafe_variables.insert((sym, current_binding_id.copied()));
+                    }
                 };
             },
         };
@@ -844,7 +841,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
                 // We can remove some exprs; clone just the others.
                 let new_vec = side_effecting_elts_refs
                     .into_iter()
-                    .chain(last_expr_opt.into_iter())
+                    .chain(last_expr_opt)
                     .cloned()
                     .collect_vec();
                 Some(ExpData::Sequence(id, new_vec).into_exp())
