@@ -1,0 +1,223 @@
+name: Build
+
+on:
+  release:
+    types: [published]
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: install requirements
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: build-essential cmake m4 nasm
+          version: 1.0
+
+      - name: Cache gmp build
+        uses: actions/cache@v3
+        with:
+          path: |
+            depends/gmp
+            depends/gmp-6.2.1.tar.xz
+          key: ${{ runner.os }}-gmp-${{ hashFiles('build_gmp.sh') }}-2
+
+      - name: build gmp for Android arm64
+        run: if [[ ! -d "depends/gmp/package_android_arm64" ]]; then ./build_gmp.sh android; fi
+
+      - name: build gmp for Android x86_64
+        run: if [[ ! -d "depends/gmp/package_android_x86_64" ]]; then ./build_gmp.sh android_x86_64; fi
+
+      - name: build gmp for Linux x86_64
+        run: if [[ ! -d "depends/gmp/package" ]]; then ./build_gmp.sh host; fi
+
+      - name: Build prover Android ARM64
+        run: |
+          mkdir build_prover_android && cd build_prover_android
+          cmake .. -DTARGET_PLATFORM=ANDROID -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../package_android
+          make -j4 && make install
+
+      - name: Build prover Android x86_64
+        run: |
+          mkdir build_prover_android_x86_64 && cd build_prover_android_x86_64
+          cmake .. -DTARGET_PLATFORM=ANDROID_x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../package_android_x86_64
+          make -j4 && make install
+
+      - name: Build prover Linux
+        run: |
+          mkdir build_prover && cd build_prover
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../package
+          make -j4 && make install
+
+      - name: test prover for linux
+        run: |
+          set -x
+          set -e
+          npm install -g snarkjs
+          package/bin/prover testdata/circuit_final.zkey testdata/witness.wtns proof.json public.json
+          snarkjs groth16 verify testdata/verification_key.json public.json proof.json
+
+      - name: upload Android ARM64 artifacts
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          mkdir rapidsnark-android-arm64-${{ github.ref_name }}
+          cp -r package_android/* rapidsnark-android-arm64-${{ github.ref_name }}/
+          zip -r rapidsnark-android-arm64-${{ github.ref_name }}.zip rapidsnark-android-arm64-${{ github.ref_name }}
+          gh release upload ${{ github.event.release.tag_name }} rapidsnark-android-arm64-${{ github.ref_name }}.zip
+
+      - name: upload Android x86_64 artifacts
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          mkdir rapidsnark-android-x86_64-${{ github.ref_name }}
+          cp -r package_android_x86_64/* rapidsnark-android-x86_64-${{ github.ref_name }}/
+          zip -r rapidsnark-android-x86_64-${{ github.ref_name }}.zip rapidsnark-android-x86_64-${{ github.ref_name }}
+          gh release upload ${{ github.event.release.tag_name }} rapidsnark-android-x86_64-${{ github.ref_name }}.zip
+
+      - name: upload Linux x86_64 artifacts
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          mkdir rapidsnark-linux-x86_64-${{ github.ref_name }}
+          cp -r package/* rapidsnark-linux-x86_64-${{ github.ref_name }}/
+          zip -r rapidsnark-linux-x86_64-${{ github.ref_name }}.zip rapidsnark-linux-x86_64-${{ github.ref_name }}
+          gh release upload ${{ github.event.release.tag_name }} rapidsnark-linux-x86_64-${{ github.ref_name }}.zip
+
+  build-apple-arm64:
+    runs-on: macos-13-xlarge
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: Cache gmp build
+        uses: actions/cache@v3
+        with:
+          path: |
+            depends/gmp
+            depends/gmp-6.2.1.tar.xz
+          key: ${{ runner.os }}-gmp-arm64-${{ hashFiles('build_gmp.sh') }}
+
+      - name: build
+        run: |
+          if [[ ! -d "depends/gmp/package_ios_arm64" ]]; then ./build_gmp.sh ios; fi
+          if [[ ! -d "depends/gmp/package_iphone_simulator" ]]; then ./build_gmp.sh ios_simulator; fi
+          if [[ ! -d "depends/gmp/package_macos_arm64" ]]; then ./build_gmp.sh macos_arm64; fi
+          
+          mkdir build_prover_ios && cd build_prover_ios
+          cmake .. -GXcode -DTARGET_PLATFORM=IOS -DCMAKE_INSTALL_PREFIX=../package_ios
+          xcodebuild -destination 'generic/platform=iOS' -scheme rapidsnarkStatic -project rapidsnark.xcodeproj -configuration Release
+          cp ../depends/gmp/package_ios_arm64/lib/libgmp.a src/Release-iphoneos
+          cd ../
+          
+          mkdir build_prover_ios_simulator && cd build_prover_ios_simulator
+          cmake .. -GXcode -DTARGET_PLATFORM=IOS -DCMAKE_INSTALL_PREFIX=../package_ios_simulator -DUSE_ASM=NO
+          xcodebuild -destination 'generic/platform=iOS Simulator' -scheme rapidsnarkStatic -project rapidsnark.xcodeproj
+          cp ../depends/gmp/package_iphone_simulator/lib/libgmp.a src/Debug-iphonesimulator
+          cd ../
+          
+          mkdir build_prover_macos_arm64 && cd build_prover_macos_arm64
+          cmake .. -DTARGET_PLATFORM=macos_arm64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../package_macos_arm64
+          make -j4 && make install
+
+      - name: test prover
+        run: |
+          set -x
+          set -e
+          npm install -g snarkjs
+          package_macos_arm64/bin/prover testdata/circuit_final.zkey testdata/witness.wtns proof.json public.json
+          snarkjs groth16 verify testdata/verification_key.json public.json proof.json
+
+      - name: upload iOS artifacts
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          mkdir rapidsnark-iOS-${{ github.ref_name }}
+          cp -r build_prover_ios/src/Release-iphoneos/* rapidsnark-iOS-${{ github.ref_name }}/
+          zip -r rapidsnark-iOS-${{ github.ref_name }}.zip rapidsnark-iOS-${{ github.ref_name }}
+          gh release upload ${{ github.event.release.tag_name }} rapidsnark-iOS-${{ github.ref_name }}.zip
+
+      - name: upload iOS Simulator artifacts
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          mkdir rapidsnark-iOS-Simulator-${{ github.ref_name }}
+          cp -r build_prover_ios_simulator/src/Debug-iphonesimulator/* rapidsnark-iOS-Simulator-${{ github.ref_name }}/
+          zip -r rapidsnark-iOS-Simulator-${{ github.ref_name }}.zip rapidsnark-iOS-Simulator-${{ github.ref_name }}
+          gh release upload ${{ github.event.release.tag_name }} rapidsnark-iOS-Simulator-${{ github.ref_name }}.zip
+
+      - name: upload macOS arm64 artifacts
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          mkdir rapidsnark-macOS-arm64-${{ github.ref_name }}
+          cp -r package_macos_arm64/* rapidsnark-macOS-arm64-${{ github.ref_name }}/
+          zip -r rapidsnark-macOS-arm64-${{ github.ref_name }}.zip rapidsnark-macOS-arm64-${{ github.ref_name }}
+          gh release upload ${{ github.event.release.tag_name }} rapidsnark-macOS-arm64-${{ github.ref_name }}.zip
+
+  build-apple-x86_64:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+
+      - name: Cache gmp build
+        uses: actions/cache@v3
+        with:
+          path: |
+            depends/gmp
+            depends/gmp-6.2.1.tar.xz
+          key: ${{ runner.os }}-gmp-x86_64-${{ hashFiles('build_gmp.sh') }}-2
+
+      - name: install dependencies
+        run: |
+          brew install nasm
+
+      - name: build
+        run: |
+          if [[ ! -d "depends/gmp/package_macos_x86_64" ]]; then ./build_gmp.sh macos_x86_64; fi
+
+          mkdir build_prover_macos_x86_64 && cd build_prover_macos_x86_64
+          cmake .. -DTARGET_PLATFORM=macos_x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../package_macos_x86_64
+          make -j4 && make install
+
+      - name: test prover
+        run: |
+          set -x
+          set -e
+          npm install -g snarkjs
+          package_macos_x86_64/bin/prover testdata/circuit_final.zkey testdata/witness.wtns proof.json public.json
+          snarkjs groth16 verify testdata/verification_key.json public.json proof.json
+
+      - name: upload macOS x86_64 artifacts
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -x
+          mkdir rapidsnark-macOS-x86_64-${{ github.ref_name }}
+          cp -r package_macos_x86_64/* rapidsnark-macOS-x86_64-${{ github.ref_name }}/
+          zip -r rapidsnark-macOS-x86_64-${{ github.ref_name }}.zip rapidsnark-macOS-x86_64-${{ github.ref_name }}
+          gh release upload ${{ github.event.release.tag_name }} rapidsnark-macOS-x86_64-${{ github.ref_name }}.zip

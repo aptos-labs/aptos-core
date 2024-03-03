@@ -66,18 +66,26 @@ pub fn compute_public_inputs_hash(
         &input.variable_keys["extra"],
     )?;
 
+    println!("a");
+
     let use_override_aud = ark_bn254::Fr::from(0);
     let override_aud_val_hashed =
         poseidon_bn254::pad_and_hash_string("", IdCommitment::MAX_AUD_VAL_BYTES)?;
+
+
+    println!("b");
 
     // Add the epk as padded and packed scalars
     let mut frs = Vec::from(temp_pubkey_frs);
 
     frs.push(temp_pubkey_len);
 
+
     // Add the id_commitment as a scalar
     let addr_idc_fr = compute_idc_hash(input, config, pepper_fr, &jwt_parts.payload_decoded()?)?;
     frs.push(addr_idc_fr);
+
+    println!("c");
 
     // Add the exp_timestamp_secs as a scalar
     frs.push(Fr::from(input.exp_date_secs));
@@ -94,6 +102,8 @@ pub fn compute_public_inputs_hash(
     )?;
     frs.push(iss_val_hash);
 
+    println!("d");
+
     let use_extra_field_fr = Fr::from(input.use_extra_field as u64);
     let extra_field_hash = poseidon_bn254::pad_and_hash_string(
         &extra_field.whole_field,
@@ -105,6 +115,8 @@ pub fn compute_public_inputs_hash(
     frs.push(use_extra_field_fr);
     frs.push(extra_field_hash);
 
+    println!("e");
+
     // Add the hash of the jwt_header with the "." separator appended
     let jwt_header_str = jwt_parts.header_undecoded_with_dot();
     let jwt_header_hash = poseidon_bn254::pad_and_hash_string(
@@ -112,6 +124,8 @@ pub fn compute_public_inputs_hash(
         config.global_input_max_lengths["jwt_header_with_separator"],
     )?;
     frs.push(jwt_header_hash);
+
+    println!("f");
 
     let pubkey_hash_fr = jwk.to_poseidon_scalar()?;
     frs.push(pubkey_hash_fr);
@@ -121,6 +135,8 @@ pub fn compute_public_inputs_hash(
     frs.push(use_override_aud);
 
     let result = poseidon_bn254::hash_scalars(frs)?;
+
+    println!("g");
 
     // debugging print statements which we used to check consistency with authenticator
     //     println!("Num EPK scalars:    {}", 4);
@@ -170,8 +186,7 @@ mod tests {
 
     #[test]
     fn test_hashing() {
-        let michael_pk_mod_str: &'static str =      "6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLh
-b_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw";
+        let michael_pk_mod_str: &'static str =      "6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw";
         let michael_pk_kid_str: &'static str = "test_jwk";
         let jwk = RSA_JWK::new_256_aqab(michael_pk_kid_str, michael_pk_mod_str);
 

@@ -10,7 +10,11 @@ use figment::{
     Figment,
 };
 use http::Method;
-use prover_service::{config::*, *};
+use prover_service::{
+    config::*, 
+    *, 
+    prover_key::cached_prover_key
+};
 use rust_rapidsnark::FullProver;
 use std::{
     net::SocketAddr,
@@ -52,6 +56,8 @@ async fn main() {
         .merge(Env::raw())
         .extract()
         .expect("Couldn't load private key from environment variable PRIVATE_KEY");
+
+    let zkey_path = cached_prover_key().await;
 
     // init state
     let public_key: Ed25519PublicKey = (&private_key).into();

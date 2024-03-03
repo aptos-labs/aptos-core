@@ -1,0 +1,12 @@
+[Unit]
+Description=RapidSnark
+StartLimitIntervalSec=600
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=50
+ExecStart=/home/ubuntu/rapidsnark/build/proverServer400 /home/ubuntu/circuit-400-32-256-64.dat /home/ubuntu/circuit-400-32-256-64_hez4_final.zkey
+KillMode=process
+StandardOutput=append:/home/ubuntu/proverServer400.log
+StandardError=append:/home/ubuntu/proverServer400.log

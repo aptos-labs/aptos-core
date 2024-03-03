@@ -28,7 +28,7 @@ rust-rapidsnark = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 axum-server = { workspace = true }
@@ -37,6 +37,10 @@ env = { workspace = true }
 figment = { workspace = true }
 http = "1.0.0"
 init-tracing-opentelemetry = { workspace = true }
+sha2 = { workspace = true }
+indicatif = { workspace = true }
+futures = { workspace = true } 
+
 
 jsonwebtoken = { workspace = true }
 lazy_static = { workspace = true }
@@ -47,6 +51,7 @@ serial_test = "3.0.0"
 thiserror = { workspace = true }
 tower = { workspace = true }
 tower-http = { workspace = true }
+futures-util = "0.3.30"
 
 
 

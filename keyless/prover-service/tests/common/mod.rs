@@ -15,6 +15,7 @@ use prover_service::{
     config::ProverServerConfig,
     handlers::encode_proof,
     input_conversion::{config::CircuitConfig, derive_circuit_input_signals, preprocess},
+    witness_gen::witness_gen
 };
 use rust_rapidsnark::FullProver;
 use serde::Serialize;
@@ -113,6 +114,8 @@ pub fn convert_prove_and_verify(
 
     let formatted_input_str =
         serde_json::to_string(&circuit_input_signals.to_json_value()).unwrap();
+
+    witness_gen(&formatted_input_str).unwrap();
     let (json, _) = full_prover.prove(&formatted_input_str).unwrap();
     let g16p = encode_proof(&Value::from_str(json).unwrap());
 

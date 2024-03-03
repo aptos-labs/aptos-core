@@ -6,6 +6,10 @@ use rust_rapidsnark::FullProver;
 use serde::{Deserialize, Serialize};
 
 pub const CONFIG_FILE_PATH: &str = "config.yml";
+pub(crate) const ZKEY_FILE_PATH : &'static str = "/usr/share/aptos-prover-service/prover_key.zkey";
+pub(crate) const RESOURCES_DIR : &'static str = "/usr/share/aptos-prover-service";
+pub(crate) const ZKEY_FILE_URL : &'static str = "https://github.com/aptos-labs/devnet-groth16-keys/raw/master/main_c.zkey";
+pub(crate) const ZKEY_SHASUM : &'static str = "29fc68fe5f44bb32cb4fc972069bd5e9f1dcbaf8f72afcac83e1fa57b0307686";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProverServerConfig {

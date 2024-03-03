@@ -5,6 +5,7 @@ use crate::{
     config::*,
     error,
     input_conversion::{config::CircuitConfig, derive_circuit_input_signals, preprocess},
+    witness_gen::witness_gen,
 };
 use anyhow::{anyhow, Result};
 use aptos_crypto::{
@@ -43,7 +44,7 @@ pub async fn prove_handler(
         error::make_error(
             e,
             StatusCode::METHOD_NOT_ALLOWED,
-            "auth_override flag is not supported for now",
+            "aud_override flag is not supported for now",
         )
     })?;
     //let jwk = RSA_JWK::new_256_aqab(input_conversion::google_pk_kid_str, input_conversion::google_pk_mod_str);
@@ -67,6 +68,15 @@ pub async fn prove_handler(
 
     // For debugging:
     fs::write("formatted_input.json", &formatted_input_str).unwrap();
+
+    witness_gen(&formatted_input_str)
+            .map_err(|e| {
+                error::make_error(
+                    e,
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "problem with witness gen",
+                )
+            })?;
 
     // TODO fix this ugly mess
     let (json, internal_metrics) = {
