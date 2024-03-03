@@ -23,6 +23,7 @@ it tolerates collisions.
 -  [Function `add_all`](#0x1_smart_table_add_all)
 -  [Function `unzip_entries`](#0x1_smart_table_unzip_entries)
 -  [Function `to_simple_map`](#0x1_smart_table_to_simple_map)
+-  [Function `keys_paginated`](#0x1_smart_table_keys_paginated)
 -  [Function `split_one_bucket`](#0x1_smart_table_split_one_bucket)
 -  [Function `bucket_index`](#0x1_smart_table_bucket_index)
 -  [Function `borrow`](#0x1_smart_table_borrow)
@@ -218,6 +219,16 @@ Invalid target bucket size.
 
 
 
+<a id="0x1_smart_table_EINVALID_BUCKET_INDEX"></a>
+
+Invalid bucket index.
+
+
+<pre><code><b>const</b> <a href="smart_table.md#0x1_smart_table_EINVALID_BUCKET_INDEX">EINVALID_BUCKET_INDEX</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x1_smart_table_EINVALID_LOAD_THRESHOLD_PERCENT"></a>
 
 Invalid load threshold percent to trigger split.
@@ -234,6 +245,16 @@ Invalid target bucket size.
 
 
 <pre><code><b>const</b> <a href="smart_table.md#0x1_smart_table_EINVALID_TARGET_BUCKET_SIZE">EINVALID_TARGET_BUCKET_SIZE</a>: u64 = 6;
+</code></pre>
+
+
+
+<a id="0x1_smart_table_EINVALID_VECTOR_INDEX"></a>
+
+Invalid vector index within a bucket.
+
+
+<pre><code><b>const</b> <a href="smart_table.md#0x1_smart_table_EINVALID_VECTOR_INDEX">EINVALID_VECTOR_INDEX</a>: u64 = 9;
 </code></pre>
 
 
@@ -552,6 +573,74 @@ Disclaimer: This function may be costly as the smart table may be huge in size. 
         i = i + 1;
     };
     res
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_smart_table_keys_paginated"></a>
+
+## Function `keys_paginated`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_keys_paginated">keys_paginated</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(<a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, starting_bucket_index: u64, starting_vector_index: u64, num_keys_to_get: u64): (<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, u64, u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_keys_paginated">keys_paginated</a>&lt;K: store + <b>copy</b> + drop, V: store + <b>copy</b>&gt;(
+    <a href="table.md#0x1_table">table</a>: &<a href="smart_table.md#0x1_smart_table_SmartTable">SmartTable</a>&lt;K, V&gt;,
+    starting_bucket_index: u64,
+    starting_vector_index: u64,
+    num_keys_to_get: u64,
+): (
+    <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;,
+    u64,
+    u64,
+) {
+    <b>let</b> keys = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
+    <b>if</b> (num_keys_to_get &gt; 0) {
+        <b>let</b> num_buckets = <a href="table.md#0x1_table">table</a>.num_buckets;
+        <b>if</b> (num_buckets &gt; 0) {
+            <b>let</b> num_keys_checked = 0;
+            <b>let</b> buckets_ref = &<a href="table.md#0x1_table">table</a>.buckets;
+            <b>let</b> bucket_index = starting_bucket_index;
+            <b>assert</b>!(starting_bucket_index &lt; num_buckets, <a href="smart_table.md#0x1_smart_table_EINVALID_BUCKET_INDEX">EINVALID_BUCKET_INDEX</a>);
+            <b>let</b> bucket_ref = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(buckets_ref, bucket_index);
+            <b>let</b> bucket_length = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket_ref);
+            <b>let</b> vector_index = starting_vector_index;
+            <b>if</b> (starting_vector_index != 0) {
+                <b>assert</b>!(starting_vector_index &lt; bucket_length, <a href="smart_table.md#0x1_smart_table_EINVALID_VECTOR_INDEX">EINVALID_VECTOR_INDEX</a>);
+            };
+            <b>while</b> (<a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a> &lt; num_buckets) {
+                bucket_ref = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(buckets_ref, bucket_index);
+                bucket_length = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket_ref);
+                <b>while</b> (vector_index &lt; bucket_length) {
+                    <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> keys, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(bucket_ref, vector_index).key);
+                    num_keys_checked = num_keys_checked + 1;
+                    vector_index = vector_index + 1;
+                    <b>if</b> (num_keys_checked == num_keys_to_get) {
+                        <b>if</b> (vector_index == bucket_length) {
+                            vector_index = 0;
+                            bucket_index = bucket_index + 1;
+                            bucket_index = <b>if</b> (<a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a> &lt; num_buckets) bucket_index <b>else</b> 0;
+                        };
+                        <b>return</b> (keys, bucket_index, vector_index)
+                    };
+                };
+                bucket_index = bucket_index + 1;
+                vector_index = 0;
+            };
+        };
+    };
+    (keys, 0, 0)
 }
 </code></pre>
 
