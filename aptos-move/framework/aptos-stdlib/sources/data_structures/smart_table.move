@@ -186,15 +186,31 @@ module aptos_std::smart_table {
         res
     }
 
-    #[view]
-    public fun keys<K: store + copy + drop, V: store + copy>(table: &SmartTable<K, V>): vector<K> {
-        let (keys, _, _) = keys_paginated(table, 0, 0, ALL_KEYS);
+    /// Get all keys in a smart table.
+    ///
+    /// For a large enough smart table this function will fail due to execution gas limits, and
+    /// `keys_paginated` should be used instead.
+    public fun keys<K: store + copy + drop, V: store + copy>(
+        table_ref: &SmartTable<K, V>
+    ): vector<K> {
+        let (keys, _, _) = keys_paginated(table_ref, 0, 0, ALL_KEYS);
         keys
     }
 
-    #[view]
+    /// Get keys from a smart table, paginated.
+    ///
+    /// This function can be used to paginate all keys in a large smart table outside of runtime,
+    /// e.g. through chained view function calls. The maximum `num_keys_to_get` before hitting gas
+    /// limits depends on the data types in the smart table.
+    ///
+    /// When starting pagination, pass `starting_bucket_index` = `starting_vector_index` = 0.
+    ///
+    /// The function will then return a vector of keys, a bucket index, and a vector index. The
+    /// return indices can then be used as inputs to another pagination call, which will return a
+    /// vector of more keys. This process can be repeated until the returned bucket index and vector
+    /// index values are both 0, which means that pagination is complete.
     public fun keys_paginated<K: store + copy + drop, V: store + copy>(
-        table: &SmartTable<K, V>,
+        table_ref: &SmartTable<K, V>,
         starting_bucket_index: u64,
         starting_vector_index: u64,
         num_keys_to_get: u64,
@@ -205,9 +221,9 @@ module aptos_std::smart_table {
     ) {
         let keys = vector[];
         if (num_keys_to_get > 0) {
-            let num_buckets = table.num_buckets;
+            let num_buckets = table_ref.num_buckets;
             let num_keys_checked = 0;
-            let buckets_ref = &table.buckets;
+            let buckets_ref = &table_ref.buckets;
             let bucket_index = starting_bucket_index;
             if (starting_bucket_index != 0) {
                 assert!(starting_bucket_index < num_buckets, EINVALID_BUCKET_INDEX);
