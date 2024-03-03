@@ -186,11 +186,13 @@ module aptos_std::smart_table {
         res
     }
 
+    #[view]
     public fun keys<K: store + copy + drop, V: store + copy>(table: &SmartTable<K, V>): vector<K> {
         let (keys, _, _) = keys_paginated(table, 0, 0, ALL_KEYS);
         keys
     }
 
+    #[view]
     public fun keys_paginated<K: store + copy + drop, V: store + copy>(
         table: &SmartTable<K, V>,
         starting_bucket_index: u64,
