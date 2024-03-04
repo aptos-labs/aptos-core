@@ -20,11 +20,13 @@ use aptos_crypto::HashValue;
 use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
+use futures::executor::block_on;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Deref,
     sync::Arc,
 };
+use tokio::{runtime::Handle, task::block_in_place};
 
 #[derive(Clone)]
 pub enum NodeStatus {
@@ -98,6 +100,10 @@ impl InMemDag {
 
     #[cfg(test)]
     pub fn add_node_for_test(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
+        self.add_node_internal(node)
+    }
+
+    fn add_node_internal(&mut self, node: CertifiedNode) -> anyhow::Result<()> {
         self.validate_new_node(&node)?;
         self.add_validated_node(node)
     }
@@ -471,24 +477,34 @@ impl DagStore {
             start_round,
             window_size,
         );
-        for (digest, certified_node) in all_nodes {
-            // TODO: save the storage call in this case
-            if let Err(e) = dag.add_node(certified_node) {
-                debug!("Delete node after bootstrap due to {}", e);
-                to_prune.push(digest);
+
+        {
+            let mut dag_writer = dag.write();
+            for (digest, certified_node) in all_nodes {
+                // TODO: save the storage call in this case
+                if let Err(e) = dag_writer.add_node_internal(certified_node) {
+                    debug!("Delete node after bootstrap due to {}", e);
+                    to_prune.push(digest);
+                }
             }
         }
-        monitor!("dag_store_new_gc", {
-            if let Err(e) = storage.delete_certified_nodes(to_prune) {
-                error!("Error deleting expired nodes: {:?}", e);
-            }
+        let handle = tokio::task::spawn_blocking(move || {
+            monitor!("dag_store_new_gc", {
+                if let Err(e) = storage.delete_certified_nodes(to_prune) {
+                    error!("Error deleting expired nodes: {:?}", e);
+                }
+            })
         });
+        if cfg!(test) {
+            let _ = block_on(handle);
+        }
         if dag.read().is_empty() {
             warn!(
                 "[DAG] Start with empty DAG store at {}, need state sync",
                 start_round
             );
         }
+
         dag
     }
 

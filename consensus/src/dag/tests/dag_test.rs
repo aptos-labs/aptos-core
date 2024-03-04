@@ -152,8 +152,8 @@ fn setup() -> (
     (signers, epoch_state, dag, storage)
 }
 
-#[test]
-fn test_dag_insertion_succeed() {
+#[tokio::test]
+async fn test_dag_insertion_succeed() {
     let (signers, epoch_state, dag, _) = setup();
 
     // Round 1 - nodes 0, 1, 2 links to vec![]
@@ -190,8 +190,8 @@ fn test_dag_insertion_succeed() {
         .is_none());
 }
 
-#[test]
-fn test_dag_insertion_failure() {
+#[tokio::test]
+async fn test_dag_insertion_failure() {
     let (signers, epoch_state, dag, _) = setup();
 
     // Round 1 - nodes 0, 1, 2 links to vec![]
@@ -224,8 +224,8 @@ fn test_dag_insertion_failure() {
     assert!(dag.write().add_node_for_test(node).is_err());
 }
 
-#[test]
-fn test_dag_recover_from_storage() {
+#[tokio::test]
+async fn test_dag_recover_from_storage() {
     let (signers, epoch_state, dag, storage) = setup();
 
     let mut metadatas = vec![];
@@ -268,8 +268,8 @@ fn test_dag_recover_from_storage() {
     assert!(storage.certified_node_data.lock().is_empty());
 }
 
-#[test]
-fn test_dag_bitmask() {
+#[tokio::test]
+async fn test_dag_bitmask() {
     let (signers, epoch_state, dag, _) = setup();
 
     assert_eq!(
