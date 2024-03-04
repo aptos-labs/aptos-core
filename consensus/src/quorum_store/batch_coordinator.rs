@@ -74,7 +74,7 @@ impl BatchCoordinator {
             // TODO: Is it fine to ignore the result of send here?
             // Sending only small batches to proof manager as large batches can't be 
             // included in the inline transactions anyway.
-            if persist_requests.size() < 30 {
+            if persist_requests.len() < 30 {
                 let _ = sender_to_proof_manager
                 .send(ProofManagerCommand::ReceiveBatches(
                     persist_requests.clone(),
