@@ -1,0 +1,63 @@
+
+Diagnostics:
+error: Cyclic type instantiations found for type parameter `T` of `test0`
+  ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:6:2
+  │
+6 │ ╭     fun test0<T>() {
+7 │ │         test0<S<T>>()
+8 │ │     }
+  │ ╰─────^
+
+error: Cyclic type instantiations found for type parameter `T` of `test1`
+   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:10:2
+   │
+10 │ ╭     fun test1<T>() {
+11 │ │         test2<T>()
+   │ │         ---------- "test2<T>" calls "test1<m0::S<T>>"
+12 │ │     }
+   │ ╰─────^
+
+error: Cyclic type instantiations found for type parameter `T` of `test2`
+   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:14:2
+   │
+14 │ ╭     fun test2<T>() {
+15 │ │         test1<S<T>>()
+   │ │         ------------- "test1<m0::S<T>>" calls "test2<m0::S<T>>"
+16 │ │     }
+   │ ╰─────^
+
+error: Cyclic type instantiations found for type parameter `T` of `test3`
+   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:18:2
+   │
+18 │ ╭     fun test3<T>() {
+19 │ │         test4<T>()
+   │ │         ---------- "test4<T>" calls "test5<T>"
+20 │ │     }
+   │ ╰─────^
+   · │
+23 │           test5<T>()
+   │           ---------- "test5<T>" calls "test3<m0::S<T>>"
+
+error: Cyclic type instantiations found for type parameter `T` of `test4`
+   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:22:2
+   │
+22 │ ╭     fun test4<T>() {
+23 │ │         test5<T>()
+   │ │         ---------- "test5<T>" calls "test3<m0::S<T>>"
+24 │ │     }
+   │ ╰─────^
+   · │
+27 │           test3<S<T>>()
+   │           ------------- "test3<m0::S<T>>" calls "test4<m0::S<T>>"
+
+error: Cyclic type instantiations found for type parameter `T` of `test5`
+   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:26:2
+   │
+19 │           test4<T>()
+   │           ---------- "test4<m0::S<T>>" calls "test5<m0::S<T>>"
+   ·
+26 │ ╭     fun test5<T>() {
+27 │ │         test3<S<T>>()
+   │ │         ------------- "test3<m0::S<T>>" calls "test4<m0::S<T>>"
+28 │ │     }
+   │ ╰─────^
