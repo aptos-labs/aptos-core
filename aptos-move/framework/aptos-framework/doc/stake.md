@@ -4084,6 +4084,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
 <b>apply</b> <a href="stake.md#0x1_stake_ValidatorOwnerNoChange">ValidatorOwnerNoChange</a> <b>to</b> *;
 <b>apply</b> <a href="stake.md#0x1_stake_ValidatorNotChangeDuringReconfig">ValidatorNotChangeDuringReconfig</a> <b>to</b> * <b>except</b> on_new_epoch;
+<b>apply</b> <a href="stake.md#0x1_stake_StakePoolNotChangeDuringReconfig">StakePoolNotChangeDuringReconfig</a> <b>to</b> * <b>except</b> on_new_epoch, update_stake_pool;
 <a id="0x1_stake_ghost_valid_perf"></a>
 <b>global</b> <a href="stake.md#0x1_stake_ghost_valid_perf">ghost_valid_perf</a>: <a href="stake.md#0x1_stake_ValidatorPerformance">ValidatorPerformance</a>;
 <a id="0x1_stake_ghost_proposer_idx"></a>
@@ -4160,6 +4161,21 @@ Returns validator's next epoch voting power, including pending_active, active, a
 <pre><code><b>schema</b> <a href="stake.md#0x1_stake_ValidatorNotChangeDuringReconfig">ValidatorNotChangeDuringReconfig</a> {
     <b>ensures</b> (<a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_is_in_progress">reconfiguration_state::spec_is_in_progress</a>() && <b>old</b>(<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework))) ==&gt;
         <b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework)) == <b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">ValidatorSet</a>&gt;(@aptos_framework);
+}
+</code></pre>
+
+
+
+
+<a id="0x1_stake_StakePoolNotChangeDuringReconfig"></a>
+
+
+<pre><code><b>schema</b> <a href="stake.md#0x1_stake_StakePoolNotChangeDuringReconfig">StakePoolNotChangeDuringReconfig</a> {
+    <b>ensures</b> <b>forall</b> a: <b>address</b> <b>where</b> <b>old</b>(<b>exists</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a)): <a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_is_in_progress">reconfiguration_state::spec_is_in_progress</a>() ==&gt;
+        (<b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a).pending_inactive) == <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a).pending_inactive &&
+        <b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a).pending_active) == <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a).pending_active &&
+        <b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a).inactive) == <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a).inactive &&
+        <b>old</b>(<b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a).active) == <b>global</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(a).active);
 }
 </code></pre>
 
@@ -4421,7 +4437,8 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>let</b> owner_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(owner_address);
 <b>ensures</b> !<b>exists</b>&lt;<a href="stake.md#0x1_stake_OwnerCapability">OwnerCapability</a>&gt;(owner_address);
 </code></pre>
@@ -4850,7 +4867,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
 <b>pragma</b> disable_invariants_in_body;
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">GetReconfigStartTimeRequirement</a>;
@@ -5213,7 +5230,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">GetReconfigStartTimeRequirement</a>;
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
@@ -5333,6 +5350,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 <pre><code><b>pragma</b> opaque;
+<b>pragma</b> verify_duration_estimate = 300;
 <b>requires</b> rewards_rate &lt;= <a href="stake.md#0x1_stake_MAX_REWARDS_RATE">MAX_REWARDS_RATE</a>;
 <b>requires</b> rewards_rate_denominator &gt; 0;
 <b>requires</b> rewards_rate &lt;= rewards_rate_denominator;

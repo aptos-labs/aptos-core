@@ -48,11 +48,11 @@ spec aptos_framework::stake {
         invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorPerformance>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorSet>(@aptos_framework);
-        // invariant update forall a: address where old(exists<StakePool>(a)): reconfiguration_state::spec_is_in_progress() ==> old(global<StakePool>(a)) == global<StakePool>(a);
 
         // property 2: The owner of a validator remains immutable.
         apply ValidatorOwnerNoChange to *;
         apply ValidatorNotChangeDuringReconfig to * except on_new_epoch;
+        apply StakePoolNotChangeDuringReconfig to * except on_new_epoch, update_stake_pool;
 
         // ghost variable
         global ghost_valid_perf: ValidatorPerformance;
@@ -71,6 +71,14 @@ spec aptos_framework::stake {
     spec schema ValidatorNotChangeDuringReconfig {
         ensures (reconfiguration_state::spec_is_in_progress() && old(exists<ValidatorSet>(@aptos_framework))) ==>
             old(global<ValidatorSet>(@aptos_framework)) == global<ValidatorSet>(@aptos_framework);
+    }
+
+    spec schema StakePoolNotChangeDuringReconfig {
+        ensures forall a: address where old(exists<StakePool>(a)): reconfiguration_state::spec_is_in_progress() ==>
+            (old(global<StakePool>(a).pending_inactive) == global<StakePool>(a).pending_inactive &&
+            old(global<StakePool>(a).pending_active) == global<StakePool>(a).pending_active &&
+            old(global<StakePool>(a).inactive) == global<StakePool>(a).inactive &&
+            old(global<StakePool>(a).active) == global<StakePool>(a).active);
     }
 
     spec schema ValidatorOwnerNoChange {
@@ -291,6 +299,8 @@ spec aptos_framework::stake {
     }
 
     spec extract_owner_cap(owner: &signer): OwnerCapability {
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         let owner_address = signer::address_of(owner);
         aborts_if !exists<OwnerCapability>(owner_address);
         ensures !exists<OwnerCapability>(owner_address);
@@ -416,7 +426,7 @@ spec aptos_framework::stake {
     }
 
     spec on_new_epoch {
-        pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 300;
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
         // invariants because this function is called during genesis.
@@ -452,7 +462,7 @@ spec aptos_framework::stake {
 
     spec update_stake_pool {
         // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 300;
         include ResourceRequirement;
         include GetReconfigStartTimeRequirement;
         include staking_config::StakingRewardsConfigRequirement;
@@ -586,6 +596,8 @@ spec aptos_framework::stake {
 
     spec calculate_rewards_amount {
         pragma opaque;
+        // TODO: set because of timeout (property proved)
+        pragma verify_duration_estimate = 300;
         requires rewards_rate <= MAX_REWARDS_RATE;
         requires rewards_rate_denominator > 0;
         requires rewards_rate <= rewards_rate_denominator;

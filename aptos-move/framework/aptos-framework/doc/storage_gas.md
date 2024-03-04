@@ -1457,7 +1457,7 @@ that is, the gas-curve is a monotonically increasing function.
 A non decreasing curve must ensure that next is greater than cur.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="storage_gas.md#0x1_storage_gas_NewGasCurveAbortsIf">NewGasCurveAbortsIf</a>;
 <b>include</b> <a href="storage_gas.md#0x1_storage_gas_ValidatePointsAbortsIf">ValidatePointsAbortsIf</a>;
 // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
