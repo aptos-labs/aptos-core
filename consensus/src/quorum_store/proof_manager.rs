@@ -128,13 +128,12 @@ impl ProofManager {
                         proof_block.iter().map(|p| p.info()).collect::<HashSet<_>>();
 
                     self.batches_without_proof_of_store
-                        .retain(|batch, _| !batch.is_expired());
+                        .retain(|batch, _| !batch.is_expired() && !excluded_batches.contains(batch) && !proof_batches.contains(batch));
                     for (batch, txns) in self.batches_without_proof_of_store.iter_mut() {
-                        if excluded_batches.contains(batch) || proof_batches.contains(batch) {
-                            continue;
-                        };
                         if let Some(txns) = txns {
                             // TODO: Should we calculate batch size by summing up sizes of individual txns?
+                            // TODO: We are including any batch that satisfies the size requirements here.
+                            // Should we prioritize based on other criteria like expiration time, etc?
                             if cur_txns + txns.len() as u64 <= max_txns
                                 && cur_bytes + batch.num_bytes() <= max_bytes
                                 && inline_txns + txns.len() as u64 <= max_inline_txns
