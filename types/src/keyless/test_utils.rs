@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 
-use super::{Groth16ZkpAndStatement, Pepper};
+use super::{Groth16ProofAndStatement, Pepper, TransactionAndProof};
 use crate::{
     jwks::rsa::RSA_JWK,
     keyless::{
@@ -11,20 +11,23 @@ use crate::{
             SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_JWT_PAYLOAD_JSON, SAMPLE_PEPPER,
             SAMPLE_PK, SAMPLE_PROOF, SAMPLE_UID_KEY,
         },
-        get_public_inputs_hash, Configuration, Groth16Zkp, KeylessPublicKey, KeylessSignature,
-        OpenIdSig, SignedGroth16Zkp, ZkpOrOpenIdSig,
+        get_public_inputs_hash,
+        zkp_sig::ZKP,
+        Configuration, EphemeralCertificate, Groth16Proof, KeylessPublicKey, KeylessSignature,
+        OpenIdSig, ZeroKnowledgeSig,
     },
-    transaction::authenticator::EphemeralSignature,
+    transaction::{authenticator::EphemeralSignature, RawTransaction, SignedTransaction},
 };
-use aptos_crypto::{ed25519::Ed25519PrivateKey, SigningKey, Uniform};
-use ark_ff::{BigInteger, PrimeField};
+use aptos_crypto::{
+    ed25519::Ed25519PrivateKey, poseidon_bn254::fr_to_bytes_le, SigningKey, Uniform,
+};
 use once_cell::sync::Lazy;
 use ring::signature;
 
 static DUMMY_EPHEMERAL_SIGNATURE: Lazy<EphemeralSignature> = Lazy::new(|| {
     let sk = Ed25519PrivateKey::generate_for_testing();
-    // Signing the sample proof, for lack of any other dummy thing to sign.
-    EphemeralSignature::ed25519(sk.sign::<Groth16Zkp>(&SAMPLE_PROOF).unwrap())
+    // Signing the sample proof, for lack of any other dummy struct to sign.
+    EphemeralSignature::ed25519(sk.sign::<Groth16Proof>(&SAMPLE_PROOF).unwrap())
 });
 
 pub fn get_sample_esk() -> Ed25519PrivateKey {
@@ -45,20 +48,15 @@ pub fn get_sample_pepper() -> Pepper {
     SAMPLE_PEPPER.clone()
 }
 
-pub fn get_sample_groth16_zkp_and_statement() -> Groth16ZkpAndStatement {
+pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
     let config = Configuration::new_for_testing();
     let (sig, pk) = get_sample_groth16_sig_and_pk();
-    let public_inputs_hash = get_public_inputs_hash(&sig, &pk, &SAMPLE_JWK, &config)
-        .unwrap()
-        .into_bigint()
-        .to_bytes_le()
-        .try_into()
-        .expect("expected 32-bytes public inputs hash");
+    let public_inputs_hash =
+        fr_to_bytes_le(&get_public_inputs_hash(&sig, &pk, &SAMPLE_JWK, &config).unwrap());
 
-    let proof = match sig.sig {
-        ZkpOrOpenIdSig::Groth16Zkp(SignedGroth16Zkp {
+    let proof = match sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(ZeroKnowledgeSig {
             proof,
-            non_malleability_signature: _,
             exp_horizon_secs: _,
             extra_field: _,
             override_aud_val: _,
@@ -67,8 +65,10 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ZkpAndStatement {
         _ => unreachable!(),
     };
 
-    Groth16ZkpAndStatement {
-        proof,
+    Groth16ProofAndStatement {
+        proof: match proof {
+            ZKP::Groth16(proof) => proof,
+        },
         public_inputs_hash,
     }
 }
@@ -78,24 +78,23 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ZkpAndStatement {
 pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     let proof = *SAMPLE_PROOF;
 
-    let groth16zkp = SignedGroth16Zkp {
-        proof,
-        non_malleability_signature: EphemeralSignature::ed25519(SAMPLE_ESK.sign(&proof).unwrap()),
+    let zks = ZeroKnowledgeSig {
+        proof: proof.into(),
         extra_field: Some(SAMPLE_JWT_EXTRA_FIELD.to_string()),
         exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
         override_aud_val: None,
         training_wheels_signature: None,
     };
 
-    let zk_sig = KeylessSignature {
-        sig: ZkpOrOpenIdSig::Groth16Zkp(groth16zkp.clone()),
+    let sig = KeylessSignature {
+        cert: EphemeralCertificate::ZeroKnowledgeSig(zks.clone()),
         jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
         exp_date_secs: SAMPLE_EXP_DATE,
         ephemeral_pubkey: SAMPLE_EPK.clone(),
         ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
     };
 
-    (zk_sig, SAMPLE_PK.clone())
+    (sig, SAMPLE_PK.clone())
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
@@ -126,7 +125,7 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     };
 
     let zk_sig = KeylessSignature {
-        sig: ZkpOrOpenIdSig::OpenIdSig(openid_sig.clone()),
+        cert: EphemeralCertificate::OpenIdSig(openid_sig.clone()),
         jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
         exp_date_secs: SAMPLE_EXP_DATE,
         ephemeral_pubkey: SAMPLE_EPK.clone(),
@@ -134,6 +133,36 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     };
 
     (zk_sig, SAMPLE_PK.clone())
+}
+
+pub fn maul_raw_groth16_txn(
+    pk: KeylessPublicKey,
+    mut sig: KeylessSignature,
+    raw_txn: RawTransaction,
+) -> SignedTransaction {
+    let mut txn_and_zkp = TransactionAndProof {
+        message: raw_txn.clone(),
+        proof: None,
+    };
+
+    // maul ephemeral signature to be over a different proof: (a, b, a) instead of (a, b, c)
+    match &mut sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+            let ZKP::Groth16(old_proof) = proof.proof;
+
+            txn_and_zkp.proof = Some(
+                Groth16Proof::new(*old_proof.get_a(), *old_proof.get_b(), *old_proof.get_a())
+                    .into(),
+            );
+        },
+        EphemeralCertificate::OpenIdSig(_) => {},
+    };
+
+    let esk = get_sample_esk();
+    sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
+
+    // reassemble TXN
+    SignedTransaction::new_keyless(raw_txn, pk, sig)
 }
 
 #[cfg(test)]
