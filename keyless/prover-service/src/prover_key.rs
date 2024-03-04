@@ -1,3 +1,4 @@
+// Copyright © Aptos Foundation
 
 use std::fs::{self};
 use std::io::{self, Read};

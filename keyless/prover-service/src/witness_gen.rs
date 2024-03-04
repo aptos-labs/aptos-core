@@ -1,3 +1,4 @@
+// Copyright © Aptos Foundation
 
 use std::process::Command;
 use std::fs;
