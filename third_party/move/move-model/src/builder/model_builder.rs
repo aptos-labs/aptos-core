@@ -509,10 +509,10 @@ impl<'env> ModelBuilder<'env> {
         for i in 0..path.len() - 1 {
             let parent_name = self.get_struct_type_name(&path[i].1);
             let child_name = self.get_struct_type_name(&path[i + 1].1);
-            loop_notes.push(format!("{} contains {}...", parent_name, child_name));
+            loop_notes.push(format!("`{}` contains `{}`...", parent_name, child_name));
         }
         loop_notes.push(format!(
-            "{} contains {}, which forms a loop.",
+            "`{}` contains `{}`, which forms a loop.",
             self.get_struct_type_name(&path.last().unwrap().1),
             self.get_struct_display_name_simple(this_struct_id)
         ));
