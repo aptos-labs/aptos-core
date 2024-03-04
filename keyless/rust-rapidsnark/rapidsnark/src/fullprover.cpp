@@ -152,6 +152,7 @@ ProverResponse FullProverImpl::prove(const char *input) {
     } catch (nlohmann::detail::exception e) {
       return ProverResponse(ProverError::INVALID_INPUT);
     }
+  std::cout << "2" << std::endl;
 
     std::string inputFile("/tmp/rapidsnark_input.json");
     std::string witnessFile("/tmp/rapidsnark_witness.wtns");
@@ -160,6 +161,7 @@ ProverResponse FullProverImpl::prove(const char *input) {
     // Load witness
     auto wtns = BinFileUtils::openExisting(witnessFile, "wtns", 2);
     auto wtnsHeader = WtnsUtils::loadHeader(wtns.get());
+  std::cout << "3" << std::endl;
             
     if (mpz_cmp(wtnsHeader->prime, altBbn128r) != 0) {
         LOG_ERROR("The generated witness file uses a different curve than bn128, which is currently the only supported curve.");
@@ -172,6 +174,7 @@ ProverResponse FullProverImpl::prove(const char *input) {
     json proof = prover->prove(wtnsData)->toJson();
     auto end = std::chrono::high_resolution_clock::now();
     auto prover_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  std::cout << "4" << std::endl;
 
     {
       std::stringstream ss;
@@ -187,6 +190,7 @@ ProverResponse FullProverImpl::prove(const char *input) {
     metrics.witness_generation_time = 0;
     
     const char *proof_raw = strdup(proof.dump().c_str());
+  std::cout << "5" << std::endl;
 
     return ProverResponse(proof_raw, metrics);
 }
