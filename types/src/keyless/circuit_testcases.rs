@@ -8,7 +8,7 @@ use crate::{
     keyless::{
         base64url_encode_str,
         bn254_circom::{G1Bytes, G2Bytes},
-        Claims, Configuration, Groth16Zkp, IdCommitment, KeylessPublicKey, OpenIdSig, Pepper,
+        Claims, Configuration, Groth16Proof, IdCommitment, KeylessPublicKey, OpenIdSig, Pepper,
     },
     transaction::authenticator::EphemeralPublicKey,
 };
@@ -147,8 +147,8 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 ///  - no override aud
 ///  - the extra field enabled
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
-pub(crate) static SAMPLE_PROOF: Lazy<Groth16Zkp> = Lazy::new(|| {
-    Groth16Zkp::new(
+pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
+    Groth16Proof::new(
         G1Bytes::new_unchecked(
             "4470668953498815291118813694625852066171551105654596174374858885226578750734",
             "14788589714058859505243017007182544407755183524390103786436121684254044340756",

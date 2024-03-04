@@ -1325,7 +1325,16 @@ impl AptosVM {
 
         let authenticators = aptos_types::keyless::get_authenticators(transaction)
             .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
-        keyless_validation::validate_authenticators(&authenticators, &self.features, resolver)?;
+
+        // If there are keyless TXN authenticators, validate them all.
+        if !authenticators.is_empty() {
+            // Feature-gating keyless TXNs: if they are *not* enabled, return `FEATURE_UNDER_GATING`,
+            // which will discard the TXN from being put on-chain.
+            if !self.features.is_keyless_enabled() {
+                return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+            }
+            keyless_validation::validate_authenticators(&authenticators, &self.features, resolver)?;
+        }
 
         // The prologue MUST be run AFTER any validation. Otherwise you may run prologue and hit
         // SEQUENCE_NUMBER_TOO_NEW if there is more than one transaction from the same sender and
