@@ -1,28 +1,34 @@
 
 Diagnostics:
-error: Unused parameter `_x` does not have the `drop` ability
-  ┌─ tests/ability-check/unused_para_no_drop.move:9:22
-  │
-9 │     public fun f1<T>(_x: T) {
-  │                      ^^
-
-error: Unused parameter `_x` does not have the `drop` ability
-   ┌─ tests/ability-check/unused_para_no_drop.move:15:19
+error: local `_x` of type `T` does not have the `drop` ability
+   ┌─ tests/ability-check/unused_para_no_drop.move:9:29
    │
-15 │     public fun f3(_x: S) {
-   │                   ^^
+ 9 │       public fun f1<T>(_x: T) {
+   │ ╭─────────────────────────────^
+10 │ │     }
+   │ ╰─────^ implicitly dropped here since it is no longer used
 
-error: Unused parameter `_x` does not have the `drop` ability
-   ┌─ tests/ability-check/unused_para_no_drop.move:21:19
+error: local `_x` of type `m::S` does not have the `drop` ability
+   ┌─ tests/ability-check/unused_para_no_drop.move:15:26
    │
-21 │     public fun f5(_x: vector<S>) {
-   │                   ^^
+15 │       public fun f3(_x: S) {
+   │ ╭──────────────────────────^
+16 │ │     }
+   │ ╰─────^ implicitly dropped here since it is no longer used
 
-error: Unused parameter `_y` does not have the `drop` ability
-   ┌─ tests/ability-check/unused_para_no_drop.move:37:29
+error: local `_x` of type `vector<m::S>` does not have the `drop` ability
+   ┌─ tests/ability-check/unused_para_no_drop.move:21:34
    │
-37 │     public fun f10<T>(x: T, _y:T): T {
-   │                             ^^
+21 │       public fun f5(_x: vector<S>) {
+   │ ╭──────────────────────────────────^
+22 │ │     }
+   │ ╰─────^ implicitly dropped here since it is no longer used
+
+error: local `_y` of type `T` does not have the `drop` ability
+   ┌─ tests/ability-check/unused_para_no_drop.move:38:9
+   │
+38 │         x
+   │         ^ implicitly dropped here since it is no longer used
 
 error: local `x` of type `m::S` does not have the `drop` ability
    ┌─ tests/ability-check/unused_para_no_drop.move:42:9

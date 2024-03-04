@@ -35,7 +35,7 @@ use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
 use move_model::{
     ast::TempIndex,
     exp_generator::ExpGenerator,
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, Parameter, StructId, TypeParameterKind},
+    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, StructId, TypeParameterKind},
     ty,
     ty::{gen_get_ty_param_kinds, Type},
 };
@@ -99,29 +99,6 @@ impl FunctionTargetProcessor for AbilityProcessor {
             lifetime,
             exit_state,
         };
-
-        // Check whether unused parameters may be dropped
-        let live_vars = live_var.get_info_at(0).before_set();
-        if exit_state.get_state_at(0).may_return() {
-            let type_params = fun_env.get_type_parameters();
-            for (i, Parameter(sym, atype, loc)) in fun_env.get_parameters().iter().enumerate() {
-                // If parameter at `i` is not alive and its type is either a type parameter, a struct or a vector of struct
-                // we need to check its drop ability
-                if !live_vars.contains(&i)
-                    && (atype.is_type_parameter() || atype.is_struct_or_vector_of_struct())
-                {
-                    let ability = fun_env.module_env.env.type_abilities(atype, &type_params);
-                    if !ability.has_ability(Ability::Drop) {
-                        let msg = format!(
-                            "Unused parameter `{}` does not have the `drop` ability",
-                            sym.display(fun_env.module_env.env.symbol_pool()),
-                        );
-                        fun_env.module_env.env.diag(Severity::Error, loc, &msg);
-                    }
-                }
-            }
-        }
-
         let state_map = analyzer.analyze_function(CopyDropState::default(), &code, &cfg);
         let copy_drop =
             analyzer.state_per_instruction_with_default(state_map, &code, &cfg, |_, after| {
@@ -269,6 +246,22 @@ struct Transformer<'a> {
 
 impl<'a> Transformer<'a> {
     fn run(&mut self, code: Vec<Bytecode>) {
+        // Check and insert drop for parameters before the first instruction if it is a return
+        if !code.is_empty() && code.first().unwrap().is_return() {
+            let instr = code.first().unwrap();
+            for temp in self
+                .live_var
+                .0
+                .get(&0)
+                .unwrap()
+                .released_and_unused_temps(instr)
+            {
+                if temp < self.builder.fun_env.get_parameters().len() {
+                    self.copy_drop.get_mut(&0).unwrap().needs_drop.insert(temp);
+                }
+            }
+            self.check_and_add_implicit_drops(0, instr, true);
+        }
         for (offset, bc) in code.into_iter().enumerate() {
             self.transform_bytecode(offset as CodeOffset, bc)
         }
@@ -313,7 +306,7 @@ impl<'a> Transformer<'a> {
             _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
         }
         // Insert/check any drops needed after this program point
-        self.check_and_add_implicit_drops(code_offset, &bc)
+        self.check_and_add_implicit_drops(code_offset, &bc, false)
     }
 
     fn check_and_emit_bytecode(&mut self, _code_offset: CodeOffset, bc: Bytecode) {
@@ -445,9 +438,14 @@ impl<'a> Transformer<'a> {
 
 impl<'a> Transformer<'a> {
     /// Add implicit drops at the given code offset.
-    fn check_and_add_implicit_drops(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
-        // No drop after terminators
-        if !bytecode.is_always_branching() {
+    fn check_and_add_implicit_drops(
+        &mut self,
+        code_offset: CodeOffset,
+        bytecode: &Bytecode,
+        before: bool,
+    ) {
+        // No drop after terminators unless it is dropped before a return
+        if !bytecode.is_always_branching() || before {
             let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
             let id = bytecode.get_attr_id();
             for temp in copy_drop_at.check_drop.iter() {
