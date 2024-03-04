@@ -264,12 +264,6 @@ async fn rpc_response_sender(
     let enqueue_micros = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64;
     match peer_sender.send((msg,enqueue_micros)).await {
         Ok(_) => {
-            if protocol_id == ProtocolId::StorageServiceRpc {
-                info!(
-                    req_id = rpc_id,
-                    protocol_id = protocol_id.as_str(),
-                    "RPCT rsp sent");
-            }
             counters::inbound_rpc_handler_latency(&network_context, protocol_id).observe(dt.as_secs_f64());
             counters::rpc_message_bytes(network_context.network_id(),protocol_id.as_str(),network_context.role(),counters::RESPONSE_LABEL,counters::OUTBOUND_LABEL,counters::SENT_LABEL, data_len as u64);
             counters::pending_rpc_requests(protocol_id.as_str()).dec();
@@ -729,13 +723,6 @@ impl<TMessage: Message> NetworkSender<TMessage> {
                         match send_result {
                             Ok(_) => {
                                 counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type, counters::REQUEST_LABEL, counters::OUTBOUND_LABEL, counters::SENT_LABEL, data_len);
-                                // if protocol == ProtocolId::StorageServiceRpc {
-                                //     info!(
-                                //         peer = recipient,
-                                //         req_id = request_id,
-                                //         protocol_id = protocol.as_str(),
-                                //         "RPCT req sent");
-                                // }
                                 receiver
                                 // now we wait for rpc reply
                             }
