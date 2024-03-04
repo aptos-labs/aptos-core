@@ -9,7 +9,11 @@ use aptos_release_builder::{
     initialize_aptos_core_path,
     validate::{DEFAULT_RESOLUTION_TIME, FAST_RESOLUTION_TIME},
 };
-use aptos_types::{account_address::AccountAddress, chain_id::ChainId};
+use aptos_types::{
+    account_address::AccountAddress,
+    chain_id::ChainId,
+    jwks::{ObservedJWKs, SupportedOIDCProviders},
+};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -228,6 +232,11 @@ async fn main() -> anyhow::Result<()> {
                     &aptos_release_builder::components::feature_flags::Features::from(&features)
                 )?
             );
+
+            let oidc_providers = fetch_config::<SupportedOIDCProviders>(&client)?;
+            let observed_jwks = fetch_config::<ObservedJWKs>(&client)?;
+            println!("SupportedOIDCProviders={:?}", oidc_providers);
+            println!("ObservedJWKs={:?}", observed_jwks);
             Ok(())
         },
         Commands::PrintPackageMetadata {

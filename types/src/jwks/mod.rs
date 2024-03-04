@@ -45,9 +45,17 @@ pub struct OIDCProvider {
     pub config_url: Vec<u8>,
 }
 
+impl Debug for OIDCProvider {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OIDCProvider")
+            .field("name", &String::from_utf8(self.name.clone()))
+            .field("config_url", &String::from_utf8(self.config_url.clone()))
+            .finish()
+    }
+}
 /// Move type `0x1::jwks::SupportedOIDCProviders` in rust.
 /// See its doc in Move for more details.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SupportedOIDCProviders {
     pub providers: Vec<OIDCProvider>,
 }
