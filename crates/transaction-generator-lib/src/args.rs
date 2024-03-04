@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind, WorkflowProgress};
+use crate::{
+    publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind,
+    WorkflowProgress,
+};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -321,7 +324,10 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
-                workflow_kind: WorkflowKind::CreateMintBurn { count: 10, creation_balance: 2000000 },
+                workflow_kind: WorkflowKind::CreateMintBurn {
+                    count: 10,
+                    creation_balance: 2000000,
+                },
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
@@ -409,7 +415,13 @@ impl TransactionTypeArg {
     ) -> Vec<Vec<(TransactionType, usize)>> {
         let arg_transaction_types = transaction_types
             .iter()
-            .map(|t| t.materialize(module_working_set_size, sender_use_account_pool, workflow_progress_type))
+            .map(|t| {
+                t.materialize(
+                    module_working_set_size,
+                    sender_use_account_pool,
+                    workflow_progress_type,
+                )
+            })
             .collect::<Vec<_>>();
 
         let arg_transaction_weights = if transaction_weights.is_empty() {

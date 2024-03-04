@@ -273,15 +273,30 @@ impl WorkflowTxnGeneratorCreator {
                     txn_executor,
                     num_modules,
                     mint_entry_point.package_name(),
-                    Some(20_00000000)
-                ).await;
+                    Some(20_00000000),
+                )
+                .await;
 
-                let mint_worker = CustomModulesDelegationGeneratorCreator::create_worker(init_txn_factory.clone(), root_account, txn_executor, &mut packages, &mut EntryPointTransactionGenerator {
-                    entry_point: mint_entry_point,
-                }).await;
-                let burn_worker = CustomModulesDelegationGeneratorCreator::create_worker(init_txn_factory.clone(), root_account, txn_executor, &mut packages, &mut EntryPointTransactionGenerator {
-                    entry_point: burn_entry_point,
-                }).await;
+                let mint_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    &mut packages,
+                    &mut EntryPointTransactionGenerator {
+                        entry_point: mint_entry_point,
+                    },
+                )
+                .await;
+                let burn_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    &mut packages,
+                    &mut EntryPointTransactionGenerator {
+                        entry_point: burn_entry_point,
+                    },
+                )
+                .await;
 
                 let packages = Arc::new(packages);
 

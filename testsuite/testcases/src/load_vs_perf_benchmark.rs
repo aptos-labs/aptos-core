@@ -7,7 +7,8 @@ use aptos_forge::{
     args::TransactionTypeArg,
     prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice},
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
-    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Test, TxnStats, WorkflowProgress,
+    EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Test, TxnStats,
+    WorkflowProgress,
 };
 use aptos_logger::info;
 use rand::SeedableRng;
@@ -119,7 +120,11 @@ impl TransactionWorkload {
         });
 
         if self.is_phased() {
-            let write_type = self.transaction_type.materialize(self.num_modules, true, WorkflowProgress::when_done_default());
+            let write_type = self.transaction_type.materialize(
+                self.num_modules,
+                true,
+                WorkflowProgress::when_done_default(),
+            );
             request.transaction_mix_per_phase(vec![
                 // warmup
                 vec![(account_creation_type, 1)],
@@ -129,7 +134,11 @@ impl TransactionWorkload {
                 vec![(write_type, 1)],
             ])
         } else {
-            request.transaction_type(self.transaction_type.materialize(self.num_modules, false, WorkflowProgress::when_done_default()))
+            request.transaction_type(self.transaction_type.materialize(
+                self.num_modules,
+                false,
+                WorkflowProgress::when_done_default(),
+            ))
         }
     }
 

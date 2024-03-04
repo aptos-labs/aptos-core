@@ -412,7 +412,7 @@ module ambassador::ambassador {
     }
 
     #[test(creator = @0x123, user1 = @0x456)]
-    fun test_mint_burn_by_user(creator: &signer, user1: &signer) acquires AmbassadorToken {
+    fun test_mint_burn_by_user(creator: &signer, user1: &signer) acquires AmbassadorToken, AmbassadorLevel {
         // ------------------------------------------
         // Creator creates the Ambassador Collection.
         // ------------------------------------------

@@ -77,7 +77,14 @@ async fn test_txn_emmitter() {
             //     ),
             // ],
             vec![
-                (TransactionTypeArg::NoOp.materialize(100, false, WorkflowProgress::when_done_default()), 20),
+                (
+                    TransactionTypeArg::NoOp.materialize(
+                        100,
+                        false,
+                        WorkflowProgress::when_done_default(),
+                    ),
+                    20,
+                ),
                 (
                     TransactionType::CallCustomModules {
                         entry_point: EntryPoints::MakeOrChangeTable {

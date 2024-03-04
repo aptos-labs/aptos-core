@@ -219,7 +219,10 @@ pub enum EntryPoints {
     TokenV1MintAndStoreFT,
     TokenV1MintAndTransferFT,
 
-    TokenV2AmbassadorMint { numbered: bool},
+    TokenV2AmbassadorMint {
+        numbered: bool,
+    },
+    /// Burn an NFT token, only works with numbered=false tokens.
     TokenV2AmbassadorBurn,
 
     InitializeVectorPicture {
@@ -276,8 +279,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "framework_usecases",
-            EntryPoints::TokenV2AmbassadorMint { .. }
-            | EntryPoints::TokenV2AmbassadorBurn => "ambassador_token",
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                "ambassador_token"
+            },
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
@@ -324,8 +328,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
-            EntryPoints::TokenV2AmbassadorMint { .. }
-            | EntryPoints::TokenV2AmbassadorBurn => "ambassador",
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                "ambassador"
+            },
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. } => "vector_picture",
@@ -559,13 +564,11 @@ impl EntryPoints {
                     ],
                 )
             },
-            EntryPoints::TokenV2AmbassadorBurn => {
-                get_payload(
-                    module_id,
-                    ident_str!("burn_named_by_user").to_owned(),
-                    vec![],
-                )
-            },
+            EntryPoints::TokenV2AmbassadorBurn => get_payload(
+                module_id,
+                ident_str!("burn_named_by_user").to_owned(),
+                vec![],
+            ),
             EntryPoints::InitializeVectorPicture { length } => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![
                     bcs::to_bytes(&length).unwrap(), // length
@@ -640,8 +643,9 @@ impl EntryPoints {
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
-            EntryPoints::TokenV2AmbassadorMint { .. }
-            | EntryPoints::TokenV2AmbassadorBurn => MultiSigConfig::Publisher,
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                MultiSigConfig::Publisher
+            },
             _ => MultiSigConfig::None,
         }
     }
@@ -685,8 +689,9 @@ impl EntryPoints {
             },
             EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => AutomaticArgs::Signer,
-            EntryPoints::TokenV2AmbassadorMint { .. }
-            | EntryPoints::TokenV2AmbassadorBurn => AutomaticArgs::SignerAndMultiSig,
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                AutomaticArgs::SignerAndMultiSig
+            },
             EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
             EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
                 AutomaticArgs::None
