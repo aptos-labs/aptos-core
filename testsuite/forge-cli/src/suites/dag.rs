@@ -9,8 +9,8 @@ use aptos_forge::{
     EmitJobMode, EmitJobRequest, ForgeConfig, NodeResourceOverride,
 };
 use aptos_sdk::types::on_chain_config::{
-    BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig,
-    OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig,
+    AnchorElectionMode, BlockGasLimitType, ConsensusAlgorithmConfig, DagConsensusConfigV1,
+    OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType, ValidatorTxnConfig,
 };
 use aptos_testcases::{
     consensus_reliability_tests::ChangingWorkingQuorumTest,
@@ -282,7 +282,10 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             let onchain_consensus_config = OnChainConsensusConfig::V3 {
-                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1 {
+                    anchor_election_mode: AnchorElectionMode::RoundRobin,
+                    ..Default::default()
+                }),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
             };
 
