@@ -1,5 +1,8 @@
 // Copyright © Aptos Foundation
 
+#![allow(clippy::all)]
+#![allow(warnings)]
+#![allow(unused_variables)]
 pub mod api;
 pub mod config;
 pub mod error;

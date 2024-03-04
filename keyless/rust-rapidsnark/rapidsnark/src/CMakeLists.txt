@@ -1,6 +1,5 @@
-link_libraries(${GMP_LIB})
+link_libraries(gmp)
 
-add_definitions(${GMP_DEFINIONS})
 
 if(USE_ASM)
     if(ARCH MATCHES "arm64")
