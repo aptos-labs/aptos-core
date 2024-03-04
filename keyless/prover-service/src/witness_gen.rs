@@ -7,7 +7,7 @@ use anyhow::{Result, bail};
 
 
 
-//#[cfg(target_arch = "arm")]
+#[cfg(target_arch = "arm")]
 pub fn witness_gen(body: &str) -> Result<()> {
 
     fs::write("/tmp/rapidsnark_input.json", body.as_bytes())?;
@@ -44,7 +44,7 @@ pub fn witness_gen(body: &str) -> Result<()> {
 
     fs::write("/tmp/rapidsnark_input.json", body.as_bytes())?;
 
-    let output = Command::new("/usr/share/aptos-prover-service/main_c")
+    let output = Command::new("/usr/local/share/aptos-prover-service/main_c")
             .args(&["/tmp/rapidsnark_input.json", "/tmp/rapidsnark_witness.wtns"]) // Example arguments
             .output()
             .expect("Failed to execute command");
