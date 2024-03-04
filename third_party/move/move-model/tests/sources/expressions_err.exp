@@ -1,4 +1,4 @@
-error: undeclared `M::x`
+error: undeclared `x`
    ┌─ tests/sources/expressions_err.move:12:7
    │
 12 │       x

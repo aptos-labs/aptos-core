@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: `M::reduce` is a function and not a macro
+error: `reduce` is a function and not a macro
    ┌─ tests/checking/typing/lambda.move:34:37
    │
 34 │         foreach(&v, |e| sum = sum + reduce!(*e, 0, |t, r| t + r));

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: undeclared `M::x`
+error: undeclared `x`
    ┌─ tests/checking/specs/expressions_err.move:11:7
    │
 11 │       x // Undeclared simple name.
