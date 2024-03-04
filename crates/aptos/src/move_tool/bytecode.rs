@@ -10,7 +10,7 @@ use crate::common::{
 };
 use anyhow::Context;
 use async_trait::async_trait;
-use clap::Parser;
+use clap::{Args, Parser};
 use itertools::Itertools;
 use move_binary_format::{
     binary_views::BinaryIndexedView, file_format::CompiledScript, CompiledModule,
@@ -60,35 +60,14 @@ pub struct Decompile {
     pub command: BytecodeCommand,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-enum BytecodeCommandType {
-    // Need to set a default for technical reasons, but we override it anyway below.
-    #[default]
-    Disassemble,
-    Decompile,
-}
-
-#[derive(Debug, Parser)]
+#[derive(Debug, Args)]
 pub struct BytecodeCommand {
-    /// Set programmatically
-    #[clap(skip)]
-    command_type: BytecodeCommandType,
-
     /// Treat input file as a script (default is to treat file as a module)
     #[clap(long)]
     pub is_script: bool,
 
-    /// The path to a directory containing Move bytecode files with the extension `.mv`.
-    /// The tool will process all files find in this directory
-    ///
-    /// If present, a source map at the same location ending in `.mvsm` and the source
-    /// file itself ending in`.move` will be processed by the tool.
-    #[clap(long)]
-    pub package_path: Option<PathBuf>,
-
-    /// Alternatively to a package path, path to a single bytecode file which should be processed.
-    #[clap(long)]
-    pub bytecode_path: Option<PathBuf>,
+    #[clap(flatten)]
+    input: BytecodeCommandInput,
 
     /// (Optional) Currently only for disassemble: path to a coverage file for the VM in order
     /// to print trace information in the disassembled output.
@@ -106,6 +85,29 @@ pub struct BytecodeCommand {
     pub(crate) prompt_options: PromptOptions,
 }
 
+/// Allows to ensure that either one of both is selected (via  the `group` attribute).
+#[derive(Debug, Args)]
+#[group(required = true, multiple = false)]
+pub struct BytecodeCommandInput {
+    /// The path to a directory containing Move bytecode files with the extension `.mv`.
+    /// The tool will process all files find in this directory
+    ///
+    /// If present, a source map at the same location ending in `.mvsm` and the source
+    /// file itself ending in`.move` will be processed by the tool.
+    #[clap(long)]
+    pub package_path: Option<PathBuf>,
+
+    /// Alternatively to a package path, path to a single bytecode file which should be processed.
+    #[clap(long)]
+    pub bytecode_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BytecodeCommandType {
+    Disassemble,
+    Decompile,
+}
+
 #[async_trait]
 impl CliCommand<String> for Disassemble {
     fn command_name(&self) -> &'static str {
@@ -113,8 +115,7 @@ impl CliCommand<String> for Disassemble {
     }
 
     async fn execute(mut self) -> CliTypedResult<String> {
-        self.command.command_type = BytecodeCommandType::Disassemble;
-        self.command.execute().await
+        self.command.execute(BytecodeCommandType::Disassemble).await
     }
 }
 
@@ -125,30 +126,22 @@ impl CliCommand<String> for Decompile {
     }
 
     async fn execute(mut self) -> CliTypedResult<String> {
-        self.command.command_type = BytecodeCommandType::Decompile;
-        self.command.execute().await
+        self.command.execute(BytecodeCommandType::Decompile).await
     }
 }
 
 impl BytecodeCommand {
-    async fn execute(self) -> CliTypedResult<String> {
-        let inputs = if let Some(path) = self.bytecode_path.clone() {
-            if self.package_path.is_some() {
-                return Err(CliError::CommandArgumentError(
-                    "Cannot provide both `--package-path` and `--bytecode-path".to_owned(),
-                ));
-            }
+    async fn execute(self, command_type: BytecodeCommandType) -> CliTypedResult<String> {
+        let inputs = if let Some(path) = self.input.bytecode_path.clone() {
             vec![path]
-        } else if let Some(path) = self.package_path.clone() {
+        } else if let Some(path) = self.input.package_path.clone() {
             read_dir_files(path.as_path(), |p| {
                 p.extension()
                     .map(|s| s == MOVE_COMPILED_EXTENSION)
                     .unwrap_or_default()
             })?
         } else {
-            return Err(CliError::CommandArgumentError(
-                "Must provide one of `--package-path` or `--bytecode-path".to_owned(),
-            ));
+            unreachable!("arguments required by clap")
         };
 
         let mut report = vec![];
@@ -165,7 +158,7 @@ impl BytecodeCommand {
                 )));
             }
 
-            let (output, extension) = match self.command_type {
+            let (output, extension) = match command_type {
                 BytecodeCommandType::Disassemble => {
                     (self.disassemble(bytecode_path)?, DISASSEMBLER_EXTENSION)
                 },
