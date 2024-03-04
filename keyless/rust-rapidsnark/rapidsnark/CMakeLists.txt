@@ -26,9 +26,9 @@ endif()
 
 if (NOT EXISTS ${GMP_LIB_FILE_FULLPATH})
     message("WARNING: ${GMP_LIB_FILE_FULLPATH} is not found and so system ${GMP_LIB_FILE} is used.")
-    set(GMP_LIB gmp)
 endif()
 
+set(GMP_LIB gmp)
 
 include_directories(BEFORE ${GMP_INCLUDE_DIR})
 
