@@ -8,7 +8,7 @@ use crate::{
         dag_fetcher::TFetchRequester,
         errors::DagDriverError,
         observability::{
-            counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
+            counters::{self, FETCH_ENQUEUE_FAILURES, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
@@ -137,6 +137,9 @@ impl DagDriver {
 
             if !dag_reader.all_exists(node.parents_metadata()) {
                 if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
+                    FETCH_ENQUEUE_FAILURES
+                        .with_label_values(&[&"cert_node"])
+                        .inc();
                     error!("request to fetch failed: {}", err);
                 }
                 bail!(DagDriverError::MissingParents);

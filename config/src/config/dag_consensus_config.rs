@@ -84,6 +84,8 @@ pub struct DagFetcherConfig {
     pub min_concurrent_responders: u32,
     pub max_concurrent_responders: u32,
     pub max_concurrent_fetches: usize,
+    pub request_channel_size: usize,
+    pub response_channel_size: usize,
 }
 
 impl Default for DagFetcherConfig {
@@ -93,7 +95,9 @@ impl Default for DagFetcherConfig {
             rpc_timeout_ms: 1000,
             min_concurrent_responders: 1,
             max_concurrent_responders: 4,
-            max_concurrent_fetches: 4,
+            max_concurrent_fetches: 50,
+            request_channel_size: 100,
+            response_channel_size: 100,
         }
     }
 }
