@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff, types::NodeCertificate};
+use super::{
+    dag_store::DagStore, health::HealthBackoff, order_rule::TOrderRule, types::NodeCertificate,
+};
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
@@ -361,7 +363,7 @@ impl DagDriver {
     }
 
     pub fn fetch_callback(&self) {
-        self.order_rule.lock().process_all();
+        self.order_rule.process_all();
         self.check_new_round();
     }
 }
@@ -386,7 +388,7 @@ impl RpcHandler for DagDriver {
 
         let node_metadata = certified_node.metadata().clone();
         self.add_node(certified_node)
-            .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
+            .map(|_| self.order_rule.process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
     }
