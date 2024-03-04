@@ -11,11 +11,12 @@ use aptos_logger::{info, warn};
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use aptos_netcore::transport::memory::MemoryTransport;
 use aptos_netcore::transport::tcp::TcpTransport;
-use aptos_netcore::transport::Transport;
+use aptos_netcore::transport::{ConnectionOrigin, Transport};
+use aptos_time_service::TimeServiceTrait;
 use aptos_types::network_address::NetworkAddress;
 use crate::application::ApplicationCollector;
 use crate::application::storage::PeersAndMetadata;
-use crate::peer;
+use crate::{counters, peer};
 use crate::protocols::network::OutboundPeerConnections;
 use crate::transport::AptosNetTransport;
 use futures::AsyncWriteExt;
@@ -142,11 +143,17 @@ async fn connect_outbound<TTransport, TSocket>(
             return Err(err);
         }
     };
+    // tcp (or mem) connected, start protocol upgrade
+    let upgrade_start = transport.time_service.now();
     let mut connection = match outbound.await {
         Ok(connection) => { // Connection<TSocket>
+            let elapsed_time = (transport.time_service.now() - upgrade_start).as_secs_f64();
+            counters::connection_upgrade_time(&network_context, ConnectionOrigin::Outbound, counters::SUCCEEDED_LABEL).observe(elapsed_time);
             connection
         }
         Err(err) => {
+            let elapsed_time = (transport.time_service.now() - upgrade_start).as_secs_f64();
+            counters::connection_upgrade_time(&network_context, ConnectionOrigin::Outbound, counters::FAILED_LABEL).observe(elapsed_time);
             warn!("dial err 2: {:?}", err);
             // TODO: counter
             return Err(err);

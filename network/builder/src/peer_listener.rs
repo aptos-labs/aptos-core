@@ -18,6 +18,7 @@ use aptos_short_hex_str::AsShortHexStr;
 use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, StreamExt};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use aptos_time_service::{TimeService,TimeServiceTrait};
 
 pub struct PeerListener<TTransport, TSocket>
     where
@@ -32,6 +33,7 @@ pub struct PeerListener<TTransport, TSocket>
     network_context: NetworkContext,
     apps: Arc<ApplicationCollector>,
     peer_senders: Arc<OutboundPeerConnections>,
+    time_service: TimeService,
     _ph2 : PhantomData<TSocket>,
 }
 
@@ -47,6 +49,7 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
         network_context: NetworkContext,
         apps: Arc<ApplicationCollector>,
         peer_senders: Arc<OutboundPeerConnections>,
+        time_service: TimeService,
     ) -> Self {
         Self{
             transport,
@@ -57,6 +60,7 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
             network_context,
             apps,
             peer_senders,
+            time_service,
             _ph2: Default::default(),
         }
     }
@@ -102,9 +106,18 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
                     return;
                 }
             };
+            // TODO: we could start a task here to handle connection negotiation the socket-listener could accept and start another connection
+            let upgrade_start = self.time_service.now();
             match conn_fut.await {
                 Ok(mut connection) => {
+                    let elapsed_time = (self.time_service.now() - upgrade_start).as_secs_f64();
                     let ok = self.check_new_inbound_connection(&connection);
+                    let counter_state = if ok {
+                        counters::SUCCEEDED_LABEL
+                    } else {
+                        counters::FAILED_LABEL
+                    };
+                    counters::connection_upgrade_time(&self.network_context, ConnectionOrigin::Inbound, counter_state).observe(elapsed_time);
                     if !ok {
                         info!("listener_thread got connection {:?}, failed", remote_addr);
                         // counted and logged inside check function above, just close here and be done.
@@ -129,7 +142,7 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
                     );
                 }
                 Err(err) => {
-                    error!(addr = remote_addr, "listener_thread {:?} connection post-processing failed (continuing): {:?}", self.config.network_id, err);
+                    info!(addr = remote_addr, "listener_thread {:?} connection post-processing failed (continuing): {:?}", self.config.network_id, err);
                 }
             }
         }

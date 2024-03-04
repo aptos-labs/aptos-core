@@ -148,7 +148,11 @@ where
                                 }
                             },
                             Err(e) => {
-                                info!(error = ?e, "rpc to {} failed", receiver);
+                                info!(
+                                    error = ?e,
+                                    peer = receiver,
+                                    "rpc failed"
+                                );
 
                                 let backoff_strategy = backoff_policies
                                     .get_mut(&receiver)
