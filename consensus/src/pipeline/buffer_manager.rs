@@ -271,7 +271,7 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_ordered()
             });
-        info!(
+        trace!(
             "Advance execution root from {:?} to {:?}",
             cursor, self.execution_root
         );
@@ -302,7 +302,7 @@ impl BufferManager {
             .find_elem_from(cursor.or_else(|| *self.buffer.head_cursor()), |item| {
                 item.is_executed()
             });
-        info!(
+        trace!(
             "Advance signing root from {:?} to {:?}",
             cursor, self.signing_root
         );
@@ -542,7 +542,7 @@ impl BufferManager {
                 // find the corresponding item
                 let author = vote.author();
                 let commit_info = vote.commit_info().clone();
-                info!("Receive commit vote {} from {}", commit_info, author);
+                trace!("Receive commit vote {} from {}", commit_info, author);
                 let target_block_id = vote.commit_info().id();
                 let current_cursor = self
                     .buffer
@@ -581,7 +581,7 @@ impl BufferManager {
             },
             CommitMessage::Decision(commit_proof) => {
                 let target_block_id = commit_proof.ledger_info().commit_info().id();
-                info!(
+                trace!(
                     "Receive commit decision {}",
                     commit_proof.ledger_info().commit_info()
                 );
