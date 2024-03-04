@@ -471,15 +471,16 @@ impl<'env> ModelBuilder<'env> {
 
     /// Gets the name of the struct
     fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
-        self
-            .reverse_struct_table
+        self.reverse_struct_table
             .get(&(qid.module_id, qid.id))
             .expect("invalid Type::Struct")
     }
 
     /// Gets the simple display name of the struct
     fn get_struct_display_name_simple(&self, qid: QualifiedId<StructId>) -> String {
-        self.get_struct_name(qid).display_simple(self.env).to_string()
+        self.get_struct_name(qid)
+            .display_simple(self.env)
+            .to_string()
     }
 
     /// Gets the display name of the struct type
@@ -487,7 +488,10 @@ impl<'env> ModelBuilder<'env> {
     fn get_struct_type_name(&self, ty: &Type) -> String {
         if let Type::Struct(mid, sid, _) = ty {
             // TODO: display the struct with type parameters
-            let qid = QualifiedId { module_id: *mid, id: *sid };
+            let qid = QualifiedId {
+                module_id: *mid,
+                id: *sid,
+            };
             self.get_struct_display_name_simple(qid).to_string()
         } else {
             panic!("ICE: calling `get_struct_type_name` with non-struct type")
@@ -499,7 +503,7 @@ impl<'env> ModelBuilder<'env> {
     fn gen_error_msg_for_fields_loop(
         &self,
         path: &Vec<Type>,
-        this_struct_id: QualifiedId<StructId>
+        this_struct_id: QualifiedId<StructId>,
     ) -> Vec<String> {
         let mut loop_notes = Vec::new();
         for i in 0..path.len() - 1 {
@@ -507,7 +511,11 @@ impl<'env> ModelBuilder<'env> {
             let child_name = self.get_struct_type_name(&path[i + 1]);
             loop_notes.push(format!("{} contains {}...", parent_name, child_name));
         }
-        loop_notes.push(format!("{} contains {}, which forms a loop.", self.get_struct_type_name(path.last().unwrap()), self.get_struct_display_name_simple(this_struct_id)));
+        loop_notes.push(format!(
+            "{} contains {}, which forms a loop.",
+            self.get_struct_type_name(path.last().unwrap()),
+            self.get_struct_display_name_simple(this_struct_id)
+        ));
         loop_notes
     }
 
@@ -533,28 +541,42 @@ impl<'env> ModelBuilder<'env> {
                 // checks if `ty` occurs in `path`
                 for parent in path.iter() {
                     if let Type::Struct(mid, sid, _) = parent {
-                        let parent_id = QualifiedId { module_id: *mid, id: *sid };
+                        let parent_id = mid.qualified(*sid);
                         if parent_id == this_struct_id {
                             if checking == this_struct_id {
-                                let loop_notes = self.gen_error_msg_for_fields_loop(path, this_struct_id);
-                                self.error_with_notes(loc_checking, &format!("recursive definition {}", self.get_struct_display_name_simple(this_struct_id)),
-                            loop_notes);
+                                let loop_notes =
+                                    self.gen_error_msg_for_fields_loop(path, this_struct_id);
+                                self.error_with_notes(
+                                    loc_checking,
+                                    &format!(
+                                        "recursive definition {}",
+                                        self.get_struct_display_name_simple(this_struct_id)
+                                    ),
+                                    loop_notes,
+                                );
                                 return true;
                             } else {
                                 return false;
                             }
                         }
                     } else {
-                        unreachable!()
+                        panic!("field access path contains non-struct")
                     }
                 }
                 if let Some(fields) = &this_struct_entry.fields {
                     path.push(ty.clone());
                     // check for descendant fields recursively
-                    for (_field_name, (_field_loc, _field_idx, field_ty_uninstantiated)) in fields.iter() {
+                    for (_field_name, (_field_loc, _field_idx, field_ty_uninstantiated)) in
+                        fields.iter()
+                    {
                         let field_ty_instantiated = field_ty_uninstantiated.instantiate(insts);
                         // short-curcuit upon first recursive occurence found
-                        if !self.check_recusive_struct_with_parents(&field_ty_instantiated, path, checking, loc_checking) {
+                        if !self.check_recusive_struct_with_parents(
+                            &field_ty_instantiated,
+                            path,
+                            checking,
+                            loc_checking,
+                        ) {
                             return false;
                         }
                     }
@@ -573,14 +595,16 @@ impl<'env> ModelBuilder<'env> {
 
     /// Checks for recursive definition of structs and adds diagnostics
     pub fn check_resursive_struct(&self, struct_entry: &StructEntry) {
-        let params = (0..struct_entry.type_params.len()).map(|i| Type::TypeParameter(i as u16)).collect_vec();
+        let params = (0..struct_entry.type_params.len())
+            .map(|i| Type::TypeParameter(i as u16))
+            .collect_vec();
         let struct_ty = Type::Struct(struct_entry.module_id, struct_entry.struct_id, params);
         let mut parents = Vec::new();
         self.check_recusive_struct_with_parents(
             &struct_ty,
             &mut parents,
             struct_entry.module_id.qualified(struct_entry.struct_id),
-            &struct_entry.loc
+            &struct_entry.loc,
         );
     }
 
