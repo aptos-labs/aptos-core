@@ -226,6 +226,7 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    OnChainDiceRoll,
 }
 
 impl EntryPoints {
@@ -272,6 +273,7 @@ impl EntryPoints {
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::OnChainDiceRoll => "on_chain_dice",
         }
     }
 
@@ -320,6 +322,7 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::OnChainDiceRoll => "dice",
         }
     }
 
@@ -582,6 +585,9 @@ impl EntryPoints {
                     bcs::to_bytes(&indices).unwrap(), // indices
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
+            },
+            EntryPoints::OnChainDiceRoll => {
+                get_payload(module_id, ident_str!("roll").to_owned(), vec![])
             },
         }
     }

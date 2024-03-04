@@ -50,30 +50,31 @@ async fn e2e_basic_consumption() {
     info!("Rolling the dice.");
     let account = cli.account_id(0).to_hex_literal();
     let roll_func_id = MemberId::from_str(&format!("{}::dice::roll", account)).unwrap();
+    let mut rolls = vec![];
     for _ in 0..10 {
         let txn_summary = cli
             .run_function(0, None, roll_func_id.clone(), vec![], vec![])
             .await
             .unwrap();
         info!("Roll txn summary: {:?}", txn_summary);
+        info!("Collecting roll result.");
+        let dice_roll_history = rest_client
+            .get_account_resource_bcs::<DiceRollHistory>(
+                root_address,
+                format!("{}::dice::DiceRollHistory", account).as_str(),
+            )
+            .await
+            .unwrap()
+            .into_inner();
+        rolls.push(dice_roll_history.last_roll);
     }
 
-    info!("Collecting roll history.");
-    let dice_roll_history = rest_client
-        .get_account_resource_bcs::<DiceRollHistory>(
-            root_address,
-            format!("{}::dice::DiceRollHistory", account).as_str(),
-        )
-        .await
-        .unwrap()
-        .into_inner();
-
-    info!("Roll history: {:?}", dice_roll_history.rolls);
+    info!("Rolls={:?}", rolls);
 }
 
 #[derive(Deserialize, Serialize)]
 struct DiceRollHistory {
-    rolls: Vec<u64>,
+    last_roll: u64,
 }
 
 async fn publish_on_chain_dice_module(cli: &mut CliTestFramework, publisher_account_idx: usize) {
