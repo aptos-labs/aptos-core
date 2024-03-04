@@ -873,7 +873,8 @@ fn test_scoped_map() {
     // check what we wrote to the smap
     for j in 0..(k * 5) {
         if (j % 2) != 0 {
-            assert!(smap.get(&j) == Some(&(j + 0)));
+            let i = 0;
+            assert!(smap.get(&j) == Some(&(j + i)));
         } else {
             assert!(smap.get(&j).is_none());
         }
@@ -919,7 +920,8 @@ fn test_scoped_map() {
     // scope 0
     for j in 0..(k * 5) {
         if (j % 2) != 0 {
-            assert!(smap.get(&j) == Some(&(j + 0)));
+            let i = 0;
+            assert!(smap.get(&j) == Some(&(j + i)));
         } else {
             assert!(smap.get(&j).is_none());
         }
