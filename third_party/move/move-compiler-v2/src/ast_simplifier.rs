@@ -226,12 +226,30 @@ fn find_possibly_modified_vars(
                         possibly_modified_vars.insert((*sym, current_binding_id_opt.copied()));
                     }
                 } else {
-                    if param_map.get(sym).is_none() {
+                    match param_map.get(sym) {
+                        None => {
+                            trace!(
+                                "Var `{}` used at node `{}` as a `LocalVar` is free and not a parameter",
+                                sym.display(env.symbol_pool()),
+                                id.as_usize(),
+                            );
+                        },
+                        Some(idx) => {
+                            trace!(
+                                "Temp `{}` = Var `{}` is used at node `{}` as a `LocalVar`",
+                                *idx,
+                                sym.display(env.symbol_pool()),
+                                id.as_usize(),
+                            );
+                        }
+                    }
+                    if modifying {
                         trace!(
-                            "Var `{}` used at node `{}` is free and not a parameter",
+                            "LocalVar `{}` with no binding is possibly modified at node `{}`",
                             sym.display(env.symbol_pool()),
                             id.as_usize(),
                         );
+                        possibly_modified_vars.insert((*sym, None));
                     }
                 }
             },
