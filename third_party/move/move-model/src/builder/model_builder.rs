@@ -540,7 +540,7 @@ impl<'env> ModelBuilder<'env> {
                 let this_struct_id = mid.qualified(*sid);
                 let this_struct_entry = self.lookup_struct_entry(this_struct_id);
                 // checks if `ty` occurs in `path`
-                for (parent_loc, parent) in path.iter() {
+                for (_parent_loc, parent) in path.iter() {
                     if let Type::Struct(mid, sid, _) = parent {
                         let parent_id = mid.qualified(*sid);
                         if parent_id == this_struct_id {
