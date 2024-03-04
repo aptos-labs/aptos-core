@@ -590,26 +590,27 @@ impl EntryPoints {
             ),
 =======
             EntryPoints::TokenMinterMint => {
+                // Set this to an address with a deployed `token_minter`
                 let module_id = ModuleId::new(
                     AccountAddress::from_hex_literal("0x0fbcdf3888f673c2860b9b7a6e68deb6606a950e7b4865d905d6886f0890e222").unwrap(),
                     Identifier::new("token_minter").unwrap()
                 );
+                // Set this to a Object<TokenMinter>
                 let token_minter_addr = "0x274a3e6501314014e1d6c3fe0016d2383ae336c5c11d8caff3755a15ccf729d7";
+
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 let random_addr_string = format!("0x{:0>64}", format!("{:x}", rng.gen_range(0u64, 2147483646u64)));
                 let mut recipient_addr  = AccountAddress::from_hex_literal(&random_addr_string).unwrap();
-                let mut recipient_addrs = vec![1u8];
-                recipient_addrs.append(&mut bcs::to_bytes(&recipient_addr).unwrap());
                 get_payload(
                         module_id,
                     ident_str!("mint_tokens_simple").to_owned(),
                     vec![
                         bcs::to_bytes(&AccountAddress::from_hex_literal(token_minter_addr).unwrap()).unwrap(),
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
-                        bcs::to_bytes("superstar #").unwrap(),          // name
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // name
                         bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
                         bcs::to_bytes(&1u64).unwrap(),                  // amount
-                        recipient_addrs,
+                        bcs::to_bytes(&vec![recipient_addr]).unwrap(),  // recipient
                     ],
                 )
             },
