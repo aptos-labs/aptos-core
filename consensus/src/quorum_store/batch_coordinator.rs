@@ -72,14 +72,14 @@ impl BatchCoordinator {
             let peer_id = persist_requests[0].author();
             // TODO: Should we avoid cloning persist_requests?
             // TODO: Is it fine to ignore the result of send here?
-            // Sending only small batches to proof manager as large batches can't be 
+            // Sending only small batches to proof manager as large batches can't be
             // included in the inline transactions anyway.
             if persist_requests.len() < 30 {
                 let _ = sender_to_proof_manager
-                .send(ProofManagerCommand::ReceiveBatches(
-                    persist_requests.clone(),
-                ))
-                .await;
+                    .send(ProofManagerCommand::ReceiveBatches(
+                        persist_requests.clone(),
+                    ))
+                    .await;
             }
             let signed_batch_infos = batch_store.persist(persist_requests);
             if !signed_batch_infos.is_empty() {

@@ -27,8 +27,7 @@ pub enum ProofManagerCommand {
 
 pub struct ProofManager {
     proofs_for_consensus: ProofQueue,
-    // TODO: Should this be a HashMap: BatchKey -> PersistedValue? Should this be a DashMap?
-    // TODO: Remove a batch from the queue if the batch's expiration time is reached
+    // TODO: Should this be a DashMap?
     batches_without_proof_of_store: HashMap<BatchInfo, Option<Vec<SignedTransaction>>>,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
@@ -128,6 +127,8 @@ impl ProofManager {
                     let proof_batches =
                         proof_block.iter().map(|p| p.info()).collect::<HashSet<_>>();
 
+                    self.batches_without_proof_of_store
+                        .retain(|batch, _| !batch.is_expired());
                     for (batch, txns) in self.batches_without_proof_of_store.iter_mut() {
                         if excluded_batches.contains(batch) || proof_batches.contains(batch) {
                             continue;
