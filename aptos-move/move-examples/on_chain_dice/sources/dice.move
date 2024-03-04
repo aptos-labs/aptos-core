@@ -1,21 +1,18 @@
 module module_owner::dice {
     use std::signer::address_of;
-    use std::vector;
-    use aptos_framework::randomness;
+    // use aptos_framework::randomness;
 
-    struct DiceRollHistory has key {
-        rolls: vector<u64>,
+    struct DiceRollHistory has drop, key {
+        last_roll: u64,
     }
 
     entry fun roll(account: signer) acquires DiceRollHistory {
         let addr = address_of(&account);
-        let roll_history = if (exists<DiceRollHistory>(addr)) {
-            move_from<DiceRollHistory>(addr)
-        } else {
-            DiceRollHistory { rolls: vector[] }
+        if (exists<DiceRollHistory>(addr)) {
+            move_from<DiceRollHistory>(addr);
         };
-        let new_roll = randomness::u64_range(0, 6);
-        vector::push_back(&mut roll_history.rolls, new_roll);
-        move_to(&account, roll_history);
+        // let new_roll = randomness::u64_range(0, 6);
+        let new_roll = 6;
+        move_to(&account, DiceRollHistory { last_roll: new_roll } );
     }
 }
