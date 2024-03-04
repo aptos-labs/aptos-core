@@ -15,11 +15,11 @@ pub fn witness_gen(body: &str) -> Result<()> {
 
     let output = Command::new("node")
             .args(&[
-                  "/usr/local/share/aptos-prover-service/generate_witness.js", 
+                  "/usr/local/share/aptos-prover-service/generate_witness.js",
                   "/usr/local/share/aptos-prover-service/main.wasm",
                   "/tmp/rapidsnark_input.json",
                   "/tmp/rapidsnark_witness.wtns",
-            ]) 
+            ])
             .output()
             .expect("Failed to execute command");
 

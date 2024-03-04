@@ -5,11 +5,11 @@ use std::io::{self, Read};
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Url;
 use crate::config::{
-    ZKEY_FILE_PATH, 
-    ZKEY_FILE_URL, 
+    ZKEY_FILE_PATH,
+    ZKEY_FILE_URL,
     VKEY_FILE_URL,
     VKEY_FILE_PATH,
-    ZKEY_SHASUM, 
+    ZKEY_SHASUM,
     RESOURCES_DIR
 };
 use std::path::Path;
@@ -87,7 +87,7 @@ pub async fn cached_prover_key() -> &'static str {
          match fs::create_dir(RESOURCES_DIR) {
             Ok(_) => println!("Directory '{}' created successfully.", RESOURCES_DIR),
             Err(err) => panic!("Error creating directory: {}", err),
-        }       
+        }
     }
 
 
@@ -113,7 +113,7 @@ pub async fn cached_verification_key() -> &'static str {
          match fs::create_dir(RESOURCES_DIR) {
             Ok(_) => println!("Directory '{}' created successfully.", RESOURCES_DIR),
             Err(err) => panic!("Error creating directory: {}", err),
-        }       
+        }
     }
 
 

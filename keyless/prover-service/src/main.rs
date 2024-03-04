@@ -11,8 +11,8 @@ use figment::{
 };
 use http::Method;
 use prover_service::{
-    config::*, 
-    *, 
+    config::*,
+    *,
     prover_key::cached_prover_key
 };
 use rust_rapidsnark::FullProver;
