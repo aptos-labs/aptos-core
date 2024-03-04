@@ -202,7 +202,7 @@ impl NetworkBuilder {
                     protos,
                     enable_proxy_protocol,
                 );
-                let pm = PeerListener::new(ant.clone(), self.peers_and_metadata.clone(), self.config.clone(), self.network_context, self.apps.clone(), self.peer_senders.clone());
+                let pm = PeerListener::new(ant.clone(), self.peers_and_metadata.clone(), self.config.clone(), self.network_context, self.apps.clone(), self.peer_senders.clone(), self.time_service.clone());
                 (TransportPeerManager::Tcp(pm), AptosNetTransportActual::Tcp(ant))
             }
             #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
@@ -219,7 +219,7 @@ impl NetworkBuilder {
                     protos,
                     enable_proxy_protocol,
                 );
-                let pm = PeerListener::new(ant.clone(), self.peers_and_metadata.clone(), self.config.clone(), self.network_context, self.apps.clone(), self.peer_senders.clone());
+                let pm = PeerListener::new(ant.clone(), self.peers_and_metadata.clone(), self.config.clone(), self.network_context, self.apps.clone(), self.peer_senders.clone(), self.time_service.clone());
                 (TransportPeerManager::Memory(pm), AptosNetTransportActual::Memory(ant))
             }
             _ => {
