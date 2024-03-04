@@ -881,20 +881,36 @@ async fn channel_send_multiple_with_timeout(
         let num_of_transactions = resp_item.transactions.len();
         let start_version = resp_item.transactions.first().unwrap().version;
         let end_version = resp_item.transactions.last().unwrap().version;
-        let start_version_txn_timestamp = resp_item
+        let start_version_txn_timestamp = match resp_item
             .transactions
             .first()
             .unwrap()
             .timestamp
-            .as_ref()
-            .unwrap();
-        let end_version_txn_timestamp = resp_item
+            .as_ref() {
+                Some(timestamp) => timestamp,
+                None => {
+                    error!(
+                        "[Data Service] Transaction timestamp is not set for version {}.",
+                        start_version
+                    );
+                    panic!("Transaction timestamp is not set.");
+                },
+            };
+        let end_version_txn_timestamp = match resp_item
             .transactions
             .last()
             .unwrap()
             .timestamp
-            .as_ref()
-            .unwrap();
+            .as_ref() {
+                Some(timestamp) => timestamp,
+                None => {
+                    error!(
+                        "[Data Service] Transaction timestamp is not set for version {}.",
+                        end_version
+                    );
+                    panic!("Transaction timestamp is not set.");
+                },
+            };
 
         tx.send_timeout(
             Result::<TransactionsResponse, Status>::Ok(resp_item.clone()),
