@@ -32,7 +32,6 @@ use aptos_types::{
     validator_verifier::ValidatorVerifier,
 };
 use futures_channel::oneshot;
-use rayon::iter::IntoParallelRefIterator;
 use serde::{Deserialize, Serialize};
 use std::{
     cmp::min,

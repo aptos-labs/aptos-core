@@ -534,7 +534,7 @@ impl BufferManager {
     fn process_commit_message(&mut self, commit_msg: IncomingCommitRequest) -> Option<HashValue> {
         let IncomingCommitRequest {
             req,
-            author,
+            author: _,
             protocol,
             response_sender,
         } = commit_msg;

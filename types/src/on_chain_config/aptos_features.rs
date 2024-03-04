@@ -193,6 +193,10 @@ impl Features {
         self.is_enabled(FeatureFlag::OIDB_ZKLESS_SIGNATURE)
     }
 
+    pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
+    }
+
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
     }
@@ -200,4 +204,19 @@ impl Features {
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
+}
+
+#[test]
+fn test_features_into_flag_vec() {
+    let mut features = Features { features: vec![] };
+    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
+    features.enable(FeatureFlag::BN254_STRUCTURES);
+    let flag_vec = features.into_flag_vec();
+    assert_eq!(
+        vec![
+            FeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::BN254_STRUCTURES
+        ],
+        flag_vec
+    );
 }

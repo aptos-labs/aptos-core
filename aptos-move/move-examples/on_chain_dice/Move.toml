@@ -1,0 +1,9 @@
+[package]
+name = "on_chain_dice"
+version = "0.0.0"
+
+[addresses]
+module_owner = "0xCAFE"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

@@ -2,15 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    context::{ClientTuple, Context, GroupedMetricsClients, JsonWebTokenService, PeerStoreTuple},
+    context::{
+        ClientTuple, Context, GroupedMetricsClients, JsonWebTokenService, PeerStoreTuple,
+        RemoteNodeConfigProvider,
+    },
     index, CustomEventConfig, LogIngestConfig, MetricsEndpointsConfig, TelemetryServiceConfig,
 };
 use aptos_crypto::{x25519, Uniform};
+use aptos_infallible::RwLock;
 use aptos_rest_client::aptos_api_types::mime_types;
 use rand::SeedableRng;
 use reqwest::header::AUTHORIZATION;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use warp::{
     http::{header::CONTENT_TYPE, Response},
     hyper::body::Bytes,
@@ -36,7 +40,7 @@ pub async fn new_test_context() -> TestContext {
         peer_identities: HashMap::new(),
         metrics_endpoints_config: MetricsEndpointsConfig::default_for_test(),
         humio_ingest_config: LogIngestConfig::default_for_test(),
-        remote_config_url: todo!(),
+        remote_config_url: "".to_string(), //TODO: i'm only making it build...
     };
 
     let peers = PeerStoreTuple::default();
@@ -51,7 +55,7 @@ pub async fn new_test_context() -> TestContext {
             jwt_service,
             HashMap::new(),
             HashMap::new(),
-            todo!(),
+            Arc::new(RwLock::new(RemoteNodeConfigProvider::new())), //TODO: i'm just making it build...
         ),
     )
 }

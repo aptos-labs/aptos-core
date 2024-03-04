@@ -89,6 +89,21 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::state_storage::StateStorageUsage",
           "data": "state storage omitted"
         },

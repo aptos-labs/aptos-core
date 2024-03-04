@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use crate::proof_of_store::{BatchInfo, ProofCache, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
@@ -280,21 +280,30 @@ impl Payload {
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
-                proof_with_status
+                let unverified: Vec<_> = proof_with_status
                     .proofs
+                    .iter()
+                    .filter(|proof| {
+                        proof_cache.get(proof.info()).map_or(true, |cached_proof| {
+                            cached_proof != *proof.multi_signature()
+                        })
+                    })
+                    .collect();
+                unverified
                     .par_iter()
-                    .with_min_len(4)
-                    .try_for_each(|proof| proof.verify(validator))?;
+                    .with_min_len(2)
+                    .try_for_each(|proof| proof.verify(validator, proof_cache))?;
                 Ok(())
             },
             (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
                 for proof in proof_with_status.proof_with_data.proofs.iter() {
-                    proof.verify(validator)?;
+                    proof.verify(validator, proof_cache)?;
                 }
                 Ok(())
             },

@@ -2,6 +2,7 @@
 
 use crate::transcript_aggregation::TranscriptAggregationState;
 use aptos_crypto::{bls12381::bls12381_keys, Uniform};
+use aptos_infallible::duration_since_epoch;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     dkg::{
@@ -23,6 +24,7 @@ fn test_transcript_aggregation_state() {
     let addrs: Vec<AccountAddress> = (0..num_validators)
         .map(|_| AccountAddress::random())
         .collect();
+    let vfn_addr = AccountAddress::random();
     let private_keys: Vec<bls12381_keys::PrivateKey> = (0..num_validators)
         .map(|_| bls12381_keys::PrivateKey::generate_for_testing())
         .collect();
@@ -43,9 +45,13 @@ fn test_transcript_aggregation_state() {
         dealer_epoch: 999,
         dealer_validator_set: validator_consensus_info_move_structs.clone(),
         target_validator_set: validator_consensus_info_move_structs.clone(),
+        block_dkg: false,
+        block_randomness: false,
     });
     let epoch_state = Arc::new(EpochState { epoch, verifier });
     let trx_agg_state = Arc::new(TranscriptAggregationState::<DummyDKG>::new(
+        duration_since_epoch(),
+        addrs[0],
         pub_params,
         epoch_state,
     ));
@@ -68,6 +74,16 @@ fn test_transcript_aggregation_state() {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[0],
+        },
+        transcript_bytes: good_trx_bytes.clone(),
+    });
+    assert!(result.is_err());
+
+    // Node authored by non-active-validator should be rejected.
+    let result = trx_agg_state.add(vfn_addr, DKGTranscript {
+        metadata: DKGTranscriptMetadata {
+            epoch: 999,
+            author: vfn_addr,
         },
         transcript_bytes: good_trx_bytes.clone(),
     });

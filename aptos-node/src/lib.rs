@@ -21,7 +21,7 @@ use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
 use aptos_config::config::{
-    merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
+    merge_node_config, BootstrappingMode, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
 };
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
@@ -196,7 +196,7 @@ fn load_remote_config(
         warn!("{:?} is not a dir. using initial config", config_dir);
         return Ok(None);
     }
-    let mut entries = fs::read_dir(config_dir.clone())?
+    let entries = fs::read_dir(config_dir.clone())?
         .filter_map(|res| {
             let Ok(entry) = res else {
                 return None;
@@ -563,6 +563,8 @@ where
     node_config.mempool.default_failovers = 1;
     node_config.mempool.max_broadcasts_per_peer = 1;
 
+    node_config.state_sync.state_sync_driver.bootstrapping_mode =
+        BootstrappingMode::ExecuteOrApplyFromGenesis;
     node_config
         .state_sync
         .state_sync_driver
