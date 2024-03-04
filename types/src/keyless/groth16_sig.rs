@@ -1,8 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    keyless::bn254_circom::{
-        G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
+    keyless::{
+        bn254_circom::{
+            G1Bytes, G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES,
+            G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
+        },
+        zkp_sig::ZKP,
     },
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
 };
@@ -19,17 +23,15 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 #[derive(
     Copy, Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize, CryptoHasher, BCSCryptoHash,
 )]
-pub struct Groth16Zkp {
+pub struct Groth16Proof {
     a: G1Bytes,
     b: G2Bytes,
     c: G1Bytes,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub struct SignedGroth16Zkp {
-    pub proof: Groth16Zkp,
-    /// A signature on the proof (via the ephemeral SK) to prevent malleability attacks.
-    pub non_malleability_signature: EphemeralSignature,
+pub struct ZeroKnowledgeSig {
+    pub proof: ZKP,
     /// The expiration horizon that the circuit should enforce on the expiration date committed in
     /// the nonce. This must be <= `Configuration::max_expiration_horizon_secs`.
     pub exp_horizon_secs: u64,
@@ -48,13 +50,13 @@ pub struct SignedGroth16Zkp {
 /// prover service can sign them together. It is only used during signature verification & never
 /// sent over the network.
 #[derive(Debug, CryptoHasher, BCSCryptoHash, PartialEq, Eq)]
-pub struct Groth16ZkpAndStatement {
-    pub proof: Groth16Zkp,
+pub struct Groth16ProofAndStatement {
+    pub proof: Groth16Proof,
     // TODO(keyless): implement Serialize/Deserialize for Fr and use Fr here directly
     pub public_inputs_hash: [u8; 32],
 }
 
-impl<'de> Deserialize<'de> for Groth16ZkpAndStatement {
+impl<'de> Deserialize<'de> for Groth16ProofAndStatement {
     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -67,15 +69,15 @@ impl<'de> Deserialize<'de> for Groth16ZkpAndStatement {
             // In this case, we use the serde(with = "hex") macro, which causes public_inputs_hash
             // to deserialize from a hex string.
             #[derive(::serde::Deserialize)]
-            #[serde(rename = "Groth16ZkpAndStatement")]
+            #[serde(rename = "Groth16ProofAndStatement")]
             struct Value {
-                pub proof: Groth16Zkp,
+                pub proof: Groth16Proof,
                 #[serde(with = "hex")]
                 pub public_inputs_hash: [u8; 32],
             }
 
             let value = Value::deserialize(deserializer)?;
-            Ok(Groth16ZkpAndStatement {
+            Ok(Groth16ProofAndStatement {
                 proof: value.proof,
                 public_inputs_hash: value.public_inputs_hash,
             })
@@ -83,14 +85,14 @@ impl<'de> Deserialize<'de> for Groth16ZkpAndStatement {
             // Same as above, except this time we don't use the serde(with = "hex") macro, so that
             // serde uses default behavior for serialization.
             #[derive(::serde::Deserialize)]
-            #[serde(rename = "Groth16ZkpAndStatement")]
+            #[serde(rename = "Groth16ProofAndStatement")]
             struct Value {
-                pub proof: Groth16Zkp,
+                pub proof: Groth16Proof,
                 pub public_inputs_hash: [u8; 32],
             }
 
             let value = Value::deserialize(deserializer)?;
-            Ok(Groth16ZkpAndStatement {
+            Ok(Groth16ProofAndStatement {
                 proof: value.proof,
                 public_inputs_hash: value.public_inputs_hash,
             })
@@ -98,16 +100,16 @@ impl<'de> Deserialize<'de> for Groth16ZkpAndStatement {
     }
 }
 
-impl Serialize for Groth16ZkpAndStatement {
+impl Serialize for Groth16ProofAndStatement {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         if serializer.is_human_readable() {
             #[derive(::serde::Serialize)]
-            #[serde(rename = "Groth16ZkpAndStatement")]
+            #[serde(rename = "Groth16ProofAndStatement")]
             struct Value {
-                pub proof: Groth16Zkp,
+                pub proof: Groth16Proof,
                 #[serde(with = "hex")]
                 pub public_inputs_hash: [u8; 32],
             }
@@ -120,9 +122,9 @@ impl Serialize for Groth16ZkpAndStatement {
             value.serialize(serializer)
         } else {
             #[derive(::serde::Serialize)]
-            #[serde(rename = "Groth16ZkpAndStatement")]
+            #[serde(rename = "Groth16ProofAndStatement")]
             struct Value {
-                pub proof: Groth16Zkp,
+                pub proof: Groth16Proof,
                 pub public_inputs_hash: [u8; 32],
             }
 
@@ -136,11 +138,7 @@ impl Serialize for Groth16ZkpAndStatement {
     }
 }
 
-impl SignedGroth16Zkp {
-    pub fn verify_non_malleability_sig(&self, pub_key: &EphemeralPublicKey) -> anyhow::Result<()> {
-        self.non_malleability_signature.verify(&self.proof, pub_key)
-    }
-
+impl ZeroKnowledgeSig {
     pub fn verify_training_wheels_sig(
         &self,
         pub_key: &EphemeralPublicKey,
@@ -154,8 +152,10 @@ impl SignedGroth16Zkp {
                 .map_err(|_| anyhow!("expected 32-byte public inputs hash"))?;
 
             // TODO(keyless): unnecessary cloning here; requires refactoring of our CryptoHasher trait which requires Deserialize to be implemented
-            let proof_and_statement = Groth16ZkpAndStatement {
-                proof: self.proof,
+            let proof_and_statement = Groth16ProofAndStatement {
+                proof: match self.proof {
+                    ZKP::Groth16(proof) => proof,
+                },
                 public_inputs_hash,
             };
 
@@ -165,43 +165,46 @@ impl SignedGroth16Zkp {
         }
     }
 
-    pub fn verify_proof(
+    pub fn verify_groth16_proof(
         &self,
         public_inputs_hash: Fr,
         pvk: &PreparedVerifyingKey<Bn254>,
     ) -> anyhow::Result<()> {
-        self.proof.verify_proof(public_inputs_hash, pvk)
+        match self.proof {
+            ZKP::Groth16(proof) => proof.verify_proof(public_inputs_hash, pvk),
+        }
     }
 }
 
-impl TryFrom<&[u8]> for Groth16Zkp {
+impl TryFrom<&[u8]> for Groth16Proof {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, CryptoMaterialError> {
-        bcs::from_bytes::<Groth16Zkp>(bytes).map_err(|_e| CryptoMaterialError::DeserializationError)
+        bcs::from_bytes::<Groth16Proof>(bytes)
+            .map_err(|_e| CryptoMaterialError::DeserializationError)
     }
 }
 
-impl Groth16Zkp {
+impl Groth16Proof {
     pub fn new(a: G1Bytes, b: G2Bytes, c: G1Bytes) -> Self {
-        Groth16Zkp { a, b, c }
+        Groth16Proof { a, b, c }
     }
 
-    pub fn get_a(&self) -> G1Bytes {
-        self.a
+    pub fn get_a(&self) -> &G1Bytes {
+        &self.a
     }
 
-    pub fn get_b(&self) -> G2Bytes {
-        self.b
+    pub fn get_b(&self) -> &G2Bytes {
+        &self.b
     }
 
-    pub fn get_c(&self) -> G1Bytes {
-        self.c
+    pub fn get_c(&self) -> &G1Bytes {
+        &self.c
     }
 
     /// NOTE: For testing only. (And used in `testsuite/generate-format`.)
     pub fn dummy_proof() -> Self {
-        Groth16Zkp {
+        Groth16Proof {
             a: G1Bytes::new_from_vec(vec![0u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),
             b: G2Bytes::new_from_vec(vec![1u8; G2_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),
             c: G1Bytes::new_from_vec(vec![2u8; G1_PROJECTIVE_COMPRESSED_NUM_BYTES]).unwrap(),

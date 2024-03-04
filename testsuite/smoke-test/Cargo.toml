@@ -42,7 +42,6 @@ aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-genesis = { workspace = true }
-ark-ff = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 diesel = { workspace = true, features = [

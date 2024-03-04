@@ -4,7 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    keyless::{KeylessPublicKey, KeylessSignature, ZkpOrOpenIdSig},
+    keyless::{EphemeralCertificate, KeylessPublicKey, KeylessSignature, TransactionAndProof},
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
@@ -1005,23 +1005,32 @@ impl AnySignature {
             },
             (Self::WebAuthn { signature }, _) => signature.verify(message, public_key),
             (Self::Keyless { signature }, AnyPublicKey::Keyless { public_key: _ }) => {
-                // TODO(keyless): Batch-verify these two signatures
-                match &signature.sig {
-                    ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-                        proof.verify_non_malleability_sig(&signature.ephemeral_pubkey)?;
-                    },
-                    ZkpOrOpenIdSig::OpenIdSig(_) => {},
-                }
-                // Verify the ephemeral signature on the TXN. The rest of the verification,
-                // i.e., [ZKPoK of] OpenID signature verification will be done in `AptosVM::run_prologue`.
-                // This is due to the dependency on the JWK, which must be fetched from the chain,
-                // since JWKs are updated automatically via consensus.
+                // Verifies the ephemeral signature on the TXN and, if present, the ZKP. The rest of
+                // the verification, i.e., [ZKPoK of] OpenID signature verification is done in
+                // `AptosVM::run_prologue`.
+                //
+                // This is because the JWK, under which the [ZKPoK of an] OpenID signature verifies,
+                // can only be fetched from on chain inside the `AptosVM`.
                 //
                 // This deferred verification is what actually ensures the `signature.ephemeral_pubkey`
                 // used below is the right pubkey signed by the OIDC provider.
+
+                let mut txn_and_zkp = TransactionAndProof {
+                    message,
+                    proof: None,
+                };
+
+                // Add the ZK proof into the `txn_and_zkp` struct, if we are in the ZK path
+                match &signature.cert {
+                    EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+                        txn_and_zkp.proof = Some(proof.proof)
+                    },
+                    EphemeralCertificate::OpenIdSig(_) => {},
+                }
+
                 signature
                     .ephemeral_signature
-                    .verify(message, &signature.ephemeral_pubkey)
+                    .verify(&txn_and_zkp, &signature.ephemeral_pubkey)
             },
             _ => bail!("Invalid key, signature pairing"),
         }
@@ -1067,7 +1076,12 @@ impl AnyPublicKey {
 }
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EphemeralSignature {
-    Ed25519 { signature: Ed25519Signature },
+    Ed25519 {
+        signature: Ed25519Signature,
+    },
+    WebAuthn {
+        signature: PartialAuthenticatorAssertionResponse,
+    },
 }
 
 impl EphemeralSignature {
@@ -1084,6 +1098,12 @@ impl EphemeralSignature {
             (Self::Ed25519 { signature }, EphemeralPublicKey::Ed25519 { public_key }) => {
                 signature.verify(message, public_key)
             },
+            (Self::WebAuthn { signature }, EphemeralPublicKey::Secp256r1Ecdsa { public_key }) => {
+                signature.verify(message, &AnyPublicKey::secp256r1_ecdsa(public_key.clone()))
+            },
+            _ => {
+                bail!("Unsupported ephemeral signature and public key combination");
+            },
         }
     }
 }
@@ -1099,7 +1119,12 @@ impl TryFrom<&[u8]> for EphemeralSignature {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum EphemeralPublicKey {
-    Ed25519 { public_key: Ed25519PublicKey },
+    Ed25519 {
+        public_key: Ed25519PublicKey,
+    },
+    Secp256r1Ecdsa {
+        public_key: secp256r1_ecdsa::PublicKey,
+    },
 }
 
 impl EphemeralPublicKey {
@@ -1162,11 +1187,19 @@ impl Serialize for EphemeralPublicKey {
             #[derive(::serde::Serialize)]
             #[serde(rename = "EphemeralPublicKey")]
             enum Value {
-                Ed25519 { public_key: Ed25519PublicKey },
+                Ed25519 {
+                    public_key: Ed25519PublicKey,
+                },
+                Secp256r1Ecdsa {
+                    public_key: secp256r1_ecdsa::PublicKey,
+                },
             }
 
             let value = match self {
                 EphemeralPublicKey::Ed25519 { public_key } => Value::Ed25519 {
+                    public_key: public_key.clone(),
+                },
+                EphemeralPublicKey::Secp256r1Ecdsa { public_key } => Value::Secp256r1Ecdsa {
                     public_key: public_key.clone(),
                 },
             };
@@ -1182,6 +1215,7 @@ mod tests {
     use crate::{
         keyless::test_utils::{
             get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk,
+            maul_raw_groth16_txn,
         },
         transaction::{webauthn::AssertionSignature, SignedTransaction},
     };
@@ -1192,7 +1226,6 @@ mod tests {
         PrivateKey, SigningKey, Uniform,
     };
     use hex::FromHex;
-    use rand::thread_rng;
 
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
@@ -1734,7 +1767,13 @@ mod tests {
             None,
             None,
         );
-        sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+        sig.ephemeral_signature = EphemeralSignature::ed25519(
+            esk.sign(&TransactionAndProof {
+                message: raw_txn.clone(),
+                proof: None,
+            })
+            .unwrap(),
+        );
 
         let single_key_auth =
             SingleKeyAuthenticator::new(AnyPublicKey::keyless(pk), AnySignature::keyless(sig));
@@ -1763,7 +1802,17 @@ mod tests {
             None,
             None,
         );
-        sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
+        let mut txn_and_zkp = TransactionAndProof {
+            message: raw_txn.clone(),
+            proof: None,
+        };
+        match &mut sig.cert {
+            EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+                txn_and_zkp.proof = Some(proof.proof);
+            },
+            EphemeralCertificate::OpenIdSig(_) => panic!("Internal inconsistency"),
+        }
+        sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
         let single_key_auth =
             SingleKeyAuthenticator::new(AnyPublicKey::keyless(pk), AnySignature::keyless(sig));
@@ -1781,8 +1830,7 @@ mod tests {
 
     #[test]
     fn test_groth16_txn_fails_non_malleability_check() {
-        let esk = get_sample_esk();
-        let (mut sig, pk) = get_sample_groth16_sig_and_pk();
+        let (sig, pk) = get_sample_groth16_sig_and_pk();
         let sender_addr =
             AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone())).account_address();
         let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
@@ -1793,23 +1841,7 @@ mod tests {
             None,
             None,
         );
-        sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&raw_txn).unwrap());
-
-        let tw_sk = Ed25519PrivateKey::generate(&mut thread_rng());
-        // Bad non-malleability signature
-        match &mut sig.sig {
-            ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-                // bad signature using the TW SK rather than the ESK
-                proof.non_malleability_signature =
-                    EphemeralSignature::ed25519(tw_sk.sign(&proof.proof).unwrap());
-            },
-            ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
-        }
-
-        let single_key_auth =
-            SingleKeyAuthenticator::new(AnyPublicKey::keyless(pk), AnySignature::keyless(sig));
-        let account_auth = AccountAuthenticator::single_key(single_key_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+        let signed_txn = maul_raw_groth16_txn(pk, sig, raw_txn);
 
         assert!(signed_txn.verify_signature().is_err());
     }

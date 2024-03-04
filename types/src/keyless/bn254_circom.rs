@@ -3,8 +3,8 @@
 use crate::{
     jwks::rsa::RSA_JWK,
     keyless::{
-        base64url_encode_str, Configuration, IdCommitment, KeylessPublicKey, KeylessSignature,
-        ZkpOrOpenIdSig,
+        base64url_encode_str, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
+        KeylessSignature,
     },
     serialize,
 };
@@ -238,7 +238,7 @@ pub fn get_public_inputs_hash(
     jwk: &RSA_JWK,
     config: &Configuration,
 ) -> anyhow::Result<Fr> {
-    if let ZkpOrOpenIdSig::Groth16Zkp(proof) = &sig.sig {
+    if let EphemeralCertificate::ZeroKnowledgeSig(proof) = &sig.cert {
         let (has_extra_field, extra_field_hash) = match &proof.extra_field {
             None => (Fr::zero(), Fr::zero()),
             Some(extra_field) => (
