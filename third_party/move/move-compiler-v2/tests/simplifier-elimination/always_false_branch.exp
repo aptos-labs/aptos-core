@@ -1,0 +1,33 @@
+
+Diagnostics:
+warning: If condition is always false, so then branch code eliminated as dead code
+  ┌─ tests/simplifier-elimination/always_false_branch.move:3:13
+  │
+3 │           if (false) {
+  │               ^^^^^
+  │               │
+  │               condition is always false
+  │ ╭────────────────────'
+4 │ │             let i = 0;
+5 │ │             i = i + 1;
+6 │ │             return i
+7 │ │         };
+  │ ╰─────────' then branch eliminated
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/always_false_branch.move:3:9
+  │
+3 │ ╭         if (false) {
+4 │ │             let i = 0;
+5 │ │             i = i + 1;
+6 │ │             return i
+7 │ │         };
+  │ ╰─────────^
+
+// ---- Model Dump
+module 0xc0ffee::m {
+    private fun test(): u64 {
+        0
+    }
+    spec fun $test(): u64;
+} // end 0xc0ffee::m

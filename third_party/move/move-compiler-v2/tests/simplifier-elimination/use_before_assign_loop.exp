@@ -1,0 +1,86 @@
+
+Diagnostics:
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/use_before_assign_loop.move:4:43
+  │
+4 │         loop { let y = move x + 1; x = 0; y; }
+  │                                           ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/use_before_assign_loop.move:9:62
+  │
+9 │         loop { let y = x + 1; if (cond) { continue }; x = 0; y; }
+  │                                                              ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/use_before_assign_loop.move:20:9
+   │
+20 │         x;
+   │         ^
+
+// ---- Model Dump
+module 0x8675309::M {
+    private fun tborrow1() {
+        {
+          let x: u64;
+          loop {
+            {
+              let y: &u64 = Borrow(Immutable)(x);
+              _: &u64 = Move(y);
+              x: u64 = 0
+            }
+          }
+        }
+    }
+    private fun tborrow2(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            {
+              let y: &u64 = Borrow(Immutable)(x);
+              _: &u64 = Move(y);
+              if cond {
+                x: u64 = 0
+              } else {
+                Tuple()
+              };
+              break
+            }
+          };
+          Tuple()
+        }
+    }
+    private fun tcopy(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            {
+              let _: u64 = Add<u64>(x, 1);
+              if cond {
+                continue
+              } else {
+                Tuple()
+              };
+              x: u64 = 0;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun tmove() {
+        {
+          let x: u64;
+          loop {
+            {
+              let _: u64 = Add<u64>(Move(x), 1);
+              x: u64 = 0;
+              Tuple()
+            }
+          }
+        }
+    }
+    spec fun $tborrow1();
+    spec fun $tborrow2(cond: bool);
+    spec fun $tcopy(cond: bool);
+    spec fun $tmove();
+} // end 0x8675309::M

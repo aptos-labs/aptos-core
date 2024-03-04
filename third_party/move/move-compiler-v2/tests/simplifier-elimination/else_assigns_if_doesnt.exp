@@ -1,0 +1,40 @@
+
+Diagnostics:
+warning: If condition is always true, so else branch code eliminated as dead code
+   ┌─ tests/simplifier-elimination/else_assigns_if_doesnt.move:5:9
+   │
+ 5 │       if (true) {
+   │           ^^^^
+   │           │
+   │           condition is always true
+ 6 │           y = 0;
+ 7 │       } else {
+   │ ╭────────────'
+ 8 │ │         x = 42;
+ 9 │ │         x;
+10 │ │     };
+   │ ╰─────' else branch eliminated
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/else_assigns_if_doesnt.move:9:9
+  │
+9 │         x;
+  │         ^
+
+// ---- Model Dump
+module <SELF>_0 {
+    private fun main() {
+        {
+          let y: u64;
+          y: u64 = 0;
+          Tuple();
+          if Eq<u64>(y, 0) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          Tuple()
+        }
+    }
+    spec fun $main();
+} // end <SELF>_0

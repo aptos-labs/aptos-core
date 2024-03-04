@@ -1,0 +1,137 @@
+
+Diagnostics:
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/assign_unpack_references.move:8:65
+  │
+8 │         R { s1: S { f }, s2 } = R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+  │                                                                 ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+  ┌─ tests/simplifier-elimination/assign_unpack_references.move:8:68
+  │
+8 │         R { s1: S { f }, s2 } = R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+  │                                                                    ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:11:9
+   │
+11 │         f; s2;
+   │         ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:11:12
+   │
+11 │         f; s2;
+   │            ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:17:66
+   │
+17 │         R { s1: S { f }, s2 } = &R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+   │                                                                  ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:17:69
+   │
+17 │         R { s1: S { f }, s2 } = &R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+   │                                                                     ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:20:9
+   │
+20 │         f; s2;
+   │         ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:20:12
+   │
+20 │         f; s2;
+   │            ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:27:70
+   │
+27 │         R { s1: S { f }, s2 } = &mut R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+   │                                                                      ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:27:73
+   │
+27 │         R { s1: S { f }, s2 } = &mut R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+   │                                                                         ^^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:30:9
+   │
+30 │         f; s2;
+   │         ^
+
+warning: Expression value unused and side-effect free, so eliminated as dead code
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:30:12
+   │
+30 │         f; s2;
+   │            ^^
+
+// ---- Model Dump
+module 0x8675309::M {
+    struct R {
+        s1: M::S,
+        s2: M::S,
+    }
+    struct S {
+        f: u64,
+    }
+    private fun t0() {
+        {
+          let f: u64;
+          {
+            let s2: M::S;
+            M::R{ s1: M::S{ f: f: u64 }, s2: s2: M::S }: M::R = pack M::R(pack M::S(0), pack M::S(1));
+            f: u64 = 0;
+            s2: M::S = pack M::S(0);
+            Tuple()
+          }
+        }
+    }
+    private fun t1() {
+        {
+          let f: &u64;
+          {
+            let s2: &M::S;
+            M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S }: M::R = Borrow(Immutable)(pack M::R(pack M::S(0), pack M::S(1)));
+            f: &u64 = Borrow(Immutable)(0);
+            s2: &M::S = Borrow(Immutable)(pack M::S(0));
+            Tuple()
+          }
+        }
+    }
+    private fun t2() {
+        {
+          let f: &mut u64;
+          {
+            let s2: &mut M::S;
+            M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S }: M::R = Borrow(Mutable)(pack M::R(pack M::S(0), pack M::S(1)));
+            f: &mut u64 = Borrow(Mutable)(0);
+            s2: &mut M::S = Borrow(Mutable)(pack M::S(0));
+            Tuple()
+          }
+        }
+    }
+    spec fun $t0();
+    spec fun $t1();
+    spec fun $t2();
+} // end 0x8675309::M
+
+
+Diagnostics:
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:17:33
+   │
+17 │         R { s1: S { f }, s2 } = &R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
+
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:27:33
+   │
+27 │         R { s1: S { f }, s2 } = &mut R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
