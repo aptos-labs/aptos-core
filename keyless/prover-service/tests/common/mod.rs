@@ -13,6 +13,8 @@ use figment::{
 };
 use prover_service::{
     config::ProverServerConfig,
+    config,
+    prover_key,
     handlers::encode_proof,
     input_conversion::{config::CircuitConfig, derive_circuit_input_signals, preprocess},
     witness_gen::witness_gen
@@ -42,7 +44,13 @@ pub fn init_test_full_prover() -> FullProver {
         metrics_port: _,
     } = prover_server_config;
 
-    FullProver::new(&zkey_path, &witness_gen_binary_folder_path)
+    let zkey_path = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(prover_key::cached_prover_key());
+
+    FullProver::new(zkey_path, &witness_gen_binary_folder_path)
         .expect("failed to initialize rapidsnark prover")
 }
 
@@ -119,6 +127,12 @@ pub fn convert_prove_and_verify(
     let (json, _) = full_prover.prove(&formatted_input_str).unwrap();
     let g16p = encode_proof(&Value::from_str(json).unwrap());
 
-    let g16vk = prepared_vk(&prover_server_config.test_verification_key_path);
+    let vkey_path = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(prover_key::cached_verification_key());
+
+    let g16vk = prepared_vk(vkey_path);
     g16p.verify_proof(public_inputs_hash, &g16vk)
 }
