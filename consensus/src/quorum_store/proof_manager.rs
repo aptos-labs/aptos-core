@@ -127,8 +127,11 @@ impl ProofManager {
                     let proof_batches =
                         proof_block.iter().map(|p| p.info()).collect::<HashSet<_>>();
 
-                    self.batches_without_proof_of_store
-                        .retain(|batch, _| !batch.is_expired() && !excluded_batches.contains(batch) && !proof_batches.contains(batch));
+                    self.batches_without_proof_of_store.retain(|batch, _| {
+                        !batch.is_expired()
+                            && !excluded_batches.contains(batch)
+                            && !proof_batches.contains(batch)
+                    });
                     for (batch, txns) in self.batches_without_proof_of_store.iter_mut() {
                         if let Some(txns) = txns {
                             // TODO: Should we calculate batch size by summing up sizes of individual txns?

@@ -426,10 +426,29 @@ impl From<&Vec<&Payload>> for PayloadFilter {
         } else {
             let mut exclude_proofs = HashSet::new();
             for payload in exclude_payloads {
-                if let Payload::InQuorumStore(proof_with_status) = payload {
-                    for proof in &proof_with_status.proofs {
-                        exclude_proofs.insert(proof.info().clone());
-                    }
+                match payload {
+                    Payload::InQuorumStore(proof_with_status) => {
+                        for proof in &proof_with_status.proofs {
+                            exclude_proofs.insert(proof.info().clone());
+                        }
+                    },
+                    Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                        for proof in &proof_with_status.proof_with_data.proofs {
+                            exclude_proofs.insert(proof.info().clone());
+                        }
+                    },
+                    Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_status) => {
+                        for proof in &proof_with_status.proof_with_data.proofs {
+                            exclude_proofs.insert(proof.info().clone());
+                        }
+                        for (batch_info, _) in inline_batches {
+                            // TODO: Verify batch_info
+                            exclude_proofs.insert(batch_info.clone());
+                        }
+                    },
+                    Payload::DirectMempool(_) => {
+                        // TODO: Should we call bail!("..")
+                    },
                 }
             }
             PayloadFilter::InQuorumStore(exclude_proofs)
