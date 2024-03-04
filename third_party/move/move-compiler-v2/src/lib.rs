@@ -22,6 +22,7 @@ use crate::{
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
+        recursive_instantiation_checker::RecursiveInstantiationChecker,
         reference_safety_processor::ReferenceSafetyProcessor,
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
@@ -275,6 +276,7 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     }
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
+        pipeline.add_processor(Box::new(RecursiveInstantiationChecker {}));
     }
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));

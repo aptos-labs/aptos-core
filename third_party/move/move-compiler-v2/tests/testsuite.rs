@@ -12,10 +12,12 @@ use move_compiler_v2::{
     },
     logging, pipeline,
     pipeline::{
-        ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
-        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+        self, ability_processor::AbilityProcessor,
+        avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
+        dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
+        recursive_instantiation_checker::RecursiveInstantiationChecker,
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
@@ -212,6 +214,17 @@ impl TestConfig {
                 env_pipeline,
                 pipeline,
                 generate_file_format: true,
+                dump_annotated_targets: false,
+                dump_for_only_some_stages: None,
+            }
+        } else if path.contains("/recursive-instantiation-checker") {
+            pipeline.add_processor(Box::new(RecursiveInstantiationChecker {}));
+            Self {
+                stop_before_generating_bytecode: false,
+                dump_ast: false,
+                env_pipeline,
+                pipeline,
+                generate_file_format: false,
                 dump_annotated_targets: false,
                 dump_for_only_some_stages: None,
             }
