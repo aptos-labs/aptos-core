@@ -1544,6 +1544,11 @@ impl Pattern {
         result
     }
 
+    // Implementation of `vars_and_exprs`:
+    //
+    // Recursively walks `Pattern` `p` and (optional) `Exp` `opt_exp` in parallel to generate a list
+    // of pairs in output parameter `r`.
+    //
     // Returns true if pattern matches exp
     fn collect_vars_exprs_from_expr(
         r: &mut Vec<(Symbol, Option<Exp>)>,
@@ -1597,6 +1602,13 @@ impl Pattern {
         }
     }
 
+    // Helper function for `vars_and_exprs`, to match variables in a `Pattern` with pieces of a
+    // `Value`.  Pieces are extracted as new `Value` expressions as needed to match vars.
+    //
+    // Recursively walks `Pattern` `p` and optional `Value` `opt_v` in tandem and appends matching
+    // pairs in output var `r`.  New `Value` expressions are created as needed to represent pieces
+    // of the input `Value`.
+    //
     // Returns true if pattern matches value
     fn collect_vars_exprs_from_value(
         r: &mut Vec<(Symbol, Option<Exp>)>,
@@ -1638,7 +1650,12 @@ impl Pattern {
         }
     }
 
-    /// Returns true unless there is a mismatch
+    // Helper function for `vars_and_exprs`, to match a vector of `Pattern` with a vector of `Exp`.
+    //
+    // Recursively walks `Pattern`s `pats` and `Exp`s `exps` in tandem and appends matching
+    // pairs in output var `r`.
+    //
+    // Returns true if slice sizes match and all patterns match expressions.
     fn collect_vars_exprs_from_vector_exprs(
         r: &mut Vec<(Symbol, Option<Exp>)>,
         pats: &[Pattern],
@@ -1660,6 +1677,13 @@ impl Pattern {
             .all(|b| b)
     }
 
+    // Helper function for `vars_and_exprs`, to match a vector of `Pattern` with a vector of `Value`.
+    //
+    // Recursively walks `Pattern`s `pats` and `Exp`s `exps` in tandem and appends matching
+    // pairs in output var `r`.  New `Value` expressions are created as needed to represent pieces
+    // of input `Value`s.
+    //
+    // Returns true if slice sizes match and all patterns match values.
     fn collect_vars_exprs_from_vector_values(
         r: &mut Vec<(Symbol, Option<Exp>)>,
         pats: &[Pattern],
@@ -1677,6 +1701,12 @@ impl Pattern {
             .all(|b| b)
     }
 
+    // Helper function for `vars_and_exprs`, to match a vector of `Pattern` with no binding.
+    //
+    // Recursively walks `Pattern`s `pats` and appends pairs matching variables in the pattern with `None`
+    // in output var `r`.
+    //
+    // Returns `false` unless the input slice `pats` is empty.
     fn collect_vars_exprs_from_vector_none(
         r: &mut Vec<(Symbol, Option<Exp>)>,
         pats: &[Pattern],
@@ -1686,6 +1716,9 @@ impl Pattern {
             .all(|b| b)
     }
 
+    // Returns a new pattern which is a copy of `self but with
+    // each `Var` subpattern contained in `vars` replaced by
+    // a `Wildcard` subpattern.
     pub fn remove_vars(self, vars: &BTreeSet<Symbol>) -> Pattern {
         match self {
             Pattern::Var(id, var) => {
@@ -1714,6 +1747,12 @@ impl Pattern {
         }
     }
 
+    /// Does a variable substitution on a pattern.
+    ///
+    /// Calls `var_map` on every symbol `sym` occurring in a `Var` subpattern of `self`, and if any
+    /// call retuns `Some(sym2)` such that `sym != sym2`, then creates a `clone` of `self` but with
+    /// every `sym3` replaced by `sym4` iff `Some(sym4) = var_map(sym3)`.  Otherwise, returns
+    /// `None` as there are no substitutions to be done.
     pub fn replace_vars<'a, F>(&self, var_map: &'a F) -> Option<Pattern>
     where
         F: Fn(&Symbol) -> Option<&'a Symbol>,
@@ -2072,6 +2111,7 @@ impl Operation {
         match self {
             MoveFunction(..) => false, // could abort
             SpecFunction(..) => false, // Spec
+            Closure(..) => false,      // Spec
             Pack(..) => false,         // Could yield an undroppable value
             Tuple => true,
 
@@ -2241,24 +2281,52 @@ impl ExpData {
     /// calls no user functions or functions that may have effects.
     pub fn is_side_effect_free(&self) -> bool {
         let mut is_pure = true;
-        let mut visitor = |e: &ExpData| {
+        let mut pure_stack = Vec::new();
+        let mut visitor = |post: bool, e: &ExpData| {
             use ExpData::*;
             match e {
+                Invalid(..) => {
+                    // leave it alone to produce better errors.
+                    is_pure = false;
+                },
+                Value(..) | LocalVar(..) | Temporary(..) => {}, // Ok, keep going
                 Call(_, oper, _) => {
                     if !oper.is_side_effect_free() {
                         is_pure = false;
-                        return false;
                     }
                 },
-                Return(..) | Loop(..) | LoopCont(..) | Assign(..) | Mutate(..) => {
+                Invoke(..) => {
+                    // Leave it alone for now, but with more analysis maybe we can do something.
                     is_pure = false;
-                    return false;
                 },
-                _ => {},
+                Lambda(..) => {
+                    // Lambda captures any side-effects.
+                    if !post {
+                        pure_stack.push(is_pure);
+                    } else {
+                        is_pure = pure_stack.pop().expect("unbalanced");
+                    }
+                },
+                Quant(..) => {
+                    // Technically pure, but we don't want to eliminate it.
+                    is_pure = false;
+                },
+                Block(..) | IfElse(..) => {}, // depends on contents
+                Return(..) => {
+                    is_pure = false;
+                },
+                Sequence(..) => {}, // depends on contents
+                Loop(..) | LoopCont(..) | Assign(..) | Mutate(..) => {
+                    is_pure = false;
+                },
+                SpecBlock(..) => {
+                    // Technically pure, but we don't want to eliminate it.
+                    is_pure = false;
+                },
             }
             true
         };
-        self.visit_pre_order(&mut visitor);
+        self.visit_pre_post(&mut visitor);
         is_pure
     }
 }

@@ -7,9 +7,13 @@
 //! - flow-insensitive constant propagation and folding
 //! - simple expression simplification
 //!
+//! Preconditions:
+//! - have previously run `check_for_unused_vars_and_params` pass to warn about unused vars,
+//!   which may be eliminated here.
+//!
 //! More details:
 //! - Do flow-insensitive constant propagation:
-//!   - identify "unsafe" symbols which may have more than one value
+//!   - identify "possibly modified" symbols which may have more than one value
 //!   - for safe symbols whose value is a constant value, propagate
 //!     the value to the use site to enable simplifying code:
 //!     - inline a constant value
@@ -37,6 +41,8 @@
 //!     - use constant folding on if predicates to eliminate dead
 //!       then or else branches (currently disabled by local constant,
 //!       as it may eliminate some useful code diagnostics).
+//!     - warn about dead code in the cases above where a statement
+//!       whose value is not used is removed.
 
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -65,7 +71,7 @@ pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
         if module.is_target() {
             for func_env in module.get_functions() {
                 if let Some(def) = func_env.get_def() {
-                    let mut rewriter = SimplifierRewriter::new(env, &func_env, eliminate_code);
+                    let mut rewriter = SimplifierRewriter::new(&func_env, eliminate_code);
                     let rewritten = rewriter.rewrite_function_body(def.clone());
                     trace!(
                         "After rewrite_function_body, function body is `{}`",
@@ -169,9 +175,10 @@ where
     }
 }
 
-// Finds sets of local vars that may be modified, and shouldn't be treated as constant.
+// Finds local vars that may be modified, and shouldn't be treated as constant.
+//
 // Vars are identified by symbol name and by the scope in which they are defined.
-// Scope is either
+//  Scope is either
 // - `None`: procedure parameter scope (uses are usually a temporary but may not be, notably in
 //    the case of `Assign`)
 // - `Some(NodeId)`: the let which creates the variable scope.
@@ -184,8 +191,17 @@ fn find_possibly_modified_vars(
     params: &[Parameter],
     exp: &ExpData,
 ) -> BTreeSet<(Symbol, Option<NodeId>)> {
+    // Maps each symbol to the nearest enclosing `let` (identified by `NodeId`) binding it
     let mut visiting_binding: ScopedMap<Symbol, NodeId> = ScopedMap::new();
-    let mut unsafe_variables: BTreeSet<(Symbol, Option<NodeId>)> = BTreeSet::new();
+    // Identifies modified `LocalVar`s by `Symbol` and the `let` (identified by `Some(NodeId)`) binding it
+    // Also includes possibly modified parameters and free variables paired with `None`.
+    let mut possibly_modified_vars: BTreeSet<(Symbol, Option<NodeId>)> = BTreeSet::new();
+    // Reverse map from `Symbol` to `idx` to facilitate checking of `Assign` validity.
+    let param_map: BTreeMap<_, _> = params
+        .iter()
+        .enumerate()
+        .map(|(idx, p)| (p.0, idx))
+        .collect();
 
     // Track when we are in a modifying scope.
     let mut modifying = false;
@@ -198,44 +214,60 @@ fn find_possibly_modified_vars(
                 // Nothing happens inside these expressions, so don't modify `modifying` state.
             },
             LocalVar(id, sym) => {
-                let current_binding_id = visiting_binding.get(sym);
-                if modifying {
-                    trace!(
-                        "Var {} in binding {:?} used in node {} is unsafe",
-                        sym.display(env.symbol_pool()),
-                        current_binding_id,
-                        id.as_usize(),
-                    );
-                    unsafe_variables.insert((*sym, current_binding_id.copied()));
+                let current_binding_id_opt = visiting_binding.get(sym);
+                if let Some(current_binding_id) = current_binding_id_opt {
+                    if modifying {
+                        trace!(
+                            "Var `{}` in binding `{}` is possibly modified at node `{}`",
+                            sym.display(env.symbol_pool()),
+                            current_binding_id.as_usize(),
+                            id.as_usize(),
+                        );
+                        possibly_modified_vars.insert((*sym, current_binding_id_opt.copied()));
+                    }
                 } else {
-                    trace!(
-                        "Var {} in binding {:?} used in node {} is ok",
-                        sym.display(env.symbol_pool()),
-                        current_binding_id,
-                        id.as_usize(),
-                    );
+                    if param_map.get(sym).is_none() {
+                        trace!(
+                            "Var `{}` used at node `{}` is free and not a parameter",
+                            sym.display(env.symbol_pool()),
+                            id.as_usize(),
+                        );
+                    }
                 }
             },
             Temporary(id, idx) => {
                 if let Some(sym) = params.get(*idx).map(|p| p.0) {
                     if modifying {
-                        let current_binding_id = visiting_binding.get(&sym);
                         trace!(
-                            "Temp {} = Var {} in binding {:?} is unsafe",
+                            "Temp `{}` = Var `{}` is possibly modified at node `{}`",
                             *idx,
                             sym.display(env.symbol_pool()),
-                            current_binding_id
+                            id.as_usize(),
                         );
-                        assert!(current_binding_id.is_none());
-                        unsafe_variables.insert((sym, None));
+                        if let Some(current_binding_id) = visiting_binding.get(&sym) {
+                            let loc = env.get_node_loc(*id);
+                            let loc2 = env.get_node_loc(*current_binding_id);
+                            env.diag_with_labels(
+                                Severity::Bug,
+                                &loc,
+                                &format!(
+                                    "Temp `{}` = Var `{}` is used inside aliasing let at node `{}`",
+                                    *idx,
+                                    sym.display(env.symbol_pool()),
+                                    id.as_usize()
+                                ),
+                                vec![(loc2, "Aliasing let here".to_string())],
+                            );
+                        }
+                        possibly_modified_vars.insert((sym, None));
                     };
                 } else {
                     let loc = env.get_node_loc(*id);
                     env.diag(
                         Severity::Bug,
                         &loc,
-                        &format!("Use of temporary with no corresponding parameter `{}`", idx),
-                    );
+                        &format!("Use of temporary `{}` with no corresponding parameter", idx),
+                    )
                 }
             },
             Call(_, op, _explist) => {
@@ -256,37 +288,6 @@ fn find_possibly_modified_vars(
                                 trace!("Exiting Move/Borrow");
                             },
                             _ => {},
-                        }
-                    },
-                    Operation::MoveFunction(module_id, fun_id) => {
-                        let qfid = module_id.qualified(*fun_id);
-                        let func_env = env.get_function(qfid);
-                        if func_env.is_inline() {
-                            // Inline function may modify parameters.
-                            match pos {
-                                VisitorPosition::Pre => {
-                                    // Add all mentioned vars to modified vars.
-                                    modifying_stack.push(modifying);
-                                    modifying = true;
-                                },
-                                VisitorPosition::Post => {
-                                    // stop adding vars
-                                    modifying = modifying_stack.pop().expect("unbalanaced visit 2");
-                                },
-                                _ => {},
-                            }
-                        } else {
-                            // Function calls other than inline ones cannot modify parameter var.
-                            match pos {
-                                VisitorPosition::Pre => {
-                                    modifying_stack.push(modifying);
-                                    modifying = false;
-                                },
-                                VisitorPosition::Post => {
-                                    modifying = modifying_stack.pop().expect("unbalanced visit 3");
-                                },
-                                _ => {},
-                            }
                         }
                     },
                     _ => {
@@ -381,29 +382,53 @@ fn find_possibly_modified_vars(
                 },
                 _ => {},
             },
-            Assign(_loc, pat, _) => {
+            Assign(id, pat, _) => {
                 if let VisitorPosition::Pre = pos {
                     // add vars in pat to modified vars
                     for (_pat_var_id, sym) in pat.vars() {
-                        let current_binding_id = visiting_binding.get(&sym);
-                        trace!(
-                            "Var {} in assignment {:?} is unsafe",
-                            sym.display(env.symbol_pool()),
-                            current_binding_id
-                        );
-                        unsafe_variables.insert((sym, current_binding_id.copied()));
+                        let current_binding_id_opt = visiting_binding.get(&sym);
+                        if let Some(current_binding_id) = current_binding_id_opt {
+                            trace!(
+                                "Var {} in binding {} is assigned in node {} so is modified",
+                                sym.display(env.symbol_pool()),
+                                current_binding_id.as_usize(),
+                                id.as_usize()
+                            );
+                        } else {
+                            match param_map.get(&sym) {
+                                Some(idx) => {
+                                    trace!(
+                                        "Var `{}` assigned at node `{}` is Temp `{}`",
+                                        sym.display(env.symbol_pool()),
+                                        id.as_usize(),
+                                        *idx,
+                                    );
+                                },
+                                None => {
+                                    let loc = env.get_node_loc(*id);
+                                    env.diag(
+                                        Severity::Bug,
+                                        &loc,
+                                        &format!(
+                                            "Free symbol {} in assignment",
+                                            sym.display(env.symbol_pool())
+                                        ),
+                                    );
+                                },
+                            }
+                        }
+                        possibly_modified_vars.insert((sym, current_binding_id_opt.copied()));
                     }
                 };
             },
         };
         true
     });
-    unsafe_variables
+    possibly_modified_vars
 }
 
 /// A function-specific simplifier rewriter.
 struct SimplifierRewriter<'env> {
-    pub env: &'env GlobalEnv,
     pub func_env: &'env FunctionEnv<'env>,
 
     pub constant_folder: ConstantFolder<'env>,
@@ -411,14 +436,14 @@ struct SimplifierRewriter<'env> {
     // Guard whether entire subexpressions are eliminated (possibly hiding some warnings).
     pub eliminate_code: bool,
 
-    // Tracks which definition (`Let` statement `NodeId`) is visible during visit to find modified
-    // local vars.  A use of a symbol which is missing must be a `Parameter`.  This is used only
-    // to determine if a symbol is in `unsafe_variables`.
+    // Tracks which definition (`Let` or `Lambda` statement `NodeId`) is visible during visit to
+    // find modified local vars.  A use of a symbol which is missing must be a `Parameter`.  This is
+    // used only to determine if a symbol is in `possibly_modified_variables`.
     visiting_binding: ScopedMap<Symbol, NodeId>,
 
-    // Unsafe variables are identified by `Symbol` and `Let` statement `NodeId`,
-    // except function parameters, which have no `NodeId` so get `None`.
-    unsafe_variables: BTreeSet<(Symbol, Option<NodeId>)>,
+    // Possibly modified variables are identified by `Symbol` and `Let` or `Lambda` statement `NodeId`,
+    // except enclosing function parameters, which have no `NodeId` so get `None`.
+    possibly_modified_variables: BTreeSet<(Symbol, Option<NodeId>)>,
 
     // Tracks constant values from scope.
     values: ScopedMap<Symbol, SimpleValue>,
@@ -434,33 +459,31 @@ enum SimpleValue {
 }
 
 impl<'env> SimplifierRewriter<'env> {
-    fn new(env: &'env GlobalEnv, func_env: &'env FunctionEnv, eliminate_code: bool) -> Self {
-        let constant_folder = ConstantFolder::new(env, false);
+    fn new(func_env: &'env FunctionEnv, eliminate_code: bool) -> Self {
+        let constant_folder = ConstantFolder::new(func_env.module_env.env, false);
         Self {
-            env,
             func_env,
             constant_folder,
             eliminate_code,
             visiting_binding: ScopedMap::new(),
-            unsafe_variables: BTreeSet::new(),
+            possibly_modified_variables: BTreeSet::new(),
             values: ScopedMap::new(),
         }
     }
 
-    /// Process a function.
-    pub fn rewrite_function_body(&mut self, exp: Exp) -> Exp {
-        self.unsafe_variables =
-            find_possibly_modified_vars(self.env, self.func_env.get_parameters_ref(), exp.as_ref());
-        self.visiting_binding.clear();
-        self.values.clear();
-        if log_enabled!(Level::Debug) {
-            debug!(
-                "Unsafe variables are ({:#?})",
-                self.unsafe_variables
+    fn env(&self) -> &GlobalEnv {
+        self.func_env.module_env.env
+    }
+
+    fn debug_dump_variables(&self) {
+        if log_enabled!(Level::Trace) {
+            trace!(
+                "Possibly modified variables are ({:#?})",
+                self.possibly_modified_variables
                     .iter()
                     .map(|(sym, opt_node)| format!(
                         "{}@{}",
-                        sym.display(self.env.symbol_pool()),
+                        sym.display(self.env().symbol_pool()),
                         if let Some(node) = opt_node {
                             node.as_usize().to_string()
                         } else {
@@ -470,6 +493,18 @@ impl<'env> SimplifierRewriter<'env> {
                     .join(", ")
             )
         }
+    }
+
+    /// Process a function.
+    pub fn rewrite_function_body(&mut self, exp: Exp) -> Exp {
+        self.possibly_modified_variables = find_possibly_modified_vars(
+            self.env(),
+            self.func_env.get_parameters_ref(),
+            exp.as_ref(),
+        );
+        self.visiting_binding.clear();
+        self.values.clear();
+        self.debug_dump_variables();
         // Enter Function scope (a specialized `rewrite_enter_scope()` call)
         self.values.enter_scope();
 
@@ -488,13 +523,13 @@ impl<'env> SimplifierRewriter<'env> {
             match simple_value {
                 SimpleValue::Value(val) => Some(ExpData::Value(id, val.clone()).into_exp()),
                 SimpleValue::Uninitialized => {
-                    let loc = self.env.get_node_loc(id);
-                    self.env.diag(
+                    let loc = self.env().get_node_loc(id);
+                    self.env().diag(
                         Severity::Error,
                         &loc,
                         &format!(
                             "use of unassigned local `{}`",
-                            sym.display(self.env.symbol_pool())
+                            sym.display(self.env().symbol_pool())
                         ),
                     );
                     None
@@ -503,13 +538,13 @@ impl<'env> SimplifierRewriter<'env> {
         } else {
             trace!(
                 "Found no value for var {} ",
-                sym.display(self.env.symbol_pool()),
+                sym.display(self.env().symbol_pool()),
             );
             None
         }
     }
 
-    // If `exp` can be represented as a `SimpleValue`, then return it.
+    /// If `exp` can be represented as a `SimpleValue`, then return it.
     fn exp_to_simple_value(&mut self, exp: Option<Exp>) -> Option<SimpleValue> {
         // `exp` should have already been simplified so we only need to check
         // for a constant value expression here.
@@ -523,15 +558,15 @@ impl<'env> SimplifierRewriter<'env> {
         }
     }
 
-    // Expand a `Value::Tuple` value expression to a call to `Tuple`
-    // Note that a `Value::Vector` value is left alone.
+    /// Expand a `Value::Tuple` value expression to a call to `Tuple`
+    /// Note that a `Value::Vector` value is left alone.
     fn expand_tuple(&mut self, exp: Exp) -> Exp {
         if let ExpData::Value(id, Value::Tuple(x)) = exp.as_ref() {
             if x.is_empty() {
                 ExpData::Call(*id, Operation::Tuple, Vec::new()).into_exp()
             } else {
-                let loc = self.env.get_node_loc(*id);
-                self.env.diag(
+                let loc = self.env().get_node_loc(*id);
+                self.env().diag(
                     Severity::Bug,
                     &loc,
                     &format!(
@@ -546,10 +581,10 @@ impl<'env> SimplifierRewriter<'env> {
         }
     }
 
-    // Try to turn a call to cast(x:T1,:T1) -> x
+    /// Try to turn a call to cast(x:T1,:T1) -> x
     fn try_collapse_cast(&mut self, id: NodeId, arg0: &Exp) -> Option<Exp> {
-        let arg0_type = self.env.get_node_type(arg0.node_id());
-        let result_type = self.env.get_node_type(id);
+        let arg0_type = self.env().get_node_type(arg0.node_id());
+        let result_type = self.env().get_node_type(id);
         if arg0_type == result_type {
             Some(arg0.clone())
         } else {
@@ -564,7 +599,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         trace!(
             "Before rewrite, expr {} is `{}`",
             old_id,
-            exp.display_verbose(self.env)
+            exp.display_verbose(self.env())
         );
         let r = self.rewrite_exp_descent(exp);
         let new_id = r.as_ref().node_id().as_usize();
@@ -572,7 +607,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             "After rewrite, expr {} is now {}: `{}`",
             old_id,
             new_id,
-            r.display_verbose(self.env)
+            r.display_verbose(self.env())
         );
         r
     }
@@ -602,9 +637,9 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
                 let value = self.values.get(&sym);
                 trace!(
                     "Replacing symbol {} at node {} with {}; in_scope={:?}, value={:?}",
-                    sym.display(self.env.symbol_pool()),
+                    sym.display(self.env().symbol_pool()),
                     id.as_usize(),
-                    exp.display(self.env),
+                    exp.display(self.env()),
                     in_scope.map(|n| n.as_usize()),
                     value
                 );
@@ -638,8 +673,8 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         let mut new_binding = Vec::new();
         if let Some(exp) = binding {
             for (var, opt_new_binding_exp) in pat.vars_and_exprs(exp) {
-                if self.unsafe_variables.contains(&(var, Some(id))) {
-                    // Ignore RHS, mark this variable as unsafe.
+                if self.possibly_modified_variables.contains(&(var, Some(id))) {
+                    // Ignore RHS, mark this variable as possibly modified.
                     new_binding.push((var, None));
                 } else {
                     // Try to evaluate opt_new_binding_exp as a constant/var.
@@ -650,8 +685,8 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         } else {
             // Body with no bindings, values are Uninitialized.
             for (_, var) in pat.vars() {
-                if self.unsafe_variables.contains(&(var, Some(id))) {
-                    // Ignore RHS, mark this variable as unsafe.
+                if self.possibly_modified_variables.contains(&(var, Some(id))) {
+                    // Ignore RHS, mark this variable as possibly modified.
                     new_binding.push((var, None));
                 } else {
                     new_binding.push((var, Some(SimpleValue::Uninitialized)))
@@ -673,7 +708,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         None
     }
 
-    // Note that `rewrite_block` is called *after* `rewrite_exit_scope`.
+    /// Note that `rewrite_block` is called *after* `rewrite_exit_scope`.
     fn rewrite_block(
         &mut self,
         id: NodeId,
@@ -684,15 +719,15 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         if let Some(exp) = opt_binding {
             let pat_id = pat.node_id();
             let exp_id = exp.node_id();
-            let pat_type = self.env.get_node_type(pat_id);
-            let exp_type = self.env.get_node_type(exp_id);
-            let type_display_context = TypeDisplayContext::new(self.env);
+            let pat_type = self.env().get_node_type(pat_id);
+            let exp_type = self.env().get_node_type(exp_id);
+            let type_display_context = TypeDisplayContext::new(self.env());
             trace!(
                 "Starting rewrite_block(id={}, pat={}, opt_binding={}, body={}, pat_type={}, exp_type={}, {})",
                 id.as_usize(),
-                pat.to_string(self.env, &type_display_context),
-                exp.display_verbose(self.env),
-                body.display_verbose(self.env),
+                pat.to_string(self.env(), &type_display_context),
+                exp.display_verbose(self.env()),
+                body.display_verbose(self.env()),
                 pat_type.display(&type_display_context),
                 exp_type.display(&type_display_context),
                 if pat_type == exp_type { "MATCHES" } else { "NO MATCH" },
@@ -701,9 +736,9 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             trace!(
                 "Starting rewrite_block(id={}, pat={}, opt_binding={}, body={})",
                 id.as_usize(),
-                pat.to_string(self.env, &TypeDisplayContext::new(self.env)),
+                pat.to_string(self.env(), &TypeDisplayContext::new(self.env())),
                 "None",
-                body.display_verbose(self.env)
+                body.display_verbose(self.env())
             );
         }
 
@@ -731,11 +766,11 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         let unused_bound_vars: BTreeSet<_> = bound_vars
             .iter()
             .filter_map(|(id, sym)| {
-                let ty = self.env.get_node_type(*id);
+                let ty = self.env().get_node_type(*id);
                 if !free_vars.contains(sym) {
                     trace!(
                         "Sym {} is not in free_vars",
-                        sym.display(self.env.symbol_pool())
+                        sym.display(self.env().symbol_pool())
                     );
                     if matches!(ty, Type::Tuple(_)) {
                         // Tuple type for variable is not valid, but won't be flagged until bytecode
@@ -753,10 +788,10 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         let binding_can_be_dropped = pat.has_no_struct()
             && if let Some(binding) = opt_binding {
                 let node_id = binding.node_id();
-                let opt_type = self.env.get_node_type_opt(node_id);
+                let opt_type = self.env().get_node_type_opt(node_id);
                 if let Some(ty) = opt_type {
                     let ability_set = self
-                        .env
+                        .env()
                         .type_abilities(&ty, self.func_env.get_type_parameters_ref());
                     ability_set.has_ability(Ability::Drop)
                 } else {
@@ -802,7 +837,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             trace!(
                 "Dropping some vars  for rewrite_block(id={}), result = {}",
                 id.as_usize(),
-                exp.display_verbose(self.env),
+                exp.display_verbose(self.env()),
             );
             Some(exp)
         } else {
@@ -812,13 +847,40 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
 
     fn rewrite_if_else(&mut self, _id: NodeId, cond: &Exp, then: &Exp, else_: &Exp) -> Option<Exp> {
         if self.eliminate_code {
-            match cond.as_ref() {
-                ExpData::Value(_, Value::Bool(true)) => Some(then.clone()),
-                ExpData::Value(_, Value::Bool(false)) => Some(else_.clone()),
+            if let Some((truth_value, branch_name, result, eliminated_id)) = match cond.as_ref() {
+                ExpData::Value(_, Value::Bool(true)) => {
+                    Some((true, "else", then.clone(), else_.node_id()))
+                },
+                ExpData::Value(_, Value::Bool(false)) => {
+                    Some((false, "then", else_.clone(), then.node_id()))
+                },
                 _ => None,
+            } {
+                let loc = self.env().get_node_loc(eliminated_id);
+                let cond_loc = self.env().get_node_loc(cond.node_id());
+                self.env().diag_with_labels(
+                    Severity::Warning,
+                    &cond_loc,
+                    &format!(
+                        "If condition is always {}, so {} branch code eliminated as dead code",
+                        truth_value, branch_name,
+                    ),
+                    vec![
+                        (
+                            cond_loc.clone(),
+                            format!("condition is always {}", truth_value).to_string(),
+                        ),
+                        (
+                            loc,
+                            format!("{} branch eliminated", branch_name).to_string(),
+                        ),
+                    ],
+                );
+                Some(result)
+            } else {
+                None
             }
         } else {
-            // TODO: warn about eliminated dead code
             None
         }
     }
@@ -829,7 +891,18 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             let mut siter = seq.iter();
             let last_expr_opt = siter.next_back(); // first remove last element from siter
             let side_effecting_elts_refs = siter
-                .filter(|exp| !exp.as_ref().is_side_effect_free())
+                .filter(|exp|
+                        if exp.as_ref().is_side_effect_free() {
+                            let loc = self.env().get_node_loc(exp.node_id());
+                            self.env().diag(
+                                Severity::Warning,
+                                &loc,
+                                "Expression value unused and side-effect free, so eliminated as dead code"
+                            );
+                            false
+                        } else {
+                            true
+                        })
                 .collect_vec();
             if side_effecting_elts_refs.len() + 1 < seq.len() {
                 // We can remove some exprs; clone just the others.

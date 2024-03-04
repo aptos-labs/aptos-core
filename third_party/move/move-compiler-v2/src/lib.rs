@@ -62,6 +62,7 @@ pub fn run_move_compiler(
     error_writer: &mut impl WriteColor,
     options: Options,
 ) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
+    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
     logging::setup_logging();
     info!("Move Compiler v2");
     // Run context check.
@@ -84,22 +85,19 @@ pub fn run_move_compiler(
     // Run inlining.
     inliner::run_inlining(&mut env);
     check_errors(&env, error_writer, "inlining")?;
-
     debug!("After inlining, GlobalEnv=\n{}", env.dump_env());
 
     function_checker::check_access_and_use(&mut env, false);
     check_errors(&env, error_writer, "post-inlining access checks")?;
 
-    // Run inlining.  No code elimination for now.
-    ast_simplifier::run_simplifier(&mut env, false);
+    // Run simplifier.  No code elimination unless `optimize_on`.
+    ast_simplifier::run_simplifier(&mut env, optimize_on);
     check_errors(&env, error_writer, "simplifier")?;
-
     debug!("After simplifier, GlobalEnv={}", env.dump_env());
 
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;
-
     debug!("After bytecode_gen, GlobalEnv={}", env.dump_env());
 
     // Run transformation pipeline
