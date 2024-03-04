@@ -4,7 +4,7 @@
 
 use crate::{
     account_address::AccountAddress,
-    keyless::{KeylessPublicKey, KeylessSignature, TransactionAndGroth16Zkp, ZkpOrOpenIdSig},
+    keyless::{EphemeralCertificate, KeylessPublicKey, KeylessSignature, TransactionAndProof},
     transaction::{
         webauthn::PartialAuthenticatorAssertionResponse, RawTransaction, RawTransactionWithData,
     },
@@ -1015,14 +1015,17 @@ impl AnySignature {
                 // This deferred verification is what actually ensures the `signature.ephemeral_pubkey`
                 // used below is the right pubkey signed by the OIDC provider.
 
-                let mut txn_and_zkp = TransactionAndGroth16Zkp {
+                let mut txn_and_zkp = TransactionAndProof {
                     message,
                     proof: None,
                 };
 
-                match &signature.sig {
-                    ZkpOrOpenIdSig::Groth16Zkp(proof) => txn_and_zkp.proof = Some(proof.proof),
-                    ZkpOrOpenIdSig::OpenIdSig(_) => {},
+                // Add the ZK proof into the `txn_and_zkp` struct, if we are in the ZK path
+                match &signature.cert {
+                    EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+                        txn_and_zkp.proof = Some(proof.proof)
+                    },
+                    EphemeralCertificate::OpenIdSig(_) => {},
                 }
 
                 signature
@@ -1210,11 +1213,9 @@ impl Serialize for EphemeralPublicKey {
 mod tests {
     use super::*;
     use crate::{
-        keyless::{
-            test_utils::{
-                get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk,
-            },
-            Groth16Zkp,
+        keyless::test_utils::{
+            get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk,
+            maul_raw_groth16_txn,
         },
         transaction::{webauthn::AssertionSignature, SignedTransaction},
     };
@@ -1767,7 +1768,7 @@ mod tests {
             None,
         );
         sig.ephemeral_signature = EphemeralSignature::ed25519(
-            esk.sign(&TransactionAndGroth16Zkp {
+            esk.sign(&TransactionAndProof {
                 message: raw_txn.clone(),
                 proof: None,
             })
@@ -1801,15 +1802,15 @@ mod tests {
             None,
             None,
         );
-        let mut txn_and_zkp = TransactionAndGroth16Zkp {
+        let mut txn_and_zkp = TransactionAndProof {
             message: raw_txn.clone(),
             proof: None,
         };
-        match &mut sig.sig {
-            ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+        match &mut sig.cert {
+            EphemeralCertificate::ZeroKnowledgeSig(proof) => {
                 txn_and_zkp.proof = Some(proof.proof);
             },
-            ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
+            EphemeralCertificate::OpenIdSig(_) => panic!("Internal inconsistency"),
         }
         sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
@@ -1829,8 +1830,7 @@ mod tests {
 
     #[test]
     fn test_groth16_txn_fails_non_malleability_check() {
-        let esk = get_sample_esk();
-        let (mut sig, pk) = get_sample_groth16_sig_and_pk();
+        let (sig, pk) = get_sample_groth16_sig_and_pk();
         let sender_addr =
             AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone())).account_address();
         let raw_txn = crate::test_helpers::transaction_test_helpers::get_test_raw_transaction(
@@ -1841,27 +1841,7 @@ mod tests {
             None,
             None,
         );
-        let mut txn_and_zkp = TransactionAndGroth16Zkp {
-            message: raw_txn.clone(),
-            proof: None,
-        };
-
-        // Bad non-malleability signature
-        match &mut sig.sig {
-            ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-                let a = proof.proof.get_a();
-                let b = proof.proof.get_b();
-                // signing the wrong proof here: (a, b, a) instead of (a, b, c)
-                txn_and_zkp.proof = Some(Groth16Zkp::new(*a, *b, *a));
-            },
-            ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
-        }
-        sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
-
-        let single_key_auth =
-            SingleKeyAuthenticator::new(AnyPublicKey::keyless(pk), AnySignature::keyless(sig));
-        let account_auth = AccountAuthenticator::single_key(single_key_auth);
-        let signed_txn = SignedTransaction::new_single_sender(raw_txn, account_auth);
+        let signed_txn = maul_raw_groth16_txn(pk, sig, raw_txn);
 
         assert!(signed_txn.verify_signature().is_err());
     }

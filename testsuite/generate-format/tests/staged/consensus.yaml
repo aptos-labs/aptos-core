@@ -442,6 +442,16 @@ EntryFunction:
           TYPENAME: TypeTag
     - args:
         SEQ: BYTES
+EphemeralCertificate:
+  ENUM:
+    0:
+      ZeroKnowledgeSig:
+        NEWTYPE:
+          TYPENAME: ZeroKnowledgeSig
+    1:
+      OpenIdSig:
+        NEWTYPE:
+          TYPENAME: OpenIdSig
 EphemeralPublicKey:
   ENUM:
     0:
@@ -456,6 +466,11 @@ EphemeralSignature:
         STRUCT:
           - signature:
               TYPENAME: Ed25519Signature
+    1:
+      WebAuthn:
+        STRUCT:
+          - signature:
+              TYPENAME: PartialAuthenticatorAssertionResponse
 EpochChangeProof:
   STRUCT:
     - ledger_info_with_sigs:
@@ -486,7 +501,7 @@ G2Bytes:
     TUPLEARRAY:
       CONTENT: U8
       SIZE: 64
-Groth16Zkp:
+Groth16Proof:
   STRUCT:
     - a:
         TYPENAME: G1Bytes
@@ -515,8 +530,8 @@ KeylessPublicKey:
         TYPENAME: IdCommitment
 KeylessSignature:
   STRUCT:
-    - sig:
-        TYPENAME: ZkpOrOpenIdSig
+    - cert:
+        TYPENAME: EphemeralCertificate
     - jwt_header_json: STR
     - exp_date_secs: U64
     - ephemeral_pubkey:
@@ -749,20 +764,6 @@ SignedBatchInfoMsg:
     - signed_infos:
         SEQ:
           TYPENAME: SignedBatchInfo
-SignedGroth16Zkp:
-  STRUCT:
-    - proof:
-        TYPENAME: Groth16Zkp
-    - non_malleability_signature:
-        TYPENAME: EphemeralSignature
-    - exp_horizon_secs: U64
-    - extra_field:
-        OPTION: STR
-    - override_aud_val:
-        OPTION: STR
-    - training_wheels_signature:
-        OPTION:
-          TYPENAME: EphemeralSignature
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -1099,13 +1100,21 @@ WriteSetPayload:
 WriteSetV0:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut
-ZkpOrOpenIdSig:
+ZKP:
   ENUM:
     0:
-      Groth16Zkp:
+      Groth16:
         NEWTYPE:
-          TYPENAME: SignedGroth16Zkp
-    1:
-      OpenIdSig:
-        NEWTYPE:
-          TYPENAME: OpenIdSig
+          TYPENAME: Groth16Proof
+ZeroKnowledgeSig:
+  STRUCT:
+    - proof:
+        TYPENAME: ZKP
+    - exp_horizon_secs: U64
+    - extra_field:
+        OPTION: STR
+    - override_aud_val:
+        OPTION: STR
+    - training_wheels_signature:
+        OPTION:
+          TYPENAME: EphemeralSignature

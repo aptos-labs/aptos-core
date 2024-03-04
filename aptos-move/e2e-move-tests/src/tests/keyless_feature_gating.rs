@@ -10,8 +10,8 @@ use aptos_types::{
             get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk,
             get_sample_openid_sig_and_pk,
         },
-        Configuration, KeylessPublicKey, KeylessSignature, TransactionAndGroth16Zkp,
-        ZkpOrOpenIdSig,
+        Configuration, EphemeralCertificate, KeylessPublicKey, KeylessSignature,
+        TransactionAndProof,
     },
     on_chain_config::FeatureFlag,
     transaction::{
@@ -130,20 +130,20 @@ fn get_keyless_txn(
 
     println!("RawTxn sender: {:?}", raw_txn.sender());
 
-    let mut txn_and_zkp = TransactionAndGroth16Zkp {
+    let mut txn_and_zkp = TransactionAndProof {
         message: raw_txn.clone(),
         proof: None,
     };
     let esk = get_sample_esk();
 
     // Compute the training wheels signature if not present
-    match &mut sig.sig {
-        ZkpOrOpenIdSig::Groth16Zkp(proof) => {
+    match &mut sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(proof) => {
             // Training wheels should be disabled.
             proof.training_wheels_signature = None;
             txn_and_zkp.proof = Some(proof.proof);
         },
-        ZkpOrOpenIdSig::OpenIdSig(_) => {},
+        EphemeralCertificate::OpenIdSig(_) => {},
     }
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 

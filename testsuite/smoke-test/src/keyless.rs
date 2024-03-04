@@ -5,6 +5,7 @@ use aptos::test::CliTestFramework;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    poseidon_bn254::fr_to_bytes_le,
     SigningKey, Uniform,
 };
 use aptos_forge::{AptosPublicInfo, LocalSwarm, NodeExt, Swarm, SwarmExt};
@@ -17,14 +18,13 @@ use aptos_types::{
         AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
     },
     keyless::{
-        get_public_inputs_hash,
+        get_public_inputs_hash, test_utils,
         test_utils::{
             get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_iss, get_sample_jwk,
             get_sample_openid_sig_and_pk,
         },
-        Configuration, Groth16VerificationKey, Groth16Zkp, Groth16ZkpAndStatement,
-        KeylessPublicKey, KeylessSignature, TransactionAndGroth16Zkp, ZkpOrOpenIdSig,
-        KEYLESS_ACCOUNT_MODULE_NAME,
+        Configuration, EphemeralCertificate, Groth16ProofAndStatement, Groth16VerificationKey,
+        KeylessPublicKey, KeylessSignature, TransactionAndProof, KEYLESS_ACCOUNT_MODULE_NAME,
     },
     transaction::{
         authenticator::{
@@ -34,11 +34,9 @@ use aptos_types::{
         SignedTransaction,
     },
 };
-use ark_ff::{BigInteger, PrimeField};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
 use std::time::Duration;
-
 // TODO(keyless): Test the override aud_val path
 
 #[tokio::test]
@@ -62,9 +60,9 @@ async fn test_keyless_oidc_txn_with_bad_jwt_sig() {
     let (tw_sk, config, jwk, mut swarm) = setup_local_net().await;
     let (mut sig, pk) = get_sample_openid_sig_and_pk();
 
-    match &mut sig.sig {
-        ZkpOrOpenIdSig::Groth16Zkp(_) => panic!("Internal inconsistency"),
-        ZkpOrOpenIdSig::OpenIdSig(openid_sig) => {
+    match &mut sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(_) => panic!("Internal inconsistency"),
+        EphemeralCertificate::OpenIdSig(openid_sig) => {
             openid_sig.jwt_sig = vec![0u8; 16] // Mauling the signature
         },
     }
@@ -191,30 +189,26 @@ async fn sign_transaction<'a>(
 
     let esk = get_sample_esk();
 
-    let public_inputs_hash: Option<[u8; 32]> = if let ZkpOrOpenIdSig::Groth16Zkp(_) = &sig.sig {
-        // This will only calculate the hash if it's needed, avoiding unnecessary computation.
-        Some(
-            get_public_inputs_hash(&sig, &pk, jwk, config)
-                .unwrap()
-                .into_bigint()
-                .to_bytes_le()
-                .try_into()
-                .expect("expected 32-byte public inputs hash"),
-        )
-    } else {
-        None
-    };
+    let public_inputs_hash: Option<[u8; 32]> =
+        if let EphemeralCertificate::ZeroKnowledgeSig(_) = &sig.cert {
+            // This will only calculate the hash if it's needed, avoiding unnecessary computation.
+            Some(fr_to_bytes_le(
+                &get_public_inputs_hash(&sig, &pk, jwk, config).unwrap(),
+            ))
+        } else {
+            None
+        };
 
-    let mut txn_and_zkp = TransactionAndGroth16Zkp {
+    let mut txn_and_zkp = TransactionAndProof {
         message: raw_txn.clone(),
         proof: None,
     };
 
     // Compute the training wheels signature if not present
-    match &mut sig.sig {
-        ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-            let proof_and_statement = Groth16ZkpAndStatement {
-                proof: proof.proof,
+    match &mut sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(proof) => {
+            let proof_and_statement = Groth16ProofAndStatement {
+                proof: proof.proof.into(),
                 public_inputs_hash: public_inputs_hash.unwrap(),
             };
 
@@ -224,7 +218,7 @@ async fn sign_transaction<'a>(
 
             txn_and_zkp.proof = Some(proof.proof);
         },
-        ZkpOrOpenIdSig::OpenIdSig(_) => {},
+        EphemeralCertificate::OpenIdSig(_) => {},
     }
 
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
@@ -234,7 +228,7 @@ async fn sign_transaction<'a>(
 
 fn maul_groth16_zkp_signature(txn: SignedTransaction) -> SignedTransaction {
     // extract the keyless PK and signature
-    let (pk, mut sig) = match txn.authenticator() {
+    let (pk, sig) = match txn.authenticator() {
         TransactionAuthenticator::SingleSender {
             sender: AccountAuthenticator::SingleKey { authenticator },
         } => match (authenticator.public_key(), authenticator.signature()) {
@@ -248,30 +242,8 @@ fn maul_groth16_zkp_signature(txn: SignedTransaction) -> SignedTransaction {
 
     // disassemble the txn
     let raw_txn = txn.into_raw_transaction();
-    let mut txn_and_zkp = TransactionAndGroth16Zkp {
-        message: raw_txn.clone(),
-        proof: None,
-    };
 
-    // maul ephemeral signature to be over a different proof: (a, b, a) instead of (a, b, c)
-    match &mut sig.sig {
-        ZkpOrOpenIdSig::Groth16Zkp(proof) => {
-            let old_proof = proof.proof;
-
-            txn_and_zkp.proof = Some(Groth16Zkp::new(
-                *old_proof.get_a(),
-                *old_proof.get_b(),
-                *old_proof.get_a(),
-            ));
-
-            let esk = get_sample_esk();
-            sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
-        },
-        ZkpOrOpenIdSig::OpenIdSig(_) => {},
-    };
-
-    // reassemble TXN
-    SignedTransaction::new_keyless(raw_txn, pk, sig)
+    test_utils::maul_raw_groth16_txn(pk, sig, raw_txn)
 }
 
 async fn get_transaction(

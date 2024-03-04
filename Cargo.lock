@@ -15102,7 +15102,6 @@ dependencies = [
  "aptos-vault-client",
  "aptos-vm",
  "aptos-vm-genesis",
- "ark-ff",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",

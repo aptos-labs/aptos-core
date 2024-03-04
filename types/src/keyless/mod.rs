@@ -31,6 +31,7 @@ mod groth16_sig;
 mod groth16_vk;
 mod openid_sig;
 pub mod test_utils;
+mod zkp_sig;
 
 use crate::keyless::circuit_constants::devnet_prepared_vk;
 pub use bn254_circom::{
@@ -38,9 +39,10 @@ pub use bn254_circom::{
     G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
 };
 pub use configuration::Configuration;
-pub use groth16_sig::{Groth16Zkp, Groth16ZkpAndStatement, SignedGroth16Zkp};
+pub use groth16_sig::{Groth16Proof, Groth16ProofAndStatement, ZeroKnowledgeSig};
 pub use groth16_vk::Groth16VerificationKey;
 pub use openid_sig::{Claims, OpenIdSig};
+pub use zkp_sig::ZKP;
 
 /// The name of the Move module for keyless accounts deployed at 0x1.
 pub const KEYLESS_ACCOUNT_MODULE_NAME: &str = "keyless_account";
@@ -66,21 +68,23 @@ macro_rules! serialize {
     }};
 }
 
-/// Allows us to support direct verification of OpenID signatures, in the rare case that we would
-/// need to turn off ZK proofs due to a bug in the circuit.
+/// A signature from the OIDC provider over the user ID, the application ID and the EPK, which serves
+/// as a "certificate" binding the EPK to the keyless account associated with that user and application.
+///
+/// This is a \[ZKPoK of an\] OpenID signature over a JWT containing several relevant fields
+/// (e.g., `aud`, `sub`, `iss`, `nonce`) where `nonce` is a commitment to the `ephemeral_pubkey` and
+/// the expiration time
+/// `exp_timestamp_secs`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
-pub enum ZkpOrOpenIdSig {
-    Groth16Zkp(SignedGroth16Zkp),
+pub enum EphemeralCertificate {
+    ZeroKnowledgeSig(ZeroKnowledgeSig),
     OpenIdSig(OpenIdSig),
 }
 
 /// NOTE: See `KeylessPublicKey` comments for why this cannot be named `Signature`.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash, Serialize)]
 pub struct KeylessSignature {
-    /// A \[ZKPoK of an\] OpenID signature over several relevant fields (e.g., `aud`, `sub`, `iss`,
-    /// `nonce`) where `nonce` contains a commitment to `ephemeral_pubkey` and an expiration time
-    /// `exp_timestamp_secs`.
-    pub sig: ZkpOrOpenIdSig,
+    pub cert: EphemeralCertificate,
 
     /// The decoded/plaintext JWT header (i.e., *not* base64url-encoded), with two relevant fields:
     ///  1. `kid`, which indicates which of the OIDC provider's JWKs should be used to verify the
@@ -101,9 +105,9 @@ pub struct KeylessSignature {
 
 /// This struct wraps the transaction and optional ZKP that is signed with the ephemeral secret key.
 #[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct TransactionAndGroth16Zkp<T> {
+pub struct TransactionAndProof<T> {
     pub message: T,
-    pub proof: Option<Groth16Zkp>,
+    pub proof: Option<ZKP>,
 }
 
 impl TryFrom<&[u8]> for KeylessSignature {
