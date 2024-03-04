@@ -86,6 +86,11 @@ spec aptos_framework::randomness {
         ensures [abstract] result == spec_u256_integer();
     }
 
+    spec u256_integer_internal(): u256 {
+        pragma unroll = 32;
+        include NextBlobAbortsIf;
+    }
+
     spec fun spec_u256_integer(): u256;
 
     spec u8_range(min_incl: u8, max_excl: u8): u8 {

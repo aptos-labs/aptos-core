@@ -48,9 +48,11 @@ spec aptos_framework::stake {
         invariant [suspendable] chain_status::is_operating() ==> exists<AptosCoinCapabilities>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorPerformance>(@aptos_framework);
         invariant [suspendable] chain_status::is_operating() ==> exists<ValidatorSet>(@aptos_framework);
+        // invariant update forall a: address where old(exists<StakePool>(a)): reconfiguration_state::spec_is_in_progress() ==> old(global<StakePool>(a)) == global<StakePool>(a);
 
         // property 2: The owner of a validator remains immutable.
         apply ValidatorOwnerNoChange to *;
+        apply ValidatorNotChangeDuringReconfig to * except on_new_epoch;
 
         // ghost variable
         global ghost_valid_perf: ValidatorPerformance;
@@ -64,6 +66,11 @@ spec aptos_framework::stake {
     spec ValidatorSet {
         /// [high-level-req-1]
         invariant consensus_scheme == 0;
+    }
+
+    spec schema ValidatorNotChangeDuringReconfig {
+        ensures (reconfiguration_state::spec_is_in_progress() && old(exists<ValidatorSet>(@aptos_framework))) ==>
+            old(global<ValidatorSet>(@aptos_framework)) == global<ValidatorSet>(@aptos_framework);
     }
 
     spec schema ValidatorOwnerNoChange {
@@ -160,6 +167,7 @@ spec aptos_framework::stake {
     {
         // This function casue timeout (property proved)
         // pragma verify_duration_estimate = 120;
+        pragma disable_invariants_in_body;
         aborts_if !staking_config::get_allow_validator_set_change(staking_config::get());
         aborts_if !exists<StakePool>(pool_address);
         aborts_if !exists<ValidatorConfig>(pool_address);
@@ -654,6 +662,7 @@ spec aptos_framework::stake {
     }
 
     spec add_stake_with_cap {
+        pragma disable_invariants_in_body;
         include ResourceRequirement;
         let amount = coins.value;
         aborts_if reconfiguration_state::spec_is_in_progress();
@@ -705,6 +714,7 @@ spec aptos_framework::stake {
     }
 
     spec update_voting_power_increase(increase_amount: u64) {
+        requires !reconfiguration_state::spec_is_in_progress();
         aborts_if !exists<ValidatorSet>(@aptos_framework);
         aborts_if !exists<staking_config::StakingConfig>(@aptos_framework);
 
