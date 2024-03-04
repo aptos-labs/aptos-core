@@ -829,13 +829,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             let mut siter = seq.iter();
             let last_expr_opt = siter.next_back(); // first remove last element from siter
             let side_effecting_elts_refs = siter
-                .filter_map(|exp| {
-                    if !exp.as_ref().is_side_effect_free() {
-                        Some(exp)
-                    } else {
-                        None
-                    }
-                })
+                .filter(|exp| !exp.as_ref().is_side_effect_free())
                 .collect_vec();
             if side_effecting_elts_refs.len() + 1 < seq.len() {
                 // We can remove some exprs; clone just the others.
