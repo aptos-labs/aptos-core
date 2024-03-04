@@ -181,7 +181,7 @@ impl<'r> TransactionDataCache<'r> {
             };
             // TODO(Gas): Shall we charge for this?
             let (ty_layout, has_aggregator_lifting) =
-                loader.type_to_type_layout_with_identifier_mappings(ty, module_store)?;
+                loader.type_to_type_layout(ty, module_store)?;
 
             let module = module_store.module_at(&ty_tag.module_id());
             let metadata: &[Metadata] = match &module {

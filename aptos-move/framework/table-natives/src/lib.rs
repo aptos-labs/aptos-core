@@ -174,7 +174,13 @@ impl TableData {
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
-                let key_layout = context.type_to_type_layout(key_ty)?;
+                let (key_layout, has_identifier_mappings) = context.type_to_type_layout(key_ty)?;
+                if has_identifier_mappings {
+                    return Err(partial_extension_error(
+                        "cannot serialize table key with delayed fields",
+                    ));
+                }
+
                 let value_layout_info = LayoutInfo::from_value_ty(context, value_ty)?;
                 let table = Table {
                     handle,
@@ -191,8 +197,7 @@ impl TableData {
 
 impl LayoutInfo {
     fn from_value_ty(context: &SafeNativeContext, value_ty: &Type) -> PartialVMResult<Self> {
-        let (layout, has_identifier_mappings) =
-            context.type_to_type_layout_with_identifier_mappings(value_ty)?;
+        let (layout, has_identifier_mappings) = context.type_to_type_layout(value_ty)?;
         Ok(Self {
             layout: Arc::new(layout),
             has_identifier_mappings,
