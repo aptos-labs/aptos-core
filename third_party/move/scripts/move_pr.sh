@@ -20,7 +20,7 @@ echo "*************** [move-pr] Assuming move root at $MOVE_BASE"
 # Run only tests which would also be run on CI
 export ENV_TEST_ON_CI=1
 
-while getopts "htcgdea" opt; do
+while getopts "htcgdia" opt; do
   case $opt in
     h)
       cat <<EOF
@@ -76,18 +76,22 @@ ARTIFACT_CRATE_PATHS="\
   move-stdlib\
 "
 
+# This is a partial list of Move crates, to keep this script fast.
+# May be extended as needed but should be kept minimal.
 MOVE_CRATES="\
-  -p move-compiler-v2\
   -p move-model\
   -p move-stackless-bytecode\
   -p move-stdlib\
   -p move-bytecode-verifier\
   -p move-binary-format\
+  -p move-compiler\
   -p move-compiler-v2\
   -p move-compiler-v2-transactional-tests\
   -p move-prover-boogie-backend\
   -p move-prover-bytecode-pipeline\
   -p move-prover\
+  -p move-docgen\
+  -p move-transactional-test-runner\
   -p move-vm-runtime\
   -p move-vm-transactional-tests\
   -p move-vm-types\
@@ -126,7 +130,7 @@ if [ ! -z "$CHECK" ]; then
   (
     cd $BASE
     cargo xclippy
-    cargo fmt +nightly
+    cargo +nightly fmt
     cargo sort --grouped --workspace 
   )
 fi
