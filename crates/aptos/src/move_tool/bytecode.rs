@@ -293,7 +293,7 @@ impl BytecodeCommand {
             Err(CliError::CommandArgumentError(format!(
                 "Cannot locate the decompiler executable. \
                 Environment variable `{}` is not set, and `{}` is not in the PATH. \
-                Have you run the TODO configuration script?",
+                Try running `aptos update revela` to download it.",
                 REVELA_EXE_ENV, REVELA_EXE
             )))
         }
