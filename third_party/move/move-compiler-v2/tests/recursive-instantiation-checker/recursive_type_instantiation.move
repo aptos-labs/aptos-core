@@ -26,4 +26,12 @@ module 0x42::m0 {
 	fun test5<T>() {
 		test3<S<T>>()
 	}
+
+	fun test6<T1, T2>() {
+		test6<T2, S<T1>>()
+	}
+
+	fun test7<T>() {
+		test7<T>()
+	}
 }

@@ -162,6 +162,8 @@ fn check_recursive_instantiations_in(
                     ty_param,
                 );
                 return false;
+            } else {
+                return true;
             }
         }
     }
@@ -190,7 +192,7 @@ fn check_callees_of(
         // because we don't have cyclic module dependencies
         return true;
     }
-    let caller_data = if callers_chain.is_empty() {
+    let caller_data = if callers_chain.is_empty() || caller.to_qualified_id() == callers_chain[0].1.to_qualified_id() {
         root_caller_data
     } else {
         function_targt_holder

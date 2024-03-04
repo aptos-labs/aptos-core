@@ -61,3 +61,11 @@ error: Cyclic type instantiations found for type parameter `T` of `test5`
    │ │         ------------- "test3<m0::S<T>>" calls "test4<m0::S<T>>"
 28 │ │     }
    │ ╰─────^
+
+error: Cyclic type instantiations found for type parameter `T1` of `test6`
+   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:30:2
+   │
+30 │ ╭     fun test6<T1, T2>() {
+31 │ │         test6<T2, S<T1>>()
+32 │ │     }
+   │ ╰─────^
