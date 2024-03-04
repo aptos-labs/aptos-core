@@ -256,7 +256,11 @@ pub struct InitPackage {
     /// Example: alice=0x1234,bob=0x5678,greg=_
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, value_parser = crate::common::utils::parse_map::< String, MoveManifestAccountWrapper >, default_value = "")]
+    #[clap(
+        long,
+        value_parser = crate::common::utils::parse_map::<String, MoveManifestAccountWrapper>,
+        default_value = ""
+    )]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
     #[clap(flatten)]
