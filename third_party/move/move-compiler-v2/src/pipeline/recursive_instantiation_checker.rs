@@ -94,7 +94,7 @@ fn report_recursive_instantiation(
 ) {
     let root_loc = callers_chain[0].0.clone();
     let root_caller = callers_chain[0].1.id.clone();
-    let labels = (1..callers_chain.len())
+    let labels = (0..callers_chain.len())
         .map(|i| {
             let (caller_loc, caller) = &callers_chain[i];
             let callee = if i != callers_chain.len() - 1 {
@@ -102,22 +102,26 @@ fn report_recursive_instantiation(
             } else {
                 &callee
             };
-            (
-                caller_loc.clone(),
-                format!(
-                    "{:?} calls {:?}",
-                    display_call(module_env, caller.clone()),
-                    display_call(module_env, callee.clone())
-                ),
+            format!(
+                "{} calls {} {}",
+                display_call(module_env, caller.clone()),
+                display_call(module_env, callee.clone()),
+                caller_loc.clone().display_line_only(&module_env.env)
             )
         })
         .collect_vec();
     let ty_param_display = Type::TypeParameter(ty_param)
         .display(&module_env.get_function(callee.id).get_type_display_ctx())
         .to_string();
-    module_env.env.error_with_labels(
+    module_env.env.error_with_notes(
         &root_loc,
-        &format!("Cyclic type instantiations found for type parameter `{}` of `{}`", ty_param_display, module_env.get_function(root_caller).get_simple_name_string()),
+        &format!(
+            "Cyclic type instantiations found for type parameter `{}` of `{}`",
+            ty_param_display,
+            module_env
+                .get_function(root_caller)
+                .get_simple_name_string()
+        ),
         labels,
     );
 }
@@ -192,7 +196,9 @@ fn check_callees_of(
         // because we don't have cyclic module dependencies
         return true;
     }
-    let caller_data = if callers_chain.is_empty() || caller.to_qualified_id() == callers_chain[0].1.to_qualified_id() {
+    let caller_data = if callers_chain.is_empty()
+        || caller.to_qualified_id() == callers_chain[0].1.to_qualified_id()
+    {
         root_caller_data
     } else {
         function_targt_holder
