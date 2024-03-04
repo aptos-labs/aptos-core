@@ -623,6 +623,7 @@ impl Interpreter {
         ty: &Type,
     ) -> PartialVMResult<()> {
         let res = Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?
+            .assert_unique(is_mut)
             .borrow_global();
         gas_meter.charge_borrow_global(
             is_mut,
@@ -702,6 +703,7 @@ impl Interpreter {
     ) -> PartialVMResult<()> {
         let resource =
             match Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?
+                .assert_unique(true)
                 .move_from()
             {
                 Ok(resource) => {
@@ -737,7 +739,7 @@ impl Interpreter {
         ty: &Type,
         resource: Value,
     ) -> PartialVMResult<()> {
-        let gv = Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?;
+        let gv = Self::load_resource(loader, data_store, module_store, gas_meter, addr, ty)?.assert_unique(true);
         // NOTE(Gas): To maintain backward compatibility, we need to charge gas after attempting
         //            the move_to operation.
         match gv.move_to(resource) {

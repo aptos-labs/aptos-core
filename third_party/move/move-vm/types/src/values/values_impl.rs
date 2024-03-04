@@ -2646,6 +2646,19 @@ impl GlobalValue {
         self.0.exists()
     }
 
+    pub fn assert_unique(&mut self, is_mut: bool) -> &mut Self {
+        if !is_mut {
+            return self;
+        }
+        match &self.0 {
+            GlobalValueImpl::Deleted | GlobalValueImpl::None => (),
+            GlobalValueImpl::Fresh { fields } | GlobalValueImpl::Cached { fields, .. } => {
+                assert!(Rc::strong_count(fields) == 1);
+            }
+        };
+        self
+    }
+
     pub fn into_effect(self) -> Option<Op<Value>> {
         self.0.into_effect().map(|op| op.map(Value))
     }
