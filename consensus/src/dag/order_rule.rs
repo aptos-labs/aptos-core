@@ -99,11 +99,15 @@ impl OrderRule {
     /// if so find next one until nothing can be ordered.
     fn check_ordering_between(&mut self, mut start_round: Round, round: Round) {
         while start_round <= round {
-            if let Some(direct_anchor) =
+            if let Some(direct_anchor) = monitor!(
+                "dag_find_anchor",
                 self.find_first_anchor_with_enough_votes(start_round, round)
-            {
-                let ordered_anchor = self.find_first_anchor_to_order(direct_anchor);
-                self.finalize_order(ordered_anchor);
+            ) {
+                let ordered_anchor = monitor!(
+                    "dag_find_first_anchor",
+                    self.find_first_anchor_to_order(direct_anchor)
+                );
+                monitor!("dag_final_order", self.finalize_order(ordered_anchor));
                 // if there's any anchor being ordered, the loop continues to check if new anchor can be ordered as well.
                 start_round = self.lowest_unordered_anchor_round;
             } else {

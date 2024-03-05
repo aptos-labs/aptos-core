@@ -12,6 +12,10 @@ use prometheus::{
 };
 use std::time::Duration;
 
+pub const LATENCY_BUCKETS: &[f64; 13] = &[
+    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0, 60.0,
+];
+
 /// A small wrapper around Histogram to handle the special case
 /// of duration buckets.
 /// This Histogram will handle the correct granularity for logging
@@ -68,10 +72,13 @@ impl OpMetrics {
             )
             .unwrap(),
             duration_histograms: HistogramVec::new(
-                HistogramOpts::new(
-                    format!("{}_duration", name_str),
-                    format!("Histogram values for {}", name_str),
-                ),
+                HistogramOpts {
+                    common_opts: Opts::new(
+                        format!("{}_duration", name_str),
+                        format!("Histogram values for {}", name_str),
+                    ),
+                    buckets: Vec::from(LATENCY_BUCKETS as &'static [f64]),
+                },
                 &["op"],
             )
             .unwrap(),
