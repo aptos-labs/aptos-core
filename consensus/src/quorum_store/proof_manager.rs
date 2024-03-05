@@ -15,7 +15,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -31,7 +31,7 @@ pub struct ProofManager {
     batches_without_proof_of_store: HashMap<BatchInfo, Option<Vec<SignedTransaction>>>,
     // Storing the most recent 20 batches added to batches_without_proof_of_store.
     // This lets us remove the older batches from batches_without_proof_of_store whenever required.
-    recent_batches_without_proof_of_store: VecDeque<BatchInfo>,
+    // recent_batches_without_proof_of_store: VecDeque<BatchInfo>,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
@@ -49,7 +49,7 @@ impl ProofManager {
         Self {
             proofs_for_consensus: ProofQueue::new(my_peer_id),
             batches_without_proof_of_store: HashMap::new(),
-            recent_batches_without_proof_of_store: VecDeque::new(),
+            // recent_batches_without_proof_of_store: VecDeque::new(),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -72,11 +72,11 @@ impl ProofManager {
             for mut batch in batches.into_iter() {
                 self.batches_without_proof_of_store
                     .insert(batch.batch_info().clone(), batch.take_payload());
-                self.recent_batches_without_proof_of_store
-                    .push_back(batch.batch_info().clone());
-                if self.recent_batches_without_proof_of_store.len() > 20 {
-                    self.recent_batches_without_proof_of_store.pop_front();
-                }
+                // self.recent_batches_without_proof_of_store
+                //     .push_back(batch.batch_info().clone());
+                // if self.recent_batches_without_proof_of_store.len() > 20 {
+                //     self.recent_batches_without_proof_of_store.pop_front();
+                // }
             }
         }
     }
@@ -119,15 +119,12 @@ impl ProofManager {
                     PayloadFilter::InQuorumStore(proofs) => proofs,
                 };
 
-                let proof_block = self.proofs_for_consensus.pull_proofs(
-                    &excluded_batches,
-                    max_txns,
-                    max_bytes,
-                    return_non_full,
-                );
+                let (proof_block, proof_queue_not_fully_utilized) = self
+                    .proofs_for_consensus
+                    .pull_proofs(&excluded_batches, max_txns, max_bytes, return_non_full);
 
                 let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
-                if self.allow_batches_without_pos_in_proposal {
+                if self.allow_batches_without_pos_in_proposal && !proof_queue_not_fully_utilized {
                     // TODO: Add a counter in grafana to monitor how many inline transactions/bytes are added
                     let mut cur_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
                     let mut cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
@@ -140,7 +137,7 @@ impl ProofManager {
                         !batch.is_expired()
                             && !excluded_batches.contains(batch)
                             && !proof_batches.contains(batch)
-                            && self.recent_batches_without_proof_of_store.contains(batch)
+                        // && self.recent_batches_without_proof_of_store.contains(batch)
                     });
                     for (batch, txns) in self.batches_without_proof_of_store.iter_mut() {
                         if let Some(txns) = txns {

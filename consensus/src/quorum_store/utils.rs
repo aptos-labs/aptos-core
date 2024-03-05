@@ -283,7 +283,7 @@ impl ProofQueue {
         max_txns: u64,
         max_bytes: u64,
         return_non_full: bool,
-    ) -> Vec<ProofOfStore> {
+    ) -> (Vec<ProofOfStore>, bool) {
         let mut ret = vec![];
         let mut cur_bytes = 0;
         let mut cur_txns = 0;
@@ -346,9 +346,9 @@ impl ProofQueue {
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            ret
+            (ret, full)
         } else {
-            Vec::new()
+            (Vec::new(), full)
         }
     }
 
