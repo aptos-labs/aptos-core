@@ -26,14 +26,6 @@ pub fn mutate(env: &GlobalEnv, conf: &Configuration) -> anyhow::Result<Vec<Mutan
         .collect::<Result<Vec<_>, _>>()?
         .concat();
 
-    /*mutants.extend(
-        env.scripts
-            .into_values()
-            .map(|script| traverse_function((script.function_name, script.function), conf, files))
-            .collect::<Result<Vec<_>, _>>()?
-            .concat(),
-    );*/
-
     trace!("Found {} possible mutations", mutants.len());
 
     Ok(mutants)
@@ -59,10 +51,7 @@ fn traverse_module_with_check(
             .move_sources
             .contains(&filename_path.to_path_buf())
     {
-        trace!(
-            "Skipping module {} as it does not come from source project",
-            module_name
-        );
+        trace!("Skipping module {module_name} as it does not come from source project");
         return Ok(vec![]);
     }
 
@@ -72,8 +61,8 @@ fn traverse_module_with_check(
             let project_path = project_path.canonicalize()?;
             if test_root != project_path {
                 trace!(
-                    "Skipping module: \n {} \n root: {} \n as it does not come from source project {}",
-                    module_name, test_root.to_string_lossy(),
+                    "Skipping module: \n {module_name} \n root: {} \n as it does not come from source project {}",
+                    test_root.to_string_lossy(),
                     project_path.to_string_lossy()
                 );
                 return Ok(vec![]);
@@ -84,7 +73,7 @@ fn traverse_module_with_check(
     // Now we need to check if the module is included in the configuration.
     if let cli::ModuleFilter::Selected(mods) = &conf.project.mutate_modules {
         if !mods.contains(&module_name) {
-            trace!("Skipping module {}", module_name);
+            trace!("Skipping module {module_name}");
             return Ok(vec![]);
         }
     }
@@ -154,7 +143,7 @@ fn traverse_function(
                 spec_blocks_loc.push(function.module_env.env.get_node_loc(exp_data.node_id()));
             }
 
-            // Check if we are not inside of any spec block. If so, don't process expression.
+            // Check if we are not inside of any spec block. If so, don't process the expression.
             // We can't simply return false to stop visiting that tree branch as it will stop
             // visiting the whole tree.
             // Visiting pre-order ensures us that we can't process any expression below spec block before
