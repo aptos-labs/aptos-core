@@ -23,7 +23,7 @@ concurrency:
 jobs:
   prover-inconsistency-test:
     runs-on: high-perf-docker
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 10 || 720}}
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 10 || 480}}
     steps:
       - uses: actions/checkout@v3
         with:

@@ -4535,6 +4535,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 <pre><code><b>pragma</b> disable_invariants_in_body;
+<b>pragma</b> verify_duration_estimate = 300;
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>let</b> amount = coins.value;
 <b>aborts_if</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_spec_is_in_progress">reconfiguration_state::spec_is_in_progress</a>();
@@ -4867,7 +4868,7 @@ Returns validator's next epoch voting power, including pending_active, active, a
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
 <b>pragma</b> disable_invariants_in_body;
 <b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">ResourceRequirement</a>;
 <b>include</b> <a href="stake.md#0x1_stake_GetReconfigStartTimeRequirement">GetReconfigStartTimeRequirement</a>;

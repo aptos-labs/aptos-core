@@ -51,6 +51,7 @@ spec aptos_framework::stake {
 
         // property 2: The owner of a validator remains immutable.
         apply ValidatorOwnerNoChange to *;
+
         apply ValidatorNotChangeDuringReconfig to * except on_new_epoch;
         apply StakePoolNotChangeDuringReconfig to * except on_new_epoch, update_stake_pool;
 
@@ -426,7 +427,7 @@ spec aptos_framework::stake {
     }
 
     spec on_new_epoch {
-        pragma verify_duration_estimate = 300;
+        pragma verify_duration_estimate = 120;
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
         // invariants because this function is called during genesis.
@@ -675,6 +676,7 @@ spec aptos_framework::stake {
 
     spec add_stake_with_cap {
         pragma disable_invariants_in_body;
+        pragma verify_duration_estimate = 300;
         include ResourceRequirement;
         let amount = coins.value;
         aborts_if reconfiguration_state::spec_is_in_progress();
