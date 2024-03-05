@@ -136,8 +136,11 @@ macro_rules! unwrap_or_discard {
         match $res {
             Ok(s) => s,
             Err(e) => {
-                let o = discarded_output(e.status_code());
-                return (e, o);
+                // covers both VMStatus itself and VMError which can convert to VMStatus
+                let s: VMStatus = e.into();
+
+                let o = discarded_output(s.status_code());
+                return (s, o);
             },
         }
     };
@@ -1508,12 +1511,13 @@ impl AptosVM {
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
         let mut session = self.new_session(resolver, SessionId::prologue_meta(&txn_data));
-        if let Err(err) =
-            self.validate_signed_transaction(&mut session, resolver, txn, &txn_data, log_context)
-        {
-            let discarded_output = discarded_output(err.status_code());
-            return (err, discarded_output);
-        };
+        unwrap_or_discard!(self.validate_signed_transaction(
+            &mut session,
+            resolver,
+            txn,
+            &txn_data,
+            log_context
+        ));
 
         if self.gas_feature_version >= 1 {
             // Create a new session so that the data cache is flushed.
@@ -1527,24 +1531,16 @@ impl AptosVM {
             session = self.new_session(resolver, SessionId::txn_meta(&txn_data));
         }
 
-        let is_account_init_for_sponsored_transaction =
-            match is_account_init_for_sponsored_transaction(&txn_data, self.features(), resolver) {
-                Ok(result) => result,
-                Err(err) => {
-                    let vm_status = err.into_vm_status();
-                    let discarded_output = discarded_output(vm_status.status_code());
-                    return (vm_status, discarded_output);
-                },
-            };
+        let is_account_init_for_sponsored_transaction = unwrap_or_discard!(
+            is_account_init_for_sponsored_transaction(&txn_data, self.features(), resolver)
+        );
 
         if is_account_init_for_sponsored_transaction {
-            if let Err(err) =
-                create_account_if_does_not_exist(&mut session, gas_meter, txn.sender())
-            {
-                let vm_status = err.into_vm_status();
-                let discarded_output = discarded_output(vm_status.status_code());
-                return (vm_status, discarded_output);
-            };
+            unwrap_or_discard!(create_account_if_does_not_exist(
+                &mut session,
+                gas_meter,
+                txn.sender()
+            ));
         }
 
         let storage_gas_params = unwrap_or_discard!(get_or_vm_startup_failure(
@@ -1601,9 +1597,7 @@ impl AptosVM {
             // Deprecated. We cannot make this `unreachable!` because a malicious
             // validator can craft this transaction and cause the node to panic.
             TransactionPayload::ModuleBundle(_) => {
-                let vm_status = deprecated_module_bundle!();
-                let discarded_output = discarded_output(vm_status.status_code());
-                return (vm_status, discarded_output);
+                unwrap_or_discard!(Err(deprecated_module_bundle!()))
             },
         };
 
