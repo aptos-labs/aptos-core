@@ -211,7 +211,7 @@ fn find_possibly_modified_vars(
         use ExpData::*;
         match e {
             Invalid(_) | Value(..) | LoopCont(..) => {
-                // Nothing happens inside these expressions, so don't modify `modifying` state.
+                // Nothing happens inside these expressions, so don't bother `modifying` state.
             },
             LocalVar(id, sym) => {
                 let current_binding_id_opt = visiting_binding.get(sym);
@@ -298,15 +298,19 @@ fn find_possibly_modified_vars(
                                 // Add all mentioned vars to modified vars.
                                 modifying_stack.push(modifying);
                                 modifying = true;
-                                trace!("Entering Move/Borrow");
+                                trace!("Entering Borrow");
                             },
                             VisitorPosition::Post => {
                                 // stop adding vars
                                 modifying = modifying_stack.pop().expect("unbalanced visit 1");
-                                trace!("Exiting Move/Borrow");
+                                trace!("Exiting Borrow");
                             },
                             _ => {},
                         }
+                    },
+                    Operation::Select(..) => {
+                        // Variable appearing in Select may be modified if it occurs top-level in a
+                        // Borrow, so leave `modifying` state alone.
                     },
                     _ => {
                         // Other operations don't modify argument variables.
@@ -337,7 +341,7 @@ fn find_possibly_modified_vars(
                 }
             },
             Lambda(node_id, pat, _) => {
-                // Define a new scope for bound vars
+                // Define a new scope for bound vars, and turn off `modifying` within.
                 match pos {
                     VisitorPosition::Pre => {
                         trace!("Entering lambda {}", node_id.as_usize());
@@ -345,19 +349,24 @@ fn find_possibly_modified_vars(
                         for (_, sym) in pat.vars() {
                             visiting_binding.insert(sym, *node_id);
                         }
+                        modifying_stack.push(modifying);
+                        modifying = false;
                     },
                     VisitorPosition::Post => {
                         // remove a scope
                         visiting_binding.exit_scope();
                         trace!("Exiting lambda {}", node_id.as_usize());
+                        modifying = modifying_stack.pop().expect("unbalanced visit 6");
                     },
                     _ => {},
                 };
             },
             Block(node_id, pat, _, _) => {
-                // Define a new scope for bound vars
+                // Define a new scope for bound vars, and turn off `modifying` within.
                 match pos {
                     VisitorPosition::Pre => {
+                        modifying_stack.push(modifying);
+                        modifying = false;
                         trace!(
                             "Entering block -- evaluating binding RHS {}",
                             node_id.as_usize()
@@ -374,69 +383,68 @@ fn find_possibly_modified_vars(
                         // remove a scope
                         visiting_binding.exit_scope();
                         trace!("Exiting block scope {}", node_id.as_usize());
+                        modifying = modifying_stack.pop().expect("unbalanced visit 7");
                     },
                     _ => {},
                 };
             },
-            IfElse(_, _cond, _then, _else) => {
+            IfElse(..) | Sequence(..) => {
                 match pos {
                     VisitorPosition::Pre => {
                         modifying_stack.push(modifying);
                         modifying = false;
                     },
-                    VisitorPosition::BeforeThen => {
-                        modifying = modifying_stack.pop().expect("unbalanced visit 6");
+                    VisitorPosition::Post => {
+                        modifying = modifying_stack.pop().expect("unbalanced visit 8");
                     },
                     _ => {},
                 };
             },
-            Sequence(_, _exp_vec) => match pos {
-                VisitorPosition::Pre => {
-                    modifying_stack.push(modifying);
-                    modifying = false;
-                },
-                VisitorPosition::PreSequenceValue => {
-                    modifying = modifying_stack.pop().expect("unbalanced visit 6");
-                },
-                _ => {},
-            },
             Assign(id, pat, _) => {
-                if let VisitorPosition::Pre = pos {
-                    // add vars in pat to modified vars
-                    for (_pat_var_id, sym) in pat.vars() {
-                        let current_binding_id_opt = visiting_binding.get(&sym);
-                        if let Some(current_binding_id) = current_binding_id_opt {
-                            trace!(
-                                "Var {} in binding {} is assigned in node {} so is modified",
-                                sym.display(env.symbol_pool()),
-                                current_binding_id.as_usize(),
-                                id.as_usize()
-                            );
-                        } else {
-                            match param_map.get(&sym) {
-                                Some(idx) => {
-                                    trace!(
-                                        "Var `{}` assigned at node `{}` is Temp `{}`",
-                                        sym.display(env.symbol_pool()),
-                                        id.as_usize(),
-                                        *idx,
-                                    );
-                                },
-                                None => {
-                                    let loc = env.get_node_loc(*id);
-                                    env.diag(
-                                        Severity::Bug,
-                                        &loc,
-                                        &format!(
-                                            "Free symbol {} in assignment",
-                                            sym.display(env.symbol_pool())
-                                        ),
-                                    );
-                                },
+                match pos {
+                    VisitorPosition::Pre => {
+                        // add vars in pat to modified vars, then turn off modifying for the RHS
+                        for (_pat_var_id, sym) in pat.vars() {
+                            let current_binding_id_opt = visiting_binding.get(&sym);
+                            if let Some(current_binding_id) = current_binding_id_opt {
+                                trace!(
+                                    "Var {} in binding {} is assigned in node {} so is modified",
+                                    sym.display(env.symbol_pool()),
+                                    current_binding_id.as_usize(),
+                                    id.as_usize()
+                                );
+                            } else {
+                                match param_map.get(&sym) {
+                                    Some(idx) => {
+                                        trace!(
+                                            "Var `{}` assigned at node `{}` is Temp `{}`",
+                                            sym.display(env.symbol_pool()),
+                                            id.as_usize(),
+                                            *idx,
+                                        );
+                                    },
+                                    None => {
+                                        let loc = env.get_node_loc(*id);
+                                        env.diag(
+                                            Severity::Bug,
+                                            &loc,
+                                            &format!(
+                                                "Free symbol {} in assignment",
+                                                sym.display(env.symbol_pool())
+                                            ),
+                                        );
+                                    },
+                                }
                             }
+                            possibly_modified_vars.insert((sym, current_binding_id_opt.copied()));
                         }
-                        possibly_modified_vars.insert((sym, current_binding_id_opt.copied()));
-                    }
+                        modifying_stack.push(modifying);
+                        modifying = false;
+                    },
+                    VisitorPosition::Post => {
+                        modifying = modifying_stack.pop().expect("unbalanced visit 9");
+                    },
+                    _ => {},
                 };
             },
         };
@@ -465,6 +473,12 @@ struct SimplifierRewriter<'env> {
 
     // Tracks constant values from scope.
     values: ScopedMap<Symbol, SimpleValue>,
+
+    // During expression rewriting, tracks whether we are evaluating a borrow argument.
+    in_borrow: bool,
+
+    // Records values from outer scope of a borrow.
+    in_borrow_stack: Vec<bool>,
 }
 
 // Representation to record a known value of a variable to
@@ -486,6 +500,8 @@ impl<'env> SimplifierRewriter<'env> {
             visiting_binding: ScopedMap::new(),
             possibly_modified_variables: BTreeSet::new(),
             values: ScopedMap::new(),
+            in_borrow: false,
+            in_borrow_stack: Vec::new(),
         }
     }
 
@@ -619,15 +635,96 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             old_id,
             exp.display_verbose(self.env())
         );
-        let r = self.rewrite_exp_descent(exp);
-        let new_id = r.as_ref().node_id().as_usize();
+        // Top-level vars in a Borrow are borrowed, so we turn on or off `in_borrow` before processing
+        // subexpressions in `self.rewrite_exp_descent`
+        // Inside a Borrow() expression, we need to be careful because top-level vars are borrowed.
+        enum BorrowEffect {
+            Transparent,
+            Variable,
+            Starts,
+            Escapes,
+        }
+        use BorrowEffect::*;
+        let borrow_effect = {
+            use ExpData::*;
+            match exp.as_ref() {
+                LocalVar(..) | Temporary(..) => Variable,
+                Call(_, op, _explist) => match op {
+                    Operation::Borrow(ReferenceKind::Mutable) => Starts,
+                    // Leave in_borrow alone
+                    Operation::Select(..) => Transparent,
+                    // Other Call operations escape from the borrow
+                    _ => Escapes,
+                },
+                // These expressions turn off borrow mode within them
+                Invalid(_) | Value(..) | Invoke(..) | Lambda(..) | Quant(..) | Block(..)
+                | IfElse(..) | Return(..) | Sequence(..) | Loop(..) | LoopCont(..) | Assign(..)
+                | Mutate(..) | SpecBlock(..) => Escapes,
+            }
+        };
+        match borrow_effect {
+            Transparent | Variable => {
+                // no effect on in_borrow.
+            },
+            Starts => {
+                self.in_borrow_stack.push(self.in_borrow);
+                self.in_borrow = true;
+            },
+            Escapes => {
+                self.in_borrow_stack.push(self.in_borrow);
+                self.in_borrow = false;
+            },
+        };
+        let rexp = self.rewrite_exp_descent(exp);
+        let new_id = rexp.as_ref().node_id().as_usize();
         trace!(
             "After rewrite, expr {} is now {}: `{}`",
             old_id,
             new_id,
-            r.display_verbose(self.env())
+            rexp.display_verbose(self.env())
         );
-        r
+        // Exit from local `in_borrow` state, and if the enclosing scope was `in_borrow`, then make
+        // sure that anything transformed into a var or `Select` from another expression type is
+        // wrapped by a `Sequence` so it will be treated as a temporary value to be borrowed.
+        let protected_rexp = match borrow_effect {
+            Transparent | Variable => {
+                rexp // No effect.
+            },
+            Starts => {
+                self.in_borrow = self
+                    .in_borrow_stack
+                    .pop()
+                    .expect("Imbalanced in_borrow stack.");
+                rexp
+            },
+            Escapes => {
+                self.in_borrow = self
+                    .in_borrow_stack
+                    .pop()
+                    .expect("Imbalanced in_borrow stack.");
+                if self.in_borrow {
+                    // This expression is at top-level in a Borrow, and was not a Variable or Select.
+                    // If we turned it into one, then wrap it in a `Sequence` to generate a temp value
+                    // to be borrowed.
+                    use ExpData::*;
+                    match rexp.as_ref() {
+                        LocalVar(id, ..)
+                        | Temporary(id, ..)
+                        | Call(id, Operation::Select(..), _) => {
+                            let cloned_id = self.env().clone_node(*id);
+                            ExpData::Sequence(cloned_id, vec![rexp]).into_exp()
+                        },
+                        _ => {
+                            // Nothing to do.
+                            rexp
+                        },
+                    }
+                } else {
+                    rexp
+                }
+            },
+        };
+        protected_rexp
     }
 
     fn rewrite_enter_scope<'a>(

@@ -2239,7 +2239,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         context: &ErrorMessageContext,
     ) -> ExpData {
         let items = seq.iter().collect_vec();
-        self.translate_seq_recursively(loc, &items, expected_type, context)
+        let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context);
+        if matches!(&seq_exp, ExpData::Sequence(..)) {
+            seq_exp
+        } else {
+            let node_id = self.new_node_id_with_type_loc(expected_type, loc);
+            ExpData::Sequence(node_id, vec![seq_exp.into_exp()])
+        }
     }
 
     fn new_unit_exp(&mut self, loc: &Loc) -> ExpData {

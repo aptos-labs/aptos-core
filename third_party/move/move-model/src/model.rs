@@ -1912,6 +1912,16 @@ impl GlobalEnv {
         id
     }
 
+    /// Allocates a new node id with same info as original.
+    pub fn clone_node(&self, node_id: NodeId) -> NodeId {
+        let id = self.new_node_id();
+        let opt_info = self.exp_info.borrow().get(&node_id).cloned();
+        if let Some(info) = opt_info {
+            self.exp_info.borrow_mut().insert(id, info.clone());
+        }
+        id
+    }
+
     /// Updates type for the given node id. Must have been set before.
     pub fn update_node_type(&self, node_id: NodeId, ty: Type) {
         let mut mods = self.exp_info.borrow_mut();
