@@ -96,14 +96,15 @@ pub enum FeatureFlag {
     Bn254Structures,
     WebAuthnSignature,
     ReconfigureWithDkg,
-    OidbSignature,
-    OidbZkLessSignature,
+    KeylessAccounts,
+    KeylessButZklessAccounts,
     RemoveDetailedError,
     JwkConsensus,
     ConcurrentFungibleAssets,
     RefundableBytes,
     ObjectCodeDeployment,
     MaxObjectNestingCheck,
+    KeylessAccountsWithPasskeys,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -258,14 +259,17 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::Bn254Structures => AptosFeatureFlag::BN254_STRUCTURES,
             FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
             FeatureFlag::ReconfigureWithDkg => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
-            FeatureFlag::OidbSignature => AptosFeatureFlag::OIDB_SIGNATURE,
-            FeatureFlag::OidbZkLessSignature => AptosFeatureFlag::OIDB_ZKLESS_SIGNATURE,
+            FeatureFlag::KeylessAccounts => AptosFeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::KeylessButZklessAccounts => AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
             FeatureFlag::JwkConsensus => AptosFeatureFlag::JWK_CONSENSUS,
             FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::RefundableBytes => AptosFeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::ObjectCodeDeployment => AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MaxObjectNestingCheck => AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK,
+            FeatureFlag::KeylessAccountsWithPasskeys => {
+                AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS
+            },
         }
     }
 }
@@ -343,14 +347,17 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::Bn254Structures,
             AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
             AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDkg,
-            AptosFeatureFlag::OIDB_SIGNATURE => FeatureFlag::OidbSignature,
-            AptosFeatureFlag::OIDB_ZKLESS_SIGNATURE => FeatureFlag::OidbZkLessSignature,
+            AptosFeatureFlag::KEYLESS_ACCOUNTS => FeatureFlag::KeylessAccounts,
+            AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS => FeatureFlag::KeylessButZklessAccounts,
             AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
             AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JwkConsensus,
             AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
             AptosFeatureFlag::REFUNDABLE_BYTES => FeatureFlag::RefundableBytes,
             AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT => FeatureFlag::ObjectCodeDeployment,
             AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK => FeatureFlag::MaxObjectNestingCheck,
+            AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS => {
+                FeatureFlag::KeylessAccountsWithPasskeys
+            },
         }
     }
 }

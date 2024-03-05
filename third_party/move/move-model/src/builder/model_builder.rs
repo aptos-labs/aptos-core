@@ -24,11 +24,7 @@ use crate::{
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{AbilitySet, Visibility};
-use move_compiler::{
-    expansion::ast::{self as EA},
-    parser::ast as PA,
-    shared::NumericalAddress,
-};
+use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -166,6 +162,16 @@ impl AnyFunEntry {
             AnyFunEntry::SpecOrBuiltin(e) => e.oper.clone(),
             AnyFunEntry::UserFun(e) => Operation::MoveFunction(e.module_id, e.fun_id),
         }
+    }
+
+    pub fn is_equality_on_ref(&self) -> bool {
+        matches!(self.get_operation(), Operation::Eq | Operation::Neq)
+            && self.get_signature().1[0].1.is_reference()
+    }
+
+    pub fn is_equality_on_non_ref(&self) -> bool {
+        matches!(self.get_operation(), Operation::Eq | Operation::Neq)
+            && !self.get_signature().1[0].1.is_reference()
     }
 }
 

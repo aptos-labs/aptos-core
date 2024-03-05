@@ -19,14 +19,14 @@ use crate::{
     epoch_state::EpochState,
     event::{EventHandle, EventKey},
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::ValidatorSet,
+    on_chain_config::{Features, ValidatorSet},
     proof::TransactionInfoListWithProof,
     state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{
         ChangeSet, ExecutionStatus, Module, RawTransaction, Script, SignatureCheckedTransaction,
-        SignedTransaction, Transaction, TransactionArgument, TransactionInfo,
-        TransactionListWithProof, TransactionPayload, TransactionStatus, TransactionToCommit,
-        Version, WriteSetPayload,
+        SignedTransaction, Transaction, TransactionArgument, TransactionAuxiliaryData,
+        TransactionInfo, TransactionListWithProof, TransactionPayload, TransactionStatus,
+        TransactionToCommit, Version, WriteSetPayload,
     },
     validator_info::ValidatorInfo,
     validator_signer::ValidatorSigner,
@@ -497,7 +497,8 @@ impl TransactionPayload {
 
 prop_compose! {
     fn arb_transaction_status()(vm_status in any::<VMStatus>()) -> TransactionStatus {
-        vm_status.into()
+        let (txn_status, _) = TransactionStatus::from_vm_status(vm_status, true, &Features::default());
+        txn_status
     }
 }
 
@@ -811,6 +812,7 @@ impl TransactionToCommitGen {
             WriteSetMut::new(write_set).freeze().expect("Cannot fail"),
             events,
             false, /* event_gen never generates reconfig events */
+            TransactionAuxiliaryData::default(),
         )
     }
 
@@ -1165,6 +1167,7 @@ impl BlockGen {
             WriteSet::default(),
             Vec::new(),
             false,
+            TransactionAuxiliaryData::default(),
         ));
 
         // materialize ledger info

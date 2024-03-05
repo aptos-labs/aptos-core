@@ -49,7 +49,7 @@ fn offer_signer_capability_v2() {
         aptos_stdlib::account_offer_signer_capability(
             signature.to_bytes().to_vec(),
             0,
-            account_alice.pubkey.to_bytes().to_vec(),
+            account_alice.pubkey.to_bytes(),
             *account_bob.address(),
         )
     ));

@@ -5,7 +5,8 @@
 //! Contains types and related functions.
 
 use crate::{
-    ast::QualifiedSymbol,
+    ast::{ModuleName, QualifiedSymbol},
+    builder::pluralize,
     model::{
         GlobalEnv, Loc, ModuleId, QualifiedId, QualifiedInstId, StructEnv, StructId, TypeParameter,
         TypeParameterKind,
@@ -64,6 +65,15 @@ impl ReferenceKind {
             ReferenceKind::Mutable
         } else {
             ReferenceKind::Immutable
+        }
+    }
+}
+
+impl fmt::Display for ReferenceKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ReferenceKind::Immutable => f.write_str("`&`"),
+            ReferenceKind::Mutable => f.write_str("`&mut`"),
         }
     }
 }
@@ -225,7 +235,7 @@ impl Constraint {
 #[derive(Debug)]
 pub enum TypeUnificationError {
     TypeMismatch(Type, Type),
-    ArityMismatch(String, usize, usize),
+    ArityMismatch(usize, usize),
     CyclicSubstitution(Type, Type),
     MutabilityMismatch(ReferenceKind, ReferenceKind),
     ConstraintUnsatisfied(Loc, Type, WideningOrder, Constraint),
@@ -1050,12 +1060,29 @@ impl Substitution {
     ) -> Result<(), TypeUnificationError> {
         // Specialize the type before binding, to maximize groundness of type terms.
         let ty = self.specialize(&ty);
-        if let Some(constrs) = self.constraints.remove(&var) {
-            for (loc, o, c) in constrs {
+        if let Some(mut constrs) = self.constraints.remove(&var) {
+            while let Some((loc, o, c)) = constrs.pop() {
                 // The effective order is the one combining the constraint order with the
                 // context order. The result needs to be swapped because the constraint
                 // of the variable is evaluated against the given type.
-                self.eval_constraint(context, &loc, &ty, variance, o.combine(order).swap(), c)?
+                match self.eval_constraint(
+                    context,
+                    &loc,
+                    &ty,
+                    variance,
+                    o.combine(order).swap(),
+                    c.clone(),
+                ) {
+                    Ok(_) => {
+                        // Constraint discharged
+                    },
+                    Err(e) => {
+                        // Put the constraint back, we may need it for error messages
+                        constrs.push((loc, o, c));
+                        self.constraints.insert(var, constrs);
+                        return Err(e);
+                    },
+                }
             }
         }
         self.subs.insert(var, ty);
@@ -1182,15 +1209,19 @@ impl Substitution {
 
     /// Unify two types, returning the unified type.
     ///
-    /// This currently implements the following notion of type compatibility:
+    /// This currently implements the following notion of type compatibility, depending
+    /// on mode:
     ///
+    /// In specification mode:
     /// - 1) References are dropped (i.e. &T and T are compatible)
     /// - 2) All integer types are compatible if spec-variance is allowed.
-    /// - 3) With the joint effect of 1) and 2), if (P, Q) is compatible under spec-variance,
-    ///      (&P, Q), (P, &Q), and (&P, &Q) are all compatible under co-variance.
-    /// - 4) If in two tuples (P1, P2, ..., Pn) and (Q1, Q2, ..., Qn), all (Pi, Qi) pairs are
+    /// - 3) If in two tuples (P1, P2, ..., Pn) and (Q1, Q2, ..., Qn), all (Pi, Qi) pairs are
     ///      compatible under spec-variance, then the two tuples are compatible under
     ///      spec-variance.
+    ///
+    /// In implementation mode:
+    /// - 1) The only known variance at this point is from `&mut T` to `&T`.
+    /// - 2) The same way as (3) above, implementation variance propagates over tuples.
     ///
     /// The substitution will be refined by variable assignments as needed to perform
     /// unification. If unification fails, the substitution will be in some intermediate state;
@@ -1272,7 +1303,7 @@ impl Substitution {
                         (Immutable, Mutable, RightToLeft | Join) => k1,
                         (Mutable, Immutable, LeftToRight | Join) => k2,
                         _ => {
-                            let (kl, kr) = if order == RightToLeft {
+                            let (kl, kr) = if matches!(order, LeftToRight) {
                                 (k1, k2)
                             } else {
                                 (k2, k1)
@@ -1293,7 +1324,7 @@ impl Substitution {
                     // variance type will be effective for the elements of tuples,
                     // which are treated similar as expression lists in function calls, and allow
                     // e.g. reference type conversions.
-                    context, variance, order, ts1, ts2, "tuples",
+                    context, variance, order, ts1, ts2,
                 )?));
             },
             (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
@@ -1315,7 +1346,7 @@ impl Substitution {
                     return Ok(Type::Struct(
                         *m1,
                         *s1,
-                        self.unify_vec(context, variance, order, ts1, ts2, "structs")?,
+                        self.unify_vec(context, variance, order, ts1, ts2)?,
                     ));
                 }
             },
@@ -1350,6 +1381,45 @@ impl Substitution {
         }
     }
 
+    /// A version of unification which lifts the critical pair of type mismatch to the top-level types.
+    /// (A critical pair in type unification is the sub-term in which two type terms disagree,
+    /// e.g for `S<t> != S<t'>`, `(t, t`)` is the critical pair.)
+    /// NOTE: we may consider to store both critical pair and context type in the unification error
+    /// for better messages. However, the majority of type expressions is not very large in Move
+    /// so this may make create more noise than benefit.
+    pub fn unify_and_lift_critical_pair(
+        &mut self,
+        context: &impl UnificationContext,
+        variance: Variance,
+        order: WideningOrder,
+        t1: &Type,
+        t2: &Type,
+    ) -> Result<Type, TypeUnificationError> {
+        let res = self.unify(context, variance, order, t1, t2);
+        res.map_err(|e| {
+            if matches!(
+                e,
+                TypeUnificationError::TypeMismatch(_, _)
+                    // SomeNumber constraint mismatch is like a type mismatch, lift it
+                    // as well
+                    | TypeUnificationError::ConstraintUnsatisfied(
+                        _,
+                        _,
+                        _,
+                        Constraint::SomeNumber(..)
+                    )
+            ) {
+                if matches!(order, WideningOrder::RightToLeft) {
+                    TypeUnificationError::TypeMismatch(self.specialize(t2), self.specialize(t1))
+                } else {
+                    TypeUnificationError::TypeMismatch(self.specialize(t1), self.specialize(t2))
+                }
+            } else {
+                e
+            }
+        })
+    }
+
     /// Helper to unify two type vectors.
     fn unify_vec(
         &mut self,
@@ -1358,14 +1428,9 @@ impl Substitution {
         order: WideningOrder,
         ts1: &[Type],
         ts2: &[Type],
-        item_name: &str,
     ) -> Result<Vec<Type>, TypeUnificationError> {
         if ts1.len() != ts2.len() {
-            return Err(TypeUnificationError::ArityMismatch(
-                item_name.to_owned(),
-                ts1.len(),
-                ts2.len(),
-            ));
+            return Err(TypeUnificationError::ArityMismatch(ts1.len(), ts2.len()));
         }
         let mut rs = vec![];
         for i in 0..ts1.len() {
@@ -1595,7 +1660,6 @@ impl TypeUnificationAdapter {
             WideningOrder::LeftToRight,
             &self.types_adapted_lhs,
             &self.types_adapted_rhs,
-            "",
         ) {
             Ok(_) => {
                 let mut inst_lhs = BTreeMap::new();
@@ -1634,13 +1698,195 @@ impl TypeUnificationAdapter {
     }
 }
 
+/// A context which determines how type unification errors are presented
+/// to the user.
+///
+/// For each of the categories of errors (type mismatch, arity mismatch, etc.)
+/// a specific error rendering function is defined below to display the error.
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+pub enum ErrorMessageContext {
+    /// The error appears in a binding, where the rhs is not assignable to the lhs.
+    Binding,
+    /// The error appears in an assignment, where the rhs is not assignable to the lhs.
+    Assignment,
+    /// The error appears in the argument list of a function.
+    Argument,
+    /// The error appears in the argument of an operator.
+    OperatorArgument,
+    /// The error appears in a type annotation.
+    TypeAnnotation,
+    /// The error appears in the return expression of a function.
+    Return,
+    /// The error appears in the context of including a schema and
+    /// binding the given name.
+    SchemaInclusion(Symbol),
+    /// The error appears in a general generic context.
+    General,
+}
+
+impl ErrorMessageContext {
+    pub fn type_mismatch(
+        self,
+        display_context: &crate::ty::TypeDisplayContext,
+        actual: &Type,
+        expected: &Type,
+    ) -> String {
+        self.type_mismatch_str(
+            display_context,
+            actual.display(display_context).to_string(),
+            expected.display(display_context).to_string(),
+        )
+    }
+
+    pub fn type_mismatch_str(
+        self,
+        display_context: &TypeDisplayContext,
+        actual: String,
+        expected: String,
+    ) -> String {
+        use ErrorMessageContext::*;
+        match self {
+            Binding => format!(
+                "cannot bind `{}` to left-hand side of type `{}`",
+                actual, expected
+            ),
+            Assignment => format!(
+                "cannot assign `{}` to left-hand side of type `{}`",
+                actual, expected
+            ),
+            Argument => format!(
+                "cannot pass `{}` to a function which expects argument of type `{}`",
+                actual, expected
+            ),
+            OperatorArgument => format!(
+                "cannot use `{}` with an operator which expects a value of type `{}`",
+                actual, expected
+            ),
+            TypeAnnotation => format!("cannot adapt `{}` to annotated type `{}`", actual, expected),
+            Return => {
+                let result_str = if expected == "()" {
+                    "which returns nothing".to_string()
+                } else {
+                    format!("with result type `{}`", expected)
+                };
+                let actual_str = if actual == "()" {
+                    "nothing".to_string()
+                } else {
+                    format!("`{}`", actual)
+                };
+                format!(
+                    "cannot return {} from a function {}",
+                    actual_str, result_str
+                )
+            },
+            SchemaInclusion(name) => {
+                format!(
+                    "variable `{}` bound by schema \
+                inclusion expected to have type `{}` but provided was `{}`",
+                    name.display(display_context.env.symbol_pool()),
+                    expected,
+                    actual
+                )
+            },
+            General => {
+                if expected == "()" {
+                    format!("expected expression with no value but found `{}`", actual)
+                } else {
+                    format!(
+                        "expected `{}` but found a value of type `{}`",
+                        expected, actual
+                    )
+                }
+            },
+        }
+    }
+
+    pub fn arity_mismatch(self, actual: usize, expected: usize) -> String {
+        use ErrorMessageContext::*;
+        match self {
+            Binding | Assignment => format!(
+                "the left-hand side has {} {} but the right-hand side provided {}",
+                expected,
+                pluralize("item", expected),
+                actual,
+            ),
+            Argument => format!(
+                "the function takes {} {} but {} were provided",
+                expected,
+                pluralize("argument", expected),
+                actual
+            ),
+            OperatorArgument => format!(
+                "the operator takes {} {} but {} were provided",
+                expected,
+                pluralize("argument", expected),
+                actual
+            ),
+            Return => format!(
+                "the function returns {} {} but {} were provided",
+                expected,
+                pluralize("argument", expected),
+                actual
+            ),
+            SchemaInclusion(_) | General | TypeAnnotation => {
+                format!("expected {} items but found {}", expected, actual)
+            },
+        }
+    }
+
+    pub fn mutability_mismatch(self, actual: ReferenceKind, expected: ReferenceKind) -> String {
+        use ErrorMessageContext::*;
+        match self {
+            Binding | Assignment => format!(
+                "the left-hand side expected {} but {} was provided",
+                expected, actual
+            ),
+            Argument => format!(
+                "the function takes {} but {} was provided",
+                expected, actual
+            ),
+            Return => format!(
+                "the function returns {} but {} was provided",
+                expected, actual
+            ),
+            OperatorArgument => format!(
+                "the operator takes {} but {} was provided",
+                expected, actual
+            ),
+            SchemaInclusion(_) | TypeAnnotation | General => {
+                format!("expected {} but {} was provided", expected, actual)
+            },
+        }
+    }
+
+    pub fn expected_reference(self, display_context: &TypeDisplayContext, actual: &Type) -> String {
+        use ErrorMessageContext::*;
+        let actual = actual.display(display_context);
+        match self {
+            Argument => format!(
+                "the function takes a reference but `{}` was provided",
+                actual
+            ),
+            OperatorArgument => {
+                format!(
+                    "the operator takes a reference but `{}` was provided",
+                    actual
+                )
+            },
+            SchemaInclusion(_) | Binding | Assignment | Return | TypeAnnotation | General => {
+                format!("a reference is expected but `{}` was provided", actual)
+            },
+        }
+    }
+}
+
 impl TypeUnificationError {
     /// Redirect the error to be reported at given location instead of default location.
     pub fn redirect(self, loc: Loc) -> Self {
         Self::RedirectedError(loc, Box::new(self))
     }
 
-    /// If this error is associated with a specific location, return this.
+    /// If this error is associated with a specific location, return it.
     pub fn specific_loc(&self) -> Option<Loc> {
         match self {
             TypeUnificationError::RedirectedError(loc, e) => {
@@ -1656,31 +1902,24 @@ impl TypeUnificationError {
         &self,
         unification_context: &impl UnificationContext,
         display_context: &TypeDisplayContext,
+        error_context: &ErrorMessageContext,
     ) -> String {
         match self {
-            TypeUnificationError::TypeMismatch(t1, t2) => {
-                format!(
-                    "expected `{}` but found `{}`",
-                    t2.display(display_context),
-                    t1.display(display_context),
-                )
+            TypeUnificationError::TypeMismatch(actual, expected) => {
+                error_context.type_mismatch(display_context, actual, expected)
             },
-            TypeUnificationError::ArityMismatch(item, a1, a2) => {
-                format!("{} have different arity ({} != {})", item, a1, a2)
+            TypeUnificationError::ArityMismatch(actual, expected) => {
+                error_context.arity_mismatch(*actual, *expected)
             },
-            TypeUnificationError::CyclicSubstitution(t1, t2) => {
-                format!(
-                    "type unification cycle check failed (`{} =?= {}`, try to annotate type)",
-                    t1.display(display_context),
-                    t2.display(display_context),
-                )
+            TypeUnificationError::CyclicSubstitution(_actual, _expected) => {
+                // We could print the types but users may find this more confusing than
+                // helpful.
+                "unable to infer type due to cyclic \
+                    type constraints (try annotating the type)"
+                    .to_string()
             },
-            TypeUnificationError::MutabilityMismatch(k1, k2) => {
-                let pr = |k: ReferenceKind| match k {
-                    ReferenceKind::Immutable => "&",
-                    ReferenceKind::Mutable => "&mut",
-                };
-                format!("mutability mismatch ({} != {})", pr(*k1), pr(*k2))
+            TypeUnificationError::MutabilityMismatch(actual, expected) => {
+                error_context.mutability_mismatch(*actual, *expected)
             },
             TypeUnificationError::ConstraintUnsatisfied(_, ty, order, constr) => match constr {
                 Constraint::SomeNumber(_) => {
@@ -1690,13 +1929,10 @@ impl TypeUnificationError {
                         WideningOrder::Join | WideningOrder::LeftToRight => (options_str, type_str),
                         WideningOrder::RightToLeft => (type_str, options_str),
                     };
-                    format!("expected `{}` but found `{}`", expected, actual)
+                    error_context.type_mismatch_str(display_context, actual, expected)
                 },
-                Constraint::SomeReference(_) => {
-                    format!(
-                        "expected `{}` to be a reference",
-                        ty.display(display_context)
-                    )
+                Constraint::SomeReference(ty) => {
+                    error_context.expected_reference(display_context, ty)
                 },
                 Constraint::SomeStruct(field_map) => {
                     Self::message_for_struct(unification_context, display_context, field_map, ty)
@@ -1723,7 +1959,7 @@ impl TypeUnificationError {
                 }
             },
             TypeUnificationError::RedirectedError(_, err) => {
-                err.message(unification_context, display_context)
+                err.message(unification_context, display_context, error_context)
             },
         }
     }
@@ -1965,6 +2201,10 @@ pub struct TypeDisplayContext<'a> {
     /// During type checking, the env might not contain the types yet of the currently checked
     /// module. This field allows to access symbolic information in this case.
     pub builder_struct_table: Option<&'a BTreeMap<(ModuleId, StructId), QualifiedSymbol>>,
+    /// If present, the module name in which context the type is displayed. Used to shorten type names.
+    pub module_name: Option<ModuleName>,
+    /// Whether to display type variables. If false, the will be displayed as `_`, otherwise as `_<n>`.
+    pub display_type_vars: bool,
 }
 
 impl<'a> TypeDisplayContext<'a> {
@@ -1974,6 +2214,15 @@ impl<'a> TypeDisplayContext<'a> {
             type_param_names: None,
             subs_opt: None,
             builder_struct_table: None,
+            module_name: None,
+            display_type_vars: false,
+        }
+    }
+
+    pub fn with_type_vars(&self) -> Self {
+        Self {
+            display_type_vars: true,
+            ..self.clone()
         }
     }
 
@@ -1986,6 +2235,8 @@ impl<'a> TypeDisplayContext<'a> {
             subs_opt: None,
             type_param_names: Some(type_param_names),
             builder_struct_table: None,
+            module_name: None,
+            display_type_vars: false,
         }
     }
 
@@ -2049,7 +2300,11 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                 f.write_str("|")?;
                 write!(f, "{}", a.display(self.context))?;
                 f.write_str("|")?;
-                write!(f, "{}", t.display(self.context))
+                if !t.is_unit() {
+                    write!(f, "{}", t.display(self.context))
+                } else {
+                    Ok(())
+                }
             },
             Struct(mid, sid, ts) => {
                 write!(f, "{}", self.struct_str(*mid, *sid))?;
@@ -2088,7 +2343,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                     self.context.subs_opt.and_then(|s| s.constraints.get(idx))
                 {
                     if ctrs.is_empty() {
-                        write!(f, "?{}", idx)
+                        f.write_str(&self.type_var_str(*idx))
                     } else {
                         let out = ctrs
                             .iter()
@@ -2097,7 +2352,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
                         f.write_str(&out)
                     }
                 } else {
-                    write!(f, "?{}", idx)
+                    f.write_str(&self.type_var_str(*idx))
                 }
             },
             Error => f.write_str("*error*"),
@@ -2106,9 +2361,17 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
 }
 
 impl<'a> TypeDisplay<'a> {
+    fn type_var_str(&self, idx: u32) -> String {
+        if self.context.display_type_vars {
+            format!("_{}", idx)
+        } else {
+            "_".to_string()
+        }
+    }
+
     fn struct_str(&self, mid: ModuleId, sid: StructId) -> String {
         let env = self.context.env;
-        if let Some(builder_table) = self.context.builder_struct_table {
+        let mut str = if let Some(builder_table) = self.context.builder_struct_table {
             let qsym = builder_table.get(&(mid, sid)).expect("type known");
             qsym.display(self.context.env).to_string()
         } else {
@@ -2118,7 +2381,21 @@ impl<'a> TypeDisplay<'a> {
                 struct_env.module_env.get_name().display(env),
                 struct_env.get_name().display(env.symbol_pool())
             )
+        };
+        if let Some(mname) = &self.context.module_name {
+            let s = format!("{}::", mname.name().display(self.context.env.symbol_pool()));
+            if let Some(shortcut) = str.strip_prefix(&s) {
+                if let Some(tparams) = &self.context.type_param_names {
+                    // Avoid name clash with type parameter
+                    if !tparams.contains(&self.context.env.symbol_pool().make(shortcut)) {
+                        str = shortcut.to_owned()
+                    }
+                } else {
+                    str = shortcut.to_owned();
+                }
+            }
         }
+        str
     }
 }
 

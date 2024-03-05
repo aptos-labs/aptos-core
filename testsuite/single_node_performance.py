@@ -7,6 +7,7 @@ import re
 import os
 import tempfile
 import json
+import itertools
 from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
@@ -109,10 +110,8 @@ TESTS = [
     RunGroupConfig(expected_tps=895, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=23, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=119, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    # RunGroupConfig(expected_tps=3.6, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C),
-    # RunGroupConfig(expected_tps=12.8, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    # RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
-    # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
+    # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-m-with256-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    # RunGroupConfig(expected_tps=40, key=RunGroupKey("smart-table-picture1-m-with256-change", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
 
     RunGroupConfig(expected_tps=20000, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2 | LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
@@ -203,6 +202,13 @@ HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
 target_directory = "execution/executor-benchmark/src"
 
 
+class CmdExecutionError(Exception):
+    def __init__(self, return_code, output):
+        super().__init__(f"CmdExecutionError with {return_code}")
+        self.return_code = return_code
+        self.output = output
+
+
 def execute_command(command):
     print(f"Executing command:\n\t{command}\nand waiting for it to finish...")
     result = []
@@ -227,7 +233,7 @@ def execute_command(command):
     if p.returncode != 0:
         if HIDE_OUTPUT:
             print(full_result)
-        raise CalledProcessError(p.returncode, p.args)
+        raise CmdExecutionError(p.returncode, full_result)
 
     if " ERROR " in full_result:
         print("ERROR log line in execution")
@@ -267,27 +273,9 @@ def get_only(values):
 
 
 def extract_run_results(
-    output: str, execution_only: bool, create_db: bool = False
+    output: str, prefix: str, create_db: bool = False
 ) -> RunResults:
-    if execution_only:
-        tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
-        gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
-        effective_gps = float(
-            re.findall(r"Overall execution effectiveGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        io_gps = float(
-            re.findall(r"Overall execution ioGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        execution_gps = float(
-            re.findall(r"Overall execution executionGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        gpt = float(
-            re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
-        )
-        output_bps = float(
-            re.findall(r"Overall execution output: (\d+\.?\d*) bytes/s", output)[-1]
-        )
-    elif create_db:
+    if create_db:
         tps = float(
             get_only(
                 re.findall(
@@ -302,38 +290,37 @@ def extract_run_results(
         execution_gps = 0
         gpt = 0
         output_bps = 0
-    else:
-        tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
-        gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
-        effective_gps = float(
-            get_only(re.findall(r"Overall effectiveGPS: (\d+\.?\d*) gas/s", output))
-        )
-        io_gps = float(
-            get_only(re.findall(r"Overall ioGPS: (\d+\.?\d*) gas/s", output))
-        )
-        execution_gps = float(
-            get_only(re.findall(r"Overall executionGPS: (\d+\.?\d*) gas/s", output))
-        )
-        gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
-        output_bps = float(
-            re.findall(r"Overall output: (\d+\.?\d*) bytes/s", output)[-1]
-        )
-
-    if create_db:
         fraction_in_execution = 0
         fraction_of_execution_in_vm = 0
         fraction_in_commit = 0
     else:
+        tps = float(get_only(re.findall(prefix + r" TPS: (\d+\.?\d*) txn/s", output)))
+        gps = float(get_only(re.findall(prefix + r" GPS: (\d+\.?\d*) gas/s", output)))
+        effective_gps = float(
+            get_only(re.findall(prefix + r" effectiveGPS: (\d+\.?\d*) gas/s", output))
+        )
+        io_gps = float(
+            get_only(re.findall(prefix + r" ioGPS: (\d+\.?\d*) gas/s", output))
+        )
+        execution_gps = float(
+            get_only(re.findall(prefix + r" executionGPS: (\d+\.?\d*) gas/s", output))
+        )
+        gpt = float(get_only(re.findall(prefix + r" GPT: (\d+\.?\d*) gas/txn", output)))
+        output_bps = float(
+            get_only(re.findall(prefix + r" output: (\d+\.?\d*) bytes/s", output))
+        )
         fraction_in_execution = float(
-            re.findall(r"Overall fraction of total: (\d+\.?\d*) in execution", output)[
-                -1
-            ]
+            re.findall(
+                prefix + r" fraction of total: (\d+\.?\d*) in execution", output
+            )[-1]
         )
         fraction_of_execution_in_vm = float(
-            re.findall(r"Overall fraction of execution (\d+\.?\d*) in VM", output)[-1]
+            re.findall(prefix + r" fraction of execution (\d+\.?\d*) in VM", output)[-1]
         )
         fraction_in_commit = float(
-            re.findall(r"Overall fraction of total: (\d+\.?\d*) in commit", output)[-1]
+            re.findall(prefix + r" fraction of total: (\d+\.?\d*) in commit", output)[
+                -1
+            ]
         )
 
     return RunResults(
@@ -428,8 +415,19 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
+    execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+    try:
+        execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
+        move_e2e_benchmark_failed = False
+    except:
+        # for land-blocking (i.e. on PR), fail immediately, for speedy response.
+        # Otherwise run all tests, and fail in the end.
+        if SELECTED_FLOW == Flow.LAND_BLOCKING:
+            print("Move E2E benchmark failed, exiting")
+            exit(1)
+        move_e2e_benchmark_failed = True
 
+    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
     create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
@@ -439,9 +437,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     results.append(
         RunGroupInstance(
             key=RunGroupKey("warmup"),
-            single_node_result=extract_run_results(
-                output, execution_only=False, create_db=True
-            ),
+            single_node_result=extract_run_results(output, "Overall", create_db=True),
             number_of_threads_results={},
             block_size=MAX_BLOCK_SIZE,
             expected_tps=0,
@@ -492,13 +488,21 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
-                output, execution_only=True
+                output, "Overall execution"
             )
 
         test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
-        single_node_result = extract_run_results(output, execution_only=False)
+        single_node_result = extract_run_results(output, "Overall")
+        stage_node_results = []
+
+        for i in itertools.count():
+            prefix = f"Staged execution: stage {i}:"
+            if prefix in output:
+                stage_node_results.append((i, extract_run_results(output, prefix)))
+            else:
+                break
 
         results.append(
             RunGroupInstance(
@@ -509,6 +513,22 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 expected_tps=test.expected_tps,
             )
         )
+
+        for stage, stage_node_result in stage_node_results:
+            results.append(
+                RunGroupInstance(
+                    key=RunGroupKey(
+                        transaction_type=test.key.transaction_type
+                        + f" [stage {stage}]",
+                        module_working_set_size=test.key.module_working_set_size,
+                        executor_type=test.key.executor_type,
+                    ),
+                    single_node_result=stage_node_result,
+                    number_of_threads_results=number_of_threads_results,
+                    block_size=cur_block_size,
+                    expected_tps=test.expected_tps,
+                )
+            )
 
         # line to be able to aggreate and visualize in Humio
         print(
@@ -597,6 +617,12 @@ if warnings:
 if errors:
     print("Errors: ")
     print("\n".join(errors))
+    exit(1)
+
+if move_e2e_benchmark_failed:
+    print(
+        "Move e2e benchmark failed, failing the job. See logs at the beginning for more details."
+    )
     exit(1)
 
 exit(0)

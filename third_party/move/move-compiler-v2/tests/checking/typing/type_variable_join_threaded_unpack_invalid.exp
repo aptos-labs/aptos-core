@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `bool` but found `integer`
+error: cannot return `integer` from a function with result type `bool`
    ┌─ tests/checking/typing/type_variable_join_threaded_unpack_invalid.move:34:9
    │
 34 │         f1

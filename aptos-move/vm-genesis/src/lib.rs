@@ -21,9 +21,9 @@ use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
+    keyless,
+    keyless::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME},
     move_utils::as_move_value::AsMoveValue,
-    oidb,
-    oidb::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY},
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
@@ -54,8 +54,11 @@ const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
-const OIDB_MODULE_NAME: &str = "openid_account";
 const JWKS_MODULE_NAME: &str = "jwks";
+const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
+const DKG_MODULE_NAME: &str = "dkg";
+const RANDOMNESS_MODULE_NAME: &str = "randomness";
+const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -76,6 +79,7 @@ pub struct GenesisConfiguration {
     pub voting_power_increase_limit: u64,
     pub employee_vesting_start: u64,
     pub employee_vesting_period_duration: u64,
+    pub initial_features_override: Option<Features>,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -136,7 +140,13 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         &execution_config,
         &gas_schedule,
     );
-    initialize_features(&mut session);
+    initialize_features(
+        &mut session,
+        genesis_config
+            .initial_features_override
+            .clone()
+            .map(Features::into_flag_vec),
+    );
     initialize_aptos_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
@@ -245,18 +255,29 @@ pub fn encode_genesis_change_set(
         execution_config,
         gas_schedule,
     );
-    initialize_features(&mut session);
+    initialize_features(
+        &mut session,
+        genesis_config
+            .initial_features_override
+            .clone()
+            .map(Features::into_flag_vec),
+    );
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
         initialize_aptos_coin(&mut session);
     }
+    initialize_config_buffer(&mut session);
+    initialize_dkg(&mut session);
+    initialize_reconfiguration_state(&mut session);
+    initialize_randomness(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
-    initialize_oidb(&mut session, chain_id);
+    initialize_jwks(&mut session);
+    initialize_keyless_accounts(&mut session, chain_id);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -413,8 +434,9 @@ fn initialize(
     );
 }
 
-fn initialize_features(session: &mut SessionExt) {
-    let features: Vec<u64> = FeatureFlag::default_features()
+fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<FeatureFlag>>) {
+    let features: Vec<u64> = features_override
+        .unwrap_or_else(FeatureFlag::default_features)
         .into_iter()
         .map(|feature| feature as u64)
         .collect();
@@ -437,6 +459,56 @@ fn initialize_aptos_coin(session: &mut SessionExt) {
         session,
         GENESIS_MODULE_NAME,
         "initialize_aptos_coin",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_config_buffer(session: &mut SessionExt) {
+    exec_function(
+        session,
+        CONFIG_BUFFER_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_dkg(session: &mut SessionExt) {
+    exec_function(
+        session,
+        DKG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_randomness(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RANDOMNESS_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_reconfiguration_state(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RECONFIGURATION_STATE_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_jwks(session: &mut SessionExt) {
+    exec_function(
+        session,
+        JWKS_MODULE_NAME,
+        "initialize",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
     );
@@ -485,11 +557,11 @@ fn initialize_on_chain_governance(session: &mut SessionExt, genesis_config: &Gen
     );
 }
 
-fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
-    let config = oidb::Configuration::new_for_devnet();
+fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
+    let config = keyless::Configuration::new_for_devnet();
     exec_function(
         session,
-        OIDB_MODULE_NAME,
+        KEYLESS_ACCOUNT_MODULE_NAME,
         "update_configuration",
         vec![],
         serialize_values(&vec![
@@ -501,7 +573,7 @@ fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
         let vk = Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone());
         exec_function(
             session,
-            OIDB_MODULE_NAME,
+            KEYLESS_ACCOUNT_MODULE_NAME,
             "update_groth16_verification_key",
             vec![],
             serialize_values(&vec![
@@ -510,19 +582,6 @@ fn initialize_oidb(session: &mut SessionExt, chain_id: ChainId) {
             ]),
         );
     }
-    exec_function(
-        session,
-        JWKS_MODULE_NAME,
-        "upsert_oidc_provider",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            "https://accounts.google.com".to_string().as_move_value(),
-            "https://accounts.google.com/.well-known/openid-configuration"
-                .to_string()
-                .as_move_value(),
-        ]),
-    );
 }
 
 fn create_accounts(session: &mut SessionExt, accounts: &[AccountBalance]) {
@@ -834,6 +893,7 @@ pub fn generate_test_genesis(
             voting_power_increase_limit: 50,
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
+            initial_features_override: None,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -881,6 +941,7 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         voting_power_increase_limit: 30,
         employee_vesting_start: 1663456089,
         employee_vesting_period_duration: 5 * 60, // 5 minutes
+        initial_features_override: None,
     }
 }
 

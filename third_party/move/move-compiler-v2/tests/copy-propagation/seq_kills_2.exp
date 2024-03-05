@@ -71,9 +71,9 @@ fun m::test($t0: u64): bool {
 [variant baseline]
 fun m::test($t0: u64): bool {
      var $t1: bool
-     var $t2: u64
+     var $t2: u64 [unused]
      var $t3: u64
-     var $t4: u64
+     var $t4: u64 [unused]
      var $t5: u64
      var $t6: u64
   0: $t3 := move($t0)

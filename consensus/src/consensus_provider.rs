@@ -10,6 +10,7 @@ use crate::{
     persistent_liveness_storage::StorageWriteProxy,
     pipeline::execution_client::ExecutionProxyClient,
     quorum_store::quorum_store_db::QuorumStoreDB,
+    rand::rand_gen::storage::db::RandDb,
     state_computer::ExecutionProxy,
     transaction_filter::TransactionFilter,
     txn_notifier::MempoolNotifier,
@@ -66,13 +67,16 @@ pub fn start_consensus(
         aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
+    let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
 
     let execution_client = Arc::new(ExecutionProxyClient::new(
+        node_config.consensus.clone(),
         Arc::new(execution_proxy),
         node_config.validator_network.as_ref().unwrap().peer_id(),
         self_sender.clone(),
         consensus_network_client.clone(),
         bounded_executor.clone(),
+        rand_storage.clone(),
     ));
 
     let epoch_mgr = EpochManager::new(
@@ -89,6 +93,7 @@ pub fn start_consensus(
         bounded_executor,
         aptos_time_service::TimeService::real(),
         vtxn_pool,
+        rand_storage,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

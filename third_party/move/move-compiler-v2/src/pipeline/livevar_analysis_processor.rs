@@ -29,7 +29,7 @@ use std::{
 
 /// Annotation which is attached to function data.
 #[derive(Default, Clone)]
-pub struct LiveVarAnnotation(BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
+pub struct LiveVarAnnotation(pub BTreeMap<CodeOffset, LiveVarInfoAtCodeOffset>);
 
 impl LiveVarAnnotation {
     /// Get the live var info at the given code offset
@@ -75,6 +75,11 @@ impl LiveVarInfoAtCodeOffset {
             }
         }
         result
+    }
+
+    /// Check whether temp is used after bc
+    pub fn is_temp_used_after(&self, temp: &TempIndex, bc: &Bytecode) -> bool {
+        self.after.contains_key(temp) && !bc.dests().contains(temp)
     }
 
     /// Creates a set of the temporaries alive before this program point.

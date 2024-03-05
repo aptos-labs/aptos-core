@@ -90,6 +90,7 @@ class Transaction(_message.Message):
         "state_checkpoint",
         "user",
         "validator",
+        "size_info",
     ]
 
     class TransactionType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -117,6 +118,7 @@ class Transaction(_message.Message):
     STATE_CHECKPOINT_FIELD_NUMBER: _ClassVar[int]
     USER_FIELD_NUMBER: _ClassVar[int]
     VALIDATOR_FIELD_NUMBER: _ClassVar[int]
+    SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     version: int
     info: TransactionInfo
@@ -128,6 +130,7 @@ class Transaction(_message.Message):
     state_checkpoint: StateCheckpointTransaction
     user: UserTransaction
     validator: ValidatorTransaction
+    size_info: TransactionSizeInfo
     def __init__(
         self,
         timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...,
@@ -141,6 +144,7 @@ class Transaction(_message.Message):
         state_checkpoint: _Optional[_Union[StateCheckpointTransaction, _Mapping]] = ...,
         user: _Optional[_Union[UserTransaction, _Mapping]] = ...,
         validator: _Optional[_Union[ValidatorTransaction, _Mapping]] = ...,
+        size_info: _Optional[_Union[TransactionSizeInfo, _Mapping]] = ...,
     ) -> None: ...
 
 class BlockMetadataTransaction(_message.Message):
@@ -1016,12 +1020,12 @@ class AnyPublicKey(_message.Message):
         TYPE_ED25519: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnyPublicKey.Type]
         TYPE_SECP256R1_ECDSA: _ClassVar[AnyPublicKey.Type]
-        TYPE_OIDB: _ClassVar[AnyPublicKey.Type]
+        TYPE_KEYLESS: _ClassVar[AnyPublicKey.Type]
     TYPE_UNSPECIFIED: AnyPublicKey.Type
     TYPE_ED25519: AnyPublicKey.Type
     TYPE_SECP256K1_ECDSA: AnyPublicKey.Type
     TYPE_SECP256R1_ECDSA: AnyPublicKey.Type
-    TYPE_OIDB: AnyPublicKey.Type
+    TYPE_KEYLESS: AnyPublicKey.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     PUBLIC_KEY_FIELD_NUMBER: _ClassVar[int]
     type: AnyPublicKey.Type
@@ -1033,7 +1037,14 @@ class AnyPublicKey(_message.Message):
     ) -> None: ...
 
 class AnySignature(_message.Message):
-    __slots__ = ["type", "signature", "ed25519", "secp256k1_ecdsa", "webauthn", "oidb"]
+    __slots__ = [
+        "type",
+        "signature",
+        "ed25519",
+        "secp256k1_ecdsa",
+        "webauthn",
+        "keyless",
+    ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = []
@@ -1041,24 +1052,24 @@ class AnySignature(_message.Message):
         TYPE_ED25519: _ClassVar[AnySignature.Type]
         TYPE_SECP256K1_ECDSA: _ClassVar[AnySignature.Type]
         TYPE_WEBAUTHN: _ClassVar[AnySignature.Type]
-        TYPE_OIDB: _ClassVar[AnySignature.Type]
+        TYPE_KEYLESS: _ClassVar[AnySignature.Type]
     TYPE_UNSPECIFIED: AnySignature.Type
     TYPE_ED25519: AnySignature.Type
     TYPE_SECP256K1_ECDSA: AnySignature.Type
     TYPE_WEBAUTHN: AnySignature.Type
-    TYPE_OIDB: AnySignature.Type
+    TYPE_KEYLESS: AnySignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     ED25519_FIELD_NUMBER: _ClassVar[int]
     SECP256K1_ECDSA_FIELD_NUMBER: _ClassVar[int]
     WEBAUTHN_FIELD_NUMBER: _ClassVar[int]
-    OIDB_FIELD_NUMBER: _ClassVar[int]
+    KEYLESS_FIELD_NUMBER: _ClassVar[int]
     type: AnySignature.Type
     signature: bytes
     ed25519: Ed25519
     secp256k1_ecdsa: Secp256k1Ecdsa
     webauthn: WebAuthn
-    oidb: Oidb
+    keyless: Keyless
     def __init__(
         self,
         type: _Optional[_Union[AnySignature.Type, str]] = ...,
@@ -1066,7 +1077,7 @@ class AnySignature(_message.Message):
         ed25519: _Optional[_Union[Ed25519, _Mapping]] = ...,
         secp256k1_ecdsa: _Optional[_Union[Secp256k1Ecdsa, _Mapping]] = ...,
         webauthn: _Optional[_Union[WebAuthn, _Mapping]] = ...,
-        oidb: _Optional[_Union[Oidb, _Mapping]] = ...,
+        keyless: _Optional[_Union[Keyless, _Mapping]] = ...,
     ) -> None: ...
 
 class Ed25519(_message.Message):
@@ -1087,7 +1098,7 @@ class WebAuthn(_message.Message):
     signature: bytes
     def __init__(self, signature: _Optional[bytes] = ...) -> None: ...
 
-class Oidb(_message.Message):
+class Keyless(_message.Message):
     __slots__ = ["signature"]
     SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     signature: bytes
@@ -1178,4 +1189,41 @@ class AccountSignature(_message.Message):
         multi_ed25519: _Optional[_Union[MultiEd25519Signature, _Mapping]] = ...,
         single_key_signature: _Optional[_Union[SingleKeySignature, _Mapping]] = ...,
         multi_key_signature: _Optional[_Union[MultiKeySignature, _Mapping]] = ...,
+    ) -> None: ...
+
+class TransactionSizeInfo(_message.Message):
+    __slots__ = ["transaction_bytes", "event_size_info", "write_op_size_info"]
+    TRANSACTION_BYTES_FIELD_NUMBER: _ClassVar[int]
+    EVENT_SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
+    WRITE_OP_SIZE_INFO_FIELD_NUMBER: _ClassVar[int]
+    transaction_bytes: int
+    event_size_info: _containers.RepeatedCompositeFieldContainer[EventSizeInfo]
+    write_op_size_info: _containers.RepeatedCompositeFieldContainer[WriteOpSizeInfo]
+    def __init__(
+        self,
+        transaction_bytes: _Optional[int] = ...,
+        event_size_info: _Optional[_Iterable[_Union[EventSizeInfo, _Mapping]]] = ...,
+        write_op_size_info: _Optional[
+            _Iterable[_Union[WriteOpSizeInfo, _Mapping]]
+        ] = ...,
+    ) -> None: ...
+
+class EventSizeInfo(_message.Message):
+    __slots__ = ["type_tag_bytes", "total_bytes"]
+    TYPE_TAG_BYTES_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_BYTES_FIELD_NUMBER: _ClassVar[int]
+    type_tag_bytes: int
+    total_bytes: int
+    def __init__(
+        self, type_tag_bytes: _Optional[int] = ..., total_bytes: _Optional[int] = ...
+    ) -> None: ...
+
+class WriteOpSizeInfo(_message.Message):
+    __slots__ = ["key_bytes", "value_bytes"]
+    KEY_BYTES_FIELD_NUMBER: _ClassVar[int]
+    VALUE_BYTES_FIELD_NUMBER: _ClassVar[int]
+    key_bytes: int
+    value_bytes: int
+    def __init__(
+        self, key_bytes: _Optional[int] = ..., value_bytes: _Optional[int] = ...
     ) -> None: ...

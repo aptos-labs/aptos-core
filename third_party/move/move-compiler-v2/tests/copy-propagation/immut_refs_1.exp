@@ -60,10 +60,10 @@ fun m::test($t0: u64): u64 {
 [variant baseline]
 fun m::test($t0: u64): u64 {
      var $t1: u64
-     var $t2: &u64
+     var $t2: &u64 [unused]
      var $t3: &u64
-     var $t4: &u64
-     var $t5: &u64
+     var $t4: &u64 [unused]
+     var $t5: &u64 [unused]
   0: $t3 := borrow_local($t0)
   1: $t1 := read_ref($t3)
   2: return $t1

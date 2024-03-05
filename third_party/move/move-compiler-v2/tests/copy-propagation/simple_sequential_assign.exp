@@ -66,11 +66,11 @@ fun m::sequential($t0: u64): u64 {
 
 [variant baseline]
 fun m::sequential($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
   0: return $t0
 }

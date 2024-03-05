@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: invalid call of `!`: expected `bool` but found `integer` for argument 1
+error: cannot use `integer` with an operator which expects a value of type `bool`
   ┌─ tests/checking/typing/v1-operators/boolean_not_non_boolean.move:3:6
   │
 3 │     !0;

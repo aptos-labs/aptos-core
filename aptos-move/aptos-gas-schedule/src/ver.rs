@@ -8,7 +8,11 @@
 ///   - Changing how gas is calculated in any way
 ///
 /// Change log:
+/// - V15
+///   - Gas & limits for dependencies
 /// - V14
+///   - Gas for type creation
+/// - V13
 ///   - Storage Fee: Make state bytes refundable and remove the per slot free quota, gated by flag REFUNDABLE_BYTES
 /// - V13
 ///   (skipped due to testnet mis-operation)
@@ -49,4 +53,4 @@
 ///       global operations.
 /// - V1
 ///   - TBA
-pub const LATEST_GAS_FEATURE_VERSION: u64 = 14;
+pub const LATEST_GAS_FEATURE_VERSION: u64 = 15;

@@ -44,6 +44,7 @@ use aptos_rest_client::aptos_api_types::{
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
     object_address::create_object_code_deployment_address,
+    on_chain_config::aptos_test_feature_flags_genesis,
     transaction::{TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
@@ -489,6 +490,7 @@ impl CliCommand<&'static str> for TestPackage {
                 NativeGasParameters::zeros(),
                 MiscGasParameters::zeros(),
             ),
+            aptos_test_feature_flags_genesis(),
             None,
             self.compute_coverage,
             &mut std::io::stdout(),

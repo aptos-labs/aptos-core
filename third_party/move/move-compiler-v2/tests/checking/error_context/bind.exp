@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot bind `R` to left-hand side of type `S`
+   ┌─ tests/checking/error_context/bind.move:14:13
+   │
+14 │         let S{x, y} = r;
+   │             ^^^^^^^
+
+error: cannot bind `R` to left-hand side of type `S`
+   ┌─ tests/checking/error_context/bind.move:15:14
+   │
+15 │         let (S{x, y}, R{z, s}) = (r, s);
+   │              ^^^^^^^
+
+error: cannot bind `S` to left-hand side of type `R`
+   ┌─ tests/checking/error_context/bind.move:15:23
+   │
+15 │         let (S{x, y}, R{z, s}) = (r, s);
+   │                       ^^^^^^^
+
+error: the left-hand side has 2 items but the right-hand side provided 3
+   ┌─ tests/checking/error_context/bind.move:19:13
+   │
+19 │         let (x, y) = (1, 2, 3);
+   │             ^^^^^^
