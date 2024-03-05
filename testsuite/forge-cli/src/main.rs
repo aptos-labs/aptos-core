@@ -604,8 +604,8 @@ fn get_land_blocking_test(
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
-        "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "land_blocking" => realistic_env_graceful_workload_sweep(), // TODO: remove land_blocking, superseded by below
+        "realistic_env_max_load" => realistic_env_graceful_workload_sweep(),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -1094,98 +1094,10 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
         workloads: Workloads::TRANSACTIONS(vec![
             // do account generation first, to fill up a storage a bit.
             TransactionWorkload {
-                transaction_type: TransactionTypeArg::AccountGeneration,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 100000,
-            },
-            TransactionWorkload {
                 transaction_type: TransactionTypeArg::CoinTransfer,
                 num_modules: 1,
                 unique_senders: false,
                 mempool_backlog: 100000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::ModifyGlobalResource,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CreateObjects10WithPayload10k,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            // very low gas/s
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::CreateObjectsConflict100WithPayload10k,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 20000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture40,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPictureRead40,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 50000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture30k,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            // very high gas/s
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::VectorPicture30k,
-                num_modules: 20,
-                unique_senders: false,
-                mempool_backlog: 10000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::SmartTablePicture30KWith200Change,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::SmartTablePicture1MWith256Change,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit,
-                num_modules: 1,
-                unique_senders: false,
-                mempool_backlog: 2000,
-            },
-            // publishing package - executes sequentially, but conflict_multiplier is 1
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::PublishPackage,
-                num_modules: 1,
-                unique_senders: true,
-                mempool_backlog: 20000,
-            },
-            // module loading
-            TransactionWorkload {
-                transaction_type: TransactionTypeArg::NoOp,
-                num_modules: 1000,
-                unique_senders: false,
-                mempool_backlog: 50000,
             },
         ]),
         criteria: Vec::new(),
@@ -1197,6 +1109,7 @@ fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
             criteria: Some(SuccessCriteria::new(8)),
         }),
     })
+    .with_emit_job(EmitJobRequest::default().txn_expiration_time_secs(1800))
     .with_genesis_helm_config_fn(Arc::new(|helm_values| {
         // no epoch change.
         helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
