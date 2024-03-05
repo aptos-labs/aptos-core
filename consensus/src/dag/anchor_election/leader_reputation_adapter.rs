@@ -19,9 +19,13 @@ use aptos_collections::BoundedVecDeque;
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
+use aptos_logger::info;
 use aptos_types::account_config::NewBlockEvent;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 pub struct MetadataBackendAdapter {
     epoch_to_validators: HashMap<u64, HashMap<Author, usize>>,
@@ -145,5 +149,54 @@ impl CommitHistory for LeaderReputationAdapter {
         }
 
         voting_power_ratio
+    }
+}
+
+pub struct CachedLeaderReputation {
+    epoch: u64,
+    inner: LeaderReputationAdapter,
+    recent_elections: Mutex<BTreeMap<Round, (Author, f64)>>,
+}
+
+impl CachedLeaderReputation {
+    pub fn new(epoch: u64, leader_reputation: LeaderReputationAdapter) -> Self {
+        Self {
+            epoch,
+            inner: leader_reputation,
+            recent_elections: Mutex::new(BTreeMap::new()),
+        }
+    }
+
+    pub fn get_or_compute_entry(&self, round: Round) -> (Author, f64) {
+        let mut recent_elections = self.recent_elections.lock();
+
+        *recent_elections.entry(round).or_insert_with(|| {
+            let result = self
+                .inner
+                .reputation
+                .get_valid_proposer_and_voting_power_participation_ratio(round);
+            info!(
+                "AnchorElection for epoch {} and round {}: {:?}",
+                self.epoch, round, result
+            );
+            result
+        })
+    }
+}
+
+impl AnchorElection for CachedLeaderReputation {
+    fn get_anchor(&self, round: Round) -> Author {
+        self.get_or_compute_entry(round).0
+    }
+
+    fn update_reputation(&self, commit_event: CommitEvent) {
+        self.inner.update_reputation(commit_event);
+        self.recent_elections.lock().clear();
+    }
+}
+
+impl CommitHistory for CachedLeaderReputation {
+    fn get_voting_power_participation_ratio(&self, round: Round) -> VotingPowerRatio {
+        self.get_or_compute_entry(round).1
     }
 }
