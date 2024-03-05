@@ -181,7 +181,6 @@ members = [
     "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
-
     # third_party/move
     "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
@@ -601,6 +600,7 @@ sec1 = "0.7.0"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+pathsearch = "0.2.0"
 passkey-authenticator = { version = "0.2.0", features = ["testable"] }
 passkey-client = { version = "0.2.0" }
 passkey-types = { version = "0.2.0" }
