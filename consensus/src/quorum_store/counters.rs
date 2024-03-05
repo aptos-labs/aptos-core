@@ -35,6 +35,8 @@ static BYTE_BUCKETS: Lazy<Vec<f64>> = Lazy::new(|| {
     .unwrap()
 });
 
+const INLINE_BATCH_COUNT_BUCKETS: &[f64] = &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+
 // Histogram buckets that expand DEFAULT_BUCKETS with more granularity between 100-2000 ms
 const QUORUM_STORE_LATENCY_BUCKETS: &[f64] = &[
     0.005, 0.01, 0.025, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.65, 0.7,
@@ -130,6 +132,51 @@ pub static BLOCK_SIZE_WHEN_PULL: Lazy<Histogram> = Lazy::new(|| {
         "quorum_store_block_size_when_pull",
         "Histogram for the number of transactions per block when pulled for consensus.",
         TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static NUM_INLINE_BATCHES: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "num_inline_batches_in_block_proposal",
+        "Histogram for the number of inline batches in a block proposed by proof manager",
+        INLINE_BATCH_COUNT_BUCKETS.to_vec(),
+    )
+    .unwrap()
+});
+
+pub static NUM_INLINE_TXNS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "num_inline_transactions_in_block_proposal",
+        "Histogram for the number of inline transactions in a block proposed by proof manager",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static NUM_TXN_SPACE_LEFT_IN_PROPOSAL: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "num_txn_space_left_in_block_proposal",
+        "Histogram for the amount of space left in the block proposal in terms of number of transactions",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static NUM_BATCHES_WITHOUT_PROOF_OF_STORE: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "num_batches_without_proof_of_store",
+        "Histogram for the number of batches without proof of store in proof manager",
+        TRANSACTION_COUNT_BUCKETS.clone(),
+    )
+    .unwrap()
+});
+
+pub static PROOF_QUEUE_FULLY_UTILIZED: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "proof_queue_utilized_fully_in_proposal",
+        "Histogram for whether the proof queue is fully utilized when creating block proposal",
+        [0.0, 1.0].to_vec(),
     )
     .unwrap()
 });

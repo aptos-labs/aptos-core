@@ -165,14 +165,25 @@ impl ProofManager {
                     }
                 }
 
+                counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE
+                    .observe(self.batches_without_proof_of_store.len() as f64);
+                counters::PROOF_QUEUE_FULLY_UTILIZED.observe(
+                    if !proof_queue_not_fully_utilized {
+                        1.0
+                    } else {
+                        0.0
+                    },
+                );
+
                 let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
+                let mut inline_batch_count: u64 = 0;
+                let mut inline_txns: u64 = 0;
+                let mut inline_bytes: u64 = 0;
+                let mut cur_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
+                let mut cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
+
                 if self.allow_batches_without_pos_in_proposal && !proof_queue_not_fully_utilized {
                     // TODO: Add a counter in grafana to monitor how many inline transactions/bytes are added
-                    let mut cur_txns: u64 = proof_block.iter().map(|p| p.num_txns()).sum();
-                    let mut cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
-                    let mut inline_txns: u64 = 0;
-                    let mut inline_bytes: u64 = 0;
-
                     let mut iters = vec![];
                     let mut full = false;
                     for (_, batches) in self.author_to_batches.iter() {
@@ -203,6 +214,7 @@ impl ProofManager {
                                             cur_txns += batch.num_txns();
                                             cur_bytes += batch.num_bytes();
                                             inline_block.push((batch.clone(), txns.clone()));
+                                            inline_batch_count += 1;
                                             return true;
                                         }
                                     }
@@ -217,6 +229,9 @@ impl ProofManager {
                         })
                     }
                 }
+                counters::NUM_INLINE_BATCHES.observe(inline_batch_count as f64);
+                counters::NUM_INLINE_TXNS.observe(inline_txns as f64);
+                counters::NUM_TXN_SPACE_LEFT_IN_PROPOSAL.observe((max_txns - cur_txns) as f64);
 
                 let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() && inline_block.is_empty() {
