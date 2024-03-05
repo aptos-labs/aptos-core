@@ -4,7 +4,11 @@
 use super::types::PersistedValue;
 use crate::{
     monitor,
-    quorum_store::{batch_generator::BackPressure, counters, utils::ProofQueue},
+    quorum_store::{
+        batch_generator::BackPressure,
+        counters,
+        utils::{BatchKey, BatchSortKey, ProofQueue},
+    },
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, ProofWithDataWithTxnLimit},
@@ -15,7 +19,8 @@ use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use std::collections::{HashMap, HashSet};
+use rand::{seq::SliceRandom, thread_rng};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -27,11 +32,9 @@ pub enum ProofManagerCommand {
 
 pub struct ProofManager {
     proofs_for_consensus: ProofQueue,
-    // TODO: Should this be a DashMap?
-    batches_without_proof_of_store: HashMap<BatchInfo, Option<Vec<SignedTransaction>>>,
-    // Storing the most recent 20 batches added to batches_without_proof_of_store.
-    // This lets us remove the older batches from batches_without_proof_of_store whenever required.
-    // recent_batches_without_proof_of_store: VecDeque<BatchInfo>,
+    batches_without_proof_of_store: HashMap<BatchKey, Option<Vec<SignedTransaction>>>,
+    // Queue per peer to ensure fairness between peers and priority within peer
+    author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
@@ -49,7 +52,7 @@ impl ProofManager {
         Self {
             proofs_for_consensus: ProofQueue::new(my_peer_id),
             batches_without_proof_of_store: HashMap::new(),
-            // recent_batches_without_proof_of_store: VecDeque::new(),
+            author_to_batches: HashMap::new(),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -60,7 +63,8 @@ impl ProofManager {
 
     pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
         for proof in proofs.into_iter() {
-            self.batches_without_proof_of_store.remove(proof.info());
+            self.batches_without_proof_of_store
+                .remove(&BatchKey::from_info(proof.info()));
             self.proofs_for_consensus.push(proof);
         }
         (self.remaining_total_txn_num, self.remaining_total_proof_num) =
@@ -70,13 +74,15 @@ impl ProofManager {
     pub(crate) fn receive_batches(&mut self, batches: Vec<PersistedValue>) {
         if self.allow_batches_without_pos_in_proposal {
             for mut batch in batches.into_iter() {
+                let batch_info = batch.batch_info();
+                let queue = self
+                    .author_to_batches
+                    .entry(batch_info.author())
+                    .or_default();
+                queue.insert(BatchSortKey::from_info(batch_info), batch_info.clone());
+
                 self.batches_without_proof_of_store
-                    .insert(batch.batch_info().clone(), batch.take_payload());
-                // self.recent_batches_without_proof_of_store
-                //     .push_back(batch.batch_info().clone());
-                // if self.recent_batches_without_proof_of_store.len() > 20 {
-                //     self.recent_batches_without_proof_of_store.pop_front();
-                // }
+                    .insert(BatchKey::from_info(batch_info), batch.take_payload());
             }
         }
     }
@@ -91,7 +97,8 @@ impl ProofManager {
             block_timestamp
         );
         for batch in batches.iter() {
-            self.batches_without_proof_of_store.remove(batch);
+            self.batches_without_proof_of_store
+                .remove(&BatchKey::from_info(batch));
         }
         self.proofs_for_consensus.mark_committed(batches);
         self.proofs_for_consensus
@@ -123,6 +130,39 @@ impl ProofManager {
                     .proofs_for_consensus
                     .pull_proofs(&excluded_batches, max_txns, max_bytes, return_non_full);
 
+                for excluded_batch in &excluded_batches {
+                    self.batches_without_proof_of_store
+                        .remove(&BatchKey::from_info(excluded_batch));
+                    if let Some(batch_tree) =
+                        self.author_to_batches.get_mut(&excluded_batch.author())
+                    {
+                        batch_tree.remove(&BatchSortKey::from_info(excluded_batch));
+                    }
+                }
+
+                for proof in &proof_block {
+                    self.batches_without_proof_of_store
+                        .remove(&BatchKey::from_info(proof.info()));
+                    if let Some(batch_tree) = self.author_to_batches.get_mut(&proof.info().author())
+                    {
+                        batch_tree.remove(&BatchSortKey::from_info(proof.info()));
+                    }
+                }
+
+                // Remove expired batches
+                let authors = self.author_to_batches.keys().cloned().collect::<Vec<_>>();
+                for author in authors {
+                    if let Some(batch_tree) = self.author_to_batches.get_mut(&author) {
+                        for (_, batch) in batch_tree.iter() {
+                            if batch.is_expired() {
+                                self.batches_without_proof_of_store
+                                    .remove(&BatchKey::from_info(batch));
+                            }
+                        }
+                        batch_tree.retain(|_batch_key, batch| !batch.is_expired());
+                    }
+                }
+
                 let mut inline_block: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
                 if self.allow_batches_without_pos_in_proposal && !proof_queue_not_fully_utilized {
                     // TODO: Add a counter in grafana to monitor how many inline transactions/bytes are added
@@ -130,33 +170,47 @@ impl ProofManager {
                     let mut cur_bytes: u64 = proof_block.iter().map(|p| p.num_bytes()).sum();
                     let mut inline_txns: u64 = 0;
                     let mut inline_bytes: u64 = 0;
-                    let proof_batches =
-                        proof_block.iter().map(|p| p.info()).collect::<HashSet<_>>();
 
-                    self.batches_without_proof_of_store.retain(|batch, _| {
-                        !batch.is_expired()
-                            && !excluded_batches.contains(batch)
-                            && !proof_batches.contains(batch)
-                        // && self.recent_batches_without_proof_of_store.contains(batch)
-                    });
-                    for (batch, txns) in self.batches_without_proof_of_store.iter_mut() {
-                        if let Some(txns) = txns {
-                            // TODO: Should we calculate batch size by summing up sizes of individual txns?
-                            // TODO: We are including any batch that satisfies the size requirements here.
-                            // Should we prioritize based on other criteria like expiration time, etc?
-                            if cur_txns + txns.len() as u64 <= max_txns
-                                && cur_bytes + batch.num_bytes() <= max_bytes
-                                && inline_txns + txns.len() as u64 <= max_inline_txns
-                                && inline_bytes + batch.num_bytes() <= max_inline_bytes
-                            {
-                                inline_txns += txns.len() as u64;
-                                inline_bytes += batch.num_bytes();
-                                cur_txns += txns.len() as u64;
-                                cur_bytes += batch.num_bytes();
-                                // TODO: Can cloning be avoided here?
-                                inline_block.push((batch.clone(), txns.clone()));
+                    let mut iters = vec![];
+                    let mut full = false;
+                    for (_, batches) in self.author_to_batches.iter() {
+                        iters.push(batches.iter().rev());
+                    }
+                    while !iters.is_empty() {
+                        iters.shuffle(&mut thread_rng());
+                        iters.retain_mut(|iter| {
+                            if full {
+                                return false;
                             }
-                        }
+                            if let Some((_sort_key, batch)) = iter.next() {
+                                if cur_txns + batch.num_txns() <= max_txns
+                                    && cur_bytes + batch.num_bytes() <= max_bytes
+                                    && inline_txns + batch.num_txns() <= max_inline_txns
+                                    && inline_bytes + batch.num_bytes() <= max_inline_bytes
+                                {
+                                    if let Some(Some(txns)) = self
+                                        .batches_without_proof_of_store
+                                        .get(&BatchKey::from_info(batch))
+                                    {
+                                        // TODO: Need to verify the batch hash
+                                        inline_txns += batch.num_txns();
+                                        inline_bytes += batch.num_bytes();
+                                        cur_txns += batch.num_txns();
+                                        cur_bytes += batch.num_bytes();
+                                        // TODO: Can cloning be avoided here?
+                                        inline_block.push((batch.clone(), txns.clone()));
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    full = true;
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        })
                     }
                 }
 

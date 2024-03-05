@@ -142,7 +142,7 @@ impl MempoolProxy {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone)]
-struct BatchKey {
+pub struct BatchKey {
     author: PeerId,
     batch_id: BatchId,
 }
@@ -157,7 +157,7 @@ impl BatchKey {
 }
 
 #[derive(PartialEq, Eq, Clone, Hash)]
-struct BatchSortKey {
+pub struct BatchSortKey {
     batch_key: BatchKey,
     gas_bucket_start: u64,
 }
