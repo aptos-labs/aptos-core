@@ -10,8 +10,9 @@ use crate::{
     gas::{check_gas, get_gas_parameters},
     keyless_validation,
     move_vm_ext::{
-        get_max_binary_format_version, get_max_identifier_size, AptosMoveResolver, MoveVmExt,
-        RespawnedSession, SessionExt, SessionId,
+        get_max_binary_format_version, get_max_identifier_size,
+        session::respawned_session::RespawnedSession, AptosMoveResolver, MoveVmExt, SessionExt,
+        SessionId,
     },
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
