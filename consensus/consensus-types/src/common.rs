@@ -6,6 +6,7 @@ use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
     validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
@@ -361,10 +362,20 @@ impl From<&Vec<&Payload>> for PayloadFilter {
         } else {
             let mut exclude_proofs = HashSet::new();
             for payload in exclude_payloads {
-                if let Payload::InQuorumStore(proof_with_status) = payload {
-                    for proof in &proof_with_status.proofs {
-                        exclude_proofs.insert(proof.info().clone());
-                    }
+                match payload {
+                    Payload::InQuorumStore(proof_with_status) => {
+                        for proof in &proof_with_status.proofs {
+                            exclude_proofs.insert(proof.info().clone());
+                        }
+                    },
+                    Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                        for proof in &proof_with_status.proof_with_data.proofs {
+                            exclude_proofs.insert(proof.info().clone());
+                        }
+                    },
+                    Payload::DirectMempool(_) => {
+                        error!("DirectMempool payload in InQuorumStore filter");
+                    },
                 }
             }
             PayloadFilter::InQuorumStore(exclude_proofs)
