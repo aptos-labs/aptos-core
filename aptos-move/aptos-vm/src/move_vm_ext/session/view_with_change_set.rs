@@ -38,23 +38,49 @@ use std::{
 };
 
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
+#[derive(Clone)]
 pub struct ExecutorViewWithChangeSet<'r> {
     base_executor_view: &'r dyn ExecutorView,
     base_resource_group_view: &'r dyn ResourceGroupView,
-    pub(crate) change_set: VMChangeSet,
+    pub(crate) change_set: Option<VMChangeSet>,
 }
 
 impl<'r> ExecutorViewWithChangeSet<'r> {
     pub(crate) fn new(
         base_executor_view: &'r dyn ExecutorView,
         base_resource_group_view: &'r dyn ResourceGroupView,
-        change_set: VMChangeSet,
+        change_set: Option<VMChangeSet>,
     ) -> Self {
         Self {
             base_executor_view,
             base_resource_group_view,
             change_set,
         }
+    }
+
+    fn change_set_opt(&self) -> Option<&VMChangeSet> {
+        self.change_set.as_ref()
+    }
+
+    pub fn take_change_set(&mut self) -> Option<VMChangeSet> {
+        self.change_set.take()
+    }
+
+    /// Asserts that `self` has None as the overlay change set and returns a new view with the same
+    /// base and the passed in `change_set` as the overlay.
+    pub fn plus_change_set(&self, change_set: VMChangeSet) -> Self {
+        self.assert_no_change_set();
+
+        Self {
+            base_executor_view: self.base_executor_view,
+            base_resource_group_view: self.base_resource_group_view,
+            change_set: Some(change_set),
+        }
+    }
+
+    pub fn assert_no_change_set(&self) -> &Self {
+        assert!(self.change_set.is_none());
+        self
     }
 }
 
@@ -65,12 +91,18 @@ impl<'r> TAggregatorV1View for ExecutorViewWithChangeSet<'r> {
         &self,
         id: &Self::Identifier,
     ) -> PartialVMResult<Option<StateValue>> {
-        match self.change_set.aggregator_v1_delta_set().get(id) {
+        match self
+            .change_set_opt()
+            .and_then(|c| c.aggregator_v1_delta_set().get(id))
+        {
             Some(delta_op) => Ok(self
                 .base_executor_view
                 .try_convert_aggregator_v1_delta_into_write_op(id, delta_op)?
                 .as_state_value()),
-            None => match self.change_set.aggregator_v1_write_set().get(id) {
+            None => match self
+                .change_set_opt()
+                .and_then(|c| c.aggregator_v1_write_set().get(id))
+            {
                 Some(write_op) => Ok(write_op.as_state_value()),
                 None => self.base_executor_view.get_aggregator_v1_state_value(id),
             },
@@ -94,7 +126,10 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
     ) -> Result<DelayedFieldValue, PanicOr<DelayedFieldsSpeculativeError>> {
         use DelayedChange::*;
 
-        match self.change_set.delayed_field_change_set().get(id) {
+        match self
+            .change_set_opt()
+            .and_then(|c| c.delayed_field_change_set().get(id))
+        {
             Some(Create(value)) => Ok(value.clone()),
             Some(Apply(apply)) => {
                 let base_value = match apply.get_apply_base_id(id) {
@@ -130,7 +165,7 @@ impl<'r> TDelayedFieldView for ExecutorViewWithChangeSet<'r> {
         use DelayedChange::*;
 
         let math = BoundedMath::new(max_value);
-        match self.change_set.delayed_field_change_set().get(id) {
+        match self.change_set_opt().and_then(|c| c.delayed_field_change_set().get(id) ){
             Some(Create(value)) => {
                 let prev_value = expect_ok(math.unsigned_add_delta(value.clone().into_aggregator_value()?, base_delta))?;
                 Ok(math.unsigned_add_delta(prev_value, delta).is_ok())
@@ -191,7 +226,10 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         state_key: &Self::Key,
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<StateValue>> {
-        match self.change_set.resource_write_set().get(state_key) {
+        match self
+            .change_set_opt()
+            .and_then(|c| c.resource_write_set().get(state_key))
+        {
             Some(
                 AbstractResourceWriteOp::Write(write_op)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
@@ -218,7 +256,10 @@ impl<'r> TResourceView for ExecutorViewWithChangeSet<'r> {
         &self,
         state_key: &Self::Key,
     ) -> PartialVMResult<Option<StateValueMetadata>> {
-        match self.change_set.resource_write_set().get(state_key) {
+        match self
+            .change_set_opt()
+            .and_then(|c| c.resource_write_set().get(state_key))
+        {
             Some(
                 AbstractResourceWriteOp::Write(write_op)
                 | AbstractResourceWriteOp::WriteWithDelayedFields(WriteWithDelayedFieldsOp {
@@ -251,9 +292,11 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         use AbstractResourceWriteOp::*;
 
         if let Some(size) = self
-        .change_set
+        .change_set_opt()
+            .and_then(|c| c
         .resource_write_set()
         .get(group_key)
+            )
         .and_then(|write| match write {
             WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
             ResourceGroupInPlaceDelayedFieldChange(_) => None,
@@ -278,9 +321,11 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         use AbstractResourceWriteOp::*;
 
         if let Some((write_op, layout)) = self
-            .change_set
-            .resource_write_set()
+            .change_set_opt()
+            .and_then(|c|
+            c.resource_write_set()
             .get(group_key)
+            )
             .and_then(|write| match write {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
@@ -306,7 +351,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     fn release_group_cache(
         &self,
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
-        unreachable!("Must not be called by RespawnedSession finish");
+        // FIXME(aldenhu): contemplate
+        self.base_resource_group_view.release_group_cache()
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
@@ -319,7 +365,10 @@ impl<'r> TModuleView for ExecutorViewWithChangeSet<'r> {
     type Key = StateKey;
 
     fn get_module_state_value(&self, state_key: &Self::Key) -> PartialVMResult<Option<StateValue>> {
-        match self.change_set.module_write_set().get(state_key) {
+        match self
+            .change_set_opt()
+            .and_then(|c| c.module_write_set().get(state_key))
+        {
             Some(write_op) => Ok(write_op.as_state_value()),
             None => self.base_executor_view.get_module_state_value(state_key),
         }
@@ -423,6 +472,7 @@ mod test {
         }
     }
 
+    // FIXME(aldenhu): test change_set = None
     #[test]
     fn test_change_set_state_view() {
         let mut state_view = FakeDataStore::default();
@@ -513,7 +563,7 @@ mod test {
         let view = ExecutorViewWithChangeSet::new(
             resolver.as_executor_view(),
             resolver.as_resource_group_view(),
-            change_set,
+            Some(change_set),
         );
 
         assert_eq!(read_module(&view, "module_base"), 10);

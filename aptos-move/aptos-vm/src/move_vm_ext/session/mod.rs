@@ -3,7 +3,9 @@
 
 use crate::{
     data_cache::get_resource_group_from_metadata,
-    move_vm_ext::{resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver},
+    move_vm_ext::{
+        resource_state_key, write_op_converter::WriteOpConverter, AptosMoveResolver, SessionId,
+    },
 };
 use aptos_framework::natives::{
     aggregator_natives::{AggregatorChangeSet, AggregatorChangeV1, NativeAggregatorContext},
@@ -33,6 +35,7 @@ use std::{
 
 pub mod respawned_session;
 pub mod session_id;
+pub(crate) mod user_transaction_sessions;
 pub mod view_with_change_set;
 
 pub(crate) enum ResourceGroupChangeSet {
@@ -46,6 +49,7 @@ type ChangeSet = Changes<Bytes, BytesWithResourceLayout>;
 pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, 'l> {
+    session_id: SessionId,
     inner: Session<'r, 'l>,
     remote: &'r dyn AptosMoveResolver,
     is_storage_slot_metadata_enabled: bool,
@@ -53,15 +57,21 @@ pub struct SessionExt<'r, 'l> {
 
 impl<'r, 'l> SessionExt<'r, 'l> {
     pub fn new(
+        session_id: SessionId,
         inner: Session<'r, 'l>,
         remote: &'r dyn AptosMoveResolver,
         is_storage_slot_metadata_enabled: bool,
     ) -> Self {
         Self {
+            session_id,
             inner,
             remote,
             is_storage_slot_metadata_enabled,
         }
+    }
+
+    pub fn session_id(&self) -> &SessionId {
+        &self.session_id
     }
 
     pub fn finish(self, configs: &ChangeSetConfigs) -> VMResult<VMChangeSet> {

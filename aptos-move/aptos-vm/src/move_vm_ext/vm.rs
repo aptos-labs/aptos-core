@@ -205,7 +205,7 @@ impl MoveVmExt {
         extensions.add(RandomnessContext::new());
         extensions.add(NativeTransactionContext::new(
             txn_hash.to_vec(),
-            session_id.into_script_hash(),
+            session_id.script_hash().to_vec(),
             self.chain_id,
         ));
         extensions.add(NativeCodeContext::default());
@@ -217,6 +217,7 @@ impl MoveVmExt {
         self.inner.flush_loader_cache_if_invalidated();
 
         SessionExt::new(
+            session_id,
             self.inner.new_session_with_extensions(resolver, extensions),
             resolver,
             self.features.is_storage_slot_metadata_enabled(),

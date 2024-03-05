@@ -8,7 +8,7 @@ use aptos_types::transaction::TransactionStatus;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, prelude::*};
 use aptos_vm_types::output::VMOutput;
 use move_binary_format::errors::VMError;
-use move_core_types::vm_status::{StatusCode, VMStatus};
+use move_core_types::vm_status::{err_msg, StatusCode, VMStatus};
 
 /// Error codes that can be emitted by the prologue. These have special significance to the VM when
 /// they are raised during the prologue.
@@ -234,4 +234,9 @@ pub fn expect_only_successful_execution(
 
 pub(crate) fn discarded_output(status_code: StatusCode) -> VMOutput {
     VMOutput::empty_with_status(TransactionStatus::Discard(status_code))
+}
+
+pub fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
+    value
+        .ok_or_else(|| VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err_msg(msg)))
 }

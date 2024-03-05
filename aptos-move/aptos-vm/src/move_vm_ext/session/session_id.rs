@@ -11,7 +11,7 @@ use aptos_types::{
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
-#[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
     Txn {
         sender: AccountAddress,
@@ -115,7 +115,7 @@ impl SessionId {
         self.hash()
     }
 
-    pub(crate) fn into_script_hash(self) -> Vec<u8> {
+    pub(crate) fn script_hash(&self) -> &[u8] {
         match self {
             Self::Txn {
                 sender: _,
@@ -141,7 +141,7 @@ impl SessionId {
             Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
             | Self::Void
-            | Self::BlockMetaExt { id: _ } => vec![],
+            | Self::BlockMetaExt { id: _ } => &[],
         }
     }
 }

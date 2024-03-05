@@ -4378,6 +4378,7 @@ dependencies = [
  "claims",
  "crossbeam-channel",
  "dashmap",
+ "derive_more",
  "fail 0.5.1",
  "futures",
  "jsonwebtoken 8.3.0",

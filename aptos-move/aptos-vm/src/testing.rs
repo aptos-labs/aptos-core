@@ -1,12 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    aptos_vm::get_or_vm_startup_failure, data_cache::AsMoveResolver,
-    transaction_metadata::TransactionMetadata, AptosVM,
-};
+use crate::AptosVM;
 use aptos_types::{state_store::StateView, transaction::SignedTransaction};
-use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::output::VMOutput;
 use move_binary_format::errors::VMResult;
 use move_core_types::vm_status::VMStatus;
@@ -60,11 +56,13 @@ impl AptosVM {
     #[cfg(any(test, feature = "testing"))]
     pub fn test_failed_transaction_cleanup(
         &self,
-        error_vm_status: VMStatus,
-        txn: &SignedTransaction,
-        state_view: &impl StateView,
-        gas_meter_balance: u64,
+        _error_vm_status: VMStatus,
+        _txn: &SignedTransaction,
+        _state_view: &impl StateView,
+        _gas_meter_balance: u64,
     ) -> (VMStatus, VMOutput) {
+        todo!()
+        /*
         let txn_data = TransactionMetadata::new(txn);
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -84,5 +82,6 @@ impl AptosVM {
             &log_context,
             change_set_configs,
         )
+         */
     }
 }
