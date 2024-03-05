@@ -4,6 +4,10 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+- Extended `aptos move download` with an option `--bytecode` to also download the bytecode of a module
+- Integrate the Revela decompiler which is now available via `aptos move decompile` 
+- Extended `aptos move disassemble` and the new `aptos move decompile` to also work on entire packages instead of only single files
+
 ## [2.5.0] - 2024/02/27
 - Updated CLI source compilation to use rust toolchain version 1.75.0 (from 1.74.1).
 - Upgraded indexer processors for local testnet from 9936ec73cef251fb01fd2c47412e064cad3975c2 to d44b2d209f57872ac593299c34751a5531b51352. Upgraded Hasura metadata accordingly.
