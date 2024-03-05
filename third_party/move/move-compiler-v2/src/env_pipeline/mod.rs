@@ -16,6 +16,7 @@ pub mod lambda_lifter;
 #[derive(Default)]
 pub struct EnvProcessorPipeline<'a> {
     /// A sequence of transformations to run on the model.
+    /// For each processor, we store its name and the transformation function.
     processors: Vec<(String, Box<dyn Fn(&mut GlobalEnv) + 'a>)>,
 }
 
@@ -29,7 +30,7 @@ impl<'a> EnvProcessorPipeline<'a> {
     }
 
     /// Runs the pipeline. Running will be ended if any of the steps produces an error.
-    /// The function returns true of all steps succeeded without errors.
+    /// The function returns true if all steps succeeded without errors.
     pub fn run(&self, env: &mut GlobalEnv) -> bool {
         debug!("before env processor pipeline: {}", env.dump_env());
         for (name, proc) in &self.processors {

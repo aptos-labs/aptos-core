@@ -91,7 +91,7 @@ pub fn lift_lambdas(options: LambdaLiftingOptions, env: &mut GlobalEnv) {
             }
         }
         // Now that we have processed all functions and released
-        // al references to the env, mutate it.
+        // all references to the env, mutate it.
         for (fun_id, new_def) in updated_funs {
             env.set_function_def(module_id.qualified(fun_id), new_def)
         }
@@ -137,7 +137,7 @@ struct LambdaLifter<'a> {
     /// Any unbound locals used so far.
     free_locals: BTreeMap<Symbol, VarInfo>,
     /// NodeId's of lambdas which are parameters to inline functions
-    /// if those should be exempted. Pushed down during descend.
+    /// and should be exempted from lifting. Pushed down during descend.
     exempted_lambdas: BTreeSet<NodeId>,
 }
 
