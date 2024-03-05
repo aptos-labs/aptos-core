@@ -84,3 +84,12 @@ pub static ANCHOR_ORDER_TYPE: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static FETCH_ENQUEUE_FAILURES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_dag_fetch_req_enq_failure",
+        "Fetch request failed",
+        &["type"]
+    )
+    .unwrap()
+});
