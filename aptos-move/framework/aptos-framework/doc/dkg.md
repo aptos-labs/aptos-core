@@ -13,6 +13,7 @@ DKG on-chain states and helper functions.
 -  [Struct `DKGSessionState`](#0x1_dkg_DKGSessionState)
 -  [Resource `DKGState`](#0x1_dkg_DKGState)
 -  [Constants](#@Constants_0)
+-  [Function `in_progress_dealer_epoch`](#0x1_dkg_in_progress_dealer_epoch)
 -  [Function `block_dkg`](#0x1_dkg_block_dkg)
 -  [Function `unblock_dkg`](#0x1_dkg_unblock_dkg)
 -  [Function `block_randomness`](#0x1_dkg_block_randomness)
@@ -279,6 +280,36 @@ The completed and in-progress DKG sessions.
 </code></pre>
 
 
+
+<a id="0x1_dkg_in_progress_dealer_epoch"></a>
+
+## Function `in_progress_dealer_epoch`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_in_progress_dealer_epoch">in_progress_dealer_epoch</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_in_progress_dealer_epoch">in_progress_dealer_epoch</a>(): u64 <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <b>let</b> state = <b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&state.in_progress)) {
+        <b>let</b> session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&state.in_progress);
+        session.metadata.dealer_epoch
+    } <b>else</b> {
+        0
+    }
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_dkg_block_dkg"></a>
 

@@ -226,7 +226,7 @@ module aptos_framework::block {
         );
         randomness::on_new_block(&vm, epoch, round, randomness_seed);
 
-        if (!dkg::in_progress() && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+        if (!(dkg::in_progress() && dkg::in_progress_dealer_epoch() == epoch) && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();
         }
     }

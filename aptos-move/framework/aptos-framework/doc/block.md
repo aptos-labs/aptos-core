@@ -592,7 +592,7 @@ The runtime always runs this before executing the transactions in a block.
     );
     <a href="randomness.md#0x1_randomness_on_new_block">randomness::on_new_block</a>(&vm, epoch, round, randomness_seed);
 
-    <b>if</b> (!<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>() && <a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
+    <b>if</b> (!(<a href="dkg.md#0x1_dkg_in_progress">dkg::in_progress</a>() && <a href="dkg.md#0x1_dkg_in_progress_dealer_epoch">dkg::in_progress_dealer_epoch</a>() == epoch) && <a href="timestamp.md#0x1_timestamp">timestamp</a> - <a href="reconfiguration.md#0x1_reconfiguration_last_reconfiguration_time">reconfiguration::last_reconfiguration_time</a>() &gt;= epoch_interval) {
         <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">reconfiguration_with_dkg::try_start</a>();
     }
 }
