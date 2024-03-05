@@ -478,16 +478,14 @@ impl DagStore {
             window_size,
         );
 
-        {
-            let mut dag_writer = dag.write();
-            for (digest, certified_node) in all_nodes {
-                // TODO: save the storage call in this case
-                if let Err(e) = dag_writer.add_node_internal(certified_node) {
-                    debug!("Delete node after bootstrap due to {}", e);
-                    to_prune.push(digest);
-                }
+        for (digest, certified_node) in all_nodes {
+            // TODO: save the storage call in this case
+            if let Err(e) = dag.add_node_inmem(certified_node) {
+                debug!("Delete node after bootstrap due to {}", e);
+                to_prune.push(digest);
             }
         }
+
         let handle = tokio::task::spawn_blocking(move || {
             monitor!("dag_store_new_gc", {
                 if let Err(e) = storage.delete_certified_nodes(to_prune) {
@@ -535,21 +533,35 @@ impl DagStore {
         }
     }
 
-    pub fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
+    pub fn add_node_internal(
+        &self,
+        node: CertifiedNode,
+        write_to_storage: bool,
+    ) -> anyhow::Result<()> {
         self.dag.write().validate_new_node(&node)?;
 
         // Note on concurrency: it is possible that a prune operation kicks in here and
         // moves the window forward making the `node` stale. Any stale node inserted
         // due to this race will be cleaned up with the next prune operation.
 
-        // mutate after all checks pass
-        self.storage.save_certified_node(&node)?;
+        if write_to_storage {
+            // mutate after all checks pass
+            self.storage.save_certified_node(&node)?;
+        }
 
         debug!("Added node {}", node.id());
         self.payload_manager
             .prefetch_payload_data(node.payload(), node.metadata().timestamp());
 
         self.dag.write().add_validated_node(node)
+    }
+
+    pub fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
+        self.add_node_internal(node, true)
+    }
+
+    pub fn add_node_inmem(&self, node: CertifiedNode) -> anyhow::Result<()> {
+        self.add_node_internal(node, false)
     }
 
     pub fn commit_callback(&self, commit_round: Round) {
