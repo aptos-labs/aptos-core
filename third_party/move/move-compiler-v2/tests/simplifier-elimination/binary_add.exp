@@ -48,7 +48,7 @@ warning: Expression value unused and side-effect free, so eliminated as dead cod
 14 │         (0) + (1);
    │         ^^^^^^^^^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,

@@ -24,7 +24,7 @@ warning: Expression value unused and side-effect free, so eliminated as dead cod
 7 │ │         };
   │ ╰─────────^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     private fun test(): u64 {
         0

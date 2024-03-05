@@ -21,7 +21,7 @@ warning: Expression value unused and side-effect free, so eliminated as dead cod
 9 │         x;
   │         ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {
         {

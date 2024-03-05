@@ -18,7 +18,7 @@ warning: Expression value unused and side-effect free, so eliminated as dead cod
 20 │         x;
    │         ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun tborrow1() {
         {

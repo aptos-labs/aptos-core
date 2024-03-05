@@ -1,21 +1,4 @@
-
-Diagnostics:
-warning: Expression value unused and side-effect free, so eliminated as dead code
-   ┌─ tests/simplifier-elimination/double_nesting.move:20:9
-   │
-20 │         assert!(a == 81911, 0);
-   │         ^^^^^^
-
-warning: If condition is always true, so else branch code eliminated as dead code
-   ┌─ tests/simplifier-elimination/double_nesting.move:20:17
-   │
-20 │         assert!(a == 81911, 0);
-   │         ------  ^^^^^^^^^^
-   │         │       │
-   │         │       condition is always true
-   │         else branch eliminated
-
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::mathtest2 {
     spec fun $fun2(a: u64,b: u64,c: u64): u64 {
         Cast(Add(Add(Mul(7, Cast(a)), Mul(11, Cast(b))), Mul(13, Cast(c))))
@@ -30,7 +13,27 @@ module 0x42::test {
     use 0x42::mathtest; // resolved as: 0x42::mathtest
     use 0x42::mathtest2; // resolved as: 0x42::mathtest2
     private fun test_nested_fun1() {
-        Tuple()
+        {
+          let a: u64 = {
+            let (_, b: u64, c: u64): (u64, u64, u64) = Tuple(2, {
+              let (_, b: u64, _): (u64, u64, u64) = Tuple(3, 161, 7);
+              Cast(Add<u128>(Add<u128>(6, Mul<u128>(3, Cast(b))), 35))
+            }, {
+              let (_, _, c: u64): (u64, u64, u64) = Tuple(8, 9, {
+                let (_, b: u64, _): (u64, u64, u64) = Tuple(10, 378, 14);
+                Cast(Add<u128>(Add<u128>(20, Mul<u128>(3, Cast(b))), 70))
+              });
+              Cast(Add<u128>(155, Mul<u128>(13, Cast(c))))
+            });
+            Cast(Add<u128>(Add<u128>(4, Mul<u128>(3, Cast(b))), Mul<u128>(5, Cast(c))))
+          };
+          if Eq<u64>(a, 81911) {
+            Tuple()
+          } else {
+            Abort(0)
+          };
+          Tuple()
+        }
     }
     spec fun $test_nested_fun1() {
         {

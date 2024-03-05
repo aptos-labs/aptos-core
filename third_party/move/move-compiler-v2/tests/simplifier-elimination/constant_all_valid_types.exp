@@ -42,7 +42,7 @@ warning: Expression value unused and side-effect free, so eliminated as dead cod
 37 │         (C7: vector<u8>);
    │          ^^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     private fun t1(): u8 {
         0

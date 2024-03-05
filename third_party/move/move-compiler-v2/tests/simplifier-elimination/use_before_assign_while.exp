@@ -12,7 +12,7 @@ warning: Expression value unused and side-effect free, so eliminated as dead cod
 9 │         while (cond) { let y = move x + 1; if (cond) { continue }; x = 0; y; }
   │                                                                           ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun tborrow1(cond: bool) {
         {
