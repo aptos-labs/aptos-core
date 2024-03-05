@@ -26,6 +26,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Constants](#@Constants_0)
 -  [Function `default_to_concurrent_fungible_supply`](#0x1_fungible_asset_default_to_concurrent_fungible_supply)
 -  [Function `default_to_concurrent_fungible_balance`](#0x1_fungible_asset_default_to_concurrent_fungible_balance)
+-  [Function `auto_upgrade_to_concurrent_fungible_balance`](#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance)
 -  [Function `add_fungibility`](#0x1_fungible_asset_add_fungibility)
 -  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
 -  [Function `generate_burn_ref`](#0x1_fungible_asset_generate_burn_ref)
@@ -254,7 +255,7 @@ The store object that holds fungible assets of a specific type associated with a
 
 ## Resource `ConcurrentFungibleBalance`
 
-The store object that holds concurrent fungible asset balance
+The store object that holds concurrent fungible asset balance.
 
 
 <pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
@@ -948,6 +949,30 @@ URI for the icon of the fungible asset metadata is too long
 
 </details>
 
+<a id="0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance"></a>
+
+## Function `auto_upgrade_to_concurrent_fungible_balance`
+
+
+
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>(): bool {
+    <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_fungible_assets_enabled">features::concurrent_fungible_assets_enabled</a>()
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_fungible_asset_add_fungibility"></a>
 
 ## Function `add_fungibility`
@@ -1286,7 +1311,8 @@ Return whether the provided address has a store initialized.
 
 ## Function `concurrent_fungible_balance_exists`
 
-Return whether the provided address has a store initialized.
+Return whether the provided address has a concurrent fungible balance initialized,
+at the fungible store address.
 
 
 <pre><code>#[view]
@@ -1404,8 +1430,8 @@ Get the balance of a given store.
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_balance">balance</a>&lt;T: key&gt;(store: Object&lt;T&gt;): u64 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
     <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
     <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_concurrent_fungible_balance_exists">concurrent_fungible_balance_exists</a>(store_addr)) {
-        <b>let</b> balance = <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(store_addr);
-        <a href="aggregator_v2.md#0x1_aggregator_v2_read">aggregator_v2::read</a>(&balance.balance)
+        <b>let</b> balance_resource = <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(store_addr);
+        <a href="aggregator_v2.md#0x1_aggregator_v2_read">aggregator_v2::read</a>(&balance_resource.balance)
     } <b>else</b> <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(store_addr)) {
         <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).balance
     } <b>else</b> {
@@ -1657,7 +1683,6 @@ Used to delete a store.  Requires the store to be completely empty prior to remo
         <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(deposit_events);
         <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(withdraw_events);
         <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(frozen_events);
-
     };
 }
 </code></pre>
@@ -2112,10 +2137,10 @@ Destroy an empty fungible asset.
     <b>assert</b>!(metadata == store_metadata, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_ASSET_AND_STORE_MISMATCH">EFUNGIBLE_ASSET_AND_STORE_MISMATCH</a>));
     <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_fungible_assets_enabled">features::concurrent_fungible_assets_enabled</a>()) {
+    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>() || <a href="fungible_asset.md#0x1_fungible_asset_concurrent_fungible_balance_exists">concurrent_fungible_balance_exists</a>(store_addr)) {
         <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(store_addr);
-        <b>let</b> balance = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(store_addr);
-        <a href="aggregator_v2.md#0x1_aggregator_v2_add">aggregator_v2::add</a>(&<b>mut</b> balance.balance, amount);
+        <b>let</b> balance_resource = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(store_addr);
+        <a href="aggregator_v2.md#0x1_aggregator_v2_add">aggregator_v2::add</a>(&<b>mut</b> balance_resource.balance, amount);
     } <b>else</b> {
         <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
         store.balance = store.balance + amount;
@@ -2151,11 +2176,11 @@ Extract <code>amount</code> of the fungible asset from <code>store</code>.
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a> {
     <b>assert</b>!(amount != 0, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EAMOUNT_CANNOT_BE_ZERO">EAMOUNT_CANNOT_BE_ZERO</a>));
 
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_fungible_assets_enabled">features::concurrent_fungible_assets_enabled</a>()) {
+    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>() || <a href="fungible_asset.md#0x1_fungible_asset_concurrent_fungible_balance_exists">concurrent_fungible_balance_exists</a>(store_addr)) {
         <a href="fungible_asset.md#0x1_fungible_asset_ensure_store_upgraded_to_concurrent_internal">ensure_store_upgraded_to_concurrent_internal</a>(store_addr);
-        <b>let</b> balance = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(store_addr);
+        <b>let</b> balance_resource = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentFungibleBalance">ConcurrentFungibleBalance</a>&gt;(store_addr);
         <b>assert</b>!(
-            <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">aggregator_v2::try_sub</a>(&<b>mut</b> balance.balance, amount),
+            <a href="aggregator_v2.md#0x1_aggregator_v2_try_sub">aggregator_v2::try_sub</a>(&<b>mut</b> balance_resource.balance, amount),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>)
         );
     } <b>else</b> {
