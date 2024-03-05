@@ -35,6 +35,7 @@
 - [ ] I have read and followed the [CONTRIBUTING](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) doc
 - [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas
+- [ ] I identified and added all stakeholders and component owners affected by this change as reviewers
 - [ ] I tested both happy and unhappy path of the functionality
 - [ ] I have made corresponding changes to the documentation
 
