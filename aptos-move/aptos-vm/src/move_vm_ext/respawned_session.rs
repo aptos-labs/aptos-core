@@ -93,6 +93,11 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
         .build())
     }
 
+    pub fn passthrough(_session: SessionExt<'r, 'l>) -> Self {
+        // FIXME(aldenhu): avoid making new executor_view
+        todo!()
+    }
+
     pub fn execute<T>(
         &mut self,
         fun: impl FnOnce(&mut SessionExt) -> Result<T, VMStatus>,
