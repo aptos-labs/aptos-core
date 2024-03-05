@@ -15,7 +15,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
 use futures_channel::mpsc::Receiver;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
@@ -29,6 +29,9 @@ pub struct ProofManager {
     proofs_for_consensus: ProofQueue,
     // TODO: Should this be a DashMap?
     batches_without_proof_of_store: HashMap<BatchInfo, Option<Vec<SignedTransaction>>>,
+    // Storing the most recent 20 batches added to batches_without_proof_of_store.
+    // This lets us remove the older batches from batches_without_proof_of_store whenever required.
+    recent_batches_without_proof_of_store: VecDeque<BatchInfo>,
     back_pressure_total_txn_limit: u64,
     remaining_total_txn_num: u64,
     back_pressure_total_proof_limit: u64,
@@ -46,6 +49,7 @@ impl ProofManager {
         Self {
             proofs_for_consensus: ProofQueue::new(my_peer_id),
             batches_without_proof_of_store: HashMap::new(),
+            recent_batches_without_proof_of_store: VecDeque::new(),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -68,6 +72,11 @@ impl ProofManager {
             for mut batch in batches.into_iter() {
                 self.batches_without_proof_of_store
                     .insert(batch.batch_info().clone(), batch.take_payload());
+                self.recent_batches_without_proof_of_store
+                    .push_back(batch.batch_info().clone());
+                if self.recent_batches_without_proof_of_store.len() > 20 {
+                    self.recent_batches_without_proof_of_store.pop_front();
+                }
             }
         }
     }
@@ -131,6 +140,7 @@ impl ProofManager {
                         !batch.is_expired()
                             && !excluded_batches.contains(batch)
                             && !proof_batches.contains(batch)
+                            && self.recent_batches_without_proof_of_store.contains(batch)
                     });
                     for (batch, txns) in self.batches_without_proof_of_store.iter_mut() {
                         if let Some(txns) = txns {
