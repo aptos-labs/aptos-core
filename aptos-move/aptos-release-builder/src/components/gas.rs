@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::*;
+use crate::{components::get_signer_arg, utils::*};
 use anyhow::Result;
 use aptos_types::on_chain_config::GasScheduleV2;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
@@ -11,6 +11,7 @@ pub fn generate_gas_upgrade_proposal(
     is_testnet: bool,
     next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
+    let signer_arg = get_signer_arg(is_testnet, &next_execution_hash);
     let mut result = vec![];
 
     let writer = CodeWriter::new(Loc::default());
@@ -55,17 +56,12 @@ pub fn generate_gas_upgrade_proposal(
             // The testnet single-step generation had something like let framework_signer = &core_signer;
             // so that their framework_signer is of type &signer, but for mainnet single-step and multi-step,
             // the framework_signer is of type signer.
-            if is_testnet && next_execution_hash.is_empty() {
-                emitln!(
-                    writer,
-                    "gas_schedule::set_gas_schedule(framework_signer, gas_schedule_blob);"
-                );
-            } else {
-                emitln!(
-                    writer,
-                    "gas_schedule::set_gas_schedule(&framework_signer, gas_schedule_blob);"
-                );
-            }
+            emitln!(
+                writer,
+                "gas_schedule::set_for_next_epoch({}, gas_schedule_blob);",
+                signer_arg
+            );
+            emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
         },
     );
 
