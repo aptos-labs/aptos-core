@@ -4,6 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 - Update `self_update` dependency to support situations where relevant directories (e.g. `/tmp`) exist on different filesystems.
+- [bugfix] Rename `--value` back to `--override-size-check` for publishing packages
 
 ## [3.0.2] - 2024/03/12
 - Increased `max_connections` for postgres container created as part of local testnet to address occasional startup failures due to overloaded DB.
