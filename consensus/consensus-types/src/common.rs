@@ -278,6 +278,26 @@ impl Payload {
         }
     }
 
+    fn verify_proofs(
+        proofs: &[ProofOfStore],
+        validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
+    ) -> anyhow::Result<()> {
+        let unverified: Vec<_> = proofs
+            .iter()
+            .filter(|proof| {
+                proof_cache.get(proof.info()).map_or(true, |cached_proof| {
+                    cached_proof != *proof.multi_signature()
+                })
+            })
+            .collect();
+        unverified
+            .par_iter()
+            .with_min_len(2)
+            .try_for_each(|proof| proof.verify(validator, proof_cache))?;
+        Ok(())
+    }
+
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
@@ -287,38 +307,13 @@ impl Payload {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
-                let unverified: Vec<_> = proof_with_status
-                    .proofs
-                    .iter()
-                    .filter(|proof| {
-                        proof_cache.get(proof.info()).map_or(true, |cached_proof| {
-                            cached_proof != *proof.multi_signature()
-                        })
-                    })
-                    .collect();
-                unverified
-                    .par_iter()
-                    .with_min_len(2)
-                    .try_for_each(|proof| proof.verify(validator, proof_cache))?;
-                Ok(())
+                Self::verify_proofs(&proof_with_status.proofs, validator, proof_cache)
             },
-            (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
-                let unverified: Vec<_> = proof_with_status
-                    .proof_with_data
-                    .proofs
-                    .iter()
-                    .filter(|proof| {
-                        proof_cache.get(proof.info()).map_or(true, |cached_proof| {
-                            cached_proof != *proof.multi_signature()
-                        })
-                    })
-                    .collect();
-                unverified
-                    .par_iter()
-                    .with_min_len(2)
-                    .try_for_each(|proof| proof.verify(validator, proof_cache))?;
-                Ok(())
-            },
+            (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => Self::verify_proofs(
+                &proof_with_status.proof_with_data.proofs,
+                validator,
+                proof_cache,
+            ),
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
                 quorum_store_enabled,
