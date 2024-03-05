@@ -880,17 +880,17 @@ impl AptosVM {
 
     fn simulate_multisig_transaction<'a>(
         &self,
-        multisig: &'a Multisig,
-        mut session: SessionExt,
         resolver: &impl AptosMoveResolver,
-        txn_data: &TransactionMetadata,
-        log_context: &AdapterLogSchema,
+        mut session: SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
+        txn_data: &TransactionMetadata,
+        payload: &'a Multisig,
+        log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        match &multisig.transaction_payload {
+        match &payload.transaction_payload {
             None => Err(VMStatus::error(StatusCode::MISSING_DATA, None)),
             Some(multisig_payload) => {
                 match multisig_payload {
@@ -900,7 +900,7 @@ impl AptosVM {
                                 &mut session,
                                 gas_meter,
                                 traversal_context,
-                                multisig.multisig_address,
+                                payload.multisig_address,
                                 entry_function,
                                 new_published_modules_loaded,
                             ));
@@ -1066,6 +1066,45 @@ impl AptosVM {
             log_context,
             change_set_configs,
         )
+    }
+
+    fn execute_or_simulate_multisig_transaction<'a>(
+        &self,
+        resolver: &impl AptosMoveResolver,
+        session: SessionExt,
+        gas_meter: &mut impl AptosGasMeter,
+        traversal_context: &mut TraversalContext<'a>,
+        txn_data: &TransactionMetadata,
+        payload: &'a Multisig,
+        log_context: &AdapterLogSchema,
+        new_published_modules_loaded: &mut bool,
+        change_set_configs: &ChangeSetConfigs,
+    ) -> Result<(VMStatus, VMOutput), VMStatus> {
+        if self.is_simulation {
+            self.simulate_multisig_transaction(
+                resolver,
+                session,
+                gas_meter,
+                traversal_context,
+                txn_data,
+                payload,
+                log_context,
+                new_published_modules_loaded,
+                change_set_configs,
+            )
+        } else {
+            self.execute_multisig_transaction(
+                resolver,
+                session,
+                gas_meter,
+                traversal_context,
+                txn_data,
+                payload,
+                log_context,
+                new_published_modules_loaded,
+                change_set_configs,
+            )
+        }
     }
 
     fn execute_multisig_entry_function(
@@ -1500,6 +1539,27 @@ impl AptosVM {
         )
     }
 
+    fn get_user_session<'r, 'l>(
+        &'l self,
+        resolver: &'r impl AptosMoveResolver,
+        txn_data: &TransactionMetadata,
+        prolog_session: SessionExt<'r, 'l>,
+    ) -> SessionExt<'r, 'l> {
+        if self.gas_feature_version >= 1 {
+            // Create a new session so that the data cache is flushed.
+            // This is to ensure we correctly charge for loading certain resources, even if they
+            // have been previously cached in the prologue.
+            //
+            // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
+            // By releasing resource group cache, we start with a fresh slate for resource group
+            // cost accounting.
+            resolver.release_resource_group_cache();
+            self.new_session(resolver, SessionId::txn_meta(txn_data))
+        } else {
+            prolog_session
+        }
+    }
+
     fn execute_user_transaction_impl<'a>(
         &self,
         resolver: &impl AptosMoveResolver,
@@ -1510,31 +1570,20 @@ impl AptosVM {
     ) -> (VMStatus, VMOutput) {
         // Revalidate the transaction.
         let txn_data = TransactionMetadata::new(txn);
-        let mut session = self.new_session(resolver, SessionId::prologue_meta(&txn_data));
+        let mut prolog_session = self.new_session(resolver, SessionId::prologue_meta(&txn_data));
         unwrap_or_discard!(self.validate_signed_transaction(
-            &mut session,
+            &mut prolog_session,
             resolver,
             txn,
             &txn_data,
             log_context
         ));
 
-        if self.gas_feature_version >= 1 {
-            // Create a new session so that the data cache is flushed.
-            // This is to ensure we correctly charge for loading certain resources, even if they
-            // have been previously cached in the prologue.
-            //
-            // TODO(Gas): Do this in a better way in the future, perhaps without forcing the data cache to be flushed.
-            // By releasing resource group cache, we start with a fresh slate for resource group
-            // cost accounting.
-            resolver.release_resource_group_cache();
-            session = self.new_session(resolver, SessionId::txn_meta(&txn_data));
-        }
+        let mut session = self.get_user_session(resolver, &txn_data, prolog_session);
 
         let is_account_init_for_sponsored_transaction = unwrap_or_discard!(
             is_account_init_for_sponsored_transaction(&txn_data, self.features(), resolver)
         );
-
         if is_account_init_for_sponsored_transaction {
             unwrap_or_discard!(create_account_if_does_not_exist(
                 &mut session,
@@ -1566,33 +1615,17 @@ impl AptosVM {
                     &mut new_published_modules_loaded,
                     &storage_gas_params.change_set_configs,
                 ),
-            TransactionPayload::Multisig(payload) => {
-                if self.is_simulation {
-                    self.simulate_multisig_transaction(
-                        payload,
-                        session,
-                        resolver,
-                        &txn_data,
-                        log_context,
-                        gas_meter,
-                        traversal_context,
-                        &mut new_published_modules_loaded,
-                        &storage_gas_params.change_set_configs,
-                    )
-                } else {
-                    self.execute_multisig_transaction(
-                        resolver,
-                        session,
-                        gas_meter,
-                        traversal_context,
-                        &txn_data,
-                        payload,
-                        log_context,
-                        &mut new_published_modules_loaded,
-                        &storage_gas_params.change_set_configs,
-                    )
-                }
-            },
+            TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
+                resolver,
+                session,
+                gas_meter,
+                traversal_context,
+                &txn_data,
+                payload,
+                log_context,
+                &mut new_published_modules_loaded,
+                &storage_gas_params.change_set_configs,
+            ),
 
             // Deprecated. We cannot make this `unreachable!` because a malicious
             // validator can craft this transaction and cause the node to panic.
