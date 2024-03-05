@@ -1,6 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod cost_cfg;
+use move_binary_format::CompiledModule;
+
 pub mod passes;
-pub mod types;
+
+pub trait ModulePass {
+    fn run_on_module(&mut self, module: &CompiledModule);
+}
