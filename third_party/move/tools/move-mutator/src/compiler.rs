@@ -60,12 +60,12 @@ pub fn generate_ast(
         .map(|p| p.to_str().expect("source path contains invalid characters"))
         .collect::<Vec<_>>();
 
-    let package = source_files.is_empty();
+    let is_package = source_files.is_empty();
 
     // If the `-m` option is specified, we should use only `move_sources`. Using Move source means we won't
     // check for deps or resolve names as there might be no standard package layout. That means we can mutate
     // only quite simple files.
-    let options = if package {
+    let options = if is_package {
         prepare_compiler_for_package(config, package_path)?
     } else {
         prepare_compiler_for_files(config, source_files.as_slice())
@@ -184,20 +184,23 @@ fn prepare_compiler_for_package(
     let mut global_address_map = BTreeMap::new();
     for pack in paths.iter().chain(bytecode_deps.iter()) {
         for (name, val) in &pack.named_address_map {
-            if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val) {
-                if old != *val {
-                    let pack_name = pack
-                        .name
-                        .map_or_else(|| "<unnamed>".to_owned(), |s| s.as_str().to_owned());
-                    bail!(
-                        "found remapped address alias `{}` (`{} != {}`) in package `{}`\
-                                    , please use unique address aliases across dependencies",
-                        name,
-                        old,
-                        val,
-                        pack_name
-                    )
-                }
+            let old = if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val) {
+                old
+            } else {
+                continue;
+            };
+            if old != *val {
+                let pack_name = pack
+                    .name
+                    .map_or_else(|| "<unnamed>".to_owned(), |s| s.as_str().to_owned());
+                bail!(
+                    "found remapped address alias `{}` (`{} != {}`) in package `{}`\
+                                , please use unique address aliases across dependencies",
+                    name,
+                    old,
+                    val,
+                    pack_name
+                )
             }
         }
     }

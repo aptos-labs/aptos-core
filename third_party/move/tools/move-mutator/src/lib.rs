@@ -80,7 +80,6 @@ pub fn run_move_mutator(
     let output_dir = output::setup_output_dir(&mutator_configuration)?;
     let mut report: Report = Report::new();
 
-    //for (hash, (filename, source)) in files {
     for fileid in &env.get_source_file_ids() {
         let source = env.get_file_source(*fileid);
         let filename = env.get_file(*fileid);
