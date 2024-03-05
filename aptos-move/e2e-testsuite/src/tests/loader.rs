@@ -47,4 +47,19 @@ proptest! {
     ) {
         run_and_assert_universe(universe, additional_txns);
     }
+
+    #[test]
+    fn smaller_world_and_test_deps_charging(
+        mut universe in DependencyGraph::strategy(
+            // Number of modules
+            5,
+            // Number of dependency edges
+            10..20,
+        ),
+    ) {
+        let mut executor = FakeExecutor::from_head_genesis().set_parallel();
+        universe.setup(&mut executor);
+        universe.caculate_expected_values();
+        universe.execute_and_check_deps_sizes(&mut executor);
+    }
 }

@@ -22,6 +22,7 @@ use move_core_types::{
         AbstractMemorySize, GasQuantity, InternalGas, InternalGasPerAbstractMemoryUnit,
         InternalGasUnit, NumArgs, NumBytes, NumTypeNodes, ToUnit,
     },
+    identifier::IdentStr,
     language_storage::ModuleId,
     u256,
     vm_status::StatusCode,
@@ -507,6 +508,16 @@ impl<'b> GasMeter for GasStatus<'b> {
     }
 
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_dependency(
+        &mut self,
+        _is_new: bool,
+        _addr: &AccountAddress,
+        _name: &IdentStr,
+        _size: NumBytes,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 }
