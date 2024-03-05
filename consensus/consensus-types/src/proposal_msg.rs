@@ -86,19 +86,26 @@ impl ProposalMsg {
         proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> Result<()> {
-        self.proposal().payload().map_or(Ok(()), |p| {
-            p.verify(validator, proof_cache, quorum_store_enabled)
-        })?;
-
-        self.proposal()
-            .validate_signature(validator)
-            .map_err(|e| format_err!("{:?}", e))?;
-        // if there is a timeout certificate, verify its signatures
-        if let Some(tc) = self.sync_info.highest_2chain_timeout_cert() {
-            tc.verify(validator).map_err(|e| format_err!("{:?}", e))?;
-        }
-        // Note that we postpone the verification of SyncInfo until it's being used.
-        self.verify_well_formed()
+        let (verify_proofs, verify_proposal) = rayon::join(
+            || {
+                self.proposal().payload().map_or(Ok(()), |p| {
+                    p.verify(validator, proof_cache, quorum_store_enabled)
+                })
+            },
+            || {
+                self.proposal()
+                    .validate_signature(validator)
+                    .map_err(|e| format_err!("{:?}", e))?;
+                // if there is a timeout certificate, verify its signatures
+                if let Some(tc) = self.sync_info.highest_2chain_timeout_cert() {
+                    tc.verify(validator).map_err(|e| format_err!("{:?}", e))?;
+                }
+                // Note that we postpone the verification of SyncInfo until it's being used.
+                self.verify_well_formed()
+            },
+        );
+        verify_proofs?;
+        verify_proposal
     }
 
     pub fn proposal(&self) -> &Block {
