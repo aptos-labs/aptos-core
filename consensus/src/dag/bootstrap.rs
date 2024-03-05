@@ -2,7 +2,9 @@
 
 use super::{
     adapter::{OrderedNotifierAdapter, TLedgerInfoProvider},
-    anchor_election::{AnchorElection, CommitHistory, RoundRobinAnchorElection},
+    anchor_election::{
+        AnchorElection, CachedLeaderReputation, CommitHistory, RoundRobinAnchorElection,
+    },
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
@@ -386,7 +388,7 @@ impl DagBootstrapper {
     fn build_leader_reputation_components(
         &self,
         config: &ProposerAndVoterConfig,
-    ) -> Arc<LeaderReputationAdapter> {
+    ) -> Arc<CachedLeaderReputation> {
         let num_validators = self.epoch_state.verifier.len();
         let epoch_to_validators_vec = self.storage.get_epoch_to_proposers();
         let epoch_to_validator_map = epoch_to_validators_vec
@@ -428,14 +430,19 @@ impl DagBootstrapper {
             .map(|p| self.epoch_state.verifier.get_voting_power(&p).unwrap())
             .collect();
 
-        Arc::new(LeaderReputationAdapter::new(
+        let cached_leader_reputation = CachedLeaderReputation::new(
             self.epoch_state.epoch,
-            epoch_to_validators_vec,
-            voting_power,
-            metadata_adapter,
-            heuristic,
-            100,
-        ))
+            LeaderReputationAdapter::new(
+                self.epoch_state.epoch,
+                epoch_to_validators_vec,
+                voting_power,
+                metadata_adapter,
+                heuristic,
+                100,
+            ),
+        );
+
+        Arc::new(cached_leader_reputation)
     }
 
     fn build_anchor_election(
