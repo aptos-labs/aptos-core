@@ -3,7 +3,10 @@
 
 use crate::{
     clients::{big_query, humio, victoria_metrics_api::Client as MetricsClient},
-    context::{ClientTuple, Context, JsonWebTokenService, LogIngestClients, PeerStoreTuple},
+    context::{
+        ClientTuple, Context, JsonWebTokenService, LogIngestClients, PeerStoreTuple,
+        RemoteNodeConfigProvider,
+    },
     index::routes,
     metrics::PrometheusExporter,
     validator_cache::PeerSetCacheUpdater,
@@ -107,6 +110,10 @@ impl AptosTelemetryServiceArgs {
         let validator_fullnodes = Arc::new(aptos_infallible::RwLock::new(HashMap::new()));
         let public_fullnodes = config.pfn_allowlist.clone();
 
+        let remote_config_provider = Arc::new(aptos_infallible::RwLock::new(
+            RemoteNodeConfigProvider::new(),
+        ));
+
         let context = Context::new(
             server_private_key,
             PeerStoreTuple::new(
@@ -122,6 +129,7 @@ impl AptosTelemetryServiceArgs {
             jwt_service,
             config.log_env_map.clone(),
             config.peer_identities.clone(),
+            remote_config_provider.clone(),
         );
 
         PeerSetCacheUpdater::new(
@@ -129,6 +137,8 @@ impl AptosTelemetryServiceArgs {
             validator_fullnodes,
             config.trusted_full_node_addresses.clone(),
             Duration::from_secs(config.update_interval),
+            remote_config_provider,
+            config.remote_config_url.clone(),
         )
         .run();
 
@@ -301,6 +311,8 @@ pub struct TelemetryServiceConfig {
     pub peer_identities: HashMap<ChainId, HashMap<PeerId, String>>,
 
     pub metrics_endpoints_config: MetricsEndpointsConfig,
+
+    pub remote_config_url: String,
 }
 
 impl TelemetryServiceConfig {

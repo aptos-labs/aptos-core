@@ -35,6 +35,7 @@ use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
+use regex::Regex;
 use std::{
     fs,
     io::Write,
@@ -176,9 +177,88 @@ impl AptosNodeArgs {
             });
 
             // Start the node
-            start(config, None, true).expect("Node should start correctly");
+            start(config, None, true, config_path).expect("Node should start correctly");
         };
     }
+}
+
+fn load_remote_config(
+    initial_config: &NodeConfig,
+    initial_config_path: PathBuf,
+) -> anyhow::Result<Option<NodeConfig>> {
+    let data_dir = initial_config.get_data_dir();
+    let config_dir = data_dir.join("remote_configs");
+    if !config_dir.is_dir() {
+        warn!("{:?} is not a dir. using initial config", config_dir);
+        return Ok(None);
+    }
+    let mut entries = fs::read_dir(config_dir.clone())?
+        .filter_map(|res| {
+            let Ok(entry) = res else {
+                return None;
+            };
+            let file_name = entry.file_name().into_string().ok()?;
+            if file_name.starts_with("remote_config_v") {
+                return Some(file_name);
+            }
+            None
+        })
+        .collect::<Vec<_>>();
+
+    if entries.is_empty() {
+        warn!("no remote config found in {:?}", config_dir.as_path());
+        return Ok(None);
+    }
+
+    let re = Regex::new(r"^remote_config_v(\d+)\.yaml$")?;
+    let mut max_version = 0;
+    let mut max_config = String::new();
+
+    for entry in &entries {
+        if let Some(cap) = re.captures(entry) {
+            if let Some(match_) = cap.get(1) {
+                if let Ok(version) = match_.as_str().parse::<i32>() {
+                    if version > max_version {
+                        max_version = version;
+                        max_config = entry.clone();
+                    }
+                }
+            }
+        }
+    }
+
+    if max_config.is_empty() {
+        warn!("no latest version of remote config found");
+        return Ok(None);
+    }
+    let latest_remote_config_path = config_dir.join(max_config.clone());
+    let latest_remote_config_file = fs::File::open(latest_remote_config_path)?;
+    let latest_remote_config_yaml: serde_yaml::Value =
+        serde_yaml::from_reader(latest_remote_config_file)?;
+    info!("latest_remote_config {:?}", latest_remote_config_yaml);
+
+    let initial_config_file = fs::File::open(initial_config_path.clone())?;
+    let initial_config_yaml: serde_yaml::Value = serde_yaml::from_reader(initial_config_file)?;
+    info!("initial_config {:?}", initial_config_yaml);
+
+    let mut merged_config = initial_config_yaml.clone();
+    merged_config
+        .as_mapping_mut()
+        .unwrap()
+        .extend(latest_remote_config_yaml.as_mapping().cloned().unwrap());
+    info!("merged_config {:?}", merged_config);
+
+    let merged_config_name = format!("merged_{}", max_config);
+    let merged_config_path = initial_config_path
+        .parent()
+        .unwrap()
+        .join(merged_config_name);
+    let merged_config_file = fs::File::create(merged_config_path.clone())?;
+    serde_yaml::to_writer(merged_config_file, &merged_config)?;
+
+    let latest_remote_config = NodeConfig::load_from_path(merged_config_path)?;
+
+    Ok(Some(latest_remote_config))
 }
 
 pub fn load_seed(input: &str) -> Result<[u8; 32], FromHexError> {
@@ -206,9 +286,10 @@ pub struct AptosHandle {
 
 /// Start an Aptos node
 pub fn start(
-    config: NodeConfig,
+    local_file_config: NodeConfig,
     log_file: Option<PathBuf>,
     create_global_rayon_pool: bool,
+    config_path: PathBuf,
 ) -> anyhow::Result<()> {
     // Setup panic handler
     aptos_crash_handler::setup_panic_handler();
@@ -217,15 +298,35 @@ pub fn start(
     utils::create_global_rayon_pool(create_global_rayon_pool);
 
     // Initialize the global aptos-node-identity
-    aptos_node_identity::init(config.get_peer_id())?;
+    aptos_node_identity::init(local_file_config.get_peer_id())?;
 
     // Instantiate the global logger
-    let (remote_log_receiver, logger_filter_update) = logger::create_logger(&config, log_file);
+    let (remote_log_receiver, logger_filter_update) =
+        logger::create_logger(&local_file_config, log_file);
 
     assert!(
         !cfg!(feature = "testing") && !cfg!(feature = "fuzzing"),
         "Testing features shouldn't be compiled"
     );
+
+    info!("Begin Initial Loaded Configs");
+    local_file_config.log_all_configs();
+    info!("End Initial Loaded Configs");
+
+    let config = match load_remote_config(&local_file_config, config_path) {
+        Ok(Some(merged_config)) => {
+            info!("Using Remote Config (Merged): {:?}", merged_config);
+            merged_config
+        },
+        Ok(None) => {
+            info!("no remote version found");
+            local_file_config
+        },
+        Err(err) => {
+            error!("error loading remote config. falling back: {}", err);
+            local_file_config
+        },
+    };
 
     // Ensure failpoints are configured correctly
     if fail::has_failpoints() {
@@ -342,7 +443,7 @@ pub fn start_test_environment_node(
     }
     println!("\nAptos is running, press ctrl-c to exit\n");
 
-    start(config, Some(log_file), false)
+    start(config, Some(log_file), false, test_dir)
 }
 
 /// Creates a simple test environment and starts the node.

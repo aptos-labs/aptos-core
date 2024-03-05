@@ -9,12 +9,13 @@ use crate::{
     system_information::create_system_info_telemetry_event,
     telemetry_log_sender::TelemetryLogSender, utils::create_build_info_telemetry_event,
 };
+use anyhow::ensure;
 use aptos_config::config::NodeConfig;
 use aptos_logger::{
     aptos_logger::RUST_LOG_TELEMETRY, prelude::*, telemetry_log_writer::TelemetryLog,
     LoggerFilterUpdater,
 };
-use aptos_telemetry_service::types::telemetry::{TelemetryDump, TelemetryEvent};
+use aptos_telemetry_service::types::telemetry::{RemoteNodeConfig, TelemetryDump, TelemetryEvent};
 use aptos_types::chain_id::ChainId;
 use futures::channel::mpsc::{self, Receiver};
 use once_cell::sync::Lazy;
@@ -24,8 +25,9 @@ use reqwest::Url;
 use serde::Deserialize;
 use std::{
     collections::BTreeMap,
-    env,
+    env, fs,
     future::Future,
+    process,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{runtime::Runtime, task::JoinHandle, time};
@@ -93,6 +95,12 @@ fn enable_push_custom_events() -> bool {
 fn enable_log_env_polling() -> bool {
     force_enable_telemetry()
         || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_LOG_ENV_POLLING).is_ok())
+}
+
+#[inline]
+fn enable_remote_config_polling() -> bool {
+    force_enable_telemetry()
+        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_REMOTE_CONFIG_POLLING).is_ok())
 }
 
 /// Starts the telemetry service and returns the execution runtime.
@@ -185,8 +193,14 @@ async fn spawn_telemetry_service(
 
     try_spawn_log_sender(telemetry_sender.clone(), remote_log_rx);
     try_spawn_metrics_sender(telemetry_sender.clone());
-    try_spawn_custom_event_sender(node_config, telemetry_sender.clone(), chain_id, build_info);
-    try_spawn_log_env_poll_task(telemetry_sender);
+    try_spawn_custom_event_sender(
+        node_config.clone(),
+        telemetry_sender.clone(),
+        chain_id,
+        build_info,
+    );
+    try_spawn_log_env_poll_task(telemetry_sender.clone());
+    try_spawn_remote_config_poll_task(node_config, telemetry_sender);
 
     // Run the logger filter update job within the telemetry runtime.
     if let Some(job) = logger_filter_update_job {
@@ -219,6 +233,50 @@ fn try_spawn_log_env_poll_task(sender: TelemetrySender) {
             }
         });
     }
+}
+
+fn try_spawn_remote_config_poll_task(initial_node_config: NodeConfig, sender: TelemetrySender) {
+    if enable_remote_config_polling() {
+        tokio::spawn(async move {
+            let mut interval = time::interval(Duration::from_secs(REMOTE_CONFIG_POLL_FREQ_SECS));
+            loop {
+                interval.tick().await;
+                if let Some(remote_config) = sender.get_remote_config().await {
+                    if let Err(err) = process_remote_config(remote_config, &initial_node_config) {
+                        warn!("error processing remote config: {}", err);
+                    } else {
+                        // Exit
+                        info!("Exiting current process to reload configs");
+                        process::exit(0);
+                    }
+                }
+            }
+        });
+    }
+}
+
+fn process_remote_config(
+    remote_config: RemoteNodeConfig,
+    initial_node_config: &NodeConfig,
+) -> anyhow::Result<()> {
+    info!("Retrieved config from remote: {:?}", remote_config);
+    // Validate config
+    let config_file_name = format!("remote_config_v{}.yaml", remote_config.version);
+    let data_dir = initial_node_config.get_data_dir();
+    let config_dir = data_dir.join("remote_configs");
+    fs::DirBuilder::new().recursive(true).create(&config_dir)?;
+    let config_file_path = config_dir.join(config_file_name);
+    ensure!(
+        !config_file_path.exists(),
+        "file already exists. ignoring changes. {:?}",
+        config_file_path.as_path(),
+    );
+
+    // Write
+    let file = fs::File::create(config_file_path)?;
+    serde_yaml::to_writer(file, &remote_config.node_config)?;
+
+    Ok(())
 }
 
 fn try_spawn_custom_event_sender(
@@ -551,4 +609,94 @@ fn spawn_event_sender_to_google_analytics(
 #[derive(Deserialize)]
 struct OriginIP {
     origin: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::process_remote_config;
+    use aptos_config::config::NodeConfig;
+    use aptos_telemetry_service::types::telemetry::RemoteNodeConfig;
+    use claims::{assert_err, assert_ok, assert_ok_eq};
+    use std::fs;
+
+    #[test]
+    fn test_process_remote_config() {
+        let mut initial_node_config = NodeConfig::default();
+        let test_dir = aptos_temppath::TempPath::new().as_ref().to_path_buf();
+        let config_dir = test_dir.join("remote_configs");
+        fs::DirBuilder::new()
+            .recursive(true)
+            .create(&config_dir)
+            .expect("Must be able to create temp directory");
+        initial_node_config.set_data_dir(test_dir.clone());
+        let remote_node_config = RemoteNodeConfig {
+            version: 1,
+            node_config: serde_yaml::from_str(
+                "
+                storage:
+                    enable_indexer: true
+                indexer_grpc:
+                    output_batch_size: 100
+                dag_consensus:
+                    node_payload_config:
+                        max_sending_txns_per_round: 100
+                ",
+            )
+            .unwrap(),
+        };
+
+        assert_ok!(process_remote_config(
+            remote_node_config.clone(),
+            &initial_node_config
+        ));
+
+        let written_file = fs::File::open(config_dir.join("remote_config_v1.yaml")).unwrap();
+        assert_ok_eq!(
+            serde_yaml::from_reader::<fs::File, serde_yaml::Value>(written_file),
+            remote_node_config.node_config.clone()
+        );
+
+        for i in 1..=100 {
+            let remote_node_config = RemoteNodeConfig {
+                version: i,
+                node_config: serde_yaml::from_str(&format!(
+                    "
+                    storage:
+                        enable_indexer: true
+                    indexer_grpc:
+                        output_batch_size: 100
+                    dag_consensus:
+                        node_payload_config:
+                            max_sending_txns_per_round: {}
+                    ",
+                    i
+                ))
+                .unwrap(),
+            };
+
+            if i == 1 {
+                assert_err!(process_remote_config(
+                    remote_node_config,
+                    &initial_node_config
+                ));
+            } else {
+                assert_ok!(process_remote_config(
+                    remote_node_config,
+                    &initial_node_config
+                ));
+            }
+        }
+
+        let written_file = fs::File::open(config_dir.join("remote_config_v1.yaml")).unwrap();
+        assert_ok_eq!(
+            serde_yaml::from_reader::<fs::File, serde_yaml::Value>(written_file),
+            remote_node_config.node_config.clone(),
+        );
+
+        let written_file = fs::File::open(config_dir.join("remote_config_v100.yaml")).unwrap();
+        assert_ok_eq!(
+            serde_yaml::from_reader::<fs::File, serde_yaml::Value>(written_file),
+            remote_node_config.node_config
+        );
+    }
 }

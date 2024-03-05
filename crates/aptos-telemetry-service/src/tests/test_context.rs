@@ -36,6 +36,7 @@ pub async fn new_test_context() -> TestContext {
         peer_identities: HashMap::new(),
         metrics_endpoints_config: MetricsEndpointsConfig::default_for_test(),
         humio_ingest_config: LogIngestConfig::default_for_test(),
+        remote_config_url: todo!(),
     };
 
     let peers = PeerStoreTuple::default();
@@ -50,6 +51,7 @@ pub async fn new_test_context() -> TestContext {
             jwt_service,
             HashMap::new(),
             HashMap::new(),
+            todo!(),
         ),
     )
 }
