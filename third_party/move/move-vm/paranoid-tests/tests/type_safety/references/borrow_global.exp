@@ -1,6 +1,6 @@
-processed 8 tasks
+processed 10 tasks
 
-task 2 'run'. lines 59-71:
+task 2 'run'. lines 77-89:
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: Some(1),
@@ -9,7 +9,7 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 7)],
 }
 
-task 3 'run'. lines 73-86:
+task 3 'run'. lines 91-104:
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,
@@ -18,11 +18,29 @@ Error: Script execution failed with VMError: {
     offsets: [(FunctionDefinitionIndex(0), 10)],
 }
 
-task 6 'run'. lines 116-127:
+task 6 'run'. lines 134-145:
 Error: Script execution failed with VMError: {
     major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
     sub_status: None,
     location: script,
     indices: [],
     offsets: [(FunctionDefinitionIndex(0), 8)],
+}
+
+task 8 'run'. lines 160-169:
+Error: Script execution failed with VMError: {
+    major_status: INVALID_BORROW_GLOBAL,
+    sub_status: None,
+    location: 0x2::A,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 4)],
+}
+
+task 9 'run'. lines 171-180:
+Error: Script execution failed with VMError: {
+    major_status: INVALID_BORROW_GLOBAL,
+    sub_status: None,
+    location: 0x2::A,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 4)],
 }

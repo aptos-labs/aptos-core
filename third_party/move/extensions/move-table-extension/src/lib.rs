@@ -276,12 +276,12 @@ pub fn table_natives(table_addr: AccountAddress, gas_params: GasParameters) -> N
         (
             "table",
             "borrow_box",
-            make_native_borrow_box(gas_params.common.clone(), gas_params.borrow_box.clone()),
+            make_native_borrow_box(gas_params.common.clone(), gas_params.borrow_box.clone(), false),
         ),
         (
             "table",
             "borrow_box_mut",
-            make_native_borrow_box(gas_params.common.clone(), gas_params.borrow_box),
+            make_native_borrow_box(gas_params.common.clone(), gas_params.borrow_box, true),
         ),
         (
             "table",
@@ -436,6 +436,7 @@ fn native_borrow_box(
     context: &mut NativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
+    is_mut: bool,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
@@ -456,7 +457,7 @@ fn native_borrow_box(
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
-    match gv.borrow_global() {
+    match gv.borrow_global(is_mut) {
         Ok(ref_val) => Ok(NativeResult::ok(cost, smallvec![ref_val])),
         Err(_) => Ok(NativeResult::err(cost, NOT_FOUND)),
     }
@@ -465,10 +466,11 @@ fn native_borrow_box(
 pub fn make_native_borrow_box(
     common_gas_params: CommonGasParameters,
     gas_params: BorrowBoxGasParameters,
+    is_mut: bool
 ) -> NativeFunction {
     Arc::new(
         move |context, ty_args, args| -> PartialVMResult<NativeResult> {
-            native_borrow_box(&common_gas_params, &gas_params, context, ty_args, args)
+            native_borrow_box(&common_gas_params, &gas_params, context, ty_args, args, is_mut)
         },
     )
 }

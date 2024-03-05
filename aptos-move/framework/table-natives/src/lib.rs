@@ -250,8 +250,8 @@ pub fn table_natives(
             .make_named_natives([
                 ("new_table_handle", native_new_table_handle as RawSafeNative),
                 ("add_box", native_add_box),
-                ("borrow_box", native_borrow_box),
-                ("borrow_box_mut", native_borrow_box),
+                ("borrow_box", |context, ty, val| native_borrow_box(context, ty, val, false)),
+                ("borrow_box_mut", |context, ty, val| native_borrow_box(context, ty, val, true)),
                 ("remove_box", native_remove_box),
                 ("contains_box", native_contains_box),
                 ("destroy_empty_box", native_destroy_empty_box),
@@ -374,6 +374,7 @@ fn native_borrow_box(
     context: &mut SafeNativeContext,
     ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
+    is_mut: bool,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 3);
     assert_eq!(args.len(), 2);
@@ -393,7 +394,7 @@ fn native_borrow_box(
 
     let (gv, loaded) = table.get_or_create_global_value(table_context, key_bytes)?;
 
-    let res = match gv.borrow_global() {
+    let res = match gv.borrow_global(is_mut) {
         Ok(ref_val) => Ok(smallvec![ref_val]),
         Err(_) => Err(SafeNativeError::Abort {
             abort_code: NOT_FOUND,

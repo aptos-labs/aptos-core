@@ -821,11 +821,13 @@ pub enum StatusCode {
     ACCESS_DENIED = 4034,
     // The stack of access control specifier has overflowed.
     ACCESS_STACK_LIMIT_EXCEEDED = 4035,
+    // Trying to borrow a resource that violates the reference safety rule.
+    INVALID_BORROW_GLOBAL = 4036,
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4036,
-    RESERVED_RUNTIME_ERROR_2 = 4037,
-    RESERVED_RUNTIME_ERROR_3 = 4038,
-    RESERVED_RUNTIME_ERROR_4 = 4039,
+    RESERVED_RUNTIME_ERROR_1 = 4037,
+    RESERVED_RUNTIME_ERROR_2 = 4038,
+    RESERVED_RUNTIME_ERROR_3 = 4039,
+    RESERVED_RUNTIME_ERROR_4 = 4040,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

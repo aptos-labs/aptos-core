@@ -229,7 +229,17 @@ enum GlobalValueImpl {
 /// A wrapper around `GlobalValueImpl`, representing a "slot" in global storage that can
 /// hold a resource.
 #[derive(Debug)]
-pub struct GlobalValue(GlobalValueImpl);
+pub struct GlobalValue {
+    borrow_status: BorrowStatus,
+    inner: GlobalValueImpl,
+}
+
+#[derive(Debug)]
+enum BorrowStatus {
+    None,
+    Mutable,
+    Immutable,
+}
 
 /// The locals for a function frame. It allows values to be read, written or taken
 /// reference from.
@@ -2619,61 +2629,86 @@ impl GlobalValueImpl {
 
 impl GlobalValue {
     pub fn none() -> Self {
-        Self(GlobalValueImpl::None)
+        Self {
+            borrow_status: BorrowStatus::None,
+            inner: GlobalValueImpl::None,
+        }
     }
 
     pub fn cached(val: Value) -> PartialVMResult<Self> {
-        Ok(Self(
-            GlobalValueImpl::cached(val.0, GlobalDataStatus::Clean).map_err(|(err, _val)| err)?,
-        ))
+        Ok(Self {
+            borrow_status: BorrowStatus::None,
+            inner: GlobalValueImpl::cached(val.0, GlobalDataStatus::Clean)
+                .map_err(|(err, _val)| err)?,
+        })
     }
 
     pub fn move_from(&mut self) -> PartialVMResult<Value> {
-        Ok(Value(self.0.move_from()?))
+        self.check_and_update_borrow_status(true)?;
+        Ok(Value(self.inner.move_from()?))
     }
 
     pub fn move_to(&mut self, val: Value) -> Result<(), (PartialVMError, Value)> {
-        self.0
+        if let Err(err) = self.check_and_update_borrow_status(true) {
+            return Err((err, val));
+        }
+        self.inner
             .move_to(val.0)
             .map_err(|(err, val)| (err, Value(val)))
     }
 
-    pub fn borrow_global(&self) -> PartialVMResult<Value> {
-        Ok(Value(self.0.borrow_global()?))
+    pub fn borrow_global(&mut self, is_mut: bool) -> PartialVMResult<Value> {
+        self.check_and_update_borrow_status(is_mut)?;
+        Ok(Value(self.inner.borrow_global()?))
     }
 
-    pub fn exists(&self) -> PartialVMResult<bool> {
-        self.0.exists()
+    pub fn exists(&mut self) -> PartialVMResult<bool> {
+        self.check_and_update_borrow_status(false)?;
+        self.inner.exists()
     }
 
-    pub fn assert_unique(&mut self, is_mut: bool) -> &mut Self {
-        if !is_mut {
-            return self;
-        }
-        match &self.0 {
-            GlobalValueImpl::Deleted | GlobalValueImpl::None => (),
-            GlobalValueImpl::Fresh { fields } | GlobalValueImpl::Cached { fields, .. } => {
-                assert!(Rc::strong_count(fields) == 1);
+    fn check_and_update_borrow_status(&mut self, is_mut: bool) -> PartialVMResult<()> {
+        if is_mut {
+            match &self.inner {
+                GlobalValueImpl::Deleted | GlobalValueImpl::None => (),
+                GlobalValueImpl::Fresh { fields } | GlobalValueImpl::Cached { fields, .. } => {
+                    if Rc::strong_count(fields) != 1 {
+                        return Err(PartialVMError::new(StatusCode::INVALID_BORROW_GLOBAL));
+                    }
+                },
+            };
+            self.borrow_status = BorrowStatus::Mutable;
+        } else {
+            if let BorrowStatus::Mutable = &self.borrow_status {
+                match &self.inner {
+                    GlobalValueImpl::Deleted | GlobalValueImpl::None => (),
+                    GlobalValueImpl::Fresh { fields } | GlobalValueImpl::Cached { fields, .. } => {
+                        if Rc::strong_count(fields) != 1 {
+                            return Err(PartialVMError::new(StatusCode::INVALID_BORROW_GLOBAL));
+                        }
+                    },
+                };
             }
-        };
-        self
+            self.borrow_status = BorrowStatus::Immutable;
+        }
+        Ok(())
     }
 
     pub fn into_effect(self) -> Option<Op<Value>> {
-        self.0.into_effect().map(|op| op.map(Value))
+        self.inner.into_effect().map(|op| op.map(Value))
     }
 
     pub fn into_effect_with_layout(
         self,
         layout: MoveTypeLayout,
     ) -> Option<Op<(Value, MoveTypeLayout)>> {
-        self.0
+        self.inner
             .into_effect()
             .map(|op| op.map(|v| (Value(v), layout)))
     }
 
     pub fn is_mutated(&self) -> bool {
-        self.0.is_mutated()
+        self.inner.is_mutated()
     }
 }
 
@@ -3686,7 +3721,7 @@ impl GlobalValue {
             }
         }
 
-        match &self.0 {
+        match &self.inner {
             G::None | G::Deleted => None,
             G::Cached { fields, .. } | G::Fresh { fields } => Some(Wrapper(fields)),
         }

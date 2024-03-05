@@ -23,6 +23,24 @@ module 0x2.A {
         return borrow_global_mut<G>(move(addr));
     }
 
+    public borrow_mut_twice(addr: address) {
+        let r1: &mut Self.G;
+        let r2: &mut Self.G;
+    label b0:
+        r1 = borrow_global_mut<G>(copy(addr));
+        r2 = borrow_global_mut<G>(move(addr));
+        return;
+    }
+
+    public borrow_immmut_after_mut(addr: address) {
+        let r1: &mut Self.G;
+        let r2: &Self.G;
+    label b0:
+        r1 = borrow_global_mut<G>(copy(addr));
+        r2 = borrow_global<G>(move(addr));
+        return;
+    }
+
     public borrow_field(addr: address): &u64 {
         let g_ref: &Self.G;
     label b0:
@@ -136,5 +154,27 @@ label b0:
     a = signer.address_of(&account);
     g_ref = A.borrow_field_mut(move(a));
     *move(g_ref) = 10;
+    return;
+}
+
+//# run --signers 0x1  --check-runtime-types
+import 0x2.A;
+import 0x1.signer;
+main(account: signer) {
+    let a: address;
+label b0:
+    a = signer.address_of(&account);
+    A.borrow_mut_twice(move(a));
+    return;
+}
+
+//# run --signers 0x1  --check-runtime-types
+import 0x2.A;
+import 0x1.signer;
+main(account: signer) {
+    let a: address;
+label b0:
+    a = signer.address_of(&account);
+    A.borrow_immmut_after_mut(move(a));
     return;
 }
