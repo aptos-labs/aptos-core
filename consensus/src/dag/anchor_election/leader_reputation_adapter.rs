@@ -129,13 +129,16 @@ impl AnchorElection for LeaderReputationAdapter {
     }
 
     fn update_reputation(&self, commit_event: CommitEvent) {
-        self.data_source.push(commit_event)
+        monitor!("dag_update_reputation", self.data_source.push(commit_event))
     }
 }
 
 impl CommitHistory for LeaderReputationAdapter {
     fn get_voting_power_participation_ratio(&self, round: Round) -> VotingPowerRatio {
-        let mut voting_power_ratio = self.reputation.get_voting_power_participation_ratio(round);
+        let mut voting_power_ratio = monitor!(
+            "dag_get_voting_power_ratio",
+            self.reputation.get_voting_power_participation_ratio(round)
+        );
         // TODO: fix this once leader reputation is fixed
         if voting_power_ratio < 0.67 {
             voting_power_ratio = 1.0;
