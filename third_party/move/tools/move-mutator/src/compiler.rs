@@ -184,11 +184,10 @@ fn prepare_compiler_for_package(
     let mut global_address_map = BTreeMap::new();
     for pack in paths.iter().chain(bytecode_deps.iter()) {
         for (name, val) in &pack.named_address_map {
-            let old = if let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val) {
-                old
-            } else {
+            let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val) else {
                 continue;
             };
+
             if old != *val {
                 let pack_name = pack
                     .name
