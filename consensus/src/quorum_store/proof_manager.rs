@@ -7,6 +7,7 @@ use crate::{
     quorum_store::{
         batch_generator::BackPressure,
         counters,
+        types::BatchPayload,
         utils::{BatchKey, BatchSortKey, ProofQueue},
     },
 };
@@ -15,6 +16,7 @@ use aptos_consensus_types::{
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
@@ -192,17 +194,19 @@ impl ProofManager {
                                         .batches_without_proof_of_store
                                         .get(&BatchKey::from_info(batch))
                                     {
-                                        // TODO: Need to verify the batch hash
-                                        inline_txns += batch.num_txns();
-                                        inline_bytes += batch.num_bytes();
-                                        cur_txns += batch.num_txns();
-                                        cur_bytes += batch.num_bytes();
                                         // TODO: Can cloning be avoided here?
-                                        inline_block.push((batch.clone(), txns.clone()));
-                                        true
-                                    } else {
-                                        false
+                                        if BatchPayload::new(batch.author(), txns.clone()).hash()
+                                            == *batch.digest()
+                                        {
+                                            inline_txns += batch.num_txns();
+                                            inline_bytes += batch.num_bytes();
+                                            cur_txns += batch.num_txns();
+                                            cur_bytes += batch.num_bytes();
+                                            inline_block.push((batch.clone(), txns.clone()));
+                                            return true;
+                                        }
                                     }
+                                    false
                                 } else {
                                     full = true;
                                     false

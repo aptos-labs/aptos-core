@@ -442,7 +442,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                             exclude_proofs.insert(proof.info().clone());
                         }
                         for (batch_info, _) in inline_batches {
-                            // TODO: Verify batch_info
+                            // TODO: Couldn't verify whether the digest is correct in batch_info
                             exclude_proofs.insert(batch_info.clone());
                         }
                     },
