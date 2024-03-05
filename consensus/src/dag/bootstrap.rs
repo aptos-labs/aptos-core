@@ -683,16 +683,23 @@ impl DagBootstrapper {
     }
 
     fn full_bootstrap(&self) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
-        let (anchor_election, commit_history, commit_events) = self.build_anchor_election();
+        let (anchor_election, commit_history, commit_events) =
+            monitor!("dag_build_anchor_election", self.build_anchor_election());
 
-        let base_state = self.bootstrap_dag_store(
-            anchor_election.clone(),
-            commit_history,
-            commit_events,
-            self.onchain_config.dag_ordering_causal_history_window as u64,
+        let base_state = monitor!(
+            "dag_full_bootstrap_ds",
+            self.bootstrap_dag_store(
+                anchor_election.clone(),
+                commit_history,
+                commit_events,
+                self.onchain_config.dag_ordering_causal_history_window as u64,
+            )
         );
 
-        let (handler, fetch_service) = self.bootstrap_components(&base_state);
+        let (handler, fetch_service) = monitor!(
+            "dag_full_bootstrap_comp",
+            self.bootstrap_components(&base_state)
+        );
         (base_state, handler, fetch_service)
     }
 
