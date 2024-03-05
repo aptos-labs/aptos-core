@@ -2,6 +2,7 @@
 /// metadata object can be any object that equipped with `Metadata` resource.
 module aptos_framework::fungible_asset {
     use aptos_framework::aggregator_v2::{Self, Aggregator};
+    use aptos_framework::create_signer;
     use aptos_framework::event;
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};
     use std::string;
@@ -579,7 +580,8 @@ module aptos_framework::fungible_asset {
         assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
 
-        if (concurrent_fungible_balance_exists(store_addr)) {
+        if (features::concurrent_fungible_assets_enabled()) {
+            ensure_store_upgraded_to_concurrent_internal(store_addr);
             let balance = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
             aggregator_v2::add(&mut balance.balance, amount);
         } else {
@@ -597,9 +599,13 @@ module aptos_framework::fungible_asset {
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
 
-        if (concurrent_fungible_balance_exists(store_addr)) {
+        if (features::concurrent_fungible_assets_enabled()) {
+            ensure_store_upgraded_to_concurrent_internal(store_addr);
             let balance = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
-            assert!(aggregator_v2::try_sub(&mut balance.balance, amount), error::invalid_argument(EINSUFFICIENT_BALANCE));
+            assert!(
+                aggregator_v2::try_sub(&mut balance.balance, amount),
+                error::invalid_argument(EINSUFFICIENT_BALANCE)
+            );
         } else {
             let store = borrow_global_mut<FungibleStore>(store_addr);
             assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
@@ -708,23 +714,18 @@ module aptos_framework::fungible_asset {
         move_to(&metadata_object_signer, supply);
     }
 
-    public fun upgrade_store_to_concurrent(
-        ref: &ExtendRef,
-    ) acquires FungibleStore, ConcurrentFungibleBalance {
-        let store_object_address = object::address_from_extend_ref(ref);
-        let store_object_signer = object::generate_signer_for_extending(ref);
-        assert!(features::concurrent_fungible_assets_enabled(), error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED));
-        assert!(exists<FungibleStore>(store_object_address), error::not_found(ESTORE_NOT_FOUND));
-
-        let store = borrow_global_mut<FungibleStore>(store_object_address);
-        let balance = store.balance;
-        store.balance = 0;
-        let concurrent_balance = ConcurrentFungibleBalance {
-            balance: aggregator_v2::create_unbounded_aggregator(),
+    /// Ensure a known `FungibleStore` has `ConcurrentFungibleBalance`.
+    inline fun ensure_store_upgraded_to_concurrent_internal(
+        fungible_store_address: address,
+    ) {
+        if (!exists<ConcurrentFungibleBalance>(fungible_store_address)) {
+            let store = borrow_global_mut<FungibleStore>(fungible_store_address);
+            let balance = aggregator_v2::create_unbounded_aggregator();
+            aggregator_v2::add(&mut balance, store.balance);
+            store.balance = 0;
+            let object_signer = create_signer::create_signer(fungible_store_address);
+            move_to(&object_signer, ConcurrentFungibleBalance { balance });
         };
-        // update current state:
-        aggregator_v2::add(&mut concurrent_balance.balance, balance);
-        move_to(&store_object_signer, concurrent_balance);
     }
 
     #[test_only]
