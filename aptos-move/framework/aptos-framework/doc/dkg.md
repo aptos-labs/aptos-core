@@ -13,7 +13,6 @@ DKG on-chain states and helper functions.
 -  [Struct `DKGSessionState`](#0x1_dkg_DKGSessionState)
 -  [Resource `DKGState`](#0x1_dkg_DKGState)
 -  [Constants](#@Constants_0)
--  [Function `in_progress_dealer_epoch`](#0x1_dkg_in_progress_dealer_epoch)
 -  [Function `block_dkg`](#0x1_dkg_block_dkg)
 -  [Function `unblock_dkg`](#0x1_dkg_unblock_dkg)
 -  [Function `block_randomness`](#0x1_dkg_block_randomness)
@@ -22,6 +21,7 @@ DKG on-chain states and helper functions.
 -  [Function `start`](#0x1_dkg_start)
 -  [Function `finish`](#0x1_dkg_finish)
 -  [Function `in_progress`](#0x1_dkg_in_progress)
+-  [Function `clean_up_in_progress_session`](#0x1_dkg_clean_up_in_progress_session)
 -  [Specification](#@Specification_1)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `start`](#@Specification_1_start)
@@ -281,36 +281,6 @@ The completed and in-progress DKG sessions.
 
 
 
-<a id="0x1_dkg_in_progress_dealer_epoch"></a>
-
-## Function `in_progress_dealer_epoch`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_in_progress_dealer_epoch">in_progress_dealer_epoch</a>(): u64
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="dkg.md#0x1_dkg_in_progress_dealer_epoch">in_progress_dealer_epoch</a>(): u64 <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
-    <b>let</b> state = <b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&state.in_progress)) {
-        <b>let</b> session = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&state.in_progress);
-        session.metadata.dealer_epoch
-    } <b>else</b> {
-        0
-    }
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_dkg_block_dkg"></a>
 
 ## Function `block_dkg`
@@ -556,6 +526,34 @@ Return whether a DKG is in progress.
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&<b>borrow_global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).in_progress)
     } <b>else</b> {
         <b>false</b>
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_dkg_clean_up_in_progress_session"></a>
+
+## Function `clean_up_in_progress_session`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_clean_up_in_progress_session">clean_up_in_progress_session</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_clean_up_in_progress_session">clean_up_in_progress_session</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <b>if</b> (<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework)) {
+        <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
+        dkg_state.in_progress = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     }
 }
 </code></pre>

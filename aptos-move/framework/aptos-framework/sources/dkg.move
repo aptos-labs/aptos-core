@@ -50,16 +50,6 @@ module aptos_framework::dkg {
         in_progress: Option<DKGSessionState>,
     }
 
-    public(friend) fun in_progress_dealer_epoch(): u64 acquires DKGState {
-        let state = borrow_global<DKGState>(@aptos_framework);
-        if (option::is_some(&state.in_progress)) {
-            let session = option::borrow(&state.in_progress);
-            session.metadata.dealer_epoch
-        } else {
-            0
-        }
-    }
-
     public fun block_dkg(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
         if (!exists<FailureInjectionBlockDKG>(@aptos_framework)) {
@@ -150,6 +140,14 @@ module aptos_framework::dkg {
             option::is_some(&borrow_global<DKGState>(@aptos_framework).in_progress)
         } else {
             false
+        }
+    }
+
+    public fun clean_up_in_progress_session(fx: &signer) acquires DKGState {
+        system_addresses::assert_aptos_framework(fx);
+        if (exists<DKGState>(@aptos_framework)) {
+            let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
+            dkg_state.in_progress = option::none();
         }
     }
 }
