@@ -171,10 +171,12 @@ impl CachedLeaderReputation {
         let mut recent_elections = self.recent_elections.lock();
 
         *recent_elections.entry(round).or_insert_with(|| {
-            let result = self
-                .inner
-                .reputation
-                .get_valid_proposer_and_voting_power_participation_ratio(round);
+            let result = monitor!(
+                "dag_compute_leader_rep",
+                self.inner
+                    .reputation
+                    .get_valid_proposer_and_voting_power_participation_ratio(round)
+            );
             info!(
                 "AnchorElection for epoch {} and round {}: {:?}",
                 self.epoch, round, result
@@ -186,7 +188,7 @@ impl CachedLeaderReputation {
 
 impl AnchorElection for CachedLeaderReputation {
     fn get_anchor(&self, round: Round) -> Author {
-        self.get_or_compute_entry(round).0
+        monitor!("dag_get_anchor", self.get_or_compute_entry(round).0)
     }
 
     fn update_reputation(&self, commit_event: CommitEvent) {
