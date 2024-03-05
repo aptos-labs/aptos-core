@@ -469,7 +469,10 @@ impl DagStore {
         start_round: Round,
         window_size: u64,
     ) -> Self {
-        let mut all_nodes = storage.get_certified_nodes().unwrap_or_default();
+        let mut all_nodes = monitor!(
+            "dag_store_new_storage",
+            storage.get_certified_nodes().unwrap_or_default()
+        );
         all_nodes.sort_unstable_by_key(|(_, node)| node.round());
         let mut to_prune = vec![];
         // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
@@ -481,28 +484,30 @@ impl DagStore {
             window_size,
         );
 
-        let groups: Vec<(Round, Vec<_>)> = all_nodes
-            .into_iter()
-            .group_by(|(_, node)| node.round())
-            .into_iter()
-            .map(|(key, group)| (key, group.collect()))
-            .collect();
-
-        for (_round, round_group) in groups {
-            let digests: Vec<_> = round_group
-                .into_par_iter()
-                .with_min_len(5)
-                .filter_map(|(digest, certified_node)| {
-                    if let Err(e) = dag.add_node_inmem(certified_node) {
-                        debug!("Delete node after bootstrap due to {}", e);
-                        Some(digest)
-                    } else {
-                        None
-                    }
-                })
+        monitor!("dag_store_new_par_iter", {
+            let groups: Vec<(Round, Vec<_>)> = all_nodes
+                .into_iter()
+                .group_by(|(_, node)| node.round())
+                .into_iter()
+                .map(|(key, group)| (key, group.collect()))
                 .collect();
-            to_prune.extend_from_slice(&digests)
-        }
+
+            for (_round, round_group) in groups {
+                let digests: Vec<_> = round_group
+                    .into_par_iter()
+                    .with_min_len(5)
+                    .filter_map(|(digest, certified_node)| {
+                        if let Err(e) = dag.add_node_inmem(certified_node) {
+                            debug!("Delete node after bootstrap due to {}", e);
+                            Some(digest)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                to_prune.extend_from_slice(&digests)
+            }
+        });
 
         let handle = tokio::task::spawn_blocking(move || {
             monitor!("dag_store_new_gc", {
