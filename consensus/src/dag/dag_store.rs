@@ -21,6 +21,10 @@ use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use futures::executor::block_on;
+use itertools::Itertools;
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Deref,
@@ -477,12 +481,27 @@ impl DagStore {
             window_size,
         );
 
-        for (digest, certified_node) in all_nodes {
-            // TODO: save the storage call in this case
-            if let Err(e) = dag.add_node_inmem(certified_node) {
-                debug!("Delete node after bootstrap due to {}", e);
-                to_prune.push(digest);
-            }
+        let groups: Vec<(Round, Vec<_>)> = all_nodes
+            .into_iter()
+            .group_by(|(_, node)| node.round())
+            .into_iter()
+            .map(|(key, group)| (key, group.collect()))
+            .collect();
+
+        for (_round, round_group) in groups {
+            let digests: Vec<_> = round_group
+                .into_par_iter()
+                .with_min_len(5)
+                .filter_map(|(digest, certified_node)| {
+                    if let Err(e) = dag.add_node_inmem(certified_node) {
+                        debug!("Delete node after bootstrap due to {}", e);
+                        Some(digest)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            to_prune.extend_from_slice(&digests)
         }
 
         let handle = tokio::task::spawn_blocking(move || {
