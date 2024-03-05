@@ -1,12 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::{
-    types::{CliCommand, CliError, CliTypedResult, PromptOptions},
-    utils::{
-        check_if_file_exists, create_dir_if_not_exist, read_dir_files, read_from_file,
-        write_to_user_only_file,
+use crate::{
+    common::{
+        types::{CliCommand, CliError, CliTypedResult, PromptOptions},
+        utils::{
+            check_if_file_exists, create_dir_if_not_exist, read_dir_files, read_from_file,
+            write_to_user_only_file,
+        },
     },
+    update::get_revela_path,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -27,12 +30,6 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-
-const REVELA_EXE_ENV: &str = "REVELA_EXE";
-#[cfg(target_os = "windows")]
-const REVELA_EXE: &str = "revela.exe";
-#[cfg(not(target_os = "windows"))]
-const REVELA_EXE: &str = "revela";
 
 const DISASSEMBLER_EXTENSION: &str = "mv.asm";
 const DECOMPILER_EXTENSION: &str = "mv.move";
@@ -260,7 +257,7 @@ impl BytecodeCommand {
     }
 
     fn decompile(&self, bytecode_path: &Path) -> Result<String, CliError> {
-        let exe = self.get_revela_path()?;
+        let exe = get_revela_path()?;
         let to_cli_error = |e| CliError::IO(exe.display().to_string(), e);
         let mut cmd = Command::new(exe.as_path());
         cmd.arg(format!("--bytecode={}", bytecode_path.display()));
@@ -280,21 +277,6 @@ impl BytecodeCommand {
                 "decompiler exited with status {}: {}",
                 out.status,
                 String::from_utf8(out.stderr).unwrap_or_default()
-            )))
-        }
-    }
-
-    fn get_revela_path(&self) -> CliTypedResult<PathBuf> {
-        if let Ok(path) = std::env::var(REVELA_EXE_ENV) {
-            Ok(PathBuf::from(path))
-        } else if let Some(path) = pathsearch::find_executable_in_path(REVELA_EXE) {
-            Ok(path)
-        } else {
-            Err(CliError::CommandArgumentError(format!(
-                "Cannot locate the decompiler executable. \
-                Environment variable `{}` is not set, and `{}` is not in the PATH. \
-                Try running `aptos update revela` to download it.",
-                REVELA_EXE_ENV, REVELA_EXE
             )))
         }
     }

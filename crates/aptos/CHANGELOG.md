@@ -4,8 +4,11 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [3.0.0] - 2024/03/05
+- **Breaking Change**: `aptos update` is now `aptos update aptos`.
+- Added `aptos update revela`. This installs / updates the `revela` binary, which is needed for the new `aptos move decompile` subcommand.
 - Extended `aptos move download` with an option `--bytecode` to also download the bytecode of a module
-- Integrate the Revela decompiler which is now available via `aptos move decompile` 
+- Integrated the Revela decompiler which is now available via `aptos move decompile` 
 - Extended `aptos move disassemble` and the new `aptos move decompile` to also work on entire packages instead of only single files
 
 ## [2.5.0] - 2024/02/27
