@@ -27,7 +27,7 @@ impl Default for DagPayloadConfig {
             max_receiving_txns_per_round: 11000,
             max_receiving_size_per_round_bytes: 20 * 1024 * 1024,
 
-            payload_pull_max_poll_time_ms: 1000,
+            payload_pull_max_poll_time_ms: 50,
         }
     }
 }
@@ -92,10 +92,10 @@ pub struct DagFetcherConfig {
 impl Default for DagFetcherConfig {
     fn default() -> Self {
         Self {
-            retry_interval_ms: 500,
-            rpc_timeout_ms: 1000,
-            min_concurrent_responders: 1,
-            max_concurrent_responders: 4,
+            retry_interval_ms: 1000,
+            rpc_timeout_ms: 5000,
+            min_concurrent_responders: 2,
+            max_concurrent_responders: 10,
             max_concurrent_fetches: 50,
             request_channel_size: 100,
             response_channel_size: 100,
@@ -116,12 +116,12 @@ pub struct ReliableBroadcastConfig {
 impl Default for ReliableBroadcastConfig {
     fn default() -> Self {
         Self {
-            // A backoff policy that starts at 100ms and doubles each iteration up to 3secs.
+            // A backoff policy that starts at 100ms and doubles each iteration up to 10secs.
             backoff_policy_base_ms: 2,
             backoff_policy_factor: 50,
-            backoff_policy_max_delay_ms: 3000,
+            backoff_policy_max_delay_ms: 10000,
 
-            rpc_timeout_ms: 1000,
+            rpc_timeout_ms: 5000,
         }
     }
 }
