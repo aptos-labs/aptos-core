@@ -524,32 +524,41 @@ impl DagBootstrapper {
                 .saturating_sub(dag_window_size_config),
         );
 
-        let dag = Arc::new(DagStore::new(
-            self.epoch_state.clone(),
-            self.storage.clone(),
-            self.payload_manager.clone(),
-            initial_round,
-            dag_window_size_config,
-        ));
+        let dag = monitor!(
+            "dag_store_new",
+            Arc::new(DagStore::new(
+                self.epoch_state.clone(),
+                self.storage.clone(),
+                self.payload_manager.clone(),
+                initial_round,
+                dag_window_size_config,
+            ))
+        );
 
-        let ordered_notifier = Arc::new(OrderedNotifierAdapter::new(
-            self.ordered_nodes_tx.clone(),
-            dag.clone(),
-            self.epoch_state.clone(),
-            parent_block_info,
-            ledger_info_provider.clone(),
-            self.allow_batches_without_pos_in_proposal,
-        ));
+        let ordered_notifier = monitor!(
+            "dag_ordered_notifier_new",
+            Arc::new(OrderedNotifierAdapter::new(
+                self.ordered_nodes_tx.clone(),
+                dag.clone(),
+                self.epoch_state.clone(),
+                parent_block_info,
+                ledger_info_provider.clone(),
+                self.allow_batches_without_pos_in_proposal,
+            ))
+        );
 
-        let order_rule = Arc::new(Mutex::new(OrderRule::new(
-            self.epoch_state.clone(),
-            commit_round + 1,
-            dag.clone(),
-            anchor_election.clone(),
-            ordered_notifier.clone(),
-            self.onchain_config.dag_ordering_causal_history_window as Round,
-            commit_events,
-        )));
+        let order_rule = monitor!(
+            "dag_order_rule_new",
+            Arc::new(Mutex::new(OrderRule::new(
+                self.epoch_state.clone(),
+                commit_round + 1,
+                dag.clone(),
+                anchor_election.clone(),
+                ordered_notifier.clone(),
+                self.onchain_config.dag_ordering_causal_history_window as Round,
+                commit_events,
+            )))
+        );
 
         BootstrapBaseState {
             dag_store: dag,
