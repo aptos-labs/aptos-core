@@ -21,10 +21,14 @@ use crate::{
 use aptos_bounded_executor::{BoundedExecutor, ConcurrentStream};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_logger::{debug, error, warn};
+use aptos_logger::{
+    debug, error,
+    prelude::{sample, SampleRate},
+    warn,
+};
 use aptos_types::epoch_state::EpochState;
 use futures::{stream::FuturesUnordered, StreamExt};
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 use tokio::{runtime::Handle, select};
 
 pub(crate) struct NetworkHandler {
@@ -269,7 +273,10 @@ impl VerifiedMessageProcessor {
                     }
                 },
                 Err(err) => {
-                    error!(error = ?err, "DAG message verification failed");
+                    sample!(
+                        SampleRate::Duration(Duration::from_millis(100)),
+                        error!(error = ?err, "DAG message verification failed")
+                    );
                     Err(DAGError::MessageVerificationError)
                 },
             }

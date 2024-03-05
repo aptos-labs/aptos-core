@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff, types::NodeCertificate};
+use super::{
+    dag_store::DagStore, health::HealthBackoff, order_rule::TOrderRule, types::NodeCertificate,
+};
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
         dag_fetcher::TFetchRequester,
         errors::DagDriverError,
         observability::{
-            counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
+            counters::{self, FETCH_ENQUEUE_FAILURES, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
@@ -140,6 +142,9 @@ impl DagDriver {
 
             if !dag_reader.all_exists(node.parents_metadata()) {
                 if let Err(err) = self.fetch_requester.request_for_certified_node(node) {
+                    FETCH_ENQUEUE_FAILURES
+                        .with_label_values(&[&"cert_node"])
+                        .inc();
                     error!("request to fetch failed: {}", err);
                 }
                 bail!(DagDriverError::MissingParents);
@@ -370,7 +375,7 @@ impl DagDriver {
     }
 
     pub fn fetch_callback(&self) {
-        self.order_rule.lock().process_all();
+        self.order_rule.process_all();
         self.check_new_round();
     }
 }
@@ -395,7 +400,7 @@ impl RpcHandler for DagDriver {
 
         let node_metadata = certified_node.metadata().clone();
         self.add_node(certified_node)
-            .map(|_| self.order_rule.lock().process_new_node(&node_metadata))?;
+            .map(|_| self.order_rule.process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
     }

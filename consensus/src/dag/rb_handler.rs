@@ -8,7 +8,7 @@ use crate::{
         dag_network::RpcHandler,
         errors::NodeBroadcastHandleError,
         observability::{
-            counters::RB_HANDLE_ACKS,
+            counters::{FETCH_ENQUEUE_FAILURES, RB_HANDLE_ACKS},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, NodeStage},
         },
@@ -189,6 +189,7 @@ impl NodeBroadcastHandler {
             // because they are already GC'ed
             if current_round > lowest_round {
                 if let Err(err) = self.fetch_requester.request_for_node(node) {
+                    FETCH_ENQUEUE_FAILURES.with_label_values(&[&"node"]).inc();
                     error!("request to fetch failed: {}", err);
                 }
                 bail!(NodeBroadcastHandleError::MissingParents);
