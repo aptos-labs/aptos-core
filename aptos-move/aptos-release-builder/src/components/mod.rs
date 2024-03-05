@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use self::framework::FrameworkReleaseConfig;
-use crate::{aptos_core_path, aptos_framework_path, components::feature_flags::Features};
+use crate::{
+    aptos_core_path, aptos_framework_path,
+    components::{feature_flags::Features, oidc_providers::OidcProviderOp},
+};
 use anyhow::{anyhow, bail, Context, Result};
 use aptos::governance::GenerateExecutionHash;
 use aptos_rest_client::Client;
@@ -30,6 +33,7 @@ pub mod execution_config;
 pub mod feature_flags;
 pub mod framework;
 pub mod gas;
+pub mod oidc_providers;
 pub mod transaction_fee;
 pub mod version;
 
@@ -64,6 +68,7 @@ impl Proposal {
                 | ReleaseEntry::Version(_)
                 | ReleaseEntry::Consensus(_)
                 | ReleaseEntry::Execution(_)
+                | ReleaseEntry::OidcProviderOps(_)
                 | ReleaseEntry::RawScript(_) => ret.push(entry.clone()),
             }
         }
@@ -113,6 +118,7 @@ pub enum ReleaseEntry {
     Consensus(OnChainConsensusConfig),
     Execution(OnChainExecutionConfig),
     RawScript(PathBuf),
+    OidcProviderOps(Vec<OidcProviderOp>),
 }
 
 impl ReleaseEntry {
@@ -251,6 +257,17 @@ impl ReleaseEntry {
                     );
                 }
             },
+            ReleaseEntry::OidcProviderOps(ops) => {
+                result.append(&mut oidc_providers::generate_oidc_provider_ops_proposal(
+                    ops,
+                    is_testnet,
+                    if is_multi_step {
+                        get_execution_hash(result)
+                    } else {
+                        "".to_owned().into_bytes()
+                    },
+                )?);
+            },
             ReleaseEntry::RawScript(script_path) => {
                 let base_path = aptos_core_path().join(script_path.as_path());
                 let file_name = base_path
@@ -364,6 +381,7 @@ impl ReleaseEntry {
                     bail!("Consensus config mismatch: Expected {:?}", execution_config);
                 }
             },
+            ReleaseEntry::OidcProviderOps(_) => {},
         }
         Ok(())
     }
@@ -677,5 +695,13 @@ impl Default for ProposalMetadata {
             source_code_url: default_url(),
             discussion_url: default_url(),
         }
+    }
+}
+
+fn get_signer_arg(is_testnet: bool, next_execution_hash: &Vec<u8>) -> &str {
+    if is_testnet && next_execution_hash.is_empty() {
+        "framework_signer"
+    } else {
+        "&framework_signer"
     }
 }
