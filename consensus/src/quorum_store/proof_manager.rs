@@ -100,6 +100,7 @@ impl BatchQueue {
         &mut self,
         max_txns: u64,
         max_bytes: u64,
+        excluded_batches: Vec<BatchInfo>,
     ) -> Vec<(BatchInfo, Vec<SignedTransaction>)> {
         let mut result: Vec<(BatchInfo, Vec<SignedTransaction>)> = vec![];
         let mut num_txns = 0;
@@ -116,7 +117,9 @@ impl BatchQueue {
                     return false;
                 }
                 if let Some((_sort_key, batch)) = iter.next() {
-                    if num_txns + batch.num_txns() <= max_txns
+                    if excluded_batches.contains(batch) {
+                        true
+                    } else if num_txns + batch.num_txns() <= max_txns
                         && num_bytes + batch.num_bytes() <= max_bytes
                     {
                         if let Some(Some(txns)) =
@@ -230,14 +233,6 @@ impl ProofManager {
                     .proofs_for_consensus
                     .pull_proofs(&excluded_batches, max_txns, max_bytes, return_non_full);
 
-                self.batch_queue
-                    .remove_batches(excluded_batches.iter().cloned().collect());
-                self.batch_queue.remove_batches(
-                    proof_block
-                        .iter()
-                        .map(|proof| proof.info().clone())
-                        .collect(),
-                );
                 self.batch_queue.remove_expired_batches();
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
@@ -257,6 +252,11 @@ impl ProofManager {
                     inline_block = self.batch_queue.pull_batches(
                         min(max_txns - cur_txns, max_inline_txns),
                         min(max_bytes - cur_bytes, max_inline_bytes),
+                        excluded_batches
+                            .iter()
+                            .cloned()
+                            .chain(proof_block.iter().map(|proof| proof.info().clone()))
+                            .collect(),
                     );
                 }
                 let inline_txns = inline_block
