@@ -501,18 +501,19 @@ impl<'env> ModelBuilder<'env> {
     /// `path`: `path[0]` contains `path[1]` ... `path[-1]` contains `this_struct`
     fn gen_error_msg_for_fields_loop(
         &self,
-        path: &Vec<(Loc, Type)>,
+        path: &Vec<(Loc, Symbol, Type)>,
         this_struct_id: QualifiedId<StructId>,
     ) -> Vec<String> {
         let mut loop_notes = Vec::new();
         for i in 0..path.len() - 1 {
-            let parent_name = self.get_struct_type_name(&path[i].1, this_struct_id.clone());
-            let child_name = self.get_struct_type_name(&path[i + 1].1, this_struct_id.clone());
-            loop_notes.push(format!("`{}` contains `{}`...", parent_name, child_name));
+            let parent_name = self.get_struct_type_name(&path[i].2, this_struct_id.clone());
+            let field_name = self.env.symbol_pool().string(path[i].1).to_string();
+            let child_name = self.get_struct_type_name(&path[i + 1].2, this_struct_id.clone());
+            loop_notes.push(format!("`{}` contains field `{}: {}`...", parent_name, field_name, child_name));
         }
         loop_notes.push(format!(
             "`{}` contains `{}`, which forms a loop.",
-            self.get_struct_type_name(&path.last().unwrap().1, this_struct_id.clone()),
+            self.get_struct_type_name(&path.last().unwrap().2, this_struct_id.clone()),
             self.get_struct_display_name_simple(this_struct_id)
         ));
         loop_notes
@@ -530,7 +531,7 @@ impl<'env> ModelBuilder<'env> {
         &self,
         ty: &Type,
         ty_loc: Loc,
-        path: &mut Vec<(Loc, Type)>,
+        path: &mut Vec<(Loc, Symbol, Type)>,
         checking: QualifiedId<StructId>,
         loc_checking: &Loc,
     ) -> bool {
@@ -539,7 +540,7 @@ impl<'env> ModelBuilder<'env> {
                 let this_struct_id = mid.qualified(*sid);
                 let this_struct_entry = self.lookup_struct_entry(this_struct_id);
                 // checks if `ty` occurs in `path`
-                for (_parent_loc, parent) in path.iter() {
+                for (_parent_loc, _field_symbol, parent) in path.iter() {
                     if let Type::Struct(mid, sid, _) = parent {
                         let parent_id = mid.qualified(*sid);
                         if parent_id == this_struct_id {
@@ -564,11 +565,11 @@ impl<'env> ModelBuilder<'env> {
                     }
                 }
                 if let Some(fields) = &this_struct_entry.fields {
-                    path.push((ty_loc, ty.clone()));
                     // check for descendant fields recursively
-                    for (_field_name, (field_loc, _field_idx, field_ty_uninstantiated)) in
-                        fields.iter()
+                    for (field_name, (field_loc, _field_idx, field_ty_uninstantiated)) in
+                    fields.iter()
                     {
+                        path.push((ty_loc.clone(), field_name.clone(), ty.clone()));
                         let field_ty_instantiated = field_ty_uninstantiated.instantiate(insts);
                         // short-curcuit upon first recursive occurence found
                         if !self.check_recusive_struct_with_parents(
@@ -580,8 +581,8 @@ impl<'env> ModelBuilder<'env> {
                         ) {
                             return false;
                         }
+                        path.pop();
                     }
-                    path.pop();
                     true
                 } else {
                     true
