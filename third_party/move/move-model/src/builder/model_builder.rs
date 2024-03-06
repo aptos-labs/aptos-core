@@ -23,7 +23,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::{AbilitySet, Visibility};
+use move_binary_format::{file_format::{AbilitySet, Visibility}, normalized::Struct};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
@@ -485,14 +485,13 @@ impl<'env> ModelBuilder<'env> {
 
     /// Gets the display name of the struct type
     /// Requires: the type is a struct type
-    fn get_struct_type_name(&self, ty: &Type) -> String {
-        if let Type::Struct(mid, sid, _) = ty {
-            // TODO: display the struct with type parameters
-            let qid = QualifiedId {
-                module_id: *mid,
-                id: *sid,
-            };
-            self.get_struct_display_name_simple(qid).to_string()
+    fn get_struct_type_name(&self, ty: &Type, root: QualifiedId<StructId>) -> String {
+        if let Type::Struct(..) = ty {
+            let mut display_ctx = self.env.get_type_display_ctx();
+            let root_entry = self.lookup_struct_entry(root);
+            display_ctx.builder_struct_table = Some(&self.reverse_struct_table);
+            display_ctx.type_param_names = Some(root_entry.type_params.iter().map(|ty_param| ty_param.0.clone()).collect_vec());
+            ty.display(&display_ctx).to_string()
         } else {
             panic!("ICE: calling `get_struct_type_name` with non-struct type")
         }
@@ -507,13 +506,13 @@ impl<'env> ModelBuilder<'env> {
     ) -> Vec<String> {
         let mut loop_notes = Vec::new();
         for i in 0..path.len() - 1 {
-            let parent_name = self.get_struct_type_name(&path[i].1);
-            let child_name = self.get_struct_type_name(&path[i + 1].1);
+            let parent_name = self.get_struct_type_name(&path[i].1, this_struct_id.clone());
+            let child_name = self.get_struct_type_name(&path[i + 1].1, this_struct_id.clone());
             loop_notes.push(format!("`{}` contains `{}`...", parent_name, child_name));
         }
         loop_notes.push(format!(
             "`{}` contains `{}`, which forms a loop.",
-            self.get_struct_type_name(&path.last().unwrap().1),
+            self.get_struct_type_name(&path.last().unwrap().1, this_struct_id.clone()),
             self.get_struct_display_name_simple(this_struct_id)
         ));
         loop_notes
