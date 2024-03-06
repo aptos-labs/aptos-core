@@ -433,7 +433,7 @@ The fast path feature for on-chain randomness.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_FAST_RANDOMNESS">FAST_RANDOMNESS</a>: u64 = 55;
+<pre><code><b>const</b> <a href="features.md#0x1_features_FAST_RANDOMNESS">FAST_RANDOMNESS</a>: u64 = 56;
 </code></pre>
 
 
