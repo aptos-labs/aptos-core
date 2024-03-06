@@ -19,7 +19,6 @@ spec aptos_framework::dkg {
     ) {
         use std::option;
         aborts_if !exists<DKGState>(@aptos_framework);
-        aborts_if option::is_some(global<DKGState>(@aptos_framework).incomplete);
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
     }
 
@@ -37,4 +36,13 @@ spec aptos_framework::dkg {
         }
     }
 
+    spec try_clear_incomplete_session(fx: &signer) {
+        use std::signer;
+        let addr = signer::address_of(fx);
+        aborts_if addr != @aptos_framework;
+    }
+
+    spec incomplete_session(): Option<DKGSessionState> {
+        aborts_if false;
+    }
 }

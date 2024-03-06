@@ -21,6 +21,8 @@ DKG on-chain states and helper functions.
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `start`](#@Specification_1_start)
     -  [Function `finish`](#@Specification_1_finish)
+    -  [Function `try_clear_incomplete_session`](#@Specification_1_try_clear_incomplete_session)
+    -  [Function `incomplete_session`](#@Specification_1_incomplete_session)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -260,7 +262,6 @@ Abort if a DKG is already in progress.
     target_validator_set: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;ValidatorConsensusInfo&gt;,
 ) <b>acquires</b> <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
     <b>let</b> dkg_state = <b>borrow_global_mut</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-    <b>assert</b>!(std::option::is_none(&dkg_state.incomplete), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="dkg.md#0x1_dkg_EDKG_IN_PROGRESS">EDKG_IN_PROGRESS</a>));
     <b>let</b> new_session_metadata = <a href="dkg.md#0x1_dkg_DKGSessionMetadata">DKGSessionMetadata</a> {
         dealer_epoch,
         dealer_validator_set,
@@ -440,7 +441,6 @@ Return the dealer epoch of a <code><a href="dkg.md#0x1_dkg_DKGSessionState">DKGS
 
 
 <pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
-<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(<b>global</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework).incomplete);
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@aptos_framework);
 </code></pre>
 
@@ -474,6 +474,39 @@ Return the dealer epoch of a <code><a href="dkg.md#0x1_dkg_DKGSessionState">DKGS
        <b>false</b>
    }
 }
+</code></pre>
+
+
+
+<a id="@Specification_1_try_clear_incomplete_session"></a>
+
+### Function `try_clear_incomplete_session`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_try_clear_incomplete_session">try_clear_incomplete_session</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(fx);
+<b>aborts_if</b> addr != @aptos_framework;
+</code></pre>
+
+
+
+<a id="@Specification_1_incomplete_session"></a>
+
+### Function `incomplete_session`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_incomplete_session">incomplete_session</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="dkg.md#0x1_dkg_DKGSessionState">dkg::DKGSessionState</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 

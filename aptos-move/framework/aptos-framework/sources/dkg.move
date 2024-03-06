@@ -60,7 +60,6 @@ module aptos_framework::dkg {
         target_validator_set: vector<ValidatorConsensusInfo>,
     ) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        assert!(std::option::is_none(&dkg_state.incomplete), error::invalid_state(EDKG_IN_PROGRESS));
         let new_session_metadata = DKGSessionMetadata {
             dealer_epoch,
             dealer_validator_set,
