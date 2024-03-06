@@ -614,8 +614,8 @@ impl<'env> ModelBuilder<'env> {
 
     /// Checks for recursive definition of structs and adds diagnostics
     pub fn check_resursive_struct(&self, struct_entry: &StructEntry) {
-        let params = (0..struct_entry.type_params.len())
-            .map(|i| Type::TypeParameter(i as u16))
+        let params = (0..struct_entry.type_params.len() as u16)
+            .map(Type::TypeParameter)
             .collect_vec();
         let struct_ty = Type::Struct(struct_entry.module_id, struct_entry.struct_id, params);
         let mut parents = Vec::new();
