@@ -29,30 +29,51 @@ B3:
 	9: Ret
 }
 public foo<Ty0: drop + store>(Arg0: E<Ty0>, Arg1: &mut Ty0) /* def_idx: 1 */ {
-L0:	loc2: E<Ty0>
-L1:	loc3: E<Ty0>
+L0:	loc2: Ty0
+L1:	loc3: Ty0
 L2:	loc4: E<Ty0>
-L3:	loc5: u64
+L3:	loc5: E<Ty0>
+L4:	loc6: E<Ty0>
+L5:	loc7: E<Ty0>
+L6:	loc8: E<Ty0>
+L7:	loc9: E<Ty0>
+L8:	loc10: Ty0
+L9:	loc11: u64
+L10:	loc12: u64
 B0:
 	0: MoveLoc[0](Arg0: E<Ty0>)
 	1: StLoc[2](loc0: E<Ty0>)
 	2: MoveLoc[2](loc0: E<Ty0>)
-	3: UnpackGeneric[1](E<Ty0>)
-	4: StLoc[3](loc1: Ty0)
-	5: MoveLoc[3](loc1: Ty0)
-	6: PackGeneric[1](E<Ty0>)
-	7: StLoc[4](loc2: E<Ty0>)
-	8: MoveLoc[4](loc2: E<Ty0>)
-	9: StLoc[5](loc3: E<Ty0>)
-	10: MoveLoc[5](loc3: E<Ty0>)
+	3: StLoc[3](loc1: E<Ty0>)
+	4: MoveLoc[3](loc1: E<Ty0>)
+	5: UnpackGeneric[1](E<Ty0>)
+	6: StLoc[4](loc2: Ty0)
+	7: MoveLoc[4](loc2: Ty0)
+	8: StLoc[5](loc3: Ty0)
+	9: MoveLoc[5](loc3: Ty0)
+	10: PackGeneric[1](E<Ty0>)
 	11: StLoc[6](loc4: E<Ty0>)
 	12: MoveLoc[6](loc4: E<Ty0>)
-	13: UnpackGeneric[1](E<Ty0>)
-	14: LdU64(3)
-	15: StLoc[7](loc5: u64)
-	16: MoveLoc[1](Arg1: &mut Ty0)
-	17: WriteRef
-	18: Ret
+	13: StLoc[7](loc5: E<Ty0>)
+	14: MoveLoc[7](loc5: E<Ty0>)
+	15: StLoc[8](loc6: E<Ty0>)
+	16: MoveLoc[8](loc6: E<Ty0>)
+	17: StLoc[9](loc7: E<Ty0>)
+	18: MoveLoc[9](loc7: E<Ty0>)
+	19: StLoc[10](loc8: E<Ty0>)
+	20: MoveLoc[10](loc8: E<Ty0>)
+	21: StLoc[11](loc9: E<Ty0>)
+	22: LdU64(3)
+	23: MoveLoc[11](loc9: E<Ty0>)
+	24: UnpackGeneric[1](E<Ty0>)
+	25: StLoc[12](loc10: Ty0)
+	26: StLoc[13](loc11: u64)
+	27: MoveLoc[13](loc11: u64)
+	28: StLoc[14](loc12: u64)
+	29: MoveLoc[12](loc10: Ty0)
+	30: MoveLoc[1](Arg1: &mut Ty0)
+	31: WriteRef
+	32: Ret
 }
 public is_none<Ty0>(Arg0: &Option<Ty0>): bool /* def_idx: 2 */ {
 B0:

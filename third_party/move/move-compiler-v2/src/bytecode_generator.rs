@@ -1133,9 +1133,14 @@ impl<'env> Generator<'env> {
                     // Type checker should have complained already
                     self.internal_error(id, "inconsistent tuple arity")
                 } else {
-                    // Map this to point-wise assignment
-                    for (pat, exp) in pats.iter().zip(args.iter()) {
-                        self.gen_assign(id, pat, exp, next_scope)
+                    // Save each tuple arg into a temporary.
+                    // Point-wise assign the temporaries.
+                    let temps = args
+                        .iter()
+                        .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
+                        .collect::<Vec<_>>();
+                    for (pat, temp) in pats.iter().zip(temps.into_iter()) {
+                        self.gen_assign_from_temp(id, pat, temp, next_scope)
                     }
                 }
             },
