@@ -23,7 +23,9 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::{file_format::{AbilitySet, Visibility}, normalized::Struct};
+use move_binary_format::{
+    file_format::{AbilitySet, Visibility},
+};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
@@ -490,7 +492,13 @@ impl<'env> ModelBuilder<'env> {
             let mut display_ctx = self.env.get_type_display_ctx();
             let root_entry = self.lookup_struct_entry(root);
             display_ctx.builder_struct_table = Some(&self.reverse_struct_table);
-            display_ctx.type_param_names = Some(root_entry.type_params.iter().map(|ty_param| ty_param.0.clone()).collect_vec());
+            display_ctx.type_param_names = Some(
+                root_entry
+                    .type_params
+                    .iter()
+                    .map(|ty_param| ty_param.0.clone())
+                    .collect_vec(),
+            );
             ty.display(&display_ctx).to_string()
         } else {
             panic!("ICE: calling `get_struct_type_name` with non-struct type")
@@ -503,20 +511,32 @@ impl<'env> ModelBuilder<'env> {
         &self,
         path: &Vec<(Loc, Symbol, Type)>,
         this_struct_id: QualifiedId<StructId>,
-    ) -> Vec<String> {
+        loc: Loc
+    ) -> Vec<(Loc, String)> {
         let mut loop_notes = Vec::new();
         for i in 0..path.len() - 1 {
             let parent_name = self.get_struct_type_name(&path[i].2, this_struct_id.clone());
             let field_name = self.env.symbol_pool().string(path[i].1).to_string();
             let child_name = self.get_struct_type_name(&path[i + 1].2, this_struct_id.clone());
-            loop_notes.push(format!("`{}` contains field `{}: {}`...", parent_name, field_name, child_name));
+            loop_notes.push((
+                path[i + 1].0.clone(),
+                format!(
+                    "`{}` contains field `{}: {}`...",
+                    parent_name, field_name, child_name
+                ),
+            ));
         }
-        loop_notes.push(format!(
+        loop_notes.push((
+            loc,
+            format!(
             "`{}` contains field `{}: {}`, which forms a loop.",
             self.get_struct_type_name(&path.last().unwrap().2, this_struct_id.clone()),
-            self.env.symbol_pool().string(path.last().unwrap().1.clone()).to_string(),
+            self.env
+                .symbol_pool()
+                .string(path.last().unwrap().1.clone())
+                .to_string(),
             self.get_struct_display_name_simple(this_struct_id)
-        ));
+        )));
         loop_notes
     }
 
@@ -546,9 +566,9 @@ impl<'env> ModelBuilder<'env> {
                         let parent_id = mid.qualified(*sid);
                         if parent_id == this_struct_id {
                             if checking == this_struct_id {
-                                let loop_notes =
-                                    self.gen_error_msg_for_fields_loop(path, this_struct_id);
-                                self.error_with_notes(
+                            let loop_notes =
+                                    self.gen_error_msg_for_fields_loop(path, this_struct_id, ty_loc.clone());
+                                self.env.error_with_labels(
                                     loc_checking,
                                     &format!(
                                         "recursive definition {}",
@@ -568,7 +588,7 @@ impl<'env> ModelBuilder<'env> {
                 if let Some(fields) = &this_struct_entry.fields {
                     // check for descendant fields recursively
                     for (field_name, (field_loc, _field_idx, field_ty_uninstantiated)) in
-                    fields.iter()
+                        fields.iter()
                     {
                         path.push((ty_loc.clone(), field_name.clone(), ty.clone()));
                         let field_ty_instantiated = field_ty_uninstantiated.instantiate(insts);
