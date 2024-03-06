@@ -3,8 +3,10 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_types::account_address::{self, AccountAddress};
-use move_core_types::language_storage::TypeTag;
-use move_core_types::{identifier::Identifier, language_storage::StructTag};
+use move_core_types::{
+    identifier::Identifier,
+    language_storage::{StructTag, TypeTag},
+};
 use serde::Deserialize;
 use std::str::FromStr;
 

@@ -8,11 +8,7 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
                                 hash: OnceCell(Uninit),
-<<<<<<< HEAD
                             }: Modification(985428a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
-=======
-                            }: Modification(c43c28a47e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
->>>>>>> 4786413b39 ([FA] Coin to FA conversion)
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
@@ -36,11 +32,7 @@ Ok(
                             StateKey {
                                 inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
                                 hash: OnceCell(Uninit),
-<<<<<<< HEAD
                             }: Modification(97b55705000000000100000000000000),
-=======
-                            }: Modification(c31d1eaa7e8d03000100000000000000),
->>>>>>> 4786413b39 ([FA] Coin to FA conversion)
                         },
                     },
                 ),
@@ -65,11 +57,7 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
                                 hash: OnceCell(Uninit),
-<<<<<<< HEAD
                             }: Modification(88ec6ea37e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
-=======
-                            }: Modification(7cd56ea37e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
->>>>>>> 4786413b39 ([FA] Coin to FA conversion)
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
@@ -77,11 +65,7 @@ Ok(
                             StateKey {
                                 inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
                                 hash: OnceCell(Uninit),
-<<<<<<< HEAD
                             }: Modification(874d9e04000000000100000000000000),
-=======
-                            }: Modification(7bb664a97e8d03000100000000000000),
->>>>>>> 4786413b39 ([FA] Coin to FA conversion)
                         },
                     },
                 ),
@@ -110,11 +94,7 @@ Ok(
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>)" },
                                 hash: OnceCell(Uninit),
-<<<<<<< HEAD
                             }: Modification(f8f659a27e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
-=======
-                            }: Modification(b4e059a27e8d03000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000beef),
->>>>>>> 4786413b39 ([FA] Coin to FA conversion)
                             StateKey {
                                 inner: AccessPath { address: 0xbeef, path: "Resource(0x1::account::Account)" },
                                 hash: OnceCell(Uninit),
@@ -122,11 +102,7 @@ Ok(
                             StateKey {
                                 inner: TableItem { handle: 1b854694ae746cdbd8d44186ca4929b2b337df21d1c74633be19b2710552fdca, key: 0619dc29a0aac8fa146714058e8dd6d2d0f3bdf5f6331907bf91f3acd81e6935 },
                                 hash: OnceCell(Uninit),
-<<<<<<< HEAD
                             }: Modification(f7578903000000000100000000000000),
-=======
-                            }: Modification(b3c14fa87e8d03000100000000000000),
->>>>>>> 4786413b39 ([FA] Coin to FA conversion)
                         },
                     },
                 ),
