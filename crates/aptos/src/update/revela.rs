@@ -14,7 +14,7 @@ use self_update::{backends::github::Update, update::ReleaseUpdate};
 use std::path::PathBuf;
 
 const REVELA_BINARY_NAME: &str = "revela";
-const TARGET_REVELA_VERSION: &str = "1.0.0-rc3";
+const TARGET_REVELA_VERSION: &str = "1.0.0";
 
 const REVELA_EXE_ENV: &str = "REVELA_EXE";
 #[cfg(target_os = "windows")]
