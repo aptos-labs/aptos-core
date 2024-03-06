@@ -136,8 +136,8 @@ impl TransactionGenerator for WorkflowTxnGenerator {
                 ..
             } => {
                 if stage_start_time.load(Ordering::Relaxed) > StageTracking::current_timestamp() {
-                    info!("Waiting for next stage for {} seconds", 15);
-                    thread::sleep(Duration::from_secs(15));
+                    info!("Waiting for next stage for {} seconds", 20);
+                    thread::sleep(Duration::from_secs(20));
                 }
                 stage_counter.load(Ordering::Relaxed)
             },
