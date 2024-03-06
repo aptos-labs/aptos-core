@@ -112,7 +112,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
 
     pub async fn run(
         mut self,
-        in_progress_session: Option<DKGSessionState>,
+        incomplete_session: Option<DKGSessionState>,
         mut dkg_start_event_rx: aptos_channel::Receiver<(), DKGStartEvent>,
         mut rpc_msg_rx: aptos_channel::Receiver<
             AccountAddress,
@@ -130,7 +130,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
         let (agg_trx_tx, mut agg_trx_rx) = aptos_channel::new(QueueStyle::KLAST, 1, None);
         self.agg_trx_tx = Some(agg_trx_tx);
 
-        if let Some(session_state) = in_progress_session {
+        if let Some(session_state) = incomplete_session {
             let DKGSessionState {
                 start_time_us,
                 metadata,

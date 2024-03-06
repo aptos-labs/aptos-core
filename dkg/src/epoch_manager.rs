@@ -169,7 +169,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             && features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
         if let (true, Some(my_index)) = (randomness_enabled, my_index) {
             let DKGState {
-                in_progress: in_progress_session,
+                incomplete: incomplete_session,
                 ..
             } = payload.get::<DKGState>().unwrap_or_default();
 
@@ -205,7 +205,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.vtxn_pool.clone(),
             );
             tokio::spawn(dkg_manager.run(
-                in_progress_session,
+                incomplete_session,
                 dkg_start_event_rx,
                 dkg_rpc_msg_rx,
                 dkg_manager_close_rx,

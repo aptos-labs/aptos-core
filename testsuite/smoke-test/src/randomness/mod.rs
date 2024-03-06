@@ -74,7 +74,7 @@ async fn wait_for_dkg_finish(
     let mut dkg_state = get_on_chain_resource::<DKGState>(client).await;
     let timer = Instant::now();
     while timer.elapsed().as_secs() < time_limit_secs
-        && !(dkg_state.in_progress.is_none()
+        && !(dkg_state.incomplete.is_none()
             && dkg_state.last_completed.is_some()
             && (target_epoch.is_none()
                 || dkg_state

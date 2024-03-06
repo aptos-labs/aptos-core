@@ -52,7 +52,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         pragma verify = true; // TODO: set because of timeout (property proved).
         pragma verify_duration_estimate = 600;
         include FinishRequirement;
-        requires dkg::spec_in_progress();
+        requires dkg::has_incomplete_session();
         aborts_if false;
     }
 

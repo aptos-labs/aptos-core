@@ -77,9 +77,9 @@ impl AptosVM {
             .ok_or_else(|| Expected(MissingResourceDKGState))?;
         let config_resource = ConfigurationResource::fetch_config(resolver)
             .ok_or_else(|| Expected(MissingResourceConfiguration))?;
-        let DKGState { in_progress, .. } = dkg_state;
-        let in_progress_session_state =
-            in_progress.ok_or_else(|| Expected(MissingResourceInprogressDKGSession))?;
+        let DKGState { incomplete, .. } = dkg_state;
+        let incomplete_session_state =
+            incomplete.ok_or_else(|| Expected(MissingResourceInprogressDKGSession))?;
 
         // Check epoch number.
         if dkg_node.metadata.epoch != config_resource.epoch() {
@@ -87,7 +87,7 @@ impl AptosVM {
         }
 
         // Deserialize transcript and verify it.
-        let pub_params = DefaultDKG::new_public_params(&in_progress_session_state.metadata);
+        let pub_params = DefaultDKG::new_public_params(&incomplete_session_state.metadata);
         let transcript = bcs::from_bytes::<<DefaultDKG as DKGTrait>::Transcript>(
             dkg_node.transcript_bytes.as_slice(),
         )

@@ -19,24 +19,19 @@ spec aptos_framework::dkg {
     ) {
         use std::option;
         aborts_if !exists<DKGState>(@aptos_framework);
-        aborts_if option::is_some(global<DKGState>(@aptos_framework).in_progress);
+        aborts_if option::is_some(global<DKGState>(@aptos_framework).incomplete);
         aborts_if !exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
     }
 
     spec finish(transcript: vector<u8>) {
         use std::option;
         aborts_if !exists<DKGState>(@aptos_framework);
-        aborts_if option::is_none(global<DKGState>(@aptos_framework).in_progress);
+        aborts_if option::is_none(global<DKGState>(@aptos_framework).incomplete);
     }
 
-    spec in_progress(): bool {
-        aborts_if false;
-        ensures result == spec_in_progress();
-    }
-
-    spec fun spec_in_progress(): bool {
+    spec fun has_incomplete_session(): bool {
         if (exists<DKGState>(@aptos_framework)) {
-            option::spec_is_some(global<DKGState>(@aptos_framework).in_progress)
+            option::spec_is_some(global<DKGState>(@aptos_framework).incomplete)
         } else {
             false
         }

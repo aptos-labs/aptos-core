@@ -37,7 +37,7 @@ module aptos_framework::dkg {
     /// The completed and in-progress DKG sessions.
     struct DKGState has key {
         last_completed: Option<DKGSessionState>,
-        in_progress: Option<DKGSessionState>,
+        incomplete: Option<DKGSessionState>,
     }
 
     /// Called in genesis to initialize on-chain states.
@@ -47,7 +47,7 @@ module aptos_framework::dkg {
             aptos_framework,
             DKGState {
                 last_completed: std::option::none(),
-                in_progress: std::option::none(),
+                incomplete: std::option::none(),
             }
         );
     }
@@ -60,14 +60,14 @@ module aptos_framework::dkg {
         target_validator_set: vector<ValidatorConsensusInfo>,
     ) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        assert!(std::option::is_none(&dkg_state.in_progress), error::invalid_state(EDKG_IN_PROGRESS));
+        assert!(std::option::is_none(&dkg_state.incomplete), error::invalid_state(EDKG_IN_PROGRESS));
         let new_session_metadata = DKGSessionMetadata {
             dealer_epoch,
             dealer_validator_set,
             target_validator_set,
         };
         let start_time_us = timestamp::now_microseconds();
-        dkg_state.in_progress = std::option::some(DKGSessionState {
+        dkg_state.incomplete = std::option::some(DKGSessionState {
             metadata: new_session_metadata,
             start_time_us,
             transcript: vector[],
@@ -79,27 +79,38 @@ module aptos_framework::dkg {
         });
     }
 
-    /// Update the current DKG state at the beginning of every block in `block_prologue_ext()`,
-    /// or when DKG result is available.
-    ///
-    /// Return true if and only if this update completes/aborts the DKG and we should proceed to the next epoch.
+    /// Put a transcript into the currently incomplete DKG session, then mark it completed.
     ///
     /// Abort if DKG is not in progress.
     public(friend) fun finish(transcript: vector<u8>) acquires DKGState {
         let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
-        assert!(option::is_some(&dkg_state.in_progress), error::invalid_state(EDKG_NOT_IN_PROGRESS));
-        let session = option::extract(&mut dkg_state.in_progress);
+        assert!(option::is_some(&dkg_state.incomplete), error::invalid_state(EDKG_NOT_IN_PROGRESS));
+        let session = option::extract(&mut dkg_state.incomplete);
         session.transcript = transcript;
         dkg_state.last_completed = option::some(session);
-        dkg_state.in_progress = option::none();
+        dkg_state.incomplete = option::none();
     }
 
-    /// Return whether a DKG is in progress.
-    public(friend) fun in_progress(): bool acquires DKGState {
+    /// Delete the currently incomplete session, if it exists.
+    public fun try_clear_incomplete_session(fx: &signer) acquires DKGState {
+        system_addresses::assert_aptos_framework(fx);
         if (exists<DKGState>(@aptos_framework)) {
-            option::is_some(&borrow_global<DKGState>(@aptos_framework).in_progress)
-        } else {
-            false
+            let dkg_state = borrow_global_mut<DKGState>(@aptos_framework);
+            dkg_state.incomplete = option::none();
         }
+    }
+
+    /// Return the incomplete DKG session state, if it exists.
+    public fun incomplete_session(): Option<DKGSessionState> acquires DKGState {
+        if (exists<DKGState>(@aptos_framework)) {
+            borrow_global<DKGState>(@aptos_framework).incomplete
+        } else {
+            option::none()
+        }
+    }
+
+    /// Return the dealer epoch of a `DKGSessionState`.
+    public fun session_dealer_epoch(session: &DKGSessionState): u64 {
+        session.metadata.dealer_epoch
     }
 }
