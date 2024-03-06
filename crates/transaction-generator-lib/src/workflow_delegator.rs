@@ -189,13 +189,13 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         //     info!("Cur stage: {}, pool sizes: {:?}", stage, self.pool_per_stage.iter().map(|p| p.len()).collect::<Vec<_>>());
         // );
 
-        println!("\nGeneratingTransactions Stage {}, num_to_create: {}, pool sizes: {:?}", stage, num_to_create, self.pool_per_stage.iter().map(|p| p.len()).collect::<Vec<_>>());
+        info!("\nGeneratingTransactions Stage {}, num_to_create: {}, pool sizes: {:?}", stage, num_to_create, self.pool_per_stage.iter().map(|p| p.len()).collect::<Vec<_>>());
         let result = if let Some(generator) = self.generators.get_mut(stage) {
             let txns = generator.generate_transactions(account, num_to_create);
-            println!("\nGeneratedTransactions Stage {}, Generated {} transactions", stage, txns.len());
+            info!("\nGeneratedTransactions Stage {}, Generated {} transactions", stage, txns.len());
             txns
         } else {
-            println!("\nGeneratedTransactions Stage {}, Generated 0 transactions", stage);
+            info!("\nGeneratedTransactions Stage {}, Generated 0 transactions", stage);
             Vec::new()
         };
 
