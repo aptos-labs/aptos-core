@@ -2240,11 +2240,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> ExpData {
         let items = seq.iter().collect_vec();
         let seq_exp = self.translate_seq_recursively(loc, &items, expected_type, context);
-        if matches!(&seq_exp, ExpData::Sequence(..)) {
-            seq_exp
-        } else {
+        if seq_exp.is_directly_borrowable() {
+            // Avoid unwrapping a borrowable item, in case context is a `Borrow`.
             let node_id = self.new_node_id_with_type_loc(expected_type, loc);
             ExpData::Sequence(node_id, vec![seq_exp.into_exp()])
+        } else {
+            seq_exp
         }
     }
 

@@ -597,6 +597,14 @@ impl ExpData {
         )
     }
 
+    pub fn is_directly_borrowable(&self) -> bool {
+        use ExpData::*;
+        matches!(
+            self,
+            LocalVar(..) | Temporary(..) | Call(_, Operation::Select(..), _)
+        )
+    }
+
     pub fn ptr_eq(e1: &Exp, e2: &Exp) -> bool {
         // For the internement based implementations, we can just test equality. Other
         // representations may need different measures.
@@ -2821,6 +2829,10 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         use Operation::*;
         match self.oper {
+            Cast => {
+                let ty = self.env.get_node_type(self.node_id);
+                write!(f, "{:?}<{}>", self.oper, ty.display(&self.tctx))
+            },
             SpecFunction(mid, fid, labels_opt) => {
                 write!(f, "{}", self.fun_str(mid, fid))?;
                 if let Some(labels) = labels_opt {

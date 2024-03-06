@@ -15,7 +15,7 @@ module 0x12391283::M {
                     let (elem: u8): (u8) = Tuple(e);
                     accu: u64 = {
                       let (sum: u64, addend: u8): (u64, u8) = Tuple(accu, elem);
-                      Add<u64>(sum, Cast(addend))
+                      Add<u64>(sum, Cast<u64>(addend))
                     }
                   };
                   Tuple()
@@ -43,7 +43,7 @@ module 0x12391283::M {
                     let (elem: u8): (u8) = Tuple(e);
                     accu: u64 = {
                       let (sum: u64, addend: u8): (u64, u8) = Tuple(accu, elem);
-                      Add<u64>(sum, Cast(addend))
+                      Add<u64>(sum, Cast<u64>(addend))
                     }
                   };
                   Tuple()

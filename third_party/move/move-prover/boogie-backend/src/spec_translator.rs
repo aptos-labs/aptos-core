@@ -699,6 +699,10 @@ impl<'env> SpecTranslator<'env> {
                 emit!(self.writer, ")");
             },
             ExpData::Invalid(_) => panic!("unexpected error expression"),
+            ExpData::Sequence(_, exp_vec) if exp_vec.len() == 1 => {
+                // Single-element sequence is just a wrapped value.
+                self.translate_exp(exp_vec.first().expect("list has an element"));
+            },
             ExpData::Return(..)
             | ExpData::Sequence(..)
             | ExpData::Loop(..)

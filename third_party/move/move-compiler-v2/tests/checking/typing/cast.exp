@@ -2,35 +2,35 @@
 module 0x8675309::M {
     private fun t0(x8: u8,x64: u64,x128: u128) {
         {
-          let _: u8 = Cast(0);
+          let _: u8 = Cast<u8>(0);
           {
-            let _: u64 = Cast(0);
+            let _: u64 = Cast<u64>(0);
             {
-              let _: u128 = Cast(0);
+              let _: u128 = Cast<u128>(0);
               {
-                let _: u8 = Cast(x8);
+                let _: u8 = Cast<u8>(x8);
                 {
-                  let _: u64 = Cast(x64);
+                  let _: u64 = Cast<u64>(x64);
                   {
-                    let _: u128 = Cast(x128);
+                    let _: u128 = Cast<u128>(x128);
                     {
-                      let _: u8 = Cast(x64);
+                      let _: u8 = Cast<u8>(x64);
                       {
-                        let _: u64 = Cast(x128);
+                        let _: u64 = Cast<u64>(x128);
                         {
-                          let _: u128 = Cast(x8);
+                          let _: u128 = Cast<u128>(x8);
                           {
-                            let _: u8 = Cast(x128);
+                            let _: u8 = Cast<u8>(x128);
                             {
-                              let _: u64 = Cast(x8);
+                              let _: u64 = Cast<u64>(x8);
                               {
-                                let _: u128 = Cast(x64);
+                                let _: u128 = Cast<u128>(x64);
                                 {
-                                  let _: u8 = Cast(340282366920938463463374607431768211455);
+                                  let _: u8 = Cast<u8>(340282366920938463463374607431768211455);
                                   {
-                                    let _: u64 = Cast(340282366920938463463374607431768211455);
+                                    let _: u64 = Cast<u64>(340282366920938463463374607431768211455);
                                     {
-                                      let _: u128 = Cast(340282366920938463463374607431768211455);
+                                      let _: u128 = Cast<u128>(340282366920938463463374607431768211455);
                                       Tuple()
                                     }
                                   }
@@ -50,35 +50,35 @@ module 0x8675309::M {
     }
     spec fun $t0(x8: u8,x64: u64,x128: u128) {
         {
-          let _: u8 = Cast(0);
+          let _: u8 = Cast<u8>(0);
           {
-            let _: u64 = Cast(0);
+            let _: u64 = Cast<u64>(0);
             {
-              let _: u128 = Cast(0);
+              let _: u128 = Cast<u128>(0);
               {
-                let _: u8 = Cast(x8);
+                let _: u8 = Cast<u8>(x8);
                 {
-                  let _: u64 = Cast(x64);
+                  let _: u64 = Cast<u64>(x64);
                   {
-                    let _: u128 = Cast(x128);
+                    let _: u128 = Cast<u128>(x128);
                     {
-                      let _: u8 = Cast(x64);
+                      let _: u8 = Cast<u8>(x64);
                       {
-                        let _: u64 = Cast(x128);
+                        let _: u64 = Cast<u64>(x128);
                         {
-                          let _: u128 = Cast(x8);
+                          let _: u128 = Cast<u128>(x8);
                           {
-                            let _: u8 = Cast(x128);
+                            let _: u8 = Cast<u8>(x128);
                             {
-                              let _: u64 = Cast(x8);
+                              let _: u64 = Cast<u64>(x8);
                               {
-                                let _: u128 = Cast(x64);
+                                let _: u128 = Cast<u128>(x64);
                                 {
-                                  let _: u8 = Cast(340282366920938463463374607431768211455);
+                                  let _: u8 = Cast<u8>(340282366920938463463374607431768211455);
                                   {
-                                    let _: u64 = Cast(340282366920938463463374607431768211455);
+                                    let _: u64 = Cast<u64>(340282366920938463463374607431768211455);
                                     {
-                                      let _: u128 = Cast(340282366920938463463374607431768211455);
+                                      let _: u128 = Cast<u128>(340282366920938463463374607431768211455);
                                       Tuple()
                                     }
                                   }

@@ -438,6 +438,7 @@ fn find_possibly_modified_vars(
                             }
                             possibly_modified_vars.insert((sym, current_binding_id_opt.copied()));
                         }
+                        // RHS is not modifying, turn it off.
                         modifying_stack.push(modifying);
                         modifying = false;
                     },
@@ -474,11 +475,11 @@ struct SimplifierRewriter<'env> {
     // Tracks constant values from scope.
     values: ScopedMap<Symbol, SimpleValue>,
 
-    // During expression rewriting, tracks whether we are evaluating a borrow argument.
-    in_borrow: bool,
+    // During expression rewriting, tracks whether we are evaluating a mutable borrow argument.
+    in_mut_borrow: bool,
 
     // Records values from outer scope of a borrow.
-    in_borrow_stack: Vec<bool>,
+    in_mut_borrow_stack: Vec<bool>,
 }
 
 // Representation to record a known value of a variable to
@@ -500,8 +501,8 @@ impl<'env> SimplifierRewriter<'env> {
             visiting_binding: ScopedMap::new(),
             possibly_modified_variables: BTreeSet::new(),
             values: ScopedMap::new(),
-            in_borrow: false,
-            in_borrow_stack: Vec::new(),
+            in_mut_borrow: false,
+            in_mut_borrow_stack: Vec::new(),
         }
     }
 
@@ -635,44 +636,50 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             old_id,
             exp.display_verbose(self.env())
         );
-        // Top-level vars in a Borrow are borrowed, so we turn on or off `in_borrow` before processing
-        // subexpressions in `self.rewrite_exp_descent`
-        // Inside a Borrow() expression, we need to be careful because top-level vars are borrowed.
+        // Top-level vars in an argument to `Borrow` (possibly with a `Selexct` as well)
+        // are borrowed directly, while if they occur in any other subexpression they will
+        // be interpreted as a copy to a temp value which is borrowed instead of the var.
+        //
+        // That is ok for immutable borrows, but mutable ones may lead to modifications of
+        // a temp instead of the desired variable.  Thus we track Mutable Borrows here.
         enum BorrowEffect {
-            Transparent,
-            Variable,
-            Starts,
-            Escapes,
+            Borrowable,
+            IsMutableBorrow,
+            TransparentToBorrow,
+            NotBorrowable,
         }
         use BorrowEffect::*;
         let borrow_effect = {
-            use ExpData::*;
-            match exp.as_ref() {
-                LocalVar(..) | Temporary(..) => Variable,
-                Call(_, op, _explist) => match op {
-                    Operation::Borrow(ReferenceKind::Mutable) => Starts,
-                    // Leave in_borrow alone
-                    Operation::Select(..) => Transparent,
+            if exp.is_directly_borrowable() {
+                Borrowable
+            } else if let ExpData::Call(_, op, _explist) = exp.as_ref() {
+                match op {
+                    Operation::Borrow(ReferenceKind::Mutable) => IsMutableBorrow,
+                    // Leave in_mut_borrow alone
+                    Operation::Select(..) => TransparentToBorrow,
                     // Other Call operations escape from the borrow
-                    _ => Escapes,
-                },
-                // These expressions turn off borrow mode within them
-                Invalid(_) | Value(..) | Invoke(..) | Lambda(..) | Quant(..) | Block(..)
-                | IfElse(..) | Return(..) | Sequence(..) | Loop(..) | LoopCont(..) | Assign(..)
-                | Mutate(..) | SpecBlock(..) => Escapes,
+                    _ => NotBorrowable,
+                }
+            } else {
+                NotBorrowable
             }
         };
-        match borrow_effect {
-            Transparent | Variable => {
-                // no effect on in_borrow.
+        match &borrow_effect {
+            TransparentToBorrow => {
+                // no effect on `in_mut_borrow`. Depends on context.
             },
-            Starts => {
-                self.in_borrow_stack.push(self.in_borrow);
-                self.in_borrow = true;
+            Borrowable => {
+                // no effect on `in_mut_borrow`, safe to rewrite ***if safe***,
+                // since such rewrites are only safe if not in a Mutable borrow.
             },
-            Escapes => {
-                self.in_borrow_stack.push(self.in_borrow);
-                self.in_borrow = false;
+            IsMutableBorrow => {
+                // Turn on `in_mut_borrow`
+                self.in_mut_borrow_stack.push(self.in_mut_borrow);
+                self.in_mut_borrow = true;
+            },
+            NotBorrowable => {
+                self.in_mut_borrow_stack.push(self.in_mut_borrow);
+                self.in_mut_borrow = false;
             },
         };
         let rexp = self.rewrite_exp_descent(exp);
@@ -683,47 +690,71 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             new_id,
             rexp.display_verbose(self.env())
         );
-        // Exit from local `in_borrow` state, and if the enclosing scope was `in_borrow`, then make
+        // Exit from local `in_mut_borrow` state, and if the enclosing scope was `in_mut_borrow`, then make
         // sure that anything transformed into a var or `Select` from another expression type is
         // wrapped by a `Sequence` so it will be treated as a temporary value to be borrowed.
-        let protected_rexp = match borrow_effect {
-            Transparent | Variable => {
+        let protected_rexp = match &borrow_effect {
+            TransparentToBorrow | Borrowable => {
+                // It was already borrowable, don't need to check for unwrap.
                 rexp // No effect.
             },
-            Starts => {
-                self.in_borrow = self
-                    .in_borrow_stack
+            IsMutableBorrow => {
+                // Exit this `in_mut_borrow` scope
+                self.in_mut_borrow = self
+                    .in_mut_borrow_stack
                     .pop()
-                    .expect("Imbalanced in_borrow stack.");
+                    .expect("Imbalanced in_mut_borrow stack.");
                 rexp
             },
-            Escapes => {
-                self.in_borrow = self
-                    .in_borrow_stack
+            NotBorrowable => {
+                // Exit `in_mut_borrow=false` scope
+                self.in_mut_borrow = self
+                    .in_mut_borrow_stack
                     .pop()
-                    .expect("Imbalanced in_borrow stack.");
-                if self.in_borrow {
+                    .expect("Imbalanced in_mut_borrow stack.");
+                // If `in_mut_borrow` was true before, then we have to be careful
+                // to make sure that we didn't unwrap a directly borrowable item.
+                // For example, a sequence with 1 expression which is a `LocalVar`
+                // will get unwrapped into just the `LocalVar` expression, which
+                // is directly borrowable and can change behavior. To avoid that,
+                // we check for such a case and wrap it in a `Sequence`.
+                //
+                // (This can happen when transforming other expressions than
+                // `Sequence`, so it's easier to just undo them all here than
+                // try to be clever when rewriting every kind of expression.)
+                if self.in_mut_borrow {
                     // This expression is at top-level in a Borrow, and was not a Variable or Select.
                     // If we turned it into one, then wrap it in a `Sequence` to generate a temp value
                     // to be borrowed.
-                    use ExpData::*;
-                    match rexp.as_ref() {
-                        LocalVar(id, ..)
-                        | Temporary(id, ..)
-                        | Call(id, Operation::Select(..), _) => {
-                            let cloned_id = self.env().clone_node(*id);
-                            ExpData::Sequence(cloned_id, vec![rexp]).into_exp()
-                        },
-                        _ => {
-                            // Nothing to do.
-                            rexp
-                        },
+                    if rexp.is_directly_borrowable() {
+                        use ExpData::*;
+                        match rexp.as_ref() {
+                            LocalVar(id, ..)
+                            | Temporary(id, ..)
+                            | Call(id, Operation::Select(..), _) => {
+                                let cloned_id = self.env().clone_node(*id);
+                                Sequence(cloned_id, vec![rexp]).into_exp()
+                            },
+                            _ => {
+                                // Nothing to do.
+                                rexp
+                            },
+                        }
+                    } else {
+                        rexp
                     }
                 } else {
                     rexp
                 }
             },
         };
+        let protected_rexp_id = protected_rexp.as_ref().node_id().as_usize();
+        trace!(
+            "After rewrite2, {} is now protected_rexp {}: `{}`",
+            new_id,
+            protected_rexp_id,
+            protected_rexp.display_verbose(self.env())
+        );
         protected_rexp
     }
 
@@ -745,6 +776,9 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
     }
 
     fn rewrite_local_var(&mut self, id: NodeId, sym: Symbol) -> Option<Exp> {
+        // Note that we could but don't need to check `in_mut_borrow` since if we have a value for a
+        // variable here then the variable can't appear in a borrow position of a Mutable borrow
+        // (see `find_possibly_modified_vars`).
         let result = self.rewrite_to_recorded_value(id, &sym);
         if log_enabled!(Level::Trace) {
             if let Some(exp) = &result {
@@ -758,6 +792,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
                     in_scope.map(|n| n.as_usize()),
                     value
                 );
+                assert!(!self.in_mut_borrow);
             }
         }
         result
@@ -1026,10 +1061,18 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
                     .chain(last_expr_opt)
                     .cloned()
                     .collect_vec();
-                Some(ExpData::Sequence(id, new_vec).into_exp())
+                if new_vec.len() == 1 {
+                    // Unwrap a lone sequence item.
+                    new_vec.first().cloned()
+                } else {
+                    Some(ExpData::Sequence(id, new_vec).into_exp())
+                }
             } else {
                 None
             }
+        } else if seq.len() == 1 {
+            // Unwrap a lone sequence item.
+            seq.first().cloned()
         } else {
             None
         }
