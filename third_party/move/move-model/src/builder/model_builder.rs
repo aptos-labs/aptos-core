@@ -512,8 +512,9 @@ impl<'env> ModelBuilder<'env> {
             loop_notes.push(format!("`{}` contains field `{}: {}`...", parent_name, field_name, child_name));
         }
         loop_notes.push(format!(
-            "`{}` contains `{}`, which forms a loop.",
+            "`{}` contains field `{}: {}`, which forms a loop.",
             self.get_struct_type_name(&path.last().unwrap().2, this_struct_id.clone()),
+            self.env.symbol_pool().string(path.last().unwrap().1.clone()).to_string(),
             self.get_struct_display_name_simple(this_struct_id)
         ));
         loop_notes
