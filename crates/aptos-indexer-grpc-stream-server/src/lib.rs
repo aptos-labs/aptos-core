@@ -1,14 +1,11 @@
 // Copyright © Aptos Foundation
 
-use tonic::{
-    service::{interceptor::InterceptedService, Interceptor},
-    transport::{server::Router, NamedService, Server},
-};
+use tonic::transport::{server::Router, NamedService, Server};
 
 const HTTP2_PING_INTERVAL_DURATION: std::time::Duration = std::time::Duration::from_secs(60);
 const HTTP2_PING_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);
 
-pub struct GrpcServerBuilder<S, I>
+pub struct GrpcServerBuilder<S>
 where
     S: NamedService
         + Send
@@ -20,13 +17,11 @@ where
             Error = std::convert::Infallible,
         > + 'static,
     S::Future: Send,
-    I: Interceptor + Send + Sync + Clone + 'static,
 {
     s: S,
-    i: I,
 }
 
-impl<S, I> GrpcServerBuilder<S, I>
+impl<S> GrpcServerBuilder<S>
 where
     S: NamedService
         + Send
@@ -38,10 +33,9 @@ where
             Error = std::convert::Infallible,
         > + 'static,
     S::Future: Send,
-    I: Interceptor + Send + Sync + Clone + 'static,
 {
-    pub fn new(s: S, i: I) -> Self {
-        Self { s, i }
+    pub fn new(s: S) -> Self {
+        Self { s }
     }
 
     pub fn build_router(
@@ -49,7 +43,7 @@ where
         tls_config: Option<tonic::transport::ServerTlsConfig>,
         file_descriptors: &[&[u8]],
     ) -> Router {
-        let svc_with_interceptor = InterceptedService::new(self.s.clone(), self.i.clone());
+        let svc = self.s.clone();
         let mut reflection_service_builder = tonic_reflection::server::Builder::configure();
         for file_descriptor in file_descriptors {
             // Note: It is critical that the file descriptor set is registered for every
@@ -61,19 +55,19 @@ where
                 reflection_service_builder.register_encoded_file_descriptor_set(file_descriptor);
         }
 
+        let mut builder = Server::builder()
+            .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
+            .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION));
+
+        if let Some(tls_config) = tls_config {
+            builder = builder.tls_config(tls_config).unwrap();
+        };
+
         let reflection_service = reflection_service_builder
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))
             .unwrap();
 
-        let mut builder = Server::builder()
-            .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
-            .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION));
-        if let Some(tls_config) = tls_config {
-            builder = builder.tls_config(tls_config).unwrap();
-        };
-        builder
-            .add_service(svc_with_interceptor)
-            .add_service(reflection_service)
+        builder.add_service(svc).add_service(reflection_service)
     }
 }

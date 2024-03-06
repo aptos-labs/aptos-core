@@ -8,6 +8,7 @@ use crate::{
 use aptos_api::context::Context;
 use aptos_config::config::NodeConfig;
 use aptos_db_indexer::table_info_reader::TableInfoReader;
+use aptos_indexer_grpc_stream_server::GrpcServerBuilder;
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_protos::{
@@ -22,7 +23,7 @@ use aptos_storage_interface::DbReader;
 use aptos_types::chain_id::ChainId;
 use std::{net::ToSocketAddrs, sync::Arc};
 use tokio::runtime::Runtime;
-use tonic::{codec::CompressionEncoding, transport::Server};
+use tonic::codec::CompressionEncoding;
 
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
@@ -66,43 +67,27 @@ pub fn bootstrap(
             output_batch_size,
         };
         // If we are here, we know indexer grpc is enabled.
-        let server = FullnodeDataService {
+        let server = FullnodeDataServer::new(FullnodeDataService {
             service_context: service_context.clone(),
-        };
-        let localnet_data_server = LocalnetDataService { service_context };
+        })
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip);
+        let localnet_data_server = RawDataServer::new(LocalnetDataService { service_context })
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip);
 
-        let reflection_service = tonic_reflection::server::Builder::configure()
-            // Note: It is critical that the file descriptor set is registered for every
-            // file that the top level API proto depends on recursively. If you don't,
-            // compilation will still succeed but reflection will fail at runtime.
-            //
-            // TODO: Add a test for this / something in build.rs, this is a big footgun.
-            .register_encoded_file_descriptor_set(INDEXER_V1_FILE_DESCRIPTOR_SET)
-            .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
-            .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
-            .build()
-            .expect("Failed to build reflection service");
+        let file_descriptors = &[
+            INDEXER_V1_FILE_DESCRIPTOR_SET,
+            TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
+            UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
+        ];
 
-        let reflection_service_clone = reflection_service.clone();
-
-        let tonic_server = Server::builder()
-            .http2_keepalive_interval(Some(std::time::Duration::from_secs(60)))
-            .http2_keepalive_timeout(Some(std::time::Duration::from_secs(5)))
-            .add_service(reflection_service_clone);
+        let fn_server_builder = GrpcServerBuilder::new(server);
+        let local_server_builder = GrpcServerBuilder::new(localnet_data_server);
 
         let router = match use_data_service_interface {
-            false => {
-                let svc = FullnodeDataServer::new(server)
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip);
-                tonic_server.add_service(svc)
-            },
-            true => {
-                let svc = RawDataServer::new(localnet_data_server)
-                    .send_compressed(CompressionEncoding::Gzip)
-                    .accept_compressed(CompressionEncoding::Gzip);
-                tonic_server.add_service(svc)
-            },
+            false => fn_server_builder.build_router(None, file_descriptors),
+            true => local_server_builder.build_router(None, file_descriptors),
         };
         // Make port into a config
         router

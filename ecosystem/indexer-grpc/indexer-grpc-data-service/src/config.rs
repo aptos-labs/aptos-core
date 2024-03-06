@@ -18,6 +18,7 @@ use std::{collections::HashSet, net::SocketAddr};
 use tonic::{
     codec::CompressionEncoding,
     metadata::{Ascii, MetadataValue},
+    service::interceptor::InterceptedService,
     Request, Status,
 };
 
@@ -158,8 +159,9 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
+        let svc = InterceptedService::new(svc, authentication_inceptor);
 
-        let grpc_server_builder = GrpcServerBuilder::new(svc, authentication_inceptor);
+        let grpc_server_builder = GrpcServerBuilder::new(svc);
 
         let mut tasks = vec![];
         if let Some(config) = &self.data_service_grpc_non_tls_config {
