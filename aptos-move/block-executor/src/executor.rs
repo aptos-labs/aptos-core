@@ -370,7 +370,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         scheduler: &Scheduler,
-    ) -> SchedulerTask {
+    ) -> Result<SchedulerTask, PanicError> {
         let aborted = !valid && scheduler.try_abort(txn_idx, incarnation);
 
         if aborted {
@@ -383,7 +383,7 @@ where
                 scheduler.queueing_commits_arm();
             }
 
-            SchedulerTask::NoTask
+            Ok(SchedulerTask::NoTask)
         }
     }
 
@@ -468,7 +468,7 @@ where
                     ),
                 )?;
 
-                scheduler.finish_execution_during_commit(txn_idx);
+                scheduler.finish_execution_during_commit(txn_idx)?;
 
                 let validation_result =
                     Self::validate(txn_idx, last_input_output, versioned_cache)?;
@@ -482,10 +482,6 @@ where
                     ))
                     .into());
                 }
-            }
-
-            defer! {
-                scheduler.add_to_commit_queue(txn_idx);
             }
 
             last_input_output
@@ -549,6 +545,9 @@ where
                 .collect::<Result<Vec<_>, _>>()?;
 
             last_input_output.record_finalized_group(txn_idx, finalized_groups);
+            defer! {
+                scheduler.add_to_commit_queue(txn_idx);
+            }
 
             // While the above propagate errors and lead to eventually halting parallel execution,
             // below we may halt the execution without an error in cases when:
@@ -759,7 +758,6 @@ where
         };
 
         loop {
-            // Prioritize committing validated transactions
             while scheduler.should_coordinate_commits() {
                 self.prepare_and_queue_commit_ready_txns(
                     &self.config.onchain.block_gas_limit_type,
@@ -790,7 +788,7 @@ where
                         last_input_output,
                         versioned_cache,
                         scheduler,
-                    )
+                    )?
                 },
                 SchedulerTask::ExecutionTask(
                     txn_idx,
@@ -812,7 +810,7 @@ where
                             shared_counter,
                         ),
                     )?;
-                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)
+                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     let (lock, cvar) = &*condvar;
