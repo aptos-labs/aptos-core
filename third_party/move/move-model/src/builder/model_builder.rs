@@ -494,7 +494,7 @@ impl<'env> ModelBuilder<'env> {
                 root_entry
                     .type_params
                     .iter()
-                    .map(|ty_param| ty_param.0.clone())
+                    .map(|ty_param| ty_param.0)
                     .collect_vec(),
             );
             ty.display(&display_ctx).to_string()
@@ -513,9 +513,9 @@ impl<'env> ModelBuilder<'env> {
     ) -> Vec<String> {
         let mut loop_notes = Vec::new();
         for i in 0..path.len() - 1 {
-            let parent_name = self.get_struct_type_name(&path[i].2, this_struct_id.clone());
+            let parent_name = self.get_struct_type_name(&path[i].2, this_struct_id);
             let field_name = self.env.symbol_pool().string(path[i].1).to_string();
-            let child_name = self.get_struct_type_name(&path[i + 1].2, this_struct_id.clone());
+            let child_name = self.get_struct_type_name(&path[i + 1].2, this_struct_id);
             loop_notes.push(format!(
                 "`{}` contains field `{}: {}`...",
                 parent_name, field_name, child_name
@@ -523,11 +523,8 @@ impl<'env> ModelBuilder<'env> {
         }
         loop_notes.push(format!(
             "`{}` contains field `{}: {}`, which forms a loop.",
-            self.get_struct_type_name(&path.last().unwrap().2, this_struct_id.clone()),
-            self.env
-                .symbol_pool()
-                .string(path.last().unwrap().1.clone())
-                .to_string(),
+            self.get_struct_type_name(&path.last().unwrap().2, this_struct_id),
+            self.env.symbol_pool().string(path.last().unwrap().1),
             self.get_struct_display_name_simple(this_struct_id)
         ));
         loop_notes
@@ -586,7 +583,7 @@ impl<'env> ModelBuilder<'env> {
                     for (field_name, (field_loc, _field_idx, field_ty_uninstantiated)) in
                         fields.iter()
                     {
-                        path.push((ty_loc.clone(), field_name.clone(), ty.clone()));
+                        path.push((ty_loc.clone(), *field_name, ty.clone()));
                         let field_ty_instantiated = field_ty_uninstantiated.instantiate(insts);
                         // short-curcuit upon first recursive occurence found
                         if !self.check_recusive_struct_with_parents(
@@ -615,9 +612,7 @@ impl<'env> ModelBuilder<'env> {
     /// Checks for recursive definition of structs and adds diagnostics
     pub fn check_resursive_struct(&self, struct_entry: &StructEntry) {
         let num_params = struct_entry.type_params.len() as u16;
-        let params = (0..num_params)
-            .map(Type::TypeParameter)
-            .collect_vec();
+        let params = (0..num_params).map(Type::TypeParameter).collect_vec();
         let struct_ty = Type::Struct(struct_entry.module_id, struct_entry.struct_id, params);
         let mut parents = Vec::new();
         self.check_recusive_struct_with_parents(
