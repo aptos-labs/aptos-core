@@ -7,12 +7,11 @@ use crate::{
     quorum_store::{
         batch_generator::BackPressure,
         counters,
-        types::BatchPayload,
         utils::{BatchKey, BatchSortKey, ProofQueue},
     },
 };
 use aptos_consensus_types::{
-    common::{Payload, PayloadFilter, ProofWithData, ProofWithDataWithTxnLimit},
+    common::{BatchPayload, Payload, PayloadFilter, ProofWithData, ProofWithDataWithTxnLimit},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };

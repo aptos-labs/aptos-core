@@ -3,13 +3,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::proof_of_store::{BatchInfo, ProofOfStore};
-use aptos_crypto::HashValue;
+use aptos_crypto::{
+    hash::{CryptoHash, CryptoHasher},
+    HashValue,
+};
+use aptos_crypto_derive::CryptoHasher;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
-    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
+    validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, PeerId,
 };
+use once_cell::sync::OnceCell;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{cmp::min, collections::HashSet, fmt, fmt::Write, sync::Arc};
@@ -348,11 +353,19 @@ impl Payload {
                 }
                 Ok(())
             },
-            (true, Payload::QuorumStoreInlineHybrid(_inline_batches, proof_with_status)) => {
+            (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_status)) => {
                 for proof in proof_with_status.proof_with_data.proofs.iter() {
                     proof.verify(validator)?;
                 }
-                // TODO: Do we need to make any checks to verify inline_batches?
+                for (batch, payload) in inline_batches.iter() {
+                    // TODO: Can cloning be avoided here?
+                    if BatchPayload::new(batch.author(), payload.clone()).hash() != *batch.digest()
+                    {
+                        return Err(anyhow::anyhow!(
+                            "Hash of the received inline batch doesn't match the digest value",
+                        ));
+                    }
+                }
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
@@ -392,6 +405,58 @@ impl fmt::Display for Payload {
                 )
             },
         }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, CryptoHasher)]
+pub struct BatchPayload {
+    author: PeerId,
+    txns: Vec<SignedTransaction>,
+    #[serde(skip)]
+    num_bytes: OnceCell<usize>,
+}
+
+impl CryptoHash for BatchPayload {
+    type Hasher = BatchPayloadHasher;
+
+    fn hash(&self) -> HashValue {
+        let mut state = Self::Hasher::new();
+        let bytes = bcs::to_bytes(&self).expect("Unable to serialize batch payload");
+        self.num_bytes.get_or_init(|| bytes.len());
+        state.update(&bytes);
+        state.finish()
+    }
+}
+
+impl BatchPayload {
+    pub fn new(author: PeerId, txns: Vec<SignedTransaction>) -> Self {
+        Self {
+            author,
+            txns,
+            num_bytes: OnceCell::new(),
+        }
+    }
+
+    pub fn into_transactions(self) -> Vec<SignedTransaction> {
+        self.txns
+    }
+
+    pub fn txns(&self) -> &Vec<SignedTransaction> {
+        &self.txns
+    }
+
+    pub fn num_txns(&self) -> usize {
+        self.txns.len()
+    }
+
+    pub fn num_bytes(&self) -> usize {
+        *self
+            .num_bytes
+            .get_or_init(|| bcs::serialized_size(&self).expect("unable to serialize batch payload"))
+    }
+
+    pub fn author(&self) -> PeerId {
+        self.author
     }
 }
 
