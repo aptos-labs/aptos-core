@@ -17,5 +17,7 @@ pub trait CommitHistory: Send + Sync {
 mod leader_reputation_adapter;
 mod round_robin;
 
-pub use leader_reputation_adapter::{LeaderReputationAdapter, MetadataBackendAdapter};
+pub use leader_reputation_adapter::{
+    CachedLeaderReputation, LeaderReputationAdapter, MetadataBackendAdapter,
+};
 pub use round_robin::RoundRobinAnchorElection;

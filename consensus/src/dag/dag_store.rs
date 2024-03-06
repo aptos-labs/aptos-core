@@ -21,12 +21,15 @@ use aptos_infallible::RwLock;
 use aptos_logger::{debug, error, warn};
 use aptos_types::{epoch_state::EpochState, validator_verifier::ValidatorVerifier};
 use futures::executor::block_on;
+use itertools::Itertools;
+use rayon::iter::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     ops::Deref,
     sync::Arc,
 };
-use tokio::{runtime::Handle, task::block_in_place};
 
 #[derive(Clone)]
 pub enum NodeStatus {
@@ -466,7 +469,10 @@ impl DagStore {
         start_round: Round,
         window_size: u64,
     ) -> Self {
-        let mut all_nodes = storage.get_certified_nodes().unwrap_or_default();
+        let mut all_nodes = monitor!(
+            "dag_store_new_storage",
+            storage.get_certified_nodes().unwrap_or_default()
+        );
         all_nodes.sort_unstable_by_key(|(_, node)| node.round());
         let mut to_prune = vec![];
         // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
@@ -478,16 +484,31 @@ impl DagStore {
             window_size,
         );
 
-        {
-            let mut dag_writer = dag.write();
-            for (digest, certified_node) in all_nodes {
-                // TODO: save the storage call in this case
-                if let Err(e) = dag_writer.add_node_internal(certified_node) {
-                    debug!("Delete node after bootstrap due to {}", e);
-                    to_prune.push(digest);
-                }
+        monitor!("dag_store_new_par_iter", {
+            let groups: Vec<(Round, Vec<_>)> = all_nodes
+                .into_iter()
+                .group_by(|(_, node)| node.round())
+                .into_iter()
+                .map(|(key, group)| (key, group.collect()))
+                .collect();
+
+            for (_round, round_group) in groups {
+                let digests: Vec<_> = round_group
+                    .into_par_iter()
+                    .with_min_len(5)
+                    .filter_map(|(digest, certified_node)| {
+                        if let Err(e) = dag.add_node_inmem(certified_node) {
+                            debug!("Delete node after bootstrap due to {}", e);
+                            Some(digest)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                to_prune.extend_from_slice(&digests)
             }
-        }
+        });
+
         let handle = tokio::task::spawn_blocking(move || {
             monitor!("dag_store_new_gc", {
                 if let Err(e) = storage.delete_certified_nodes(to_prune) {
@@ -535,21 +556,35 @@ impl DagStore {
         }
     }
 
-    pub fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
+    pub fn add_node_internal(
+        &self,
+        node: CertifiedNode,
+        write_to_storage: bool,
+    ) -> anyhow::Result<()> {
         self.dag.write().validate_new_node(&node)?;
 
         // Note on concurrency: it is possible that a prune operation kicks in here and
         // moves the window forward making the `node` stale. Any stale node inserted
         // due to this race will be cleaned up with the next prune operation.
 
-        // mutate after all checks pass
-        self.storage.save_certified_node(&node)?;
+        if write_to_storage {
+            // mutate after all checks pass
+            self.storage.save_certified_node(&node)?;
+        }
 
         debug!("Added node {}", node.id());
         self.payload_manager
             .prefetch_payload_data(node.payload(), node.metadata().timestamp());
 
         self.dag.write().add_validated_node(node)
+    }
+
+    pub fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
+        self.add_node_internal(node, true)
+    }
+
+    pub fn add_node_inmem(&self, node: CertifiedNode) -> anyhow::Result<()> {
+        self.add_node_internal(node, false)
     }
 
     pub fn commit_callback(&self, commit_round: Round) {
