@@ -212,6 +212,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         ConsensusConfig::default(),
         Features::default(),
         true,
+        None,
     )
 }
 

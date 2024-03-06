@@ -20,6 +20,7 @@ use tokio::time::Instant;
 
 mod disable_feature_0;
 mod disable_feature_1;
+mod disable_feature_2;
 mod dkg_with_validator_down;
 mod dkg_with_validator_join_leave;
 mod e2e_basic_consumption;
@@ -27,6 +28,8 @@ mod e2e_correctness;
 mod enable_feature_0;
 mod enable_feature_1;
 mod enable_feature_2;
+mod enable_feature_3;
+mod enable_feature_4;
 mod validator_restart_during_dkg;
 
 #[allow(dead_code)]

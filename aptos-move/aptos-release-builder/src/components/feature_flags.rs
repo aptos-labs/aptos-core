@@ -105,6 +105,7 @@ pub enum FeatureFlag {
     ObjectCodeDeployment,
     MaxObjectNestingCheck,
     KeylessAccountsWithPasskeys,
+    FastRandomness,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -270,6 +271,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::KeylessAccountsWithPasskeys => {
                 AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS
             },
+            FeatureFlag::FastRandomness => AptosFeatureFlag::FAST_RANDOMNESS,
         }
     }
 }
@@ -358,6 +360,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS => {
                 FeatureFlag::KeylessAccountsWithPasskeys
             },
+            AptosFeatureFlag::FAST_RANDOMNESS => FeatureFlag::FastRandomness,
         }
     }
 }

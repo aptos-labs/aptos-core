@@ -27,6 +27,7 @@ async fn e2e_basic_consumption() {
             // Ensure randomness flag is set.
             let mut features = Features::default();
             features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
+            features.enable(FeatureFlag::FAST_RANDOMNESS);
             conf.initial_features_override = Some(features);
         }))
         .build_with_cli(0)
