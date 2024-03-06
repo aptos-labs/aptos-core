@@ -10,7 +10,7 @@
 - [ ] Dependency update
 - [ ] Documentation update
 
-## Which Component or System Does This Change Impact?
+## Which Components or Systems Does This Change Impact?
 - [ ] Validator Node
 - [ ] Full Node (API, Indexer, etc.)
 - [ ] Move/Aptos Virtual Machine
