@@ -428,6 +428,17 @@ module std::features {
         is_enabled(KEYLESS_ACCOUNTS_WITH_PASSKEYS)
     }
 
+    /// Whether the Multisig V2 enhancement feature is enabled.
+    ///
+    /// Lifetime: transient
+    const MULTISIG_V2_ENHANCEMENT: u64 = 55;
+
+    public fun get_multisig_v2_enhancement_feature(): u64 { MULTISIG_V2_ENHANCEMENT }
+
+    public fun multisig_v2_enhancement_feature_enabled(): bool acquires Features {
+        is_enabled(MULTISIG_V2_ENHANCEMENT)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
