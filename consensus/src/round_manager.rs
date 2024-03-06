@@ -841,18 +841,20 @@ impl RoundManager {
         // generate and multicast randomness share for the fast path
         if let Some(fast_config) = &self.fast_rand_config {
             let ledger_info = vote.ledger_info();
-            let metadata: RandMetadata = RandMetadata::new(
-                ledger_info.epoch(),
-                ledger_info.round(),
-                ledger_info.consensus_block_id(),
-                ledger_info.timestamp_usecs(),
-            );
-            let self_share = Share::generate(fast_config, metadata.clone());
-            let fast_share = FastShare::new(self_share);
-            info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
-                .epoch(fast_share.epoch())
-                .round(fast_share.round()));
-            self.network.broadcast_fast_share(fast_share).await;
+            if !ledger_info.is_dummy() {
+                let metadata: RandMetadata = RandMetadata::new(
+                    ledger_info.epoch(),
+                    ledger_info.round(),
+                    ledger_info.consensus_block_id(),
+                    ledger_info.timestamp_usecs(),
+                );
+                let self_share = Share::generate(fast_config, metadata.clone());
+                let fast_share = FastShare::new(self_share);
+                info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
+                    .epoch(fast_share.epoch())
+                    .round(fast_share.round()));
+                self.network.broadcast_fast_share(fast_share).await;
+            }
         }
 
         if self.broadcast_vote {
