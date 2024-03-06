@@ -23,9 +23,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::{
-    file_format::{AbilitySet, Visibility},
-};
+use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
@@ -511,24 +509,19 @@ impl<'env> ModelBuilder<'env> {
         &self,
         path: &Vec<(Loc, Symbol, Type)>,
         this_struct_id: QualifiedId<StructId>,
-        loc: Loc
-    ) -> Vec<(Loc, String)> {
+        _loc: Loc,
+    ) -> Vec<String> {
         let mut loop_notes = Vec::new();
         for i in 0..path.len() - 1 {
             let parent_name = self.get_struct_type_name(&path[i].2, this_struct_id.clone());
             let field_name = self.env.symbol_pool().string(path[i].1).to_string();
             let child_name = self.get_struct_type_name(&path[i + 1].2, this_struct_id.clone());
-            loop_notes.push((
-                path[i + 1].0.clone(),
-                format!(
-                    "`{}` contains field `{}: {}`...",
-                    parent_name, field_name, child_name
-                ),
+            loop_notes.push(format!(
+                "`{}` contains field `{}: {}`...",
+                parent_name, field_name, child_name
             ));
         }
-        loop_notes.push((
-            loc,
-            format!(
+        loop_notes.push(format!(
             "`{}` contains field `{}: {}`, which forms a loop.",
             self.get_struct_type_name(&path.last().unwrap().2, this_struct_id.clone()),
             self.env
@@ -536,7 +529,7 @@ impl<'env> ModelBuilder<'env> {
                 .string(path.last().unwrap().1.clone())
                 .to_string(),
             self.get_struct_display_name_simple(this_struct_id)
-        )));
+        ));
         loop_notes
     }
 
@@ -566,9 +559,12 @@ impl<'env> ModelBuilder<'env> {
                         let parent_id = mid.qualified(*sid);
                         if parent_id == this_struct_id {
                             if checking == this_struct_id {
-                            let loop_notes =
-                                    self.gen_error_msg_for_fields_loop(path, this_struct_id, ty_loc.clone());
-                                self.env.error_with_labels(
+                                let loop_notes = self.gen_error_msg_for_fields_loop(
+                                    path,
+                                    this_struct_id,
+                                    ty_loc.clone(),
+                                );
+                                self.error_with_notes(
                                     loc_checking,
                                     &format!(
                                         "recursive definition {}",
