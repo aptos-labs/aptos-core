@@ -16,6 +16,7 @@ use std::{
         Arc,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
+    thread,
 };
 
 #[derive(Clone, Debug)]
@@ -114,16 +115,34 @@ impl TransactionGenerator for WorkflowTxnGenerator {
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
         info!("\nGenerate transactions: stage: {:?}, num_to_create: {:?}", self.stage, num_to_create);
-        let stage = match self.stage.load_current_stage() {
-            Some(stage) => stage,
-            None => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(2)),
-                    info!("Waiting for delay before next stage");
-                );
-                return Vec::new();
+        // let stage = match self.stage.load_current_stage() {
+        //     Some(stage) => stage,
+        //     None => {
+        //         info!("Waiting for delay before next stage");
+        //         thread::sleep(Duration::from_secs(2));
+        //         // sample!(
+        //         //     SampleRate::Duration(Duration::from_secs(2)),
+        //         // );
+        //         return Vec::new();
+        //     },
+        // };
+        let stage = match &self.stage {
+            StageTracking::ExternallySet(stage_counter) => {
+                stage_counter.load(Ordering::Relaxed)
+            },
+            StageTracking::WhenDone {
+                stage_counter,
+                stage_start_time,
+                ..
+            } => {
+                if stage_start_time.load(Ordering::Relaxed) > StageTracking::current_timestamp() {
+                    info!("Waiting for next stage");
+                    thread::sleep(Duration::from_secs(stage_start_time.fetch_sub(StageTracking::current_timestamp(), Ordering::Relaxed)));
+                }
+                stage_counter.load(Ordering::Relaxed)
             },
         };
+        info!("Entered Stage {}", stage);
 
         if stage == 0 {
             // We can treat completed_for_first_stage as a stream of indices [0, +inf),
