@@ -283,13 +283,9 @@ impl ProofManager {
                             proof_block.len(),
                             inline_block.len()
                         );
-                        // TODO: Need to calcuale max_txns_to_execute correctly here.
                         Payload::QuorumStoreInlineHybrid(
                             inline_block,
-                            ProofWithDataWithTxnLimit::new(
-                                ProofWithData::new(proof_block),
-                                Some(max_txns as usize),
-                            ),
+                            ProofWithDataWithTxnLimit::new(ProofWithData::new(proof_block), None),
                         )
                     },
                 );
