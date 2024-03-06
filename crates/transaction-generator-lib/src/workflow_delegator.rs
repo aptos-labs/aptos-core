@@ -448,7 +448,7 @@ impl WorkflowTxnGeneratorCreator {
                         place_orders_pool,
                     ]
                 };
-
+                info!("PoolPerStage len: {}, stage 0 len: {}, stage 1 len: {}, stage 2 len: {}", pool_per_stage.len(), pool_per_stage[0].len(), pool_per_stage[1].len(), pool_per_stage[2].len());
                 Self::new(stage_tracking, creators, pool_per_stage, num_users)
             },
         }
