@@ -385,7 +385,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::EconiaBasic1Market => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 50,
+                    num_users: 50000,
                     flow_type: crate::EconiaFlowType::Basic,
                     num_markets: 1,
                     reuse_accounts_for_orders: false,
@@ -396,7 +396,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::EconiaAdvanced1Market => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 50,
+                    num_users: 50000,
                     flow_type: crate::EconiaFlowType::Advanced,
                     num_markets: 1,
                     reuse_accounts_for_orders: false,
@@ -407,7 +407,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::EconiaAdvanced10Market => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 50,
+                    num_users: 50000,
                     flow_type: crate::EconiaFlowType::Advanced,
                     num_markets: 10,
                     reuse_accounts_for_orders: false,
@@ -418,7 +418,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::EconiaBasic1MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 50,
+                    num_users: 50000,
                     flow_type: crate::EconiaFlowType::Basic,
                     num_markets: 1,
                     reuse_accounts_for_orders: true,
@@ -429,7 +429,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::EconiaAdvanced1MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 50,
+                    num_users: 50000,
                     flow_type: crate::EconiaFlowType::Advanced,
                     num_markets: 1,
                     reuse_accounts_for_orders: true,
@@ -440,7 +440,7 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::EconiaAdvanced10MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 50,
+                    num_users: 50000,
                     flow_type: crate::EconiaFlowType::Advanced,
                     num_markets: 10,
                     reuse_accounts_for_orders: true,
