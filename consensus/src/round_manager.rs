@@ -7,8 +7,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
     },
-    counters,
-    counters::{PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
+    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -24,6 +23,7 @@ use crate::{
     pending_votes::VoteReceptionResult,
     persistent_liveness_storage::PersistentLivenessStorage,
     quorum_store::types::BatchMsg,
+    rand::rand_gen::types::{FastShare, RandConfig, Share, TShare},
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
@@ -50,6 +50,7 @@ use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{Features, OnChainConsensusConfig, ValidatorTxnConfig},
+    randomness::RandMetadata,
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
@@ -214,6 +215,7 @@ pub struct RoundManager {
     local_config: ConsensusConfig,
     features: Features,
     broadcast_vote: bool,
+    fast_rand_config: Option<RandConfig>,
 }
 
 impl RoundManager {
@@ -231,6 +233,7 @@ impl RoundManager {
         local_config: ConsensusConfig,
         features: Features,
         broadcast_vote: bool,
+        fast_rand_config: Option<RandConfig>,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -257,6 +260,7 @@ impl RoundManager {
             local_config,
             features,
             broadcast_vote,
+            fast_rand_config,
         }
     }
 
@@ -834,6 +838,25 @@ impl RoundManager {
             .context("[RoundManager] Process proposal")?;
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
+
+        // generate and multicast randomness share for the fast path
+        if let Some(fast_config) = &self.fast_rand_config {
+            let ledger_info = vote.ledger_info();
+            if !ledger_info.is_dummy() {
+                let metadata: RandMetadata = RandMetadata::new(
+                    ledger_info.epoch(),
+                    ledger_info.round(),
+                    ledger_info.consensus_block_id(),
+                    ledger_info.timestamp_usecs(),
+                );
+                let self_share = Share::generate(fast_config, metadata.clone());
+                let fast_share = FastShare::new(self_share);
+                info!(LogSchema::new(LogEvent::BroadcastRandShareFastPath)
+                    .epoch(fast_share.epoch())
+                    .round(fast_share.round()));
+                self.network.broadcast_fast_share(fast_share).await;
+            }
+        }
 
         if self.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);

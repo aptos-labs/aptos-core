@@ -100,6 +100,10 @@ return true.
 -  [Function `is_object_code_deployment_enabled`](#0x1_features_is_object_code_deployment_enabled)
 -  [Function `get_max_object_nesting_check_feature`](#0x1_features_get_max_object_nesting_check_feature)
 -  [Function `max_object_nesting_check_enabled`](#0x1_features_max_object_nesting_check_enabled)
+-  [Function `get_keyless_accounts_with_passkeys_feature`](#0x1_features_get_keyless_accounts_with_passkeys_feature)
+-  [Function `keyless_accounts_with_passkeys_feature_enabled`](#0x1_features_keyless_accounts_with_passkeys_feature_enabled)
+-  [Function `get_fast_randomness_feature`](#0x1_features_get_fast_randomness_feature)
+-  [Function `fast_randomness_enabled`](#0x1_features_fast_randomness_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
 -  [Function `on_new_epoch`](#0x1_features_on_new_epoch)
@@ -420,6 +424,18 @@ The provided signer has not a framework address.
 
 
 
+<a id="0x1_features_FAST_RANDOMNESS"></a>
+
+The fast path feature for on-chain randomness.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_FAST_RANDOMNESS">FAST_RANDOMNESS</a>: u64 = 55;
+</code></pre>
+
+
+
 <a id="0x1_features_FEE_PAYER_ACCOUNT_OPTIONAL"></a>
 
 
@@ -448,6 +464,18 @@ Lifetime: permanent
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a>: u64 = 49;
+</code></pre>
+
+
+
+<a id="0x1_features_KEYLESS_ACCOUNTS_WITH_PASSKEYS"></a>
+
+Whether keyless accounts support passkey-based ephemeral signatures.
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_KEYLESS_ACCOUNTS_WITH_PASSKEYS">KEYLESS_ACCOUNTS_WITH_PASSKEYS</a>: u64 = 54;
 </code></pre>
 
 
@@ -2291,6 +2319,98 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_max_object_nesting_check_enabled">max_object_nesting_check_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MAX_OBJECT_NESTING_CHECK">MAX_OBJECT_NESTING_CHECK</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_keyless_accounts_with_passkeys_feature"></a>
+
+## Function `get_keyless_accounts_with_passkeys_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_keyless_accounts_with_passkeys_feature">get_keyless_accounts_with_passkeys_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_keyless_accounts_with_passkeys_feature">get_keyless_accounts_with_passkeys_feature</a>(): u64 { <a href="features.md#0x1_features_KEYLESS_ACCOUNTS_WITH_PASSKEYS">KEYLESS_ACCOUNTS_WITH_PASSKEYS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_keyless_accounts_with_passkeys_feature_enabled"></a>
+
+## Function `keyless_accounts_with_passkeys_feature_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_keyless_accounts_with_passkeys_feature_enabled">keyless_accounts_with_passkeys_feature_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_keyless_accounts_with_passkeys_feature_enabled">keyless_accounts_with_passkeys_feature_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_KEYLESS_ACCOUNTS_WITH_PASSKEYS">KEYLESS_ACCOUNTS_WITH_PASSKEYS</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_fast_randomness_feature"></a>
+
+## Function `get_fast_randomness_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_fast_randomness_feature">get_fast_randomness_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_fast_randomness_feature">get_fast_randomness_feature</a>(): u64 { <a href="features.md#0x1_features_FAST_RANDOMNESS">FAST_RANDOMNESS</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_fast_randomness_enabled"></a>
+
+## Function `fast_randomness_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_fast_randomness_enabled">fast_randomness_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_fast_randomness_enabled">fast_randomness_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_FAST_RANDOMNESS">FAST_RANDOMNESS</a>)
 }
 </code></pre>
 
