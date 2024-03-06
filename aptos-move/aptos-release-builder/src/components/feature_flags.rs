@@ -105,6 +105,7 @@ pub enum FeatureFlag {
     ObjectCodeDeployment,
     MaxObjectNestingCheck,
     KeylessAccountsWithPasskeys,
+    TransactionContextExtension,
     FastRandomness,
 }
 
@@ -271,6 +272,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::KeylessAccountsWithPasskeys => {
                 AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS
             },
+            FeatureFlag::TransactionContextExtension => {
+                AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION
+            },
             FeatureFlag::FastRandomness => AptosFeatureFlag::FAST_RANDOMNESS,
         }
     }
@@ -359,6 +363,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK => FeatureFlag::MaxObjectNestingCheck,
             AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS => {
                 FeatureFlag::KeylessAccountsWithPasskeys
+            },
+            AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION => {
+                FeatureFlag::TransactionContextExtension
             },
             AptosFeatureFlag::FAST_RANDOMNESS => FeatureFlag::FastRandomness,
         }

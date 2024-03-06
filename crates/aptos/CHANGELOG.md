@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [3.0.1] - 2024/03/05
+- Fix bug in `aptos update revela` if default install directory doesn't exist.
+
 ## [3.0.0] - 2024/03/05
 - **Breaking Change**: `aptos update` is now `aptos update aptos`.
 - Added `aptos update revela`. This installs / updates the `revela` binary, which is needed for the new `aptos move decompile` subcommand.

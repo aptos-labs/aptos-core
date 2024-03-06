@@ -50,7 +50,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
 
         Ok(RespawnedSessionBuilder {
             executor_view,
-            resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
+            resolver_builder: |executor_view| vm.as_move_resolver_with_group_view(executor_view),
             session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
             storage_refund,
         }
