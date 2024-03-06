@@ -4,6 +4,7 @@
 ## Type of Change
 - [ ] New feature
 - [ ] Bug fix
+- [ ] Breaking change
 - [ ] Performance improvement
 - [ ] Refactoring
 - [ ] Dependency update
