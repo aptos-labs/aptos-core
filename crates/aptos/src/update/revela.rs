@@ -97,7 +97,13 @@ impl BinaryUpdater for RevelaUpdateTool {
 
         let install_dir = match self.install_dir.clone() {
             Some(dir) => dir,
-            None => get_additional_binaries_dir(),
+            None => {
+                let dir = get_additional_binaries_dir();
+                // Make the directory if it doesn't already exist.
+                std::fs::create_dir_all(&dir)
+                    .with_context(|| format!("Failed to create directory: {:?}", dir))?;
+                dir
+            },
         };
 
         let current_version = match &info.current_version {
