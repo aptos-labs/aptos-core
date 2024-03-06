@@ -61,7 +61,9 @@ fn decrement_size_for_remove_tag(
     old_tagged_resource_size: u64,
 ) -> PartialVMResult<()> {
     match size {
-        ResourceGroupSize::Concrete(_) => Err(code_invariant_error("Unexpected ResourceGroupSize::Concrete in decrement_size_for_remove_tag").into()),
+        ResourceGroupSize::Concrete(_) => Err(code_invariant_error(
+            "Unexpected ResourceGroupSize::Concrete in decrement_size_for_remove_tag",
+        )),
         ResourceGroupSize::Combined {
             num_tagged_resources,
             all_tagged_resources_size,
@@ -436,7 +438,7 @@ mod tests {
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
         assert_eq!(resolver.resource_group_size(&key).unwrap(), expected_size);
-        // TODO: Layout hardcoded to None. Test with layout = Some(..)
+        // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
         let group_changes = BTreeMap::from([
             (mock_tag_0(), MoveStorageOp::Delete),
             (
@@ -450,10 +452,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(group_write.metadata_op().metadata(), &metadata);
-        let expected_new_size = bcs::serialized_size(&mock_tag_1()).unwrap()
-            + bcs::serialized_size(&mock_tag_2()).unwrap()
-            + 7; // values bytes size: 2 + 5
-        assert_some_eq!(group_write.maybe_group_op_size().map(ResourceGroupSize::get), expected_new_size as u64);
+        let expected_new_size =
+            group_size_as_sum(vec![(&mock_tag_1(), 2), (&mock_tag_2(), 5)].into_iter()).unwrap();
+        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size);
         assert_eq!(group_write.inner_ops().len(), 2);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_0()),
@@ -497,11 +498,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(group_write.metadata_op().metadata(), &metadata);
-        let expected_new_size = bcs::serialized_size(&mock_tag_0()).unwrap()
-            + bcs::serialized_size(&mock_tag_1()).unwrap()
-            + bcs::serialized_size(&mock_tag_2()).unwrap()
-            + 6; // values bytes size: 1 + 2 + 3.
-        assert_some_eq!(group_write.maybe_group_op_size().map(ResourceGroupSize::get), expected_new_size as u64);
+        let expected_new_size = group_size_as_sum(
+            vec![(&mock_tag_0(), 1), (&mock_tag_1(), 2), (&mock_tag_2(), 3)].into_iter(),
+        )
+        .unwrap();
+        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size);
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_2()),
@@ -516,7 +517,7 @@ mod tests {
         let s = MockStateView::new(BTreeMap::new());
         let resolver = as_resolver_with_group_size_kind(&s, GroupSizeKind::AsSum);
 
-        // TODO: Layout hardcoded to None. Test with layout = Some(..)
+        // TODO[agg_v2](test): Layout hardcoded to None. Test with layout = Some(..)
         let group_changes =
             BTreeMap::from([(mock_tag_1(), MoveStorageOp::New((vec![2, 2].into(), None)))]);
         let key = StateKey::raw(vec![0]);
@@ -526,8 +527,8 @@ mod tests {
             .unwrap();
 
         assert!(group_write.metadata_op().metadata().is_none());
-        let expected_new_size = bcs::serialized_size(&mock_tag_1()).unwrap() + 2;
-        assert_some_eq!(group_write.maybe_group_op_size().map(ResourceGroupSize::get), expected_new_size as u64);
+        let expected_new_size = group_size_as_sum(vec![(&mock_tag_1(), 2)].into_iter()).unwrap();
+        assert_some_eq!(group_write.maybe_group_op_size(), expected_new_size);
         assert_eq!(group_write.inner_ops().len(), 1);
         assert_some_eq!(
             group_write.inner_ops().get(&mock_tag_1()),

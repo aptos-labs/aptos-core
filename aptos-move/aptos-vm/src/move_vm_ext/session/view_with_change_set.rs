@@ -258,7 +258,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
             WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
             ResourceGroupInPlaceDelayedFieldChange(_) => None,
             Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                // There should be no colisions, we cannot have group key refer to a resource.
+                // There should be no collisions, we cannot have group key refer to a resource.
                 Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
             },
         })
@@ -285,7 +285,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
                 Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    // There should be no colisions, we cannot have group key refer to a resource.
+                    // There should be no collisions, we cannot have group key refer to a resource.
                     Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
                 },
             })
@@ -310,7 +310,8 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
     }
 
     fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
-        self.base_resource_group_view.is_resource_groups_split_in_change_set_capable()
+        self.base_resource_group_view
+            .is_resource_groups_split_in_change_set_capable()
     }
 }
 
@@ -476,7 +477,7 @@ mod test {
                             (WriteOp::legacy_modification(serialize(&300).into()), None),
                         ),
                     ]),
-                    0,
+                    ResourceGroupSize::zero_combined(),
                     0,
                 ),
             ),
@@ -488,7 +489,7 @@ mod test {
                         mock_tag_1(),
                         (WriteOp::legacy_modification(serialize(&5000).into()), None),
                     )]),
-                    0,
+                    ResourceGroupSize::zero_combined(),
                     0,
                 ),
             ),

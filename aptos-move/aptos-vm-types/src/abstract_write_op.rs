@@ -71,7 +71,9 @@ impl AbstractResourceWriteOp {
                         write_len: maybe_group_op_size.expect("Creation must have size").get(),
                     },
                     Modification { .. } => WriteOpSize::Modification {
-                        write_len: maybe_group_op_size.expect("Modification must have size").get(),
+                        write_len: maybe_group_op_size
+                            .expect("Modification must have size")
+                            .get(),
                     },
                     Deletion { .. } => WriteOpSize::Deletion,
                 }
