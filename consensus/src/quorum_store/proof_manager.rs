@@ -215,10 +215,11 @@ impl ProofManager {
                                             cur_bytes += batch.num_bytes();
                                             inline_block.push((batch.clone(), txns.clone()));
                                             inline_batch_count += 1;
-                                            return true;
+                                        } else {
+                                            counters::NUM_CORRUPT_BATCHES.inc();
                                         }
                                     }
-                                    false
+                                    true
                                 } else {
                                     full = true;
                                     false

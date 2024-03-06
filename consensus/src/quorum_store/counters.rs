@@ -218,6 +218,14 @@ pub static BATCH_IN_PROGRESS_COMMITTED: Lazy<IntCounter> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static NUM_CORRUPT_BATCHES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "corrupt_batches_in_proof_manager",
+        "Number of batches in proof manager for which the digest does not match"
+    )
+    .unwrap()
+});
+
 pub static BATCH_IN_PROGRESS_EXPIRED: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "quorum_store_batch_in_progress_expired",
