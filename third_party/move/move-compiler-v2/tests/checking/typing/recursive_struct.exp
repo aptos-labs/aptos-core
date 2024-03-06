@@ -8,8 +8,8 @@ error: recursive definition S
 4 │ │     }
   │ ╰─────^
   │
-  = `S` contains `T`...
-  = `T` contains `S`, which forms a loop.
+  = `simple_recursion::S` contains field `f: simple_recursion::T`...
+  = `simple_recursion::T` contains `S`, which forms a loop.
 
 error: recursive definition T
   ┌─ tests/checking/typing/recursive_struct.move:5:2
@@ -19,8 +19,8 @@ error: recursive definition T
 7 │ │     }
   │ ╰─────^
   │
-  = `T` contains `S`...
-  = `S` contains `T`, which forms a loop.
+  = `simple_recursion::T` contains field `f: simple_recursion::S`...
+  = `simple_recursion::S` contains `T`, which forms a loop.
 
 error: recursive definition S1
    ┌─ tests/checking/typing/recursive_struct.move:9:2
@@ -30,9 +30,9 @@ error: recursive definition S1
 11 │ │     }
    │ ╰─────^
    │
-   = `S1` contains `S2`...
-   = `S2` contains `S3`...
-   = `S3` contains `S1`, which forms a loop.
+   = `simple_recursion::S1` contains field `f: simple_recursion::S2`...
+   = `simple_recursion::S2` contains field `f: simple_recursion::S3`...
+   = `simple_recursion::S3` contains `S1`, which forms a loop.
 
 error: recursive definition S2
    ┌─ tests/checking/typing/recursive_struct.move:13:2
@@ -42,9 +42,9 @@ error: recursive definition S2
 15 │ │     }
    │ ╰─────^
    │
-   = `S2` contains `S3`...
-   = `S3` contains `S1`...
-   = `S1` contains `S2`, which forms a loop.
+   = `simple_recursion::S2` contains field `f: simple_recursion::S3`...
+   = `simple_recursion::S3` contains field `f: simple_recursion::S1`...
+   = `simple_recursion::S1` contains `S2`, which forms a loop.
 
 error: recursive definition S3
    ┌─ tests/checking/typing/recursive_struct.move:17:2
@@ -54,9 +54,9 @@ error: recursive definition S3
 19 │ │     }
    │ ╰─────^
    │
-   = `S3` contains `S1`...
-   = `S1` contains `S2`...
-   = `S2` contains `S3`, which forms a loop.
+   = `simple_recursion::S3` contains field `f: simple_recursion::S1`...
+   = `simple_recursion::S1` contains field `f: simple_recursion::S2`...
+   = `simple_recursion::S2` contains `S3`, which forms a loop.
 
 error: recursive definition S4
    ┌─ tests/checking/typing/recursive_struct.move:21:2
@@ -66,7 +66,7 @@ error: recursive definition S4
 23 │ │     }
    │ ╰─────^
    │
-   = `S4` contains `S4`, which forms a loop.
+   = `simple_recursion::S4<T>` contains `S4`, which forms a loop.
 
 error: recursive definition S5
    ┌─ tests/checking/typing/recursive_struct.move:25:2
@@ -76,7 +76,7 @@ error: recursive definition S5
 27 │ │     }
    │ ╰─────^
    │
-   = `S5` contains `S5`, which forms a loop.
+   = `simple_recursion::S5` contains `S5`, which forms a loop.
 
 error: recursive definition S
    ┌─ tests/checking/typing/recursive_struct.move:31:2
@@ -86,8 +86,8 @@ error: recursive definition S
 33 │ │     }
    │ ╰─────^
    │
-   = `S` contains `G`...
-   = `G` contains `S`, which forms a loop.
+   = `type_param::S` contains field `f: type_param::G<type_param::S>`...
+   = `type_param::G<type_param::S>` contains `S`, which forms a loop.
 
 error: recursive definition S1
    ┌─ tests/checking/typing/recursive_struct.move:39:2
@@ -97,7 +97,7 @@ error: recursive definition S1
 41 │ │     }
    │ ╰─────^
    │
-   = `S1` contains `S1`, which forms a loop.
+   = `type_param::S1` contains `S1`, which forms a loop.
 
 error: recursive definition S2
    ┌─ tests/checking/typing/recursive_struct.move:43:2
@@ -107,8 +107,8 @@ error: recursive definition S2
 45 │ │     }
    │ ╰─────^
    │
-   = `S2` contains `S3`...
-   = `S3` contains `S2`, which forms a loop.
+   = `type_param::S2<T1, T2>` contains field `f: type_param::S3<u8, type_param::S2<T1, T2>>`...
+   = `type_param::S3<u8, type_param::S2<T1, T2>>` contains `S2`, which forms a loop.
 
 error: recursive definition S3
    ┌─ tests/checking/typing/recursive_struct.move:47:2
@@ -118,5 +118,5 @@ error: recursive definition S3
 49 │ │     }
    │ ╰─────^
    │
-   = `S3` contains `S2`...
-   = `S2` contains `S3`, which forms a loop.
+   = `type_param::S3<T1, T2>` contains field `f: type_param::S2<u8, type_param::S3<u8, u8>>`...
+   = `type_param::S2<u8, type_param::S3<u8, u8>>` contains `S3`, which forms a loop.
