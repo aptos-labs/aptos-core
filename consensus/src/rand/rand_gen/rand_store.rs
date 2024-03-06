@@ -43,12 +43,22 @@ impl<S: TShare> ShareAggregator<S> {
         rand_config: &RandConfig,
         rand_metadata: RandMetadata,
         decision_tx: Sender<Randomness>,
+        is_fast_path: bool,
     ) -> Either<Self, RandShare<S>> {
         if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
         }
-        // timestamp records the time when the block is created
-        observe_block(rand_metadata.timestamp, BlockStage::RAND_ADD_ENOUGH_SHARE);
+        if is_fast_path {
+            observe_block(
+                rand_metadata.timestamp,
+                BlockStage::RAND_ADD_ENOUGH_SHARE_FAST,
+            );
+        } else {
+            observe_block(
+                rand_metadata.timestamp,
+                BlockStage::RAND_ADD_ENOUGH_SHARE_SLOW,
+            );
+        }
         let rand_config = rand_config.clone();
         let self_share = self
             .get_self_share()
@@ -134,13 +144,23 @@ impl<S: TShare> RandItem<S> {
         }
     }
 
-    fn try_aggregate(&mut self, rand_config: &RandConfig, decision_tx: Sender<Randomness>) {
+    fn try_aggregate(
+        &mut self,
+        rand_config: &RandConfig,
+        decision_tx: Sender<Randomness>,
+        is_fast_path: bool,
+    ) {
         let item = std::mem::replace(self, Self::new(Author::ONE));
         let new_item = match item {
             RandItem::PendingDecision {
                 share_aggregator,
                 metadata,
-            } => match share_aggregator.try_aggregate(rand_config, metadata.clone(), decision_tx) {
+            } => match share_aggregator.try_aggregate(
+                rand_config,
+                metadata.clone(),
+                decision_tx,
+                is_fast_path,
+            ) {
                 Either::Left(share_aggregator) => Self::PendingDecision {
                     metadata,
                     share_aggregator,
@@ -231,7 +251,7 @@ impl<S: TShare> RandStore<S> {
             .entry(rand_metadata.round())
             .or_insert_with(|| RandItem::new(self.author));
         rand_item.add_metadata(&self.rand_config, rand_metadata.clone());
-        rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+        rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone(), false);
         // fast path
         if self.fast_rand_map.is_some() && self.fast_rand_config.is_some() {
             let fast_rand_item = self
@@ -247,6 +267,7 @@ impl<S: TShare> RandStore<S> {
             fast_rand_item.try_aggregate(
                 self.fast_rand_config.as_ref().unwrap(),
                 self.decision_tx.clone(),
+                true,
             );
         }
     }
@@ -266,7 +287,7 @@ impl<S: TShare> RandStore<S> {
             .entry(rand_metadata.round())
             .or_insert_with(|| RandItem::new(self.author));
         rand_item.add_share(share, &self.rand_config)?;
-        rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+        rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone(), false);
         Ok(rand_item.has_decision())
     }
 
@@ -298,6 +319,7 @@ impl<S: TShare> RandStore<S> {
         fast_rand_item.try_aggregate(
             self.fast_rand_config.as_ref().unwrap(),
             self.decision_tx.clone(),
+            true,
         );
         Ok(fast_rand_item.has_decision())
     }
@@ -498,7 +520,7 @@ mod tests {
             RandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000),
         );
         assert_eq!(item.total_weights().unwrap(), 5);
-        item.try_aggregate(&ctxt.rand_config, tx);
+        item.try_aggregate(&ctxt.rand_config, tx, false);
         assert!(item.has_decision());
 
         let mut item = RandItem::<MockShare>::new(ctxt.authors[0]);

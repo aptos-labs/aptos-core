@@ -54,14 +54,17 @@ async fn enable_feature_3() {
         .await
         .expect("Waited too long for epoch 3.");
 
-    info!("Now in epoch 3. Enabling feature RECONFIGURE_WITH_DKG.");
+    info!("Now in epoch 3. Enabling feature RECONFIGURE_WITH_DKG and FAST_RANDOMNESS.");
     let enable_dkg_script = r#"
 script {
     use aptos_framework::aptos_governance;
+    use std::features;
     fun main(core_resources: &signer) {
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let dkg_feature_id: u64 = std::features::get_reconfigure_with_dkg_feature();
-        aptos_governance::toggle_features(&framework_signer, vector[dkg_feature_id], vector[]);
+        let dkg_feature_id: u64 = features::get_reconfigure_with_dkg_feature();
+        let fast_path_feature_id: u64 = std::features::get_fast_randomness_feature();
+        features::change_feature_flags_for_next_epoch(&framework_signer, vector[dkg_feature_id, fast_path_feature_id], vector[]);
+        aptos_governance::reconfigure(&framework_signer);
     }
 }
 "#;
@@ -70,25 +73,7 @@ script {
         .run_script(root_idx, enable_dkg_script)
         .await
         .expect("Txn execution error.");
-    debug!("enabling_dkg_summary={:?}", txn_summary);
-
-    info!("Now in epoch 3. Enabling feature FAST_RANDOMNESS.");
-    let enable_fast_path_script = r#"
-    script {
-    use aptos_framework::aptos_governance;
-    fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let dkg_feature_id: u64 = std::features::get_fast_randomness_feature();
-        aptos_governance::toggle_features(&framework_signer, vector[dkg_feature_id], vector[]);
-    }
-    }
-    "#;
-
-    let txn_summary = cli
-        .run_script(root_idx, enable_fast_path_script)
-        .await
-        .expect("Txn execution error.");
-    debug!("enabling_dkg_summary={:?}", txn_summary);
+    debug!("enabling_dkg_and_fast_randomness_summary={:?}", txn_summary);
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 2))
