@@ -600,17 +600,23 @@ impl EntryPoints {
 
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 let random_addr_string = format!("0x{:0>64}", format!("{:x}", rng.gen_range(0u64, 2147483646u64)));
-                let mut recipient_addr  = AccountAddress::from_hex_literal(&random_addr_string).unwrap();
+                let property_keys: Vec<Vec<String>> = vec![vec!["foo".to_string()]];
+                let property_types: Vec<Vec<String>> = vec![vec!["0x1::string::String".to_string()]];
+                let property_values: Vec<Vec<Vec<u8>>> = vec![vec![bcs::to_bytes(&"bar").unwrap()]];
+                let recipient_addrs = vec![AccountAddress::from_hex_literal(&random_addr_string).unwrap()];
                 get_payload(
                         module_id,
-                    ident_str!("mint_tokens_simple").to_owned(),
+                    ident_str!("mint_tokens").to_owned(),
                     vec![
                         bcs::to_bytes(&AccountAddress::from_hex_literal(token_minter_addr).unwrap()).unwrap(),
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
                         bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // name
                         bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
                         bcs::to_bytes(&1u64).unwrap(),                  // amount
-                        bcs::to_bytes(&vec![recipient_addr]).unwrap(),  // recipient
+                        bcs::to_bytes(&property_keys).unwrap(),         // property_keys
+                        bcs::to_bytes(&property_types).unwrap(),        // property_types
+                        bcs::to_bytes(&property_values).unwrap(),       // property_values
+                        bcs::to_bytes(&recipient_addrs).unwrap(),       // recipient
                     ],
                 )
             },
