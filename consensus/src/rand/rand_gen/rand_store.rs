@@ -14,6 +14,8 @@ use aptos_types::randomness::{RandMetadata, Randomness};
 use itertools::Either;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use super::types::FastShare;
+
 const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
 
 pub struct ShareAggregator<S> {
@@ -194,6 +196,8 @@ pub struct RandStore<S> {
     author: Author,
     rand_config: RandConfig,
     rand_map: BTreeMap<Round, RandItem<S>>,
+    fast_rand_config: Option<RandConfig>,
+    fast_rand_map: Option<BTreeMap<Round, RandItem<S>>>,
     highest_known_round: u64,
     decision_tx: Sender<Randomness>,
 }
@@ -203,6 +207,7 @@ impl<S: TShare> RandStore<S> {
         epoch: u64,
         author: Author,
         rand_config: RandConfig,
+        fast_rand_config: Option<RandConfig>,
         decision_tx: Sender<Randomness>,
     ) -> Self {
         Self {
@@ -210,6 +215,8 @@ impl<S: TShare> RandStore<S> {
             author,
             rand_config,
             rand_map: BTreeMap::new(),
+            fast_rand_config: fast_rand_config.clone(),
+            fast_rand_map: fast_rand_config.map(|_| BTreeMap::new()),
             highest_known_round: 0,
             decision_tx,
         }
@@ -226,6 +233,17 @@ impl<S: TShare> RandStore<S> {
             .or_insert_with(|| RandItem::new(self.author));
         rand_item.add_metadata(&self.rand_config, rand_metadata.clone());
         rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
+        // fast path
+        if self.fast_rand_map.is_some() && self.fast_rand_config.is_some() {
+            let fast_rand_item = self
+                .fast_rand_map
+                .as_mut()
+                .unwrap()
+                .entry(rand_metadata.round())
+                .or_insert_with(|| RandItem::new(self.author));
+            fast_rand_item.add_metadata(&self.fast_rand_config.as_ref().unwrap(), rand_metadata.clone());
+            fast_rand_item.try_aggregate(&self.fast_rand_config.as_ref().unwrap(), self.decision_tx.clone());
+        }
     }
 
     pub fn add_share(&mut self, share: RandShare<S>) -> anyhow::Result<bool> {
@@ -245,6 +263,29 @@ impl<S: TShare> RandStore<S> {
         rand_item.add_share(share, &self.rand_config)?;
         rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone());
         Ok(rand_item.has_decision())
+    }
+
+    pub fn add_fast_share(&mut self, fast_share: FastShare<S>) -> anyhow::Result<bool> {
+        ensure!(
+            fast_share.metadata().epoch() == self.epoch,
+            "Share from different epoch"
+        );
+        ensure!(
+            fast_share.metadata().round() <= self.highest_known_round + FUTURE_ROUNDS_TO_ACCEPT,
+            "Share from future round"
+        );
+        let rand_metadata = fast_share.metadata().clone();
+        ensure!(self.fast_rand_config.is_some() && self.fast_rand_map.is_some(), "Fast path not enabled");
+
+        let fast_rand_item = self
+            .fast_rand_map
+            .as_mut()
+            .unwrap()
+            .entry(rand_metadata.round())
+            .or_insert_with(|| RandItem::new(self.author));
+        fast_rand_item.add_share(fast_share.rand_share().clone(), &self.fast_rand_config.as_ref().unwrap())?;
+        fast_rand_item.try_aggregate(&self.fast_rand_config.as_ref().unwrap(), self.decision_tx.clone());
+        Ok(fast_rand_item.has_decision())
     }
 
     /// This should only be called after the block is added, returns None if already decided
@@ -464,6 +505,7 @@ mod tests {
             ctxt.target_epoch,
             ctxt.authors[1],
             ctxt.rand_config.clone(),
+            None,
             decision_tx,
         );
 
