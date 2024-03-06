@@ -43,6 +43,13 @@ module 0xc0ffee::m {
         (*a, *b)
     }
 
+    fun swap8(x: u64, y: u64, n: u64): (u64, u64) {
+        for (i in 0..n) {
+            (x, y) = (y, x);
+        };
+        (x, y)
+    }
+
     public fun test1(): (u32, u32) {
         swap1(1, 2)
     }
@@ -66,6 +73,12 @@ module 0xc0ffee::m {
     public fun test7(): (u64, u64) {
         swap7(44, 440)
     }
+
+    public fun test8(): (u64, u64, u64, u64) {
+        let (a, b) = swap8(8, 80, 8);
+        let (c, d) = swap8(8, 80, 9);
+        (a, b, c, d)
+    }
 }
 
 //# run 0xc0ffee::m::test1
@@ -81,3 +94,5 @@ module 0xc0ffee::m {
 //# run 0xc0ffee::m::test6
 
 //# run 0xc0ffee::m::test7
+
+//# run 0xc0ffee::m::test8

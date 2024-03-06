@@ -1,24 +1,27 @@
-processed 8 tasks
+processed 9 tasks
 
-task 1 'run'. lines 71-71:
+task 1 'run'. lines 84-84:
 return values: 2, 1
 
-task 2 'run'. lines 73-73:
+task 2 'run'. lines 86-86:
 return values: 30, 40, 20, 10
 
-task 3 'run'. lines 75-75:
+task 3 'run'. lines 88-88:
 return values: 22, 11
 
-task 4 'run'. lines 77-77:
+task 4 'run'. lines 90-90:
 return values: { 222 }, { 111 }
 
-task 5 'run'. lines 79-79:
+task 5 'run'. lines 92-92:
 return values: 258, 147
 
-task 6 'run'. lines 81-81:
+task 6 'run'. lines 94-94:
 return values: 41, 5
 
-task 7 'run'. lines 83-83:
+task 7 'run'. lines 96-96:
 return values: 440, 44
+
+task 8 'run'. lines 98-98:
+return values: 8, 80, 80, 8
 
 ==> Compiler v2 delivered same results!
