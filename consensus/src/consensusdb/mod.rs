@@ -12,7 +12,8 @@ use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{
-    schema::Schema, Options, ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME,
+    schema::Schema, BlockBasedOptions, Cache, DBCompressionType, Options, ReadOptions, SchemaBatch,
+    DB, DEFAULT_COLUMN_FAMILY_NAME,
 };
 use aptos_storage_interface::AptosDbError;
 pub use schema::{
@@ -68,6 +69,14 @@ impl ConsensusDB {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
+        opts.increase_parallelism(8);
+        opts.set_max_background_jobs(4);
+        let mut table_options = BlockBasedOptions::default();
+        table_options.set_block_size(4 * (1 << 10)); // 4KB
+        let cache = Cache::new_lru_cache(1 * (1 << 30)); // 1GB
+        table_options.set_block_cache(&cache);
+        opts.set_compression_type(DBCompressionType::Lz4);
+        opts.set_block_based_table_factory(&table_options);
         let db = DB::open(path.clone(), "consensus", column_families, &opts)
             .expect("ConsensusDB open failed; unable to continue");
 
@@ -202,7 +211,10 @@ impl ConsensusDB {
     }
 
     pub fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
-        let mut iter = self.db.iter::<S>(ReadOptions::default())?;
+        let mut opts = ReadOptions::default();
+        opts.set_async_io(true);
+        opts.set_readahead_size(8 * 1024 * 1024);
+        let mut iter = self.db.iter::<S>(opts)?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>, AptosDbError>>()?)
     }
