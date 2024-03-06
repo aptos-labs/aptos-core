@@ -10696,6 +10696,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "ethnum",
+ "hashbrown 0.14.3",
  "hex",
  "num 0.4.1",
  "once_cell",
@@ -11334,6 +11335,7 @@ dependencies = [
  "better_any",
  "bytes",
  "fail 0.4.0",
+ "hashbrown 0.14.3",
  "hex",
  "lazy_static",
  "lru 0.7.8",
@@ -11351,6 +11353,7 @@ dependencies = [
  "smallbitvec",
  "tracing",
  "triomphe",
+ "typed-arena",
 ]
 
 [[package]]
