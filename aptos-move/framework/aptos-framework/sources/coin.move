@@ -199,7 +199,9 @@ module aptos_framework::coin {
     }
 
     inline fun borrow_conversion_map_mut(): &mut CoinConversionMap {
-        if (!exists<CoinConversionMap>(@aptos_framework)) {
+        if (!exists<CoinConversionMap>(
+            @aptos_framework
+        ) && std::features::coin_to_fungible_asset_migration_feature_enabled()) {
             move_to(&create_signer::create_signer(@aptos_framework), CoinConversionMap {
                 coin_to_fungible_asset_map: table::new<TypeInfo, address>(),
             })
@@ -648,8 +650,10 @@ module aptos_framework::coin {
                 DepositEvent { amount: coin.value },
             );
             merge(&mut coin_store.coin, coin);
-        } else {
+        } else if (std::features::coin_to_fungible_asset_migration_feature_enabled()) {
             primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
+        } else {
+            abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
         };
     }
 
@@ -662,11 +666,13 @@ module aptos_framework::coin {
         if (exists<CoinStore<CoinType>>(account_addr)) {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             merge(&mut coin_store.coin, coin);
-        } else {
+        } else if (std::features::coin_to_fungible_asset_migration_feature_enabled()) {
             let fa = coin_to_fungible_asset(coin);
             let metadata = fungible_asset::asset_metadata(&fa);
             let store = primary_fungible_store::primary_store(account_addr, metadata);
             fungible_asset::deposit_internal(store, fa);
+        } else {
+            abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
         }
     }
 
