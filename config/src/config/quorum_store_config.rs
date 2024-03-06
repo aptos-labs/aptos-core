@@ -44,7 +44,6 @@ impl Default for QuorumStoreBackPressureConfig {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct QuorumStoreConfig {
-    pub allow_batches_without_pos_in_proposal: bool,
     pub channel_size: usize,
     pub proof_timeout_ms: usize,
     pub batch_generation_poll_interval_ms: usize,
@@ -72,12 +71,12 @@ pub struct QuorumStoreConfig {
     pub back_pressure: QuorumStoreBackPressureConfig,
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
+    pub allow_batches_without_pos_in_proposal: bool,
 }
 
 impl Default for QuorumStoreConfig {
     fn default() -> QuorumStoreConfig {
         QuorumStoreConfig {
-            allow_batches_without_pos_in_proposal: true,
             channel_size: 1000,
             proof_timeout_ms: 10000,
             batch_generation_poll_interval_ms: 25,
@@ -109,6 +108,7 @@ impl Default for QuorumStoreConfig {
             // number of batch coordinators to handle QS batch messages, should be >= 1
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
+            allow_batches_without_pos_in_proposal: true,
         }
     }
 }

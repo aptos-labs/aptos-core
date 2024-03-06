@@ -145,7 +145,7 @@ impl ProofWithData {
             .sum()
     }
 
-    pub fn size(&self) -> usize {
+    pub fn num_bytes(&self) -> usize {
         self.proofs
             .iter()
             .map(|proof| proof.num_bytes() as usize)
@@ -311,14 +311,14 @@ impl Payload {
                 .with_min_len(100)
                 .map(|txn| txn.raw_txn_bytes_len())
                 .sum(),
-            Payload::InQuorumStore(proof_with_status) => proof_with_status.size(),
+            Payload::InQuorumStore(proof_with_status) => proof_with_status.num_bytes(),
             // We dedeup, shuffle and finally truncate the txns in the payload to the length == 'max_txns_to_execute'.
             // Hence, it makes sense to pass the full size of the payload here.
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
-                proof_with_status.proof_with_data.size()
+                proof_with_status.proof_with_data.num_bytes()
             },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_status) => {
-                proof_with_status.proof_with_data.size()
+                proof_with_status.proof_with_data.num_bytes()
                     + inline_batches
                         .iter()
                         .map(|(batch_info, _)| batch_info.num_bytes() as usize)
@@ -442,7 +442,6 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                             exclude_proofs.insert(proof.info().clone());
                         }
                         for (batch_info, _) in inline_batches {
-                            // TODO: Couldn't verify whether the digest is correct in batch_info
                             exclude_proofs.insert(batch_info.clone());
                         }
                     },
