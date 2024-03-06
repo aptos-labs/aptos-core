@@ -154,15 +154,6 @@ pub static NUM_INLINE_TXNS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
-pub static NUM_TXN_SPACE_LEFT_IN_PROPOSAL: Lazy<Histogram> = Lazy::new(|| {
-    register_histogram!(
-        "num_txn_space_left_in_block_proposal",
-        "Histogram for the amount of space left in the block proposal in terms of number of transactions",
-        TRANSACTION_COUNT_BUCKETS.clone(),
-    )
-    .unwrap()
-});
-
 pub static NUM_BATCHES_WITHOUT_PROOF_OF_STORE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "num_batches_without_proof_of_store",
