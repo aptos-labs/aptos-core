@@ -113,7 +113,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         mut num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
-        // println!("\nGenerate transactions: stage: {:?}", self.stage);
+        info!("\nGenerate transactions: stage: {:?}, num_to_create: {:?}", self.stage, num_to_create);
         let stage = match self.stage.load_current_stage() {
             Some(stage) => stage,
             None => {
@@ -145,6 +145,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
                 delay_between_stages,
             } => {
                 if stage == 0 {
+                    info!("TransactionGenerator Workflow: Stage 0, num_to_create: {}", num_to_create);
                     if num_to_create == 0 {
                         info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.first().unwrap().len());
                         stage_start_time.store(
