@@ -1,10 +1,13 @@
 # This is a docker bake file in HCL syntax.
 # It provides a high-level mechenanism to build multiple dockerfiles in one shot.
-# Check https://crazymax.dev/docker-allhands2-buildx-bake and https://docs.docker.com/engine/reference/commandline/buildx_bake/#file-definition for an intro.
+# Check https://crazymax.dev/docker-allhands2-buildx-bake and
+# https://docs.docker.com/engine/reference/commandline/buildx_bake/#file-definition
+# for an intro.
 
 variable "CI" {
-  # whether this build runs in aptos-labs' CI environment which makes certain assumptions about certain registries being available to push to cache layers.
-  # for local builds we simply default to relying on dockers local caching.
+  # Whether this build runs in aptos-labs' CI environment which makes certain
+  # assumptions about certain registries being available to push to cache layers.
+  # For local builds we simply default to relying on Docker's local caching.
   default = "false"
 }
 variable "TARGET_CACHE_ID" {}
@@ -17,8 +20,6 @@ variable "GIT_BRANCH" {}
 variable "GIT_TAG" {}
 
 variable "GIT_CREDENTIALS" {}
-
-variable "BUILT_VIA_BUILDKIT" {}
 
 variable "GCP_DOCKER_ARTIFACT_REPO" {}
 
@@ -37,6 +38,9 @@ variable "ecr_base" {
 
 variable "NORMALIZED_GIT_BRANCH_OR_PR" {}
 variable "IMAGE_TAG_PREFIX" {}
+variable "IMAGE_RETENTION_CLASS" {
+  default = "dev"
+}
 variable "PROFILE" {
   // Cargo compilation profile
   default = "release"
@@ -231,16 +235,21 @@ function "generate_tags" {
   result = TARGET_REGISTRY == "remote-all" ? [
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_RETENTION_CLASS}${NORMALIZED_GIT_BRANCH_OR_PR}",
     "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_RETENTION_CLASS}${NORMALIZED_GIT_BRANCH_OR_PR}",
     "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
     "${ecr_base}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+    "${ecr_base}/${target}:${IMAGE_RETENTION_CLASS}${NORMALIZED_GIT_BRANCH_OR_PR}",
     ] : (
     TARGET_REGISTRY == "gcp" || TARGET_REGISTRY == "remote" ? [
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+      "${GCP_DOCKER_ARTIFACT_REPO}/${target}:${IMAGE_RETENTION_CLASS}${NORMALIZED_GIT_BRANCH_OR_PR}",
       "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}",
       "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_TAG_PREFIX}${NORMALIZED_GIT_BRANCH_OR_PR}",
+      "${GCP_DOCKER_ARTIFACT_REPO_US}/${target}:${IMAGE_RETENTION_CLASS}${NORMALIZED_GIT_BRANCH_OR_PR}",
       ] : [ // "local" or any other value
       "aptos-core/${target}:${IMAGE_TAG_PREFIX}${GIT_SHA}-from-local",
       "aptos-core/${target}:${IMAGE_TAG_PREFIX}from-local",
