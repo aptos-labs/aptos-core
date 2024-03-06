@@ -23,11 +23,11 @@ base64 = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 cloud-storage = { workspace = true }
-flate2 = { workspace = true }
 futures = { workspace = true }
 futures-core = { workspace = true }
 futures-util = { workspace = true }
 itertools = { workspace = true }
+lz4 = { workspace = true }
 once_cell = { workspace = true }
 prometheus = { workspace = true }
 prost = { workspace = true }

@@ -31,7 +31,7 @@ impl GcsFileStoreOperator {
     ) -> Self {
         env::set_var(SERVICE_ACCOUNT_ENV_VAR, service_account_path);
         let storage_format = if enable_compression {
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         } else {
             StorageFormat::JsonBase64UncompressedProto
         };
