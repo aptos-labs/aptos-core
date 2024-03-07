@@ -85,13 +85,12 @@ impl PayloadManager {
                             .iter()
                             .map(|proof| proof.info().clone())
                             .collect::<Vec<_>>(),
-                        Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_status) => {
+                        Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
                             inline_batches
                                 .iter()
                                 .map(|(batch_info, _)| batch_info.clone())
                                 .chain(
-                                    proof_with_status
-                                        .proof_with_data
+                                    proof_with_data
                                         .proofs
                                         .iter()
                                         .map(|proof| proof.info().clone()),
@@ -143,11 +142,8 @@ impl PayloadManager {
                         batch_reader.clone(),
                     );
                 },
-                Payload::QuorumStoreInlineHybrid(_, proof_with_data) => {
-                    request_txns_and_update_status(
-                        &proof_with_data.proof_with_data,
-                        batch_reader.clone(),
-                    );
+                Payload::QuorumStoreInlineHybrid(_, proof_with_data, _) => {
+                    request_txns_and_update_status(proof_with_data, batch_reader.clone());
                 },
                 Payload::DirectMempool(_) => {
                     unreachable!()
@@ -266,15 +262,15 @@ impl PayloadManager {
             )),
             (
                 PayloadManager::InQuorumStore(batch_reader, _),
-                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data),
+                Payload::QuorumStoreInlineHybrid(
+                    inline_batches,
+                    proof_with_data,
+                    max_txns_to_execute,
+                ),
             ) => Ok((
                 {
-                    let mut all_txns = process_payload(
-                        &proof_with_data.proof_with_data,
-                        batch_reader.clone(),
-                        block,
-                    )
-                    .await?;
+                    let mut all_txns =
+                        process_payload(proof_with_data, batch_reader.clone(), block).await?;
                     all_txns.append(
                         &mut inline_batches
                             .iter()
@@ -284,7 +280,7 @@ impl PayloadManager {
                     );
                     all_txns
                 },
-                proof_with_data.max_txns_to_execute,
+                *max_txns_to_execute,
             )),
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",

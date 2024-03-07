@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::{
-    common::{BatchPayload, Payload, PayloadFilter, ProofWithData, ProofWithDataWithTxnLimit},
+    common::{BatchPayload, Payload, PayloadFilter, ProofWithData},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
@@ -66,15 +66,6 @@ impl BatchQueue {
         self.batch_to_txns.remove(&BatchKey::from_info(batch));
         if let Some(batch_tree) = self.author_to_batches.get_mut(&batch.author()) {
             batch_tree.remove(&BatchSortKey::from_info(batch));
-        }
-    }
-
-    pub fn remove_batches(&mut self, batches: Vec<BatchInfo>) {
-        for batch in batches.iter() {
-            self.batch_to_txns.remove(&BatchKey::from_info(batch));
-            if let Some(batch_tree) = self.author_to_batches.get_mut(&batch.author()) {
-                batch_tree.remove(&BatchSortKey::from_info(batch));
-            }
         }
     }
 
@@ -202,7 +193,9 @@ impl ProofManager {
             "QS: got clean request from execution at block timestamp {}",
             block_timestamp
         );
-        self.batch_queue.remove_batches(batches.clone());
+        for batch in &batches {
+            self.batch_queue.remove_batch(batch);
+        }
         self.proofs_for_consensus.mark_committed(batches);
         self.proofs_for_consensus
             .handle_updated_block_timestamp(block_timestamp);
@@ -285,7 +278,8 @@ impl ProofManager {
                         );
                         Payload::QuorumStoreInlineHybrid(
                             inline_block,
-                            ProofWithDataWithTxnLimit::new(ProofWithData::new(proof_block), None),
+                            ProofWithData::new(proof_block),
+                            None,
                         )
                     },
                 );
