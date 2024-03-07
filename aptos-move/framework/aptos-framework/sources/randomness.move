@@ -23,7 +23,7 @@ module aptos_framework::randomness {
     const DST: vector<u8> = b"APTOS_RANDOMNESS";
 
     /// Randomness APIs calls must originate from a private entry function with
-    /// `#[unbiasable]` annotation. Otherwise, test-and-abort attacks are possible.
+    /// `#[randomness]` annotation. Otherwise, test-and-abort attacks are possible.
     const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
 
     const MAX_U256: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
@@ -384,7 +384,7 @@ module aptos_framework::randomness {
     /// Called in each randomness generation function to ensure certain safety invariants, namely:
     ///  1. The transaction that led to the call of this function had a private (or friend) entry
     ///     function as its payload.
-    ///  2. The entry function had `#[unbiasable]` annotation.
+    ///  2. The entry function had `#[randomness]` annotation.
     native fun is_unbiasable(): bool;
 
     #[test]

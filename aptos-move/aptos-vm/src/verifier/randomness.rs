@@ -5,8 +5,8 @@ use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
 use aptos_types::transaction::EntryFunction;
 use move_binary_format::errors::VMResult;
 
-/// Returns true if function has an annotation that it is unbiasable.
-pub(crate) fn is_entry_function_unbiasable(
+/// Returns true if function has an attribute that it uses randomness.
+pub(crate) fn has_randomness_attribute(
     resolver: &impl AptosMoveResolver,
     session: &mut SessionExt,
     entry_fn: &EntryFunction,
@@ -19,7 +19,7 @@ pub(crate) fn is_entry_function_unbiasable(
         Ok(metadata
             .fun_attributes
             .get(entry_fn.function().as_str())
-            .map(|attrs| attrs.iter().any(|attr| attr.is_unbiasable()))
+            .map(|attrs| attrs.iter().any(|attr| attr.is_randomness()))
             .unwrap_or(false))
     } else {
         Ok(false)

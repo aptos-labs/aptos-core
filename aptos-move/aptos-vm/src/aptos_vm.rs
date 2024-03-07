@@ -18,7 +18,7 @@ use crate::{
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
     transaction_validation, verifier,
-    verifier::randomness::is_entry_function_unbiasable,
+    verifier::randomness::has_randomness_attribute,
     VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
@@ -746,8 +746,7 @@ impl AptosVM {
             entry_fn.ty_args(),
         )?;
 
-        // TODO(George): change the order once performance is confirmed.
-        if is_entry_function_unbiasable(resolver, session, entry_fn)? && is_friend_or_private {
+        if is_friend_or_private && has_randomness_attribute(resolver, session, entry_fn)? {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();

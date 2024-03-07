@@ -1,5 +1,5 @@
 module 0x1::invalid {
-    #[unbiasable]
+    #[randomness]
     public fun foo() {
         // Do nothing.
     }

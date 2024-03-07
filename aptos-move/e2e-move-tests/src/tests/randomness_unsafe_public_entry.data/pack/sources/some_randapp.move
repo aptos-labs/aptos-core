@@ -1,7 +1,7 @@
 module 0x1::some_randapp {
     use aptos_framework::randomness;
 
-    #[unbiasable]
+    #[randomness]
     entry fun safe_private_entry_call() {
         let _ = randomness::u64_integer();
     }
@@ -10,7 +10,7 @@ module 0x1::some_randapp {
         let _ = randomness::u64_integer();
     }
 
-    #[unbiasable]
+    #[randomness]
     public(friend) entry fun safe_friend_entry_call() {
         let _ = randomness::u64_integer();
     }

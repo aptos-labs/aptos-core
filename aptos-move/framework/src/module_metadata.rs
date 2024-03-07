@@ -84,7 +84,7 @@ pub enum KnownAttributeKind {
     ResourceGroup = 2,
     ResourceGroupMember = 3,
     Event = 4,
-    Unbiasable = 5,
+    Randomness = 5,
 }
 
 impl KnownAttribute {
@@ -149,15 +149,15 @@ impl KnownAttribute {
         self.kind == KnownAttributeKind::Event as u8
     }
 
-    pub fn unbiasable() -> Self {
+    pub fn randomness() -> Self {
         Self {
-            kind: KnownAttributeKind::Unbiasable as u8,
+            kind: KnownAttributeKind::Randomness as u8,
             args: vec![],
         }
     }
 
-    pub fn is_unbiasable(&self) -> bool {
-        self.kind == KnownAttributeKind::Unbiasable as u8
+    pub fn is_randomness(&self) -> bool {
+        self.kind == KnownAttributeKind::Randomness as u8
     }
 }
 
@@ -359,7 +359,7 @@ pub fn is_valid_unbiasable_function(
 
     Err(AttributeValidationError {
         key: fun.to_string(),
-        attribute: KnownAttributeKind::Unbiasable as u8,
+        attribute: KnownAttributeKind::Randomness as u8,
     })
 }
 
@@ -448,7 +448,7 @@ pub fn verify_module_metadata(
         for attr in attrs {
             if attr.is_view_function() {
                 is_valid_view_function(&functions, fun)?;
-            } else if attr.is_unbiasable() {
+            } else if attr.is_randomness() {
                 is_valid_unbiasable_function(&functions, fun)?;
             } else {
                 return Err(AttributeValidationError {

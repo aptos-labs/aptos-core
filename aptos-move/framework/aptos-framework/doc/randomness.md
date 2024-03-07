@@ -191,7 +191,7 @@ Event emitted every time a public randomness API in this module is called.
 <a id="0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT"></a>
 
 Randomness APIs calls must originate from a private entry function with
-<code>#[unbiasable]</code> annotation. Otherwise, test-and-abort attacks are possible.
+<code>#[<a href="randomness.md#0x1_randomness">randomness</a>]</code> annotation. Otherwise, test-and-abort attacks are possible.
 
 
 <pre><code><b>const</b> <a href="randomness.md#0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT">E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT</a>: u64 = 1;
@@ -973,7 +973,7 @@ Aborts with <code><a href="randomness.md#0x1_randomness_E_API_USE_SUSCEPTIBLE_TO
 Called in each randomness generation function to ensure certain safety invariants, namely:
 1. The transaction that led to the call of this function had a private (or friend) entry
 function as its payload.
-2. The entry function had <code>#[unbiasable]</code> annotation.
+2. The entry function had <code>#[<a href="randomness.md#0x1_randomness">randomness</a>]</code> annotation.
 
 
 <pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_is_unbiasable">is_unbiasable</a>(): bool

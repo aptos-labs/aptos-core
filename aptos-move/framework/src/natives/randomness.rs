@@ -17,7 +17,7 @@ pub struct RandomnessContext {
     // blob is requested.
     txn_local_state: Vec<u8>,
     // True if the current transaction's payload was a public(friend) or
-    // private entry function, which also had `#[unbiasable]` annotation.
+    // private entry function, which also has `#[randomness]` annotation.
     unbiasable: bool,
 }
 

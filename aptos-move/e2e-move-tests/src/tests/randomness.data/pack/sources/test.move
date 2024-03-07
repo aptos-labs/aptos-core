@@ -5,12 +5,12 @@ module 0x1::test {
         // Do nothing.
     }
 
-    #[unbiasable]
+    #[randomness]
     entry fun ok_if_annotated_and_not_using_randomness() {
         // Do nothing.
     }
 
-    #[unbiasable]
+    #[randomness]
     entry fun ok_if_annotated_and_using_randomness() {
         let _ = randomness::u64_integer();
     }

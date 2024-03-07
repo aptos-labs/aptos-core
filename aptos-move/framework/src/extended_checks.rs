@@ -37,11 +37,11 @@ const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
 const EVENT_STRUCT_ATTRIBUTE: &str = "event";
+const RANDOMNESS_ATTRIBUTE: &str = "randomness";
 const RESOURCE_GROUP: &str = "resource_group";
 const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
 const RESOURCE_GROUP_NAME: &str = "group";
 const RESOURCE_GROUP_SCOPE: &str = "scope";
-const UNBIASABLE_ATTRIBUTE: &str = "unbiasable";
 const VIEW_FUN_ATTRIBUTE: &str = "view";
 
 // top-level attribute names, only.
@@ -52,7 +52,7 @@ pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
         RESOURCE_GROUP_MEMBER,
         VIEW_FUN_ATTRIBUTE,
         EVENT_STRUCT_ATTRIBUTE,
-        UNBIASABLE_ATTRIBUTE,
+        RANDOMNESS_ATTRIBUTE,
     ];
 
     fn extended_attribute_names() -> BTreeSet<String> {
@@ -460,18 +460,18 @@ impl<'a> ExtendedChecker<'a> {
 impl<'a> ExtendedChecker<'a> {
     fn check_and_record_unbiasabale_entry_functions(&mut self, module: &ModuleEnv) {
         for ref fun in module.get_functions() {
-            if !self.has_attribute(fun, UNBIASABLE_ATTRIBUTE) {
+            if !self.has_attribute(fun, RANDOMNESS_ATTRIBUTE) {
                 continue;
             }
 
             if !fun.is_entry() || fun.visibility().is_public() {
                 self.env.error(
                     &fun.get_id_loc(),
-                    "only private or public(friend) entry functions can have #[unbiasable] attribute",
+                    "only private or public(friend) entry functions can have #[randomness] attribute",
                 )
             }
 
-            // Record functions which are unbiasable.
+            // Record functions which use randomness.
             let module_id = self.get_runtime_module_id(module);
             self.output
                 .entry(module_id)
@@ -479,7 +479,7 @@ impl<'a> ExtendedChecker<'a> {
                 .fun_attributes
                 .entry(fun.get_simple_name_string().to_string())
                 .or_default()
-                .push(KnownAttribute::unbiasable());
+                .push(KnownAttribute::randomness());
         }
     }
 }
