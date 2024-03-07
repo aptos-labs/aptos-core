@@ -1473,9 +1473,9 @@ impl<'a> Resolver<'a> {
             if sum_nodes > MAX_TYPE_INSTANTIATION_NODES {
                 return Err(
                     PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Too many type instantiation nodes when constructing a struct type: {} < {}",
-                    MAX_TYPE_INSTANTIATION_NODES, sum_nodes
-                )),
+                        "Number of type instantiation nodes exceeded the maximum of {}",
+                        MAX_TYPE_INSTANTIATION_NODES
+                    )),
                 );
             }
         }
@@ -1760,8 +1760,12 @@ impl PseudoGasContext {
     fn charge(&mut self, amount: u64) -> PartialVMResult<()> {
         self.cost += amount;
         if self.cost > self.max_cost {
-            Err(PartialVMError::new(StatusCode::TYPE_TAG_LIMIT_EXCEEDED)
-                .with_message(format!("Max type limit {} exceeded", self.max_cost)))
+            Err(
+                PartialVMError::new(StatusCode::TYPE_TAG_LIMIT_EXCEEDED).with_message(format!(
+                    "Exceeded maximum type tag limit of {}",
+                    self.max_cost
+                )),
+            )
         } else {
             Ok(())
         }
@@ -1990,16 +1994,16 @@ impl Loader {
         if *count > MAX_TYPE_TO_LAYOUT_NODES {
             return Err(
                 PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Too many type nodes when constructing type layout: {} < {}",
-                    MAX_TYPE_TO_LAYOUT_NODES, count
+                    "Number of type nodes when constructing type layout exceeded the maximum of {}",
+                    MAX_TYPE_TO_LAYOUT_NODES
                 )),
             );
         }
         if depth > VALUE_DEPTH_MAX {
             return Err(
                 PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
-                    "Maximum depth reached when constructing type layout: {} < {}",
-                    VALUE_DEPTH_MAX, depth
+                    "Depth of a layout exceeded the maximum of {} during construction",
+                    VALUE_DEPTH_MAX
                 )),
             );
         }
@@ -2148,16 +2152,16 @@ impl Loader {
         if *count > MAX_TYPE_TO_LAYOUT_NODES {
             return Err(
                 PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Too many type nodes when constructing type layout: {} < {}",
-                    MAX_TYPE_TO_LAYOUT_NODES, count
+                    "Number of type nodes when constructing type layout exceeded the maximum of {}",
+                    MAX_TYPE_TO_LAYOUT_NODES
                 )),
             );
         }
         if depth > VALUE_DEPTH_MAX {
             return Err(
                 PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED).with_message(format!(
-                    "Maximum depth reached when constructing type layout: {} < {}",
-                    VALUE_DEPTH_MAX, depth
+                    "Depth of a layout exceeded the maximum of {} during construction",
+                    VALUE_DEPTH_MAX
                 )),
             );
         }
