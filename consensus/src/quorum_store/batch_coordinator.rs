@@ -70,14 +70,15 @@ impl BatchCoordinator {
         let sender_to_proof_manager = self.sender_to_proof_manager.clone();
         tokio::spawn(async move {
             let peer_id = persist_requests[0].author();
-            // TODO: Should we avoid cloning persist_requests?
             // TODO: Is it fine to ignore the result of send here?
             // Sending only small batches to proof manager as large batches can't be
             // included in the inline transactions anyway.
+            let batches = persist_requests
+                .iter()
+                .map(|persisted_value| persisted_value.batch_info().clone())
+                .collect();
             let _ = sender_to_proof_manager
-                .send(ProofManagerCommand::ReceiveBatches(
-                    persist_requests.clone(),
-                ))
+                .send(ProofManagerCommand::ReceiveBatches(batches))
                 .await;
             let signed_batch_infos = batch_store.persist(persist_requests);
             if !signed_batch_infos.is_empty() {

@@ -1,21 +1,20 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::types::PersistedValue;
+use super::batch_store::BatchStore;
 use crate::{
     monitor,
     quorum_store::{
         batch_generator::BackPressure,
         counters,
-        utils::{BatchKey, BatchSortKey, ProofQueue},
+        utils::{BatchSortKey, ProofQueue},
     },
 };
 use aptos_consensus_types::{
-    common::{BatchPayload, Payload, PayloadFilter, ProofWithData},
+    common::{Payload, PayloadFilter, ProofWithData},
     proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_logger::prelude::*;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use futures::StreamExt;
@@ -24,46 +23,39 @@ use rand::{seq::SliceRandom, thread_rng};
 use std::{
     cmp::min,
     collections::{BTreeMap, HashMap, HashSet},
+    sync::Arc,
 };
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
     ReceiveProofs(ProofOfStoreMsg),
-    ReceiveBatches(Vec<PersistedValue>),
+    ReceiveBatches(Vec<BatchInfo>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
 pub struct BatchQueue {
-    batch_to_txns: HashMap<BatchKey, Option<Vec<SignedTransaction>>>,
+    batch_store: Arc<BatchStore>,
     // Queue per peer to ensure fairness between peers and priority within peer
     author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
 }
 
 impl BatchQueue {
-    pub fn new() -> Self {
+    pub fn new(batch_store: Arc<BatchStore>) -> Self {
         Self {
-            batch_to_txns: HashMap::new(),
+            batch_store,
             author_to_batches: HashMap::new(),
         }
     }
 
-    pub fn add_batches(&mut self, batches: Vec<PersistedValue>) {
-        for mut batch in batches.into_iter() {
-            let batch_info = batch.batch_info();
-            let queue = self
-                .author_to_batches
-                .entry(batch_info.author())
-                .or_default();
-            queue.insert(BatchSortKey::from_info(batch_info), batch_info.clone());
-
-            self.batch_to_txns
-                .insert(BatchKey::from_info(batch_info), batch.take_payload());
+    pub fn add_batches(&mut self, batches: Vec<BatchInfo>) {
+        for batch in batches.into_iter() {
+            let queue = self.author_to_batches.entry(batch.author()).or_default();
+            queue.insert(BatchSortKey::from_info(&batch), batch.clone());
         }
     }
 
     pub fn remove_batch(&mut self, batch: &BatchInfo) {
-        self.batch_to_txns.remove(&BatchKey::from_info(batch));
         if let Some(batch_tree) = self.author_to_batches.get_mut(&batch.author()) {
             batch_tree.remove(&BatchSortKey::from_info(batch));
         }
@@ -73,18 +65,16 @@ impl BatchQueue {
         let authors = self.author_to_batches.keys().cloned().collect::<Vec<_>>();
         for author in authors {
             if let Some(batch_tree) = self.author_to_batches.get_mut(&author) {
-                for (_, batch) in batch_tree.iter() {
-                    if batch.is_expired() {
-                        self.batch_to_txns.remove(&BatchKey::from_info(batch));
-                    }
-                }
                 batch_tree.retain(|_batch_key, batch| !batch.is_expired());
             }
         }
     }
 
     pub fn len(&self) -> usize {
-        self.batch_to_txns.len()
+        self.author_to_batches
+            .values()
+            .map(|batch_tree| batch_tree.len())
+            .sum()
     }
 
     pub fn pull_batches(
@@ -113,18 +103,13 @@ impl BatchQueue {
                     } else if num_txns + batch.num_txns() <= max_txns
                         && num_bytes + batch.num_bytes() <= max_bytes
                     {
-                        if let Some(Some(txns)) =
-                            self.batch_to_txns.get(&BatchKey::from_info(batch))
+                        if let Ok(mut persisted_value) =
+                            self.batch_store.get_batch_from_local(batch.digest())
                         {
-                            // TODO: Can cloning be avoided here?
-                            if BatchPayload::new(batch.author(), txns.clone()).hash()
-                                == *batch.digest()
-                            {
+                            if let Some(txns) = persisted_value.take_payload() {
                                 num_txns += batch.num_txns();
                                 num_bytes += batch.num_bytes();
                                 result.push((batch.clone(), txns.clone()));
-                            } else {
-                                counters::NUM_CORRUPT_BATCHES.inc();
                             }
                         }
                         true
@@ -156,11 +141,12 @@ impl ProofManager {
         my_peer_id: PeerId,
         back_pressure_total_txn_limit: u64,
         back_pressure_total_proof_limit: u64,
+        batch_store: Arc<BatchStore>,
         allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         Self {
             proofs_for_consensus: ProofQueue::new(my_peer_id),
-            batch_queue: BatchQueue::new(),
+            batch_queue: BatchQueue::new(batch_store),
             back_pressure_total_txn_limit,
             remaining_total_txn_num: 0,
             back_pressure_total_proof_limit,
@@ -178,7 +164,7 @@ impl ProofManager {
             self.proofs_for_consensus.remaining_txns_and_proofs();
     }
 
-    pub(crate) fn receive_batches(&mut self, batches: Vec<PersistedValue>) {
+    pub(crate) fn receive_batches(&mut self, batches: Vec<BatchInfo>) {
         if self.allow_batches_without_pos_in_proposal {
             self.batch_queue.add_batches(batches);
         }
