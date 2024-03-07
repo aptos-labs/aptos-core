@@ -756,9 +756,9 @@ impl<T: Transaction> UnsyncReadSet<T> {
 mod test {
     use super::*;
     use crate::proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType};
-    use aptos_aggregator::types::DelayedFieldID;
     use aptos_mvhashmap::types::StorageVersion;
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
+    use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use test_case::test_case;
 
     #[test]

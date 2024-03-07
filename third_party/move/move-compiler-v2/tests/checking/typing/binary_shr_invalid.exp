@@ -1,78 +1,78 @@
 
 Diagnostics:
-error: invalid call of `>>`: expected `integer` but found `bool` for argument 1
+error: cannot use `bool` with an operator which expects a value of type `integer`
   ┌─ tests/checking/typing/binary_shr_invalid.move:8:9
   │
 8 │         false >> true;
   │         ^^^^^
 
-error: invalid call of `>>`: expected `u8` but found `bool` for argument 2
+error: cannot use `bool` with an operator which expects a value of type `u8`
   ┌─ tests/checking/typing/binary_shr_invalid.move:9:14
   │
 9 │         1 >> false;
   │              ^^^^^
 
-error: invalid call of `>>`: expected `integer` but found `bool` for argument 1
+error: cannot use `bool` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_shr_invalid.move:10:9
    │
 10 │         false >> 1;
    │         ^^^^^
 
-error: invalid call of `>>`: expected `integer` but found `address` for argument 1
+error: cannot use `address` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_shr_invalid.move:11:9
    │
 11 │         @0x0 >> @0x1;
    │         ^^^^
 
-error: invalid call of `>>`: expected `u8` but found `u128` for argument 2
+error: cannot use `u128` with an operator which expects a value of type `u8`
    ┌─ tests/checking/typing/binary_shr_invalid.move:12:21
    │
 12 │         (0: u8) >> (1: u128);
    │                     ^
 
-error: invalid call of `>>`: expected `integer` but found `M::R` for argument 1
+error: cannot use `R` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_shr_invalid.move:13:9
    │
 13 │         r >> r;
    │         ^
 
-error: invalid call of `>>`: expected `integer` but found `M::S` for argument 1
+error: cannot use `S` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_shr_invalid.move:14:9
    │
 14 │         s >> s;
    │         ^
 
-error: invalid call of `>>`: expected `u8` but found `bool` for argument 2
+error: cannot use `bool` with an operator which expects a value of type `u8`
    ┌─ tests/checking/typing/binary_shr_invalid.move:15:14
    │
 15 │         1 >> false >> @0x0 >> 0;
    │              ^^^^^
 
-error: invalid call of `>>`: expected `u8` but found `address` for argument 2
+error: cannot use `address` with an operator which expects a value of type `u8`
    ┌─ tests/checking/typing/binary_shr_invalid.move:15:23
    │
 15 │         1 >> false >> @0x0 >> 0;
    │                       ^^^^
 
-error: invalid call of `>>`: expected `integer` but found `()` for argument 1
+error: cannot use `()` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_shr_invalid.move:16:9
    │
 16 │         () >> ();
    │         ^^
 
-error: invalid call of `>>`: expected `u8` but found `()` for argument 2
+error: cannot use `()` with an operator which expects a value of type `u8`
    ┌─ tests/checking/typing/binary_shr_invalid.move:17:14
    │
 17 │         1 >> ();
    │              ^^
 
-error: invalid call of `>>`: expected `integer` but found `(integer, integer)` for argument 1
+error: cannot use `(integer, integer)` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_shr_invalid.move:18:9
    │
 18 │         (0, 1) >> (0, 1, 2);
    │         ^^^^^^
 
-error: invalid call of `>>`: expected `integer` but found `(integer, integer)` for argument 1
+error: cannot use `(integer, integer)` with an operator which expects a value of type `integer`
    ┌─ tests/checking/typing/binary_shr_invalid.move:19:9
    │
 19 │         (1, 2) >> (0, 1);

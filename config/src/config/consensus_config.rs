@@ -11,7 +11,8 @@ use cfg_if::cfg_if;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 2500;
+// NOTE: when changing, make sure to update QuorumStoreBackPressureConfig::backlog_txn_limit_count as well.
+pub(crate) const MAX_SENDING_BLOCK_TXNS: u64 = 1900;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]

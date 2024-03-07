@@ -6,7 +6,7 @@ warning: Unused parameter `f`. Consider removing or prefixing with an underscore
 3 │     inline fun foo(f: |&u64|) {
   │                    ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::m {
     private fun g() {
         {
@@ -15,7 +15,7 @@ module 0x42::m {
         };
         Tuple()
     }
-    spec fun $foo(f: |&u64|()) {
+    spec fun $foo(f: |&u64|) {
         Tuple()
     }
     spec fun $g();

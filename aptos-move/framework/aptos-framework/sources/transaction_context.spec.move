@@ -50,6 +50,8 @@ spec aptos_framework::transaction_context {
     spec fun spec_get_txn_hash(): vector<u8>;
     spec get_transaction_hash(): vector<u8> {
         pragma opaque;
+        aborts_if [abstract] false;
+        ensures result == spec_get_txn_hash();
         // property 1: Fetching the transaction hash should return a vector with 32 bytes, if the auid feature flag is enabled.
         /// [high-level-req-1]
         ensures [abstract] len(result) == 32;

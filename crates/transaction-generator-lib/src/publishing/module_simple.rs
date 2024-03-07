@@ -102,6 +102,15 @@ pub enum LoopType {
     BcsToBytes { len: u64 },
 }
 
+/// Automatic arguments function expects (i.e. signer, or multiple signers, etc)
+/// That execution can add before the call.
+#[derive(Debug, Copy, Clone)]
+pub enum AutomaticArgs {
+    None,
+    Signer,
+    SignerAndMultiSig,
+}
+
 //
 // List of entry points to expose
 //
@@ -210,7 +219,11 @@ pub enum EntryPoints {
     TokenV1MintAndStoreFT,
     TokenV1MintAndTransferFT,
 
-    TokenV2AmbassadorMint,
+    TokenV2AmbassadorMint {
+        numbered: bool,
+    },
+    /// Burn an NFT token, only works with numbered=false tokens.
+    TokenV2AmbassadorBurn,
 
     InitializeVectorPicture {
         length: u64,
@@ -266,7 +279,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "framework_usecases",
-            EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                "ambassador_token"
+            },
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
@@ -313,7 +328,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
-            EntryPoints::TokenV2AmbassadorMint => "ambassador",
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                "ambassador"
+            },
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. } => "vector_picture",
@@ -524,7 +541,7 @@ impl EntryPoints {
                     bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
                 ])
             },
-            EntryPoints::TokenV2AmbassadorMint => {
+            EntryPoints::TokenV2AmbassadorMint { numbered: true } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
@@ -536,6 +553,22 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::TokenV2AmbassadorMint { numbered: false } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("mint_ambassador_token_by_user").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                    ],
+                )
+            },
+            EntryPoints::TokenV2AmbassadorBurn => get_payload(
+                module_id,
+                ident_str!("burn_named_by_user").to_owned(),
+                vec![],
+            ),
             EntryPoints::InitializeVectorPicture { length } => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![
                     bcs::to_bytes(&length).unwrap(), // length
@@ -610,8 +643,61 @@ impl EntryPoints {
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
-            EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                MultiSigConfig::Publisher
+            },
             _ => MultiSigConfig::None,
+        }
+    }
+
+    pub fn automatic_args(&self) -> AutomaticArgs {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loop { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::EmitEvents { .. }
+            | EntryPoints::MakeOrChangeTable { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. } => AutomaticArgs::Signer,
+            EntryPoints::Nop2Signers | EntryPoints::Nop5Signers => AutomaticArgs::SignerAndMultiSig,
+            EntryPoints::IncGlobal
+            | EntryPoints::IncGlobalAggV2
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => AutomaticArgs::None,
+            EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
+                AutomaticArgs::Signer
+            },
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => AutomaticArgs::Signer,
+            EntryPoints::ResourceGroupsGlobalWriteTag { .. }
+            | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => {
+                AutomaticArgs::SignerAndMultiSig
+            },
+            EntryPoints::ResourceGroupsSenderWriteTag { .. }
+            | EntryPoints::ResourceGroupsSenderMultiChange { .. } => AutomaticArgs::Signer,
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                AutomaticArgs::SignerAndMultiSig
+            },
+            EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
+            EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
+                AutomaticArgs::None
+            },
+            EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
+            EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
         }
     }
 }

@@ -12,7 +12,10 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
 };
-use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
+    vm_status::StatusCode,
+};
 use move_vm_types::{
     gas::{GasMeter as MoveGasMeter, SimpleInstruction},
     views::{TypeView, ValueView},
@@ -160,6 +163,8 @@ where
         fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
 
         fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+        fn charge_dependency(&mut self, is_new: bool, addr: &AccountAddress, name: &IdentStr, size: NumBytes) -> PartialVMResult<()>;
     }
 
     #[inline]

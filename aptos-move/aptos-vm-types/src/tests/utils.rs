@@ -10,7 +10,6 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, DeltaOp},
-    types::DelayedFieldID,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -18,7 +17,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    transaction::{ExecutionStatus, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
     write_set::WriteOp,
 };
 use move_core_types::{
@@ -26,6 +25,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     value::MoveTypeLayout,
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct MockChangeSetChecker;
@@ -263,6 +263,7 @@ pub(crate) fn build_vm_output(
             .build(),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
+        TransactionAuxiliaryData::default(),
     )
 }
 

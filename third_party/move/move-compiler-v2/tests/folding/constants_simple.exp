@@ -34,7 +34,7 @@ error: Not a valid constant expression.
   │                      │
   │                      Invalid statement or expression in constant
 
-error: undeclared `M::cond`
+error: undeclared `cond`
   ┌─ tests/folding/constants_simple.move:8:24
   │
 8 │     const C4: u8 = if (cond) 0 else 1;

@@ -72,6 +72,7 @@ use std::{
     time::Duration,
 };
 use tempfile::TempDir;
+use thiserror::__private::AsDisplay;
 use tokio::time::{sleep, Instant};
 
 #[cfg(test)]
@@ -468,6 +469,16 @@ impl CliTestFramework {
         }
         .execute()
         .await
+    }
+
+    pub fn add_file_in_package(&self, rel_path: &str, content: String) {
+        let source_path = self.move_dir().join(rel_path);
+        write_to_file(
+            source_path.as_path(),
+            &source_path.as_display().to_string(),
+            content.as_bytes(),
+        )
+        .unwrap();
     }
 
     pub async fn update_validator_network_addresses(
@@ -887,6 +898,7 @@ impl CliTestFramework {
             package,
             output_dir: Some(output_dir),
             print_metadata: false,
+            bytecode: true,
         }
         .execute()
         .await
@@ -1026,7 +1038,7 @@ impl CliTestFramework {
         .await
     }
 
-    fn aptos_framework_dir() -> PathBuf {
+    pub fn aptos_framework_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("..")
             .join("..")

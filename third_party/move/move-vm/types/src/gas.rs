@@ -8,6 +8,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes, NumTypeNodes},
+    identifier::IdentStr,
     language_storage::ModuleId,
 };
 
@@ -299,6 +300,14 @@ pub trait GasMeter {
     ) -> PartialVMResult<()>;
 
     fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()>;
+
+    fn charge_dependency(
+        &mut self,
+        is_new: bool,
+        addr: &AccountAddress,
+        name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()>;
 }
 
 /// A dummy gas meter that does not meter anything.
@@ -532,6 +541,16 @@ impl GasMeter for UnmeteredGasMeter {
     }
 
     fn charge_create_ty(&mut self, _num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn charge_dependency(
+        &mut self,
+        _is_new: bool,
+        _addr: &AccountAddress,
+        _name: &IdentStr,
+        _size: NumBytes,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 }

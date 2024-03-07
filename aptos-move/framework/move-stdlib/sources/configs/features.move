@@ -347,26 +347,35 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
-    /// Whether the zkID feature is enabled, possibly with the ZK-less verification mode.
+    /// The on-chain randomness feature.
     ///
     /// Lifetime: transient
-    const ZK_ID_SIGNATURES: u64 = 46;
-
-    public fun get_zkid_feature(): u64 { ZK_ID_SIGNATURES }
-
-    public fun zkid_feature_enabled(): bool acquires Features {
-        is_enabled(ZK_ID_SIGNATURES)
+    const RECONFIGURE_WITH_DKG: u64 = 45;
+    public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
+    public fun reconfigure_with_dkg_enabled(): bool acquires Features {
+        is_enabled(RECONFIGURE_WITH_DKG)
     }
 
-    /// Whether the ZK-less mode of the zkID feature is enabled.
+    /// Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
     ///
     /// Lifetime: transient
-    const ZK_ID_ZKLESS_SIGNATURE: u64 = 47;
+    const KEYLESS_ACCOUNTS: u64 = 46;
 
-    public fun get_zkid_zkless_feature(): u64 { ZK_ID_ZKLESS_SIGNATURE }
+    public fun get_keyless_accounts_feature(): u64 { KEYLESS_ACCOUNTS }
 
-    public fun zkid_zkless_feature_enabled(): bool acquires Features {
-        is_enabled(ZK_ID_ZKLESS_SIGNATURE)
+    public fun keyless_accounts_enabled(): bool acquires Features {
+        is_enabled(KEYLESS_ACCOUNTS)
+    }
+
+    /// Whether the ZK-less mode of the keyless accounts feature is enabled.
+    ///
+    /// Lifetime: transient
+    const KEYLESS_BUT_ZKLESS_ACCOUNTS: u64 = 47;
+
+    public fun get_keyless_but_zkless_accounts_feature(): u64 { KEYLESS_BUT_ZKLESS_ACCOUNTS }
+
+    public fun keyless_but_zkless_accounts_feature_enabled(): bool acquires Features {
+        is_enabled(KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
     /// The JWK consensus feature.
@@ -383,7 +392,7 @@ module std::features {
     /// Whether enable Fungible Asset creation
     /// to create higher throughput concurrent variants.
     /// Lifetime: transient
-    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 49;
+    const CONCURRENT_FUNGIBLE_ASSETS: u64 = 50;
 
     public fun get_concurrent_fungible_assets_feature(): u64 { CONCURRENT_FUNGIBLE_ASSETS }
 
@@ -394,8 +403,40 @@ module std::features {
 
     /// Whether deploying to objects is enabled.
     const OBJECT_CODE_DEPLOYMENT: u64 = 52;
+
     public fun is_object_code_deployment_enabled(): bool acquires Features {
         is_enabled(OBJECT_CODE_DEPLOYMENT)
+    }
+
+    /// Whether checking the maximum object nesting is enabled.
+    const MAX_OBJECT_NESTING_CHECK: u64 = 53;
+
+    public fun get_max_object_nesting_check_feature(): u64 { MAX_OBJECT_NESTING_CHECK }
+
+    public fun max_object_nesting_check_enabled(): bool acquires Features {
+        is_enabled(MAX_OBJECT_NESTING_CHECK)
+    }
+
+    /// Whether keyless accounts support passkey-based ephemeral signatures.
+    ///
+    /// Lifetime: transient
+    const KEYLESS_ACCOUNTS_WITH_PASSKEYS: u64 = 54;
+
+    public fun get_keyless_accounts_with_passkeys_feature(): u64 { KEYLESS_ACCOUNTS_WITH_PASSKEYS }
+
+    public fun keyless_accounts_with_passkeys_feature_enabled(): bool acquires Features {
+        is_enabled(KEYLESS_ACCOUNTS_WITH_PASSKEYS)
+    }
+
+    /// Whether the Multisig V2 enhancement feature is enabled.
+    ///
+    /// Lifetime: transient
+    const MULTISIG_V2_ENHANCEMENT: u64 = 55;
+
+    public fun get_multisig_v2_enhancement_feature(): u64 { MULTISIG_V2_ENHANCEMENT }
+
+    public fun multisig_v2_enhancement_feature_enabled(): bool acquires Features {
+        is_enabled(MULTISIG_V2_ENHANCEMENT)
     }
 
     // ============================================================================================
@@ -406,6 +447,12 @@ module std::features {
 
     /// The enabled features, represented by a bitset stored on chain.
     struct Features has key {
+        features: vector<u8>,
+    }
+
+    /// This resource holds the feature vec updates received in the current epoch.
+    /// On epoch change, the updates take effect and this buffer is cleared.
+    struct PendingFeatures has key {
         features: vector<u8>,
     }
 
@@ -423,6 +470,45 @@ module std::features {
         vector::for_each_ref(&disable, |feature| {
             set(features, *feature, false);
         });
+    }
+
+    /// Enable and disable features *for the next epoch*.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
+    ///
+    /// Can only be called by a signer of @std.
+    public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires PendingFeatures, Features {
+        assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+
+        // Figure out the baseline feature vec that the diff will be applied to.
+        let new_feature_vec = if (exists<PendingFeatures>(@std)) {
+            // If there is a buffered feature vec, use it as the baseline.
+            let PendingFeatures { features } = move_from<PendingFeatures>(@std);
+            features
+        } else if (exists<Features>(@std)) {
+            // Otherwise, use the currently effective feature flag vec as the baseline, if it exists.
+            borrow_global<Features>(@std).features
+        } else {
+            // Otherwise, use an empty feature vec.
+            vector[]
+        };
+
+        // Apply the diff and save it to the buffer.
+        apply_diff(&mut new_feature_vec, enable, disable);
+        move_to(framework, PendingFeatures { features: new_feature_vec });
+    }
+
+    /// Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
+    ///
+    /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
+    /// who have permission to set the flag that's checked in `extract()`.
+    public fun on_new_epoch(vm_or_framework: &signer) acquires Features, PendingFeatures {
+        ensure_vm_or_framework_signer(vm_or_framework);
+        if (exists<PendingFeatures>(@std)) {
+            let PendingFeatures { features } = move_from<PendingFeatures>(@std);
+            borrow_global_mut<Features>(@std).features = features;
+        }
     }
 
     #[view]
@@ -451,6 +537,20 @@ module std::features {
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
         byte_index < vector::length(features) && (*vector::borrow(features, byte_index) & bit_mask) != 0
+    }
+
+    fun apply_diff(features: &mut vector<u8>, enable: vector<u64>, disable: vector<u64>) {
+        vector::for_each(enable, |feature| {
+            set(features, feature, true);
+        });
+        vector::for_each(disable, |feature| {
+            set(features, feature, false);
+        });
+    }
+
+    fun ensure_vm_or_framework_signer(account: &signer) {
+        let addr = signer::address_of(account);
+        assert!(addr == @std || addr == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
     }
 
     #[test]

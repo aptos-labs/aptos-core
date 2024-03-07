@@ -6,6 +6,7 @@ use crate::proof_of_store::{BatchInfo, ProofOfStore};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
     validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus,
@@ -285,15 +286,20 @@ impl Payload {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
-                for proof in proof_with_status.proofs.iter() {
-                    proof.verify(validator)?;
-                }
+                proof_with_status
+                    .proofs
+                    .par_iter()
+                    .with_min_len(4)
+                    .try_for_each(|proof| proof.verify(validator))?;
                 Ok(())
             },
             (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
-                for proof in proof_with_status.proof_with_data.proofs.iter() {
-                    proof.verify(validator)?;
-                }
+                proof_with_status
+                    .proof_with_data
+                    .proofs
+                    .par_iter()
+                    .with_min_len(4)
+                    .try_for_each(|proof| proof.verify(validator))?;
                 Ok(())
             },
             (_, _) => Err(anyhow::anyhow!(
@@ -356,10 +362,20 @@ impl From<&Vec<&Payload>> for PayloadFilter {
         } else {
             let mut exclude_proofs = HashSet::new();
             for payload in exclude_payloads {
-                if let Payload::InQuorumStore(proof_with_status) = payload {
-                    for proof in &proof_with_status.proofs {
-                        exclude_proofs.insert(proof.info().clone());
-                    }
+                match payload {
+                    Payload::InQuorumStore(proof_with_status) => {
+                        for proof in &proof_with_status.proofs {
+                            exclude_proofs.insert(proof.info().clone());
+                        }
+                    },
+                    Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                        for proof in &proof_with_status.proof_with_data.proofs {
+                            exclude_proofs.insert(proof.info().clone());
+                        }
+                    },
+                    Payload::DirectMempool(_) => {
+                        error!("DirectMempool payload in InQuorumStore filter");
+                    },
                 }
             }
             PayloadFilter::InQuorumStore(exclude_proofs)

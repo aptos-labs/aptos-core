@@ -10,10 +10,9 @@ use aptos_aggregator::{
     types::{DelayedFieldsSpeculativeError, PanicOr},
 };
 #[cfg(feature = "testing")]
-use aptos_aggregator::{
-    resolver::TDelayedFieldView,
-    types::{DelayedFieldID, DelayedFieldValue},
-};
+use aptos_aggregator::{resolver::TDelayedFieldView, types::DelayedFieldValue};
+#[cfg(feature = "testing")]
+use aptos_framework::natives::randomness::RandomnessContext;
 #[cfg(feature = "testing")]
 use aptos_framework::natives::{cryptography::algebra::AlgebraContext, event::NativeEventContext};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
@@ -40,6 +39,8 @@ use move_binary_format::errors::PartialVMResult;
 #[cfg(feature = "testing")]
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_runtime::native_functions::NativeFunctionTable;
+#[cfg(feature = "testing")]
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 #[cfg(feature = "testing")]
 use std::{
     collections::{BTreeMap, HashSet},
@@ -226,11 +227,9 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
 
     exts.add(NativeTableContext::new([0u8; 32], &*DUMMY_RESOLVER));
     exts.add(NativeCodeContext::default());
-    exts.add(NativeTransactionContext::new(
-        vec![1],
-        vec![1],
-        ChainId::test().id(),
-    )); // We use the testing environment chain ID here
+    let mut txn_context = NativeTransactionContext::new(vec![1], vec![1], ChainId::test().id());
+    txn_context.set_is_friend_or_private_entry_func();
+    exts.add(txn_context); // We use the testing environment chain ID here
     exts.add(NativeAggregatorContext::new(
         [0; 32],
         &*DUMMY_RESOLVER,
@@ -239,4 +238,5 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
     exts.add(NativeRistrettoPointContext::new());
     exts.add(AlgebraContext::new());
     exts.add(NativeEventContext::default());
+    exts.add(RandomnessContext::new());
 }
