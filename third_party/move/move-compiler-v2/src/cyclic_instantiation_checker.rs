@@ -35,6 +35,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         let mut callers = Vec::new();
         let num_ty_params = self.mod_env.get_function(fun_id).get_type_parameter_count() as u16;
         let insts = (0..num_ty_params).map(Type::TypeParameter).collect_vec();
+		println!("38");
         fun_body.visit_positions(&mut |pos, e| self.visit(pos, e, &mut callers, insts.clone()));
     }
 
@@ -47,6 +48,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
     ) -> bool {
         use ExpData::*;
         use VisitorPosition::*;
+		println!("visit {:?} with {:?}", e, insts);
         match (position, e) {
             (Pre, Call(nid, op, _)) => self.visit_call(nid, op, callers_chain, insts),
             _ => true,
@@ -86,7 +88,9 @@ impl<'a> CyclicInstantiationChecker<'a> {
                             {
                                 self.report_error(*nid, callee, callers_chain);
                                 return false;
-                            }
+                            } else {
+								return true;
+							}
                         }
                     }
                 }
