@@ -1079,17 +1079,17 @@ impl ExpData {
     ///
     /// In every case, if `visitor` returns `false`, then the visit is stopped early; otherwise
     /// the the visit will continue.
-    pub fn visit_positions<F>(&self, visitor: &mut F)
+    pub fn visit_positions<F>(&self, visitor: &mut F) -> Option<()>
     where
         F: FnMut(VisitorPosition, &ExpData) -> bool,
     {
-        let _ = self.visit_positions_impl(&mut |x, e| {
+        self.visit_positions_impl(&mut |x, e| {
             if visitor(x, e) {
                 Some(())
             } else {
                 None
             }
-        });
+        })
     }
 
     /// Visitor implementation uses `Option<()>` to implement short-cutting without verbosity.
