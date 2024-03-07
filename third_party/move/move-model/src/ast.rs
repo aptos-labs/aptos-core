@@ -1317,12 +1317,12 @@ impl<'a> ExpRewriterFunctions for ExpRewriter<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Operation {
     MoveFunction(ModuleId, FunId),
-    SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
-    Closure(ModuleId, FunId),
     Pack(ModuleId, StructId),
     Tuple,
 
     // Specification specific
+    SpecFunction(ModuleId, SpecFunId, Option<Vec<MemoryLabel>>),
+    Closure(ModuleId, FunId),
     Select(ModuleId, StructId, FieldId),
     UpdateField(ModuleId, StructId, FieldId),
     Result(usize),

@@ -9,6 +9,9 @@
 //! - Inside of specification expressions;
 //! - For a lambda argument of a regular (not inline) function
 //!
+//! Also, lambda lifting is currently restricted to only lift lambdas which do
+//! not modify free variables.
+//!
 //! Lambda lifting rewrites lambda expressions into construction
 //! of *closures*. A closure refers to a function and contains a partial list
 //! of arguments for that function, essentially currying it. Example:
