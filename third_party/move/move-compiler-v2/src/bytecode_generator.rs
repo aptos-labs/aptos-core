@@ -21,7 +21,7 @@ use move_stackless_bytecode::{
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
 use num::ToPrimitive;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 // ======================================================================================
 // Entry
@@ -1133,14 +1133,40 @@ impl<'env> Generator<'env> {
                     // Type checker should have complained already
                     self.internal_error(id, "inconsistent tuple arity")
                 } else {
-                    // Save each tuple arg into a temporary.
-                    // Point-wise assign the temporaries.
-                    let temps = args
+                    let lhs_vars = pats
                         .iter()
-                        .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
+                        .flat_map(|p| p.vars().into_iter().map(|t| t.1))
+                        .collect::<BTreeSet<_>>();
+                    // Compute the rhs expression's free locals and params used.
+                    // We can just use free variables in the expression once #12317 is addressed.
+                    let param_symbols = self
+                        .func_env
+                        .get_parameters()
+                        .into_iter()
+                        .map(|p| p.0)
                         .collect::<Vec<_>>();
-                    for (pat, temp) in pats.iter().zip(temps.into_iter()) {
-                        self.gen_assign_from_temp(id, pat, temp, next_scope)
+                    let mut rhs_vars = exp
+                        .used_temporaries(self.env())
+                        .into_iter()
+                        .map(|t| param_symbols[t.0])
+                        .collect::<BTreeSet<_>>();
+                    // Check if there is any overlap between the lhs and rhs variables.
+                    rhs_vars.append(&mut exp.free_vars());
+                    if lhs_vars.intersection(&rhs_vars).next().is_some() {
+                        // Save each tuple arg into a temporary.
+                        // Then, point-wise assign the temporaries.
+                        let temps = args
+                            .iter()
+                            .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
+                            .collect::<Vec<_>>();
+                        for (pat, temp) in pats.iter().zip(temps.into_iter()) {
+                            self.gen_assign_from_temp(id, pat, temp, next_scope)
+                        }
+                    } else {
+                        // No overlap, just do point-wise assignment.
+                        for (pat, exp) in pats.iter().zip(args.iter()) {
+                            self.gen_assign(id, pat, exp, next_scope)
+                        }
                     }
                 }
             },

@@ -88,9 +88,6 @@ L8:	loc8: u64
 L9:	loc9: u64
 L10:	loc10: u64
 L11:	loc11: u64
-L12:	loc12: u64
-L13:	loc13: u64
-L14:	loc14: u64
 B0:
 	0: LdU64(1)
 	1: VecPack(5, 1)
@@ -113,43 +110,37 @@ B1:
 	17: ImmBorrowLoc[6](loc6: vector<u64>)
 	18: Call 1vector::is_empty<u64>(&vector<u64>): bool
 	19: Not
-	20: BrFalse(35)
+	20: BrFalse(29)
 B2:
 	21: MutBorrowLoc[6](loc6: vector<u64>)
 	22: VecPopBack(5)
 	23: StLoc[7](loc7: u64)
 	24: MoveLoc[7](loc7: u64)
 	25: StLoc[8](loc8: u64)
-	26: MoveLoc[8](loc8: u64)
-	27: StLoc[9](loc9: u64)
-	28: MoveLoc[4](loc4: u64)
-	29: StLoc[10](loc10: u64)
-	30: MoveLoc[9](loc9: u64)
-	31: StLoc[11](loc11: u64)
-	32: LdU64(0)
-	33: StLoc[4](loc4: u64)
-	34: Branch(36)
+	26: LdU64(0)
+	27: StLoc[4](loc4: u64)
+	28: Branch(30)
 B3:
-	35: Branch(37)
+	29: Branch(31)
 B4:
-	36: Branch(17)
+	30: Branch(17)
 B5:
-	37: MoveLoc[4](loc4: u64)
-	38: StLoc[12](loc12: u64)
-	39: MoveLoc[12](loc12: u64)
-	40: StLoc[13](loc13: u64)
-	41: LdU64(0)
-	42: StLoc[14](loc14: u64)
-	43: MoveLoc[13](loc13: u64)
-	44: MoveLoc[14](loc14: u64)
-	45: Eq
-	46: BrFalse(48)
+	31: MoveLoc[4](loc4: u64)
+	32: StLoc[9](loc9: u64)
+	33: MoveLoc[9](loc9: u64)
+	34: StLoc[10](loc10: u64)
+	35: LdU64(0)
+	36: StLoc[11](loc11: u64)
+	37: MoveLoc[10](loc10: u64)
+	38: MoveLoc[11](loc11: u64)
+	39: Eq
+	40: BrFalse(42)
 B6:
-	47: Branch(50)
+	41: Branch(44)
 B7:
-	48: LdU64(0)
-	49: Abort
+	42: LdU64(0)
+	43: Abort
 B8:
-	50: Ret
+	44: Ret
 }
 }

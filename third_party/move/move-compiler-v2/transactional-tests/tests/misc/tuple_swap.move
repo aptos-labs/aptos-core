@@ -50,6 +50,26 @@ module 0xc0ffee::m {
         (x, y)
     }
 
+    fun swap9(): (u64, u64) {
+        let x = 51;
+        let y = 23;
+        (x, y) = (y, x);
+        (x, y)
+    }
+
+    fun swap10(x: u64): (u64, u64){
+        let y;
+        (x, y) = ({let x = 88; x}, x);
+        (x, y)
+    }
+
+    fun swap11(): (u64, u64){
+        let x = 53;
+        let y;
+        (x, y) = ({let x = 83; x}, x);
+        (x, y)
+    }
+
     public fun test1(): (u32, u32) {
         swap1(1, 2)
     }
@@ -79,6 +99,10 @@ module 0xc0ffee::m {
         let (c, d) = swap8(8, 80, 9);
         (a, b, c, d)
     }
+
+    public fun test10(): (u64, u64){
+        swap10(10)
+    }
 }
 
 //# run 0xc0ffee::m::test1
@@ -96,3 +120,9 @@ module 0xc0ffee::m {
 //# run 0xc0ffee::m::test7
 
 //# run 0xc0ffee::m::test8
+
+//# run 0xc0ffee::m::swap9
+
+//# run 0xc0ffee::m::test10
+
+//# run 0xc0ffee::m::swap11
