@@ -244,6 +244,7 @@ fn test_success_dir() {
         .init();
 
     let mut fmt_num = 0;
+    // eprintln!("formated {} files", scan_dir("./tests/formatter/use"));
     fmt_num = fmt_num + scan_dir("./tests/formatter/tuple");
     fmt_num = fmt_num + scan_dir("./tests/formatter/expr");
     fmt_num = fmt_num + scan_dir("./tests/formatter/fun");
@@ -263,7 +264,7 @@ fn test_dir() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_env("MOVEFMT_LOG"))
         .init();
-    eprintln!("formated {} files", scan_dir("./tests/formatter/use"));
+    eprintln!("formated {} files", scan_dir("./tests/complex/branch"));
 }
 
 #[test]

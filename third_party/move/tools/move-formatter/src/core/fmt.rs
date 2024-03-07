@@ -699,6 +699,14 @@ impl Format {
                 self.new_line(None);
             }
 
+            if *tok == Tok::Else && next_token.is_some() && 
+                (next_token.unwrap().simple_str().unwrap_or_default() == "if" || 
+                self.syntax_extractor
+                    .branch_extractor
+                    .is_nested_within_an_outer_else(*pos)) {
+                self.new_line(None);
+            }
+
             // add comment(xxx) before current simple_token
             self.add_comments(*pos, content.clone());
             /*
@@ -765,7 +773,7 @@ impl Format {
                 // Note: You can get the token tree of the entire format_context.env here
             }
 
-            if content.contains("if") {
+            if content == "if" {
                 self.format_context
                     .borrow_mut()
                     .set_env(FormatEnv::FormatExp);

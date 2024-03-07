@@ -28,6 +28,7 @@ pub struct ComIfElseBlock {
     pub if_else_blk_loc_vec: Vec<Loc>,
     pub then_loc_vec: Vec<Loc>,
     pub else_loc_vec: Vec<Loc>,
+    pub else_with_if_vec: Vec<bool>,
 }
 
 #[derive(Debug)]
@@ -62,6 +63,7 @@ impl BranchExtractor {
             if_else_blk_loc_vec: vec![],
             then_loc_vec: vec![],
             else_loc_vec: vec![],
+            else_with_if_vec: vec![],
         };
         let mut this_branch_extractor = Self {
             let_if_else,
@@ -110,6 +112,11 @@ impl BranchExtractor {
                 self.collect_expr(then_.as_ref());
                 if let Some(el) = eles_opt {
                     self.com_if_else.else_loc_vec.push(el.loc);
+                    if let Exp_::IfElse(..) = el.value {
+                        self.com_if_else.else_with_if_vec.push(true);
+                    } else {
+                        self.com_if_else.else_with_if_vec.push(false);
+                    }
                     self.collect_expr(el.as_ref());
                 }
             }
@@ -247,6 +254,10 @@ impl BranchExtractor {
                     0
                 };
 
+                if self.com_if_else.else_with_if_vec[else_loc_idx] {
+                    has_added = false;
+                }
+
                 tracing::debug!(
                     "need_new_line_after_else --> has_added[{:?}] = {:?}, new_line_cnt = {}",
                     cur_line,
@@ -303,6 +314,15 @@ impl BranchExtractor {
     pub fn added_new_line_after_branch(&self, branch_end_pos: ByteIndex) -> usize {
         self.added_new_line_in_then_without_brace(branch_end_pos)
             + self.added_new_line_after_else(branch_end_pos)
+    }
+
+    pub fn is_nested_within_an_outer_else(&self, pos: ByteIndex) -> bool {
+        for else_loc in self.com_if_else.else_loc_vec.iter() {
+            if else_loc.start() < pos && pos < else_loc.end() {
+                return true;
+            }
+        }
+        false
     }
 }
 

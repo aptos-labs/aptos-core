@@ -150,16 +150,17 @@ module oracle::oracle {
     }
 
     public fun base(n: u8): u128 {
-        if (n == 9) 1000000000 else
-            if (n == 8) 100000000 else
-                if (n == 7) 10000000 else
-                    if (n == 6) 1000000 else
-                        if (n == 5) 100000 else
-                            if (n == 4) 10000 else
-                                if (n == 3) 1000 else
-                                    if (n == 2) 100 else
-                                        if (n == 1) 10 else
-                                            if (n == 0) 1 else abort 0
+        if (n == 9) 1000000000
+        else if (n == 8) 100000000
+        else if (n == 7) 10000000
+        else if (n == 6) 1000000
+        else if (n == 5) 100000
+        else if (n == 4) 10000
+        else if (n == 3) 1000
+        else if (n == 2) 100
+        else if (n == 1) 10
+        else if (n == 0) 1
+        else abort 0
     }
 
     // Tests

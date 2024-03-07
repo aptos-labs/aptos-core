@@ -53,7 +53,7 @@ module 0xcafe::vectors {
     inline fun loops_without_break(flips: &vector<u8>) {
         let i = 0;
         while (i < vector::length(flips)) {
-            assert !(*vector::borrow(flips, i) == 0, 3);
+            assert!(*vector::borrow(flips, i) == 0, 3);
             i = i + 1;
         };
     }
