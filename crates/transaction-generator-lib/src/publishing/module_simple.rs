@@ -596,7 +596,7 @@ impl EntryPoints {
                     Identifier::new("token_minter").unwrap()
                 );
                 // Set this to a Object<TokenMinter>
-                let token_minter_addr = "0x274a3e6501314014e1d6c3fe0016d2383ae336c5c11d8caff3755a15ccf729d7";
+                let token_minter_addr = "0xc9245297280bfc1118448e72d277bcaa50aa8dcdf2eafcfc2f538bf61299744c";
 
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 let random_addr_string = format!("0x{:0>64}", format!("{:x}", rng.gen_range(0u64, 2147483646u64)));
