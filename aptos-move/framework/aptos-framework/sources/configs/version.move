@@ -2,6 +2,7 @@
 module aptos_framework::version {
     use std::error;
     use std::signer;
+    use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
@@ -39,6 +40,7 @@ module aptos_framework::version {
     /// TODO: update all the tests that reference this function, then disable this function.
     public entry fun set_version(account: &signer, major: u64) acquires Version {
         assert!(exists<SetVersionCapability>(signer::address_of(account)), error::permission_denied(ENOT_AUTHORIZED));
+        chain_status::assert_genesis();
 
         let old_major = borrow_global<Version>(@aptos_framework).major;
         assert!(old_major < major, error::invalid_argument(EINVALID_MAJOR_VERSION_NUMBER));

@@ -57,7 +57,8 @@ have a simple layout which is easily accessible in Rust.
 -  [Function `apply_patch`](#0x1_jwks_apply_patch)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/doc/comparator.md#0x1_comparator">0x1::comparator</a>;
+<pre><code><b>use</b> <a href="chain_status.md#0x1_chain_status">0x1::chain_status</a>;
+<b>use</b> <a href="../../aptos-stdlib/doc/comparator.md#0x1_comparator">0x1::comparator</a>;
 <b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
@@ -780,6 +781,7 @@ TODO: update all the tests that reference this function, then disable this funct
 
 <pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_upsert_oidc_provider">upsert_oidc_provider</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, config_url: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
 
     <b>let</b> provider_set = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework);
 
@@ -858,6 +860,7 @@ TODO: update all the tests that reference this function, then disable this funct
 
 <pre><code><b>public</b> <b>fun</b> <a href="jwks.md#0x1_jwks_remove_oidc_provider">remove_oidc_provider</a>(fx: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): Option&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt; <b>acquires</b> <a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(fx);
+    <a href="chain_status.md#0x1_chain_status_assert_genesis">chain_status::assert_genesis</a>();
 
     <b>let</b> provider_set = <b>borrow_global_mut</b>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">SupportedOIDCProviders</a>&gt;(@aptos_framework);
     <a href="jwks.md#0x1_jwks_remove_oidc_provider_internal">remove_oidc_provider_internal</a>(provider_set, name)
