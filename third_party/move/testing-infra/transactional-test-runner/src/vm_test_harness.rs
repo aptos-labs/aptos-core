@@ -256,7 +256,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
+    ) -> Result<Option<String>> {
         let signers: Vec<_> = signers
             .into_iter()
             .map(|addr| self.compiled_state().resolve_address(&addr))
@@ -276,24 +276,21 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .chain(args)
             .collect();
         let verbose = extra_args.verbose;
-        let serialized_return_values = self
-            .perform_session_action(
-                gas_budget,
-                |session, gas_status| {
-                    session.execute_script(script_bytes, type_args, args, gas_status)
-                },
-                VMConfig::from(extra_args),
-            )
-            .map_err(|vm_error| {
-                anyhow!(
-                    "Script execution failed with VMError: {}",
-                    vm_error.format_test_output(
-                        move_test_debug() || verbose,
-                        !move_test_debug() && self.comparison_mode
-                    )
+        self.perform_session_action(
+            gas_budget,
+            |session, gas_status| session.execute_script(script_bytes, type_args, args, gas_status),
+            VMConfig::from(extra_args),
+        )
+        .map_err(|vm_error| {
+            anyhow!(
+                "Script execution failed with VMError: {}",
+                vm_error.format_test_output(
+                    move_test_debug() || verbose,
+                    !move_test_debug() && self.comparison_mode
                 )
-            })?;
-        Ok((None, serialized_return_values))
+            )
+        })?;
+        Ok(None)
     }
 
     fn call_function(
