@@ -256,8 +256,8 @@ impl DagDriver {
                 max_txns,
                 max_size_bytes,
                 // TODO: Set max_inline_items and max_inline_bytes correctly
-                10,
-                20000,
+                100,
+                100 * 1024,
                 sys_payload_filter,
                 payload_filter,
                 Box::pin(async {}),
