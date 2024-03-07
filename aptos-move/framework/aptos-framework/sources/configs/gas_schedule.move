@@ -51,7 +51,6 @@ module aptos_framework::gas_schedule {
     /// TODO: update all the tests that reference this function, then disable this function.
     public fun set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasSchedule, GasScheduleV2 {
         system_addresses::assert_aptos_framework(aptos_framework);
-        chain_status::assert_genesis();
         assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
 
         if (exists<GasScheduleV2>(@aptos_framework)) {
