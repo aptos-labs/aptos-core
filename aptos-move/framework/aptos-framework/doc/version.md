@@ -189,9 +189,8 @@ TODO: update all the tests that reference this function, then disable this funct
 
 Used in on-chain governances to update the major version for the next epoch.
 Example usage:
-```
-aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);
-aptos_framework::aptos_governance::reconfigure(&framework_signer);
+- <code>aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);</code>
+- <code>aptos_framework::aptos_governance::reconfigure(&framework_signer);</code>
 ```
 
 

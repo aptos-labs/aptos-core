@@ -861,9 +861,8 @@ pub enum EntryFunctionCall {
 
     /// Used in on-chain governances to update the major version for the next epoch.
     /// Example usage:
-    /// ```
-    /// aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);
-    /// aptos_framework::aptos_governance::reconfigure(&framework_signer);
+    /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
+    /// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
     /// ```
     VersionSetForNextEpoch {
         major: u64,
@@ -3970,9 +3969,8 @@ pub fn staking_proxy_set_voter(
 
 /// Used in on-chain governances to update the major version for the next epoch.
 /// Example usage:
-/// ```
-/// aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);
-/// aptos_framework::aptos_governance::reconfigure(&framework_signer);
+/// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
+/// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
 /// ```
 pub fn version_set_for_next_epoch(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
