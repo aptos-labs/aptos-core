@@ -277,6 +277,9 @@ impl ProofQueue {
 
     // gets excluded and iterates over the vector returning non excluded or expired entries.
     // return the vector of pulled PoS, and the size of the remaining PoS
+    // The flag in the second return argument is true iff the entire proof queue is fully utilized
+    // when pulling the proofs. If any proof from proof queue cannot be included due to size limits,
+    // this flag is set false.
     pub(crate) fn pull_proofs(
         &mut self,
         excluded_batches: &HashSet<BatchInfo>,
@@ -346,9 +349,9 @@ impl ProofQueue {
             counters::EXCLUDED_TXNS_WHEN_PULL.observe(excluded_txns as f64);
             // Stable sort, so the order of proofs within an author will not change.
             ret.sort_by_key(|proof| Reverse(proof.gas_bucket_start()));
-            (ret, full)
+            (ret, !full)
         } else {
-            (Vec::new(), full)
+            (Vec::new(), !full)
         }
     }
 
