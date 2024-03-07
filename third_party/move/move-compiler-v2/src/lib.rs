@@ -78,6 +78,23 @@ where
     let mut env = run_checker_and_rewriters(options.clone(), RewritingScope::CompilationTarget)?;
     check_errors(&env, error_writer, "checking errors")?;
 
+    trace!(
+        "After flow-insensitive checks, GlobalEnv=\n{}",
+        env.dump_env()
+    );
+
+    // Run inlining.
+    inliner::run_inlining(&mut env);
+    check_errors(&env, error_writer, "inlining")?;
+
+    debug!("After inlining, GlobalEnv=\n{}", env.dump_env());
+
+    function_checker::check_access_and_use(&mut env, false);
+    check_errors(&env, error_writer, "post-inlining access checks")?;
+
+    cyclic_instantiation_checker::check_cyclic_instantiations(&env);
+    check_errors(&env, error_writer, "post-cyclic instantiations checking")?;
+
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;

@@ -5,7 +5,7 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::debug;
 use move_compiler_v2::{
-    annotate_units, ast_simplifier, check_and_rewrite_pipeline, disassemble_compiled_units,
+    annotate_units, ast_simplifier, check_and_rewrite_pipeline, cyclic_instantiation_checker, disassemble_compiled_units,
     env_pipeline::{
         lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
         spec_rewriter, EnvProcessorPipeline,
@@ -17,13 +17,11 @@ use move_compiler_v2::{
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
-        recursive_instantiation_checker::RecursiveInstantiationChecker,
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
-    },
-    run_bytecode_verifier, run_file_format_gen, Options,
+    }, run_bytecode_verifier, run_file_format_gen, Options
 };
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
@@ -218,7 +216,6 @@ impl TestConfig {
                 dump_for_only_some_stages: None,
             }
         } else if path.contains("/recursive-instantiation-checker") {
-            pipeline.add_processor(Box::new(RecursiveInstantiationChecker {}));
             Self {
                 stop_before_generating_bytecode: false,
                 dump_ast: false,
