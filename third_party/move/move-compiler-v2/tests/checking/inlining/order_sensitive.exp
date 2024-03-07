@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::OrderSensitiveTest1 {
     spec fun $inline_fun1(a: u64,b: u64): u64 {
         Mul(a, b)

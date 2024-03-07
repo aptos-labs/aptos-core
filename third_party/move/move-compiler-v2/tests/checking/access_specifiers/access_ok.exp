@@ -18,7 +18,7 @@ warning: Unused parameter `x`. Consider removing or prefixing with an underscore
 41 │     fun make_up_address(x: u64): address {
    │                         ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::m {
     struct T {
         dummy_field: bool,

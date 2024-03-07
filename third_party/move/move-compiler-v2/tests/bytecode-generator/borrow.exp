@@ -12,7 +12,7 @@ warning: Unused parameter `param`. Consider removing or prefixing with an unders
 29 │     fun mut_local(param: u64): u64 {
    │                   ^^^^^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::borrow {
     struct S {
         f: u64,

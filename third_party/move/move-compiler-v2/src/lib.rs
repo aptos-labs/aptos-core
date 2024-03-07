@@ -2,16 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-mod bytecode_generator;
-mod experiments;
-mod file_format_generator;
-pub mod flow_insensitive_checkers;
-pub mod function_checker;
-pub mod inliner;
-pub mod logging;
-pub mod options;
-pub mod pipeline;
-
 use crate::pipeline::{
     ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
     copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -46,6 +36,17 @@ use move_stackless_bytecode::function_target_pipeline::{
 use move_symbol_pool::Symbol;
 pub use options::*;
 use std::{collections::BTreeSet, path::Path};
+
+mod bytecode_generator;
+pub mod env_pipeline;
+mod experiments;
+mod file_format_generator;
+pub mod flow_insensitive_checkers;
+pub mod function_checker;
+pub mod inliner;
+pub mod logging;
+pub mod options;
+pub mod pipeline;
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
