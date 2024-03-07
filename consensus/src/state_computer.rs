@@ -217,11 +217,11 @@ impl StateComputer for ExecutionProxy {
             .await;
 
         Box::pin(async move {
+            let pipeline_execution_result = fut.await?;
             debug!(
                 block_id = block_id,
                 "Got state compute result, post processing."
             );
-            let pipeline_execution_result = fut.await?;
             let user_txns = &pipeline_execution_result.input_txns;
             let result = &pipeline_execution_result.result;
 
