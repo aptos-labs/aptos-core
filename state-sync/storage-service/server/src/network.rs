@@ -24,7 +24,7 @@ use std::{
 };
 use tokio::runtime::Handle;
 use tokio_stream::wrappers::ReceiverStream;
-use aptos_network2::protocols::network::network_event_prefetch;
+use aptos_network2::protocols::network::network_event_prefetch_parallel;
 
 /// A simple wrapper for each network request
 pub struct NetworkRequest {
@@ -45,7 +45,8 @@ pub struct StorageServiceNetworkEvents {
 impl StorageServiceNetworkEvents {
     pub fn new(network_events: NetworkEvents<StorageServiceMessage>, handle: &Handle) -> Self {
         let (event_tx, event_rx) = tokio::sync::mpsc::channel(10); // TODO: configurable prefetch size other than 10?
-        handle.spawn(network_event_prefetch(network_events, event_tx));
+        // handle.spawn(network_event_prefetch(network_events, event_tx));
+        handle.spawn(network_event_prefetch_parallel(network_events, event_tx, 4));
         let network_events = ReceiverStream::new(event_rx);
 
         // Transform each event to a network request

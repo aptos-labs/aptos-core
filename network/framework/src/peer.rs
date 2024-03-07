@@ -397,11 +397,11 @@ async fn complete_rpc(rpc_state: OpenRpcRequestState, nmsg: NetworkMessage, rx_t
         let data_len = blob.len() as u64;
         match rpc_state.sender.send(Ok((blob.into(), rx_time))) {
             Ok(_) => {
-                counters::rpc_message_bytes(rpc_state.network_id, rpc_state.protocol_id.as_str(), rpc_state.role_type, counters::RESPONSE_LABEL, counters::INBOUND_LABEL, counters::RECEIVED_LABEL, data_len);
+                counters::rpc_message_bytes(rpc_state.network_id, rpc_state.protocol_id.as_str(), rpc_state.role_type.as_str(), counters::RESPONSE_LABEL, counters::INBOUND_LABEL, counters::RECEIVED_LABEL, data_len);
                 counters::outbound_rpc_request_latency(rpc_state.role_type, rpc_state.network_id, rpc_state.protocol_id).observe(dt.as_secs_f64());
             }
             Err(_) => {
-                counters::rpc_message_bytes(rpc_state.network_id, rpc_state.protocol_id.as_str(), rpc_state.role_type, counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "declined", data_len);
+                counters::rpc_message_bytes(rpc_state.network_id, rpc_state.protocol_id.as_str(), rpc_state.role_type.as_str(), counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "declined", data_len);
             }
         }
     } else {
@@ -485,14 +485,14 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
             NetworkMessage::RpcRequest(request) => {
                 let protocol_id = request.protocol_id;
                 let data_len = request.raw_request.len() as u64;
-                counters::rpc_message_bytes(self.remote_peer_network_id.network_id(), protocol_id.as_str(), self.role_type, counters::REQUEST_LABEL, counters::INBOUND_LABEL, counters::RECEIVED_LABEL, data_len);
+                counters::rpc_message_bytes(self.remote_peer_network_id.network_id(), protocol_id.as_str(), self.role_type.as_str(), counters::REQUEST_LABEL, counters::INBOUND_LABEL, counters::RECEIVED_LABEL, data_len);
                 self.forward(protocol_id, nmsg).await;
             }
             NetworkMessage::RpcResponse(response) => {
                 match self.open_outbound_rpc.remove(&response.request_id) {
                     None => {
                         let data_len = response.raw_response.len() as u64;
-                        counters::rpc_message_bytes(self.remote_peer_network_id.network_id(), "unk", self.role_type, counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "miss", data_len);
+                        counters::rpc_message_bytes(self.remote_peer_network_id.network_id(), "unk", self.role_type.as_str(), counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "miss", data_len);
                     }
                     Some(rpc_state) => {
                         let rx_time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64;
@@ -585,6 +585,7 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                     return;
                 },
             };
+            // TODO: start timer for outer message received moment and measure how long it takes to get to the app
             match rrmm {
                 Some(rmm) => match rmm {
                     Ok(msg) => match msg {
