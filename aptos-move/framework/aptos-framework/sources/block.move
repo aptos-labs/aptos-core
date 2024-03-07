@@ -9,7 +9,6 @@ module aptos_framework::block {
     use aptos_framework::randomness;
 
     use aptos_framework::account;
-    use aptos_framework::dkg;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::reconfiguration;
     use aptos_framework::reconfiguration_with_dkg;
@@ -226,7 +225,7 @@ module aptos_framework::block {
         );
         randomness::on_new_block(&vm, epoch, round, randomness_seed);
 
-        if (!dkg::in_progress() && timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
+        if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();
         }
     }
