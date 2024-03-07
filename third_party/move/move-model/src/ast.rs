@@ -2110,11 +2110,10 @@ impl Operation {
         )
     }
 
-    /// Determines whether this op is side-effect free, so if the value is unused the
-    /// operation could be removed without affecting the program.
-    ///
-    /// We treat Specs and expressions that might yield errors or assertions as having side-effects.
-    pub fn is_side_effect_free(&self) -> bool {
+    /// Checks whether an expression calling the operation is OK to remove from code.  This includes
+    /// side-effect-free expressions which are not related to Specs, Assertions, and won't generate
+    /// errors or warnings in stackless-bytecode passes.
+    pub fn is_ok_to_remove_from_code(&self) -> bool {
         use Operation::*;
         match self {
             MoveFunction(..) => false, // could abort
@@ -2285,9 +2284,10 @@ impl ExpData {
         is_pure
     }
 
-    /// Checks whether the expression is side-effect-free, i.e. modifies no variables and
-    /// calls no user functions or functions that may have effects.
-    pub fn is_side_effect_free(&self) -> bool {
+    /// Checks whether the expression is OK to remove from code.  This includes
+    /// side-effect-free expressions which are not related to Specs, Assertions,
+    /// and won't generate errors or warnings in stackless-bytecode passes.
+    pub fn is_ok_to_remove_from_code(&self) -> bool {
         let mut is_pure = true;
         let mut pure_stack = Vec::new();
         let mut visitor = |post: bool, e: &ExpData| {
@@ -2299,7 +2299,7 @@ impl ExpData {
                 },
                 Value(..) | LocalVar(..) | Temporary(..) => {}, // Ok, keep going
                 Call(_, oper, _) => {
-                    if !oper.is_side_effect_free() {
+                    if !oper.is_ok_to_remove_from_code() {
                         is_pure = false;
                     }
                 },

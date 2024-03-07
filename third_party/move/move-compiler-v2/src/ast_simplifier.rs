@@ -313,7 +313,8 @@ fn find_possibly_modified_vars(
                         // Borrow, so leave `modifying` state alone.
                     },
                     _ => {
-                        // Other operations don't modify argument variables.
+                        // Other operations don't modify argument variables, so turn off `modifying`
+                        // inside them.
                         match pos {
                             VisitorPosition::Pre => {
                                 modifying_stack.push(modifying);
@@ -954,7 +955,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         let can_eliminate_bindings = binding_can_be_dropped
             && bound_vars.len() == unused_bound_vars.len()
             && if let Some(binding) = opt_binding {
-                binding.is_side_effect_free()
+                binding.is_ok_to_remove_from_code()
             } else {
                 true
             };
@@ -1042,7 +1043,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             let last_expr_opt = siter.next_back(); // first remove last element from siter
             let side_effecting_elts_refs = siter
                 .filter(|exp|
-                        if exp.as_ref().is_side_effect_free() {
+                        if exp.as_ref().is_ok_to_remove_from_code() {
                             let loc = self.env().get_node_loc(exp.node_id());
                             self.env().diag(
                                 Severity::Warning,
