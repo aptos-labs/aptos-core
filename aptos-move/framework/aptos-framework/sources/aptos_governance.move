@@ -547,7 +547,7 @@ module aptos_framework::aptos_governance {
     ///
     /// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
     /// since such updates are applied whenever we enter an new epoch.
-    public fun reconfigure(aptos_framework: &signer) {
+    public entry fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (consensus_config::validator_txn_enabled() && randomness_config::enabled()) {
             reconfiguration_with_dkg::try_start();
@@ -562,9 +562,16 @@ module aptos_framework::aptos_governance {
     ///
     /// WARNING: currently only used by tests. In most cases you should use `reconfigure()` instead.
     /// TODO: migrate these tests to be aware of async reconfiguration.
-    public fun force_end_epoch(aptos_framework: &signer) {
+    public entry fun force_end_epoch(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         reconfiguration_with_dkg::finish(aptos_framework);
+    }
+
+    /// `force_end_epoch()` used in some move tests.
+    public entry fun force_end_epoch_test_only(admin: &signer) acquires GovernanceResponsbility {
+        let core_signer = get_signer_testnet_only(admin, @0x1);
+        system_addresses::assert_aptos_framework(&core_signer);
+        reconfiguration_with_dkg::finish(&core_signer);
     }
 
     /// Update feature flags and also trigger reconfiguration.
@@ -966,7 +973,7 @@ module aptos_framework::aptos_governance {
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 10, 2);
 
         initialize_partial_voting(&aptos_framework);
-        features::change_feature_flags(&aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
+        features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
 
         coin::register<AptosCoin>(&voter_1);
         coin::register<AptosCoin>(&voter_2);
@@ -1125,7 +1132,7 @@ module aptos_framework::aptos_governance {
         voter_2: &signer,
     ) acquires GovernanceResponsbility {
         initialize_partial_voting(aptos_framework);
-        features::change_feature_flags(aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
+        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
         setup_voting(aptos_framework, proposer, voter_1, voter_2);
     }
 

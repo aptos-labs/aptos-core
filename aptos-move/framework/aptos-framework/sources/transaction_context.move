@@ -52,7 +52,7 @@ module aptos_framework::transaction_context {
         use std::vector;
 
         let feature = features::get_auids();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let auids: vector<address> = vector<address>[];
         let i: u64 = 0;
