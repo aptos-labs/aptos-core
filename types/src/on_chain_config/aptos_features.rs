@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use move_core_types::{
+    effects::{ChangeSet, Op},
+    language_storage::CORE_CODE_ADDRESS,
+};
 use serde::{Deserialize, Serialize};
 use strum_macros::FromRepr;
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
@@ -61,6 +65,8 @@ pub enum FeatureFlag {
     REFUNDABLE_BYTES = 51,
     OBJECT_CODE_DEPLOYMENT = 52,
     MAX_OBJECT_NESTING_CHECK = 53,
+    KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
+    TRANSACTION_CONTEXT_EXTENSION = 55,
 }
 
 impl FeatureFlag {
@@ -112,6 +118,8 @@ impl FeatureFlag {
             FeatureFlag::REFUNDABLE_BYTES,
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
+            FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
+            FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
         ]
     }
 }
@@ -238,6 +246,10 @@ impl Features {
         self.is_enabled(FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
+    pub fn is_keyless_with_passkeys_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
+    }
+
     pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
     }
@@ -249,6 +261,22 @@ impl Features {
     pub fn is_refundable_bytes_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
     }
+}
+
+pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
+    let features_value = bcs::to_bytes(&Features::default()).unwrap();
+
+    let mut change_set = ChangeSet::new();
+    // we need to initialize features to their defaults.
+    change_set
+        .add_resource_op(
+            CORE_CODE_ADDRESS,
+            Features::struct_tag(),
+            Op::New(features_value.into()),
+        )
+        .expect("adding genesis Feature resource must succeed");
+
+    change_set
 }
 
 #[test]

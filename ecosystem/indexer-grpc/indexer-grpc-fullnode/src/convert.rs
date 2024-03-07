@@ -15,7 +15,7 @@ use aptos_logger::warn;
 use aptos_protos::{
     transaction::{
         v1 as transaction,
-        v1::{any_signature, Ed25519, Keyless, Secp256k1Ecdsa, WebAuthn},
+        v1::{any_signature, Ed25519, Keyless, Secp256k1Ecdsa, TransactionSizeInfo, WebAuthn},
     },
     util::timestamp,
 };
@@ -740,6 +740,7 @@ pub fn convert_transaction(
     transaction: &Transaction,
     block_height: u64,
     epoch: u64,
+    size_info: TransactionSizeInfo,
 ) -> transaction::Transaction {
     let mut timestamp: Option<timestamp::Timestamp> = None;
 
@@ -833,5 +834,6 @@ pub fn convert_transaction(
         block_height,
         r#type: txn_type as i32,
         txn_data: Some(txn_data),
+        size_info: Some(size_info),
     }
 }

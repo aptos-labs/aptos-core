@@ -8,11 +8,11 @@ use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
     keyless::{
-        get_public_inputs_hash, Configuration, Groth16VerificationKey, KeylessPublicKey,
-        KeylessSignature, ZkpOrOpenIdSig,
+        get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16VerificationKey,
+        KeylessPublicKey, KeylessSignature, ZKP,
     },
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
-    transaction::authenticator::EphemeralPublicKey,
+    transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
     vm_status::{StatusCode, VMStatus},
 };
 use move_binary_format::errors::Location;
@@ -103,20 +103,20 @@ pub(crate) fn validate_authenticators(
     features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
-    // Feature gating
     for (_, sig) in authenticators {
-        if !features.is_keyless_enabled() && matches!(sig.sig, ZkpOrOpenIdSig::Groth16Zkp { .. }) {
-            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-        }
-        if (!features.is_keyless_enabled() || !features.is_keyless_zkless_enabled())
-            && matches!(sig.sig, ZkpOrOpenIdSig::OpenIdSig { .. })
+        // Feature-gating for keyless-but-zkless TXNs: If keyless TXNs *are* enabled, and (1) this
+        // is a ZKless transaction but (2) ZKless TXNs are not yet enabled, discard the TXN from
+        // being put on-chain.
+        if matches!(sig.cert, EphemeralCertificate::OpenIdSig { .. })
+            && !features.is_keyless_zkless_enabled()
         {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }
-    }
-
-    if authenticators.is_empty() {
-        return Ok(());
+        if matches!(sig.ephemeral_signature, EphemeralSignature::WebAuthn { .. })
+            && !features.is_keyless_with_passkeys_enabled()
+        {
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+        }
     }
 
     let config = &get_configs_onchain(resolver)?;
@@ -148,46 +148,53 @@ pub(crate) fn validate_authenticators(
     for (pk, sig) in authenticators {
         let jwk = get_jwk_for_authenticator(&patched_jwks, pk, sig)?;
 
-        match &sig.sig {
-            ZkpOrOpenIdSig::Groth16Zkp(proof) => match jwk {
+        match &sig.cert {
+            EphemeralCertificate::ZeroKnowledgeSig(zksig) => match jwk {
                 JWK::RSA(rsa_jwk) => {
-                    if proof.exp_horizon_secs > config.max_exp_horizon_secs {
+                    if zksig.exp_horizon_secs > config.max_exp_horizon_secs {
                         return Err(invalid_signature!("The expiration horizon is too long"));
                     }
 
                     // If an `aud` override was set for account recovery purposes, check that it is
                     // in the allow-list on-chain.
-                    if proof.override_aud_val.is_some() {
-                        config.is_allowed_override_aud(proof.override_aud_val.as_ref().unwrap())?;
+                    if zksig.override_aud_val.is_some() {
+                        config.is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())?;
                     }
 
-                    // The training wheels signature is only checked if a training wheels PK is set on chain
-                    if training_wheels_pk.is_some() {
-                        proof
-                            .verify_training_wheels_sig(training_wheels_pk.as_ref().unwrap())
-                            .map_err(|_| {
-                                invalid_signature!("Could not verify training wheels signature")
-                            })?;
-                    }
+                    match zksig.proof {
+                        ZKP::Groth16(_) => {
+                            let public_inputs_hash =
+                                get_public_inputs_hash(sig, pk, &rsa_jwk, config).map_err(
+                                    |_| invalid_signature!("Could not compute public inputs hash"),
+                                )?;
 
-                    let public_inputs_hash = get_public_inputs_hash(sig, pk, &rsa_jwk, config)
-                        .map_err(|_| invalid_signature!("Could not compute public inputs hash"))?;
-                    proof
-                        .verify_proof(public_inputs_hash, pvk)
-                        .map_err(|_| invalid_signature!("Proof verification failed"))?;
+                            // The training wheels signature is only checked if a training wheels PK is set on chain
+                            if training_wheels_pk.is_some() {
+                                zksig
+                                    .verify_training_wheels_sig(
+                                        training_wheels_pk.as_ref().unwrap(),
+                                        &public_inputs_hash,
+                                    )
+                                    .map_err(|_| {
+                                        invalid_signature!(
+                                            "Could not verify training wheels signature"
+                                        )
+                                    })?;
+                            }
+
+                            zksig
+                                .verify_groth16_proof(public_inputs_hash, pvk)
+                                .map_err(|_| invalid_signature!("Proof verification failed"))?;
+                        },
+                    }
                 },
                 JWK::Unsupported(_) => return Err(invalid_signature!("JWK is not supported")),
             },
-            ZkpOrOpenIdSig::OpenIdSig(openid_sig) => {
+            EphemeralCertificate::OpenIdSig(openid_sig) => {
                 match jwk {
                     JWK::RSA(rsa_jwk) => {
                         openid_sig
-                            .verify_jwt_claims(
-                                sig.exp_timestamp_secs,
-                                &sig.ephemeral_pubkey,
-                                pk,
-                                config,
-                            )
+                            .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, pk, config)
                             .map_err(|_| invalid_signature!("OpenID claim verification failed"))?;
 
                         // TODO(OpenIdSig): Implement batch verification for all RSA signatures in
@@ -202,7 +209,7 @@ pub(crate) fn validate_authenticators(
                         //
                         // We are now ready to verify the RSA signature
                         openid_sig
-                            .verify_jwt_signature(&rsa_jwk, &sig.jwt_header_b64)
+                            .verify_jwt_signature(&rsa_jwk, &sig.jwt_header_json)
                             .map_err(|_| {
                                 invalid_signature!(
                                     "RSA signature verification failed for OpenIdSig"
@@ -214,5 +221,6 @@ pub(crate) fn validate_authenticators(
             },
         }
     }
+
     Ok(())
 }

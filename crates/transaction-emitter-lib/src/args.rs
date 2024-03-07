@@ -70,8 +70,9 @@ pub struct ClusterArgs {
     #[clap(long, conflicts_with = "targets")]
     pub targets_file: Option<String>,
 
-    #[clap(long, default_value_t = ChainId::test())]
-    pub chain_id: ChainId,
+    // If the chain_id is not provided, it is derived from the targets.
+    #[clap(long)]
+    pub chain_id: Option<ChainId>,
 
     #[clap(flatten)]
     pub coin_source_args: CoinSourceArgs,

@@ -31,7 +31,7 @@ pub async fn put_provider_on_chain(
                 r#"
         let issuer = b"{}";
         let config_url = b"{}";
-        jwks::upsert_oidc_provider(&framework_signer, issuer, config_url);
+        jwks::upsert_oidc_provider_for_next_epoch(&framework_signer, issuer, config_url);
 "#,
                 String::from_utf8(name).unwrap(),
                 String::from_utf8(config_url).unwrap(),

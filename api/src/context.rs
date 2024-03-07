@@ -648,7 +648,9 @@ impl Context {
             .into_iter()
             .map(|t| {
                 // Update the timestamp if the next block occurs
-                if let Some(txn) = t.transaction.try_as_block_metadata() {
+                if let Some(txn) = t.transaction.try_as_block_metadata_ext() {
+                    timestamp = txn.timestamp_usecs();
+                } else if let Some(txn) = t.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                 }
                 let txn = converter.try_into_onchain_transaction(timestamp, t)?;
@@ -727,7 +729,7 @@ impl Context {
             .enumerate()
             .map(|(i, ((txn, txn_output), info))| {
                 let version = start_version + i as u64;
-                let (write_set, events, _, _) = txn_output.unpack();
+                let (write_set, events, _, _, _) = txn_output.unpack();
                 self.get_accumulator_root_hash(version)
                     .map(|h| (version, txn, info, events, h, write_set).into())
             })

@@ -13,6 +13,7 @@ Ok(
             status: Discard(
                 SIGNERS_CONTAIN_DUPLICATES,
             ),
+            auxiliary_data: None,
         },
     ],
 )

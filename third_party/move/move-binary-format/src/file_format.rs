@@ -2229,6 +2229,14 @@ impl CompiledModule {
     pub fn self_id(&self) -> ModuleId {
         self.module_id_for_handle(self.self_handle())
     }
+
+    pub fn self_addr(&self) -> &AccountAddress {
+        self.address_identifier_at(self.self_handle().address)
+    }
+
+    pub fn self_name(&self) -> &IdentStr {
+        self.identifier_at(self.self_handle().name)
+    }
 }
 
 /// Return the simplest module that will pass the bounds checker

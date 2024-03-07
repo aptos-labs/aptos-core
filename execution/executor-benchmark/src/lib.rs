@@ -196,14 +196,14 @@ pub fn run_benchmark<V>(
 
     let mut overall_measuring = OverallMeasuring::start();
 
-    if let Some((transaction_generators, phase)) = transaction_generators {
+    let num_blocks_created = if let Some((transaction_generators, phase)) = transaction_generators {
         generator.run_workload(
             block_size,
             num_blocks,
             transaction_generators,
             phase,
             transactions_per_sender,
-        );
+        )
     } else {
         generator.run_transfer(
             block_size,
@@ -212,8 +212,8 @@ pub fn run_benchmark<V>(
             connected_tx_grps,
             shuffle_connected_txns,
             hotspot_probability,
-        );
-    }
+        )
+    };
     if pipeline_config.delay_execution_start {
         overall_measuring.start_time = Instant::now();
     }
@@ -230,7 +230,7 @@ pub fn run_benchmark<V>(
         }
     );
 
-    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks as u64;
+    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks_created as u64;
     overall_measuring.print_end("Overall", num_txns);
 
     if verify_sequence_numbers {
@@ -697,7 +697,7 @@ mod tests {
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
-    use aptos_transaction_generator_lib::args::TransactionTypeArg;
+    use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
     use aptos_vm::AptosVM;
 
     fn test_generic_benchmark<E>(
@@ -730,7 +730,8 @@ mod tests {
         super::run_benchmark::<E>(
             10, /* block_size */
             30, /* num_blocks */
-            transaction_type.map(|t| vec![(t.materialize(1, true), 1)]),
+            transaction_type
+                .map(|t| vec![(t.materialize(1, true, WorkflowProgress::MoveByPhases), 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */

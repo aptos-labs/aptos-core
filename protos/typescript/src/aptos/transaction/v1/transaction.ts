@@ -223,6 +223,7 @@ export interface Transaction {
   stateCheckpoint?: StateCheckpointTransaction | undefined;
   user?: UserTransaction | undefined;
   validator?: ValidatorTransaction | undefined;
+  sizeInfo?: TransactionSizeInfo | undefined;
 }
 
 export enum Transaction_TransactionType {
@@ -1084,6 +1085,22 @@ export function accountSignature_TypeToJSON(object: AccountSignature_Type): stri
   }
 }
 
+export interface TransactionSizeInfo {
+  transactionBytes?: number | undefined;
+  eventSizeInfo?: EventSizeInfo[] | undefined;
+  writeOpSizeInfo?: WriteOpSizeInfo[] | undefined;
+}
+
+export interface EventSizeInfo {
+  typeTagBytes?: number | undefined;
+  totalBytes?: number | undefined;
+}
+
+export interface WriteOpSizeInfo {
+  keyBytes?: number | undefined;
+  valueBytes?: number | undefined;
+}
+
 function createBaseBlock(): Block {
   return { timestamp: undefined, height: BigInt("0"), transactions: [], chainId: 0 };
 }
@@ -1242,6 +1259,7 @@ function createBaseTransaction(): Transaction {
     stateCheckpoint: undefined,
     user: undefined,
     validator: undefined,
+    sizeInfo: undefined,
   };
 }
 
@@ -1288,6 +1306,9 @@ export const Transaction = {
     }
     if (message.validator !== undefined) {
       ValidatorTransaction.encode(message.validator, writer.uint32(170).fork()).ldelim();
+    }
+    if (message.sizeInfo !== undefined) {
+      TransactionSizeInfo.encode(message.sizeInfo, writer.uint32(178).fork()).ldelim();
     }
     return writer;
   },
@@ -1376,6 +1397,13 @@ export const Transaction = {
 
           message.validator = ValidatorTransaction.decode(reader, reader.uint32());
           continue;
+        case 22:
+          if (tag !== 178) {
+            break;
+          }
+
+          message.sizeInfo = TransactionSizeInfo.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1432,6 +1460,7 @@ export const Transaction = {
         : undefined,
       user: isSet(object.user) ? UserTransaction.fromJSON(object.user) : undefined,
       validator: isSet(object.validator) ? ValidatorTransaction.fromJSON(object.validator) : undefined,
+      sizeInfo: isSet(object.sizeInfo) ? TransactionSizeInfo.fromJSON(object.sizeInfo) : undefined,
     };
   },
 
@@ -1470,6 +1499,9 @@ export const Transaction = {
     if (message.validator !== undefined) {
       obj.validator = ValidatorTransaction.toJSON(message.validator);
     }
+    if (message.sizeInfo !== undefined) {
+      obj.sizeInfo = TransactionSizeInfo.toJSON(message.sizeInfo);
+    }
     return obj;
   },
 
@@ -1502,6 +1534,9 @@ export const Transaction = {
       : undefined;
     message.validator = (object.validator !== undefined && object.validator !== null)
       ? ValidatorTransaction.fromPartial(object.validator)
+      : undefined;
+    message.sizeInfo = (object.sizeInfo !== undefined && object.sizeInfo !== null)
+      ? TransactionSizeInfo.fromPartial(object.sizeInfo)
       : undefined;
     return message;
   },
@@ -8858,8 +8893,351 @@ export const AccountSignature = {
   },
 };
 
+function createBaseTransactionSizeInfo(): TransactionSizeInfo {
+  return { transactionBytes: 0, eventSizeInfo: [], writeOpSizeInfo: [] };
+}
+
+export const TransactionSizeInfo = {
+  encode(message: TransactionSizeInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.transactionBytes !== undefined && message.transactionBytes !== 0) {
+      writer.uint32(8).uint32(message.transactionBytes);
+    }
+    if (message.eventSizeInfo !== undefined && message.eventSizeInfo.length !== 0) {
+      for (const v of message.eventSizeInfo) {
+        EventSizeInfo.encode(v!, writer.uint32(18).fork()).ldelim();
+      }
+    }
+    if (message.writeOpSizeInfo !== undefined && message.writeOpSizeInfo.length !== 0) {
+      for (const v of message.writeOpSizeInfo) {
+        WriteOpSizeInfo.encode(v!, writer.uint32(26).fork()).ldelim();
+      }
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): TransactionSizeInfo {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTransactionSizeInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.transactionBytes = reader.uint32();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.eventSizeInfo!.push(EventSizeInfo.decode(reader, reader.uint32()));
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.writeOpSizeInfo!.push(WriteOpSizeInfo.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<TransactionSizeInfo, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<TransactionSizeInfo | TransactionSizeInfo[]>
+      | Iterable<TransactionSizeInfo | TransactionSizeInfo[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [TransactionSizeInfo.encode(p).finish()];
+        }
+      } else {
+        yield* [TransactionSizeInfo.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, TransactionSizeInfo>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<TransactionSizeInfo> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [TransactionSizeInfo.decode(p)];
+        }
+      } else {
+        yield* [TransactionSizeInfo.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): TransactionSizeInfo {
+    return {
+      transactionBytes: isSet(object.transactionBytes) ? globalThis.Number(object.transactionBytes) : 0,
+      eventSizeInfo: globalThis.Array.isArray(object?.eventSizeInfo)
+        ? object.eventSizeInfo.map((e: any) => EventSizeInfo.fromJSON(e))
+        : [],
+      writeOpSizeInfo: globalThis.Array.isArray(object?.writeOpSizeInfo)
+        ? object.writeOpSizeInfo.map((e: any) => WriteOpSizeInfo.fromJSON(e))
+        : [],
+    };
+  },
+
+  toJSON(message: TransactionSizeInfo): unknown {
+    const obj: any = {};
+    if (message.transactionBytes !== undefined && message.transactionBytes !== 0) {
+      obj.transactionBytes = Math.round(message.transactionBytes);
+    }
+    if (message.eventSizeInfo?.length) {
+      obj.eventSizeInfo = message.eventSizeInfo.map((e) => EventSizeInfo.toJSON(e));
+    }
+    if (message.writeOpSizeInfo?.length) {
+      obj.writeOpSizeInfo = message.writeOpSizeInfo.map((e) => WriteOpSizeInfo.toJSON(e));
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<TransactionSizeInfo>): TransactionSizeInfo {
+    return TransactionSizeInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<TransactionSizeInfo>): TransactionSizeInfo {
+    const message = createBaseTransactionSizeInfo();
+    message.transactionBytes = object.transactionBytes ?? 0;
+    message.eventSizeInfo = object.eventSizeInfo?.map((e) => EventSizeInfo.fromPartial(e)) || [];
+    message.writeOpSizeInfo = object.writeOpSizeInfo?.map((e) => WriteOpSizeInfo.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseEventSizeInfo(): EventSizeInfo {
+  return { typeTagBytes: 0, totalBytes: 0 };
+}
+
+export const EventSizeInfo = {
+  encode(message: EventSizeInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.typeTagBytes !== undefined && message.typeTagBytes !== 0) {
+      writer.uint32(8).uint32(message.typeTagBytes);
+    }
+    if (message.totalBytes !== undefined && message.totalBytes !== 0) {
+      writer.uint32(16).uint32(message.totalBytes);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): EventSizeInfo {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEventSizeInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.typeTagBytes = reader.uint32();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.totalBytes = reader.uint32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<EventSizeInfo, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<EventSizeInfo | EventSizeInfo[]> | Iterable<EventSizeInfo | EventSizeInfo[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [EventSizeInfo.encode(p).finish()];
+        }
+      } else {
+        yield* [EventSizeInfo.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, EventSizeInfo>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<EventSizeInfo> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [EventSizeInfo.decode(p)];
+        }
+      } else {
+        yield* [EventSizeInfo.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): EventSizeInfo {
+    return {
+      typeTagBytes: isSet(object.typeTagBytes) ? globalThis.Number(object.typeTagBytes) : 0,
+      totalBytes: isSet(object.totalBytes) ? globalThis.Number(object.totalBytes) : 0,
+    };
+  },
+
+  toJSON(message: EventSizeInfo): unknown {
+    const obj: any = {};
+    if (message.typeTagBytes !== undefined && message.typeTagBytes !== 0) {
+      obj.typeTagBytes = Math.round(message.typeTagBytes);
+    }
+    if (message.totalBytes !== undefined && message.totalBytes !== 0) {
+      obj.totalBytes = Math.round(message.totalBytes);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<EventSizeInfo>): EventSizeInfo {
+    return EventSizeInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<EventSizeInfo>): EventSizeInfo {
+    const message = createBaseEventSizeInfo();
+    message.typeTagBytes = object.typeTagBytes ?? 0;
+    message.totalBytes = object.totalBytes ?? 0;
+    return message;
+  },
+};
+
+function createBaseWriteOpSizeInfo(): WriteOpSizeInfo {
+  return { keyBytes: 0, valueBytes: 0 };
+}
+
+export const WriteOpSizeInfo = {
+  encode(message: WriteOpSizeInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.keyBytes !== undefined && message.keyBytes !== 0) {
+      writer.uint32(8).uint32(message.keyBytes);
+    }
+    if (message.valueBytes !== undefined && message.valueBytes !== 0) {
+      writer.uint32(16).uint32(message.valueBytes);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): WriteOpSizeInfo {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseWriteOpSizeInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.keyBytes = reader.uint32();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.valueBytes = reader.uint32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<WriteOpSizeInfo, Uint8Array>
+  async *encodeTransform(
+    source: AsyncIterable<WriteOpSizeInfo | WriteOpSizeInfo[]> | Iterable<WriteOpSizeInfo | WriteOpSizeInfo[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [WriteOpSizeInfo.encode(p).finish()];
+        }
+      } else {
+        yield* [WriteOpSizeInfo.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, WriteOpSizeInfo>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<WriteOpSizeInfo> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [WriteOpSizeInfo.decode(p)];
+        }
+      } else {
+        yield* [WriteOpSizeInfo.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): WriteOpSizeInfo {
+    return {
+      keyBytes: isSet(object.keyBytes) ? globalThis.Number(object.keyBytes) : 0,
+      valueBytes: isSet(object.valueBytes) ? globalThis.Number(object.valueBytes) : 0,
+    };
+  },
+
+  toJSON(message: WriteOpSizeInfo): unknown {
+    const obj: any = {};
+    if (message.keyBytes !== undefined && message.keyBytes !== 0) {
+      obj.keyBytes = Math.round(message.keyBytes);
+    }
+    if (message.valueBytes !== undefined && message.valueBytes !== 0) {
+      obj.valueBytes = Math.round(message.valueBytes);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<WriteOpSizeInfo>): WriteOpSizeInfo {
+    return WriteOpSizeInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<WriteOpSizeInfo>): WriteOpSizeInfo {
+    const message = createBaseWriteOpSizeInfo();
+    message.keyBytes = object.keyBytes ?? 0;
+    message.valueBytes = object.valueBytes ?? 0;
+    return message;
+  },
+};
+
 function bytesFromBase64(b64: string): Uint8Array {
-  if (globalThis.Buffer) {
+  if ((globalThis as any).Buffer) {
     return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
   } else {
     const bin = globalThis.atob(b64);
@@ -8872,7 +9250,7 @@ function bytesFromBase64(b64: string): Uint8Array {
 }
 
 function base64FromBytes(arr: Uint8Array): string {
-  if (globalThis.Buffer) {
+  if ((globalThis as any).Buffer) {
     return globalThis.Buffer.from(arr).toString("base64");
   } else {
     const bin: string[] = [];

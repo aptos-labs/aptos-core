@@ -40,7 +40,7 @@ fn verify_signature() {
         *sender.address(),
         0,
         &private_key,
-        sender.account().pubkey.clone(),
+        sender.account().pubkey.as_ed25519().unwrap(),
         program,
     );
 
@@ -70,9 +70,9 @@ fn verify_multi_agent_invalid_sender_signature() {
         vec![*secondary_signer.address()],
         10,
         &private_key,
-        sender.account().pubkey.clone(),
+        sender.account().pubkey.as_ed25519().unwrap(),
         vec![&secondary_signer.account().privkey],
-        vec![secondary_signer.account().pubkey.clone()],
+        vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
         None,
     );
     assert_prologue_parity!(
@@ -100,9 +100,9 @@ fn verify_multi_agent_invalid_secondary_signature() {
         vec![*secondary_signer.address()],
         10,
         &sender.account().privkey,
-        sender.account().pubkey.clone(),
+        sender.account().pubkey.as_ed25519().unwrap(),
         vec![&private_key],
-        vec![secondary_signer.account().pubkey.clone()],
+        vec![secondary_signer.account().pubkey.as_ed25519().unwrap()],
         None,
     );
     assert_prologue_parity!(
@@ -134,16 +134,16 @@ fn verify_multi_agent_duplicate_secondary_signer() {
         ],
         10,
         &sender.account().privkey,
-        sender.account().pubkey.clone(),
+        sender.account().pubkey.as_ed25519().unwrap(),
         vec![
             &secondary_signer.account().privkey,
             &third_signer.account().privkey,
             &secondary_signer.account().privkey,
         ],
         vec![
-            secondary_signer.account().pubkey.clone(),
-            third_signer.account().pubkey.clone(),
-            secondary_signer.account().pubkey.clone(),
+            secondary_signer.account().pubkey.as_ed25519().unwrap(),
+            third_signer.account().pubkey.as_ed25519().unwrap(),
+            secondary_signer.account().pubkey.as_ed25519().unwrap(),
         ],
         None,
     );
@@ -212,7 +212,10 @@ fn verify_simple_payment() {
         .max_gas_amount(100_000)
         .gas_unit_price(1)
         .raw()
-        .sign(&sender.account().privkey, sender.account().pubkey.clone())
+        .sign(
+            &sender.account().privkey,
+            sender.account().pubkey.as_ed25519().unwrap(),
+        )
         .unwrap()
         .into_inner();
 

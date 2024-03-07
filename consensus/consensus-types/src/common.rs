@@ -10,6 +10,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::CryptoHasher;
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::Mutex;
+use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, transaction::SignedTransaction,
     validator_verifier::ValidatorVerifier, vm_status::DiscardedVMStatus, PeerId,
@@ -353,9 +354,12 @@ impl Payload {
                 Ok(())
             },
             (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
-                for proof in proof_with_status.proof_with_data.proofs.iter() {
-                    proof.verify(validator)?;
-                }
+                proof_with_status
+                    .proof_with_data
+                    .proofs
+                    .par_iter()
+                    .with_min_len(4)
+                    .try_for_each(|proof| proof.verify(validator))?;
                 Ok(())
             },
             (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)) => {
@@ -516,7 +520,7 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                         }
                     },
                     Payload::DirectMempool(_) => {
-                        // TODO: Should we call bail!("..")
+                        error!("DirectMempool payload in InQuorumStore filter");
                     },
                 }
             }

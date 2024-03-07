@@ -229,7 +229,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "2.5.0"
+version = "3.0.1"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -295,6 +295,7 @@ dependencies = [
  "move-unit-test",
  "move-vm-runtime",
  "once_cell",
+ "pathsearch",
  "poem",
  "processor",
  "rand 0.7.3",
@@ -973,6 +974,7 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-executor-types",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4",
@@ -1021,10 +1023,10 @@ dependencies = [
  "byteorder",
  "bytes",
  "criterion",
- "curve25519-dalek",
+ "curve25519-dalek 3.2.0",
  "curve25519-dalek-ng",
  "digest 0.9.0",
- "ed25519-dalek",
+ "ed25519-dalek 1.0.1",
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
@@ -1313,6 +1315,7 @@ dependencies = [
  "async-trait",
  "bcs 0.1.4",
  "bytes",
+ "fail 0.5.1",
  "futures",
  "futures-channel",
  "futures-util",
@@ -2498,6 +2501,85 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-keyless-pepper-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-bn254",
+ "ark-ec",
+ "ark-ff",
+ "ark-serialize",
+ "ark-std",
+ "base64 0.13.1",
+ "bcs 0.1.4",
+ "byteorder",
+ "curve25519-dalek 3.2.0",
+ "ff 0.13.0",
+ "group 0.13.0",
+ "hex",
+ "jsonwebtoken 8.3.0",
+ "num-bigint 0.3.3",
+ "once_cell",
+ "poseidon-ark",
+ "rand 0.7.3",
+ "rand_core 0.5.1",
+ "serde",
+ "sha2 0.10.8",
+ "sha3 0.9.1",
+]
+
+[[package]]
+name = "aptos-keyless-pepper-example-client-rust"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-keyless-pepper-common",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-serialize",
+ "bcs 0.1.4",
+ "hex",
+ "rand 0.7.3",
+ "reqwest",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "aptos-keyless-pepper-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-keyless-pepper-common",
+ "aptos-types",
+ "ark-bls12-381",
+ "ark-ec",
+ "ark-ff",
+ "ark-serialize",
+ "bcs 0.1.4",
+ "byteorder",
+ "dashmap",
+ "env_logger",
+ "group 0.13.0",
+ "hex",
+ "hyper",
+ "jsonwebtoken 8.3.0",
+ "jwt",
+ "log",
+ "once_cell",
+ "rand 0.7.3",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha3 0.9.1",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-language-e2e-tests"
 version = "0.1.0"
 dependencies = [
@@ -2786,7 +2868,7 @@ dependencies = [
 [[package]]
 name = "aptos-moving-average"
 version = "0.1.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "chrono",
 ]
@@ -6676,6 +6758,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "curve25519-dalek"
+version = "4.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a677b8922c94e01bdbb12126b0bc852f00447528dee1782229af9c720c3f348"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "curve25519-dalek-derive",
+ "digest 0.10.7",
+ "fiat-crypto",
+ "platforms",
+ "rustc_version",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "curve25519-dalek-derive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
+dependencies = [
+ "proc-macro2 1.0.76",
+ "quote 1.0.35",
+ "syn 2.0.48",
+]
+
+[[package]]
 name = "curve25519-dalek-ng"
 version = "4.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7266,17 +7376,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "ed25519"
+version = "2.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
+dependencies = [
+ "pkcs8 0.10.2",
+ "signature 2.2.0",
+]
+
+[[package]]
 name = "ed25519-dalek"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c762bae6dcaf24c4c84667b8579785430908723d5c889f469d76a41d59cc7a9d"
 dependencies = [
- "curve25519-dalek",
- "ed25519",
+ "curve25519-dalek 3.2.0",
+ "ed25519 1.5.3",
  "rand 0.7.3",
  "serde",
  "serde_bytes",
  "sha2 0.9.9",
+ "zeroize",
+]
+
+[[package]]
+name = "ed25519-dalek"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a3daa8e81a3963a60642bcc1f90a670680bd4a77535faa384e9d1c79d620871"
+dependencies = [
+ "curve25519-dalek 4.1.2",
+ "ed25519 2.2.3",
+ "serde",
+ "sha2 0.10.8",
+ "signature 2.2.0",
+ "subtle",
  "zeroize",
 ]
 
@@ -7287,7 +7422,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d2be62a4061b872c8c0873ee4fc6f101ce7b889d039f019c5fa2af471a59908"
 dependencies = [
  "derivation-path",
- "ed25519-dalek",
+ "ed25519-dalek 1.0.1",
  "hmac 0.12.1",
  "sha2 0.10.8",
 ]
@@ -7821,6 +7956,12 @@ dependencies = [
  "rand_core 0.6.4",
  "subtle",
 ]
+
+[[package]]
+name = "fiat-crypto"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1676f435fc1dadde4d03e43f5d62b259e1ce5f40bd4ffb21db2b42ebe59c1382"
 
 [[package]]
 name = "field_count"
@@ -8827,6 +8968,9 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "hex-literal"
@@ -9625,6 +9769,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jwt"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6204285f77fe7d9784db3fdc449ecce1a0114927a51d5a41c4c7a292011c015f"
+dependencies = [
+ "base64 0.13.1",
+ "crypto-common",
+ "digest 0.10.7",
+ "hmac 0.12.1",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "k8s-openapi"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10351,9 +10510,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "0.8.10"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3d0b296e374a4e6f3c7b0a1f5a51d748a0d34c85e7dc48fc3fa9a87657fe09"
+checksum = "a4a650543ca06a924e8b371db273b2756685faae30f8487da1b56505a8f78b0c"
 dependencies = [
  "libc",
  "log",
@@ -10729,6 +10888,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "ethnum",
+ "hashbrown 0.14.3",
  "hex",
  "num 0.4.1",
  "once_cell",
@@ -11367,6 +11527,7 @@ dependencies = [
  "better_any",
  "bytes",
  "fail 0.4.0",
+ "hashbrown 0.14.3",
  "hex",
  "lazy_static",
  "lru 0.7.8",
@@ -11384,6 +11545,7 @@ dependencies = [
  "smallbitvec",
  "tracing",
  "triomphe",
+ "typed-arena",
 ]
 
 [[package]]
@@ -12221,6 +12383,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "pathsearch"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da983bc5e582ab17179c190b4b66c7d76c5943a69c6d34df2a2b6bf8a2977b05"
+dependencies = [
+ "anyhow",
+ "libc",
+]
+
+[[package]]
 name = "pbjson"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12512,6 +12684,12 @@ name = "pkg-config"
 version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69d3587f8a9e599cc7ec2c00e331f71c4e69a5f9a4b8a6efd5b07466b9736f9a"
+
+[[package]]
+name = "platforms"
+version = "3.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "626dec3cac7cc0e1577a2ec3fc496277ec2baa084bebad95bb6fdbfae235f84c"
 
 [[package]]
 name = "plotters"
@@ -13016,11 +13194,11 @@ dependencies = [
 [[package]]
 name = "processor"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "ahash 0.8.8",
  "anyhow",
- "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c)",
+ "aptos-moving-average 0.1.0 (git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352)",
  "aptos-protos 1.3.0 (git+https://github.com/aptos-labs/aptos-core.git?rev=5d1cefad0ea0d37fb08e9aec7847080745c83f9c)",
  "async-trait",
  "base64 0.13.1",
@@ -14349,9 +14527,8 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.38.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b3c585a1ced6b97ac13bd5e56f66559e5a75f477da5913f70df98e114518446"
+version = "0.39.0"
+source = "git+https://github.com/banool/self_update.git?rev=65916eade8b37e90ea5778c62592f20614b56627#65916eade8b37e90ea5778c62592f20614b56627"
 dependencies = [
  "hyper",
  "indicatif 0.17.7",
@@ -14365,6 +14542,7 @@ dependencies = [
  "tempfile",
  "urlencoding",
  "zip",
+ "zipsign-api",
 ]
 
 [[package]]
@@ -14625,7 +14803,7 @@ dependencies = [
 [[package]]
 name = "server-framework"
 version = "1.0.0"
-source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d5dc7a003c655bdbd30233a8e9076796cceae72c#d5dc7a003c655bdbd30233a8e9076796cceae72c"
+source = "git+https://github.com/aptos-labs/aptos-indexer-processors.git?rev=d44b2d209f57872ac593299c34751a5531b51352#d44b2d209f57872ac593299c34751a5531b51352"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -14977,6 +15155,8 @@ dependencies = [
  "aptos-consensus",
  "aptos-crypto",
  "aptos-db",
+ "aptos-debugger",
+ "aptos-dkg",
  "aptos-faucet-core",
  "aptos-forge",
  "aptos-framework",
@@ -15006,16 +15186,19 @@ dependencies = [
  "base64 0.13.1",
  "bcs 0.1.4",
  "diesel",
+ "digest 0.9.0",
  "futures",
  "hex",
  "hyper",
  "move-core-types",
+ "num-traits",
  "num_cpus",
  "once_cell",
  "proptest",
  "rand 0.7.3",
  "regex",
  "reqwest",
+ "serde",
  "serde_json",
  "serde_yaml 0.8.26",
  "tokio",
@@ -17247,7 +17430,7 @@ name = "x25519-dalek"
 version = "1.2.0"
 source = "git+https://github.com/aptos-labs/x25519-dalek?branch=zeroize_v1#762a9501668d213daa4a1864fa1f9db22716b661"
 dependencies = [
- "curve25519-dalek",
+ "curve25519-dalek 3.2.0",
  "rand_core 0.5.1",
  "zeroize",
 ]
@@ -17373,6 +17556,16 @@ dependencies = [
  "crossbeam-utils",
  "flate2",
  "time",
+]
+
+[[package]]
+name = "zipsign-api"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ba5aa1827d6b1a35a29b3413ec69ce5f796e4d897e3e5b38f461bef41d225ea"
+dependencies = [
+ "ed25519-dalek 2.1.1",
+ "thiserror",
 ]
 
 [[package]]

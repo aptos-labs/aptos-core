@@ -18,19 +18,19 @@ error: invalid access specifier: a wildcard cannot be followed by a non-wildcard
 12 │     fun f3() acquires 0x42::*::S {
    │                       ^^^^^^^^^^^
 
-error: undeclared `m::y`
+error: undeclared `y`
    ┌─ tests/checking/access_specifiers/access_err.move:18:35
    │
 18 │     fun f5(x: address) acquires *(y) {
    │                                   ^
 
-error: undeclared `m::y`
+error: undeclared `y`
    ┌─ tests/checking/access_specifiers/access_err.move:21:51
    │
 21 │     fun f6(x: address) acquires *(make_up_address(y)) {
    │                                                   ^
 
-error: expected `address` but found `u64`
+error: cannot pass `u64` to a function which expects argument of type `address`
    ┌─ tests/checking/access_specifiers/access_err.move:24:30
    │
 24 │     fun f7(x: u64) acquires *(make_up_address_wrong(x)) {

@@ -132,6 +132,7 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
+    "keyless/pepper/common", "keyless/pepper/example-client-rust", "keyless/pepper/service",
     "mempool",
     "network/benchmark",
     "network/builder",
@@ -180,7 +181,6 @@ members = [
     "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
-
     # third_party/move
     "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
@@ -384,6 +384,8 @@ aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
+aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
+aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
 aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "protos/rust" }
@@ -544,7 +546,7 @@ group = "0.13"
 guppy = "0.17.0"
 handlebars = "4.2.2"
 heck = "0.4.1"
-hex = "0.4.3"
+hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.10.0"
 hostname = "0.3.1"
 http = "0.2.9"
@@ -565,6 +567,7 @@ jemallocator = { version = "0.5.0", features = [
 jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
+jwt = "0.16.0"
 lazy_static = "1.4.0"
 libc = "0.2.147"
 libfuzzer-sys = "0.4.6"
@@ -597,6 +600,7 @@ sec1 = "0.7.0"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+pathsearch = "0.2.0"
 passkey-authenticator = { version = "0.2.0", features = ["testable"] }
 passkey-client = { version = "0.2.0" }
 passkey-types = { version = "0.2.0" }

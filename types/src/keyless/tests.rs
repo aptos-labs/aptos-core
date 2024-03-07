@@ -1,11 +1,10 @@
 // Copyright © Aptos Foundation
 
 use crate::keyless::{
-    base64url_encode_str,
     bn254_circom::get_public_inputs_hash,
     circuit_testcases::*,
     test_utils::{get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk},
-    Configuration, ZkpOrOpenIdSig, DEVNET_VERIFICATION_KEY,
+    Configuration, EphemeralCertificate, DEVNET_VERIFICATION_KEY,
 };
 use std::ops::{AddAssign, Deref};
 
@@ -15,9 +14,9 @@ fn test_keyless_groth16_proof_verification() {
     let config = Configuration::new_for_devnet();
 
     let (zk_sig, zk_pk) = get_sample_groth16_sig_and_pk();
-    let proof = match &zk_sig.sig {
-        ZkpOrOpenIdSig::Groth16Zkp(proof) => proof.clone(),
-        ZkpOrOpenIdSig::OpenIdSig(_) => panic!("Internal inconsistency"),
+    let proof = match &zk_sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(proof) => proof.clone(),
+        EphemeralCertificate::OpenIdSig(_) => panic!("Internal inconsistency"),
     };
 
     let public_inputs_hash = get_public_inputs_hash(&zk_sig, &zk_pk, &SAMPLE_JWK, &config).unwrap();
@@ -28,7 +27,7 @@ fn test_keyless_groth16_proof_verification() {
     );
 
     proof
-        .verify_proof(public_inputs_hash, DEVNET_VERIFICATION_KEY.deref())
+        .verify_groth16_proof(public_inputs_hash, DEVNET_VERIFICATION_KEY.deref())
         .unwrap();
 }
 
@@ -38,17 +37,17 @@ fn test_keyless_oidc_sig_verifies() {
     let config = Configuration::new_for_testing();
     let (sig, pk) = get_sample_openid_sig_and_pk();
 
-    let oidc_sig = match &sig.sig {
-        ZkpOrOpenIdSig::Groth16Zkp(_) => panic!("Internal inconsistency"),
-        ZkpOrOpenIdSig::OpenIdSig(oidc_sig) => oidc_sig.clone(),
+    let oidc_sig = match &sig.cert {
+        EphemeralCertificate::ZeroKnowledgeSig(_) => panic!("Internal inconsistency"),
+        EphemeralCertificate::OpenIdSig(oidc_sig) => oidc_sig.clone(),
     };
 
     oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap();
 
     oidc_sig
-        .verify_jwt_signature(&SAMPLE_JWK, &sig.jwt_header_b64)
+        .verify_jwt_signature(&SAMPLE_JWK, &sig.jwt_header_json)
         .unwrap();
 
     // Maul the pepper; verification should fail
@@ -57,7 +56,7 @@ fn test_keyless_oidc_sig_verifies() {
     assert_ne!(bad_oidc_sig.pepper, oidc_sig.pepper);
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("IDC verification failed"));
 
@@ -77,11 +76,10 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.sub = format!("{}+1", SAMPLE_JWT_PARSED.oidc_claims.sub);
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("IDC verification failed"));
 
@@ -89,11 +87,10 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.nonce = "bad nonce".to_string();
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("'nonce' claim"));
 
@@ -101,11 +98,10 @@ fn test_keyless_oidc_sig_verifies() {
     let mut bad_oidc_sig = oidc_sig.clone();
     let mut jwt = SAMPLE_JWT_PARSED.clone();
     jwt.oidc_claims.iss = "bad iss".to_string();
-    bad_oidc_sig.jwt_payload_b64 =
-        base64url_encode_str(serde_json::to_string(&jwt).unwrap().as_str());
+    bad_oidc_sig.jwt_payload_json = serde_json::to_string(&jwt).unwrap();
 
     let e = bad_oidc_sig
-        .verify_jwt_claims(sig.exp_timestamp_secs, &sig.ephemeral_pubkey, &pk, &config)
+        .verify_jwt_claims(sig.exp_date_secs, &sig.ephemeral_pubkey, &pk, &config)
         .unwrap_err();
     assert!(e.to_string().contains("'iss' claim "));
 }

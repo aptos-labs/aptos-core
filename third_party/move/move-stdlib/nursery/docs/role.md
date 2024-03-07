@@ -1,5 +1,5 @@
 
-<a name="0x1_role"></a>
+<a id="0x1_role"></a>
 
 # Module `0x1::role`
 
@@ -20,7 +20,7 @@ A generic module for role-based access control (RBAC).
 
 
 
-<a name="0x1_role_Role"></a>
+<a id="0x1_role_Role"></a>
 
 ## Resource `Role`
 
@@ -47,12 +47,12 @@ A generic module for role-based access control (RBAC).
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_role_EROLE"></a>
+<a id="0x1_role_EROLE"></a>
 
 
 
@@ -61,7 +61,7 @@ A generic module for role-based access control (RBAC).
 
 
 
-<a name="0x1_role_assign_role"></a>
+<a id="0x1_role_assign_role"></a>
 
 ## Function `assign_role`
 
@@ -88,7 +88,7 @@ expected to be a function of the module that defines <code>Type</code>.
 
 </details>
 
-<a name="0x1_role_revoke_role"></a>
+<a id="0x1_role_revoke_role"></a>
 
 ## Function `revoke_role`
 
@@ -115,7 +115,7 @@ expected to be a function of the module that defines <code>Type</code>.
 
 </details>
 
-<a name="0x1_role_has_role"></a>
+<a id="0x1_role_has_role"></a>
 
 ## Function `has_role`
 
@@ -140,7 +140,7 @@ Return true iff the address has the role.
 
 </details>
 
-<a name="0x1_role_assert_has_role"></a>
+<a id="0x1_role_assert_has_role"></a>
 
 ## Function `assert_has_role`
 
