@@ -197,6 +197,7 @@ Abort if no DKG is in progress.
     <b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">gas_schedule::GasScheduleV2</a>&gt;;
     <b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="execution_config.md#0x1_execution_config_ExecutionConfig">execution_config::ExecutionConfig</a>&gt;;
     <b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="consensus_config.md#0x1_consensus_config_ConsensusConfig">consensus_config::ConsensusConfig</a>&gt;;
+    <b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="jwks.md#0x1_jwks_SupportedOIDCProviders">jwks::SupportedOIDCProviders</a>&gt;;
     <b>aborts_if</b> <b>false</b>;
 }
 </code></pre>
@@ -214,8 +215,7 @@ Abort if no DKG is in progress.
 
 
 
-<pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> verify_duration_estimate = 600;
+<pre><code><b>pragma</b> verify_duration_estimate = 600;
 <b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">FinishRequirement</a>;
 <b>requires</b> <a href="dkg.md#0x1_dkg_has_incomplete_session">dkg::has_incomplete_session</a>();
 <b>aborts_if</b> <b>false</b>;

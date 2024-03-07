@@ -119,7 +119,7 @@ impl DKGSessionState {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGState {
     pub last_completed: Option<DKGSessionState>,
-    pub incomplete: Option<DKGSessionState>,
+    pub in_progress: Option<DKGSessionState>,
 }
 
 impl DKGState {
