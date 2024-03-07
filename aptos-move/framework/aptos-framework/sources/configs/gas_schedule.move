@@ -4,7 +4,6 @@ module aptos_framework::gas_schedule {
     use std::error;
     use std::string::String;
     use std::vector;
-    use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;

@@ -546,7 +546,7 @@ module aptos_framework::aptos_governance {
     ///
     /// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
     /// since such updates are applied whenever we enter an new epoch.
-    public fun reconfigure(aptos_framework: &signer) {
+    public entry fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         if (consensus_config::validator_txn_enabled() && features::reconfigure_with_dkg_enabled()) {
             reconfiguration_with_dkg::try_start();
@@ -561,9 +561,16 @@ module aptos_framework::aptos_governance {
     ///
     /// WARNING: currently only used by tests. In most cases you should use `reconfigure()` instead.
     /// TODO: migrate these tests to be aware of async reconfiguration.
-    public fun force_end_epoch(aptos_framework: &signer) {
+    public entry fun force_end_epoch(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
         reconfiguration_with_dkg::finish(aptos_framework);
+    }
+
+    /// `force_end_epoch()` but run as admin.
+    public entry fun force_end_epoch_by_admin(admin: &signer) acquires GovernanceResponsbility {
+        let core_signer = get_signer_testnet_only(admin, @0x1);
+        system_addresses::assert_aptos_framework(&core_signer);
+        reconfiguration_with_dkg::finish(&core_signer);
     }
 
     /// Update feature flags and also trigger reconfiguration.
