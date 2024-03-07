@@ -15,7 +15,7 @@ use anyhow::{bail, Context, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::time::{Duration, Instant};
 
@@ -88,6 +88,7 @@ pub async fn emit_transactions_with_cluster(
         &args.transaction_phases,
         args.module_working_set_size.unwrap_or(1),
         args.sender_use_account_pool.unwrap_or(false),
+        WorkflowProgress::when_done_default(),
     );
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
