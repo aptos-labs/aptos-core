@@ -77,15 +77,15 @@ impl BatchCoordinator {
                 .iter()
                 .map(|persisted_value| persisted_value.batch_info().clone())
                 .collect();
-            let _ = sender_to_proof_manager
-                .send(ProofManagerCommand::ReceiveBatches(batches))
-                .await;
             let signed_batch_infos = batch_store.persist(persist_requests);
             if !signed_batch_infos.is_empty() {
                 network_sender
                     .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
                     .await;
             }
+            let _ = sender_to_proof_manager
+                .send(ProofManagerCommand::ReceiveBatches(batches))
+                .await;
         });
     }
 
