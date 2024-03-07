@@ -279,7 +279,7 @@ of the hash function).
 
 
 <pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_next_32_bytes">next_32_bytes</a>(): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; <b>acquires</b> <a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a> {
-    <b>assert</b>!(<a href="randomness.md#0x1_randomness_is_safe_call">is_safe_call</a>(), <a href="randomness.md#0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT">E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT</a>);
+    <b>assert</b>!(<a href="randomness.md#0x1_randomness_is_unbiasable">is_unbiasable</a>(), <a href="randomness.md#0x1_randomness_E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT">E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT</a>);
 
     <b>let</b> input = <a href="randomness.md#0x1_randomness_DST">DST</a>;
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>borrow_global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
@@ -1074,7 +1074,7 @@ function as its payload.
 <pre><code><b>schema</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a> {
     <b>let</b> <a href="randomness.md#0x1_randomness">randomness</a> = <b>global</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(<a href="randomness.md#0x1_randomness">randomness</a>.seed);
-    <b>aborts_if</b> !<a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>();
+    <b>aborts_if</b> !<a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>();
     <b>aborts_if</b> !<b>exists</b>&lt;<a href="randomness.md#0x1_randomness_PerBlockRandomness">PerBlockRandomness</a>&gt;(@aptos_framework);
 }
 </code></pre>
@@ -1339,16 +1339,16 @@ function as its payload.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> [abstract] <b>false</b>;
-<b>ensures</b> [abstract] result == <a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>();
+<b>ensures</b> [abstract] result == <a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>();
 </code></pre>
 
 
 
 
-<a id="0x1_randomness_spec_is_safe_call"></a>
+<a id="0x1_randomness_spec_is_unbiasable"></a>
 
 
-<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_is_safe_call">spec_is_safe_call</a>(): bool;
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_spec_is_unbiasable">spec_is_unbiasable</a>(): bool;
 </code></pre>
 
 

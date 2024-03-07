@@ -19,7 +19,7 @@ use crate::{
     transaction_metadata::TransactionMetadata,
     transaction_validation, verifier,
     verifier::randomness::is_entry_function_unbiasable,
-    zkid_validation, VMExecutor, VMValidator,
+    VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
@@ -738,27 +738,28 @@ impl AptosVM {
                 module_id.name(),
             )])?;
         }
-    
+
         let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
-            script_fn.module(),
-            script_fn.function(),
-            script_fn.ty_args(),
+            entry_fn.module(),
+            entry_fn.function(),
+            entry_fn.ty_args(),
         )?;
 
-        if is_friend_or_private && is_entry_function_unbiasable(session, script_fn)? {
+        if is_friend_or_private && is_entry_function_unbiasable(session, entry_fn)? {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();
             txn_context.mark_unbiasable();
         }
 
-        let struct_constructors = self.features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
+        let struct_constructors_enabled =
+            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             senders,
             entry_fn.args().to_vec(),
             &function,
-            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+            struct_constructors_enabled,
         )?;
         Ok(session.execute_entry_function(
             entry_fn.module(),

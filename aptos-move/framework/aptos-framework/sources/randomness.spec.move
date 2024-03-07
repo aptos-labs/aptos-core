@@ -55,7 +55,7 @@ spec aptos_framework::randomness {
     spec schema NextBlobAbortsIf {
         let randomness = global<PerBlockRandomness>(@aptos_framework);
         aborts_if option::spec_is_none(randomness.seed);
-        aborts_if !spec_is_safe_call();
+        aborts_if !spec_is_unbiasable();
         aborts_if !exists<PerBlockRandomness>(@aptos_framework);
     }
 

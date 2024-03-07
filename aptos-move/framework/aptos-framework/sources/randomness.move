@@ -69,16 +69,10 @@ module aptos_framework::randomness {
         }
     }
 
-<<<<<<< HEAD
     /// Generate the next 32 random bytes. Repeated calls will yield different results (assuming the collision-resistance
     /// of the hash function).
     fun next_32_bytes(): vector<u8> acquires PerBlockRandomness {
-        assert!(is_safe_call(), E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT);
-=======
-    /// Generate 32 random bytes.
-    public fun next_blob(): vector<u8> acquires PerBlockRandomness {
         assert!(is_unbiasable(), E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT);
->>>>>>> 0cd451167b (unify for is_safe call and add private deployement time checks)
 
         let input = DST;
         let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);

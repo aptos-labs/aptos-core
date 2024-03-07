@@ -352,7 +352,7 @@ impl<'r, 'l> Session<'r, 'l> {
 
     /// Note: Cannot return a `Function` struct here due to its `pub(crate)` visibility.
     pub fn load_function_and_is_friend_or_private_def(
-        &self,
+        &mut self,
         module_id: &ModuleId,
         function_name: &IdentStr,
         type_arguments: &[TypeTag],

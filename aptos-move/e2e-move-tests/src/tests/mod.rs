@@ -35,6 +35,7 @@ mod object_code_deployment;
 mod offer_rotation_capability;
 mod offer_signer_capability;
 mod per_category_gas_limits;
+mod randomness_test_and_abort;
 mod resource_groups;
 mod rotate_auth_key;
 mod scripts;
