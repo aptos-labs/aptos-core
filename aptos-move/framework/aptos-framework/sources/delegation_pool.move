@@ -790,7 +790,7 @@ module aptos_framework::delegation_pool {
         // allocate pending_inactive stake to staker, current operator, any previous operators still pending_inactive
         while (pool_u64_iterable::shareholders_count(&distribution_pool) > 0) {
             let recipients = pool_u64_iterable::shareholders(&distribution_pool);
-            let recipient = *vector::borrow(&mut recipients, 0);
+            let recipient = *vector::borrow(&recipients, 0);
             let current_shares = pool_u64_iterable::shares(&distribution_pool, recipient);
             let amount_to_distribute = pool_u64_iterable::redeem_shares(
                 &mut distribution_pool,
@@ -824,7 +824,7 @@ module aptos_framework::delegation_pool {
         };
 
         // set delegated voter of staker which takes effect immediately
-        initialize_staker_delegated_voter(staker, pool_address, staker_delegated_voter);
+        initialize_staker_delegated_voter(staker_address, pool_address, staker_delegated_voter);
     }
 
     #[view]
@@ -1305,11 +1305,12 @@ module aptos_framework::delegation_pool {
     /// Set delegated voter of staker when initializing a delegation pool from a staking contract. This change applies
     /// instantly without waiting a lockup cycle.
     fun initialize_staker_delegated_voter(
-        staker: &signer,
+        staker_address: address,
         pool_address: address,
         voter: address
     ) acquires DelegationPool, GovernanceRecords {
-        let staker_address = signer::address_of(staker);
+        assert_partial_governance_voting_enabled(pool_address);
+
         let delegation_pool = borrow_global<DelegationPool>(pool_address);
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
         let last_locked_until_secs = stake::get_lockup_secs(pool_address);
@@ -4431,6 +4432,282 @@ module aptos_framework::delegation_pool {
     public entry fun test_get_expected_stake_pool_address(staker: address) {
         let pool_address = get_expected_stake_pool_address(staker, vector[0x42, 0x42]);
         assert!(pool_address == @0xe9fc2fbb82b7e1cb7af3daef8c7a24e66780f9122d15e4f1d486ee7c7c36c48d, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234)]
+    /// Produce rewards for staker and operator, but do not request commission by the time of conversion.
+    public entry fun test_initialize_from_staking_contract_scenario_1(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(aptos_framework);
+        // conversion would fail when setting staker's delegated voter unless partial voting is supported
+        features::change_feature_flags(
+            aptos_framework,
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting()
+            ],
+            vector[],
+        );
+        staking_contract::setup_staking_contract(
+            aptos_framework,
+            staker,
+            operator,
+            1_000_000 * ONE_APT,
+            20
+        );
+
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = staking_contract::stake_pool_address(staker_address, operator_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        let (total_active_stake, accumulated_rewards, commission_amount) =
+            staking_contract::staking_contract_amounts(staker_address, operator_address);
+        assert!(total_active_stake == 101000000000000, total_active_stake);
+        assert!(accumulated_rewards == 1000000000000, accumulated_rewards);
+        assert!(commission_amount == 200000000000, commission_amount);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        let (total_active_stake, accumulated_rewards, commission_amount) =
+            staking_contract::staking_contract_amounts(staker_address, operator_address);
+        assert!(total_active_stake == 102010000000000, total_active_stake);
+        assert!(accumulated_rewards == 2010000000000, accumulated_rewards);
+        assert!(commission_amount == 402000000000, commission_amount);
+
+        // Destroying the staking contract trigger `staking_contract::request_commission`.
+        initialize_delegation_pool_from_staking_contract(staker, operator_address);
+
+        // commission has been extracted from active stake, unlocked and allocated to operator
+        assert_delegation(staker_address, pool_address, 102010000000000 - 402000000000, 0, 0);
+        assert_delegation(operator_address, pool_address, 0, 0, 402000000000);
+        assert_pending_withdrawal(operator_address, pool_address, true, 0, false, 402000000000);
+        stake::assert_stake_pool(pool_address, 102010000000000 - 402000000000, 0, 0, 402000000000);
+
+        // Unlock pending distribution.
+        stake::fast_forward_to_unlock(pool_address);
+        assert_delegation(
+            operator_address,
+            pool_address,
+            // active commission produced since delegation pool creation
+            ((102010000000000 - 402000000000) * 1 / 100) * 20 / 100,
+            // pending-inactive commission produced rewards itself one more epoch before being inactivated
+            402000000000 + 402000000000 * 1 / 100,
+            0
+        );
+
+        // Check that inactive distribution can be withdrawn.
+        synchronize_delegation_pool(pool_address);
+        assert_pending_withdrawal(operator_address, pool_address, true, 0, true, 402000000000 + 402000000000 * 1 / 100);
+
+        let balance = coin::balance<AptosCoin>(operator_address);
+        withdraw(operator, pool_address, 406020000000);
+        assert!(
+            coin::balance<AptosCoin>(operator_address) == balance + 406020000000,
+            coin::balance<AptosCoin>(operator_address)
+        );
+        assert_delegation(
+            operator_address,
+            pool_address,
+            ((102010000000000 - 402000000000) * 1 / 100) * 20 / 100 - 1,
+            0,
+            0
+        );
+        assert_pending_withdrawal(operator_address, pool_address, false, 0, false, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234)]
+    /// Produce rewards for staker and operator, request commission and wait for it to become inactive, but do not
+    /// distribute (withdraw) by the time of conversion.
+    public entry fun test_initialize_from_staking_contract_scenario_2(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(aptos_framework);
+        // conversion would fail when setting staker's delegated voter unless partial voting is supported
+        features::change_feature_flags(
+            aptos_framework,
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting()
+            ],
+            vector[],
+        );
+        staking_contract::setup_staking_contract(
+            aptos_framework,
+            staker,
+            operator,
+            1_000_000 * ONE_APT,
+            20
+        );
+
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = staking_contract::stake_pool_address(staker_address, operator_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        let (total_active_stake, accumulated_rewards, commission_amount) =
+            staking_contract::staking_contract_amounts(staker_address, operator_address);
+        assert!(total_active_stake == 101000000000000, total_active_stake);
+        assert!(accumulated_rewards == 1000000000000, accumulated_rewards);
+        assert!(commission_amount == 200000000000, commission_amount);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        let (total_active_stake, accumulated_rewards, commission_amount) =
+            staking_contract::staking_contract_amounts(staker_address, operator_address);
+        assert!(total_active_stake == 102010000000000, total_active_stake);
+        assert!(accumulated_rewards == 2010000000000, accumulated_rewards);
+        assert!(commission_amount == 402000000000, commission_amount);
+
+        // Request commission for operator.
+        staking_contract::request_commission(operator, staker_address, operator_address);
+
+        let (total_active_stake, accumulated_rewards, commission_amount) =
+            staking_contract::staking_contract_amounts(staker_address, operator_address);
+        assert!(total_active_stake == 102010000000000 - 402000000000, total_active_stake);
+        assert!(accumulated_rewards == 0, accumulated_rewards);
+        assert!(commission_amount == 0, commission_amount);
+        assert!(staking_contract::pending_distribution_counts(staker_address, operator_address) == 1, 0);
+        staking_contract::assert_distribution(staker_address, operator_address, operator_address, 402000000000);
+
+        // Unlock pending distribution.
+        stake::fast_forward_to_unlock(pool_address);
+
+        let (total_active_stake, accumulated_rewards, commission_amount) =
+            staking_contract::staking_contract_amounts(staker_address, operator_address);
+        // (102010000000000 - 402000000000) + (102010000000000 - 402000000000) * 1 / 100
+        assert!(total_active_stake == 102624080000000, total_active_stake);
+        // (102010000000000 - 402000000000) * 1 / 100
+        assert!(accumulated_rewards == 1016080000000, accumulated_rewards);
+        // (102010000000000 - 402000000000) * 1 / 100 * 20 / 100
+        assert!(commission_amount == 203216000000, commission_amount);
+
+        // commission earned previous lockup is now inactive, but not withdrawn
+        // commission earned current lockup is pending_inactive, but not distributed to operator
+        staking_contract::assert_distribution(staker_address, operator_address, operator_address, 402000000000);
+        stake::assert_stake_pool(pool_address, 102624080000000, 402000000000 + 402000000000 * 1 / 100, 0, 0);
+
+        let balance = coin::balance<AptosCoin>(operator_address);
+        // Destroying the staking contract triggers `distribute` + `request commission`.
+        initialize_delegation_pool_from_staking_contract(staker, operator_address);
+
+        assert!(
+            // previous pending_inactive commission produced rewards one more epoch before inactivation
+            coin::balance<AptosCoin>(operator_address) == balance + 402000000000 + 402000000000 * 1 / 100,
+            coin::balance<AptosCoin>(operator_address)
+        );
+        assert_delegation(operator_address, pool_address, 0, 0, 203216000000);
+        assert_pending_withdrawal(operator_address, pool_address, true, 0, false, 203216000000);
+        assert_delegation(staker_address, pool_address, 102624080000000 - 203216000000, 0, 0);
+        stake::assert_stake_pool(pool_address, 102624080000000 - 203216000000, 0, 0, 203216000000);
+    }
+
+    #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234)]
+    public entry fun test_initialize_from_staking_contract_validate_configs(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolOwnership {
+        initialize_for_test(aptos_framework);
+        // conversion would fail when setting staker's delegated voter unless partial voting is supported
+        features::change_feature_flags(
+            aptos_framework,
+            vector[
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting()
+            ],
+            vector[],
+        );
+        staking_contract::setup_staking_contract(
+            aptos_framework,
+            staker,
+            operator,
+            1_000_000 * ONE_APT,
+            20
+        );
+
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = staking_contract::stake_pool_address(staker_address, operator_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Staker sets a different voter than themselves on the staking contract.
+        let staker_voter = @0x345;
+        staking_contract::update_voter(staker, operator_address, staker_voter);
+
+        // Operator sets a different beneficiary than themselves on all staking contracts.
+        let operator_beneficiary_staking_contracts = @0x456;
+        staking_contract::set_beneficiary_for_operator(operator, operator_beneficiary_staking_contracts);
+        // Operator sets a different beneficiary than themselves on all delegation pool.
+        let operator_beneficiary_delegation_pools = @0x567;
+        set_beneficiary_for_operator(operator, operator_beneficiary_delegation_pools);
+
+        initialize_delegation_pool_from_staking_contract(staker, operator_address);
+
+        // Delegation pool has been created.
+        assert_delegation_pool_exists(pool_address);
+        assert!(
+            pool_address == account::get_signer_capability_address(
+                &borrow_global<DelegationPool>(pool_address).stake_pool_signer_cap
+            ),
+            0
+        );
+
+        // Validator remains in active state.
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Staker is the owner of the delegation pool.
+        assert!(pool_address == get_owned_pool_address(staker_address), 0);
+        // Operator is preserved.
+        assert!(operator_address == stake::get_operator(pool_address), 0);
+        // Operator commission fee is preserved.
+        assert!(operator_commission_percentage(pool_address) == 2000, 0);
+
+        // Partial voting is enabled and staker's voter is preserved.
+        assert_partial_governance_voting_enabled(pool_address);
+        assert!(calculate_and_update_delegator_voter(pool_address, staker_address) == staker_voter, 0);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, staker_address) == 0, 0);
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, staker_voter) == 1_000_000 * ONE_APT, 0);
+
+        // Operator's beneficiary configured on the delegation pool module is used.
+        assert!(beneficiary_for_operator(operator_address) == operator_beneficiary_delegation_pools, 0);
+        assert!(beneficiary_for_operator(operator_address) != operator_beneficiary_staking_contracts, 0);
+
+        // There is no remaining inactive stake on the stake pool.
+        let (_, inactive, _, _) = stake::get_stake(pool_address);
+        assert!(inactive == 0, 0);
+        assert!(total_coins_inactive(pool_address) == 0, 0);
+        assert!(observed_lockup_cycle(pool_address) == 0, 0);
+
+        // Active stake is consistently owned.
+        stake::assert_stake_pool(pool_address, 1_000_000 * ONE_APT, 0, 0, 0);
+        assert_delegation(staker_address, pool_address, 1_000_000 * ONE_APT, 0, 0);
+        assert_delegation(operator_address, pool_address, 0, 0, 0);
     }
 
     #[test_only]
