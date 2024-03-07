@@ -210,14 +210,14 @@ pub static APTOS_NETWORK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
 pub fn rpc_message_bytes(
     network_id: NetworkId,
     protocol_id: &'static str, // ProtocolId.as_str() or "unk"
-    role_type: RoleType,
+    role_type: &'static str, // RoleType.as_str() or "unk"
     message_type_label: &'static str,
     message_direction_label: &'static str,
     state_label: &'static str,
     data_len: u64,
 ) {
     let values = &[
-        role_type.as_str(),
+        role_type,
         network_id.as_str(),
         protocol_id,
         message_type_label,
@@ -664,20 +664,20 @@ pub fn start_serialization_timer(protocol_id: ProtocolId, operation: &str) -> Hi
 }
 
 
-pub static NETWORK_BCS_ENCODE_NANOS: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_network_bcs_encode_nanos", "Nanoseconds spent encoding outbound messages").unwrap()
-});
-pub static NETWORK_BCS_ENCODE_BYTES: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_network_bcs_encode_bytes", "Bytes of outbound messages as encoded").unwrap()
-});
-pub static NETWORK_BCS_ENCODES: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!("aptos_network_bcs_encodes", "Number of outbound messages encoded").unwrap()
-});
-pub fn bcs_encode_count(length: usize, dt: Duration) {
-    NETWORK_BCS_ENCODE_NANOS.inc_by(dt.as_nanos() as u64);
-    NETWORK_BCS_ENCODE_BYTES.inc_by(length as u64);
-    NETWORK_BCS_ENCODES.inc();
-}
+// pub static NETWORK_BCS_ENCODE_NANOS: Lazy<IntCounter> = Lazy::new(|| {
+//     register_int_counter!("aptos_network_bcs_encode_nanos", "Nanoseconds spent encoding outbound messages").unwrap()
+// });
+// pub static NETWORK_BCS_ENCODE_BYTES: Lazy<IntCounter> = Lazy::new(|| {
+//     register_int_counter!("aptos_network_bcs_encode_bytes", "Bytes of outbound messages as encoded").unwrap()
+// });
+// pub static NETWORK_BCS_ENCODES: Lazy<IntCounter> = Lazy::new(|| {
+//     register_int_counter!("aptos_network_bcs_encodes", "Number of outbound messages encoded").unwrap()
+// });
+// pub fn bcs_encode_count(length: usize, dt: Duration) {
+//     NETWORK_BCS_ENCODE_NANOS.inc_by(dt.as_nanos() as u64);
+//     NETWORK_BCS_ENCODE_BYTES.inc_by(length as u64);
+//     NETWORK_BCS_ENCODES.inc();
+// }
 
 pub static APTOS_NETWORK_INBOUND_QUEUE_DELAY: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(

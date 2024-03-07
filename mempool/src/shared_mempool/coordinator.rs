@@ -42,7 +42,8 @@ use std::{
 };
 use tokio::{runtime::Handle, time::interval};
 use tokio_stream::wrappers::{IntervalStream, ReceiverStream};
-use aptos_network2::protocols::network::network_event_prefetch;
+// use aptos_network2::protocols::network::network_event_prefetch;
+use aptos_network2::protocols::network::network_event_prefetch_parallel;
 
 /// Coordinator that handles inbound network events and outbound txn broadcasts.
 pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvider>(
@@ -78,7 +79,8 @@ pub(crate) async fn coordinator<NetworkClient, TransactionValidator, ConfigProvi
     let bounded_executor = BoundedExecutor::new(workers_available, executor.clone());
 
     let (event_tx, event_rx) = tokio::sync::mpsc::channel(10); // TODO: configurable prefetch size other than 10?
-    executor.spawn(network_event_prefetch(network_events, event_tx));
+    // executor.spawn(network_event_prefetch(network_events, event_tx));
+    executor.spawn(network_event_prefetch_parallel(network_events, event_tx, 4));
     let mut network_events = ReceiverStream::new(event_rx).fuse();
 
     let initial_reconfig = mempool_reconfig_events

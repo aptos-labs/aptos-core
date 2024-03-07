@@ -2925,6 +2925,7 @@ dependencies = [
  "aptos-short-hex-str",
  "aptos-time-service",
  "aptos-types",
+ "async-channel 1.9.0",
  "async-trait",
  "bcs 0.1.4",
  "bytes",

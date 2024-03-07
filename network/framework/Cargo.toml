@@ -27,6 +27,7 @@ aptos-runtimes = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
+async-channel = { workspace = true }
 async-trait = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }

@@ -18,11 +18,12 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Add;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::Mutex;
 use tokio_stream::wrappers::ReceiverStream;
 use aptos_config::network_id::{NetworkContext, NetworkId, PeerNetworkId};
 use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RequestId, RpcRequest, RpcResponse};
@@ -220,13 +221,407 @@ impl<TMessage: Message + Unpin> NewNetworkEvents for NetworkEvents<TMessage> {
     }
 }
 
-impl<TMessage: Message + Unpin> NetworkEvents<TMessage> {
+/// Result from processing a ReceivedMessage
+struct OutboundEvent<TMessage> {
+    msg: Option<Event<TMessage>>,
+    index: u32,
+}
+
+/// It's like a TCP window allowing for out of order packet arrival, sending when the 'next' packet is ready.
+struct OutboundEventRingBuffer<TMessage> {
+    event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
+    nthreads: u32,
+    held_outputs: Vec<OutboundEvent<TMessage>>,
+    next: u32,
+}
+
+impl<TMessage> OutboundEventRingBuffer<TMessage> {
+    fn new(
+        event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
+        nthreads: u32,
+    ) -> Self {
+        Self {
+            event_tx,
+            nthreads,
+            held_outputs: Vec::with_capacity(nthreads as usize),
+            next: 0,
+        }
+    }
+
+    /// Put an event to send in sequence.
+    /// Should put None for a message that was dropped.
+    /// Returns number of messages sent to sink.
+    async fn put(&mut self, msg: Option<Event<TMessage>>, index: u32) -> u32 {
+        // Put into ring buffer with open slots for the next {nthreads} results.
+        // Window moves forwards as front end at {next} is ready.
+        // | next | next + 1 | next + 2 | ... | next + nthreads -1 |
+        //
+        // Send on the outbound queue only blocks if it is full, in which case doing more
+        // work is pointless, so this is not a problem, just do blocking send().
+        let mut sent : u32 = 0;
+        let oi = (index % self.nthreads) as usize;
+        if index == self.next {
+            self.held_outputs[oi].index = self.next;
+            // send it immediately
+            if let Some(msg) = msg {
+                self.event_tx.send(msg).await; // TODO: error handling
+                sent += 1;
+            }
+            loop {
+                self.next += 1;
+                let oi = (self.next % self.nthreads) as usize;
+                let oe = &mut self.held_outputs[oi];
+                if oe.index == self.next {
+                    // another ready element to send
+                    if let Some(msg) = oe.msg.take() {
+                        self.event_tx.send(msg).await; // TODO: error handling
+                        sent += 1;
+                    }
+                } else {
+                    return sent;
+                }
+            }
+        }
+
+        // this math should handle u32 overflow
+        assert!(index - self.next < self.nthreads, "overflow, index {} > {} + {}", index, self.next, self.nthreads);
+
+        self.held_outputs[oi] = OutboundEvent {
+            msg,
+            index,
+        };
+        return 0;
+    }
+}
+
+fn process_received_message<TMessage: Message + Unpin + Send>(
+    // out: Arc<Mutex<OutboundEventRingBuffer<TMessage>>>,
+    wmsg: ReceivedMessage,
+    // label: &'static str,
+    label: String,
+    sender_source: Arc<std::sync::Mutex<PeerSenderCache>>,
+    // sender_source: &mut PeerSenderCache,
+    // nc_source: fn(network_id: &NetworkId) -> NetworkContext,
+    contexts: Arc<BTreeMap<NetworkId, NetworkContext>>,
+) -> Option<Event<TMessage>> {
+    match wmsg.message {
+        NetworkMessage::Error(err) => {
+            // We just drop error responses! TODO: never send them
+            // fall through, maybe get another
+            info!("app_int err msg discarded: {:?}", err);
+            //out.lock().await.put(None, index);
+            None
+        }
+        NetworkMessage::RpcRequest(request) => {
+            // let role_type = mself.contexts.get(&msg.sender.network_id()).unwrap().role();
+            let role_type = "unk";
+            // info!("app_int rpc_req {} id={}, {}b", request.protocol_id, request.request_id, request.raw_request.len());
+            let request_received_start = tokio::time::Instant::now();
+            let data_len = request.raw_request.len();
+            // Multi-core decoding protocol_id.from_bytes() is left as an exercise to the application code.
+            // The easiest approach is pipelining and introducing a short queue of decoded items inside the app, a thread continuously reads from this Stream and stores decoded objects in the app queue, this disconnects decoding from handling, allowing the app to do request handling work while a decode is happening in another thread.
+            // See network_event_prefetch below.
+            let app_msg = match request.protocol_id.from_bytes(request.raw_request.as_slice()) {
+                Ok(x) => { x },
+                Err(err) => {
+                    // mself.done = true;
+                    warn!("app_int rpc_req {} id={}; err {}, {} {} -> {}", request.protocol_id, request.request_id, err, label, request.raw_request.encode_hex_upper::<String>(), std::any::type_name::<TMessage>());
+                    counters::rpc_message_bytes(wmsg.sender.network_id(), request.protocol_id.as_str(), role_type, counters::REQUEST_LABEL, counters::INBOUND_LABEL, "err", data_len as u64);
+                    // TODO: BSC failed. log error, count error, close peer connection
+                    // out.lock().await.put(None, index);
+                    return None;
+                }
+            };
+            let rpc_id = request.request_id;
+            // setup responder oneshot channel
+            let (responder, response_reader) = oneshot::channel();
+            // let raw_sender = match sender_source.sender_for_peer(&wmsg.sender) {
+            let raw_sender = match sender_source.lock().unwrap().sender_for_peer(&wmsg.sender) {
+                None => {
+                    // peer disconnected in the moment between receiving message and here?
+                    warn!("app_int rpc_req no peer {} id={}", request.protocol_id, request.request_id);
+                    counters::rpc_message_bytes(wmsg.sender.network_id(), request.protocol_id.as_str(), role_type, counters::REQUEST_LABEL, counters::INBOUND_LABEL, "err", data_len as u64);
+                    // out.lock().await.put(None, index);
+                    return None;
+                }
+                Some(x) => x,
+            };
+            // when this spawned task reads from the response oneshot channel it will send it to the network peer
+            // let network_context = mself.contexts.get(&msg.sender.network_id()).unwrap();
+            let network_context = contexts.get(&wmsg.sender.network_id()).unwrap();
+            counters::pending_rpc_requests(request.protocol_id.as_str()).inc();
+            Handle::current().spawn(rpc_response_sender(response_reader, rpc_id, raw_sender, request_received_start, *network_context, request.protocol_id));
+            counters::rpc_message_bytes(wmsg.sender.network_id(), request.protocol_id.as_str(), role_type, counters::REQUEST_LABEL, counters::INBOUND_LABEL, "delivered", data_len as u64);
+            let event = Event::RpcRequest(
+                wmsg.sender, app_msg, request.protocol_id, responder);
+            // out.lock().await.put(Some(event), index);
+            Some(event)
+        }
+        NetworkMessage::RpcResponse(_) => {
+            unreachable!("NetworkMessage::RpcResponse should not arrive in NetworkEvents because it is handled by Peer and reconnected with oneshot there");
+        }
+        NetworkMessage::DirectSendMsg(message) => {
+            // Multi-core decoding protocol_id.from_bytes() is left as an exercise to the application code.
+            // The easiest approach is pipelining and introducing a short queue of decoded items inside the app, a thread continuously reads from this Stream and stores decoded objects in the app queue, this disconnects decoding from handling, allowing the app to do request handling work while a decode is happening in another thread.
+            // See network_event_prefetch below.
+            match message.protocol_id.from_bytes(message.raw_msg.as_slice()) {
+                Ok(app_msg) => {
+                    // out.lock().await.put(Some(Event::Message(wmsg.sender, app_msg)), index);
+                    // return Poll::Ready(Some(Event::Message(msg.sender, app_msg)));
+                    Some(Event::Message(wmsg.sender, app_msg))
+                },
+                Err(_) => {
+                    // TODO: BSC failed. log error, count error, close peer connection
+                    // out.lock().await.put(None, index);
+                    None
+                }
+            }
+        }
+    }
+}
+
+pub struct PeerSenderCache {
+    peer_senders: Arc<OutboundPeerConnections>,
+    pub peers: HashMap<PeerNetworkId, PeerStub>,
+    peers_generation: u32,
+}
+
+impl PeerSenderCache {
+    pub fn new(peer_senders: Arc<OutboundPeerConnections>) -> Self {
+        Self {
+            peer_senders,
+            peers: HashMap::new(),
+            peers_generation: 0,
+        }
+    }
+
+    pub fn update_peers(&mut self) {
+        if let Some((new_peers, new_generation)) = self.peer_senders.get_generational(self.peers_generation) {
+            self.peers_generation = new_generation;
+            self.peers.clear();
+            self.peers.extend(new_peers);
+        }
+    }
+
+    //sender_source: fn(peer_network_id: &PeerNetworkId) -> Option<tokio::sync::mpsc::Sender<(NetworkMessage,u64)>>,
+    pub fn sender_for_peer(&mut self, peer_network_id: &PeerNetworkId) -> Option<tokio::sync::mpsc::Sender<(NetworkMessage,u64)>> {
+        self.update_peers();
+        self.peers.get(peer_network_id).map(|stub| stub.sender.clone())
+    }
+}
+
+#[cfg(disabled)]
+async fn parallel_deserialization_worker<TMessage: Message + Unpin + Send>(
+    source: async_channel::Receiver<(ReceivedMessage,u32)>,
+    sink: tokio::sync::mpsc::Sender<(Option<Event<TMessage>>,u32)>,
+    label: String,
+    // sender_source: Arc<std::sync::Mutex<PeerSenderCache>>,
+    peer_senders: Arc<OutboundPeerConnections>,
+    contexts: Arc<BTreeMap<NetworkId, NetworkContext>>,
+) {
+    let mut sender_source = PeerSenderCache::new(peer_senders);
+    loop {
+        match source.recv().await {
+            Ok((msg, index)) => {
+                let xm = process_received_message(msg, label.clone(), &mut sender_source, contexts.clone());
+                if let Err(se) = sink.send((xm,index)).await {
+                    error!("parallel_deserialization_worker send err: {:?}", se);
+                    return;
+                }
+            }
+            Err(err) => {
+                error!("parallel_deserialization_worker exit: {:?}", err);
+                return;
+            }
+        }
+    }
+}
+
+async fn parallel_deserialization_collector<TMessage: Message + Unpin + Send>(
+    mut source: tokio::sync::mpsc::Receiver<(Option<Event<TMessage>>,u32)>,
+    releases: tokio::sync::mpsc::Sender<()>,
+    sink: tokio::sync::mpsc::Sender<Event<TMessage>>,
+    nthreads: u32,
+) {
+    let mut out = OutboundEventRingBuffer::new(sink, nthreads);
+    loop {
+        let (em,index) = match source.recv().await {
+            None => {
+                error!("parallel_deserialization_collector source None; exiting");
+                return;
+            }
+            Some((em,index)) => (em,index)
+        };
+        let sent = out.put(em, index).await;
+        if sent != 0 {
+            for i in 0..sent {
+                releases.send(()).await;
+            }
+        }
+    }
+}
+
+#[cfg(unused)]
+/// network_event_prefetch when spawned as a new tokio task decouples BCS deserialization an object handling allowing for parallelization.
+/// NetworkEvents Stream .next() does the work of BCS decode in this thread, another thread listening on the Receiver<Event<TMessage>> does the application work.
+/// This is the solution I think I want, but Rust thinks I need to make "TMessage: 'static" and I think I don't want that -- bolson 2024-03-07 09:02:20 EST
+pub async fn network_event_prefetch_parallel<TMessage: Message + Unpin + Send>(
+    mut network_events: NetworkEvents<TMessage>,
+    event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
+    nthreads: u32,
+    handle: Handle,
+) {
+// ) -> tokio::sync::mpsc::Receiver<Event<TMessage>> {
+    let (rm_sender, rm_receiver) = async_channel::bounded((nthreads*2) as usize);
+    let (collect_sender, collect_receiver) = tokio::sync::mpsc::channel((nthreads*2) as usize);
+    let (backpressure_sender, backpressure_receiver) = tokio::sync::mpsc::channel((nthreads*2) as usize);
+    // let (event_tx, event_rx) = tokio::sync::mpsc::channel((nthreads*2) as usize);
+    let peer_senders = network_events.peer_senders.clone();
+    let label = network_events.label.clone();
+    let contexts = network_events.contexts.clone();
+    handle.spawn(network_events.parallel_deserialization_input_stage(rm_sender, backpressure_receiver));
+    for _ in 0..nthreads {
+        handle.spawn(parallel_deserialization_worker(rm_receiver.clone(), collect_sender.clone(), label.clone(), peer_senders.clone(), contexts.clone()));
+    }
+    handle.spawn(parallel_deserialization_collector(collect_receiver, backpressure_sender, event_tx, nthreads));
+    // event_rx
+}
+
+#[cfg(disabled)]
+async fn process_received_message_op<TMessage: Message + Unpin + Send>(
+    // out: Arc<Mutex<OutboundEventRingBuffer<TMessage>>>,
+    wmsg: ReceivedMessage,
+    index: u32,
+    // label: &'static str,
+    label: String,
+    // peers: fn () -> HashMap<PeerNetworkId, PeerStub>,
+    // sender_source: fn(peer_network_id: &PeerNetworkId) -> Option<tokio::sync::mpsc::Sender<(NetworkMessage,u64)>>,
+    sender_source: Arc<std::sync::Mutex<PeerSenderCache>>,
+    // nc_source: fn(network_id: &NetworkId) -> NetworkContext,
+    contexts: Arc<BTreeMap<NetworkId, NetworkContext>>,
+    out : Arc<tokio::sync::Mutex<OutboundEventRingBuffer<TMessage>>>,
+) {
+    let xm = process_received_message(wmsg, label, sender_source, contexts);
+    out.lock().await.put(xm, index).await
+}
+
+impl<TMessage: Message + Unpin + Send> NetworkEvents<TMessage> {
     fn update_peers(&mut self) {
         if let Some((new_peers, new_generation)) = self.peer_senders.get_generational(self.peers_generation) {
             self.peers_generation = new_generation;
             self.peers.clear();
             self.peers.extend(new_peers);
         }
+    }
+
+    fn sender_for_peer(&mut self, peer_network_id: &PeerNetworkId) -> Option<tokio::sync::mpsc::Sender<(NetworkMessage,u64)>> {
+        self.update_peers();
+        self.peers.get(peer_network_id).map(|stub| stub.sender.clone())
+    }
+
+    /// spawn() this at head of parallel deserialization tasks
+    async fn parallel_deserialization_input_stage(
+        mut self,
+        sink: async_channel::Sender<(ReceivedMessage,u32)>,
+        mut releases: tokio::sync::mpsc::Receiver<()>,
+    ) {
+        loop {
+            let mut index : u32 = 0;
+            // wait for backpressure release (which will be primed with N entries)
+            if releases.recv().await.is_none() {
+                error!("parallel_deserialization_input_stage releases.next is None, exiting.");
+            }
+            match self.network_source.next().await {
+                Some(msg) => {
+                    if let Err(err) = sink.send((msg,index)).await {
+                        error!("parallel_deserialization_input_stage sink err (exiting): {:?}", err);
+                        return;
+                    }
+                    index = index + 1;
+                }
+                None => {
+                    error!("parallel_deserialization_input_stage network_source.next is None, exiting.");
+                    return;
+                }
+            }
+        }
+    }
+
+    /// spawn() this, takes ownerships of NetworkEvents
+    async fn parallel_deserialization(
+        mut self,
+        sink: tokio::sync::mpsc::Sender<Event<TMessage>>,
+        nthreads: usize,
+    ) {
+        let label = self.label.clone();
+        let contexts = self.contexts.clone();
+        let sender_source = Arc::new(std::sync::Mutex::new(PeerSenderCache::new(self.peer_senders)));
+        self.network_source.for_each_concurrent(
+            nthreads,
+            |msg| async {
+                let sink = sink.clone();
+                let xm = process_received_message(msg, label.clone(), sender_source.clone(), contexts.clone());
+                if let Some(em) = xm {
+                    sink.send(em).await; // TODO: error checking
+                }
+            }
+        ).await;
+    }
+
+    #[cfg(disabled)]
+    async fn wat(
+        &mut self,
+        // nthreads: u32,
+        // event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
+        out : Arc<tokio::sync::Mutex<OutboundEventRingBuffer<TMessage>>>,
+        peer_senders: Arc<OutboundPeerConnections>
+    ) {
+        let mut next_receive_msg_index : u32 = 0;
+        let handle = Handle::current();
+        // let out = Arc::new(Mutex::new(OutboundEventRingBuffer::new(event_tx, nthreads)));
+        let peers = Arc::new(std::sync::Mutex::new(PeerSenderCache::new(peer_senders)));
+
+        loop {
+            let msg = match self.network_source.next().await {
+                None => {
+                    // Done!
+                    error!(
+                        app = self.label,
+                        "stream to app closed"
+                    );
+                    return
+                },
+                Some(x) => x,
+            };
+            let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64;
+            let queue_micros = now - msg.rx_at;
+            counters::inbound_queue_delay(msg.sender.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
+            let index = next_receive_msg_index;
+            handle.spawn(process_received_message_op(msg, index, self.label.clone(), peers.clone(), self.contexts.clone(), out.clone()));
+            // handle.spawn(|| async {
+            //     let (xm, ui) = process_received_message(msg, index, self.label.clone(), peers.clone(), self.contexts.clone());
+            //     out.lock().unwrap().put(xm, ui)
+            // });
+            next_receive_msg_index = next_receive_msg_index + 1;
+        }
+    }
+
+    #[cfg(disabled)]
+    async fn w2(
+        &mut self,
+        event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
+        peer_senders: Arc<OutboundPeerConnections>,
+    ) {
+        let peers = Arc::new(Mutex::new(PeerSenderCache::new(peer_senders)));
+        // ERROR: for_each_concurrent is not order preserving
+        let x = self.network_source.for_each_concurrent(
+            4,
+            |msg| {
+                let (xm,_u) = process_received_message(msg, 0, self.label.clone(), peers.clone(), self.contexts.clone());
+                if let(Some(xm)) = xm {
+                    event_tx.clone().send(xm).await;
+                }
+            }).await;
     }
 }
 
@@ -265,17 +660,17 @@ async fn rpc_response_sender(
     match peer_sender.send((msg,enqueue_micros)).await {
         Ok(_) => {
             counters::inbound_rpc_handler_latency(&network_context, protocol_id).observe(dt.as_secs_f64());
-            counters::rpc_message_bytes(network_context.network_id(),protocol_id.as_str(),network_context.role(),counters::RESPONSE_LABEL,counters::OUTBOUND_LABEL,counters::SENT_LABEL, data_len as u64);
+            counters::rpc_message_bytes(network_context.network_id(),protocol_id.as_str(),network_context.role().as_str(),counters::RESPONSE_LABEL,counters::OUTBOUND_LABEL,counters::SENT_LABEL, data_len as u64);
             counters::pending_rpc_requests(protocol_id.as_str()).dec();
         }
         Err(_) => {
-            counters::rpc_message_bytes(network_context.network_id(),protocol_id.as_str(),network_context.role(),counters::RESPONSE_LABEL,counters::OUTBOUND_LABEL,"peererr", data_len as u64);
+            counters::rpc_message_bytes(network_context.network_id(),protocol_id.as_str(),network_context.role().as_str(),counters::RESPONSE_LABEL,counters::OUTBOUND_LABEL,"peererr", data_len as u64);
             counters::pending_rpc_requests(protocol_id.as_str()).dec();
         }
     }
 }
 
-impl<TMessage: Message + Unpin> Stream for NetworkEvents<TMessage> {
+impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
     type Item = Event<TMessage>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -329,7 +724,7 @@ impl<TMessage: Message + Unpin> Stream for NetworkEvents<TMessage> {
                         Err(err) => {
                             mself.done = true;
                             warn!("app_int rpc_req {} id={}; err {}, {} {} -> {}; from {:?}", request.protocol_id, request.request_id, err, mself.label, request.raw_request.encode_hex_upper::<String>(), std::any::type_name::<TMessage>(), &mself.network_source);
-                            counters::rpc_message_bytes(msg.sender.network_id(), request.protocol_id.as_str(), role_type, counters::REQUEST_LABEL, counters::INBOUND_LABEL, "err", data_len as u64);
+                            counters::rpc_message_bytes(msg.sender.network_id(), request.protocol_id.as_str(), role_type.as_str(), counters::REQUEST_LABEL, counters::INBOUND_LABEL, "err", data_len as u64);
                             // TODO: BSC failed. log error, count error, close peer connection
                             continue 'retries;
                         }
@@ -342,7 +737,7 @@ impl<TMessage: Message + Unpin> Stream for NetworkEvents<TMessage> {
                         None => {
                             // peer disconnected in the moment between receiving message and here?
                             warn!("app_int rpc_req no peer {} id={}", request.protocol_id, request.request_id);
-                            counters::rpc_message_bytes(msg.sender.network_id(), request.protocol_id.as_str(), role_type, counters::REQUEST_LABEL, counters::INBOUND_LABEL, "err", data_len as u64);
+                            counters::rpc_message_bytes(msg.sender.network_id(), request.protocol_id.as_str(), role_type.as_str(), counters::REQUEST_LABEL, counters::INBOUND_LABEL, "err", data_len as u64);
                             continue 'retries;
                         }
                         Some(peer_stub) => {
@@ -353,7 +748,7 @@ impl<TMessage: Message + Unpin> Stream for NetworkEvents<TMessage> {
                     let network_context = mself.contexts.get(&msg.sender.network_id()).unwrap();
                     counters::pending_rpc_requests(request.protocol_id.as_str()).inc();
                     Handle::current().spawn(rpc_response_sender(response_reader, rpc_id, raw_sender, request_received_start, *network_context, request.protocol_id));
-                    counters::rpc_message_bytes(msg.sender.network_id(), request.protocol_id.as_str(), role_type, counters::REQUEST_LABEL, counters::INBOUND_LABEL, "delivered", data_len as u64);
+                    counters::rpc_message_bytes(msg.sender.network_id(), request.protocol_id.as_str(), role_type.as_str(), counters::REQUEST_LABEL, counters::INBOUND_LABEL, "delivered", data_len as u64);
                     return Poll::Ready(Some(Event::RpcRequest(
                         msg.sender, app_msg, request.protocol_id, responder)))
                 }
@@ -380,7 +775,7 @@ impl<TMessage: Message + Unpin> Stream for NetworkEvents<TMessage> {
     }
 }
 
-impl<TMessage: Message + Unpin> FusedStream for NetworkEvents<TMessage> {
+impl<TMessage: Message + Unpin + Send> FusedStream for NetworkEvents<TMessage> {
     fn is_terminated(&self) -> bool {
         self.done
     }
@@ -406,6 +801,13 @@ pub async fn network_event_prefetch<TMessage: Message + Unpin + Send>(
     }
 }
 
+pub async fn network_event_prefetch_parallel<TMessage: Message + Unpin + Send>(
+    mut network_events: NetworkEvents<TMessage>,
+    event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
+    nthreads: usize,
+) {
+    network_events.parallel_deserialization(event_tx, nthreads).await;
+}
 
 /// `NetworkSender` is the generic interface from upper network applications to
 /// the lower network layer. It provides the full API for network applications,
@@ -596,10 +998,10 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         let peer_network_id = PeerNetworkId::new(self.network_id, recipient);
         let msg_src = || -> Result<NetworkMessage,NetworkError> {
             // TODO: detach .send_to() into its own thread in app code that cares to continue on instead of waiting for protocol.to_bytes()
-            let start = Instant::now();
+            // let start = Instant::now();
             let mdata : Vec<u8> = protocol.to_bytes(&message)?;
-            let dt = Instant::now().duration_since(start);
-            counters::bcs_encode_count(mdata.len(), dt);
+            // let dt = Instant::now().duration_since(start);
+            // counters::bcs_encode_count(mdata.len(), dt);
             Ok(NetworkMessage::DirectSendMsg(DirectSendMsg {
                 protocol_id: protocol,
                 priority: 0,
@@ -722,17 +1124,17 @@ impl<TMessage: Message> NetworkSender<TMessage> {
                         };
                         match send_result {
                             Ok(_) => {
-                                counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type, counters::REQUEST_LABEL, counters::OUTBOUND_LABEL, counters::SENT_LABEL, data_len);
+                                counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type.as_str(), counters::REQUEST_LABEL, counters::OUTBOUND_LABEL, counters::SENT_LABEL, data_len);
                                 receiver
                                 // now we wait for rpc reply
                             }
                             Err(tse) => match &tse {
                                 TrySendError::Full(_) => {
-                                    counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type, counters::REQUEST_LABEL, counters::OUTBOUND_LABEL, "peerfull", data_len);
+                                    counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type.as_str(), counters::REQUEST_LABEL, counters::OUTBOUND_LABEL, "peerfull", data_len);
                                     return Err(RpcError::TooManyPending(1)); // TODO: look up the channel size and return that many pending?
                                 }
                                 TrySendError::Closed(_) => {
-                                    counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type, counters::REQUEST_LABEL, counters::OUTBOUND_LABEL, "peergone", data_len);
+                                    counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type.as_str(), counters::REQUEST_LABEL, counters::OUTBOUND_LABEL, "peergone", data_len);
                                     return Err(RpcError::NotConnected(recipient));
                                 }
                             }
@@ -764,7 +1166,7 @@ impl<TMessage: Message> NetworkSender<TMessage> {
                         // time since this send_rpc() started
                         let rpc_micros = endtime.duration_since(now).as_micros() as u64;
                         counters::inbound_queue_delay(self.network_id.as_str(), protocol.as_str(), delay_micros);
-                        counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type, counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "delivered", data_len);
+                        counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type.as_str(), counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "delivered", data_len);
                         counters::outbound_rpc_request_api_latency(self.network_id, protocol).observe((rpc_micros as f64) / 1_000_000.0);
 
                         let wat = match protocol.from_bytes(bytes.as_ref()) {

@@ -304,6 +304,7 @@ impl PeersAndMetadata {
         info!(
             peer = peer_network_id.to_string(),
             op = "icm",
+            direction = connection_metadata.origin,
             "pamtrace"
         );
         let mut writer = self.peers_and_metadata.write();
