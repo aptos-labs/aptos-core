@@ -5,6 +5,7 @@
 //! Interface between Consensus and Network layers.
 
 use crate::{
+    consensus_observer::network_messages::ObserverMessage,
     dag::DAGNetworkMessage,
     pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
@@ -75,6 +76,8 @@ pub enum ConsensusMsg {
     RandGenMessage(RandGenMessage),
     /// Quorum Store: Response to the batch request.
     BatchResponseV2(Box<BatchResponse>),
+    /// Consensus observer message
+    ObserverMessage(Box<ObserverMessage>),
 }
 
 /// Network type for consensus
@@ -101,6 +104,7 @@ impl ConsensusMsg {
             ConsensusMsg::CommitMessage(_) => "CommitMessage",
             ConsensusMsg::RandGenMessage(_) => "RandGenMessage",
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
+            ConsensusMsg::ObserverMessage(_) => "ObserverMessage",
         }
     }
 }
