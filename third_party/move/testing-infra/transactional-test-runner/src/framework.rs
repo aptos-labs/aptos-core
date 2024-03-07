@@ -150,7 +150,7 @@ pub trait MoveTestAdapter<'a>: Sized {
         args: Vec<<<Self as MoveTestAdapter<'a>>::ExtraValueArgs as ParsableValue>::ConcreteValue>,
         gas_budget: Option<u64>,
         extra: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)>;
+    ) -> Result<Option<String>>;
     fn call_function(
         &mut self,
         module: &ModuleId,
@@ -410,10 +410,8 @@ pub trait MoveTestAdapter<'a>: Sized {
                 };
                 let args = self.compiled_state().resolve_args(args)?;
                 let type_args = self.compiled_state().resolve_type_args(type_args)?;
-                let (mut output, return_values) =
+                let mut output =
                     self.execute_script(script, type_args, signers, args, gas_budget, extra_args)?;
-                let rendered_return_value = display_return_values(return_values);
-                output = merge_output(output, rendered_return_value);
                 if print_bytecode {
                     output = merge_output(output, printed);
                 }

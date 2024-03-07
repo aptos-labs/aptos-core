@@ -82,7 +82,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-    ) -> VMResult<SerializedReturnValues> {
+    ) -> VMResult<()> {
         let bypass_declared_entry_check = false;
         self.move_vm.runtime.execute_function(
             module,
@@ -94,7 +94,8 @@ impl<'r, 'l> Session<'r, 'l> {
             gas_meter,
             &mut self.native_extensions,
             bypass_declared_entry_check,
-        )
+        )?;
+        Ok(())
     }
 
     /// Similar to execute_entry_function, but it bypasses visibility checks
@@ -161,7 +162,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-    ) -> VMResult<SerializedReturnValues> {
+    ) -> VMResult<()> {
         self.move_vm.runtime.execute_script(
             script,
             ty_args,

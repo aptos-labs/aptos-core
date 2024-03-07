@@ -137,7 +137,7 @@ fn main() {
         }),
         (258, EntryPoints::TokenV1MintAndTransferFT),
         (407, EntryPoints::TokenV1MintAndTransferNFTSequential),
-        (375, EntryPoints::TokenV2AmbassadorMint),
+        (375, EntryPoints::TokenV2AmbassadorMint { numbered: true }),
     ];
 
     let mut failures = Vec::new();

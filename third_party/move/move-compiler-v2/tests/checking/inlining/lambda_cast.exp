@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x12391283::M {
     use std::vector;
     private fun test_1(): u64 {

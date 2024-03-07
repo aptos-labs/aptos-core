@@ -1435,7 +1435,11 @@ fn workload_mix_test() -> ForgeConfig {
                         100,
                     ),
                     (
-                        TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(1, true),
+                        TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(
+                            1,
+                            true,
+                            WorkflowProgress::when_done_default(),
+                        ),
                         100,
                     ),
                     (
@@ -1443,7 +1447,7 @@ fn workload_mix_test() -> ForgeConfig {
                         10000,
                     ),
                     (
-                        TransactionTypeArg::ModifyGlobalResource.materialize(1, false),
+                        TransactionTypeArg::ModifyGlobalResource.materialize_default(),
                         1000,
                     ),
                     (
@@ -1531,7 +1535,11 @@ fn individual_workload_tests(test_name: String) -> ForgeConfig {
                         TransactionTypeArg::AccountGeneration.materialize_default()
                     },
                     "publishing" => TransactionTypeArg::PublishPackage.materialize_default(),
-                    "module_loading" => TransactionTypeArg::NoOp.materialize(1000, false),
+                    "module_loading" => TransactionTypeArg::NoOp.materialize(
+                        1000,
+                        false,
+                        WorkflowProgress::when_done_default(),
+                    ),
                     _ => unreachable!("{}", test_name),
                 })
             },

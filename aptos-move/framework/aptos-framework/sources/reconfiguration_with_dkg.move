@@ -1,6 +1,7 @@
 /// Reconfiguration with DKG helper functions.
 module aptos_framework::reconfiguration_with_dkg {
     use std::features;
+    use std::option;
     use aptos_framework::consensus_config;
     use aptos_framework::dkg;
     use aptos_framework::execution_config;
@@ -15,7 +16,13 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Trigger a reconfiguration with DKG.
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
-        if (dkg::in_progress()) { return };
+        let incomplete_dkg_session = dkg::incomplete_session();
+        if (option::is_some(&incomplete_dkg_session)) {
+            let session = option::borrow(&incomplete_dkg_session);
+            if (dkg::session_dealer_epoch(session) == reconfiguration::current_epoch()) {
+                return
+            }
+        };
         reconfiguration_state::on_reconfig_start();
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(
@@ -25,10 +32,12 @@ module aptos_framework::reconfiguration_with_dkg {
         );
     }
 
+    /// Clear incomplete DKG session, if it exists.
     /// Apply buffered on-chain configs (except for ValidatorSet, which is done inside `reconfiguration::reconfigure()`).
     /// Re-enable validator set changes.
     /// Run the default reconfiguration to enter the new epoch.
     public(friend) fun finish(account: &signer) {
+        dkg::try_clear_incomplete_session(account);
         consensus_config::on_new_epoch();
         execution_config::on_new_epoch();
         gas_schedule::on_new_epoch();

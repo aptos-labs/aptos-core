@@ -202,22 +202,22 @@ crate::gas_schedule::macros::define_gas_parameters!(
         ],
         [
             dependency_per_module: InternalGas,
-            { 14.. => "dependency_per_module" },
+            { 15.. => "dependency_per_module" },
             4_000,
         ],
         [
             dependency_per_byte: InternalGasPerByte,
-            { 14.. => "dependency_per_byte" },
+            { 15.. => "dependency_per_byte" },
             100,
         ],
         [
             max_num_dependencies: NumModules,
-            { 14.. => "max_num_dependencies" },
+            { 15.. => "max_num_dependencies" },
             420,
         ],
         [
             max_total_dependency_size: NumBytes,
-            { 14.. => "max_total_dependency_size" },
+            { 15.. => "max_total_dependency_size" },
             1024 * 1024 * 12 / 10, // 1.2 MB
         ],
     ]
