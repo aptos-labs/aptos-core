@@ -1,25 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::move_vm_ext::SessionExt;
+use crate::move_vm_ext::{AptosMoveResolver, SessionExt};
 use aptos_types::transaction::EntryFunction;
-use move_binary_format::{
-    errors::{Location, VMResult},
-    CompiledModule,
-};
+use move_binary_format::errors::VMResult;
 
 /// Returns true if function has an annotation that it is unbiasable.
 pub(crate) fn is_entry_function_unbiasable(
+    resolver: &impl AptosMoveResolver,
     session: &mut SessionExt,
     entry_fn: &EntryFunction,
 ) -> VMResult<bool> {
-    let module_bytes = session.load_module(entry_fn.module())?;
-    let module = CompiledModule::deserialize_with_config(
-        &module_bytes,
-        &session.get_vm_config().deserializer_config,
-    )
-    .map_err(|e| e.finish(Location::Undefined))?;
-
+    let module = session
+        .get_move_vm()
+        .load_module(entry_fn.module(), resolver)?;
     let metadata = aptos_framework::get_metadata_from_compiled_module(&module);
     if let Some(metadata) = metadata {
         Ok(metadata

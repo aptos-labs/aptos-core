@@ -65,13 +65,13 @@ fn test_only_private_entry_function_can_be_annotated() {
         "randomness.data/invalid_pack_non_entry",
         &mut h
     )
-        .is_err());
+    .is_err());
     assert!(deploy_code(
         AccountAddress::ONE,
         "randomness.data/invalid_pack_public_entry",
         &mut h
     )
-        .is_err());
+    .is_err());
 }
 
 #[test]
