@@ -61,6 +61,61 @@ pub enum FeatureFlag {
     REFUNDABLE_BYTES = 51,
     OBJECT_CODE_DEPLOYMENT = 52,
     MAX_OBJECT_NESTING_CHECK = 53,
+    KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
+    FAST_RANDOMNESS = 55,
+}
+
+impl FeatureFlag {
+    pub fn default_features() -> Vec<Self> {
+        vec![
+            FeatureFlag::CODE_DEPENDENCY_CHECK,
+            FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
+            FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
+            FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
+            FeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
+            FeatureFlag::BLAKE2B_256_NATIVE,
+            FeatureFlag::RESOURCE_GROUPS,
+            FeatureFlag::MULTISIG_ACCOUNTS,
+            FeatureFlag::DELEGATION_POOLS,
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
+            FeatureFlag::STRUCT_CONSTRUCTORS,
+            FeatureFlag::SIGNATURE_CHECKER_V2,
+            FeatureFlag::STORAGE_SLOT_METADATA,
+            FeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::BULLETPROOFS_NATIVES,
+            FeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
+            FeatureFlag::MODULE_EVENT,
+            FeatureFlag::EMIT_FEE_STATEMENT,
+            FeatureFlag::STORAGE_DELETION_REFUND,
+            FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
+            FeatureFlag::AGGREGATOR_V2_API,
+            FeatureFlag::SAFER_RESOURCE_GROUPS,
+            FeatureFlag::SAFER_METADATA,
+            FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+            FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+            FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+            FeatureFlag::CONCURRENT_TOKEN_V2,
+            FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+            FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
+            FeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
+            FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
+            FeatureFlag::WEBAUTHN_SIGNATURE,
+            // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
+            FeatureFlag::JWK_CONSENSUS,
+            FeatureFlag::REFUNDABLE_BYTES,
+            FeatureFlag::OBJECT_CODE_DEPLOYMENT,
+            FeatureFlag::MAX_OBJECT_NESTING_CHECK,
+            FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
+            // FeatureFlag::FAST_RANDOMNESS,
+        ]
+    }
 }
 
 /// Representation of features on chain as a bitset.

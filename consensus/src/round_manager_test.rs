@@ -310,6 +310,7 @@ impl NodeSetup {
             local_consensus_config.clone(),
             features.clone(),
             false,
+            None,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

@@ -2,7 +2,9 @@
 
 use super::{
     adapter::{OrderedNotifierAdapter, TLedgerInfoProvider},
-    anchor_election::{AnchorElection, CommitHistory, RoundRobinAnchorElection},
+    anchor_election::{
+        AnchorElection, CachedLeaderReputation, CommitHistory, RoundRobinAnchorElection,
+    },
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
@@ -386,7 +388,7 @@ impl DagBootstrapper {
     fn build_leader_reputation_components(
         &self,
         config: &ProposerAndVoterConfig,
-    ) -> Arc<LeaderReputationAdapter> {
+    ) -> Arc<CachedLeaderReputation> {
         let num_validators = self.epoch_state.verifier.len();
         let epoch_to_validators_vec = self.storage.get_epoch_to_proposers();
         let epoch_to_validator_map = epoch_to_validators_vec
@@ -428,14 +430,19 @@ impl DagBootstrapper {
             .map(|p| self.epoch_state.verifier.get_voting_power(&p).unwrap())
             .collect();
 
-        Arc::new(LeaderReputationAdapter::new(
+        let cached_leader_reputation = CachedLeaderReputation::new(
             self.epoch_state.epoch,
-            epoch_to_validators_vec,
-            voting_power,
-            metadata_adapter,
-            heuristic,
-            100,
-        ))
+            LeaderReputationAdapter::new(
+                self.epoch_state.epoch,
+                epoch_to_validators_vec,
+                voting_power,
+                metadata_adapter,
+                heuristic,
+                100,
+            ),
+        );
+
+        Arc::new(cached_leader_reputation)
     }
 
     fn build_anchor_election(
@@ -516,31 +523,40 @@ impl DagBootstrapper {
                 .saturating_sub(dag_window_size_config),
         );
 
-        let dag = Arc::new(DagStore::new(
-            self.epoch_state.clone(),
-            self.storage.clone(),
-            self.payload_manager.clone(),
-            initial_round,
-            dag_window_size_config,
-        ));
+        let dag = monitor!(
+            "dag_store_new",
+            Arc::new(DagStore::new(
+                self.epoch_state.clone(),
+                self.storage.clone(),
+                self.payload_manager.clone(),
+                initial_round,
+                dag_window_size_config,
+            ))
+        );
 
-        let ordered_notifier = Arc::new(OrderedNotifierAdapter::new(
-            self.ordered_nodes_tx.clone(),
-            dag.clone(),
-            self.epoch_state.clone(),
-            parent_block_info,
-            ledger_info_provider.clone(),
-        ));
+        let ordered_notifier = monitor!(
+            "dag_ordered_notifier_new",
+            Arc::new(OrderedNotifierAdapter::new(
+                self.ordered_nodes_tx.clone(),
+                dag.clone(),
+                self.epoch_state.clone(),
+                parent_block_info,
+                ledger_info_provider.clone(),
+            ))
+        );
 
-        let order_rule = Arc::new(Mutex::new(OrderRule::new(
-            self.epoch_state.clone(),
-            commit_round + 1,
-            dag.clone(),
-            anchor_election.clone(),
-            ordered_notifier.clone(),
-            self.onchain_config.dag_ordering_causal_history_window as Round,
-            commit_events,
-        )));
+        let order_rule = monitor!(
+            "dag_order_rule_new",
+            Arc::new(Mutex::new(OrderRule::new(
+                self.epoch_state.clone(),
+                commit_round + 1,
+                dag.clone(),
+                anchor_election.clone(),
+                ordered_notifier.clone(),
+                self.onchain_config.dag_ordering_causal_history_window as Round,
+                commit_events,
+            )))
+        );
 
         BootstrapBaseState {
             dag_store: dag,
@@ -672,16 +688,23 @@ impl DagBootstrapper {
     }
 
     fn full_bootstrap(&self) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
-        let (anchor_election, commit_history, commit_events) = self.build_anchor_election();
+        let (anchor_election, commit_history, commit_events) =
+            monitor!("dag_build_anchor_election", self.build_anchor_election());
 
-        let base_state = self.bootstrap_dag_store(
-            anchor_election.clone(),
-            commit_history,
-            commit_events,
-            self.onchain_config.dag_ordering_causal_history_window as u64,
+        let base_state = monitor!(
+            "dag_full_bootstrap_ds",
+            self.bootstrap_dag_store(
+                anchor_election.clone(),
+                commit_history,
+                commit_events,
+                self.onchain_config.dag_ordering_causal_history_window as u64,
+            )
         );
 
-        let (handler, fetch_service) = self.bootstrap_components(&base_state);
+        let (handler, fetch_service) = monitor!(
+            "dag_full_bootstrap_comp",
+            self.bootstrap_components(&base_state)
+        );
         (base_state, handler, fetch_service)
     }
 

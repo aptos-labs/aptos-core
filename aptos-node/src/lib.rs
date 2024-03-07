@@ -52,7 +52,7 @@ use tokio::runtime::Runtime;
 use aptos_network2::protocols::network::OutboundPeerConnections;
 use crate::network2::AppSetupContext;
 
-const EPOCH_LENGTH_SECS: u64 = 60;
+const EPOCH_LENGTH_SECS: u64 = 10;
 
 /// Runs an Aptos validator or fullnode
 #[derive(Clone, Debug, Parser)]

@@ -35,6 +35,8 @@ pub async fn create_dag_swarm(num_nodes: usize) -> LocalSwarm {
                 min_concurrent_responders: 2,
                 max_concurrent_responders: 7,
                 max_concurrent_fetches: 4,
+                request_channel_size: 100,
+                response_channel_size: 100,
             }
         }))
         .with_init_genesis_config(Arc::new(move |genesis_config| {
