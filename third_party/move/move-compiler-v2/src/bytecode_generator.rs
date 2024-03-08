@@ -1132,41 +1132,20 @@ impl<'env> Generator<'env> {
                 if args.len() != pats.len() {
                     // Type checker should have complained already
                     self.internal_error(id, "inconsistent tuple arity")
-                } else {
-                    let lhs_vars = pats
+                } else if args.len() != 1 && self.have_overlapping_vars(pats, exp) {
+                    // Save each tuple arg (from rhs) into a temporary.
+                    // Then, point-wise assign the temporaries. This simulates "simultaneous" assignment.
+                    let temps = args
                         .iter()
-                        .flat_map(|p| p.vars().into_iter().map(|t| t.1))
-                        .collect::<BTreeSet<_>>();
-                    // Compute the rhs expression's free locals and params used.
-                    // We can just use free variables in the expression once #12317 is addressed.
-                    let param_symbols = self
-                        .func_env
-                        .get_parameters()
-                        .into_iter()
-                        .map(|p| p.0)
+                        .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
                         .collect::<Vec<_>>();
-                    let mut rhs_vars = exp
-                        .used_temporaries(self.env())
-                        .into_iter()
-                        .map(|t| param_symbols[t.0])
-                        .collect::<BTreeSet<_>>();
-                    // Check if there is any overlap between the lhs and rhs variables.
-                    rhs_vars.append(&mut exp.free_vars());
-                    if lhs_vars.intersection(&rhs_vars).next().is_some() {
-                        // Save each tuple arg into a temporary.
-                        // Then, point-wise assign the temporaries.
-                        let temps = args
-                            .iter()
-                            .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
-                            .collect::<Vec<_>>();
-                        for (pat, temp) in pats.iter().zip(temps.into_iter()) {
-                            self.gen_assign_from_temp(id, pat, temp, next_scope)
-                        }
-                    } else {
-                        // No overlap, just do point-wise assignment.
-                        for (pat, exp) in pats.iter().zip(args.iter()) {
-                            self.gen_assign(id, pat, exp, next_scope)
-                        }
+                    for (pat, temp) in pats.iter().zip(temps.into_iter()) {
+                        self.gen_assign_from_temp(id, pat, temp, next_scope)
+                    }
+                } else {
+                    // No overlap, or a 1-tuple: just do point-wise assignment.
+                    for (pat, exp) in pats.iter().zip(args.iter()) {
+                        self.gen_assign(id, pat, exp, next_scope)
                     }
                 }
             },
@@ -1277,6 +1256,29 @@ impl<'env> Generator<'env> {
         } else {
             self.find_local(id, sym)
         }
+    }
+
+    // Do the variables in `lhs` and `rhs` overlap?
+    fn have_overlapping_vars(&self, lhs: &[Pattern], rhs: &Exp) -> bool {
+        let lhs_vars = lhs
+            .iter()
+            .flat_map(|p| p.vars().into_iter().map(|t| t.1))
+            .collect::<BTreeSet<_>>();
+        // Compute the rhs expression's free locals and params used.
+        // We can likely just use free variables in the expression once #12317 is addressed.
+        let param_symbols = self
+            .func_env
+            .get_parameters()
+            .into_iter()
+            .map(|p| p.0)
+            .collect::<Vec<_>>();
+        let mut rhs_vars = rhs
+            .used_temporaries(self.env())
+            .into_iter()
+            .map(|t| param_symbols[t.0])
+            .collect::<BTreeSet<_>>();
+        rhs_vars.append(&mut rhs.free_vars());
+        lhs_vars.intersection(&rhs_vars).next().is_some()
     }
 }
 
