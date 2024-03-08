@@ -108,7 +108,7 @@ impl Default for RocksdbConfig {
             // threads to use internally.
             max_background_jobs: 16,
             // Default block cache size is 8MB,
-            block_cache_size: 2 * (1u64 << 30),
+            block_cache_size: 512 * (1u64 << 20),
             // Default block cache size is 4KB,
             block_size: 16 * (1u64 << 10),
             // Whether cache index and filter blocks into block cache.
