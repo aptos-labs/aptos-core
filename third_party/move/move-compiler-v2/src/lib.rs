@@ -294,7 +294,6 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     }
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
-        pipeline.add_processor(Box::new(RecursiveInstantiationChecker {}));
     }
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
