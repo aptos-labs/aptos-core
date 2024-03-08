@@ -451,6 +451,7 @@ spec aptos_framework::coin {
         to: address,
         amount: u64,
     ) {
+        modifies global<CoinStore<CoinType>>(account_addr_from);
         let account_addr_from = signer::address_of(from);
         let coin_store_from = global<CoinStore<CoinType>>(account_addr_from);
         let post coin_store_post_from = global<CoinStore<CoinType>>(account_addr_from);
