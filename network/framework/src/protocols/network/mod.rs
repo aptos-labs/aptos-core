@@ -304,6 +304,9 @@ fn process_received_message<TMessage: Message + Unpin + Send>(
     // nc_source: fn(network_id: &NetworkId) -> NetworkContext,
     contexts: Arc<BTreeMap<NetworkId, NetworkContext>>,
 ) -> Option<Event<TMessage>> {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64;
+    let queue_micros = now - wmsg.rx_at;
+    counters::inbound_queue_delay(wmsg.sender.network_id().as_str(), wmsg.protocol_id_as_str(), queue_micros);
     match wmsg.message {
         NetworkMessage::Error(err) => {
             // We just drop error responses! TODO: never send them
