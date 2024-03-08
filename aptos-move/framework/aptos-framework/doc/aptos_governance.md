@@ -82,6 +82,7 @@ on a proposal multiple times as long as the total voting power of these votes do
     -  [Function `remove_approved_hash`](#@Specification_1_remove_approved_hash)
     -  [Function `reconfigure`](#@Specification_1_reconfigure)
     -  [Function `force_end_epoch`](#@Specification_1_force_end_epoch)
+    -  [Function `force_end_epoch_by_admin`](#@Specification_1_force_end_epoch_by_admin)
     -  [Function `toggle_features`](#@Specification_1_toggle_features)
     -  [Function `get_signer_testnet_only`](#@Specification_1_get_signer_testnet_only)
     -  [Function `get_voting_power`](#@Specification_1_get_voting_power)
@@ -2722,6 +2723,22 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 <pre><code><b>schema</b> <a href="aptos_governance.md#0x1_aptos_governance_VotingInitializationAbortIfs">VotingInitializationAbortIfs</a> {
     <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_spec_partial_governance_voting_enabled">features::spec_partial_governance_voting_enabled</a>() && !<b>exists</b>&lt;<a href="aptos_governance.md#0x1_aptos_governance_VotingRecordsV2">VotingRecordsV2</a>&gt;(@aptos_framework);
 }
+</code></pre>
+
+
+
+<a id="@Specification_1_force_end_epoch_by_admin"></a>
+
+### Function `force_end_epoch_by_admin`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch_by_admin">force_end_epoch_by_admin</a>(admin: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
 </code></pre>
 
 
