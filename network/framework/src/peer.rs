@@ -133,7 +133,6 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
         self.large_fragment_id = 0;
         let header_payload_size = self.max_frame_size - STREAM_HEADER_OVERHEAD_BYTES - msg.header_len();
         let fragment_payload_size = self.max_frame_size - STREAM_FRAGMENT_OVERHEAD_BYTES;
-        // let serialized_len = estimate_serialized_length(&msg);
         let payload_len = msg.data_len();
         let fragments_len = payload_len - header_payload_size;
         let mut num_fragments = (fragments_len / fragment_payload_size) + 1;
@@ -175,9 +174,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                 counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
                 counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
-                let serialized_len = estimate_serialized_length(&msg);
-                info!("next high prio ser len {:?}", serialized_len);
-                if serialized_len > self.max_frame_size {
+                if estimate_serialized_length(&msg) > self.max_frame_size {
                     // finish prior large message before starting a new large message
                     if self.large_message.is_some() {
                         self.next_large_msg = Some(msg);
@@ -206,9 +203,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                 counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
                 counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
-                let serialized_len = estimate_serialized_length(&msg);
-                info!("next ser len {:?}", serialized_len);
-                if serialized_len > self.max_frame_size { // TODO: FIXME, serialize msg to find out if it is bigger than max_frame_size?
+                if estimate_serialized_length(&msg) > self.max_frame_size { // TODO: FIXME, serialize msg to find out if it is bigger than max_frame_size?
                     // finish prior large message before starting a new large message
                     if self.large_message.is_some() {
                         self.next_large_msg = Some(msg);
@@ -272,7 +267,6 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                                 counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
                                 counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
-                                // info!("selected high prio for {:?} bytes", estimate_serialized_length(&msg));
                                 if estimate_serialized_length(&msg) > self.max_frame_size {
                                     // start stream
                                     self.start_large(msg)
@@ -290,7 +284,6 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                                 counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
                                 let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
                                 counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
-                                // info!("selected normal for {:?} bytes", estimate_serialized_length(&msg));
                                 if estimate_serialized_length(&msg) > self.max_frame_size {
                                     // start stream
                                     self.start_large(msg)
@@ -643,6 +636,7 @@ async fn peer_cleanup_task(
     closed.wait().await;
     info!(
         peer = remote_peer_network_id,
+        reason = "cleanup",
         op = "cleanup",
         "peerclose"
     );

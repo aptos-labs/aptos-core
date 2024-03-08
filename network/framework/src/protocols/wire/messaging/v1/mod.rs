@@ -52,8 +52,11 @@ pub enum MultiplexMessage {
     Stream(StreamMessage),
 }
 
-pub const STREAM_HEADER_OVERHEAD_BYTES : usize = 9;
-pub const STREAM_FRAGMENT_OVERHEAD_BYTES : usize = 9;
+// TODO: principled system of determining the actual overhead bytes.
+// Best guess by inspection was 9 bytes but things failed.
+// Given 4 MiB fragment size, a few bytes wasted is okay?
+pub const STREAM_HEADER_OVERHEAD_BYTES : usize = 20;
+pub const STREAM_FRAGMENT_OVERHEAD_BYTES : usize = 20;
 
 impl MultiplexMessage {
     pub fn data_len(&self) -> usize {
