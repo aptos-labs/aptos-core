@@ -200,9 +200,34 @@ impl CounterState {
     }
 }
 
+#[async_trait::async_trait]
+pub trait RootAccountHandle: Send + Sync {
+    async fn approve_funds(&self, amount: u64, reason: &str);
+
+    fn get_root_account(&self) -> &LocalAccount;
+}
+
+pub struct AlwaysApproveRootAccountHandle<'t> {
+    pub root_account: &'t LocalAccount,
+}
+
+#[async_trait::async_trait]
+impl<'t> RootAccountHandle for AlwaysApproveRootAccountHandle<'t> {
+    async fn approve_funds(&self, amount: u64, reason: &str) {
+        println!(
+            "Consuming funds from root/source account: up to {} for {}",
+            amount, reason
+        );
+    }
+
+    fn get_root_account(&self) -> &LocalAccount {
+        self.root_account
+    }
+}
+
 pub async fn create_txn_generator_creator(
     transaction_mix_per_phase: &[Vec<(TransactionType, usize)>],
-    root_account: &mut LocalAccount,
+    root_account: impl RootAccountHandle,
     source_accounts: &mut [LocalAccount],
     initial_burner_accounts: Vec<LocalAccount>,
     txn_executor: &dyn ReliableTransactionSubmitter,
@@ -308,7 +333,7 @@ pub async fn create_txn_generator_creator(
                         CustomModulesDelegationGeneratorCreator::new(
                             txn_factory.clone(),
                             init_txn_factory.clone(),
-                            root_account,
+                            &root_account,
                             txn_executor,
                             *num_modules,
                             entry_point.package_name(),
@@ -339,7 +364,7 @@ pub async fn create_txn_generator_creator(
                         *workflow_kind,
                         txn_factory.clone(),
                         init_txn_factory.clone(),
-                        root_account,
+                        &root_account,
                         txn_executor,
                         *num_modules,
                         use_account_pool.then(|| accounts_pool.clone()),
