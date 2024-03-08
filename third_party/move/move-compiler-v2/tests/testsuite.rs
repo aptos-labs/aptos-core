@@ -12,16 +12,16 @@ use move_compiler_v2::{
     },
     logging, pipeline,
     pipeline::{
-        self, ability_processor::AbilityProcessor,
-        avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
-        dead_store_elimination::DeadStoreElimination,
+        ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
-    }, run_bytecode_verifier, run_file_format_gen, Options
+    },
+    run_bytecode_verifier, run_file_format_gen, Options,
 };
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
@@ -108,6 +108,9 @@ impl TestConfig {
         // as part of regular compilation, but only as part of a prover run.
         env_pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
 
+        env_pipeline.add("recursive instantiation check", |env| {
+            cyclic_instantiation_checker::check_cyclic_instantiations(env)
+        });
         // The bytecode transformation pipeline
         let mut pipeline = FunctionTargetPipeline::default();
 
@@ -218,7 +221,7 @@ impl TestConfig {
         } else if path.contains("/recursive-instantiation-checker") {
             Self {
                 stop_before_generating_bytecode: false,
-                dump_ast: false,
+                dump_ast: AstDumpLevel::None,
                 env_pipeline,
                 pipeline,
                 generate_file_format: false,
