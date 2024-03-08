@@ -630,6 +630,10 @@ pub fn construct_node_helm_values(
     let username = env::var("FORGE_USERNAME").unwrap_or(DEFAULT_USERNAME.to_string());
     value["labels"]["forge-username"] = make_k8s_label(username).into();
 
+    if let Ok(cluster_name) = get_cluster_name() {
+        value["cluster_name"] = cluster_name.into();
+    }
+
     if let Some(config_fn) = node_helm_config_fn {
         (config_fn)(&mut value);
     }
@@ -664,6 +668,10 @@ pub fn construct_genesis_helm_values(
     value["genesis"]["fullnode"]["internal_host_suffix"] = fullnode_internal_host_suffix.into();
     value["labels"]["forge-namespace"] = make_k8s_label(kube_namespace).into();
     value["labels"]["forge-image-tag"] = make_k8s_label(genesis_image_tag).into();
+
+    if let Ok(cluster_name) = get_cluster_name() {
+        value["genesis"]["cluster_name"] = cluster_name.into();
+    }
 
     // if present, tag the node with the test suite name and username
     let suite_name = env::var("FORGE_TEST_SUITE").unwrap_or(DEFAULT_TEST_SUITE_NAME.to_string());
@@ -747,12 +755,16 @@ async fn make_kube_client_config() -> Result<Config> {
     }
 }
 
+fn get_cluster_name() -> Result<String> {
+    Kubeconfig::read()
+        .map(|k| k.current_context.unwrap_or_default())
+        .map_err(|_| anyhow::anyhow!("Failed to get cluster name"))
+}
+
 pub async fn create_k8s_client() -> Result<K8sClient> {
     let mut config = make_kube_client_config().await?;
 
-    let cluster_name = Kubeconfig::read()
-        .map(|k| k.current_context.unwrap_or_default())
-        .unwrap_or_else(|_| config.cluster_url.to_string());
+    let cluster_name = get_cluster_name().unwrap_or_else(|_| config.cluster_url.to_string());
 
     config.accept_invalid_certs = true;
 
