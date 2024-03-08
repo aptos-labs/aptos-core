@@ -1133,8 +1133,10 @@ impl<'env> Generator<'env> {
                     // Type checker should have complained already
                     self.internal_error(id, "inconsistent tuple arity")
                 } else if args.len() != 1 && self.have_overlapping_vars(pats, exp) {
-                    // Save each tuple arg (from rhs) into a temporary.
-                    // Then, point-wise assign the temporaries. This simulates "simultaneous" assignment.
+                    // We want to simulate the semantics for "simultaneous" assignment with
+                    // overlapping variables, eg., `(x, y) = (y, x)`.
+                    // To do so, we save each tuple arg (from rhs) into a temporary.
+                    // Then, point-wise assign the temporaries.
                     let temps = args
                         .iter()
                         .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
