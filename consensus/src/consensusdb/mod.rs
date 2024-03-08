@@ -81,6 +81,7 @@ impl ConsensusDB {
         opts.create_missing_column_families(true);
         opts.increase_parallelism(8);
         opts.set_max_background_jobs(4);
+        opts.set_advise_random_on_open(false);
 
         let mut table_options = BlockBasedOptions::default();
         table_options.set_block_size(32 * (1 << 10)); // 4KB
@@ -231,7 +232,7 @@ impl ConsensusDB {
     pub fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
         let mut opts = ReadOptions::default();
         opts.set_async_io(true);
-        opts.set_readahead_size(512 * (1 << 20));
+        opts.set_readahead_size(1 * (1 << 30));
         let mut iter = self.db.iter::<S>(opts)?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>, AptosDbError>>()?)
