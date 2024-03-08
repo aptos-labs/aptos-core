@@ -633,7 +633,8 @@ Payload:
                 - TYPENAME: BatchInfo
                 - SEQ:
                     TYPENAME: SignedTransaction
-          - TYPENAME: ProofWithDataWithTxnLimit
+          - TYPENAME: ProofWithData
+          - OPTION: U64
 Pepper:
   NEWTYPESTRUCT:
     TUPLEARRAY:
