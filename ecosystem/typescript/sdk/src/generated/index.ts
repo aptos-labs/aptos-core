@@ -58,6 +58,7 @@ export type { MultiEd25519Signature } from './models/MultiEd25519Signature';
 export type { MultiKeySignature } from './models/MultiKeySignature';
 export type { MultisigPayload } from './models/MultisigPayload';
 export type { MultisigTransactionPayload } from './models/MultisigTransactionPayload';
+export type { MultisigTransactionPayload_EntryFunctionPayload } from './models/MultisigTransactionPayload_EntryFunctionPayload';
 export type { PendingTransaction } from './models/PendingTransaction';
 export type { PublicKey } from './models/PublicKey';
 export type { PublicKey_string_HexEncodedBytes_ } from './models/PublicKey_string_HexEncodedBytes_';
