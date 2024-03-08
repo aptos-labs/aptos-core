@@ -163,15 +163,15 @@ module aptos_framework::fungible_asset {
         frozen: bool,
     }
 
-    fun default_to_concurrent_fungible_supply(): bool {
+    inline fun default_to_concurrent_fungible_supply(): bool {
         features::concurrent_fungible_assets_enabled()
     }
 
-    fun default_to_concurrent_fungible_balance(): bool {
+    inline fun default_to_concurrent_fungible_balance(): bool {
         features::concurrent_fungible_assets_enabled()
     }
 
-    fun auto_upgrade_to_concurrent_fungible_balance(): bool {
+    inline fun auto_upgrade_to_concurrent_fungible_balance(): bool {
         features::concurrent_fungible_assets_enabled()
     }
 

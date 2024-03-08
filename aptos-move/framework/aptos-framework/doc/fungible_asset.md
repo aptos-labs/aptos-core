@@ -916,7 +916,7 @@ URI for the icon of the fungible asset metadata is too long
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_default_to_concurrent_fungible_supply">default_to_concurrent_fungible_supply</a>(): bool {
+<pre><code>inline <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_default_to_concurrent_fungible_supply">default_to_concurrent_fungible_supply</a>(): bool {
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_fungible_assets_enabled">features::concurrent_fungible_assets_enabled</a>()
 }
 </code></pre>
@@ -940,7 +940,7 @@ URI for the icon of the fungible asset metadata is too long
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_default_to_concurrent_fungible_balance">default_to_concurrent_fungible_balance</a>(): bool {
+<pre><code>inline <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_default_to_concurrent_fungible_balance">default_to_concurrent_fungible_balance</a>(): bool {
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_fungible_assets_enabled">features::concurrent_fungible_assets_enabled</a>()
 }
 </code></pre>
@@ -964,7 +964,7 @@ URI for the icon of the fungible asset metadata is too long
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>(): bool {
+<pre><code>inline <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_auto_upgrade_to_concurrent_fungible_balance">auto_upgrade_to_concurrent_fungible_balance</a>(): bool {
     <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_concurrent_fungible_assets_enabled">features::concurrent_fungible_assets_enabled</a>()
 }
 </code></pre>
