@@ -167,8 +167,7 @@ fn main() -> Result<()> {
     let src = fs::read_to_string(&args[1])?;
     if let Ok(script_blob) = Compiler::new(test_modules.iter().collect()).into_script_blob(&src) {
         let args: Vec<Vec<u8>> = vec![];
-        let res = sess.execute_script(script_blob, vec![], args, &mut UnmeteredGasMeter)?;
-        println!("{:?}", res);
+        sess.execute_script(script_blob, vec![], args, &mut UnmeteredGasMeter)?;
     } else {
         let module = Compiler::new(test_modules.iter().collect()).into_compiled_module(&src)?;
         let mut module_blob = vec![];

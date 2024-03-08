@@ -131,7 +131,11 @@ pub enum EntryFunctionCall {
         cap_update_table: Vec<u8>,
     },
 
-    /// Entry function-only rotation key function that allows the signer update their authentication_key.
+    /// Private entry function for key rotation that allows the signer to update their authentication key.
+    /// Note that this does not update the `OriginatingAddress` table because the `new_auth_key` is not "verified": it
+    /// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+    /// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+    /// the format expected in `rotate_authentication_key`.
     AccountRotateAuthenticationKeyCall {
         new_auth_key: Vec<u8>,
     },
@@ -499,6 +503,12 @@ pub enum EntryFunctionCall {
         multisig_account: AccountAddress,
     },
 
+    /// Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
+    MultisigAccountExecuteRejectedTransactions {
+        multisig_account: AccountAddress,
+        final_sequence_number: u64,
+    },
+
     /// Reject a multisig transaction.
     MultisigAccountRejectTransaction {
         multisig_account: AccountAddress,
@@ -563,6 +573,23 @@ pub enum EntryFunctionCall {
     },
 
     /// Generic function that can be used to either approve or reject a multisig transaction
+    MultisigAccountVoteTransaction {
+        multisig_account: AccountAddress,
+        sequence_number: u64,
+        approved: bool,
+    },
+
+    /// Generic function that can be used to either approve or reject a batch of transactions within a specified range.
+    MultisigAccountVoteTransactions {
+        multisig_account: AccountAddress,
+        starting_sequence_number: u64,
+        final_sequence_number: u64,
+        approved: bool,
+    },
+
+    /// Generic function that can be used to either approve or reject a multisig transaction
+    /// Retained for backward compatibility: the function with the typographical error in its name
+    /// will continue to be an accessible entry point.
     MultisigAccountVoteTransanction {
         multisig_account: AccountAddress,
         sequence_number: u64,
@@ -810,8 +837,11 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    /// Updates the major version to a larger version.
-    /// This can be called by on chain governance.
+    /// Deprecated by `set_for_next_epoch()`.
+    ///
+    /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+    ///
+    /// TODO: update all the tests that reference this function, then disable this function.
     VersionSetVersion {
         major: u64,
     },
@@ -1213,6 +1243,13 @@ impl EntryFunctionCall {
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
             },
+            MultisigAccountExecuteRejectedTransactions {
+                multisig_account,
+                final_sequence_number,
+            } => multisig_account_execute_rejected_transactions(
+                multisig_account,
+                final_sequence_number,
+            ),
             MultisigAccountRejectTransaction {
                 multisig_account,
                 sequence_number,
@@ -1246,6 +1283,22 @@ impl EntryFunctionCall {
             MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required,
             } => multisig_account_update_signatures_required(new_num_signatures_required),
+            MultisigAccountVoteTransaction {
+                multisig_account,
+                sequence_number,
+                approved,
+            } => multisig_account_vote_transaction(multisig_account, sequence_number, approved),
+            MultisigAccountVoteTransactions {
+                multisig_account,
+                starting_sequence_number,
+                final_sequence_number,
+                approved,
+            } => multisig_account_vote_transactions(
+                multisig_account,
+                starting_sequence_number,
+                final_sequence_number,
+                approved,
+            ),
             MultisigAccountVoteTransanction {
                 multisig_account,
                 sequence_number,
@@ -1676,7 +1729,11 @@ pub fn account_rotate_authentication_key(
     ))
 }
 
-/// Entry function-only rotation key function that allows the signer update their authentication_key.
+/// Private entry function for key rotation that allows the signer to update their authentication key.
+/// Note that this does not update the `OriginatingAddress` table because the `new_auth_key` is not "verified": it
+/// does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+/// the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+/// the format expected in `rotate_authentication_key`.
 pub fn account_rotate_authentication_key_call(new_auth_key: Vec<u8>) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -2755,6 +2812,28 @@ pub fn multisig_account_execute_rejected_transaction(
     ))
 }
 
+/// Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
+pub fn multisig_account_execute_rejected_transactions(
+    multisig_account: AccountAddress,
+    final_sequence_number: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("execute_rejected_transactions").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&final_sequence_number).unwrap(),
+        ],
+    ))
+}
+
 /// Reject a multisig transaction.
 pub fn multisig_account_reject_transaction(
     multisig_account: AccountAddress,
@@ -2935,6 +3014,58 @@ pub fn multisig_account_update_signatures_required(
 }
 
 /// Generic function that can be used to either approve or reject a multisig transaction
+pub fn multisig_account_vote_transaction(
+    multisig_account: AccountAddress,
+    sequence_number: u64,
+    approved: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("vote_transaction").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&sequence_number).unwrap(),
+            bcs::to_bytes(&approved).unwrap(),
+        ],
+    ))
+}
+
+/// Generic function that can be used to either approve or reject a batch of transactions within a specified range.
+pub fn multisig_account_vote_transactions(
+    multisig_account: AccountAddress,
+    starting_sequence_number: u64,
+    final_sequence_number: u64,
+    approved: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("vote_transactions").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&starting_sequence_number).unwrap(),
+            bcs::to_bytes(&final_sequence_number).unwrap(),
+            bcs::to_bytes(&approved).unwrap(),
+        ],
+    ))
+}
+
+/// Generic function that can be used to either approve or reject a multisig transaction
+/// Retained for backward compatibility: the function with the typographical error in its name
+/// will continue to be an accessible entry point.
 pub fn multisig_account_vote_transanction(
     multisig_account: AccountAddress,
     sequence_number: u64,
@@ -3740,8 +3871,11 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
-/// Updates the major version to a larger version.
-/// This can be called by on chain governance.
+/// Deprecated by `set_for_next_epoch()`.
+///
+/// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+///
+/// TODO: update all the tests that reference this function, then disable this function.
 pub fn version_set_version(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4822,6 +4956,21 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_execute_rejected_transactions(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountExecuteRejectedTransactions {
+                    multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    final_sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_reject_transaction(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -4916,6 +5065,35 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_vote_transaction(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountVoteTransaction {
+                multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+                approved: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_vote_transactions(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountVoteTransactions {
+                multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                starting_sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+                final_sequence_number: bcs::from_bytes(script.args().get(2)?).ok()?,
+                approved: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -5848,6 +6026,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_execute_rejected_transaction),
         );
         map.insert(
+            "multisig_account_execute_rejected_transactions".to_string(),
+            Box::new(decoder::multisig_account_execute_rejected_transactions),
+        );
+        map.insert(
             "multisig_account_reject_transaction".to_string(),
             Box::new(decoder::multisig_account_reject_transaction),
         );
@@ -5878,6 +6060,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_update_signatures_required".to_string(),
             Box::new(decoder::multisig_account_update_signatures_required),
+        );
+        map.insert(
+            "multisig_account_vote_transaction".to_string(),
+            Box::new(decoder::multisig_account_vote_transaction),
+        );
+        map.insert(
+            "multisig_account_vote_transactions".to_string(),
+            Box::new(decoder::multisig_account_vote_transactions),
         );
         map.insert(
             "multisig_account_vote_transanction".to_string(),

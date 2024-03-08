@@ -3,8 +3,8 @@
 
 use crate::{
     log::{
-        CallFrame, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, StorageFees, WriteStorage,
-        WriteTransient,
+        CallFrame, Dependency, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, StorageFees,
+        WriteStorage, WriteTransient,
     },
     render::Render,
     FrameName, TransactionGasLog,
@@ -191,12 +191,35 @@ impl WriteTransient {
     }
 }
 
+impl Dependency {
+    fn to_erased(&self) -> Node<InternalGas> {
+        Node::new(
+            format!(
+                "{}{}",
+                Render(&self.id),
+                if self.is_new { " (new)" } else { "" }
+            ),
+            self.cost,
+        )
+    }
+}
+
 impl ExecutionAndIOCosts {
     /// Convert the gas log into a type-erased representation.
     pub fn to_erased(&self) -> TypeErasedExecutionAndIoCosts {
         let mut nodes = vec![];
 
         nodes.push(Node::new("intrinsic", self.intrinsic_cost));
+
+        if !self.dependencies.is_empty() {
+            let deps = Node::new_with_children(
+                "dependencies",
+                0,
+                self.dependencies.iter().map(|dep| dep.to_erased()),
+            );
+            nodes.push(deps);
+        }
+
         nodes.push(self.call_graph.to_erased());
 
         let writes = Node::new_with_children(

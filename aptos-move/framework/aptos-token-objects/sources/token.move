@@ -78,8 +78,8 @@ module aptos_token_objects::token {
     #[deprecated]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct ConcurrentTokenIdentifiers has key {
-        _1: AggregatorSnapshot<u64>,
-        _2: AggregatorSnapshot<String>,
+        index: AggregatorSnapshot<u64>,
+        name: AggregatorSnapshot<String>,
     }
 
     /// This enables burning an NFT, if possible, it will also delete the object. Note, the data
@@ -430,13 +430,16 @@ module aptos_token_objects::token {
     }
 
     public fun burn(burn_ref: BurnRef) acquires Token, TokenIdentifiers {
-        let addr = if (option::is_some(&burn_ref.inner)) {
+        let (addr, previous_owner) = if (option::is_some(&burn_ref.inner)) {
             let delete_ref = option::extract(&mut burn_ref.inner);
             let addr = object::address_from_delete_ref(&delete_ref);
+            let previous_owner = object::owner(object::address_to_object<Token>(addr));
             object::delete(delete_ref);
-            addr
+            (addr, previous_owner)
         } else {
-            option::extract(&mut burn_ref.self)
+            let addr = option::extract(&mut burn_ref.self);
+            let previous_owner = object::owner(object::address_to_object<Token>(addr));
+            (addr, previous_owner)
         };
 
         if (royalty::exists_at(addr)) {
@@ -463,7 +466,7 @@ module aptos_token_objects::token {
         };
 
         event::destroy_handle(mutation_events);
-        collection::decrement_supply(&collection, addr, option::some(index));
+        collection::decrement_supply(&collection, addr, option::some(index), previous_owner);
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
@@ -795,6 +798,13 @@ module aptos_token_objects::token {
 
         let token_2_ref = create_numbered_token_helper(creator, collection_name, token_name);
         assert!(name(object::object_from_constructor_ref<Token>(&token_2_ref)) == std::string::utf8(b"token name2"), 1);
+        assert!(vector::length(&event::emitted_events<collection::Mint>()) == 1, 0);
+
+        let burn_ref = generate_burn_ref(&token_2_ref);
+        let token_addr = object::address_from_constructor_ref(&token_2_ref);
+        assert!(exists<Token>(token_addr), 0);
+        burn(burn_ref);
+        assert!(vector::length(&event::emitted_events<collection::Burn>()) == 1, 0);
     }
 
     #[test_only]

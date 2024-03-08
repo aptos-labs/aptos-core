@@ -90,6 +90,12 @@ impl<'a, T: ModuleResolver + ?Sized> MoveValueAnnotator<'a, T> {
         }
     }
 
+    pub fn new_with_max_bytecode_version(view: &'a T, max_bytecode_version: u32) -> Self {
+        Self {
+            cache: Resolver::new_with_max_bytecode_version(view, max_bytecode_version),
+        }
+    }
+
     pub fn get_module(&self, module: &ModuleId) -> Result<Rc<CompiledModule>> {
         self.cache.get_module_by_id_or_err(module)
     }

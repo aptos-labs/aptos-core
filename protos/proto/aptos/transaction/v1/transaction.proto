@@ -62,6 +62,8 @@ message Transaction {
     UserTransaction user = 10;
     ValidatorTransaction validator = 21;
   }
+
+  TransactionSizeInfo size_info = 22;
 }
 
 message BlockMetadataTransaction {
@@ -451,7 +453,7 @@ message AnyPublicKey {
     TYPE_ED25519 = 1;
     TYPE_SECP256K1_ECDSA = 2;
     TYPE_SECP256R1_ECDSA = 3;
-    TYPE_ZKID = 4;
+    TYPE_KEYLESS = 4;
   }
 
   Type type = 1;
@@ -464,7 +466,7 @@ message AnySignature {
     TYPE_ED25519 = 1;
     TYPE_SECP256K1_ECDSA = 2;
     TYPE_WEBAUTHN = 3;
-    TYPE_ZKID = 4;
+    TYPE_KEYLESS = 4;
   }
 
   Type type = 1;
@@ -478,7 +480,7 @@ message AnySignature {
     Ed25519 ed25519 = 3;
     Secp256k1Ecdsa secp256k1_ecdsa = 4;
     WebAuthn webauthn = 5;
-    ZkId zkid = 6;
+    Keyless keyless = 6;
   }
 }
 
@@ -494,7 +496,7 @@ message WebAuthn {
   bytes signature = 1;
 }
 
-message ZkId {
+message Keyless {
   bytes signature = 1;
 }
 
@@ -537,4 +539,20 @@ message AccountSignature {
     SingleKeySignature single_key_signature = 5;
     MultiKeySignature multi_key_signature = 6;
   }
+}
+
+message TransactionSizeInfo {
+  uint32 transaction_bytes = 1;
+  repeated EventSizeInfo event_size_info = 2;
+  repeated WriteOpSizeInfo write_op_size_info = 3;
+}
+
+message EventSizeInfo {
+  uint32 type_tag_bytes = 1;
+  uint32 total_bytes = 2;
+}
+
+message WriteOpSizeInfo {
+  uint32 key_bytes = 1;
+  uint32 value_bytes = 2;
 }

@@ -535,7 +535,7 @@ public intrinsic fun vector::swap_remove<#0>($t0|v: &mut vector<#0>, $t1|i: u64)
 
 [variant baseline]
 fun TestMutRef::call_return_ref_different_path($t0|b: bool): TestMutRef::N {
-     var $t1|r: &mut u64
+     var $t1|r: &mut u64 [unused]
      var $t2|x: TestMutRef::N
      var $t3: u64
      var $t4: u64
@@ -580,8 +580,8 @@ fun TestMutRef::call_return_ref_different_path($t0|b: bool): TestMutRef::N {
 [variant baseline]
 fun TestMutRef::call_return_ref_different_path_vec($t0|b: bool): TestMutRef::V {
      var $t1|is: vector<u64>
-     var $t2|r: &mut u64
-     var $t3|ts: vector<TestMutRef::T>
+     var $t2|r: &mut u64 [unused]
+     var $t3|ts: vector<TestMutRef::T> [unused]
      var $t4|x: TestMutRef::V
      var $t5: vector<TestMutRef::T>
      var $t6: &mut vector<u64>
@@ -657,7 +657,7 @@ fun TestMutRef::call_return_ref_different_path_vec($t0|b: bool): TestMutRef::V {
 [variant baseline]
 fun TestMutRef::call_return_ref_different_path_vec2($t0|b: bool): TestMutRef::V {
      var $t1|is: vector<u64>
-     var $t2|r: &mut u64
+     var $t2|r: &mut u64 [unused]
      var $t3|ts: vector<TestMutRef::T>
      var $t4|x: TestMutRef::V
      var $t5: &mut vector<u64>
@@ -776,7 +776,7 @@ fun TestMutRef::call_return_ref_different_path_vec2($t0|b: bool): TestMutRef::V 
 [variant baseline]
 fun TestMutRef::call_return_ref_different_path_vec2_incorrect($t0|b: bool): TestMutRef::V {
      var $t1|is: vector<u64>
-     var $t2|r: &mut u64
+     var $t2|r: &mut u64 [unused]
      var $t3|ts: vector<TestMutRef::T>
      var $t4|x: TestMutRef::V
      var $t5: &mut vector<u64>
@@ -894,7 +894,7 @@ fun TestMutRef::call_return_ref_different_path_vec2_incorrect($t0|b: bool): Test
 
 [variant baseline]
 fun TestMutRef::call_return_ref_different_root($t0|b: bool): (TestMutRef::T, TestMutRef::R) {
-     var $t1|r: &mut u64
+     var $t1|r: &mut u64 [unused]
      var $t2|x: TestMutRef::T
      var $t3|y: TestMutRef::R
      var $t4: u64

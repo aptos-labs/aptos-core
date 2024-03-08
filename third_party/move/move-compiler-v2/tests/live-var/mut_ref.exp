@@ -162,14 +162,6 @@ fun m::some2($t0: &mut m::R, $t1: &mut m::R) {
   0: return ()
 }
 
-
-Diagnostics:
-error: implicit copy of mutable reference in local `x` which is used later in argument list
-   ┌─ tests/live-var/mut_ref.move:41:9
-   │
-41 │         some2(x, x); // expected error because multiple use
-   │         ^^^^^^^^^^^ implicitly copied here
-
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
@@ -179,25 +171,22 @@ fun m::f1_ok() {
      var $t2: u64
      var $t3: &mut m::R
      var $t4: &mut m::R
-     var $t5: &mut m::R
      # live vars:
   0: $t2 := 0
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := infer($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
-  4: $t3 := move($t4)
+  4: $t3 := infer($t4)
      # live vars: $t3
-  5: $t5 := copy($t3)
-     # live vars: $t3, $t5
-  6: m::some($t5)
+  5: m::some($t3)
      # live vars: $t3
-  7: m::some($t3)
+  6: m::some($t3)
      # live vars:
-  8: return ()
+  7: return ()
 }
 
 
@@ -209,27 +198,24 @@ fun m::f1a_ok() {
      var $t3: &mut m::R
      var $t4: &mut m::R
      var $t5: m::R
-     var $t6: &mut m::R
      # live vars:
   0: $t2 := 0
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := infer($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
-  4: $t3 := move($t4)
+  4: $t3 := infer($t4)
      # live vars: $t3
   5: $t5 := read_ref($t3)
      # live vars: $t3
-  6: $t6 := copy($t3)
-     # live vars: $t3, $t6
-  7: m::some($t6)
+  6: m::some($t3)
      # live vars: $t3
-  8: m::some($t3)
+  7: m::some($t3)
      # live vars:
-  9: return ()
+  8: return ()
 }
 
 
@@ -241,27 +227,24 @@ fun m::f1b_ok() {
      var $t3: &mut m::R
      var $t4: &mut m::R
      var $t5: m::R
-     var $t6: &mut m::R
      # live vars:
   0: $t2 := 0
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := infer($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
-  4: $t3 := move($t4)
+  4: $t3 := infer($t4)
      # live vars: $t3
-  5: $t6 := copy($t3)
-     # live vars: $t3, $t6
-  6: m::some($t6)
+  5: m::some($t3)
      # live vars: $t3
-  7: $t5 := read_ref($t3)
+  6: $t5 := read_ref($t3)
      # live vars: $t3
-  8: m::some($t3)
+  7: m::some($t3)
      # live vars:
-  9: return ()
+  8: return ()
 }
 
 
@@ -277,11 +260,11 @@ fun m::f2_fail() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := infer($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
-  4: $t3 := move($t4)
+  4: $t3 := infer($t4)
      # live vars: $t3
   5: m::some2($t3, $t3)
      # live vars:
@@ -302,17 +285,17 @@ fun m::f3_ok() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := infer($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t0, $t4
-  4: $t3 := move($t4)
+  4: $t3 := infer($t4)
      # live vars: $t0, $t3
   5: m::some($t3)
      # live vars: $t0
   6: $t5 := borrow_local($t0)
      # live vars: $t5
-  7: $t3 := move($t5)
+  7: $t3 := infer($t5)
      # live vars: $t3
   8: m::some($t3)
      # live vars:
@@ -333,15 +316,15 @@ fun m::f4_ok() {
      # live vars: $t2
   1: $t1 := pack m::R($t2)
      # live vars: $t1
-  2: $t0 := move($t1)
+  2: $t0 := infer($t1)
      # live vars: $t0
   3: $t4 := borrow_local($t0)
      # live vars: $t4
-  4: $t3 := move($t4)
+  4: $t3 := infer($t4)
      # live vars: $t3
   5: $t5 := m::id($t3)
      # live vars: $t5
-  6: $t3 := move($t5)
+  6: $t3 := infer($t5)
      # live vars: $t3
   7: m::some($t3)
      # live vars:
@@ -362,13 +345,13 @@ fun m::f5_fail($t0: bool) {
      # live vars: $t0, $t3
   1: $t2 := pack m::R($t3)
      # live vars: $t0, $t2
-  2: $t1 := move($t2)
+  2: $t1 := infer($t2)
      # live vars: $t0, $t1
   3: $t5 := borrow_local($t1)
      # live vars: $t0, $t5
-  4: $t4 := move($t5)
+  4: $t4 := infer($t5)
      # live vars: $t0, $t4
-  5: $t6 := copy($t4)
+  5: $t6 := infer($t4)
      # live vars: $t0, $t4, $t6
   6: if ($t0) goto 7 else goto 11
      # live vars: $t4, $t6
@@ -396,7 +379,7 @@ fun m::f5_fail($t0: bool) {
 fun m::id($t0: &mut m::R): &mut m::R {
      var $t1: &mut m::R
      # live vars: $t0
-  0: $t1 := move($t0)
+  0: $t1 := infer($t0)
      # live vars: $t1
   1: return $t1
 }
@@ -404,13 +387,13 @@ fun m::id($t0: &mut m::R): &mut m::R {
 
 [variant baseline]
 fun m::some($t0: &mut m::R) {
-     # live vars:
+     # live vars: $t0
   0: return ()
 }
 
 
 [variant baseline]
 fun m::some2($t0: &mut m::R, $t1: &mut m::R) {
-     # live vars:
+     # live vars: $t0, $t1
   0: return ()
 }

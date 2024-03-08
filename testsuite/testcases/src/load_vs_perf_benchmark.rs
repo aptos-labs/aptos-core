@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::NetworkLoadTest;
+use crate::{create_emitter_and_request, LoadDestination, NetworkLoadTest};
+use anyhow::Context;
 use aptos_forge::{
     args::TransactionTypeArg,
     prometheus_metrics::{LatencyBreakdown, LatencyBreakdownSlice},
     success_criteria::{SuccessCriteria, SuccessCriteriaChecker},
     EmitJobMode, EmitJobRequest, NetworkContext, NetworkTest, Result, Test, TxnStats,
+    WorkflowProgress,
 };
 use aptos_logger::info;
 use rand::SeedableRng;
@@ -111,14 +113,18 @@ impl TransactionWorkload {
 
     fn configure(&self, request: EmitJobRequest) -> EmitJobRequest {
         let account_creation_type =
-            TransactionTypeArg::AccountGenerationLargePool.materialize(1, false);
+            TransactionTypeArg::AccountGenerationLargePool.materialize_default();
 
         let request = request.mode(EmitJobMode::MaxLoad {
             mempool_backlog: self.mempool_backlog,
         });
 
         if self.is_phased() {
-            let write_type = self.transaction_type.materialize(self.num_modules, true);
+            let write_type = self.transaction_type.materialize(
+                self.num_modules,
+                true,
+                WorkflowProgress::when_done_default(),
+            );
             request.transaction_mix_per_phase(vec![
                 // warmup
                 vec![(account_creation_type, 1)],
@@ -128,7 +134,11 @@ impl TransactionWorkload {
                 vec![(write_type, 1)],
             ])
         } else {
-            request.transaction_type(self.transaction_type.materialize(self.num_modules, false))
+            request.transaction_type(self.transaction_type.materialize(
+                self.num_modules,
+                false,
+                WorkflowProgress::when_done_default(),
+            ))
         }
     }
 
@@ -151,10 +161,17 @@ impl TransactionWorkload {
     }
 }
 
+pub struct ContinuousTraffic {
+    pub traffic: EmitJobRequest,
+    pub criteria: Option<SuccessCriteria>,
+}
+
 pub struct LoadVsPerfBenchmark {
     pub test: Box<dyn NetworkLoadTest>,
     pub workloads: Workloads,
     pub criteria: Vec<SuccessCriteria>,
+
+    pub continuous_traffic: Option<ContinuousTraffic>,
 }
 
 impl Test for LoadVsPerfBenchmark {
@@ -206,7 +223,31 @@ impl NetworkTest for LoadVsPerfBenchmark {
             self.workloads.len(),
         );
 
-        let _runtime = Runtime::new().unwrap();
+        let rt = Runtime::new().unwrap();
+
+        let mut continous_job = if let Some(continuous_traffic) = &self.continuous_traffic {
+            let nodes_to_send_load_to =
+                LoadDestination::FullnodesOtherwiseValidators.get_destination_nodes(ctx.swarm());
+            let rng = SeedableRng::from_rng(ctx.core().rng())?;
+            let (mut emitter, emit_job_request) = create_emitter_and_request(
+                ctx.swarm(),
+                continuous_traffic.traffic.clone(),
+                &nodes_to_send_load_to,
+                rng,
+            )
+            .context("create emitter")?;
+
+            let job = rt
+                .block_on(emitter.start_job(
+                    ctx.swarm().chain_info().root_account,
+                    emit_job_request,
+                    1 + 2 * self.workloads.len(),
+                ))
+                .context("start emitter job")?;
+            Some(job)
+        } else {
+            None
+        };
 
         let (phase_duration, buffer) = self.workloads.split_duration(ctx.global_duration);
 
@@ -215,6 +256,10 @@ impl NetworkTest for LoadVsPerfBenchmark {
             if index != 0 {
                 info!("Sleeping in between loadtests, for {}s", buffer.as_secs());
                 std::thread::sleep(buffer);
+            }
+
+            if let Some(job) = continous_job.as_mut() {
+                job.start_next_phase()
             }
 
             info!("Starting for {:?}", self.workloads);
@@ -228,6 +273,10 @@ impl NetworkTest for LoadVsPerfBenchmark {
                         .unwrap(),
                 )?,
             );
+
+            if let Some(job) = continous_job.as_mut() {
+                job.start_next_phase()
+            }
 
             // Note: uncomment below to perform reconfig during a test
             // let mut aptos_info = ctx.swarm().aptos_public_info();
@@ -243,6 +292,28 @@ impl NetworkTest for LoadVsPerfBenchmark {
         for line in table {
             ctx.report.report_text(line);
         }
+
+        let continuous_results = continous_job.map(|job| {
+            let stats_by_phase = rt.block_on(job.stop_job());
+
+            let mut result = vec![];
+            for (phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
+                if phase % 2 != 0 {
+                    result.push((
+                        format!("continuous with traffic {}", phase / 2),
+                        phase_stats,
+                    ));
+                }
+            }
+
+            let table = to_table_continuous("continuous traffic".to_string(), &result);
+            for line in table {
+                ctx.report.report_text(line);
+            }
+
+            result
+        });
+
         for (index, result) in results.iter().enumerate() {
             // always take last phase for success criteria
             let target_result = &result[result.len() - 1];
@@ -257,6 +328,22 @@ impl NetworkTest for LoadVsPerfBenchmark {
                 )?;
             }
         }
+
+        if let Some(results) = continuous_results {
+            for (name, stats) in results {
+                let rate = stats.rate();
+                if let Some(criteria) = &self.continuous_traffic.as_ref().unwrap().criteria {
+                    SuccessCriteriaChecker::check_core_for_success(
+                        criteria,
+                        ctx.report,
+                        &rate,
+                        None,
+                        Some(name),
+                    )?;
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -304,6 +391,40 @@ fn to_table(type_name: String, results: &[Vec<SingleRunStats>]) -> Vec<String> {
                 result.actual_duration.as_secs()
             ));
         }
+    }
+
+    table
+}
+
+fn to_table_continuous(type_name: String, results: &[(String, TxnStats)]) -> Vec<String> {
+    let mut table = Vec::new();
+    table.push(format!(
+        "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+        type_name,
+        "submitted/s",
+        "committed/s",
+        "expired/s",
+        "rejected/s",
+        "latency",
+        "p50 lat",
+        "p90 lat",
+        "p99 lat",
+    ));
+
+    for (name, stats) in results {
+        let rate = stats.rate();
+        table.push(format!(
+            "{: <40} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12} | {: <12}",
+            name,
+            rate.submitted,
+            rate.committed,
+            rate.expired,
+            rate.failed_submission,
+            rate.latency,
+            rate.p50_latency,
+            rate.p90_latency,
+            rate.p99_latency,
+        ));
     }
 
     table

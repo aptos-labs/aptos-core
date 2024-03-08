@@ -33,9 +33,9 @@ proposals:
             - refundable_bytes
   - name: step_4_enable_fairness_shuffler
     metadata:
-      title: "Enable Fairness Shuffler"
-      description: "FairnessShuffler that tries to spread out (delay) transactions from dominant modules in a block, so that if block limit is hit, transactions from non-dominant modules have a fair share of the block space."
-      discussion_url: "TBA"
+      title: "AIP-68: Reordering transactions in a block for fairness"
+      description: "AIP-68: This AIP proposes to update the Transaction Shuffler logic to add other aspects of fairness to how transactions are ordered in the block."
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/333"
     execution_mode: MultiStep
     update_sequence:
       - Execution:
@@ -106,7 +106,7 @@ proposals:
     update_sequence:
       - FeatureFlag:
           enabled:
-            - aggregator_v2_delayed_fields          
+            - aggregator_v2_delayed_fields
             - resource_groups_split_in_vm_change_set
   - name: step_10_enable_validator_txn
     metadata:
@@ -151,21 +151,20 @@ proposals:
       - FeatureFlag:
           enabled:
             - jwk_consensus
-  - name: step_12_enable_zkid
+  - name: step_12_enable_keyless_accounts
     metadata:
-      title: "AIP-61: OpenID blockchain (OIDB) accounts"
-      description: "Enable validation of zkID transactions, allowing users to transact using their Web2 accounts"
+      title: "AIP-61: Keyless accounts"
+      description: "Enable keyless blockchain accounts, allowing users to transact directly using their Web2 accounts instead of managing a secret key"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/297"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - zk_id_signature
+            - keyless_accounts
   - name: step_13_start_watching_google_jwks
     metadata:
       title: "Start JWK consensus for Google"
-      description: "JWK Consensus (AIP-67) for Google enables Google-based OIDB accounts (AIP-61)."
-      discussion_url: "TBA"
+      description: "JWK Consensus (AIP-67) for Google enables Google-based keyless accounts (AIP-61)."
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move

@@ -273,7 +273,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
                     };
                     let _post = PER_WORKER_TIMER.timer_with(&[&idx, "run_txn_post_vm"]);
                     // TODO(ptx): error handling
-                    let (_vm_status, vm_output, _msg) = vm_output.expect("VM execution failed.");
+                    let (_vm_status, vm_output) = vm_output.expect("VM execution failed.");
 
                     // inform output state values to the manager
                     // TODO use try_into_storage_change_set() instead, and ChangeSet it returns, instead of VMOutput.

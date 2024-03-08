@@ -1,5 +1,5 @@
 
-<a name="0x1_offer"></a>
+<a id="0x1_offer"></a>
 
 # Module `0x1::offer`
 
@@ -39,7 +39,7 @@ redeemed it.
 
 
 
-<a name="0x1_offer_Offer"></a>
+<a id="0x1_offer_Offer"></a>
 
 ## Resource `Offer`
 
@@ -73,12 +73,12 @@ A wrapper around value <code>offered</code> that can be claimed by the address s
 
 </details>
 
-<a name="@Constants_0"></a>
+<a id="@Constants_0"></a>
 
 ## Constants
 
 
-<a name="0x1_offer_EOFFER_ALREADY_CREATED"></a>
+<a id="0x1_offer_EOFFER_ALREADY_CREATED"></a>
 
 Address already has an offer of this type.
 
@@ -88,7 +88,7 @@ Address already has an offer of this type.
 
 
 
-<a name="0x1_offer_EOFFER_DNE_FOR_ACCOUNT"></a>
+<a id="0x1_offer_EOFFER_DNE_FOR_ACCOUNT"></a>
 
 An offer of the specified type for the account does not exist
 
@@ -98,7 +98,7 @@ An offer of the specified type for the account does not exist
 
 
 
-<a name="0x1_offer_EOFFER_DOES_NOT_EXIST"></a>
+<a id="0x1_offer_EOFFER_DOES_NOT_EXIST"></a>
 
 Address does not have an offer of this type to redeem.
 
@@ -108,7 +108,7 @@ Address does not have an offer of this type to redeem.
 
 
 
-<a name="0x1_offer_create"></a>
+<a id="0x1_offer_create"></a>
 
 ## Function `create`
 
@@ -152,7 +152,7 @@ placing the offer under the signer's address
 
 </details>
 
-<a name="0x1_offer_redeem"></a>
+<a id="0x1_offer_redeem"></a>
 
 ## Function `redeem`
 
@@ -203,7 +203,7 @@ Ensures that the offered struct under <code>offer_address</code> is removed.
 
 </details>
 
-<a name="0x1_offer_exists_at"></a>
+<a id="0x1_offer_exists_at"></a>
 
 ## Function `exists_at`
 
@@ -246,7 +246,7 @@ Returns whether or not an <code><a href="offer.md#0x1_offer_Offer">Offer</a></co
 
 </details>
 
-<a name="0x1_offer_address_of"></a>
+<a id="0x1_offer_address_of"></a>
 
 ## Function `address_of`
 
@@ -288,24 +288,24 @@ under the <code>offer_address</code>.
 
 </details>
 
-<a name="@Module_Specification_1"></a>
+<a id="@Module_Specification_1"></a>
 
 ## Module Specification
 
 
 
-<a name="@Access_Control_2"></a>
+<a id="@Access_Control_2"></a>
 
 ### Access Control
 
 
-<a name="@Creation_of_Offers_3"></a>
+<a id="@Creation_of_Offers_3"></a>
 
 #### Creation of Offers
 
 
 
-<a name="0x1_offer_NoOfferCreated"></a>
+<a id="0x1_offer_NoOfferCreated"></a>
 
 Says no offer is created for any address. Later, it is applied to all functions
 except <code>create</code>
@@ -326,13 +326,13 @@ Apply OnlyCreateCanCreateOffer to every function except <code>create</code>
 
 
 
-<a name="@Removal_of_Offers_4"></a>
+<a id="@Removal_of_Offers_4"></a>
 
 #### Removal of Offers
 
 
 
-<a name="0x1_offer_NoOfferRemoved"></a>
+<a id="0x1_offer_NoOfferRemoved"></a>
 
 Says no offer is removed for any address. Applied below to everything except <code>redeem</code>
 
@@ -353,7 +353,7 @@ Only <code>redeem</code> can remove an offer from the global store.
 
 
 
-<a name="@Helper_Functions_5"></a>
+<a id="@Helper_Functions_5"></a>
 
 ### Helper Functions
 
@@ -362,7 +362,7 @@ Returns true if the recipient is allowed to redeem <code><a href="offer.md#0x1_o
 and false otherwise.
 
 
-<a name="0x1_offer_is_allowed_recipient"></a>
+<a id="0x1_offer_is_allowed_recipient"></a>
 
 
 <pre><code><b>fun</b> <a href="offer.md#0x1_offer_is_allowed_recipient">is_allowed_recipient</a>&lt;Offered&gt;(offer_addr: <b>address</b>, recipient: <b>address</b>): bool {

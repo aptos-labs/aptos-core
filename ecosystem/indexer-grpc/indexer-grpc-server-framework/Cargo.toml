@@ -29,3 +29,6 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 warp = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+aptos-admin-service = { workspace = true }

@@ -786,6 +786,7 @@ impl<'env> SpecTranslator<'env> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         match oper {
+            Operation::Closure(..) => unimplemented!("closures in specs"),
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),
@@ -913,13 +914,16 @@ impl<'env> SpecTranslator<'env> {
                     "currently `TRACE(..)` cannot be used in spec functions or in lets",
                 )
             },
+            Operation::Freeze => {
+                // Skip freeze operation
+                self.translate_exp(&args[0])
+            },
             Operation::MoveFunction(_, _)
             | Operation::BorrowGlobal(_)
             | Operation::Borrow(..)
             | Operation::Deref
             | Operation::MoveTo
             | Operation::MoveFrom
-            | Operation::Freeze
             | Operation::Abort
             | Operation::Vector
             | Operation::Old => {

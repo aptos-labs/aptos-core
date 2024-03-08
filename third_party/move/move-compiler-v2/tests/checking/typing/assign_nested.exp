@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected 4 item(s), found 3
+error: the left-hand side has 3 items but the right-hand side provided 4
    ┌─ tests/checking/typing/assign_nested.move:14:9
    │
 14 │         (_, x, _) = four();

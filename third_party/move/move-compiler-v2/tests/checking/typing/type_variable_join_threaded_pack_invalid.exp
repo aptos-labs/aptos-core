@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `bool` but found `integer`
+error: cannot return `Box<integer>` from a function with result type `Box<bool>`
    ┌─ tests/checking/typing/type_variable_join_threaded_pack_invalid.move:42:9
    │
 42 │         b

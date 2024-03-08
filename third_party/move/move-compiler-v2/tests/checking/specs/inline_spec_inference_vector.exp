@@ -6,7 +6,7 @@ warning: Unused parameter `length`. Consider removing or prefixing with an under
 3 │   public fun new(length: u64) {
   │                  ^^^^^^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::bit_vector {
     use std::vector;
     public fun new(length: u64) {
