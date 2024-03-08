@@ -119,6 +119,38 @@ fn test_exempted_modules() {
     .run()
 }
 
+/// Simulating sender_aware::test_5_sender_shuffling
+#[test]
+fn test_sender_shuffling_1() {
+    TestCase {
+        shuffler: FairnessShuffler::new_for_test(3, 1, 2),
+        conflict_key_registries: [
+            ConflictKeyRegistry::nums_per_key([2, 1, 1, 1, 1]),
+            ConflictKeyRegistry::all_exempt(6),
+            ConflictKeyRegistry::all_exempt(6),
+        ],
+        // S1_1, S2_1, S3_1, S4_1, S1_2, S5_1
+        expected_order: vec![0, 2, 3, 4, 1, 5],
+    }
+    .run()
+}
+
+/// Simulating sender_aware::test_6_sender_shuffling
+#[test]
+fn test_sender_shuffling_2() {
+    TestCase {
+        shuffler: FairnessShuffler::new_for_test(3, 1, 2),
+        conflict_key_registries: [
+            ConflictKeyRegistry::nums_per_key([2, 1, 2, 1, 1, 1]),
+            ConflictKeyRegistry::all_exempt(8),
+            ConflictKeyRegistry::all_exempt(8),
+        ],
+        // S1_1, S2_1, S3_1, S4_1, S1_2, S5_1, S3_2, S6_1
+        expected_order: vec![0, 2, 3, 5, 1, 6, 4, 7],
+    }
+    .run()
+}
+
 #[test]
 fn test_dominating_module() {
     TestCase {

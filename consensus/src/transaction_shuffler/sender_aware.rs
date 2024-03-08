@@ -5,6 +5,7 @@ use crate::{counters::NUM_SENDERS_IN_BLOCK, transaction_shuffler::TransactionShu
 use aptos_types::transaction::SignedTransaction;
 use move_core_types::account_address::AccountAddress;
 use std::collections::{HashMap, VecDeque};
+use crate::transaction_shuffler::fairness::FairnessShuffler;
 
 /// An implementation of transaction shuffler, which tries to spread transactions from same senders
 /// in a block in order to reduce conflict. On a high level, it works as follows - It defines a
@@ -36,47 +37,11 @@ pub struct SenderAwareShuffler {
 
 impl TransactionShuffler for SenderAwareShuffler {
     fn shuffle(&self, txns: Vec<SignedTransaction>) -> Vec<SignedTransaction> {
-        // Early return for performance reason if there are no transactions to shuffle
-        if txns.is_empty() {
-            return txns;
-        }
-
-        // handle the corner case of conflict window being 0, in which case we don't do any shuffling
-        if self.conflict_window_size == 0 {
-            return txns;
-        }
-
-        // maintains the intermediate state of the shuffled transactions
-        let mut sliding_window = SlidingWindowState::new(self.conflict_window_size, txns.len());
-        let mut pending_txns = PendingTransactions::new();
-        let num_transactions = txns.len();
-        let mut orig_txns = VecDeque::from(txns);
-        let mut next_to_add = |sliding_window: &mut SlidingWindowState| -> SignedTransaction {
-            // First check if we have a sender dropped off of conflict window in previous step, if so,
-            // we try to find pending transaction from the corresponding sender and add it to the block.
-            if let Some(sender) = sliding_window.last_dropped_sender() {
-                if let Some(txn) = pending_txns.remove_pending_from_sender(sender) {
-                    return txn;
-                }
-            }
-            // If we can't find any transaction from a sender dropped off of conflict window, then
-            // iterate through the original transactions and try to find the next candidate
-            while let Some(txn) = orig_txns.pop_front() {
-                if !sliding_window.has_conflict(&txn.sender()) {
-                    return txn;
-                }
-                pending_txns.add_transaction(txn);
-            }
-
-            // If we can't find any candidate in above steps, then lastly
-            // add pending transactions in the order if we can't find any other candidate
-            pending_txns.remove_first_pending().unwrap()
-        };
-        while sliding_window.num_txns() < num_transactions {
-            let txn = next_to_add(&mut sliding_window);
-            sliding_window.add_transaction(txn)
-        }
-        sliding_window.finalize()
+        FairnessShuffler {
+            sender_conflict_window_size: self.conflict_window_size,
+            module_conflict_window_size: 1,
+            entry_fun_conflict_window_size: 2,
+        }.shuffle(txns)
     }
 }
 
@@ -231,6 +196,10 @@ mod tests {
         collections::{HashMap, HashSet},
         time::Instant,
     };
+    use aptos_types::transaction::EntryFunction;
+    use move_core_types::identifier::Identifier;
+    use move_core_types::language_storage::ModuleId;
+    use move_core_types::value::MoveTypeLayout::Address;
 
     fn create_signed_transaction(num_transactions: usize) -> Vec<SignedTransaction> {
         let private_key = Ed25519PrivateKey::generate_for_testing();
@@ -241,7 +210,15 @@ mod tests {
 
         for i in 0..num_transactions {
             let transaction_payload =
-                TransactionPayload::Script(Script::new(vec![], vec![], vec![]));
+                TransactionPayload::EntryFunction(EntryFunction::new(
+                    ModuleId::new(
+                        AccountAddress::ONE,
+                        Identifier::new("A").unwrap()
+                    ),
+                    Identifier::new("B").unwrap(),
+                    vec![],
+                    vec![],
+                ));
             let raw_transaction = RawTransaction::new(
                 sender,
                 i as u64,
