@@ -3,77 +3,87 @@ Diagnostics:
 error: cyclic type instantiation
   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:6:2
   │
-6 │ ╭     fun test0<T>() {
-7 │ │         test0<S<T>>()
+6 │ ╭     public fun simple_recursion<T>() {
+7 │ │         simple_recursion<S<T>>()
 8 │ │     }
   │ ╰─────^
   │
-  = test0<T> calls test0<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:6
+  = simple_recursion<T> calls simple_recursion<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:6
 
 error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:10:2
    │
-10 │ ╭     fun test1<T>() {
-11 │ │         test2<T>()
+10 │ ╭     fun two_level_recursion_0<T>() {
+11 │ │         two_level_recursion_1<T>()
 12 │ │     }
    │ ╰─────^
    │
-   = test1<T> calls test2<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:10
-   = test2<T> calls test1<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:11
+   = two_level_recursion_0<T> calls two_level_recursion_1<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:10
+   = two_level_recursion_1<T> calls two_level_recursion_0<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:11
 
 error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:14:2
    │
-14 │ ╭     fun test2<T>() {
-15 │ │         test1<S<T>>()
+14 │ ╭     fun two_level_recursion_1<T>() {
+15 │ │         two_level_recursion_0<S<T>>()
 16 │ │     }
    │ ╰─────^
    │
-   = test2<T> calls test1<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:14
-   = test1<m0::S<T>> calls test2<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:15
+   = two_level_recursion_1<T> calls two_level_recursion_0<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:14
+   = two_level_recursion_0<m0::S<T>> calls two_level_recursion_1<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:15
 
 error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:18:2
    │
-18 │ ╭     fun test3<T>() {
-19 │ │         test4<T>()
+18 │ ╭     fun three_level_recursion_0<T>() {
+19 │ │         three_level_recursion_1<T>()
 20 │ │     }
    │ ╰─────^
    │
-   = test3<T> calls test4<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:18
-   = test4<T> calls test5<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:19
-   = test5<T> calls test3<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:23
+   = three_level_recursion_0<T> calls three_level_recursion_1<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:18
+   = three_level_recursion_1<T> calls three_level_recursion_2<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:19
+   = three_level_recursion_2<T> calls three_level_recursion_0<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:23
 
 error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:22:2
    │
-22 │ ╭     fun test4<T>() {
-23 │ │         test5<T>()
+22 │ ╭     fun three_level_recursion_1<T>() {
+23 │ │         three_level_recursion_2<T>()
 24 │ │     }
    │ ╰─────^
    │
-   = test4<T> calls test5<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:22
-   = test5<T> calls test3<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:23
-   = test3<m0::S<T>> calls test4<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:27
+   = three_level_recursion_1<T> calls three_level_recursion_2<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:22
+   = three_level_recursion_2<T> calls three_level_recursion_0<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:23
+   = three_level_recursion_0<m0::S<T>> calls three_level_recursion_1<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:27
 
 error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:26:2
    │
-26 │ ╭     fun test5<T>() {
-27 │ │         test3<S<T>>()
+26 │ ╭     fun three_level_recursion_2<T>() {
+27 │ │         three_level_recursion_0<S<T>>()
 28 │ │     }
    │ ╰─────^
    │
-   = test5<T> calls test3<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:26
-   = test3<m0::S<T>> calls test4<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:27
-   = test4<m0::S<T>> calls test5<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:19
+   = three_level_recursion_2<T> calls three_level_recursion_0<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:26
+   = three_level_recursion_0<m0::S<T>> calls three_level_recursion_1<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:27
+   = three_level_recursion_1<m0::S<T>> calls three_level_recursion_2<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:19
 
 error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:30:2
    │
-30 │ ╭     fun test6<T1, T2>() {
-31 │ │         test6<T2, S<T1>>()
+30 │ ╭     fun recurse_at_different_position<T1, T2>() {
+31 │ │         recurse_at_different_position<T2, S<T1>>()
 32 │ │     }
    │ ╰─────^
    │
-   = test6<T1, T2> calls test6<T2, m0::S<T1>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:30
+   = recurse_at_different_position<T1, T2> calls recurse_at_different_position<T2, m0::S<T1>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:30
+
+error: cyclic type instantiation
+   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:44:2
+   │
+44 │ ╭     fun test_vec<T>() {
+45 │ │         test_vec<vector<T>>()
+46 │ │     }
+   │ ╰─────^
+   │
+   = test_vec<T> calls test_vec<vector<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:44

@@ -3,39 +3,54 @@ module 0x42::m0 {
 		f: T
 	}
 
-	fun test0<T>() {
-		test0<S<T>>()
+	public fun simple_recursion<T>() {
+		simple_recursion<S<T>>()
 	}
 
-	fun test1<T>() {
-		test2<T>()
+	fun two_level_recursion_0<T>() {
+		two_level_recursion_1<T>()
 	}
 
-	fun test2<T>() {
-		test1<S<T>>()
+	fun two_level_recursion_1<T>() {
+		two_level_recursion_0<S<T>>()
 	}
 
-	fun test3<T>() {
-		test4<T>()
+	fun three_level_recursion_0<T>() {
+		three_level_recursion_1<T>()
 	}
 
-	fun test4<T>() {
-		test5<T>()
+	fun three_level_recursion_1<T>() {
+		three_level_recursion_2<T>()
 	}
 
-	fun test5<T>() {
-		test3<S<T>>()
+	fun three_level_recursion_2<T>() {
+		three_level_recursion_0<S<T>>()
 	}
 
-	fun test6<T1, T2>() {
-		test6<T2, S<T1>>()
+	fun recurse_at_different_position<T1, T2>() {
+		recurse_at_different_position<T2, S<T1>>()
 	}
 
-	fun test7<T>() {
-		test7<T>()
+	// ok
+	fun simple_loop<T>() {
+		simple_loop<T>()
 	}
 
-	fun test8() {
-		test8()
+	// ok
+	fun simple_recursion_no_ty_param() {
+		simple_recursion_no_ty_param()
+	}
+
+	fun test_vec<T>() {
+		test_vec<vector<T>>()
+	}
+}
+
+module 0x42::m1 {
+	use 0x42::m0::simple_recursion;
+
+	fun call_simple_recursion() {
+		// no err message for this
+		simple_recursion<bool>()
 	}
 }
