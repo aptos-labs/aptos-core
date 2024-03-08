@@ -36,9 +36,11 @@ impl<'a> CyclicInstantiationChecker<'a> {
 	/// Checks the given function
     fn check_fun(&self, fun_id: FunId) {
         let fun_body = self.get_fun_def(fun_id);
-        let mut callers = Vec::new();
         let num_ty_params = self.mod_env.get_function(fun_id).get_type_parameter_count() as u16;
         let insts = (0..num_ty_params).map(Type::TypeParameter).collect_vec();
+		let root_caller = self.mod_env.get_id().qualified_inst(fun_id, insts.clone());
+		let root_caller_loc = self.mod_env.get_function(fun_id).get_loc();
+        let mut callers = vec![(root_caller_loc, root_caller)];
         fun_body.visit_positions(&mut |pos, e| self.visit(pos, e, &mut callers, insts.clone()));
     }
 
@@ -49,7 +51,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         &self,
         position: VisitorPosition,
         e: &ExpData,
-        callers_chain: &mut Vec<(NodeId, QualifiedInstId<FunId>)>,
+        callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
         insts: Vec<Type>,
     ) -> bool {
         use ExpData::*;
@@ -66,7 +68,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         &self,
         nid: &NodeId,
         op: &Operation,
-        callers_chain: &mut Vec<(NodeId, QualifiedInstId<FunId>)>,
+        callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
         insts: Vec<Type>,
     ) -> bool {
         if let Operation::MoveFunction(mod_id, fun_id) = op {
@@ -115,11 +117,12 @@ impl<'a> CyclicInstantiationChecker<'a> {
         &self,
         caller_node: NodeId,
         caller: QualifiedInstId<FunId>,
-        callers_chain: &mut Vec<(NodeId, QualifiedInstId<FunId>)>,
+        callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
         insts: Vec<Type>,
     ) -> bool {
         let caller_body = self.get_fun_def(caller.id);
-        callers_chain.push((caller_node, caller));
+		let caller_loc = self.mod_env.env.get_node_loc(caller_node);
+        callers_chain.push((caller_loc, caller));
         let insts = Type::instantiate_vec(self.get_inst(caller_node), &insts);
         let res = caller_body
             .visit_positions(&mut |pos, exp| self.visit(pos, exp, callers_chain, insts.clone()));
@@ -161,12 +164,11 @@ impl<'a> CyclicInstantiationChecker<'a> {
         &self,
         _nid: NodeId,
         callee: QualifiedInstId<FunId>,
-        callers_chain: &mut Vec<(NodeId, QualifiedInstId<FunId>)>,
+        callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
     ) {
         let labels = (0..callers_chain.len())
             .map(|i| {
-                let (caller_node, caller) = &callers_chain[i];
-                let caller_loc = self.mod_env.env.get_node_loc(*caller_node);
+                let (caller_loc, caller) = &callers_chain[i];
                 let callee = if i != callers_chain.len() - 1 {
                     &callers_chain[i + 1].1
                 } else {
@@ -180,11 +182,10 @@ impl<'a> CyclicInstantiationChecker<'a> {
                 )
             })
             .collect_vec();
-        let root_node_id = &callers_chain[0].0;
-        let root_loc = self.mod_env.env.get_node_loc(*root_node_id);
+        let root_loc = &callers_chain[0].0;
         self.mod_env
             .env
-            .error_with_notes(&root_loc, "cyclic type instantiation", labels)
+            .error_with_notes(&root_loc, &format!("cyclic type instantiation {}", self.mod_env.get_function(callers_chain[0].1.id).get_name_str()), labels)
     }
 
     /// Returns the display name of a function call with type parameters but without arguments
