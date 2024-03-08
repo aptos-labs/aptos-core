@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Cyclic type instantiations found for type parameter `T` of `test0`
+error: cyclic type instantiation
   ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:6:2
   │
 6 │ ╭     fun test0<T>() {
@@ -10,7 +10,7 @@ error: Cyclic type instantiations found for type parameter `T` of `test0`
   │
   = test0<T> calls test0<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:6
 
-error: Cyclic type instantiations found for type parameter `T` of `test1`
+error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:10:2
    │
 10 │ ╭     fun test1<T>() {
@@ -21,7 +21,7 @@ error: Cyclic type instantiations found for type parameter `T` of `test1`
    = test1<T> calls test2<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:10
    = test2<T> calls test1<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:11
 
-error: Cyclic type instantiations found for type parameter `T` of `test2`
+error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:14:2
    │
 14 │ ╭     fun test2<T>() {
@@ -32,7 +32,7 @@ error: Cyclic type instantiations found for type parameter `T` of `test2`
    = test2<T> calls test1<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:14
    = test1<m0::S<T>> calls test2<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:15
 
-error: Cyclic type instantiations found for type parameter `T` of `test3`
+error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:18:2
    │
 18 │ ╭     fun test3<T>() {
@@ -44,7 +44,7 @@ error: Cyclic type instantiations found for type parameter `T` of `test3`
    = test4<T> calls test5<T> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:19
    = test5<T> calls test3<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:23
 
-error: Cyclic type instantiations found for type parameter `T` of `test4`
+error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:22:2
    │
 22 │ ╭     fun test4<T>() {
@@ -56,7 +56,7 @@ error: Cyclic type instantiations found for type parameter `T` of `test4`
    = test5<T> calls test3<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:23
    = test3<m0::S<T>> calls test4<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:27
 
-error: Cyclic type instantiations found for type parameter `T` of `test5`
+error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:26:2
    │
 26 │ ╭     fun test5<T>() {
@@ -68,7 +68,7 @@ error: Cyclic type instantiations found for type parameter `T` of `test5`
    = test3<m0::S<T>> calls test4<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:27
    = test4<m0::S<T>> calls test5<m0::S<T>> at tests/recursive-instantiation-checker/recursive_type_instantiation.move:19
 
-error: Cyclic type instantiations found for type parameter `T1` of `test6`
+error: cyclic type instantiation
    ┌─ tests/recursive-instantiation-checker/recursive_type_instantiation.move:30:2
    │
 30 │ ╭     fun test6<T1, T2>() {

@@ -34,4 +34,8 @@ module 0x42::m0 {
 	fun test7<T>() {
 		test7<T>()
 	}
+
+	fun test8() {
+		test8()
+	}
 }
