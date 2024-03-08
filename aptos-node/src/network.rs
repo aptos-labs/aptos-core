@@ -166,7 +166,7 @@ pub fn storage_service_network_configuration(node_config: &NodeConfig) -> Networ
 pub fn observer_service_network_configuration(
     _node_config: &NodeConfig,
 ) -> NetworkApplicationConfig {
-    let direct_send_protocols = vec![ProtocolId::ConsensusDirectSendCompressed];
+    let direct_send_protocols = vec![ProtocolId::ConsensusObserverCompressed];
     let rpc_protocols = vec![];
     let max_network_channel_size = 100;
 

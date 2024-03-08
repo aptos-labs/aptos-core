@@ -71,6 +71,7 @@ pub enum ProtocolId {
     JWKConsensusRpcCompressed = 24,
     JWKConsensusRpcBcs = 25,
     JWKConsensusRpcJson = 26,
+    ConsensusObserverCompressed = 27,
 }
 
 /// The encoding types for Protocols
@@ -111,6 +112,7 @@ impl ProtocolId {
             JWKConsensusRpcCompressed => "JWKConsensusRpcCompressed",
             JWKConsensusRpcBcs => "JWKConsensusRpcBcs",
             JWKConsensusRpcJson => "JWKConsensusRpcJson",
+            ConsensusObserverCompressed => "ConsensusObserverCompressed",
         }
     }
 
@@ -144,6 +146,7 @@ impl ProtocolId {
             ProtocolId::JWKConsensusRpcCompressed,
             ProtocolId::JWKConsensusRpcBcs,
             ProtocolId::JWKConsensusRpcJson,
+            ProtocolId::ConsensusObserverCompressed,
         ]
     }
 
@@ -151,9 +154,9 @@ impl ProtocolId {
     fn encoding(self) -> Encoding {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
-            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
-                Encoding::CompressedBcs(RECURSION_LIMIT)
-            },
+            ProtocolId::ConsensusDirectSendCompressed
+            | ProtocolId::ConsensusRpcCompressed
+            | ProtocolId::ConsensusObserverCompressed => Encoding::CompressedBcs(RECURSION_LIMIT),
             ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
                 Encoding::CompressedBcs(RECURSION_LIMIT)
             },
@@ -168,9 +171,9 @@ impl ProtocolId {
     /// Returns the compression client label based on the current protocol id
     fn get_compression_client(self) -> CompressionClient {
         match self {
-            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
-                CompressionClient::Consensus
-            },
+            ProtocolId::ConsensusDirectSendCompressed
+            | ProtocolId::ConsensusRpcCompressed
+            | ProtocolId::ConsensusObserverCompressed => CompressionClient::Consensus,
             ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
             ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
                 CompressionClient::DKG
