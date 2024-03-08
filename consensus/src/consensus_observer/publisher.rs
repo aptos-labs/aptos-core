@@ -1,19 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    consensus_observer::network_messages::ObserverMessage, network_interface::ConsensusMsg,
-};
+use crate::{consensus_observer::network::ObserverMessage, network_interface::ConsensusMsg};
 use aptos_config::network_id::PeerNetworkId;
+use aptos_logger::info;
 use aptos_network::application::interface::{NetworkClient, NetworkClientInterface};
 
 /// Publish updates to downstream observers.
 pub struct Publisher {
-    network_client: NetworkClient<ConsensusMsg>,
+    network_client: NetworkClient<ObserverMessage>,
 }
 
 impl Publisher {
-    pub fn new(network_client: NetworkClient<ConsensusMsg>) -> Self {
+    pub fn new(network_client: NetworkClient<ObserverMessage>) -> Self {
         Self { network_client }
     }
 
@@ -36,10 +35,9 @@ impl Publisher {
         }
     }
 
-    pub fn publish(&self, msg: Box<ObserverMessage>) {
+    pub fn publish(&self, msg: ObserverMessage) {
         let downstream_peers = self.get_downstream_peers();
-        let _ = self
-            .network_client
-            .send_to_peers(ConsensusMsg::ObserverMessage(msg), &downstream_peers);
+        info!("[Publisher] Sending {}", msg);
+        let _ = self.network_client.send_to_peers(msg, &downstream_peers);
     }
 }

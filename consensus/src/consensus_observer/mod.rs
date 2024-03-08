@@ -2,6 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(dead_code)]
-pub mod network_messages;
-mod observer;
-mod publisher;
+pub mod network;
+pub mod observer;
+pub mod publisher;

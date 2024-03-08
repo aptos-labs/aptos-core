@@ -234,12 +234,14 @@ impl<
     async fn handle_consensus_notification(&mut self, notification: ConsensusNotification) {
         // Verify the notification: full nodes shouldn't receive notifications
         // and consensus should only send notifications after bootstrapping!
-        let result = if self.driver_configuration.role == RoleType::FullNode {
-            Err(Error::FullNodeConsensusNotification(format!(
-                "Received consensus notification: {:?}",
-                notification
-            )))
-        } else if !self.bootstrapper.is_bootstrapped() {
+        // let result =
+        // if self.driver_configuration.role == RoleType::FullNode {
+        // Err(Error::FullNodeConsensusNotification(format!(
+        //     "Received consensus notification: {:?}",
+        //     notification
+        // )))
+        // } else
+        let result = if !self.bootstrapper.is_bootstrapped() {
             Err(Error::BootstrapNotComplete(format!(
                 "Received consensus notification: {:?}",
                 notification
@@ -537,7 +539,8 @@ impl<
 
     /// Returns true iff this node is a validator
     fn is_validator(&self) -> bool {
-        self.driver_configuration.role == RoleType::Validator
+        true
+        // self.driver_configuration.role == RoleType::Validator
     }
 
     /// Returns true iff consensus is currently executing

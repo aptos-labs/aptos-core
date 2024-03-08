@@ -23,6 +23,7 @@ use aptos_build_info::build_information;
 use aptos_config::config::{
     merge_node_config, BootstrappingMode, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
 };
+use aptos_consensus::consensus_provider::start_consensus_observer;
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
@@ -709,6 +710,7 @@ pub fn setup_environment_and_start_node(
         mempool_network_interfaces,
         peer_monitoring_service_network_interfaces,
         storage_service_network_interfaces,
+        observer_network_interfaces,
     ) = network::setup_networks_and_get_interfaces(
         &node_config,
         chain_id,
@@ -830,32 +832,46 @@ pub fn setup_environment_and_start_node(
         _ => None,
     };
 
-    // Create the consensus runtime (this blocks on state sync first)
-    let consensus_runtime = consensus_network_interfaces.map(|consensus_network_interfaces| {
-        // Wait until state sync has been initialized
-        debug!("Waiting until state sync is initialized!");
-        state_sync_runtimes.block_until_initialized();
-        debug!("State sync initialization complete.");
+    // Wait until state sync has been initialized
+    debug!("Waiting until state sync is initialized!");
+    state_sync_runtimes.block_until_initialized();
+    debug!("State sync initialization complete.");
 
-        // Initialize and start consensus
-        let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
+    // Create the consensus runtime (this blocks on state sync first)
+    let consensus_runtime = match consensus_network_interfaces {
+        // validator consensus
+        Some(consensus_network_interfaces) => {
+            // Initialize and start consensus
+            let (runtime, consensus_db, quorum_store_db) = services::start_consensus_runtime(
+                &mut node_config,
+                db_rw,
+                consensus_reconfig_subscription,
+                consensus_network_interfaces,
+                consensus_notifier,
+                consensus_to_mempool_sender,
+                vtxn_pool,
+                observer_network_interfaces.network_client,
+            );
+            admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
+            runtime
+        },
+        // consensus observer
+        None => start_consensus_observer(
             &mut node_config,
-            db_rw,
-            consensus_reconfig_subscription,
-            consensus_network_interfaces,
-            consensus_notifier,
+            observer_network_interfaces.network_client,
+            observer_network_interfaces.network_service_events,
+            Arc::new(consensus_notifier),
             consensus_to_mempool_sender,
-            vtxn_pool,
-        );
-        admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
-        runtime
-    });
+            db_rw,
+            consensus_reconfig_subscription.unwrap(),
+        ),
+    };
 
     Ok(AptosHandle {
         _admin_service: admin_service,
         _api_runtime: api_runtime,
         _backup_runtime: backup_service,
-        _consensus_runtime: consensus_runtime,
+        _consensus_runtime: Some(consensus_runtime),
         _dkg_runtime: dkg_runtime,
         _indexer_grpc_runtime: indexer_grpc_runtime,
         _indexer_runtime: indexer_runtime,

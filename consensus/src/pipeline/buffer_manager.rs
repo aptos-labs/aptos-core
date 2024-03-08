@@ -4,6 +4,10 @@
 
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
+    consensus_observer::{
+        network::{ObserverMessage, OrderedBlock as ObserverBlock},
+        publisher::Publisher,
+    },
     counters, monitor,
     network::{IncomingCommitRequest, NetworkSender},
     network_interface::ConsensusMsg,
@@ -129,6 +133,8 @@ pub struct BufferManager {
     previous_commit_time: Instant,
     reset_flag: Arc<AtomicBool>,
     bounded_executor: BoundedExecutor,
+    // Publisher for downstream observers.
+    publisher: Option<Publisher>,
 }
 
 impl BufferManager {
@@ -153,6 +159,7 @@ impl BufferManager {
         ongoing_tasks: Arc<AtomicU64>,
         reset_flag: Arc<AtomicBool>,
         executor: BoundedExecutor,
+        publisher: Option<Publisher>,
     ) -> Self {
         let buffer = Buffer::<BufferItem>::new();
 
@@ -198,6 +205,7 @@ impl BufferManager {
             previous_commit_time: Instant::now(),
             reset_flag,
             bounded_executor: executor,
+            publisher,
         }
     }
 
@@ -253,6 +261,12 @@ impl BufferManager {
             ordered_blocks: ordered_blocks.clone(),
             lifetime_guard: self.create_new_request(()),
         });
+        if let Some(publisher) = &self.publisher {
+            publisher.publish(ObserverMessage::OrderedBlock(ObserverBlock {
+                blocks: ordered_blocks.clone().into_iter().map(Arc::new).collect(),
+                ordered_proof: ordered_proof.clone(),
+            }));
+        }
         self.execution_schedule_phase_tx
             .send(request)
             .await
@@ -358,6 +372,11 @@ impl BufferManager {
                         .replace(self.do_reliable_broadcast(commit_decision));
                 }
                 let commit_proof = aggregated_item.commit_proof.clone();
+                if let Some(publisher) = &self.publisher {
+                    publisher.publish(ObserverMessage::CommitDecision(CommitDecision::new(
+                        commit_proof.clone(),
+                    )));
+                }
                 self.persisting_phase_tx
                     .send(self.create_new_request(PersistingRequest {
                         blocks: blocks_to_persist,

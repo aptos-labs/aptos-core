@@ -4,12 +4,11 @@
 
 use crate::{
     block::Block,
-    block_data::BlockData,
     common::{Payload, Round},
     quorum_cert::QuorumCert,
     vote_proposal::VoteProposal,
 };
-use aptos_crypto::{bls12381, hash::HashValue};
+use aptos_crypto::hash::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_types::{
     block_info::BlockInfo, contract_event::ContractEvent, randomness::Randomness,
