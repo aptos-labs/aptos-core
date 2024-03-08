@@ -10,12 +10,15 @@ use crate::error::DbError;
 use anyhow::Result;
 use aptos_consensus_types::{block::Block, quorum_cert::QuorumCert};
 use aptos_crypto::HashValue;
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::{register_int_gauge_vec, IntGaugeVec};
 use aptos_schemadb::{
-    schema::Schema, BlockBasedOptions, Cache, DBCompressionType, Options, ReadOptions, SchemaBatch,
-    DB, DEFAULT_COLUMN_FAMILY_NAME,
+    schema::Schema, BlockBasedOptions, Cache, ColumnFamilyName, DBCompressionType, Options,
+    ReadOptions, SchemaBatch, DB, DEFAULT_COLUMN_FAMILY_NAME,
 };
 use aptos_storage_interface::AptosDbError;
+use once_cell::sync::Lazy;
 pub use schema::{
     block::BlockSchema,
     dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
@@ -26,7 +29,14 @@ use schema::{
     BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME, QC_CF_NAME,
     SINGLE_ENTRY_CF_NAME,
 };
-use std::{iter::Iterator, path::Path, time::Instant};
+use std::{
+    collections::HashMap,
+    iter::Iterator,
+    path::Path,
+    sync::{mpsc, Arc},
+    thread::{self, JoinHandle},
+    time::{Duration, Instant},
+};
 
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
@@ -72,8 +82,8 @@ impl ConsensusDB {
         opts.increase_parallelism(8);
         opts.set_max_background_jobs(4);
         let mut table_options = BlockBasedOptions::default();
-        table_options.set_block_size(4 * (1 << 10)); // 4KB
-        let cache = Cache::new_lru_cache(1 * (1 << 30)); // 1GB
+        table_options.set_block_size(32 * (1 << 10)); // 4KB
+        let cache = Cache::new_lru_cache(2 * (1 << 30)); // 1GB
         table_options.set_block_cache(&cache);
         opts.set_compression_type(DBCompressionType::Lz4);
         opts.set_block_based_table_factory(&table_options);
@@ -213,7 +223,7 @@ impl ConsensusDB {
     pub fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
         let mut opts = ReadOptions::default();
         opts.set_async_io(true);
-        opts.set_readahead_size(8 * 1024 * 1024);
+        opts.set_readahead_size(512 * (1 << 20));
         let mut iter = self.db.iter::<S>(opts)?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>, AptosDbError>>()?)
@@ -223,3 +233,134 @@ impl ConsensusDB {
         Ok(self.db.get::<S>(key)?)
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct RocksdbPropertyReporter {
+    sender: Mutex<mpsc::Sender<()>>,
+    join_handle: Option<JoinHandle<()>>,
+}
+
+impl RocksdbPropertyReporter {
+    pub(crate) fn new(consensus_db: Arc<ConsensusDB>) -> Self {
+        let (send, recv) = mpsc::channel();
+        let join_handle = Some(thread::spawn(move || loop {
+            if let Err(e) = update_rocksdb_properties(&consensus_db) {
+                warn!(
+                    error = ?e,
+                    "Updating rocksdb property failed."
+                );
+            }
+            // report rocksdb properties each 10 seconds
+            const TIMEOUT_MS: u64 = if cfg!(test) { 10 } else { 10000 };
+
+            match recv.recv_timeout(Duration::from_millis(TIMEOUT_MS)) {
+                Ok(_) => break,
+                Err(mpsc::RecvTimeoutError::Timeout) => (),
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }));
+        Self {
+            sender: Mutex::new(send),
+            join_handle,
+        }
+    }
+}
+
+impl Drop for RocksdbPropertyReporter {
+    fn drop(&mut self) {
+        // Notify the property reporting thread to exit
+        self.sender.lock().send(()).unwrap();
+        self.join_handle
+            .take()
+            .expect("Rocksdb property reporting thread must exist.")
+            .join()
+            .expect("Rocksdb property reporting thread should join peacefully.");
+    }
+}
+
+fn update_rocksdb_properties(consensus_db: &ConsensusDB) -> Result<()> {
+    // let _timer = OTHER_TIMERS_SECONDS
+    //     .with_label_values(&["update_rocksdb_properties"])
+    //     .start_timer();
+
+    for cf in consensus_db_column_families() {
+        set_property(cf, &consensus_db.db)?;
+    }
+
+    Ok(())
+}
+
+pub(super) fn consensus_db_column_families() -> Vec<ColumnFamilyName> {
+    vec![
+        DEFAULT_COLUMN_FAMILY_NAME,
+        BLOCK_CF_NAME,
+        QC_CF_NAME,
+        SINGLE_ENTRY_CF_NAME,
+        NODE_CF_NAME,
+        CERTIFIED_NODE_CF_NAME,
+        DAG_VOTE_CF_NAME,
+        "ordered_anchor_id",
+    ]
+}
+
+fn set_property(cf_name: &str, db: &DB) -> Result<()> {
+    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+        DAG_ROCKSDB_PROPERTIES
+            .with_label_values(&[cf_name, aptos_rocksdb_property_name])
+            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+    }
+    Ok(())
+}
+
+/// Rocksdb metrics
+static DAG_ROCKSDB_PROPERTIES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        // metric name
+        "aptos_dag_rocksdb_properties",
+        // metric description
+        "rocksdb integer properties",
+        // metric labels (dimensions)
+        &["cf_name", "property_name",]
+    )
+    .unwrap()
+});
+
+static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
+    [
+        "rocksdb.num-immutable-mem-table",
+        "rocksdb.mem-table-flush-pending",
+        "rocksdb.compaction-pending",
+        "rocksdb.background-errors",
+        "rocksdb.cur-size-active-mem-table",
+        "rocksdb.cur-size-all-mem-tables",
+        "rocksdb.size-all-mem-tables",
+        "rocksdb.num-entries-active-mem-table",
+        "rocksdb.num-entries-imm-mem-tables",
+        "rocksdb.num-deletes-active-mem-table",
+        "rocksdb.num-deletes-imm-mem-tables",
+        "rocksdb.estimate-num-keys",
+        "rocksdb.estimate-table-readers-mem",
+        "rocksdb.is-file-deletions-enabled",
+        "rocksdb.num-snapshots",
+        "rocksdb.oldest-snapshot-time",
+        "rocksdb.num-live-versions",
+        "rocksdb.current-super-version-number",
+        "rocksdb.estimate-live-data-size",
+        "rocksdb.min-log-number-to-keep",
+        "rocksdb.min-obsolete-sst-number-to-keep",
+        "rocksdb.total-sst-files-size",
+        "rocksdb.live-sst-files-size",
+        "rocksdb.base-level",
+        "rocksdb.estimate-pending-compaction-bytes",
+        "rocksdb.num-running-compactions",
+        "rocksdb.num-running-flushes",
+        "rocksdb.actual-delayed-write-rate",
+        "rocksdb.is-write-stopped",
+        "rocksdb.block-cache-capacity",
+        "rocksdb.block-cache-usage",
+        "rocksdb.block-cache-pinned-usage",
+    ]
+    .iter()
+    .map(|x| (*x, format!("aptos_{}", x.replace('.', "_"))))
+    .collect()
+});
