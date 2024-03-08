@@ -84,7 +84,7 @@ impl ConsensusDB {
 
         let mut table_options = BlockBasedOptions::default();
         table_options.set_block_size(32 * (1 << 10)); // 4KB
-        let cache = Cache::new_lru_cache(2 * (1 << 30)); // 1GB
+        let cache = Cache::new_hyper_clock_cache(2 * (1 << 30), 32 * (1 << 10)); // 1GB
         table_options.set_block_cache(&cache);
         let cfds = column_families
             .iter()
