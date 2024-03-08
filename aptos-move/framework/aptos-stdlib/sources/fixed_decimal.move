@@ -174,6 +174,48 @@ module aptos_std::fixed_decimal {
         ((fixed_l as u256) * SCALE_FACTOR_u256 / (fixed_r as u256) as u128)
     }
 
+    #[test_only]
+    const RELATIVE_ERROR_THRESHOLD_NUMERATOR: u64 = 1;
+    #[test_only]
+    const RELATIVE_ERROR_THRESHOLD_DENOMINATOR: u64 = 1_000_000_000_000;
+
+    #[test_only]
+    fun assert_relative_error(expected: u64, actual: u64, threshold: u128) {
+        let (error) = if (expected > actual) (expected - actual) else (actual - expected);
+        let relative_error = divide(from_int(error), from_int(expected));
+        assert!(relative_error <= threshold, 0);
+    }
+
+    #[test_only]
+    fun assert_bilateral_conversion_precision(a: u64, b: u64) {
+        let relative_error_threshold = from_ratio(
+            RELATIVE_ERROR_THRESHOLD_NUMERATOR,
+            RELATIVE_ERROR_THRESHOLD_DENOMINATOR
+        );
+        assert_unilateral_conversion_precision(a, b, relative_error_threshold);
+        assert_unilateral_conversion_precision(b, a, relative_error_threshold);
+    }
+
+    #[test_only]
+    fun assert_unilateral_conversion_precision(a: u64, b: u64, relative_error_threshold: u128) {
+        let c = from_ratio(a, b);
+        assert_relative_error(a, scale_int(b, c), relative_error_threshold);
+        assert_relative_error(b, divide_int(a, c), relative_error_threshold);
+    }
+
+    #[test]
+    fun test_conversion_precision() {
+        assert_bilateral_conversion_precision(1, 10_000_000_000_000_000_000);
+        assert_bilateral_conversion_precision(1, 9_999_999_999_999_999_999);
+        assert_bilateral_conversion_precision(2, 9_999_999_999_999_999_999);
+        assert_bilateral_conversion_precision(3, 9_999_999_999_999_999_999);
+        assert_bilateral_conversion_precision(12, 9_999_999_999_999_999_999);
+        assert_bilateral_conversion_precision(123, 9_999_999_999_999_999_999);
+        assert_bilateral_conversion_precision(1_234, 9_999_999_999_999_999_999);
+        assert_bilateral_conversion_precision(12_345, 9_999_999_999_999_999_999);
+        assert_bilateral_conversion_precision(123_456, 9_999_999_999_999_999_999);
+    }
+
     #[test]
     fun test_constant_getters() {
         assert!(get_MAX_U64_DECIMAL() == MAX_U64_DECIMAL_u64, 0);
