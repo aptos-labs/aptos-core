@@ -129,12 +129,18 @@ kubectl get pvc -o name | grep /fn- | grep -v "e${ERA}-" | xargs -r kubectl dele
 # delete all genesis secrets except for those from this era
 kubectl get secret -o name | grep "genesis-e" | grep -v "e${ERA}-" | xargs -r kubectl delete
 
+# Upload genesis.blob to GCS
+cluster_name=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/attributes/cluster-name)
+signed_url_cf_base_url="https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url"
+signed_url=$(curl -s -X GET "$signed_url_cf_base_url?cluster_name=${cluster_name}&namespace=${NAMESPACE}&era=${ERA}&method=PUT")
+curl -X PUT -T ${WORKSPACE}/genesis.blob "$signed_url"
+
 # create genesis secrets for validators to startup
 for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
   username="${USERNAME_PREFIX}-${i}"
   user_dir="${WORKSPACE}/${username}"
+
   kubectl create secret generic "${username}-genesis-e${ERA}" \
-    --from-file=genesis.blob=${WORKSPACE}/genesis.blob \
     --from-file=waypoint.txt=${WORKSPACE}/waypoint.txt \
     --from-file=validator-identity.yaml=${user_dir}/validator-identity.yaml \
     --from-file=validator-full-node-identity.yaml=${user_dir}/validator-full-node-identity.yaml

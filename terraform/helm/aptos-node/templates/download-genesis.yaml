@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: script-configmap
+data:
+  download-genesis.sh: |
+    #!/bin/sh
+    set -x
+    cp /opt/aptos/genesis_readonly/* /opt/aptos/genesis
+    signed_url_cf_base_url="https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url"
+    signed_url=$(curl -s -X GET "$signed_url_cf_base_url?namespace={{ $.Release.Namespace }}&era={{ $.Values.chain.era }}&method=GET")
+    curl -o /opt/aptos/genesis/genesis.blob "$signed_url"
+    ls -l /opt/aptos/genesis
