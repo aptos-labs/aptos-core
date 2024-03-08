@@ -104,6 +104,17 @@ spec:
         prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
+      initContainers:
+        - name: run-script
+          image: curlimages/curl:latest
+          command: ["/bin/sh", "/scripts/download-genesis.sh"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+            - name: genesis-config
+              mountPath: /opt/aptos/genesis_readonly
+            - name: writable-genesis
+              mountPath: /opt/aptos/genesis
       containers:
       - name: fullnode
         {{- if and $fullnode_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -148,7 +159,7 @@ spec:
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc
-        - name: genesis-config
+        - name: writable-genesis
           mountPath: /opt/aptos/genesis
         {{- if $.Values.migrations.enable_vfn_explicit_pvc }}
         - name: aptos-data
@@ -208,6 +219,11 @@ spec:
       - name: genesis-config
         secret:
           secretName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
+      - name: writable-genesis
+        emptyDir: {}
+      - name: scripts
+        configMap:
+          name: script-configmap
       {{- if $.Values.migrations.enable_vfn_explicit_pvc }}
       - name: aptos-data
         persistentVolumeClaim:

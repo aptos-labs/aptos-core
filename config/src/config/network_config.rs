@@ -11,6 +11,7 @@ use crate::{
     utils,
 };
 use aptos_crypto::{x25519, Uniform};
+use aptos_logger::error;
 use aptos_secure_storage::{CryptoStorage, KVStorage, Storage};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::{
@@ -258,6 +259,7 @@ impl NetworkConfig {
                 Some(peer_id)
             },
             Identity::FromFile(config) => {
+                error!("Loading peer id from file: {}", config.path.display());
                 let identity_blob: IdentityBlob = IdentityBlob::from_file(&config.path).unwrap();
 
                 // If account is not specified, generate peer id from public key
