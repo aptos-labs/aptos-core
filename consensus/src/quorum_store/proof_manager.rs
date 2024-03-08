@@ -111,6 +111,8 @@ impl BatchQueue {
                                 num_bytes += batch.num_bytes();
                                 result.push((batch.clone(), txns.clone()));
                             }
+                        } else {
+                            warn!("Couldn't find a batch in local storage while creating inline block: {:?}", batch.digest());
                         }
                         true
                     } else {

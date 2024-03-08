@@ -70,9 +70,6 @@ impl BatchCoordinator {
         let sender_to_proof_manager = self.sender_to_proof_manager.clone();
         tokio::spawn(async move {
             let peer_id = persist_requests[0].author();
-            // TODO: Is it fine to ignore the result of send here?
-            // Sending only small batches to proof manager as large batches can't be
-            // included in the inline transactions anyway.
             let batches = persist_requests
                 .iter()
                 .map(|persisted_value| persisted_value.batch_info().clone())
