@@ -5,7 +5,7 @@ use move_model::{
     ty::Type,
 };
 
-
+/// Checks all modules in `env`
 pub fn check_cyclic_instantiations(env: &GlobalEnv) {
 	for module in env.get_modules() {
 		let checker = CyclicInstantiationChecker::new(module);
@@ -13,7 +13,9 @@ pub fn check_cyclic_instantiations(env: &GlobalEnv) {
 	}
 }
 
+/// Module checker state
 struct CyclicInstantiationChecker<'a> {
+	/// The module we are checking
     mod_env: ModuleEnv<'a>,
 }
 
@@ -24,12 +26,14 @@ impl<'a> CyclicInstantiationChecker<'a> {
 		}
 	}
 
+	/// Checks all functions in the module
 	fn check(&self) {
 		for fun_env in self.mod_env.get_functions() {
 			self.check_fun(fun_env.get_id())
 		}
 	}
 
+	/// Checks the given function
     fn check_fun(&self, fun_id: FunId) {
         let fun_body = self.get_fun_def(fun_id);
         let mut callers = Vec::new();
@@ -38,6 +42,9 @@ impl<'a> CyclicInstantiationChecker<'a> {
         fun_body.visit_positions(&mut |pos, e| self.visit(pos, e, &mut callers, insts.clone()));
     }
 
+	/// Visits an expression and checks for cyclic type instantiations.
+	/// `callers_chain`: the chain of callers leading to the current expression
+	/// `insts`: the type parameters of the current expression
     fn visit(
         &self,
         position: VisitorPosition,
@@ -53,7 +60,8 @@ impl<'a> CyclicInstantiationChecker<'a> {
         }
     }
 
-    /// `insts`: type parameters of the call
+    /// Visits a call expression and checks for cyclic type instantiations.
+	/// Other parameters are the same as in `visit`
     fn visit_call(
         &self,
         nid: &NodeId,
@@ -67,7 +75,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
             if *mod_id != self.mod_env.get_id() || self.def_not_recursive(callee.to_qualified_id())
             {
                 // skips if callee from another module (since there is no cyclic module dependency),
-                // or callee
+				// or if the callee is not recursive
                 true
             } else {
                 for (_, ancester_caller) in callers_chain.iter() {
@@ -76,6 +84,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
                         let (_, checking_for) = &callers_chain[0];
                         if checking_for.to_qualified_id() != callee.to_qualified_id() {
                             // check and report diagnostics when `callee` is checked
+							// this happens when root caller `f` calls `g` which then calls `g` itself
                             return true;
                         } else {
                             if let Some(_ty_param) = callee
@@ -99,8 +108,9 @@ impl<'a> CyclicInstantiationChecker<'a> {
         }
     }
 
-    /// Checks calles of `caller`
-    /// Precondition: `caller` defined in `self.moc_env`
+    /// Visits a call expression and checks for cyclic type instantiations.
+	/// Other parameters are the same as in `visit`.
+    /// Precondition: `caller` defined in `self.mod_env`
     fn visit_callees(
         &self,
         caller_node: NodeId,
@@ -145,9 +155,11 @@ impl<'a> CyclicInstantiationChecker<'a> {
         }
     }
 
+	/// Reports a cyclic type instantiation error, in which the root caller eventually calls `callee`
+	/// with a cyclic type instantiation.
     fn report_error(
         &self,
-        nid: NodeId,
+        _nid: NodeId,
         callee: QualifiedInstId<FunId>,
         callers_chain: &mut Vec<(NodeId, QualifiedInstId<FunId>)>,
     ) {
