@@ -114,18 +114,6 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         mut num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
-        info!("\nGenerate transactions: stage: {:?}, num_to_create: {:?}", self.stage, num_to_create);
-        // let stage = match self.stage.load_current_stage() {
-        //     Some(stage) => stage,
-        //     None => {
-        //         info!("Waiting for delay before next stage");
-        //         thread::sleep(Duration::from_secs(2));
-        //         // sample!(
-        //         //     SampleRate::Duration(Duration::from_secs(2)),
-        //         // );
-        //         return Vec::new();
-        //     },
-        // };
         let stage = match &self.stage {
             StageTracking::ExternallySet(stage_counter) => {
                 stage_counter.load(Ordering::Relaxed)
@@ -142,7 +130,6 @@ impl TransactionGenerator for WorkflowTxnGenerator {
                 stage_counter.load(Ordering::Relaxed)
             },
         };
-        info!("Entered Stage {}", stage);
 
         if stage == 0 {
             // We can treat completed_for_first_stage as a stream of indices [0, +inf),
@@ -164,7 +151,6 @@ impl TransactionGenerator for WorkflowTxnGenerator {
                 delay_between_stages,
             } => {
                 if stage == 0 {
-                    info!("TransactionGenerator Workflow: Stage 0, num_to_create: {}", num_to_create);
                     if num_to_create == 0 {
                         info!("TransactionGenerator Workflow: Stage 0 is full with {} accounts, moving to stage 1", self.pool_per_stage.first().unwrap().len());
                         stage_start_time.store(
@@ -203,18 +189,15 @@ impl TransactionGenerator for WorkflowTxnGenerator {
             },
         }
 
-        // sample!(
-        //     SampleRate::Duration(Duration::from_secs(2)),
-        //     info!("Cur stage: {}, pool sizes: {:?}", stage, self.pool_per_stage.iter().map(|p| p.len()).collect::<Vec<_>>());
-        // );
+        sample!(
+            SampleRate::Duration(Duration::from_secs(2)),
+            info!("Cur stage: {}, pool sizes: {:?}", stage, self.pool_per_stage.iter().map(|p| p.len()).collect::<Vec<_>>());
+        );
 
-        info!("\nGeneratingTransactions Stage {}, num_to_create: {}, pool sizes: {:?}", stage, num_to_create, self.pool_per_stage.iter().map(|p| p.len()).collect::<Vec<_>>());
         let result = if let Some(generator) = self.generators.get_mut(stage) {
             let txns = generator.generate_transactions(account, num_to_create);
-            info!("\nGeneratedTransactions Stage {}, Generated {} transactions", stage, txns.len());
             txns
         } else {
-            info!("\nGeneratedTransactions Stage {}, Generated 0 transactions", stage);
             Vec::new()
         };
 
@@ -450,7 +433,6 @@ impl WorkflowTxnGeneratorCreator {
                         place_orders_pool,
                     ]
                 };
-                info!("PoolPerStage len: {}, stage 0 len: {}, stage 1 len: {}, stage 2 len: {}", pool_per_stage.len(), pool_per_stage[0].len(), pool_per_stage[1].len(), pool_per_stage[2].len());
                 Self::new(stage_tracking, creators, pool_per_stage, num_users)
             },
         }

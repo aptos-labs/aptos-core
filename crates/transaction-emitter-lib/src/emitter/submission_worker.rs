@@ -302,7 +302,6 @@ impl SubmissionWorker {
             .iter()
             .choose_multiple(&mut self.rng, batch_size);
 
-        println!("gen_requests accounts: {:?} batch_size: {:?}", accounts.len(), batch_size);
         accounts
             .into_iter()
             .flat_map(|account| {

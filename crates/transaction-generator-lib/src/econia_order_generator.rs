@@ -95,7 +95,6 @@ pub fn place_bid_market_order(
     market_id: u64,
     publisher: AccountAddress
 ) -> TransactionPayload {
-    println!("place_bid_market_order for market_id: {}, publisher: {}", market_id, publisher);
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("place_bid_market_order").to_owned(),
@@ -124,7 +123,6 @@ pub fn place_ask_market_order(
     market_id: u64,
     publisher: AccountAddress
 ) -> TransactionPayload {
-    println!("place_ask_market_order for market_id: {}, publisher: {}", market_id, publisher);
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("place_ask_market_order").to_owned(),
@@ -150,7 +148,6 @@ pub fn register_market(
     module_id: ModuleId,
     num_markets: u64,
 ) -> TransactionPayload {
-    println!("register_markets for num_markets: {}, module_id: {}", num_markets, module_id);
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("register_multiple_markets").to_owned(),
@@ -166,7 +163,6 @@ pub fn register_market_accounts(
     market_id: u64,
     publisher: AccountAddress,
 ) -> TransactionPayload {
-    println!("register_market_accounts for market_id: {} base_coin_type: {}, quote_coin_type: {}, publisher: {}, module_id: {}", market_id, base_coin_type(market_id), quote_coin_type(market_id), publisher, module_id);
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("register_market_accounts").to_owned(),
@@ -192,7 +188,6 @@ pub fn deposit_coins(
     market_id: u64,
     publisher: AccountAddress,
 ) -> TransactionPayload {
-    println!("deposit_coins for market_id: {} base_coin_type: {}, quote_coin_type: {}, publisher: {}", market_id, base_coin_type(market_id), quote_coin_type(market_id), publisher);
     TransactionPayload::EntryFunction(EntryFunction::new(
         module_id,
         ident_str!("deposit_coins").to_owned(),
