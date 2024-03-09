@@ -106,7 +106,7 @@ impl SchemaBatch {
 #[derive(Debug)]
 pub struct DB {
     name: String, // for logging
-    pub inner: rocksdb::DB,
+    inner: rocksdb::DB,
 }
 
 impl DB {
