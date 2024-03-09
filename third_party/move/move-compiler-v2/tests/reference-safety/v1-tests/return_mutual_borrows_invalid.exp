@@ -1,118 +1,97 @@
 
 Diagnostics:
 error: mutable reference in local `return[0]` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:14:45
+   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:16:9
    │
-14 │       fun mut_imm_0(s1: &mut S): (&mut S, &S) {
-   │ ╭─────────────────────────────────────────────^
-15 │ │         let f = freeze(s1);
-   │ │                 ---------- previous freeze
-16 │ │         (s1, f)
-17 │ │     }
-   │ ╰─────^ requirement enforced here
+15 │         let f = freeze(s1);
+   │                 ---------- previous freeze
+16 │         (s1, f)
+   │         ^^^^^^^ requirement enforced here
 
 error: mutable reference in local `return[0]` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:18:47
+   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:20:9
    │
-18 │       fun mut_imm_1(s1: &mut S): (&mut S, &u64) {
-   │ ╭───────────────────────────────────────────────^
-19 │ │         let f = &s1.f;
-   │ │                 ----- previous field borrow
-20 │ │         (s1, f)
-21 │ │     }
-   │ ╰─────^ requirement enforced here
+19 │         let f = &s1.f;
+   │                 ----- previous field borrow
+20 │         (s1, f)
+   │         ^^^^^^^ requirement enforced here
 
 error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:24:10
    │
-22 │       fun mut_imm_2(s1: &mut S): (&mut u64, &u64) {
-   │ ╭─────────────────────────────────────────────────'
-23 │ │         let f = &s1.f;
-   │ │                 ----- previous field borrow
-24 │ │         (&mut s1.f, f)
-   │ │          ^^^^^^^^^ mutable borrow attempted here
-25 │ │     }
-   │ ╰─────' requirement enforced here
+23 │         let f = &s1.f;
+   │                 ----- previous field borrow
+24 │         (&mut s1.f, f)
+   │         -^^^^^^^^^----
+   │         ││
+   │         │mutable borrow attempted here
+   │         requirement enforced here
 
 error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:28:10
    │
-26 │       fun mut_imm_3(s1: &mut S): (&mut u64, &u64) {
-   │ ╭─────────────────────────────────────────────────'
-27 │ │         let f = id(&s1.f);
-   │ │                 ---------
-   │ │                 │  │
-   │ │                 │  previous field borrow
-   │ │                 used by call result
-28 │ │         (&mut s1.f, f)
-   │ │          ^^^^^^^^^ mutable borrow attempted here
-29 │ │     }
-   │ ╰─────' requirement enforced here
+27 │         let f = id(&s1.f);
+   │                 ---------
+   │                 │  │
+   │                 │  previous field borrow
+   │                 used by call result
+28 │         (&mut s1.f, f)
+   │         -^^^^^^^^^----
+   │         ││
+   │         │mutable borrow attempted here
+   │         requirement enforced here
 
 error: same mutable reference in local `return[0]` is also used in other local `return[1]` in argument list
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:31:49
+   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:32:9
    │
-31 │       fun mut_mut_0(s1: &mut S): (&mut S, &mut S) {
-   │                     -- previous mutable local borrow
-   │ ╭─────────────────────────────────────────────────^
-32 │ │         (s1, s1) // error in v1 since &mut cannot be copied
-33 │ │     }
-   │ ╰─────^ requirement enforced here
+31 │     fun mut_mut_0(s1: &mut S): (&mut S, &mut S) {
+   │                   -- previous mutable local borrow
+32 │         (s1, s1) // error in v1 since &mut cannot be copied
+   │         ^^^^^^^^ requirement enforced here
 
 error: mutable reference in local `return[0]` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:34:51
+   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:36:9
    │
-34 │       fun mut_mut_1(s1: &mut S): (&mut S, &mut u64) {
-   │ ╭───────────────────────────────────────────────────^
-35 │ │         let f =  &mut s1.f;
-   │ │                  --------- previous mutable field borrow
-36 │ │         (s1, f)
-37 │ │     }
-   │ ╰─────^ requirement enforced here
+35 │         let f =  &mut s1.f;
+   │                  --------- previous mutable field borrow
+36 │         (s1, f)
+   │         ^^^^^^^ requirement enforced here
 
 error: mutable reference in local `return[1]` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:38:51
+   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:39:9
    │
-38 │       fun mut_mut_2(s1: &mut S): (&mut u64, &mut S) {
-   │ ╭───────────────────────────────────────────────────^
-39 │ │         (&mut s1.f, s1)
-   │ │          --------- previous mutable field borrow
-40 │ │     }
-   │ ╰─────^ requirement enforced here
+39 │         (&mut s1.f, s1)
+   │         ^^^^^^^^^^^^^^^
+   │         ││
+   │         │previous mutable field borrow
+   │         requirement enforced here
 
 error: mutable reference in local `return[1]` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:41:49
+   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:42:9
    │
-41 │       fun mut_mut_3(s1: &mut S): (&mut S, &mut S) {
-   │ ╭─────────────────────────────────────────────────^
-42 │ │         (id_mut(s1), s1)
-   │ │          ---------- previous mutable call result
-43 │ │     }
-   │ ╰─────^ requirement enforced here
+42 │         (id_mut(s1), s1)
+   │         ^^^^^^^^^^^^^^^^
+   │         ││
+   │         │previous mutable call result
+   │         requirement enforced here
 
 error: mutable reference in local `return[0]` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:44:51
+   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:46:9
    │
-44 │       fun mut_mut_4(s1: &mut S): (&mut S, &mut u64) {
-   │ ╭───────────────────────────────────────────────────^
-45 │ │         let f = id_mut(&mut s1.f);
-   │ │                 -----------------
-   │ │                 │      │
-   │ │                 │      previous mutable field borrow
-   │ │                 used by mutable call result
-46 │ │         (s1, f)
-47 │ │     }
-   │ ╰─────^ requirement enforced here
+45 │         let f = id_mut(&mut s1.f);
+   │                 -----------------
+   │                 │      │
+   │                 │      previous mutable field borrow
+   │                 used by mutable call result
+46 │         (s1, f)
+   │         ^^^^^^^ requirement enforced here
 
 error: mutable reference in local `return[1]` requires exclusive access but is borrowed
-   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:48:51
+   ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:49:9
    │
-48 │       fun mut_mut_5(s1: &mut S): (&mut u64, &mut S) {
-   │ ╭───────────────────────────────────────────────────^
-49 │ │         (id_mut(&mut s1.f), s1)
-   │ │          -----------------
-   │ │          │      │
-   │ │          │      previous mutable field borrow
-   │ │          used by mutable call result
-50 │ │     }
-   │ ╰─────^ requirement enforced here
+49 │         (id_mut(&mut s1.f), s1)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │         ││      │
+   │         ││      previous mutable field borrow
+   │         │used by mutable call result
+   │         requirement enforced here

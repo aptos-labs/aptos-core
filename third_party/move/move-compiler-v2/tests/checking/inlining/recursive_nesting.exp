@@ -21,18 +21,12 @@ module 0x42::test {
     use 0x42::mathtest2; // resolved as: 0x42::mathtest2
     use 0x42::mathtest3; // resolved as: 0x42::mathtest3
     private fun test_nested_mul_div() {
-        {
-          let a: u64 = {
-            let (a: u64, b: u64, c: u64): (u64, u64, u64) = Tuple(1, 1, 1);
-            Cast(Div<u128>(Mul<u128>(Cast(a), Cast(b)), Cast(c)))
-          };
-          if Eq<u64>(a, 1) {
-            Tuple()
-          } else {
-            Abort(0)
-          };
+        if true {
           Tuple()
-        }
+        } else {
+          Abort(0)
+        };
+        Tuple()
     }
     spec fun $test_nested_mul_div() {
         {

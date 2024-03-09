@@ -1,34 +1,34 @@
 
 Diagnostics:
 error: Not a valid constant expression.
-  ┌─ tests/folding/constants_blocks.move:5:21
+  ┌─ tests/folding/constants_blocks.move:5:23
   │
 5 │     const C1: u64 = { u() };
-  │                     ^^^^^^^
+  │                       ^^^
   │                       │
   │                       Invalid call or operation in constant
 
 error: Not a valid constant expression.
-  ┌─ tests/folding/constants_blocks.move:7:22
+  ┌─ tests/folding/constants_blocks.move:7:24
   │
 7 │     const C3: bool = { loop () };
-  │                      ^^^^^^^^^^^
+  │                        ^^^^^^^
   │                        │
   │                        Invalid statement or expression in constant
 
 error: Not a valid constant expression.
-  ┌─ tests/folding/constants_blocks.move:8:20
+  ┌─ tests/folding/constants_blocks.move:8:22
   │
 8 │     const C4: u8 = { if (false) 0 else 1 };
-  │                    ^^^^^^^^^^^^^^^^^^^^^^^
+  │                      ^^^^^^^^^^^^^^^^^^^
   │                      │
   │                      Invalid statement or expression in constant
 
 error: Not a valid constant expression.
-  ┌─ tests/folding/constants_blocks.move:9:38
+  ┌─ tests/folding/constants_blocks.move:9:40
   │
 9 │     const C5: vector<vector<bool>> = { abort 0 };
-  │                                      ^^^^^^^^^^^
+  │                                        ^^^^^^^
   │                                        │
   │                                        Invalid call or operation in constant
 

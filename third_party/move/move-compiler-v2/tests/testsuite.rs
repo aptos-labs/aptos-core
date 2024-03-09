@@ -400,9 +400,11 @@ impl TestConfig {
         if ok {
             // Run env processor pipeline.
             if self.dump_ast == AstDumpLevel::AllStages {
-                let mut out = String::new();
+                let mut out = Buffer::no_color();
                 self.env_pipeline.run_and_record(&mut env, &mut out)?;
-                test_output.borrow_mut().push_str(&out);
+                test_output
+                    .borrow_mut()
+                    .push_str(&String::from_utf8_lossy(&out.into_inner()));
                 ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
             } else {
                 self.env_pipeline.run(&mut env);
