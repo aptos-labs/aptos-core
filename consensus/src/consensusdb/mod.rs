@@ -82,10 +82,16 @@ impl ConsensusDB {
         opts.increase_parallelism(8);
         opts.set_max_background_jobs(4);
         opts.set_advise_random_on_open(false);
+        opts.enable_statistics();
+        opts.set_stats_dump_period_sec(3);
+        opts.set_use_direct_reads(true);
+        opts.set_use_direct_io_for_flush_and_compaction(true);
 
         let mut table_options = BlockBasedOptions::default();
+        table_options.set_cache_index_and_filter_blocks(true);
+        table_options.set_pin_l0_filter_and_index_blocks_in_cache(true);
         table_options.set_block_size(32 * (1 << 10)); // 4KB
-        let cache = Cache::new_hyper_clock_cache(2 * (1 << 30), 32 * (1 << 10)); // 1GB
+        let cache = Cache::new_lru_cache(2 * (1 << 30)); // 1GB
         table_options.set_block_cache(&cache);
         let cfds = column_families
             .iter()
@@ -93,18 +99,26 @@ impl ConsensusDB {
                 let mut cf_opts = Options::default();
                 cf_opts.set_compression_type(DBCompressionType::Lz4);
                 cf_opts.set_block_based_table_factory(&table_options);
+                cf_opts.enable_statistics();
+                cf_opts.set_stats_dump_period_sec(3);
                 ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts)
             })
             .collect();
         let db = DB::open_cf(&opts, path.clone(), "consensus", cfds)
             .expect("ConsensusDB open failed; unable to continue");
         db.inner
+            .set_options(&[(
+                &"block_based_table_factory",
+                &"{prepopulate_block_cache=kFlushOnly;}",
+            )])
+            .unwrap();
+        db.inner
             .set_options_cf(
                 db.get_cf_handle(CERTIFIED_NODE_CF_NAME)
                     .expect("must exist"),
                 &[(
                     &"block_based_table_factory",
-                    &"prepopulate_block_cache=kFlushOnly",
+                    &"{prepopulate_block_cache=kFlushOnly;}",
                 )],
             )
             .unwrap();
@@ -242,7 +256,7 @@ impl ConsensusDB {
     pub fn get_all<S: Schema>(&self) -> Result<Vec<(S::Key, S::Value)>, DbError> {
         let mut opts = ReadOptions::default();
         opts.set_async_io(true);
-        opts.set_readahead_size(1 * (1 << 30));
+        opts.set_readahead_size(1 * (1 << 20));
         let mut iter = self.db.iter::<S>(opts)?;
         iter.seek_to_first();
         Ok(iter.collect::<Result<Vec<(S::Key, S::Value)>, AptosDbError>>()?)
