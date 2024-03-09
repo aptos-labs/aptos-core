@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     spec fun add1(x: num): num {
         Add(x, 1)

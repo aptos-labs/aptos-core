@@ -688,6 +688,8 @@ impl<'env> Generator<'env> {
 
             Operation::NoOp => {}, // do nothing
 
+            Operation::Closure(..) => self.internal_error(id, "closure not yet implemented"),
+
             // Non-supported specification related operations
             Operation::Exists(Some(_))
             | Operation::SpecFunction(_, _, _)

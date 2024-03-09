@@ -24,7 +24,7 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
 
 [variant baseline]
 fun m::g<#0>($t0: &mut vector<#0>) {
-     # live vars:
+     # live vars: $t0
   0: return ()
 }
 
@@ -53,7 +53,7 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
 
 [variant baseline]
 fun m::g<#0>($t0: &mut vector<#0>) {
-     # live vars:
+     # live vars: $t0
      # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
@@ -111,7 +111,7 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
 [variant baseline]
 fun m::g<#0>($t0: &mut vector<#0>) {
      # abort state: {returns}
-     # live vars:
+     # live vars: $t0
      # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
      # locals: {$t0=@2000000}
      # globals: {}
@@ -174,7 +174,8 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
 
 [variant baseline]
 fun m::g<#0>($t0: &mut vector<#0>) {
-  0: return ()
+  0: drop($t0)
+  1: return ()
 }
 
 
