@@ -106,7 +106,7 @@ impl SchemaBatch {
 #[derive(Debug)]
 pub struct DB {
     name: String, // for logging
-    inner: rocksdb::DB,
+    pub inner: rocksdb::DB,
 }
 
 impl DB {
@@ -291,7 +291,7 @@ impl DB {
         Ok(())
     }
 
-    fn get_cf_handle(&self, cf_name: &str) -> DbResult<&rocksdb::ColumnFamily> {
+    pub fn get_cf_handle(&self, cf_name: &str) -> DbResult<&rocksdb::ColumnFamily> {
         self.inner
             .cf_handle(cf_name)
             .ok_or_else(|| {
