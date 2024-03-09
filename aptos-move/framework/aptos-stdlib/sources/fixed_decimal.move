@@ -175,45 +175,55 @@ module aptos_std::fixed_decimal {
     }
 
     #[test_only]
-    const RELATIVE_ERROR_THRESHOLD_NUMERATOR: u64 = 1;
-    #[test_only]
-    const RELATIVE_ERROR_THRESHOLD_DENOMINATOR: u64 = 1_000_000_000_000;
+    use std::vector;
 
     #[test_only]
-    fun assert_relative_error(expected: u64, actual: u64, threshold: u128) {
+    /// As a fixed-pont decimal.
+    const RELATIVE_ERROR_TOLERANCE: u128 = 1;
+
+    #[test_only]
+    fun assert_relative_error(expected: u128, actual: u128) {
         let (error) = if (expected > actual) (expected - actual) else (actual - expected);
-        let relative_error = divide(from_int(error), from_int(expected));
-        assert!(relative_error <= threshold, 0);
+        let relative_error = divide(error, expected);
+        assert!(relative_error <= RELATIVE_ERROR_TOLERANCE, 0);
     }
 
     #[test_only]
     fun assert_bilateral_conversion_precision(a: u64, b: u64) {
-        let relative_error_threshold = from_ratio(
-            RELATIVE_ERROR_THRESHOLD_NUMERATOR,
-            RELATIVE_ERROR_THRESHOLD_DENOMINATOR
-        );
-        assert_unilateral_conversion_precision(a, b, relative_error_threshold);
-        assert_unilateral_conversion_precision(b, a, relative_error_threshold);
+        assert_unilateral_conversion_precision(a, b);
+        assert_unilateral_conversion_precision(b, a);
     }
 
     #[test_only]
-    fun assert_unilateral_conversion_precision(a: u64, b: u64, relative_error_threshold: u128) {
+    fun assert_unilateral_conversion_precision(a: u64, b: u64) {
         let c = from_ratio(a, b);
-        assert_relative_error(a, scale_int(b, c), relative_error_threshold);
-        assert_relative_error(b, divide_int(a, c), relative_error_threshold);
+        assert_relative_error(from_int(a), multiply(from_int(b), c));
+        assert_relative_error(from_int(b), divide(from_int(a), c));
     }
 
     #[test]
     fun test_conversion_precision() {
-        assert_bilateral_conversion_precision(1, 10_000_000_000_000_000_000);
-        assert_bilateral_conversion_precision(1, 9_999_999_999_999_999_999);
-        assert_bilateral_conversion_precision(2, 9_999_999_999_999_999_999);
-        assert_bilateral_conversion_precision(3, 9_999_999_999_999_999_999);
-        assert_bilateral_conversion_precision(12, 9_999_999_999_999_999_999);
-        assert_bilateral_conversion_precision(123, 9_999_999_999_999_999_999);
-        assert_bilateral_conversion_precision(1_234, 9_999_999_999_999_999_999);
-        assert_bilateral_conversion_precision(12_345, 9_999_999_999_999_999_999);
-        assert_bilateral_conversion_precision(123_456, 9_999_999_999_999_999_999);
+        let bigs = vector[
+            MAX_U64_DECIMAL_u64,
+            MAX_U64_DECIMAL_u64 - 1,
+            9_876_543_210_987_654_321, // Causes failure.
+            1_234_567_890_123_456_789, // Causes failure.
+        ];
+        let smalls = vector[
+            1,
+            2,
+            3,
+            12,
+            123,
+            1_234,
+            12_345,
+            123_456
+        ];
+        vector::for_each_ref(&bigs, |i_ref| {
+            vector::for_each_ref(&smalls, |j_ref| {
+                assert_bilateral_conversion_precision(*i_ref, *j_ref);
+            })
+        });
     }
 
     #[test]
