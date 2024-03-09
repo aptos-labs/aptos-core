@@ -80,6 +80,8 @@ or if their stake drops below the min required, they would get removed at the en
 -  [Function `add_stake_with_cap`](#0x1_stake_add_stake_with_cap)
 -  [Function `reactivate_stake`](#0x1_stake_reactivate_stake)
 -  [Function `reactivate_stake_with_cap`](#0x1_stake_reactivate_stake_with_cap)
+-  [Function `rotate_consensus_key_internal`](#0x1_stake_rotate_consensus_key_internal)
+-  [Function `rotate_consensus_key_genesis`](#0x1_stake_rotate_consensus_key_genesis)
 -  [Function `rotate_consensus_key`](#0x1_stake_rotate_consensus_key)
 -  [Function `update_network_and_fullnode_addresses`](#0x1_stake_update_network_and_fullnode_addresses)
 -  [Function `increase_lockup`](#0x1_stake_increase_lockup)
@@ -2409,6 +2411,95 @@ Move <code>amount</code> of coins from pending_inactive to active.
 
 </details>
 
+<a id="0x1_stake_rotate_consensus_key_internal"></a>
+
+## Function `rotate_consensus_key_internal`
+
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_rotate_consensus_key_internal">rotate_consensus_key_internal</a>(operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, new_consensus_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, proof_of_possession: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, <a href="genesis.md#0x1_genesis">genesis</a>: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="stake.md#0x1_stake_rotate_consensus_key_internal">rotate_consensus_key_internal</a>(
+    operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pool_address: <b>address</b>,
+    new_consensus_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    proof_of_possession: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    <a href="genesis.md#0x1_genesis">genesis</a>: bool,
+) <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a> {
+    <a href="stake.md#0x1_stake_assert_stake_pool_exists">assert_stake_pool_exists</a>(pool_address);
+    <b>let</b> stake_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(operator) == stake_pool.operator_address, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="stake.md#0x1_stake_ENOT_OPERATOR">ENOT_OPERATOR</a>));
+
+    <b>assert</b>!(<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="stake.md#0x1_stake_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
+    <b>let</b> validator_info = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address);
+    <b>let</b> old_consensus_pubkey = validator_info.consensus_pubkey;
+    // Checks the <b>public</b> key <b>has</b> a valid proof-of-possession <b>to</b> prevent rogue-key attacks.
+    <b>if</b> (!<a href="genesis.md#0x1_genesis">genesis</a>) {
+        <b>let</b> pubkey_from_pop = &<b>mut</b> <a href="../../aptos-stdlib/doc/bls12381.md#0x1_bls12381_public_key_from_bytes_with_pop">bls12381::public_key_from_bytes_with_pop</a>(
+            new_consensus_pubkey,
+            &proof_of_possession_from_bytes(proof_of_possession)
+        );
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(pubkey_from_pop), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="stake.md#0x1_stake_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>));
+    } <b>else</b> {
+        <b>let</b> pubkey = &<b>mut</b> <a href="../../aptos-stdlib/doc/bls12381.md#0x1_bls12381_public_key_from_bytes">bls12381::public_key_from_bytes</a>(new_consensus_pubkey);
+        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(pubkey), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="stake.md#0x1_stake_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>));
+    };
+    validator_info.consensus_pubkey = new_consensus_pubkey;
+
+    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
+        &<b>mut</b> stake_pool.rotate_consensus_key_events,
+        <a href="stake.md#0x1_stake_RotateConsensusKeyEvent">RotateConsensusKeyEvent</a> {
+            pool_address,
+            old_consensus_pubkey,
+            new_consensus_pubkey,
+        },
+    );
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_stake_rotate_consensus_key_genesis"></a>
+
+## Function `rotate_consensus_key_genesis`
+
+Rotate the consensus key of the validator
+does not verify proof of possession
+only for genesis
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_rotate_consensus_key_genesis">rotate_consensus_key_genesis</a>(operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, pool_address: <b>address</b>, new_consensus_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, proof_of_poseesion: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="stake.md#0x1_stake_rotate_consensus_key_genesis">rotate_consensus_key_genesis</a>(
+    operator: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    pool_address: <b>address</b>,
+    new_consensus_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    proof_of_poseesion: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+) <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a> {
+    <a href="stake.md#0x1_stake_rotate_consensus_key_internal">rotate_consensus_key_internal</a>(operator, pool_address, new_consensus_pubkey, proof_of_poseesion, <b>true</b>);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_stake_rotate_consensus_key"></a>
 
 ## Function `rotate_consensus_key`
@@ -2431,29 +2522,7 @@ Rotate the consensus key of the validator, it'll take effect in next epoch.
     new_consensus_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     proof_of_possession: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
 ) <b>acquires</b> <a href="stake.md#0x1_stake_StakePool">StakePool</a>, <a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a> {
-    <a href="stake.md#0x1_stake_assert_stake_pool_exists">assert_stake_pool_exists</a>(pool_address);
-    <b>let</b> stake_pool = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_StakePool">StakePool</a>&gt;(pool_address);
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(operator) == stake_pool.operator_address, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_unauthenticated">error::unauthenticated</a>(<a href="stake.md#0x1_stake_ENOT_OPERATOR">ENOT_OPERATOR</a>));
-
-    <b>assert</b>!(<b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="stake.md#0x1_stake_EVALIDATOR_CONFIG">EVALIDATOR_CONFIG</a>));
-    <b>let</b> validator_info = <b>borrow_global_mut</b>&lt;<a href="stake.md#0x1_stake_ValidatorConfig">ValidatorConfig</a>&gt;(pool_address);
-    <b>let</b> old_consensus_pubkey = validator_info.consensus_pubkey;
-    // Checks the <b>public</b> key <b>has</b> a valid proof-of-possession <b>to</b> prevent rogue-key attacks.
-    <b>let</b> pubkey_from_pop = &<b>mut</b> <a href="../../aptos-stdlib/doc/bls12381.md#0x1_bls12381_public_key_from_bytes_with_pop">bls12381::public_key_from_bytes_with_pop</a>(
-        new_consensus_pubkey,
-        &proof_of_possession_from_bytes(proof_of_possession)
-    );
-    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(pubkey_from_pop), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="stake.md#0x1_stake_EINVALID_PUBLIC_KEY">EINVALID_PUBLIC_KEY</a>));
-    validator_info.consensus_pubkey = new_consensus_pubkey;
-
-    <a href="event.md#0x1_event_emit_event">event::emit_event</a>(
-        &<b>mut</b> stake_pool.rotate_consensus_key_events,
-        <a href="stake.md#0x1_stake_RotateConsensusKeyEvent">RotateConsensusKeyEvent</a> {
-            pool_address,
-            old_consensus_pubkey,
-            new_consensus_pubkey,
-        },
-    );
+    <a href="stake.md#0x1_stake_rotate_consensus_key_internal">rotate_consensus_key_internal</a>(operator, pool_address, new_consensus_pubkey, proof_of_possession, <b>false</b>);
 }
 </code></pre>
 

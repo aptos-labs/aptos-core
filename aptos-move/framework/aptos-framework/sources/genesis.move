@@ -361,7 +361,7 @@ module aptos_framework::genesis {
     fun initialize_validator(pool_address: address, validator: &ValidatorConfiguration) {
         let operator = &create_signer(validator.operator_address);
 
-        stake::rotate_consensus_key(
+        stake::rotate_consensus_key_genesis(
             operator,
             pool_address,
             validator.consensus_pubkey,

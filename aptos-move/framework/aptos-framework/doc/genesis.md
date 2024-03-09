@@ -775,7 +775,7 @@ encoded in a single BCS byte array.
 <pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address: <b>address</b>, validator: &<a href="genesis.md#0x1_genesis_ValidatorConfiguration">ValidatorConfiguration</a>) {
     <b>let</b> operator = &<a href="create_signer.md#0x1_create_signer">create_signer</a>(validator.operator_address);
 
-    <a href="stake.md#0x1_stake_rotate_consensus_key">stake::rotate_consensus_key</a>(
+    <a href="stake.md#0x1_stake_rotate_consensus_key_genesis">stake::rotate_consensus_key_genesis</a>(
         operator,
         pool_address,
         validator.consensus_pubkey,

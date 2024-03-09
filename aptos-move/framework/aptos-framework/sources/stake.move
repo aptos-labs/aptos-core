@@ -689,12 +689,12 @@ module aptos_framework::stake {
         );
     }
 
-    /// Rotate the consensus key of the validator, it'll take effect in next epoch.
-    public entry fun rotate_consensus_key(
+    fun rotate_consensus_key_internal(
         operator: &signer,
         pool_address: address,
         new_consensus_pubkey: vector<u8>,
         proof_of_possession: vector<u8>,
+        genesis: bool,
     ) acquires StakePool, ValidatorConfig {
         assert_stake_pool_exists(pool_address);
         let stake_pool = borrow_global_mut<StakePool>(pool_address);
@@ -704,11 +704,16 @@ module aptos_framework::stake {
         let validator_info = borrow_global_mut<ValidatorConfig>(pool_address);
         let old_consensus_pubkey = validator_info.consensus_pubkey;
         // Checks the public key has a valid proof-of-possession to prevent rogue-key attacks.
-        let pubkey_from_pop = &mut bls12381::public_key_from_bytes_with_pop(
-            new_consensus_pubkey,
-            &proof_of_possession_from_bytes(proof_of_possession)
-        );
-        assert!(option::is_some(pubkey_from_pop), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        if (!genesis) {
+            let pubkey_from_pop = &mut bls12381::public_key_from_bytes_with_pop(
+                new_consensus_pubkey,
+                &proof_of_possession_from_bytes(proof_of_possession)
+            );
+            assert!(option::is_some(pubkey_from_pop), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        } else {
+            let pubkey = &mut bls12381::public_key_from_bytes(new_consensus_pubkey);
+            assert!(option::is_some(pubkey), error::invalid_argument(EINVALID_PUBLIC_KEY));
+        };
         validator_info.consensus_pubkey = new_consensus_pubkey;
 
         event::emit_event(
@@ -719,6 +724,28 @@ module aptos_framework::stake {
                 new_consensus_pubkey,
             },
         );
+    }
+
+    /// Rotate the consensus key of the validator
+    /// does not verify proof of possession
+    /// only for genesis
+    public(friend) fun rotate_consensus_key_genesis(
+        operator: &signer,
+        pool_address: address,
+        new_consensus_pubkey: vector<u8>,
+        proof_of_poseesion: vector<u8>,
+    ) acquires StakePool, ValidatorConfig {
+        rotate_consensus_key_internal(operator, pool_address, new_consensus_pubkey, proof_of_poseesion, true);
+    }
+
+    /// Rotate the consensus key of the validator, it'll take effect in next epoch.
+    public entry fun rotate_consensus_key(
+        operator: &signer,
+        pool_address: address,
+        new_consensus_pubkey: vector<u8>,
+        proof_of_possession: vector<u8>,
+    ) acquires StakePool, ValidatorConfig {
+        rotate_consensus_key_internal(operator, pool_address, new_consensus_pubkey, proof_of_possession, false);
     }
 
     /// Update the network and full node addresses of the validator. This only takes effect in the next epoch.
