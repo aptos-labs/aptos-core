@@ -279,9 +279,10 @@ impl SyncMode {
                     Ok(sync_result) => {
                         if sync_result.is_ok() {
                             info!("sync succeeded. running full bootstrap.");
+                            let dag_store = sync_result.unwrap();
                             // If the sync task finishes successfully, we can transition to Active mode by
                             // rebootstrapping all components starting from the DAG store.
-                            let (new_state, new_handler, new_fetch_service) = monitor!("dag_sync_full_bootstrap", bootstrapper.full_bootstrap());
+                            let (new_state, new_handler, new_fetch_service) = monitor!("dag_sync_full_bootstrap", bootstrapper.full_bootstrap(Some(dag_store)));
                             Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
@@ -509,6 +510,7 @@ impl DagBootstrapper {
         commit_history: Arc<dyn CommitHistory>,
         commit_events: Option<Vec<CommitEvent>>,
         dag_window_size_config: u64,
+        existing_dag_store: Option<DagStore>,
     ) -> BootstrapBaseState {
         let ledger_info_from_storage = self
             .storage
@@ -531,16 +533,26 @@ impl DagBootstrapper {
                 .saturating_sub(dag_window_size_config),
         );
 
-        let dag = monitor!(
-            "dag_store_new",
-            Arc::new(DagStore::new(
-                self.epoch_state.clone(),
-                self.storage.clone(),
-                self.payload_manager.clone(),
-                initial_round,
-                dag_window_size_config,
-            ))
-        );
+        let dag = monitor!("dag_store_new", {
+            if let Some(store) = existing_dag_store {
+                Arc::new(DagStore::new_from_existing(
+                    self.epoch_state.clone(),
+                    self.storage.clone(),
+                    self.payload_manager.clone(),
+                    initial_round,
+                    dag_window_size_config,
+                    store,
+                ))
+            } else {
+                Arc::new(DagStore::new(
+                    self.epoch_state.clone(),
+                    self.storage.clone(),
+                    self.payload_manager.clone(),
+                    initial_round,
+                    dag_window_size_config,
+                ))
+            }
+        });
 
         let ordered_notifier = monitor!(
             "dag_ordered_notifier_new",
@@ -698,7 +710,10 @@ impl DagBootstrapper {
         (dag_handler, dag_fetcher)
     }
 
-    fn full_bootstrap(&self) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
+    fn full_bootstrap(
+        &self,
+        existing_dag_store: Option<DagStore>,
+    ) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
         let (anchor_election, commit_history, commit_events) =
             monitor!("dag_build_anchor_election", self.build_anchor_election());
 
@@ -709,6 +724,7 @@ impl DagBootstrapper {
                 commit_history,
                 commit_events,
                 self.onchain_config.dag_ordering_causal_history_window as u64,
+                existing_dag_store
             )
         );
 
@@ -729,7 +745,7 @@ impl DagBootstrapper {
             epoch = self.epoch_state.epoch,
         );
 
-        let (base_state, handler, fetch_service) = self.full_bootstrap();
+        let (base_state, handler, fetch_service) = self.full_bootstrap(None);
 
         let mut mode = Mode::Active(ActiveMode {
             handler,
@@ -796,7 +812,7 @@ pub(super) fn bootstrap_dag_for_test(
         true,
     );
 
-    let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
+    let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap(None);
 
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 
