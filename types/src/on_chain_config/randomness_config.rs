@@ -1,8 +1,27 @@
 // Copyright © Aptos Foundation
 
-use crate::{move_any::Any as MoveAny, on_chain_config::OnChainConfig};
+use crate::{
+    move_any::{Any as MoveAny, AsMoveAny},
+    move_utils::as_move_value::AsMoveValue,
+    on_chain_config::OnChainConfig,
+};
 use anyhow::anyhow;
+use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize)]
+pub struct ConfigOff {}
+
+impl AsMoveAny for ConfigOff {
+    const MOVE_TYPE_NAME: &'static str = "0x1::randomness_config::ConfigOff";
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct ConfigV1 {}
+
+impl AsMoveAny for ConfigV1 {
+    const MOVE_TYPE_NAME: &'static str = "0x1::randomness_config::ConfigV1";
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainRandomnessConfig {
@@ -46,5 +65,15 @@ impl OnChainConfig for OnChainRandomnessConfig {
             "0x1::randomness_config::ConfigV1" => Ok(OnChainRandomnessConfig::V1),
             _ => Err(anyhow!("unknown variant type name")),
         }
+    }
+}
+
+impl AsMoveValue for OnChainRandomnessConfig {
+    fn as_move_value(&self) -> MoveValue {
+        let packed_variant = match self {
+            OnChainRandomnessConfig::Off => ConfigOff {}.as_move_any(),
+            OnChainRandomnessConfig::V1 => ConfigV1 {}.as_move_any(),
+        };
+        MoveValue::Struct(MoveStruct::Runtime(vec![packed_variant.as_move_value()]))
     }
 }

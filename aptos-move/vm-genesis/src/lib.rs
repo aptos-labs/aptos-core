@@ -510,7 +510,7 @@ fn initialize_randomness_config(
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            bcs::to_bytes(randomness_config).unwrap().as_move_value(),
+            randomness_config.as_move_value(),
         ]),
     );
 }
