@@ -61,6 +61,15 @@ async fn test_txn_emmitter() {
         Duration::from_secs(20),
         100,
         vec![
+            vec![(
+                TransactionType::Workflow {
+                    workflow_kind: WorkflowKind::Econia { num_users: 100 },
+                    num_modules: 1,
+                    move_stages_by_phase: true,
+                    use_account_pool: true,
+                },
+                1,
+            )],
             // vec![(
             //     TransactionType::AccountGeneration {
             //         add_created_accounts_to_pool: true,

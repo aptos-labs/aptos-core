@@ -35,6 +35,8 @@ pub mod publish_modules;
 pub mod publishing;
 mod transaction_mix_generator;
 mod workflow_delegator;
+pub mod econia_order_generator;
+
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
@@ -86,9 +88,23 @@ pub enum TransactionType {
     },
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum EconiaFlowType {
+    Basic,
+    Advanced,
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
     CreateMintBurn { count: usize, creation_balance: u64 },
+    // Places bid and ask limit orders at random price
+    Econia {
+        num_users: usize,
+        flow_type: EconiaFlowType,
+        num_markets: u64,
+        // If this is flag is set, the same accounts will be reused for placing multiple orders
+        reuse_accounts_for_orders: bool,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]

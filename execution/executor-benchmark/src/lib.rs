@@ -729,7 +729,7 @@ mod tests {
 
         super::run_benchmark::<E>(
             10, /* block_size */
-            30, /* num_blocks */
+            200, /* num_blocks */
             transaction_type
                 .map(|t| vec![(t.materialize(1, true, WorkflowProgress::MoveByPhases), 1)]),
             2,     /* transactions per sender */
@@ -758,10 +758,7 @@ mod tests {
         AptosVM::set_concurrency_level_once(4);
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
-        test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
-            true,
-        );
+        test_generic_benchmark::<AptosVM>(Some(TransactionTypeArg::EconiaAdvanced1Market), true);
     }
 
     #[test]

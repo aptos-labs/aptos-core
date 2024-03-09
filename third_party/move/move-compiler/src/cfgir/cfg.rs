@@ -27,12 +27,12 @@ pub trait CFG {
 
     fn predecessors(&self, label: Label) -> &BTreeSet<Label>;
     fn commands<'a>(&'a self, label: Label) -> Box<dyn Iterator<Item = (usize, &'a Command)> + 'a>;
-    fn num_blocks(&self) -> usize;
+    // fn num_blocks(&self) -> usize;
     fn start_block(&self) -> Label;
 
     fn next_block(&self, label: Label) -> Option<Label>;
 
-    fn is_loop_head(&self, label: Label) -> bool;
+    // fn is_loop_head(&self, label: Label) -> bool;
 
     fn is_back_edge(&self, cur: Label, next: Label) -> bool;
 
@@ -278,9 +278,9 @@ impl<'a> CFG for BlockCFG<'a> {
         Box::new(self.block(label).iter().enumerate())
     }
 
-    fn num_blocks(&self) -> usize {
-        self.blocks.len()
-    }
+    // fn num_blocks(&self) -> usize {
+    //     self.blocks.len()
+    // }
 
     fn start_block(&self) -> Label {
         self.start
@@ -290,9 +290,9 @@ impl<'a> CFG for BlockCFG<'a> {
         self.traversal_successors.get(&label).copied()
     }
 
-    fn is_loop_head(&self, label: Label) -> bool {
-        self.loop_heads.contains_key(&label)
-    }
+    // fn is_loop_head(&self, label: Label) -> bool {
+    //     self.loop_heads.contains_key(&label)
+    // }
 
     fn is_back_edge(&self, cur: Label, next: Label) -> bool {
         self.loop_heads
@@ -704,9 +704,9 @@ impl<'a> CFG for ReverseBlockCFG<'a> {
         Box::new(self.block(label).iter().enumerate().rev())
     }
 
-    fn num_blocks(&self) -> usize {
-        self.blocks.len()
-    }
+    // fn num_blocks(&self) -> usize {
+    //     self.blocks.len()
+    // }
 
     fn start_block(&self) -> Label {
         self.traversal_order[0]
@@ -716,9 +716,9 @@ impl<'a> CFG for ReverseBlockCFG<'a> {
         self.traversal_successors.get(&label).copied()
     }
 
-    fn is_loop_head(&self, label: Label) -> bool {
-        self.loop_heads.contains_key(&label)
-    }
+    // fn is_loop_head(&self, label: Label) -> bool {
+    //     self.loop_heads.contains_key(&label)
+    // }
 
     fn is_back_edge(&self, cur: Label, next: Label) -> bool {
         self.loop_heads

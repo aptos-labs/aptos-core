@@ -31,6 +31,8 @@ class Flow(Flag):
     AGG_V2 = auto()
     # Test resource groups
     RESOURCE_GROUPS = auto()
+    # Econia tests
+    ECONIA = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -56,13 +58,16 @@ class RunGroupConfig:
     expected_tps: float
     included_in: Flow
     waived: bool = field(default=False)
+    expected_stages: int = 1
 
 
-SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
+# SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
+SELECTED_FLOW = Flow[os.environ.get("FLOW", default="ECONIA")]
+
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "20000"
 )
 DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
 
@@ -75,6 +80,7 @@ NUM_ACCOUNTS = max(
         (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE,
     ]
 )
+NUM_ACCOUNTS = (2 + 2 * NUM_BLOCKS) * MAX_BLOCK_SIZE
 MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 
 # numbers are based on the machine spec used by github action
@@ -86,6 +92,9 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced10-market"), expected_stages=10, included_in=Flow.ECONIA),
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
@@ -145,6 +154,8 @@ TESTS = [
     RunGroupConfig(expected_tps=7006, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=6946, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
+    # RunGroupConfig(expected_tps=12000, key=RunGroupKey("econia-advanced1-market", module_working_set_size=1), included_in=Flow.ECONIA),
+
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
 
@@ -171,7 +182,7 @@ CODE_PERF_VERSION = "v4"
 
 # default to using production number of execution threads for assertions
 NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=8)
+    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
 )
 
 if os.environ.get("DETAILED"):

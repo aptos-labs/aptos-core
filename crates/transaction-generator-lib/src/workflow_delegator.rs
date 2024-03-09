@@ -2,11 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator,
-    call_custom_modules::CustomModulesDelegationGeneratorCreator,
-    entry_points::EntryPointTransactionGenerator, EntryPoints, ObjectPool,
-    ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
-    TransactionGeneratorCreator, WorkflowKind, WorkflowProgress,
+    account_generator::AccountGeneratorCreator, RootAccountHandle, accounts_pool_wrapper::{AccountsPoolWrapperCreator, ReuseAccountsPoolWrapperCreator}, call_custom_modules::CustomModulesDelegationGeneratorCreator, econia_order_generator::{EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, register_econia_markets, EconiaRegisterMarketUserTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -20,9 +16,10 @@ use std::{
         Arc,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
+    thread,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum StageTracking {
     // stage is externally modified
     ExternallySet(Arc<AtomicUsize>),
@@ -117,14 +114,20 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         mut num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
-        let stage = match self.stage.load_current_stage() {
-            Some(stage) => stage,
-            None => {
-                sample!(
-                    SampleRate::Duration(Duration::from_secs(2)),
-                    info!("Waiting for delay before next stage");
-                );
-                return Vec::new();
+        let stage = match &self.stage {
+            StageTracking::ExternallySet(stage_counter) => {
+                stage_counter.load(Ordering::Relaxed)
+            },
+            StageTracking::WhenDone {
+                stage_counter,
+                stage_start_time,
+                ..
+            } => {
+                if stage_start_time.load(Ordering::Relaxed) > StageTracking::current_timestamp() {
+                    info!("Waiting for next stage for {} seconds", 60);
+                    thread::sleep(Duration::from_secs(60));
+                }
+                stage_counter.load(Ordering::Relaxed)
             },
         };
 
@@ -192,7 +195,8 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         );
 
         let result = if let Some(generator) = self.generators.get_mut(stage) {
-            generator.generate_transactions(account, num_to_create)
+            let txns = generator.generate_transactions(account, num_to_create);
+            txns
         } else {
             Vec::new()
         };
@@ -232,7 +236,7 @@ impl WorkflowTxnGeneratorCreator {
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
-        _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
+        initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
         cur_phase: Arc<AtomicUsize>,
         progress_type: WorkflowProgress,
     ) -> Self {
@@ -333,6 +337,143 @@ impl WorkflowTxnGeneratorCreator {
                     vec![created_pool, minted_pool, burnt_pool],
                     count,
                 )
+            },
+            WorkflowKind::Econia { num_users, flow_type, num_markets, reuse_accounts_for_orders } => {
+                let create_accounts = initial_account_pool.is_none();
+                let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
+                let register_market_accounts_pool = Arc::new(ObjectPool::new());
+                let deposit_coins_pool = Arc::new(ObjectPool::new());
+                let place_orders_pool = Arc::new(ObjectPool::new());
+
+                let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    num_modules,
+                    EntryPoints::EconiaRegisterMarket.package_name(),
+                    Some(100_000_000_000_000),
+                )
+                .await;
+                
+                register_econia_markets(
+                    init_txn_factory.clone(),
+                    &mut packages,
+                    txn_executor,                    
+                    num_markets
+                ).await;
+
+                let econia_register_market_user_worker =
+                    CustomModulesDelegationGeneratorCreator::create_worker(
+                        init_txn_factory.clone(),
+                        root_account,
+                        txn_executor,
+                        &mut packages,
+                        &mut EconiaRegisterMarketUserTransactionGenerator::new(num_markets),
+                    )
+                    .await;
+
+                let econia_deposit_coins_worker =
+                    CustomModulesDelegationGeneratorCreator::create_worker(
+                        init_txn_factory.clone(),
+                        root_account,
+                        txn_executor,
+                        &mut packages,
+                        &mut EconiaDepositCoinsTransactionGenerator::new(num_markets),
+                    )
+                    .await;
+
+                let econia_place_orders_worker = match flow_type {
+                    EconiaFlowType::Basic => CustomModulesDelegationGeneratorCreator::create_worker(
+                            init_txn_factory.clone(),
+                            root_account,
+                            txn_executor,
+                            &mut packages,
+                            &mut EntryPointTransactionGenerator {
+                                entry_point: EntryPoints::EconiaPlaceRandomLimitOrder,
+                            },
+                        )
+                        .await,
+                    EconiaFlowType::Advanced => CustomModulesDelegationGeneratorCreator::create_worker(
+                            init_txn_factory.clone(),
+                            root_account,
+                            txn_executor,
+                            &mut packages,
+                            &mut EconiaLimitOrderTransactionGenerator::new(
+                                num_markets
+                            )
+                        )
+                        .await
+                };
+
+                let packages = Arc::new(packages);
+
+                let mut creators: Vec<Box<dyn TransactionGeneratorCreator>> = vec![];
+                if create_accounts {
+                    creators.push(Box::new(AccountGeneratorCreator::new(
+                        txn_factory.clone(),
+                        None,
+                        Some(created_pool.clone()),
+                        num_users,
+                        400_000_000,
+                    )));
+                }
+
+                creators.push(Box::new(AccountsPoolWrapperCreator::new(
+                    Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                        txn_factory.clone(),
+                        packages.clone(),
+                        econia_register_market_user_worker,
+                    )),
+                    created_pool.clone(),
+                    Some(register_market_accounts_pool.clone()),
+                )));
+
+                creators.push(Box::new(AccountsPoolWrapperCreator::new(
+                    Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                        txn_factory.clone(),
+                        packages.clone(),
+                        econia_deposit_coins_worker,
+                    )),
+                    register_market_accounts_pool.clone(),
+                    Some(deposit_coins_pool.clone()),
+                )));
+
+                if reuse_accounts_for_orders {
+                    creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            econia_place_orders_worker,
+                        )),
+                        deposit_coins_pool.clone(),
+                    )));
+                } else {
+                    creators.push(Box::new(AccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            econia_place_orders_worker,
+                        )),
+                        deposit_coins_pool.clone(),
+                        Some(place_orders_pool.clone()),
+                    )));
+                }
+
+                let pool_per_stage = if create_accounts {
+                    vec![
+                        created_pool,
+                        register_market_accounts_pool,
+                        deposit_coins_pool,
+                        place_orders_pool,
+                    ]
+                } else {
+                    vec![
+                        register_market_accounts_pool,
+                        deposit_coins_pool,
+                        place_orders_pool,
+                    ]
+                };
+                Self::new(stage_tracking, creators, pool_per_stage, num_users)
             },
         }
     }
