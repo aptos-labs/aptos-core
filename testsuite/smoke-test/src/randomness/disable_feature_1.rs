@@ -8,9 +8,7 @@ use crate::{
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::{
-    dkg::DKGState,
-    on_chain_config::{FeatureFlag, Features},
-    randomness::PerBlockRandomness,
+    dkg::DKGState, on_chain_config::OnChainRandomnessConfig, randomness::PerBlockRandomness,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -26,13 +24,9 @@ async fn disable_feature_1() {
             conf.epoch_duration_secs = epoch_duration_secs;
             conf.allow_new_validators = true;
 
-            // Ensure vtxn is enabled.
+            // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-
-            // Ensure randomness flag is set.
-            let mut features = Features::default();
-            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::On);
         }))
         .build_with_cli(0)
         .await;

@@ -82,8 +82,9 @@ use aptos_types::{
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
     on_chain_config::{
-        FeatureFlag, Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
-        OnChainConsensusConfig, OnChainExecutionConfig, ProposerElectionType, ValidatorSet,
+        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        ProposerElectionType, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
@@ -722,11 +723,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         onchain_execution_config: OnChainExecutionConfig,
+        onchain_randomness_config: OnChainRandomnessConfig,
+        onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: Arc<NetworkSender>,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
         rand_config: Option<RandConfig>,
-        features: Features,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let epoch = epoch_state.epoch;
@@ -775,7 +777,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 payload_manager.clone(),
                 &onchain_consensus_config,
                 &onchain_execution_config,
-                &features,
+                &onchain_randomness_config,
                 rand_config,
                 rand_msg_rx,
             )
@@ -840,7 +842,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config,
             buffered_proposal_tx,
             self.config.clone(),
-            features.clone(),
+            onchain_randomness_config,
+            onchain_jwk_consensus_config,
             true,
         );
 
@@ -879,14 +882,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn try_get_rand_config_for_new_epoch(
         &self,
         new_epoch_state: &EpochState,
-        features: &Features,
+        onchain_randomness_config: &OnChainRandomnessConfig,
         maybe_dkg_state: anyhow::Result<DKGState>,
         consensus_config: &OnChainConsensusConfig,
     ) -> Result<RandConfig, NoRandomnessReason> {
         if !consensus_config.is_vtxn_enabled() {
             return Err(NoRandomnessReason::VTxnDisabled);
         }
-        if !features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG) {
+        if !onchain_randomness_config.randomness_enabled() {
             return Err(NoRandomnessReason::FeatureDisabled);
         }
         let new_epoch = new_epoch_state.epoch;
@@ -981,7 +984,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
-        let features = payload.get::<Features>();
+        let onchain_randomness_config: anyhow::Result<OnChainRandomnessConfig> = payload.get();
+        let onchain_jwk_consensus_config: anyhow::Result<OnChainJWKConsensusConfig> = payload.get();
         let dkg_state = payload.get::<DKGState>();
 
         if let Err(error) = &onchain_consensus_config {
@@ -992,8 +996,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             error!("Failed to read on-chain execution config {}", error);
         }
 
-        if let Err(error) = &features {
-            error!("Failed to read on-chain features {}", error);
+        if let Err(error) = &onchain_randomness_config {
+            error!("Failed to read on-chain randomness config {}", error);
         }
 
         self.epoch_state = Some(epoch_state.clone());
@@ -1001,11 +1005,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let consensus_config = onchain_consensus_config.unwrap_or_default();
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
-        let features = features.unwrap_or_default();
-
+        let onchain_randomness_config = onchain_randomness_config
+            .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
+        let jwk_consensus_config = onchain_jwk_consensus_config
+            .unwrap_or_else(|_| OnChainJWKConsensusConfig::default_if_missing());
         let rand_config = self.try_get_rand_config_for_new_epoch(
             &epoch_state,
-            &features,
+            &onchain_randomness_config,
             dkg_state,
             &consensus_config,
         );
@@ -1032,11 +1038,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch_state,
                 consensus_config,
                 execution_config,
+                onchain_randomness_config,
+                jwk_consensus_config,
                 network_sender,
                 payload_client,
                 payload_manager,
                 rand_config,
-                &features,
                 rand_msg_rx,
             )
             .await
@@ -1045,11 +1052,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 epoch_state,
                 consensus_config,
                 execution_config,
+                onchain_randomness_config,
+                jwk_consensus_config,
                 network_sender,
                 payload_client,
                 payload_manager,
                 rand_config,
-                &features,
                 rand_msg_rx,
             )
             .await
@@ -1087,11 +1095,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: Arc<EpochState>,
         consensus_config: OnChainConsensusConfig,
         execution_config: OnChainExecutionConfig,
+        onchain_randomness_config: OnChainRandomnessConfig,
+        jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
         rand_config: Option<RandConfig>,
-        features: &Features,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         match self.storage.start() {
@@ -1102,11 +1111,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     epoch_state,
                     consensus_config,
                     execution_config,
+                    onchain_randomness_config,
+                    jwk_consensus_config,
                     Arc::new(network_sender),
                     payload_client,
                     payload_manager,
                     rand_config,
-                    features.clone(),
                     rand_msg_rx,
                 )
                 .await
@@ -1129,11 +1139,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         on_chain_execution_config: OnChainExecutionConfig,
+        onchain_randomness_config: OnChainRandomnessConfig,
+        onchain_jwkconsensus_config: OnChainJWKConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
         rand_config: Option<RandConfig>,
-        features: &Features,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let epoch = epoch_state.epoch;
@@ -1154,7 +1165,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 payload_manager.clone(),
                 &onchain_consensus_config,
                 &on_chain_execution_config,
-                features,
+                &onchain_randomness_config,
                 rand_config,
                 rand_msg_rx,
             )
@@ -1193,8 +1204,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.execution_client.clone(),
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.effective_validator_txn_config(),
+            onchain_randomness_config,
+            onchain_jwkconsensus_config,
             self.bounded_executor.clone(),
-            features.clone(),
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

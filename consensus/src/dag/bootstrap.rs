@@ -49,7 +49,8 @@ use aptos_types::{
     on_chain_config::{
         AnchorElectionMode, DagConsensusConfigV1, FeatureFlag, Features,
         LeaderReputationType::{ProposerAndVoter, ProposerAndVoterV2},
-        ProposerAndVoterConfig, ValidatorTxnConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, ProposerAndVoterConfig,
+        ValidatorTxnConfig,
     },
     validator_signer::ValidatorSigner,
 };
@@ -334,8 +335,9 @@ pub struct DagBootstrapper {
     execution_client: Arc<dyn TExecutionClient>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
+    randomness_config: OnChainRandomnessConfig,
+    jwk_consensus_config: OnChainJWKConsensusConfig,
     executor: BoundedExecutor,
-    features: Features,
 }
 
 impl DagBootstrapper {
@@ -357,8 +359,9 @@ impl DagBootstrapper {
         execution_client: Arc<dyn TExecutionClient>,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
+        randomness_config: OnChainRandomnessConfig,
+        jwk_consensus_config: OnChainJWKConsensusConfig,
         executor: BoundedExecutor,
-        features: Features,
     ) -> Self {
         Self {
             self_peer,
@@ -377,8 +380,9 @@ impl DagBootstrapper {
             execution_client,
             quorum_store_enabled,
             vtxn_config,
+            randomness_config,
+            jwk_consensus_config,
             executor,
-            features,
         }
     }
 
@@ -642,7 +646,8 @@ impl DagBootstrapper {
             fetch_requester,
             self.config.node_payload_config.clone(),
             self.vtxn_config.clone(),
-            self.features.clone(),
+            self.randomness_config.clone(),
+            self.jwk_consensus_config.clone(),
             health_backoff,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
@@ -748,8 +753,9 @@ pub(super) fn bootstrap_dag_for_test(
         execution_client,
         false,
         ValidatorTxnConfig::default_enabled(),
+        OnChainRandomnessConfig::default_enabled(),
+        OnChainJWKConsensusConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
-        features,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();

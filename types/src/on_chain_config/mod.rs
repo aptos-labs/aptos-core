@@ -27,6 +27,8 @@ mod commit_history;
 mod consensus_config;
 mod execution_config;
 mod gas_schedule;
+mod jwk_consensus;
+mod randomness;
 mod timed_features;
 mod timestamp;
 mod transaction_fee;
@@ -49,6 +51,8 @@ pub use self::{
         OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
+    jwk_consensus::OnChainJWKConsensusConfig,
+    randomness::OnChainRandomnessConfig,
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,

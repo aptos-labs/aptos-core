@@ -45,6 +45,15 @@ pub struct OIDCProvider {
     pub config_url: Vec<u8>,
 }
 
+impl OIDCProvider {
+    pub fn new(name: String, config_url: String) -> Self {
+        Self {
+            name: name.as_bytes().to_vec(),
+            config_url: config_url.as_bytes().to_vec(),
+        }
+    }
+}
+
 /// Move type `0x1::jwks::SupportedOIDCProviders` in rust.
 /// See its doc in Move for more details.
 #[derive(Default, Serialize, Deserialize)]
