@@ -287,52 +287,24 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
     }
 }
 
-
-pub struct EconiaRegisterMarketTransactionGenerator {
-    num_markets: Arc<u64>,
-}
-
-impl EconiaRegisterMarketTransactionGenerator {
-    pub fn new(
-        num_markets: u64
-    ) -> Self {
-        Self {
-            num_markets: Arc::new(num_markets),
-        }
+pub async fn register_econia_markets(
+    init_txn_factory: TransactionFactory,
+    packages: &mut Vec<(Package, LocalAccount)>,
+    txn_executor: &dyn ReliableTransactionSubmitter,
+    num_markets: u64,
+) {
+    assert!(num_markets > 0, "num_markets must be greater than 0");
+    assert!(num_markets <= 11, "num_markets must be less than or equal to 11");        
+    let mut requests = vec![];
+    for (package, publisher) in packages {
+        let builder = init_txn_factory.payload(register_market(package.get_module_id("txn_generator_utils"), num_markets));
+        requests.push(publisher.sign_with_transaction_builder(builder));
     }
+    txn_executor
+        .execute_transactions(&requests)
+        .await
+        .unwrap();
 }
-
-#[async_trait]
-impl UserModuleTransactionGenerator for EconiaRegisterMarketTransactionGenerator {
-    fn initialize_package(
-        &mut self,
-        _package: &Package,
-        _publisher: &mut LocalAccount,
-        _txn_factory: &TransactionFactory,
-        _rng: &mut StdRng,
-    ) -> Vec<SignedTransaction> {
-        vec![]
-    }
-
-    async fn create_generator_fn(
-        &mut self,
-        _root_account: &mut LocalAccount,
-        _txn_factory: &TransactionFactory,
-        _txn_executor: &dyn ReliableTransactionSubmitter,
-        _rng: &mut StdRng,
-    ) -> Arc<TransactionGeneratorWorker> {
-        let num_markets = self.num_markets.clone();
-        Arc::new(move |_account, package, publisher, txn_factory, _rng| {
-            let mut requests = vec![];
-            assert!(*num_markets > 0, "num_markets must be greater than 0");
-            assert!(*num_markets <= 11, "num_markets must be less than or equal to 11");
-            let builder = txn_factory.payload(register_market(package.get_module_id("txn_generator_utils"), *num_markets));
-            requests.push(publisher.sign_with_transaction_builder(builder));
-            requests
-        })
-    }
-}
-
 
 pub struct EconiaRegisterMarketUserTransactionGenerator {
     num_markets: Arc<u64>,

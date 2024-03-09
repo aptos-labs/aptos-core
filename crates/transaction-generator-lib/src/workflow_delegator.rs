@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, BypassAccountsPoolWrapperCreator, ReuseAccountsPoolWrapperCreator}, call_custom_modules::{CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator}, econia_order_generator::{EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, EconiaRegisterMarketTransactionGenerator, EconiaRegisterMarketUserTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, BypassAccountsPoolWrapperCreator, ReuseAccountsPoolWrapperCreator}, call_custom_modules::{CustomModulesDelegationGeneratorCreator, UserModuleTransactionGenerator}, econia_order_generator::{EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, register_econia_markets, EconiaRegisterMarketUserTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -318,7 +318,6 @@ impl WorkflowTxnGeneratorCreator {
             WorkflowKind::Econia { num_users, flow_type, num_markets, reuse_accounts_for_orders } => {
                 let create_accounts = initial_account_pool.is_none();
                 let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
-                let register_market_pool = Arc::new(ObjectPool::new());
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());
                 let deposit_coins_pool = Arc::new(ObjectPool::new());
                 let place_orders_pool = Arc::new(ObjectPool::new());
@@ -332,19 +331,13 @@ impl WorkflowTxnGeneratorCreator {
                     Some(100_000_000_000_000),
                 )
                 .await;
-
-                let publishers_pool = Arc::new(ObjectPool::new());
-                publishers_pool.add_to_pool(packages.iter().map(|(_package, account)| account).collect());
-
-                let econia_register_market_worker =
-                    CustomModulesDelegationGeneratorCreator::create_worker(
-                        init_txn_factory.clone(),
-                        root_account,
-                        txn_executor,
-                        &mut packages,
-                        &mut EconiaRegisterMarketTransactionGenerator::new(num_markets),
-                    )
-                    .await;
+                
+                register_econia_markets(
+                    init_txn_factory.clone(),
+                    &mut packages,
+                    txn_executor,                    
+                    num_markets
+                ).await;
 
                 let econia_register_market_user_worker =
                     CustomModulesDelegationGeneratorCreator::create_worker(
@@ -402,23 +395,13 @@ impl WorkflowTxnGeneratorCreator {
                     )));
                 }
 
-                creators.push(Box::new(BypassAccountsPoolWrapperCreator::new(
-                    Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
-                        txn_factory.clone(),
-                        packages.clone(),
-                        econia_register_market_worker,
-                    )),
-                    created_pool.clone(),
-                    Some(register_market_pool.clone()),
-                )));
-
                 creators.push(Box::new(AccountsPoolWrapperCreator::new(
                     Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                         txn_factory.clone(),
                         packages.clone(),
                         econia_register_market_user_worker,
                     )),
-                    register_market_pool.clone(),
+                    created_pool.clone(),
                     Some(register_market_accounts_pool.clone()),
                 )));
 
@@ -456,14 +439,12 @@ impl WorkflowTxnGeneratorCreator {
                 let pool_per_stage = if create_accounts {
                     vec![
                         created_pool,
-                        register_market_pool,
                         register_market_accounts_pool,
                         deposit_coins_pool,
                         place_orders_pool,
                     ]
                 } else {
                     vec![
-                        register_market_pool,
                         register_market_accounts_pool,
                         deposit_coins_pool,
                         place_orders_pool,
