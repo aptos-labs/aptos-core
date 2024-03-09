@@ -27,6 +27,7 @@ use rayon::iter::{
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    mem,
     ops::Deref,
     sync::Arc,
 };
@@ -525,6 +526,28 @@ impl DagStore {
                 start_round
             );
         }
+
+        dag
+    }
+
+    pub fn new_from_existing(
+        epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
+        payload_manager: Arc<dyn TPayloadManager>,
+        start_round: Round,
+        window_size: u64,
+        existing_dag: Self,
+    ) -> Self {
+        let dag = Self::new_empty(
+            epoch_state,
+            storage.clone(),
+            payload_manager,
+            start_round,
+            window_size,
+        );
+
+        let mut w = existing_dag.dag.write();
+        dag.dag.write().nodes_by_round = mem::replace(&mut w.nodes_by_round, BTreeMap::new());
 
         dag
     }
