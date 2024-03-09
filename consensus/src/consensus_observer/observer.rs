@@ -210,7 +210,7 @@ impl Observer {
             self.await_new_epoch().await;
         }
         self.sync_handle = None;
-        let pending = std::mem::take(self.pending_blocks.lock().deref_mut());
+        let pending = self.pending_blocks.lock().clone();
         for (_, (ordered_block, maybe_decision)) in pending.into_iter() {
             let OrderedBlock {
                 blocks,
