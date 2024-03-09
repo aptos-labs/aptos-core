@@ -43,7 +43,7 @@ async fn enable_feature_2() {
         .await
         .expect("Waited too long for epoch 3.");
 
-    info!("Now in epoch 3. Enabling features.");
+    info!("Now in epoch 3. Enabling all the dependencies at the same time.");
     let mut config = get_current_consensus_config(&client).await;
     config.enable_validator_txns();
     let config_bytes = bcs::to_bytes(&config).unwrap();
@@ -52,13 +52,13 @@ async fn enable_feature_2() {
 script {{
     use aptos_framework::aptos_governance;
     use aptos_framework::consensus_config;
-    use std::features;
+    use aptos_framework::randomness_config;
     fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let config_bytes = vector{:?};
-        consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
-        let dkg_feature_id: u64 = features::get_reconfigure_with_dkg_feature();
-        features::change_feature_flags_for_next_epoch(&framework_signer, vector[dkg_feature_id], vector[]);
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let consensus_config_bytes = vector{:?};
+        consensus_config::set_for_next_epoch(&framework_signer, consensus_config_bytes);
+        let randomness_config = randomness::new_v1();
+        randomness_config::set_for_next_epoch(&framework_signer, randomness_config);
         aptos_governance::reconfigure(&framework_signer);
     }}
 }}

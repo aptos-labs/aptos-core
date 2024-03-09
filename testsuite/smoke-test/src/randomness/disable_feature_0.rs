@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},
+    randomness::{
+        decrypt_key_map, get_on_chain_resource, script_to_disable_main_logic, verify_dkg_transcript,
+    },
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
@@ -11,7 +13,7 @@ use aptos_types::{
 };
 use std::{sync::Arc, time::Duration};
 
-/// Disable on-chain randomness by only disabling feature `RECONFIGURE_WITH_DKG`.
+/// Disable on-chain randomness by only disabling randomness main logic.
 #[tokio::test]
 async fn disable_feature_0() {
     let epoch_duration_secs = 20;
@@ -43,23 +45,12 @@ async fn disable_feature_0() {
         .await
         .expect("Waited too long for epoch 3.");
 
-    info!("Now in epoch 3. Disabling feature RECONFIGURE_WITH_DKG.");
-    let disable_dkg_script = r#"
-script {
-    use aptos_framework::aptos_governance;
-    fun main(core_resources: &signer) {
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-        let dkg_feature_id: u64 = std::features::get_reconfigure_with_dkg_feature();
-        aptos_governance::toggle_features(&framework_signer, vector[], vector[dkg_feature_id]);
-    }
-}
-"#;
-
+    info!("Now in epoch 3. Disabling randomness main logic.");
     let txn_summary = cli
-        .run_script(root_idx, disable_dkg_script)
+        .run_script(root_idx, script_to_disable_main_logic().as_str())
         .await
         .expect("Txn execution error.");
-    debug!("disabling_dkg_summary={:?}", txn_summary);
+    debug!("txn_summary={:?}", txn_summary);
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 2))
