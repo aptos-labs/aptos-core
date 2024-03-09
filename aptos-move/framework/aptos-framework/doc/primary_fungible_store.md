@@ -13,9 +13,9 @@ The transfer flow works as below:
 2. The fungible asset metadata object calls <code>ensure_primary_store_exists</code> to ensure that both the sender's and the
 recipient's primary stores exist. If either doesn't, it will be created.
 3. The fungible asset metadata object calls <code>withdraw</code> on the sender's primary store to withdraw <code>amount</code> of
-fungible asset from it. This emits an withdraw event.
+fungible asset from it. This emits a withdraw event.
 4. The fungible asset metadata object calls <code>deposit</code> on the recipient's primary store to deposit <code>amount</code> of
-fungible asset to it. This emits an deposit event.
+fungible asset to it. This emits a deposit event.
 
 
 -  [Resource `DeriveRefPod`](#0x1_primary_fungible_store_DeriveRefPod)
@@ -702,7 +702,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <td>9</td>
 <td>Only the owner of a primary store can transfer its balance to any recipient's primary store.</td>
 <td>High</td>
-<td>The function transfer fetches sender and recipient's primary stores, if the sender's store is withdraws the assets from the sender's store and then deposits to the recipient's store. The function transfer_with_ref fetches the sender's and recipient's stores and calls the the asset to the recipient with the ref.</td>
+<td>The function transfer fetches sender and recipient's primary stores, if the sender's store is withdraws the assets from the sender's store and then deposits to the recipient's store. The function transfer_with_ref fetches the sender's and recipient's stores and calls the asset to the recipient with the ref.</td>
 <td>Audited the deposit and withdraw (transfer). Audited the deposit_with_ref and withdraw_with_ref (transfer_with_ref). Audited that the store balance of the sender is decreased by the specified amount and its added to the recipients store. (transfer, transfer_with_ref) Audited that the sender's store is not burned (transfer).</td>
 </tr>
 
@@ -727,7 +727,7 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 <td>Setting the frozen flag of a store is only allowed with a valid reference.</td>
 <td>High</td>
 <td>The function set_frozen_flag fetches the primary store and calls fungible_asset::set_frozen_flag which validates the TransferRef's metadata with the store's metadata and then updates the frozen flag.</td>
-<td>Audited that it aborts if the store's metadata is not same as the the TransferRef's metadata. Audited that the status of the frozen flag is updated correctly.</td>
+<td>Audited that it aborts if the store's metadata is not same as the TransferRef's metadata. Audited that the status of the frozen flag is updated correctly.</td>
 </tr>
 
 </table>
