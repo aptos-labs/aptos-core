@@ -435,7 +435,7 @@ Capability that represents ownership over privileged operations on the underlyin
 
 ## Struct `VoteDelegation`
 
-Track delgated voter of each delegator.
+Track delegated voter of each delegator.
 
 
 <pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_VoteDelegation">VoteDelegation</a> <b>has</b> <b>copy</b>, drop, store
@@ -475,7 +475,7 @@ Track delgated voter of each delegator.
 
 ## Struct `DelegatedVotes`
 
-Track total voteing power of each voter.
+Track total voting power of each voter.
 
 
 <pre><code><b>struct</b> <a href="delegation_pool.md#0x1_delegation_pool_DelegatedVotes">DelegatedVotes</a> <b>has</b> <b>copy</b>, drop, store
@@ -1523,7 +1523,7 @@ There is not enough <code>active</code> stake on the stake pool to <code>unlock<
 
 <a id="0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED"></a>
 
-Chaning beneficiaries for operators is not supported.
+Changing beneficiaries for operators is not supported.
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED">EOPERATOR_BENEFICIARY_CHANGE_NOT_SUPPORTED</a>: u64 = 19;
@@ -1619,7 +1619,7 @@ Maximum operator percentage fee(of double digit precision): 22.85% is represente
 Minimum coins to exist on a shares pool at all times.
 Enforced per delegator for both active and pending_inactive pools.
 This constraint ensures the share price cannot overly increase and lead to
-substantial loses when buying shares (can lose at most 1 share which may
+substantial losses when buying shares (can lose at most 1 share which may
 be worth a lot if current share price is high).
 This constraint is not enforced on inactive pools as they only allow redeems
 (can lose at most 1 coin regardless of current share price).
@@ -1744,7 +1744,7 @@ Return whether a delegation pool exists at supplied address <code>addr</code>.
 
 ## Function `partial_governance_voting_enabled`
 
-Return whether a delegation pool has already enabled partial govnernance voting.
+Return whether a delegation pool has already enabled partial governance voting.
 
 
 <pre><code>#[view]
@@ -2459,7 +2459,7 @@ Ownership over setting the operator/voter is granted to <code>owner</code> who h
     // save delegation pool ownership and resource <a href="account.md#0x1_account">account</a> <b>address</b> (inner <a href="stake.md#0x1_stake">stake</a> pool <b>address</b>) on `owner`
     <b>move_to</b>(owner, <a href="delegation_pool.md#0x1_delegation_pool_DelegationPoolOwnership">DelegationPoolOwnership</a> { pool_address });
 
-    // All delegation pool enable partial governace <a href="voting.md#0x1_voting">voting</a> by default once the feature flag is enabled.
+    // All delegation pool enable partial governance <a href="voting.md#0x1_voting">voting</a> by default once the feature flag is enabled.
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_partial_governance_voting_enabled">features::partial_governance_voting_enabled</a>() && <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_delegation_pool_partial_governance_voting_enabled">features::delegation_pool_partial_governance_voting_enabled</a>()) {
         <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address);
     }
@@ -2505,7 +2505,7 @@ Return the beneficiary address of the operator.
 ## Function `enable_partial_governance_voting`
 
 Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
-THe existing voter will be replaced. The function is permissionless.
+The existing voter will be replaced. The function is permissionless.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="delegation_pool.md#0x1_delegation_pool_enable_partial_governance_voting">enable_partial_governance_voting</a>(pool_address: <b>address</b>)
@@ -3395,7 +3395,7 @@ Allows an owner to change the operator of the underlying stake pool.
 ## Function `set_beneficiary_for_operator`
 
 Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
-beneficiary. To ensures payment to the current beneficiary, one should first call <code>synchronize_delegation_pool</code>
+beneficiary. To ensure payment to the current beneficiary, one should first call <code>synchronize_delegation_pool</code>
 before switching the beneficiary. An operator can set one beneficiary for delegation pools, not a separate
 one for each pool.
 
