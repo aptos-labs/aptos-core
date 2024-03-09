@@ -1164,6 +1164,48 @@ impl<'env> Generator<'env> {
         }
     }
 
+    /// Generate borrow_field when unpacking a reference to a struct
+    // e.g. `let s = &S; let (a, b, c) = &s`, a, b, and c are references
+    fn gen_borrow_field_for_unpack_ref(
+        &mut self,
+        id: &NodeId,
+        str: &QualifiedInstId<StructId>,
+        arg: TempIndex,
+        temps: Vec<TempIndex>,
+        ref_kind: ReferenceKind,
+    ) {
+        let struct_env = self.env().get_struct(str.to_qualified_id());
+        let mut temp_to_field_offsets = BTreeMap::new();
+        for (field, input_temp) in struct_env.get_fields().zip(temps.clone()) {
+            temp_to_field_offsets.insert(input_temp, field.get_offset());
+        }
+        for (temp, field_offset) in temp_to_field_offsets {
+            self.with_reference_mode(|s, entering| {
+                if entering {
+                    s.reference_mode_kind = ref_kind
+                }
+                if !s.temp_type(temp).is_reference() {
+                    s.env().diag(
+                        Severity::Bug,
+                        &s.env().get_node_loc(*id),
+                        "Unpacking a reference to a struct must return the references of fields",
+                    );
+                }
+                s.emit_call(
+                    *id,
+                    vec![temp],
+                    BytecodeOperation::BorrowField(
+                        str.module_id,
+                        str.id,
+                        str.inst.to_owned(),
+                        field_offset,
+                    ),
+                    vec![arg],
+                );
+            });
+        }
+    }
+
     fn gen_assign_from_temp(
         &mut self,
         id: NodeId,
@@ -1183,6 +1225,15 @@ impl<'env> Generator<'env> {
             },
             Pattern::Struct(id, str, args) => {
                 let (temps, cont_assigns) = self.flatten_patterns(args, next_scope);
+                let ty = self.temp_type(arg);
+                if ty.is_reference() {
+                    let ref_kind = if ty.is_immutable_reference() {
+                        ReferenceKind::Immutable
+                    } else {
+                        ReferenceKind::Mutable
+                    };
+                    return self.gen_borrow_field_for_unpack_ref(id, str, arg, temps, ref_kind);
+                }
                 self.emit_call(
                     *id,
                     temps,
