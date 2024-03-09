@@ -98,6 +98,16 @@ impl ConsensusDB {
             .collect();
         let db = DB::open_cf(&opts, path.clone(), "consensus", cfds)
             .expect("ConsensusDB open failed; unable to continue");
+        db.inner
+            .set_options_cf(
+                db.get_cf_handle(CERTIFIED_NODE_CF_NAME)
+                    .expect("must exist"),
+                &[(
+                    &"block_based_table_factory",
+                    &"prepopulate_block_cache=kFlushOnly",
+                )],
+            )
+            .unwrap();
 
         info!(
             "Opened ConsensusDB at {:?} in {} ms",
