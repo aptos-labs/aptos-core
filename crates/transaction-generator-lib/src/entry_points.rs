@@ -45,7 +45,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
     }
 
     async fn create_generator_fn(
-        &self,
+        &mut self,
         root_account: &dyn RootAccountHandle,
         txn_factory: &TransactionFactory,
         txn_executor: &dyn ReliableTransactionSubmitter,

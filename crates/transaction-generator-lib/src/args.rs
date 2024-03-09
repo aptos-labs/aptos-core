@@ -60,8 +60,6 @@ pub enum TransactionTypeArg {
     VectorPicture40,
     VectorPictureRead40,
     SmartTablePicture30KWith200Change,
-    SmartTablePicture1MWith1KChange,
-    SmartTablePicture1BWith1KChange,
     EconiaBasic1Market,
     EconiaAdvanced1Market,
     EconiaAdvanced10Market,

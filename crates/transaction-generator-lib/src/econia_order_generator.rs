@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator}, publishing::publish_util::Package, ReliableTransactionSubmitter};
+use crate::{call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator}, publishing::publish_util::Package, ReliableTransactionSubmitter, RootAccountHandle};
 use aptos_sdk::{
     bcs,
     move_types::account_address::AccountAddress,
@@ -237,11 +237,11 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
     }
 
     async fn create_generator_fn(
-        &self,
-        _root_account: &mut LocalAccount,
+        &mut self,
+        _root_account: &dyn RootAccountHandle,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
-        rng: &mut StdRng,
+        _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
         self.num_base_orders_placed += 1;
@@ -328,8 +328,8 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketUserTransactionGener
     }
 
     async fn create_generator_fn(
-        &self,
-        _root_account: &mut LocalAccount,
+        &mut self,
+        _root_account: &dyn RootAccountHandle,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
         _rng: &mut StdRng,
@@ -372,8 +372,8 @@ impl UserModuleTransactionGenerator for EconiaDepositCoinsTransactionGenerator {
     }
 
     async fn create_generator_fn(
-        &self,
-        _root_account: &mut LocalAccount,
+        &mut self,
+        _root_account: &dyn RootAccountHandle,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
         _rng: &mut StdRng,
