@@ -57,7 +57,7 @@ script {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
         let consensus_config_bytes = vector{:?};
         consensus_config::set_for_next_epoch(&framework_signer, consensus_config_bytes);
-        let randomness_config = randomness::new_v1();
+        let randomness_config = randomness_config::new_v1();
         randomness_config::set_for_next_epoch(&framework_signer, randomness_config);
         aptos_governance::reconfigure(&framework_signer);
     }}
