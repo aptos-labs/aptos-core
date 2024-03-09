@@ -47,7 +47,7 @@ use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        AnchorElectionMode, DagConsensusConfigV1, FeatureFlag, Features,
+        AnchorElectionMode, DagConsensusConfigV1,
         LeaderReputationType::{ProposerAndVoter, ProposerAndVoterV2},
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ProposerAndVoterConfig,
         ValidatorTxnConfig,
@@ -734,8 +734,6 @@ pub(super) fn bootstrap_dag_for_test(
     UnboundedReceiver<OrderedBlocks>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
-    let mut features = Features::default();
-    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let bootstraper = DagBootstrapper::new(
         self_peer,
         DagConsensusConfig::default(),

@@ -25,7 +25,7 @@ async fn randomness_correctness() {
 
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::On);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::V1);
         }))
         .build_with_cli(0)
         .await;

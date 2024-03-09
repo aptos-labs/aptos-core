@@ -24,7 +24,7 @@ async fn dkg_with_validator_join_leave() {
 
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::On);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::V1);
         }))
         .build()
         .await;
