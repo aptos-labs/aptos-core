@@ -120,19 +120,25 @@ impl Observer {
         let last_block_id = self.last_block().id();
         // if the block is a child of the last block we have, we can insert it.
         if last_block_id == blocks.first().unwrap().parent_id() {
-            info!("[Observer] Add blocks to pending");
+            info!(
+                "[Observer] Add blocks to pending {}",
+                ordered_proof.commit_info()
+            );
             self.pending_blocks
                 .lock()
                 .insert(blocks.last().unwrap().round(), (ordered_block, None));
             if self.sync_handle.is_none() {
-                info!("[Observer] Forward blocks");
+                info!("[Observer] Forward blocks {}", ordered_proof.commit_info());
                 self.execution_client
                     .finalize_order(&blocks, ordered_proof, self.commit_callback())
                     .await
                     .unwrap();
             }
         } else {
-            info!("[Observer] Do not have parent block, Ignore.")
+            info!(
+                "[Observer] Do not have parent block, Ignore {}.",
+                ordered_proof.commit_info()
+            );
         }
     }
 
@@ -145,10 +151,16 @@ impl Observer {
         let decision_epoch = decision.ledger_info().commit_info().epoch();
         let decision_round = decision.round();
         if let Some((_, maybe_decision)) = pending_blocks.get_mut(&decision_round) {
-            info!("[Observer] Add decision to pending");
+            info!(
+                "[Observer] Add decision to pending {}",
+                decision.ledger_info().commit_info()
+            );
             *maybe_decision = Some(decision.clone());
             if self.sync_handle.is_none() {
-                info!("[Observer] Forward decision to pending");
+                info!(
+                    "[Observer] Forward decision to pending {}.",
+                    decision.ledger_info().commit_info()
+                );
                 self.forward_decision(decision);
             }
         } else {
@@ -182,7 +194,6 @@ impl Observer {
                 self.sync_handle = Some(DropGuard::new(abort_handle));
             }
         }
-        info!("[Observer] Finish processing decision.");
     }
 
     async fn process_sync_notify(&mut self, epoch: u64, round: Round) {

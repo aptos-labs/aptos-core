@@ -293,6 +293,7 @@ pub fn setup_networks_and_get_interfaces(
                     network_id,
                     &network_config,
                     consensus_network_configuration(node_config),
+                    false,
                 ));
             }
 
@@ -304,6 +305,7 @@ pub fn setup_networks_and_get_interfaces(
                     network_id,
                     &network_config,
                     dkg_network_configuration(node_config),
+                    false,
                 ));
             }
 
@@ -315,6 +317,7 @@ pub fn setup_networks_and_get_interfaces(
                     network_id,
                     &network_config,
                     jwk_consensus_network_configuration(node_config),
+                    false,
                 ));
             }
         }
@@ -325,6 +328,7 @@ pub fn setup_networks_and_get_interfaces(
             network_id,
             &network_config,
             mempool_network_configuration(node_config),
+            false,
         );
         mempool_network_handles.push(mempool_network_handle);
 
@@ -334,6 +338,7 @@ pub fn setup_networks_and_get_interfaces(
             network_id,
             &network_config,
             peer_monitoring_network_configuration(node_config),
+            false,
         );
         peer_monitoring_service_network_handles.push(peer_monitoring_service_network_handle);
 
@@ -343,6 +348,7 @@ pub fn setup_networks_and_get_interfaces(
             network_id,
             &network_config,
             storage_service_network_configuration(node_config),
+            false,
         );
         storage_service_network_handles.push(storage_service_network_handle);
 
@@ -351,6 +357,7 @@ pub fn setup_networks_and_get_interfaces(
             network_id,
             &network_config,
             observer_service_network_configuration(node_config),
+            true,
         );
         observer_network_handles.push(observer_network_handle);
 
@@ -361,6 +368,7 @@ pub fn setup_networks_and_get_interfaces(
                 network_id,
                 &network_config,
                 app_config,
+                false,
             );
             netbench_handles.push(netbench_handle);
         }
@@ -442,10 +450,15 @@ fn register_client_and_service_with_network<
     network_id: NetworkId,
     network_config: &NetworkConfig,
     application_config: NetworkApplicationConfig,
+    no_parallel: bool,
 ) -> ApplicationNetworkHandle<T> {
     let (network_sender, network_events) = network_builder.add_client_and_service(
         &application_config,
-        network_config.max_parallel_deserialization_tasks,
+        if no_parallel {
+            None
+        } else {
+            network_config.max_parallel_deserialization_tasks
+        },
     );
     ApplicationNetworkHandle {
         network_id,
