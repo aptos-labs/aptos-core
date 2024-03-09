@@ -20,7 +20,7 @@
 //  - crane - https://github.com/google/go-containerregistry/tree/main/cmd/crane#installation
 //  - pnpm - https://pnpm.io/installation
 // 2. docker login - with authorization to push to the `aptoslabs` org
-// 3. gcloud auth configure-docker us-west1-docker.pkg.dev
+// 3. gcloud auth configure-docker us-docker.pkg.dev
 // 4. gcloud auth login --update-adc
 // 5. AWS CLI credentials configured
 //

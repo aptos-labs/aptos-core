@@ -7,6 +7,7 @@ import re
 import os
 import tempfile
 import json
+import itertools
 from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
@@ -99,7 +100,7 @@ TESTS = [
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=31300, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=30443, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=19200, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=4170, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=15400, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
@@ -109,7 +110,7 @@ TESTS = [
         transaction_type_override="publish-package coin-transfer",
         transaction_weights_override="1 500",
     ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=345, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=353, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=995, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=165, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
@@ -117,11 +118,9 @@ TESTS = [
     RunGroupConfig(expected_tps=151, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=895, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=23, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=119, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    # RunGroupConfig(expected_tps=3.6, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C),
-    # RunGroupConfig(expected_tps=12.8, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    # RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
-    # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=126, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-m-with256-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    # RunGroupConfig(expected_tps=40, key=RunGroupKey("smart-table-picture1-m-with256-change", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
 
     RunGroupConfig(expected_tps=20000, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2 | LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
@@ -139,9 +138,9 @@ TESTS = [
     RunGroupConfig(expected_tps=14000, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     
-    RunGroupConfig(expected_tps=1740, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=1777, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=8520, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=1050, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=1081, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=5740, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
     RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0)),
@@ -152,8 +151,8 @@ TESTS = [
 
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
    
-    RunGroupConfig(expected_tps=6840, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=6800, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=7006, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=6946, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     # RunGroupConfig(expected_tps=12000, key=RunGroupKey("econia-advanced1-market", module_working_set_size=1), included_in=Flow.ECONIA),
 
@@ -322,15 +321,17 @@ def extract_run_results(
             get_only(re.findall(prefix + r" output: (\d+\.?\d*) bytes/s", output))
         )
         fraction_in_execution = float(
-            re.findall(prefix + r" fraction of total: (\d+\.?\d*) in execution", output)[
-                -1
-            ]
+            re.findall(
+                prefix + r" fraction of total: (\d+\.?\d*) in execution", output
+            )[-1]
         )
         fraction_of_execution_in_vm = float(
             re.findall(prefix + r" fraction of execution (\d+\.?\d*) in VM", output)[-1]
         )
         fraction_in_commit = float(
-            re.findall(prefix + r" fraction of total: (\d+\.?\d*) in commit", output)[-1]
+            re.findall(prefix + r" fraction of total: (\d+\.?\d*) in commit", output)[
+                -1
+            ]
         )
 
     return RunResults(
@@ -447,9 +448,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     results.append(
         RunGroupInstance(
             key=RunGroupKey("warmup"),
-            single_node_result=extract_run_results(
-                output, "Overall", create_db=True
-            ),
+            single_node_result=extract_run_results(output, "Overall", create_db=True),
             number_of_threads_results={},
             block_size=MAX_BLOCK_SIZE,
             expected_tps=0,
@@ -509,11 +508,12 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         single_node_result = extract_run_results(output, "Overall")
         stage_node_results = []
 
-        if test.expected_stages > 1:
-            for i in range(test.expected_stages):
-                prefix = f"Staged execution: stage {i}:"
-                if prefix in output:
-                    stage_node_results.append((i, extract_run_results(output, prefix)))
+        for i in itertools.count():
+            prefix = f"Staged execution: stage {i}:"
+            if prefix in output:
+                stage_node_results.append((i, extract_run_results(output, prefix)))
+            else:
+                break
 
         results.append(
             RunGroupInstance(
@@ -525,13 +525,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             )
         )
 
-        for stage, stage_node_result in stage_node_results:  
+        for stage, stage_node_result in stage_node_results:
             results.append(
                 RunGroupInstance(
                     key=RunGroupKey(
-                        transaction_type=test.key.transaction_type + f" [stage {stage}]",
+                        transaction_type=test.key.transaction_type
+                        + f" [stage {stage}]",
                         module_working_set_size=test.key.module_working_set_size,
-                        executor_type=test.key.executor_type,   
+                        executor_type=test.key.executor_type,
                     ),
                     single_node_result=stage_node_result,
                     number_of_threads_results=number_of_threads_results,

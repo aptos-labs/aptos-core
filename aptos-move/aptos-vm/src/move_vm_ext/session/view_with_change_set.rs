@@ -1,11 +1,5 @@
 // Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    data_cache::StorageAdapter,
-    move_vm_ext::{AptosMoveResolver, SessionExt, SessionId},
-    AptosVM,
-};
 use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},
     delayed_change::{ApplyBase, DelayedApplyChange, DelayedChange},
@@ -15,7 +9,6 @@ use aptos_aggregator::{
         code_invariant_error, expect_ok, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
     },
 };
-use aptos_gas_algebra::Fee;
 use aptos_types::{
     delayed_fields::PanicError,
     state_store::{
@@ -34,124 +27,21 @@ use aptos_vm_types::{
         ExecutorView, ResourceGroupSize, ResourceGroupView, StateStorageView, TModuleView,
         TResourceGroupView, TResourceView,
     },
-    storage::change_set_configs::ChangeSetConfigs,
 };
 use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
-use move_core_types::{
-    language_storage::StructTag,
-    value::MoveTypeLayout,
-    vm_status::{err_msg, StatusCode, VMStatus},
-};
+use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 
-fn unwrap_or_invariant_violation<T>(value: Option<T>, msg: &str) -> Result<T, VMStatus> {
-    value
-        .ok_or_else(|| VMStatus::error(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR, err_msg(msg)))
-}
-
-/// We finish the session after the user transaction is done running to get the change set and
-/// charge gas and storage fee based on it before running storage refunds and the transaction
-/// epilogue. The latter needs to see the state view as if the change set is applied on top of
-/// the base state view, and this struct implements that.
-#[ouroboros::self_referencing]
-pub struct RespawnedSession<'r, 'l> {
-    executor_view: ExecutorViewWithChangeSet<'r>,
-    #[borrows(executor_view)]
-    #[covariant]
-    resolver: StorageAdapter<'this, ExecutorViewWithChangeSet<'r>>,
-    #[borrows(resolver)]
-    #[not_covariant]
-    session: Option<SessionExt<'this, 'l>>,
-    pub storage_refund: Fee,
-}
-
-impl<'r, 'l> RespawnedSession<'r, 'l> {
-    pub fn spawn(
-        vm: &'l AptosVM,
-        session_id: SessionId,
-        base: &'r impl AptosMoveResolver,
-        previous_session_change_set: VMChangeSet,
-        storage_refund: Fee,
-    ) -> Result<Self, VMStatus> {
-        let executor_view = ExecutorViewWithChangeSet::new(
-            base.as_executor_view(),
-            base.as_resource_group_view(),
-            previous_session_change_set,
-        );
-
-        Ok(RespawnedSessionBuilder {
-            executor_view,
-            resolver_builder: |executor_view| vm.as_move_resolver(executor_view),
-            session_builder: |resolver| Some(vm.new_session(resolver, session_id)),
-            storage_refund,
-        }
-        .build())
-    }
-
-    pub fn execute<T>(
-        &mut self,
-        fun: impl FnOnce(&mut SessionExt) -> Result<T, VMStatus>,
-    ) -> Result<T, VMStatus> {
-        self.with_session_mut(|session| {
-            fun(unwrap_or_invariant_violation(
-                session.as_mut(),
-                "VM respawned session has to be set for execution.",
-            )?)
-        })
-    }
-
-    pub fn finish(
-        mut self,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<VMChangeSet, VMStatus> {
-        let additional_change_set = self.with_session_mut(|session| {
-            unwrap_or_invariant_violation(
-                session.take(),
-                "VM session cannot be finished more than once.",
-            )?
-            .finish(change_set_configs)
-            .map_err(|e| e.into_vm_status())
-        })?;
-        if additional_change_set.has_creation() {
-            // After respawning, for example, in the epilogue, there shouldn't be new slots
-            // created, otherwise there's a potential vulnerability like this:
-            // 1. slot created by the user
-            // 2. another user transaction deletes the slot and claims the refund
-            // 3. in the epilogue the same slot gets recreated, and the final write set will have
-            //    a ModifyWithMetadata carrying the original metadata
-            // 4. user keeps doing the same and repeatedly claim refund out of the slot.
-            return Err(VMStatus::error(
-                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                err_msg("Unexpected storage allocation after respawning session."),
-            ));
-        }
-        let mut change_set = self.into_heads().executor_view.change_set;
-        change_set
-            .squash_additional_change_set(additional_change_set, change_set_configs)
-            .map_err(|_err| {
-                VMStatus::error(
-                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-                    err_msg("Failed to squash VMChangeSet"),
-                )
-            })?;
-        Ok(change_set)
-    }
-
-    pub fn get_storage_fee_refund(&self) -> Fee {
-        *self.borrow_storage_refund()
-    }
-}
-
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
 pub struct ExecutorViewWithChangeSet<'r> {
     base_executor_view: &'r dyn ExecutorView,
     base_resource_group_view: &'r dyn ResourceGroupView,
-    change_set: VMChangeSet,
+    pub(crate) change_set: VMChangeSet,
 }
 
 impl<'r> ExecutorViewWithChangeSet<'r> {
@@ -356,10 +246,27 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
 
     fn resource_group_size(
         &self,
-        _group_key: &Self::GroupKey,
+        group_key: &Self::GroupKey,
     ) -> PartialVMResult<ResourceGroupSize> {
-        // In respawned session, gas is irrelevant, so we return 0 (GroupSizeKind::None).
-        Ok(ResourceGroupSize::zero_concrete())
+        use AbstractResourceWriteOp::*;
+
+        if let Some(size) = self
+        .change_set
+        .resource_write_set()
+        .get(group_key)
+        .and_then(|write| match write {
+            WriteResourceGroup(group_write) => Some(Ok(group_write.maybe_group_op_size().unwrap_or(ResourceGroupSize::zero_combined()))),
+            ResourceGroupInPlaceDelayedFieldChange(_) => None,
+            Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
+                // There should be no collisions, we cannot have group key refer to a resource.
+                Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
+            },
+        })
+        .transpose()? {
+            return Ok(size);
+        }
+
+        self.base_resource_group_view.resource_group_size(group_key)
     }
 
     fn get_resource_from_group(
@@ -369,6 +276,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         maybe_layout: Option<&Self::Layout>,
     ) -> PartialVMResult<Option<Bytes>> {
         use AbstractResourceWriteOp::*;
+
         if let Some((write_op, layout)) = self
             .change_set
             .resource_write_set()
@@ -377,7 +285,7 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
                 WriteResourceGroup(group_write) => Some(Ok(group_write)),
                 ResourceGroupInPlaceDelayedFieldChange(_) => None,
                 Write(_) | WriteWithDelayedFields(_) | InPlaceDelayedFieldChange(_) => {
-                    // There should be no colisions, we cannot have group key refer to a resource.
+                    // There should be no collisions, we cannot have group key refer to a resource.
                     Some(Err(code_invariant_error(format!("Non-ResourceGroup write found for key in get_resource_from_group call for key {group_key:?}"))))
                 },
             })
@@ -399,6 +307,11 @@ impl<'r> TResourceGroupView for ExecutorViewWithChangeSet<'r> {
         &self,
     ) -> Option<HashMap<Self::GroupKey, BTreeMap<Self::ResourceTag, Bytes>>> {
         unreachable!("Must not be called by RespawnedSession finish");
+    }
+
+    fn is_resource_groups_split_in_change_set_capable(&self) -> bool {
+        self.base_resource_group_view
+            .is_resource_groups_split_in_change_set_capable()
     }
 }
 
@@ -436,14 +349,11 @@ mod test {
     use aptos_language_e2e_tests::data_store::FakeDataStore;
     use aptos_types::{account_address::AccountAddress, write_set::WriteOp};
     use aptos_vm_types::{abstract_write_op::GroupWrite, check_change_set::CheckChangeSet};
-    use move_binary_format::errors::PartialVMResult;
     use move_core_types::{
         identifier::Identifier,
         language_storage::{StructTag, TypeTag},
     };
-    use std::collections::BTreeMap;
 
-    /// A mock for testing. Always succeeds on checking a change set.
     struct NoOpChangeSetChecker;
 
     impl CheckChangeSet for NoOpChangeSetChecker {
@@ -567,7 +477,7 @@ mod test {
                             (WriteOp::legacy_modification(serialize(&300).into()), None),
                         ),
                     ]),
-                    0,
+                    ResourceGroupSize::zero_combined(),
                     0,
                 ),
             ),
@@ -579,7 +489,7 @@ mod test {
                         mock_tag_1(),
                         (WriteOp::legacy_modification(serialize(&5000).into()), None),
                     )]),
-                    0,
+                    ResourceGroupSize::zero_combined(),
                     0,
                 ),
             ),

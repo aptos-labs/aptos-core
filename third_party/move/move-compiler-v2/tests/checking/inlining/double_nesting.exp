@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::mathtest2 {
     spec fun $fun2(a: u64,b: u64,c: u64): u64 {
         Cast(Add(Add(Mul(7, Cast(a)), Mul(11, Cast(b))), Mul(13, Cast(c))))

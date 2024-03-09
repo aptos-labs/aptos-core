@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind, WorkflowProgress};
+use crate::{
+    publishing::module_simple::LoopType, EntryPoints, TransactionType, WorkflowKind,
+    WorkflowProgress,
+};
 use clap::{Parser, ValueEnum};
 use serde::{Deserialize, Serialize};
 
@@ -49,6 +52,7 @@ pub enum TransactionTypeArg {
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
     TokenV2AmbassadorMint,
+    TokenV2AmbassadorMintAndBurn1M,
     VectorPictureCreate30k,
     VectorPicture30k,
     VectorPictureRead30k,
@@ -64,17 +68,21 @@ pub enum TransactionTypeArg {
     EconiaBasic1MarketReuseAccounts,
     EconiaAdvanced1MarketReuseAccounts,
     EconiaAdvanced10MarketReuseAccounts,
+    SmartTablePicture1MWith256Change,
+    SmartTablePicture1BWith256Change,
+    SmartTablePicture1MWith1KChangeExceedsLimit,
 }
 
 impl TransactionTypeArg {
     pub fn materialize_default(&self) -> TransactionType {
-        self.materialize(1, false)
+        self.materialize(1, false, WorkflowProgress::when_done_default())
     }
 
     pub fn materialize(
         &self,
         module_working_set_size: usize,
         sender_use_account_pool: bool,
+        workflow_progress_type: WorkflowProgress,
     ) -> TransactionType {
         match self {
             TransactionTypeArg::CoinTransfer => TransactionType::CoinTransfer {
@@ -319,9 +327,18 @@ impl TransactionTypeArg {
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::TokenV2AmbassadorMint => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::TokenV2AmbassadorMint,
+                entry_point: EntryPoints::TokenV2AmbassadorMint { numbered: true },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::CreateMintBurn {
+                    count: 10,
+                    creation_balance: 2000000,
+                },
+                num_modules: 1,
+                use_account_pool: sender_use_account_pool,
+                progress_type: workflow_progress_type,
             },
             TransactionTypeArg::VectorPictureCreate30k => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
@@ -363,20 +380,30 @@ impl TransactionTypeArg {
                     use_account_pool: sender_use_account_pool,
                 }
             },
-            TransactionTypeArg::SmartTablePicture1MWith1KChange => {
+            TransactionTypeArg::SmartTablePicture1MWith256Change => {
                 TransactionType::CallCustomModules {
                     entry_point: EntryPoints::SmartTablePicture {
                         length: 1024 * 1024,
-                        num_points_per_txn: 1024,
+                        num_points_per_txn: 256,
                     },
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
             },
-            TransactionTypeArg::SmartTablePicture1BWith1KChange => {
+            TransactionTypeArg::SmartTablePicture1BWith256Change => {
                 TransactionType::CallCustomModules {
                     entry_point: EntryPoints::SmartTablePicture {
                         length: 1024 * 1024 * 1024,
+                        num_points_per_txn: 256,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::SmartTablePicture {
+                        length: 1024 * 1024,
                         num_points_per_txn: 1024,
                     },
                     num_modules: module_working_set_size,
@@ -458,10 +485,17 @@ impl TransactionTypeArg {
         transaction_phases: &[usize],
         module_working_set_size: usize,
         sender_use_account_pool: bool,
+        workflow_progress_type: WorkflowProgress,
     ) -> Vec<Vec<(TransactionType, usize)>> {
         let arg_transaction_types = transaction_types
             .iter()
-            .map(|t| t.materialize(module_working_set_size, sender_use_account_pool))
+            .map(|t| {
+                t.materialize(
+                    module_working_set_size,
+                    sender_use_account_pool,
+                    workflow_progress_type,
+                )
+            })
             .collect::<Vec<_>>();
 
         let arg_transaction_weights = if transaction_weights.is_empty() {

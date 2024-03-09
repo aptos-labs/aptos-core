@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {
         loop {

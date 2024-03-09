@@ -24,7 +24,7 @@ warning: Function `0xc0ffee::m::unused_lambda_suppressed2` is unused: it has no 
 14 │     fun unused_lambda_suppressed2() {
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     private fun unused_lambda() {
         {

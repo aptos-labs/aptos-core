@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::log::{
-    CallFrame, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName, StorageFees,
-    TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
+    CallFrame, Dependency, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName,
+    StorageFees, TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
@@ -18,7 +18,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    identifier::Identifier,
+    identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_types::{
@@ -32,6 +32,7 @@ pub struct GasProfiler<G> {
     base: G,
 
     intrinsic_cost: Option<InternalGas>,
+    dependencies: Vec<Dependency>,
     frames: Vec<CallFrame>,
     write_set_transient: Vec<WriteTransient>,
     storage_fees: Option<StorageFees>,
@@ -85,6 +86,7 @@ impl<G> GasProfiler<G> {
             base,
 
             intrinsic_cost: None,
+            dependencies: vec![],
             frames: vec![CallFrame::new_script()],
             write_set_transient: vec![],
             storage_fees: None,
@@ -101,6 +103,7 @@ impl<G> GasProfiler<G> {
             base,
 
             intrinsic_cost: None,
+            dependencies: vec![],
             frames: vec![CallFrame::new_function(module_id, func_name, ty_args)],
             write_set_transient: vec![],
             storage_fees: None,
@@ -466,6 +469,28 @@ where
 
         res
     }
+
+    fn charge_dependency(
+        &mut self,
+        is_new: bool,
+        addr: &AccountAddress,
+        name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        let (cost, res) =
+            self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
+
+        if !cost.is_zero() {
+            self.dependencies.push(Dependency {
+                is_new,
+                id: ModuleId::new(*addr, name.to_owned()),
+                size,
+                cost,
+            });
+        }
+
+        res
+    }
 }
 
 fn write_op_type(op: &WriteOpSize) -> WriteOpType {
@@ -615,6 +640,7 @@ where
             gas_scaling_factor: self.base.gas_unit_scaling_factor(),
             total: self.algebra().execution_gas_used() + self.algebra().io_gas_used(),
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(|| 0.into()),
+            dependencies: self.dependencies,
             call_graph: self.frames.pop().expect("frame must exist"),
             write_set_transient: self.write_set_transient,
         };

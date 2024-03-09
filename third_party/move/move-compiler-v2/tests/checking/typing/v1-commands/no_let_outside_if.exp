@@ -12,7 +12,7 @@ error: undeclared `y`
 6 │         y = 0;
   │         ^
 
-error: undeclared `<SELF>_0::y`
+error: undeclared `y`
   ┌─ tests/checking/typing/v1-commands/no_let_outside_if.move:8:13
   │
 8 │     assert!(y == 5, 42);

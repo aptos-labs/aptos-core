@@ -13,7 +13,7 @@ error: calling impure function `vector::pop_back` is not allowed
 56 │         ensures result == vector::pop_back(old(v));
    │                           ^^^^^^^^^^^^^^^^^^^^^^^^
    │
-   = impure function `vector::pop_back(&mut vector<#0>): #0`
+   = impure function `vector::pop_back<Element>(&mut vector<Element>): Element`
 
 error: calling impure function `TestPureFun::impure_f_2` is not allowed
    ┌─ tests/sources/functional/pure_function_call_incorrect.move:62:13

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected 3 item(s), found 2
+error: the function returns 3 arguments but 2 were provided
   ┌─ tests/checking/typing/exp_list_nested.move:6:9
   │
 6 │         (0, (S{}, R{}))

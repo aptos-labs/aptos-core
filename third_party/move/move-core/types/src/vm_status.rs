@@ -514,7 +514,8 @@ pub enum StatusCode {
     SEQUENCE_NUMBER_TOO_OLD = 3,
     // Sequence number is too new
     SEQUENCE_NUMBER_TOO_NEW = 4,
-    // Insufficient balance to pay minimum transaction fee
+    // Insufficient balance to pay for max_gas specified in the transaction.
+    // Balance needs to be above max_gas_amount * gas_unit_price to proceed.
     INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE = 5,
     // The transaction has expired
     TRANSACTION_EXPIRED = 6,
@@ -709,13 +710,15 @@ pub enum StatusCode {
     MAX_FUNCTION_DEFINITIONS_REACHED = 1119,
     MAX_STRUCT_DEFINITIONS_REACHED = 1120,
     MAX_FIELD_DEFINITIONS_REACHED = 1121,
-    // Reserved error code for future use
     TOO_MANY_BACK_EDGES = 1122,
     EVENT_METADATA_VALIDATION_ERROR = 1123,
-    RESERVED_VERIFICATION_ERROR_2 = 1124,
-    RESERVED_VERIFICATION_ERROR_3 = 1125,
-    RESERVED_VERIFICATION_ERROR_4 = 1126,
-    RESERVED_VERIFICATION_ERROR_5 = 1127,
+    DEPENDENCY_LIMIT_REACHED = 1124,
+    // Reserved error code for future use
+    RESERVED_VERIFICATION_ERROR_1 = 1125,
+    RESERVED_VERIFICATION_ERROR_2 = 1126,
+    RESERVED_VERIFICATION_ERROR_3 = 1127,
+    RESERVED_VERIFICATION_ERROR_4 = 1128,
+    RESERVED_VERIFICATION_ERROR_5 = 1129,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.

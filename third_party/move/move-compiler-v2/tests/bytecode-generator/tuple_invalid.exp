@@ -6,7 +6,7 @@ warning: Unused local variable `x`. Consider removing or prefixing with an under
 12 │         let x = tuple(x);
    │             ^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::tuple_invalid {
     struct S {
         f: u64,
