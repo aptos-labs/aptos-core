@@ -695,7 +695,7 @@ impl AptosDataClient {
         request_timeout_ms: u64,
     ) -> crate::error::Result<Response<T>>
     where
-        T: TryFrom<StorageServiceResponse, Error = E>,
+        T: TryFrom<StorageServiceResponse, Error = E> + Send + 'static,
         E: Into<Error>,
     {
         // Start the timer for the request
@@ -733,17 +733,22 @@ impl AptosDataClient {
             )));
         }
 
-        // Try to convert the storage service enum into the exact variant we're expecting
-        match T::try_from(storage_response) {
-            Ok(new_payload) => Ok(Response::new(context, new_payload)),
-            // If the variant doesn't match what we're expecting, report the issue
-            Err(err) => {
-                context
-                    .response_callback
-                    .notify_bad_response(ResponseError::InvalidPayloadDataType);
-                Err(err.into())
-            },
-        }
+        // Try to convert the storage service enum into the exact variant we're expecting.
+        // We do this using spawn_blocking because it involves serde and compression.
+        tokio::task::spawn_blocking(move || {
+            match T::try_from(storage_response) {
+                Ok(new_payload) => Ok(Response::new(context, new_payload)),
+                // If the variant doesn't match what we're expecting, report the issue
+                Err(err) => {
+                    context
+                        .response_callback
+                        .notify_bad_response(ResponseError::InvalidPayloadDataType);
+                    Err(err.into())
+                },
+            }
+        })
+        .await
+        .map_err(|error| Error::UnexpectedErrorEncountered(error.to_string()))?
     }
 
     /// Sends a request to a specific peer

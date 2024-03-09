@@ -457,7 +457,7 @@ async fn parallel_deserialization_collector<TMessage: Message + Unpin + Send>(
         };
         let sent = out.put(em, index).await;
         if sent != 0 {
-            for i in 0..sent {
+            for _i in 0..sent {
                 releases.send(()).await;
             }
         }
@@ -899,7 +899,8 @@ impl<TMessage> NetworkSender<TMessage> {
     }
 }
 
-impl<TMessage: Message> NetworkSender<TMessage> {
+impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
+    /// Send a message to a single recipient.
     fn peer_try_send<F>(&self, peer_network_id: &PeerNetworkId, msg_src: F, high_prio: bool) -> Result<(), NetworkError>
     where F: Fn() -> Result<NetworkMessage,NetworkError>
     {
@@ -991,7 +992,8 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         }
     }
 
-    /// Send a message to a single recipient.
+    /// Send a protobuf message to a single recipient. Provides a wrapper over
+    /// `[peer_manager::PeerManagerRequestSender::send_to]`.
     pub fn send_to(
         &self,
         recipient: PeerId,
@@ -1100,6 +1102,8 @@ impl<TMessage: Message> NetworkSender<TMessage> {
                     }
                     Some(peer) => {
                         // TODO: detach .send_rpc() into its own thread in app code that cares to continue on instead of waiting for protocol.to_bytes()
+                        // Serialize the request using a blocking task
+                        // let mdata: Vec<u8> = match tokio::task::spawn_blocking(move || protocol.to_bytes(&req_msg)).await {
                         let mdata: Vec<u8> = match protocol.to_bytes(&req_msg) {
                             Ok(x) => {x}
                             Err(err) => {
@@ -1172,8 +1176,15 @@ impl<TMessage: Message> NetworkSender<TMessage> {
                         counters::rpc_message_bytes(self.network_id, protocol.as_str(), self.role_type.as_str(), counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "delivered", data_len);
                         counters::outbound_rpc_request_api_latency(self.network_id, protocol).observe((rpc_micros as f64) / 1_000_000.0);
 
-                        let wat = match protocol.from_bytes(bytes.as_ref()) {
-                            Ok(x) => {x},
+			            let wat = match tokio::task::spawn_blocking(move || protocol.from_bytes(bytes.as_ref())).await {
+                        //let wat = match protocol.from_bytes(bytes.as_ref()) {
+                            Ok(x) => match x {
+                                Ok(y) => { y },
+                                Err(yerr) => {
+                                    counters::rpc_messages(self.network_id, protocol.as_str(), self.role_type, counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "bcserr").inc();
+                                    return Err(yerr.into());
+                                },
+                            },
                             Err(err) => {
                                 counters::rpc_messages(self.network_id, protocol.as_str(), self.role_type, counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "bcserr").inc();
                                 return Err(err.into());

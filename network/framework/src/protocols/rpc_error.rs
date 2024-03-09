@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use anyhow::anyhow;
 use aptos_types::PeerId;
 use futures::channel::{mpsc, oneshot};
 use std::io;
@@ -41,6 +42,9 @@ pub enum RpcError {
 
     #[error("Rpc timed out")]
     TimedOut,
+
+    #[error("Error in tokio executor, give up")]
+    TokioJoinError,
 }
 
 impl From<oneshot::Canceled> for RpcError {
@@ -57,6 +61,12 @@ impl From<tokio::time::error::Elapsed> for RpcError {
 
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RpcError {
     fn from(_err: tokio::sync::mpsc::error::SendError<T>) -> RpcError {
-        RpcError::TokioMpscSendError
+        RpcError::TokioJoinError
+    }
+}
+
+impl From<tokio::task::JoinError> for RpcError {
+    fn from(err: tokio::task::JoinError) -> RpcError {
+        RpcError::Error(anyhow!("JoinError: {:?}", err))
     }
 }

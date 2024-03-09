@@ -203,11 +203,8 @@ impl<
         &mut self,
         consensus_sync_request: Arc<Mutex<Option<ConsensusSyncRequest>>>,
     ) -> Result<(), Error> {
-        for _ in 0..self
-            .driver_configuration
-            .config
-            .max_consecutive_stream_notifications
-        {
+        let state_sync_driver_config = &self.driver_configuration.config;
+        for _ in 0..state_sync_driver_config.max_consecutive_stream_notifications {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {

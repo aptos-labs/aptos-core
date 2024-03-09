@@ -45,6 +45,16 @@ pub enum RpcError {
     TimedOut,
 }
 
+impl From<PeerManagerError> for RpcError {
+    fn from(err: PeerManagerError) -> Self {
+        match err {
+            PeerManagerError::NotConnected(peer_id) => RpcError::NotConnected(peer_id),
+            PeerManagerError::IoError(err) => RpcError::IoError(err),
+            err => RpcError::Error(anyhow!(err)),
+        }
+    }
+}
+
 impl From<oneshot::Canceled> for RpcError {
     fn from(_: oneshot::Canceled) -> Self {
         RpcError::UnexpectedResponseChannelCancel
@@ -60,5 +70,11 @@ impl From<tokio::time::error::Elapsed> for RpcError {
 impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RpcError {
     fn from(_err: tokio::sync::mpsc::error::SendError<T>) -> RpcError {
         RpcError::TokioMpscSendError
+    }
+}
+
+impl From<tokio::task::JoinError> for RpcError {
+    fn from(err: tokio::task::JoinError) -> RpcError {
+        RpcError::Error(anyhow!("JoinError: {:?}", err))
     }
 }
