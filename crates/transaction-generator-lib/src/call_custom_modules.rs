@@ -12,7 +12,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use async_trait::async_trait;
-use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
+use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously

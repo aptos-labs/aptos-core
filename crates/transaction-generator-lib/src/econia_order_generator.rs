@@ -1,6 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::{call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator}, econia_order_generator, publishing::publish_util::Package, ObjectPool, ReliableTransactionSubmitter};
+use crate::{call_custom_modules::{TransactionGeneratorWorker, UserModuleTransactionGenerator}, publishing::publish_util::Package, ReliableTransactionSubmitter};
 use aptos_sdk::{
     bcs,
     move_types::account_address::AccountAddress,
@@ -237,7 +237,7 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
     }
 
     async fn create_generator_fn(
-        &mut self,
+        &self,
         _root_account: &mut LocalAccount,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
@@ -328,7 +328,7 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketUserTransactionGener
     }
 
     async fn create_generator_fn(
-        &mut self,
+        &self,
         _root_account: &mut LocalAccount,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
@@ -372,7 +372,7 @@ impl UserModuleTransactionGenerator for EconiaDepositCoinsTransactionGenerator {
     }
 
     async fn create_generator_fn(
-        &mut self,
+        &self,
         _root_account: &mut LocalAccount,
         _txn_factory: &TransactionFactory,
         _txn_executor: &dyn ReliableTransactionSubmitter,
