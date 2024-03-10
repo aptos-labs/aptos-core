@@ -10,64 +10,24 @@ use aptos::{common::types::TransactionSummary, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
-use aptos_types::jwks::{
-    jwk::{JWKMoveStruct, JWK},
-    unsupported::UnsupportedJWK,
-    AllProvidersJWKs, OIDCProvider, PatchedJWKs, ProviderJWKs,
+use aptos_types::{
+    jwks::{
+        jwk::{JWKMoveStruct, JWK},
+        unsupported::UnsupportedJWK,
+        AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
+    },
+    on_chain_config::OnChainJWKConsensusConfig,
 };
 use move_core_types::account_address::AccountAddress;
 use std::time::Duration;
-use aptos_types::on_chain_config::OnChainJWKConsensusConfig;
-
-pub async fn put_provider_on_chain_depreciated(
-    cli: CliTestFramework,
-    account_idx: usize,
-    providers: Vec<OIDCProvider>,
-) -> TransactionSummary {
-    let implementation = providers
-        .into_iter()
-        .map(|provider| {
-            let OIDCProvider { name, config_url } = provider;
-            format!(
-                r#"
-        let issuer = b"{}";
-        let config_url = b"{}";
-        jwks::upsert_oidc_provider_for_next_epoch(&framework_signer, issuer, config_url);
-"#,
-                String::from_utf8(name).unwrap(),
-                String::from_utf8(config_url).unwrap(),
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("");
-
-    let add_dummy_provider_script = format!(
-        r#"
-script {{
-    use aptos_framework::aptos_governance;
-    use aptos_framework::jwk_consensus_config;
-    fun main(core_resources: &signer) {{
-        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-        {implementation}
-        jwk_consensus_config::set_for_next_epoch(&framework, config);
-        aptos_governance::reconfigure(&framework);
-    }}
-}}
-"#,
-    );
-    cli.run_script(account_idx, &add_dummy_provider_script)
-        .await
-        .unwrap()
-}
 
 pub async fn update_jwk_consensus_config(
     cli: CliTestFramework,
     account_idx: usize,
-    config: &OnChainJWKConsensusConfig
+    config: &OnChainJWKConsensusConfig,
 ) -> TransactionSummary {
     let script = match config {
-        OnChainJWKConsensusConfig::Off => {
-            r#"
+        OnChainJWKConsensusConfig::Off => r#"
 script {
     use aptos_framework::aptos_governance;
     use aptos_framework::jwk_consensus_config;
@@ -78,17 +38,22 @@ script {
         aptos_governance::reconfigure(&framework);
     }
 }
-"#.to_string()
-        }
+"#
+        .to_string(),
         OnChainJWKConsensusConfig::V1(config_v1) => {
-            let provider_lines = config_v1.oidc_providers.iter().map(|provider| {
-                format!(
-                    "jwk_consensus_config::new_oidc_provider(utf8(b\"{}\"), utf8(b\"{}\")),",
-                    provider.name,
-                    provider.config_url
-                )
-            }).collect::<Vec<_>>().join("\n            ");
-            format!(r#"
+            let provider_lines = config_v1
+                .oidc_providers
+                .iter()
+                .map(|provider| {
+                    format!(
+                        "jwk_consensus_config::new_oidc_provider(utf8(b\"{}\"), utf8(b\"{}\")),",
+                        provider.name, provider.config_url
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n            ");
+            format!(
+                r#"
 script {{
     use aptos_framework::aptos_governance;
     use aptos_framework::jwk_consensus_config;
@@ -103,14 +68,13 @@ script {{
         aptos_governance::reconfigure(&framework);
     }}
 }}
-"#)
-        }
+"#
+            )
+        },
     };
     println!("script={script}");
 
-    cli.run_script(account_idx, script.as_str())
-        .await
-        .unwrap()
+    cli.run_script(account_idx, script.as_str()).await.unwrap()
 }
 
 async fn get_patched_jwks(rest_client: &Client) -> PatchedJWKs {

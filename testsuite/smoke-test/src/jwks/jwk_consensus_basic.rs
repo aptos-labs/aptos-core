@@ -6,20 +6,18 @@ use crate::{
             request_handler::{EquivocatingServer, StaticContentServer},
             DummyProvider,
         },
-        get_patched_jwks,
+        get_patched_jwks, update_jwk_consensus_config,
     },
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::jwks::{
-    jwk::JWK, rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs,
-    ProviderJWKs,
+use aptos_types::{
+    jwks::{jwk::JWK, rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, ProviderJWKs},
+    on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
-use aptos_types::on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig};
-use crate::jwks::update_jwk_consensus_config;
 
 /// The validators should agree on the JWK after provider set is changed/JWK is rotated.
 #[tokio::test]
@@ -68,10 +66,18 @@ async fn jwk_consensus_basic() {
     provider_bob.update_request_handler(Some(Arc::new(StaticContentServer::new(
         r#"{"keys": ["BOB_JWK_V0"]}"#.as_bytes().to_vec(),
     ))));
-    let config = OnChainJWKConsensusConfig::V1(JWKConsensusConfigV1 { oidc_providers: vec![
-        OIDCProvider {name: "https://alice.io".to_string(), config_url: provider_alice.open_id_config_url() },
-        OIDCProvider {name: "https://bob.dev".to_string(), config_url: provider_bob.open_id_config_url() },
-    ] });
+    let config = OnChainJWKConsensusConfig::V1(JWKConsensusConfigV1 {
+        oidc_providers: vec![
+            OIDCProvider {
+                name: "https://alice.io".to_string(),
+                config_url: provider_alice.open_id_config_url(),
+            },
+            OIDCProvider {
+                name: "https://bob.dev".to_string(),
+                config_url: provider_bob.open_id_config_url(),
+            },
+        ],
+    });
 
     let txn_summary = update_jwk_consensus_config(cli, root_idx, &config).await;
     debug!("txn_summary={:?}", txn_summary);
