@@ -186,7 +186,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
 
         // voting power == 90% and pass wait time if health backoff
         let duration_since_start = duration_since_epoch().saturating_sub(inner.start_time);
-        if voting_power == self.ninty_percent
+        if voting_power == self.epoch_state.verifier.total_voting_power()
             && (duration_since_start >= wait_time || !is_health_backoff)
         {
             let _ = self.event_sender.send(new_round);
