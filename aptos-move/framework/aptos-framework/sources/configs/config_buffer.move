@@ -33,9 +33,11 @@ module aptos_framework::config_buffer {
     }
 
     public fun initialize(aptos_framework: &signer) {
-        move_to(aptos_framework, PendingConfigs {
-            configs: simple_map::new(),
-        })
+        if (!exists<PendingConfigs>(@aptos_framework)) {
+            move_to(aptos_framework, PendingConfigs {
+                configs: simple_map::new(),
+            })
+        }
     }
 
     /// Check whether there is a pending config payload for `T`.

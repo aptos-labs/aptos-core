@@ -22,7 +22,8 @@ use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
-    jwks::{OIDCProvider, ObservedJWKs, ObservedJWKsUpdated, SupportedOIDCProviders},
+    jwks,
+    jwks::{ObservedJWKs, ObservedJWKsUpdated, SupportedOIDCProviders},
     on_chain_config::{
         FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, ValidatorSet,
@@ -175,14 +176,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Ok(config) => {
                 let should_run =
                     config.jwk_consensus_enabled() && onchain_consensus_config.is_vtxn_enabled();
-                let providers = config.oidc_providers().cloned().map(|provider_map| {
-                    let providers: Vec<OIDCProvider> = provider_map
-                        .into_iter()
-                        .map(|(name, url)| OIDCProvider::new(name, url))
-                        .collect();
-                    SupportedOIDCProviders { providers }
-                });
-                (should_run, providers)
+                let providers = config
+                    .oidc_providers_cloned()
+                    .into_iter()
+                    .map(jwks::OIDCProvider::from)
+                    .collect();
+                (should_run, Some(SupportedOIDCProviders { providers }))
             },
             Err(_) => {
                 let should_run = features.is_enabled(FeatureFlag::JWK_CONSENSUS)

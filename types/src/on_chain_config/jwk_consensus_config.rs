@@ -1,23 +1,45 @@
 // Copyright © Aptos Foundation
 
-use crate::on_chain_config::OnChainConfig;
-use anyhow::format_err;
+use crate::{
+    move_any::{Any as MoveAny, Any, AsMoveAny},
+    on_chain_config::OnChainConfig,
+};
+use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ConfigOff {}
+
+impl AsMoveAny for ConfigOff {
+    const MOVE_TYPE_NAME: &'static str = "0x1::jwk_consensus_config::ConfigOff";
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct OIDCProvider {
+    pub name: String,
+    pub config_url: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct ConfigV1 {
+    oidc_providers: Vec<OIDCProvider>,
+}
+
+impl AsMoveAny for ConfigV1 {
+    const MOVE_TYPE_NAME: &'static str = "0x1::jwk_consensus_config::ConfigV1";
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum OnChainJWKConsensusConfig {
     Off,
-    On {
-        oidc_providers: BTreeMap<String, String>,
-    },
+    V1(ConfigV1),
 }
 
 impl OnChainJWKConsensusConfig {
     pub fn default_enabled() -> Self {
-        Self::On {
-            oidc_providers: BTreeMap::new(),
-        }
+        Self::V1(ConfigV1 {
+            oidc_providers: vec![],
+        })
     }
 
     pub fn default_disabled() -> Self {
@@ -29,22 +51,22 @@ impl OnChainJWKConsensusConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        Self::On {
-            oidc_providers: BTreeMap::new(),
-        }
+        Self::V1(ConfigV1 {
+            oidc_providers: vec![],
+        })
     }
 
     pub fn jwk_consensus_enabled(&self) -> bool {
         match self {
             OnChainJWKConsensusConfig::Off => false,
-            OnChainJWKConsensusConfig::On { .. } => true,
+            OnChainJWKConsensusConfig::V1 { .. } => true,
         }
     }
 
-    pub fn oidc_providers(&self) -> Option<&BTreeMap<String, String>> {
+    pub fn oidc_providers_cloned(&self) -> Vec<OIDCProvider> {
         match self {
-            OnChainJWKConsensusConfig::Off => None,
-            OnChainJWKConsensusConfig::On { oidc_providers } => Some(oidc_providers),
+            OnChainJWKConsensusConfig::Off => vec![],
+            OnChainJWKConsensusConfig::V1(v1) => v1.oidc_providers.clone(),
         }
     }
 }
@@ -54,8 +76,14 @@ impl OnChainConfig for OnChainJWKConsensusConfig {
     const TYPE_IDENTIFIER: &'static str = "JWKConsensusConfig";
 
     fn deserialize_into_config(bytes: &[u8]) -> anyhow::Result<Self> {
-        let raw_bytes: Vec<u8> = bcs::from_bytes(bytes)?;
-        bcs::from_bytes(&raw_bytes)
-            .map_err(|e| format_err!("[on-chain config] Failed to deserialize into config: {}", e))
+        let variant = bcs::from_bytes::<MoveAny>(bytes)?;
+        match variant.type_name.as_str() {
+            ConfigOff::MOVE_TYPE_NAME => Ok(OnChainJWKConsensusConfig::Off),
+            ConfigV1::MOVE_TYPE_NAME => {
+                let config_v1 = Any::unpack::<ConfigV1>(ConfigV1::MOVE_TYPE_NAME, variant).map_err(|e|anyhow!("OnChainJWKConsensusConfig deserialization failed with ConfigV1 unpack error: {e}"))?;
+                Ok(OnChainJWKConsensusConfig::V1(config_v1))
+            },
+            _ => Err(anyhow!("unknown variant type")),
+        }
     }
 }

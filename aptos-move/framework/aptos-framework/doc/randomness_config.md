@@ -49,8 +49,8 @@ The configuration of the on-chain randomness feature.
 <dd>
  A config variant packed as an <code>Any</code>.
  Currently the variant type is one of the following.
- - <code>ConfigOn</code>
  - <code><a href="randomness_config.md#0x1_randomness_config_ConfigOff">ConfigOff</a></code>
+ - <code><a href="randomness_config.md#0x1_randomness_config_ConfigV1">ConfigV1</a></code>
 </dd>
 </dl>
 

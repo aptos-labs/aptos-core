@@ -14,8 +14,8 @@ module aptos_framework::randomness_config {
     struct RandomnessConfig has drop, key, store {
         /// A config variant packed as an `Any`.
         /// Currently the variant type is one of the following.
-        /// - `ConfigOn`
         /// - `ConfigOff`
+        /// - `ConfigV1`
         variant: Any,
     }
 
