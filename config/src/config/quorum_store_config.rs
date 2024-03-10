@@ -71,6 +71,7 @@ pub struct QuorumStoreConfig {
     pub back_pressure: QuorumStoreBackPressureConfig,
     pub num_workers_for_remote_batches: usize,
     pub batch_buckets: Vec<u64>,
+    pub allow_batches_without_pos_in_proposal: bool,
 }
 
 impl Default for QuorumStoreConfig {
@@ -104,6 +105,8 @@ impl Default for QuorumStoreConfig {
             // number of batch coordinators to handle QS batch messages, should be >= 1
             num_workers_for_remote_batches: 10,
             batch_buckets: DEFAULT_BUCKETS.to_vec(),
+            // TODO: change to true on next release
+            allow_batches_without_pos_in_proposal: false,
         }
     }
 }
