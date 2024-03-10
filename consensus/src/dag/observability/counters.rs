@@ -45,7 +45,7 @@ pub static NUM_TXNS_PER_NODE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_dag_num_txns_per_node",
         "Histogram counting the number of transactions per node",
-        NUM_CONSENSUS_TRANSACTIONS_BUCKETS
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS.to_vec()
     )
     .unwrap()
 });
