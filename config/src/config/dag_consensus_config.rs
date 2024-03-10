@@ -22,10 +22,10 @@ pub struct DagPayloadConfig {
 impl Default for DagPayloadConfig {
     fn default() -> Self {
         Self {
-            max_sending_txns_per_round: 20000,
-            max_sending_size_per_round_bytes: 10 * 1024 * 1024,
-            max_receiving_txns_per_round: 21000,
-            max_receiving_size_per_round_bytes: 20 * 1024 * 1024,
+            max_sending_txns_per_round: 150_000,
+            max_sending_size_per_round_bytes: 100 * 1024 * 1024,
+            max_receiving_txns_per_round: 151_000,
+            max_receiving_size_per_round_bytes: 110 * 1024 * 1024,
 
             payload_pull_max_poll_time_ms: 50,
         }
@@ -95,7 +95,7 @@ impl Default for DagFetcherConfig {
             retry_interval_ms: 1000,
             rpc_timeout_ms: 5000,
             min_concurrent_responders: 2,
-            max_concurrent_responders: 10,
+            max_concurrent_responders: 6,
             max_concurrent_fetches: 50,
             request_channel_size: 100,
             response_channel_size: 100,
