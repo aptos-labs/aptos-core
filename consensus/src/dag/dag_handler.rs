@@ -89,9 +89,10 @@ impl NetworkHandler {
             ..
         } = self;
 
+        let executor = BoundedExecutor::new(200, Handle::current());
         // TODO: feed in the executor based on verification Runtime
         let mut verified_msg_stream =
-            dag_rpc_rx.concurrent_map(executor.clone(), move |rpc_request: IncomingDAGRequest| {
+            dag_rpc_rx.concurrent_map(executor, move |rpc_request: IncomingDAGRequest| {
                 let timer = INCOMING_MSG_PROCESSING.start_timer();
                 let epoch_state = epoch_state.clone();
                 async move {
