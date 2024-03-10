@@ -36,10 +36,16 @@ pub static CURRENT_ROUND: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+const NUM_CONSENSUS_TRANSACTIONS_BUCKETS: [f64; 24] = [
+    5.0, 10.0, 20.0, 40.0, 75.0, 100.0, 200.0, 400.0, 800.0, 1200.0, 1800.0, 2500.0, 3300.0,
+    4000.0, 5000.0, 6500.0, 8000.0, 10000.0, 12500.0, 15000.0, 18000.0, 21000.0, 25000.0, 30000.0,
+];
+
 pub static NUM_TXNS_PER_NODE: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_consensus_dag_num_txns_per_node",
         "Histogram counting the number of transactions per node",
+        NUM_CONSENSUS_TRANSACTIONS_BUCKETS
     )
     .unwrap()
 });
