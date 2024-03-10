@@ -116,9 +116,9 @@ pub struct ReliableBroadcastConfig {
 impl Default for ReliableBroadcastConfig {
     fn default() -> Self {
         Self {
-            // A backoff policy that starts at 100ms and doubles each iteration up to 10secs.
+            // A backoff policy that starts at 200ms and doubles each iteration up to 10secs.
             backoff_policy_base_ms: 2,
-            backoff_policy_factor: 50,
+            backoff_policy_factor: 100,
             backoff_policy_max_delay_ms: 10000,
 
             rpc_timeout_ms: 5000,
