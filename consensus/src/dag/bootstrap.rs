@@ -643,6 +643,7 @@ impl DagBootstrapper {
                 new_round_tx,
                 self.epoch_state.clone(),
                 Duration::from_millis(round_state_config.adaptive_responsive_minimum_wait_time_ms),
+                round_state_config.wait_voting_power_pct,
             )),
         );
 

@@ -52,7 +52,7 @@ pub(crate) struct DagDriver {
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
-    rb_handles: Mutex<BoundedVecDeque<(DropGuard, u64)>>,
+    rb_handles: Mutex<BoundedVecDeque<(DropGuard, u64, Round)>>,
     storage: Arc<dyn DAGStorage>,
     order_rule: Arc<Mutex<OrderRule>>,
     fetch_requester: Arc<dyn TFetchRequester>,
@@ -364,13 +364,21 @@ impl DagDriver {
         tokio::spawn(Abortable::new(task, abort_registration));
         // TODO: a bounded vec queue can hold more than window rounds, but we want to limit
         // by number of rounds.
-        if let Some((_handle, prev_round_timestamp)) = self
-            .rb_handles
-            .lock()
-            .push_back((DropGuard::new(abort_handle), timestamp))
+        let mut rb_handles = self.rb_handles.lock();
+        if let Some((_handle, prev_round_timestamp, _)) =
+            rb_handles.push_back((DropGuard::new(abort_handle), timestamp, round))
         {
             // TODO: this observation is inaccurate.
             observe_round(prev_round_timestamp, RoundStage::Finished);
+        }
+
+        while let Some(front) = rb_handles.front() {
+            if round.abs_diff(front.2) > self.window_size_config {
+                observe_round(front.1, RoundStage::Finished);
+                rb_handles.pop_front();
+            } else {
+                break;
+            }
         }
     }
 
