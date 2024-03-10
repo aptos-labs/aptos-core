@@ -132,10 +132,10 @@ impl QuorumStoreConfig {
             receiver_max_total_txns: 500,
             receiver_max_total_bytes: 8 * 1024 * 1024,
             back_pressure: QuorumStoreBackPressureConfig {
-                backlog_txn_limit_count: 100000,
+                backlog_txn_limit_count: 50_000,
                 backlog_per_validator_batch_limit_count: 20,
                 dynamic_min_txn_per_s: 100,
-                dynamic_max_txn_per_s: 200,
+                dynamic_max_txn_per_s: 500,
                 ..Default::default()
             },
             ..Default::default()

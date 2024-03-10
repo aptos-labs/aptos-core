@@ -243,7 +243,7 @@ fn dag_reconfig_enable_test() -> ForgeConfig {
 fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     // THE MOST COMMONLY USED TUNE-ABLES:
     const USE_CRAZY_MACHINES: bool = false;
-    const ENABLE_VFNS: bool = false;
+    const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 100;
 
     // Config is based on these values. The target TPS should be a slight overestimate of
@@ -316,7 +316,7 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
     if ENABLE_VFNS {
         forge_config = forge_config
-            .with_initial_fullnode_count(VALIDATOR_COUNT)
+            .with_initial_fullnode_count(10)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
                 optimize_state_sync_for_throughput(config);
