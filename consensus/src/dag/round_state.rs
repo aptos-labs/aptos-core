@@ -125,7 +125,7 @@ struct AdaptiveResponsiveInner {
 pub struct AdaptiveResponsive {
     inner: Mutex<AdaptiveResponsiveInner>,
     epoch_state: Arc<EpochState>,
-    ninty_percent: u128,
+    wait_voting_power: u128,
     minimal_wait_time: Duration,
     event_sender: tokio::sync::mpsc::UnboundedSender<Round>,
 }
@@ -135,19 +135,21 @@ impl AdaptiveResponsive {
         event_sender: tokio::sync::mpsc::UnboundedSender<Round>,
         epoch_state: Arc<EpochState>,
         minimal_wait_time: Duration,
+        wait_voting_power_pct: usize,
     ) -> Self {
+        let wait_voting_power = epoch_state
+            .verifier
+            .total_voting_power()
+            .saturating_mul(wait_voting_power_pct as u128)
+            .saturating_add(50)
+            .saturating_div(100);
         Self {
             inner: Mutex::new(AdaptiveResponsiveInner {
                 start_time: duration_since_epoch(),
                 state: State::Initial,
             }),
-            ninty_percent: epoch_state
-                .verifier
-                .total_voting_power()
-                .saturating_mul(90)
-                .saturating_add(50)
-                .saturating_div(100),
             epoch_state,
+            wait_voting_power,
             minimal_wait_time,
             event_sender,
         }
@@ -184,11 +186,17 @@ impl ResponsiveCheck for AdaptiveResponsive {
             (self.minimal_wait_time, false)
         };
 
-        // voting power == 90% and pass wait time if health backoff
+        // voting power >= 90% and pass wait time if health backoff
         let duration_since_start = duration_since_epoch().saturating_sub(inner.start_time);
-        if voting_power == self.epoch_state.verifier.total_voting_power()
+        if voting_power >= self.wait_voting_power
             && (duration_since_start >= wait_time || !is_health_backoff)
         {
+            if voting_power >= self.wait_voting_power {
+                observe_round(
+                    inner.start_time.as_micros() as u64,
+                    RoundStage::VotingPowerMet,
+                );
+            }
             let _ = self.event_sender.send(new_round);
             if let State::Scheduled(handle) = std::mem::replace(&mut inner.state, State::Sent) {
                 handle.abort();

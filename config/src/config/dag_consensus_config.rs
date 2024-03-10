@@ -130,12 +130,14 @@ impl Default for ReliableBroadcastConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct DagRoundStateConfig {
     pub adaptive_responsive_minimum_wait_time_ms: u64,
+    pub wait_voting_power_pct: usize,
 }
 
 impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
             adaptive_responsive_minimum_wait_time_ms: 5000,
+            wait_voting_power_pct: 100,
         }
     }
 }
