@@ -125,6 +125,7 @@ struct AdaptiveResponsiveInner {
 pub struct AdaptiveResponsive {
     inner: Mutex<AdaptiveResponsiveInner>,
     epoch_state: Arc<EpochState>,
+    ninty_percent: u128,
     minimal_wait_time: Duration,
     event_sender: tokio::sync::mpsc::UnboundedSender<Round>,
 }
@@ -140,6 +141,12 @@ impl AdaptiveResponsive {
                 start_time: duration_since_epoch(),
                 state: State::Initial,
             }),
+            ninty_percent: epoch_state
+                .verifier
+                .total_voting_power()
+                .saturating_mul(90)
+                .saturating_add(50)
+                .saturating_div(100),
             epoch_state,
             minimal_wait_time,
             event_sender,
@@ -159,10 +166,12 @@ impl ResponsiveCheck for AdaptiveResponsive {
             return;
         }
         let new_round = highest_strong_links_round + 1;
-        observe_round(
-            inner.start_time.as_micros() as u64,
-            RoundStage::StrongLinkReceived,
-        );
+        if matches!(inner.state, State::Initial) {
+            observe_round(
+                inner.start_time.as_micros() as u64,
+                RoundStage::StrongLinkReceived,
+            );
+        }
         let voting_power = self
             .epoch_state
             .verifier
@@ -175,9 +184,9 @@ impl ResponsiveCheck for AdaptiveResponsive {
             (self.minimal_wait_time, false)
         };
 
-        // voting power == 3f+1 and pass wait time if health backoff
+        // voting power == 90% and pass wait time if health backoff
         let duration_since_start = duration_since_epoch().saturating_sub(inner.start_time);
-        if voting_power == self.epoch_state.verifier.total_voting_power()
+        if voting_power == self.ninty_percent
             && (duration_since_start >= wait_time || !is_health_backoff)
         {
             let _ = self.event_sender.send(new_round);
