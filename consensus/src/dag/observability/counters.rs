@@ -93,3 +93,20 @@ pub static FETCH_ENQUEUE_FAILURES: Lazy<IntCounterVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static DAG_RPC_CHANNEL: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_consensus_dag_rpc_channel",
+        "Counters(queued,dequeued,dropped) related to dag channel",
+        &["state"]
+    )
+    .unwrap()
+});
+
+pub static INCOMING_MSG_PROCESSING: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        "aptos_consensus_dag_incoming_msg_process",
+        "dag incoming message processing"
+    )
+    .unwrap()
+});

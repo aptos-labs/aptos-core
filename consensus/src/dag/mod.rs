@@ -14,7 +14,7 @@ mod dag_state_sync;
 mod dag_store;
 mod errors;
 mod health;
-mod observability;
+pub(crate) mod observability;
 mod order_rule;
 mod rb_handler;
 mod round_state;
