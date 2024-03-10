@@ -546,7 +546,7 @@ fn initialize_jwk_consensus_config(
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            bcs::to_bytes(jwk_consensus_config).unwrap().as_move_value(),
+            jwk_consensus_config.as_move_value(),
         ]),
     );
 }

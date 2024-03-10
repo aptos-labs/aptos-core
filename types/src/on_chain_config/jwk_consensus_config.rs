@@ -2,9 +2,11 @@
 
 use crate::{
     move_any::{Any as MoveAny, Any, AsMoveAny},
+    move_utils::as_move_value::AsMoveValue,
     on_chain_config::OnChainConfig,
 };
 use anyhow::anyhow;
+use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -85,5 +87,15 @@ impl OnChainConfig for OnChainJWKConsensusConfig {
             },
             _ => Err(anyhow!("unknown variant type")),
         }
+    }
+}
+
+impl AsMoveValue for OnChainJWKConsensusConfig {
+    fn as_move_value(&self) -> MoveValue {
+        let packed_variant = match self {
+            OnChainJWKConsensusConfig::Off => ConfigOff {}.as_move_any(),
+            OnChainJWKConsensusConfig::V1(v1) => v1.as_move_any(),
+        };
+        MoveValue::Struct(MoveStruct::Runtime(vec![packed_variant.as_move_value()]))
     }
 }
