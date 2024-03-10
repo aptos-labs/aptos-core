@@ -786,25 +786,9 @@ impl Interpreter {
         //      nodes,
         //   2) bytecode verifier fails, e.g. on module publishing.
         // These errors mean that the code breaks some invariant, so we need to
-        // remap the error to VERIFICATION_ERROR which is of invariant violation
-        // type.
+        // remap the error.
         if err.status_type() == StatusType::Verification {
-            let (_major_status, sub_status, message, exec_state, location, indices, offsets) =
-                err.all_data();
-            let mut new_err = PartialVMError::new(StatusCode::VERIFICATION_ERROR);
-            if let Some(sub_status) = sub_status {
-                new_err = new_err.with_sub_status(sub_status);
-            };
-            if let Some(message) = message {
-                new_err = new_err.with_message(message.to_string());
-            };
-            if let Some(exec_state) = exec_state {
-                new_err = new_err.with_exec_state(exec_state);
-            };
-            err = new_err
-                .at_indices(indices)
-                .at_code_offsets(offsets)
-                .finish(location)
+            err.set_major_status(StatusCode::VERIFICATION_ERROR);
         }
 
         // We do not consider speculative invariant violations.
