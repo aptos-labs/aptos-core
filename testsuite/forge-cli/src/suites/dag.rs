@@ -316,7 +316,7 @@ fn dag_realistic_network_tuned_for_throughput_test() -> ForgeConfig {
 
     if ENABLE_VFNS {
         forge_config = forge_config
-            .with_initial_fullnode_count(10)
+            .with_initial_fullnode_count(20)
             .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
                 // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
                 optimize_state_sync_for_throughput(config);
