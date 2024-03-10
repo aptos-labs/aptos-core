@@ -21,7 +21,7 @@ use move_stackless_bytecode::{
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
 use num::ToPrimitive;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 // ======================================================================================
 // Entry
@@ -1134,8 +1134,20 @@ impl<'env> Generator<'env> {
                 if args.len() != pats.len() {
                     // Type checker should have complained already
                     self.internal_error(id, "inconsistent tuple arity")
+                } else if args.len() != 1 && self.have_overlapping_vars(pats, exp) {
+                    // We want to simulate the semantics for "simultaneous" assignment with
+                    // overlapping variables, eg., `(x, y) = (y, x)`.
+                    // To do so, we save each tuple arg (from rhs) into a temporary.
+                    // Then, point-wise assign the temporaries.
+                    let temps = args
+                        .iter()
+                        .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
+                        .collect::<Vec<_>>();
+                    for (pat, temp) in pats.iter().zip(temps.into_iter()) {
+                        self.gen_assign_from_temp(id, pat, temp, next_scope)
+                    }
                 } else {
-                    // Map this to point-wise assignment
+                    // No overlap, or a 1-tuple: just do point-wise assignment.
                     for (pat, exp) in pats.iter().zip(args.iter()) {
                         self.gen_assign(id, pat, exp, next_scope)
                     }
@@ -1149,6 +1161,48 @@ impl<'env> Generator<'env> {
                     self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
                 }
             },
+        }
+    }
+
+    /// Generate borrow_field when unpacking a reference to a struct
+    // e.g. `let s = &S; let (a, b, c) = &s`, a, b, and c are references
+    fn gen_borrow_field_for_unpack_ref(
+        &mut self,
+        id: &NodeId,
+        str: &QualifiedInstId<StructId>,
+        arg: TempIndex,
+        temps: Vec<TempIndex>,
+        ref_kind: ReferenceKind,
+    ) {
+        let struct_env = self.env().get_struct(str.to_qualified_id());
+        let mut temp_to_field_offsets = BTreeMap::new();
+        for (field, input_temp) in struct_env.get_fields().zip(temps.clone()) {
+            temp_to_field_offsets.insert(input_temp, field.get_offset());
+        }
+        for (temp, field_offset) in temp_to_field_offsets {
+            self.with_reference_mode(|s, entering| {
+                if entering {
+                    s.reference_mode_kind = ref_kind
+                }
+                if !s.temp_type(temp).is_reference() {
+                    s.env().diag(
+                        Severity::Bug,
+                        &s.env().get_node_loc(*id),
+                        "Unpacking a reference to a struct must return the references of fields",
+                    );
+                }
+                s.emit_call(
+                    *id,
+                    vec![temp],
+                    BytecodeOperation::BorrowField(
+                        str.module_id,
+                        str.id,
+                        str.inst.to_owned(),
+                        field_offset,
+                    ),
+                    vec![arg],
+                );
+            });
         }
     }
 
@@ -1171,6 +1225,15 @@ impl<'env> Generator<'env> {
             },
             Pattern::Struct(id, str, args) => {
                 let (temps, cont_assigns) = self.flatten_patterns(args, next_scope);
+                let ty = self.temp_type(arg);
+                if ty.is_reference() {
+                    let ref_kind = if ty.is_immutable_reference() {
+                        ReferenceKind::Immutable
+                    } else {
+                        ReferenceKind::Mutable
+                    };
+                    return self.gen_borrow_field_for_unpack_ref(id, str, arg, temps, ref_kind);
+                }
                 self.emit_call(
                     *id,
                     temps,
@@ -1248,6 +1311,29 @@ impl<'env> Generator<'env> {
         } else {
             self.find_local(id, sym)
         }
+    }
+
+    // Do the variables in `lhs` and `rhs` overlap?
+    fn have_overlapping_vars(&self, lhs: &[Pattern], rhs: &Exp) -> bool {
+        let lhs_vars = lhs
+            .iter()
+            .flat_map(|p| p.vars().into_iter().map(|t| t.1))
+            .collect::<BTreeSet<_>>();
+        // Compute the rhs expression's free locals and params used.
+        // We can likely just use free variables in the expression once #12317 is addressed.
+        let param_symbols = self
+            .func_env
+            .get_parameters()
+            .into_iter()
+            .map(|p| p.0)
+            .collect::<Vec<_>>();
+        let mut rhs_vars = rhs
+            .used_temporaries(self.env())
+            .into_iter()
+            .map(|t| param_symbols[t.0])
+            .collect::<BTreeSet<_>>();
+        rhs_vars.append(&mut rhs.free_vars());
+        lhs_vars.intersection(&rhs_vars).next().is_some()
     }
 }
 

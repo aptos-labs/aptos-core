@@ -107,6 +107,9 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
                 MultiSigConfig::Publisher => {
                     account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)
                 },
+                MultiSigConfig::FeePayerPublisher => {
+                    account.sign_fee_payer_with_transaction_builder(vec![], publisher, builder)
+                },
             })
         })
     }
