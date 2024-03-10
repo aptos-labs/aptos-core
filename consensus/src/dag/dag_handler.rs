@@ -11,6 +11,7 @@ use crate::{
             DAGError, DAGRpcError, DagDriverError, FetchRequestHandleError,
             NodeBroadcastHandleError,
         },
+        observability::counters::INCOMING_MSG_PROCESSING,
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
         CertifiedNode, Node,
@@ -92,8 +93,10 @@ impl NetworkHandler {
         // TODO: feed in the executor based on verification Runtime
         let mut verified_msg_stream =
             dag_rpc_rx.concurrent_map(executor.clone(), move |rpc_request: IncomingDAGRequest| {
+                let timer = INCOMING_MSG_PROCESSING.start_timer();
                 let epoch_state = epoch_state.clone();
                 async move {
+                    defer!({ drop(timer) });
                     let epoch = rpc_request.req.epoch();
                     let result = rpc_request
                         .req

@@ -19,7 +19,7 @@ where
     Fut::Output: Send + 'static,
 {
     stream
-        .flat_map_unordered(Some(24), move |item| {
+        .flat_map_unordered(Some(100), move |item| {
             let future = mapper(item);
             let executor = executor.clone();
             stream::once(
@@ -28,7 +28,7 @@ where
             )
             .boxed()
         })
-        .flat_map_unordered(Some(24), |handle| {
+        .flat_map_unordered(Some(100), |handle| {
             stream::once(async move { handle.await.expect("result") }.boxed()).boxed()
         })
         .fuse()
