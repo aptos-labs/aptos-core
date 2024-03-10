@@ -1299,7 +1299,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(
             QueueStyle::FIFO,
-            30,
+            50,
             Some(&crate::dag::observability::counters::DAG_RPC_CHANNEL),
         );
         self.dag_rpc_tx = Some(dag_rpc_tx);
