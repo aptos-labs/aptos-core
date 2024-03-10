@@ -22,6 +22,7 @@ pub enum TransactionTypeArg {
     PublishPackage,
     // Simple EntryPoints
     NoOp,
+    NoOpFeePayer,
     NoOp2Signers,
     NoOp5Signers,
     AccountResource32B,
@@ -151,6 +152,11 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::Nop,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::NoOpFeePayer => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::NopFeePayer,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -325,8 +331,8 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::TokenV2AmbassadorMintAndBurn1M => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::CreateMintBurn {
-                    count: 10,
-                    creation_balance: 2000000,
+                    count: 10000,
+                    creation_balance: 200000,
                 },
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
