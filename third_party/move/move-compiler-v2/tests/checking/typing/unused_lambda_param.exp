@@ -56,10 +56,4 @@ module 0xc0ffee::m {
         };
         Tuple()
     }
-    spec fun $test(p: u64,f: |u64|u64): u64 {
-        (f)(p)
-    }
-    spec fun $unused_lambda();
-    spec fun $unused_lambda_suppressed1();
-    spec fun $unused_lambda_suppressed2();
 } // end 0xc0ffee::m

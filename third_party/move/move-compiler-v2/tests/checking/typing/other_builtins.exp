@@ -18,8 +18,4 @@ module 0x8675309::M {
         };
         Tuple()
     }
-    spec fun $any<T>(): #0 {
-        Abort(0)
-    }
-    spec fun $foo(x: &mut u64);
 } // end 0x8675309::M

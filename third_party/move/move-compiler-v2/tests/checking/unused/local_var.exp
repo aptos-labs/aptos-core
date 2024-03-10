@@ -15,19 +15,4 @@ module 0xc0ffee::m {
           }
         }
     }
-    spec fun $test(): u64 {
-        {
-          let x: u256 = 1;
-          {
-            let x: num = Add(x, 1);
-            {
-              let y: u256 = 2;
-              {
-                let y: num = Add(y, 1);
-                Add(x, y)
-              }
-            }
-          }
-        }
-    }
 } // end 0xc0ffee::m

@@ -27,6 +27,4 @@ module 0xc0ffee::m {
           i
         }
     }
-    spec fun $bar(): u64;
-    spec fun $foo(): u64;
 } // end 0xc0ffee::m

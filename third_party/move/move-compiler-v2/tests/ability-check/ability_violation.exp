@@ -1,75 +1,21 @@
 
 Diagnostics:
-error: type `ability::Impotent` does not have the `key` ability
-   ┌─ tests/ability-check/ability_violation.move:4:3
-   │
- 4 │         move_from<T>(addr);
-   │         ^^^^^^^^^^^^^^^^^^ required because of storage operation here
-   ·
-14 │         move_from_no_key<Impotent>(addr);
-   │         -------------------------------- from a call inlined at this callsite
-
-error: value of type `ability::Impotent` does not have the `drop` ability
-   ┌─ tests/ability-check/ability_violation.move:4:3
-   │
- 4 │         move_from<T>(addr);
-   │         ^^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
-   ·
-14 │         move_from_no_key<Impotent>(addr);
-   │         -------------------------------- from a call inlined at this callsite
-
-error: type `ability::S<ability::Impotent>` does not have the `key` ability
-   ┌─ tests/ability-check/ability_violation.move:15:3
-   │
-15 │         move_from<S<Impotent>>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required because of storage operation here
-
-error: value of type `ability::S<ability::Impotent>` does not have the `drop` ability
-   ┌─ tests/ability-check/ability_violation.move:15:3
-   │
-15 │         move_from<S<Impotent>>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
-
-error: type `ability::Impotent` does not have the `key` ability
-   ┌─ tests/ability-check/ability_violation.move:16:3
-   │
-16 │         borrow_global_mut<Impotent>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required because of storage operation here
-
-error: type `ability::Impotent` does not have the `key` ability
-   ┌─ tests/ability-check/ability_violation.move:17:3
-   │
-17 │         borrow_global<Impotent>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required because of storage operation here
-
-error: type `ability::Impotent` does not have the `key` ability
-   ┌─ tests/ability-check/ability_violation.move:18:3
-   │
-18 │         exists<Impotent>(addr);
-   │         ^^^^^^^^^^^^^^^^^^^^^^ required because of storage operation here
-
-error: type `ability::Impotent` does not have the `key` ability
-   ┌─ tests/ability-check/ability_violation.move:22:3
-   │
-22 │         move_to(signer, Impotent {})
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required because of storage operation here
-
 error: local `x` of type `ability::Impotent` does not have the `copy` ability
-   ┌─ tests/ability-check/ability_violation.move:27:4
-   │
-27 │         (x, x);
-   │          ^  - used here
-   │          │
-   │          copy needed here because value is still in use
+  ┌─ tests/ability-check/ability_violation.move:7:10
+  │
+7 │         (x, x);
+  │          ^  - used here
+  │          │
+  │          copy needed here because value is still in use
 
 error: value of type `ability::Impotent` does not have the `drop` ability
-   ┌─ tests/ability-check/ability_violation.move:27:4
-   │
-27 │         (x, x);
-   │          ^ implicitly dropped here since it is no longer used
+  ┌─ tests/ability-check/ability_violation.move:7:10
+  │
+7 │         (x, x);
+  │          ^ implicitly dropped here since it is no longer used
 
 error: value of type `ability::Impotent` does not have the `drop` ability
-   ┌─ tests/ability-check/ability_violation.move:27:7
-   │
-27 │         (x, x);
-   │             ^ implicitly dropped here since it is no longer used
+  ┌─ tests/ability-check/ability_violation.move:7:13
+  │
+7 │         (x, x);
+  │             ^ implicitly dropped here since it is no longer used

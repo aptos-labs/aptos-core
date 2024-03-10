@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod ast_simplifier;
 mod bytecode_generator;
 pub mod env_pipeline;
 mod experiments;
@@ -15,7 +14,7 @@ pub mod options;
 pub mod pipeline;
 
 use crate::{
-    env_pipeline::EnvProcessorPipeline,
+    env_pipeline::{rewrite_target::RewritingScope, spec_checker, EnvProcessorPipeline},
     pipeline::{
         ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -51,7 +50,6 @@ use move_stackless_bytecode::function_target_pipeline::{
 use move_symbol_pool::Symbol;
 pub use options::*;
 use std::{collections::BTreeSet, io::Write, path::Path};
-
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
     options: Options,
@@ -70,24 +68,10 @@ where
 {
     logging::setup_logging();
     info!("Move Compiler v2");
+
     // Run context check.
-    let mut env = run_checker(options.clone())?;
+    let mut env = run_checker_and_rewriters(options.clone(), RewritingScope::CompilationTarget)?;
     check_errors(&env, error_writer, "checking errors")?;
-
-    debug!("After context check, GlobalEnv=\n{}", env.dump_env());
-
-    let env_pipeline = create_env_processor_pipeline(&env);
-    if log_enabled!(Level::Debug) {
-        env_pipeline.run_and_record(&mut env, error_writer)?;
-    } else {
-        env_pipeline.run(&mut env);
-    }
-    check_errors(&env, error_writer, "checking errors")?;
-
-    debug!(
-        "After flow-insensitive checks, GlobalEnv=\n{}",
-        env.dump_env()
-    );
 
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
@@ -164,6 +148,21 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     env.set_address_alias_map(map);
     // Store options in env, for later access
     env.set_extension(options);
+    Ok(env)
+}
+
+/// Run the type checker as well as the AST rewriting pipeline and related additional
+/// checks, returning the global env (with errors if encountered). The result
+/// fails not on context checking errors, but possibly on i/o errors.
+pub fn run_checker_and_rewriters(
+    options: Options,
+    scope: RewritingScope,
+) -> anyhow::Result<GlobalEnv> {
+    let mut env = run_checker(options)?;
+    if !env.has_errors() {
+        let env_pipeline = check_and_rewrite_pipeline(false, scope);
+        env_pipeline.run(&mut env);
+    }
     Ok(env)
 }
 
@@ -262,6 +261,50 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // but it is needed by file format generator.
     pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline
+}
+
+/// Constructs the env checking and rewriting processing pipeline. `inlining_scope` can be set to
+/// `Everything` for use with the Move Prover, otherwise `CompilationTarget`
+/// should be used.
+pub fn check_and_rewrite_pipeline<'a>(
+    for_v1_model: bool,
+    inlining_scope: RewritingScope,
+) -> EnvProcessorPipeline<'a> {
+    // The default transformation pipeline on the GlobalEnv
+    let mut env_pipeline = EnvProcessorPipeline::default();
+    env_pipeline.add(
+        "unused checks",
+        flow_insensitive_checkers::check_for_unused_vars_and_params,
+    );
+    env_pipeline.add(
+        "type parameter check",
+        function_checker::check_for_function_typed_parameters,
+    );
+    if !for_v1_model {
+        // Currently when coming via the v1 model building path friend info is
+        // not populated, so skip those tests. They are anyway run already by
+        // the v1 compiler.
+        env_pipeline.add(
+            "access and use check before inlining",
+            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
+        );
+    }
+    env_pipeline.add("inlining", {
+        move |env| {
+            inliner::run_inlining(env, inlining_scope, /*keep_inline_functions*/ false)
+        }
+    });
+    if !for_v1_model {
+        env_pipeline.add(
+            "access and use check after inlining",
+            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
+        );
+    }
+    env_pipeline.add("specification checker", |env| {
+        let env: &GlobalEnv = env;
+        spec_checker::run_spec_checker(env)
+    });
+    env_pipeline
 }
 
 /// Add the default optimization pipeline to the given function target pipeline.

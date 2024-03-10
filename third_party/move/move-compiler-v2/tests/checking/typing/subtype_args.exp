@@ -28,19 +28,4 @@ module 0x8675309::M {
         M::imm_imm<u64>(Freeze(Borrow(Mutable)(0)), Freeze(Borrow(Mutable)(0)));
         Tuple()
     }
-    spec fun $imm<T>(_x: #0) {
-        Tuple()
-    }
-    spec fun $imm_imm<T>(_x: #0,_y: #0) {
-        Tuple()
-    }
-    spec fun $imm_mut<T>(_x: #0,_y: #0) {
-        Tuple()
-    }
-    spec fun $mut_imm<T>(_x: #0,_y: #0) {
-        Tuple()
-    }
-    spec fun $t0();
-    spec fun $t1();
-    spec fun $t2(f: |(&u64, &mut u64)|);
 } // end 0x8675309::M
