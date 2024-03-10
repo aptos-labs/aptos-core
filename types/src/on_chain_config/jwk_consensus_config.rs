@@ -24,7 +24,7 @@ pub struct OIDCProvider {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct ConfigV1 {
-    oidc_providers: Vec<OIDCProvider>,
+    pub oidc_providers: Vec<OIDCProvider>,
 }
 
 impl AsMoveAny for ConfigV1 {

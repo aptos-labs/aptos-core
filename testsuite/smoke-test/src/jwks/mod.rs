@@ -17,8 +17,9 @@ use aptos_types::jwks::{
 };
 use move_core_types::account_address::AccountAddress;
 use std::time::Duration;
+use aptos_types::on_chain_config::OnChainJWKConsensusConfig;
 
-pub async fn put_provider_on_chain(
+pub async fn put_provider_on_chain_depreciated(
     cli: CliTestFramework,
     account_idx: usize,
     providers: Vec<OIDCProvider>,
@@ -44,16 +45,70 @@ pub async fn put_provider_on_chain(
         r#"
 script {{
     use aptos_framework::aptos_governance;
-    use aptos_framework::jwks;
+    use aptos_framework::jwk_consensus_config;
     fun main(core_resources: &signer) {{
-        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
         {implementation}
-        aptos_governance::reconfigure(&framework_signer);
+        jwk_consensus_config::set_for_next_epoch(&framework, config);
+        aptos_governance::reconfigure(&framework);
     }}
 }}
 "#,
     );
     cli.run_script(account_idx, &add_dummy_provider_script)
+        .await
+        .unwrap()
+}
+
+pub async fn update_jwk_consensus_config(
+    cli: CliTestFramework,
+    account_idx: usize,
+    config: &OnChainJWKConsensusConfig
+) -> TransactionSummary {
+    let script = match config {
+        OnChainJWKConsensusConfig::Off => {
+            r#"
+script {
+    use aptos_framework::aptos_governance;
+    use aptos_framework::jwk_consensus_config;
+    fun main(core_resources: &signer) {
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let config = jwk_consensus_config::new_off();
+        jwk_consensus_config::set_for_next_epoch(&framework, config);
+        aptos_governance::reconfigure(&framework);
+    }
+}
+"#.to_string()
+        }
+        OnChainJWKConsensusConfig::V1(config_v1) => {
+            let provider_lines = config_v1.oidc_providers.iter().map(|provider| {
+                format!(
+                    "jwk_consensus_config::new_oidc_provider(utf8(b\"{}\"), utf8(b\"{}\")),",
+                    provider.name,
+                    provider.config_url
+                )
+            }).collect::<Vec<_>>().join("\n            ");
+            format!(r#"
+script {{
+    use aptos_framework::aptos_governance;
+    use aptos_framework::jwk_consensus_config;
+    use std::string::utf8;
+
+    fun main(core_resources: &signer) {{
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let config = jwk_consensus_config::new_v1(vector[
+            {provider_lines}
+        ]);
+        jwk_consensus_config::set_for_next_epoch(&framework, config);
+        aptos_governance::reconfigure(&framework);
+    }}
+}}
+"#)
+        }
+    };
+    println!("script={script}");
+
+    cli.run_script(account_idx, script.as_str())
         .await
         .unwrap()
 }

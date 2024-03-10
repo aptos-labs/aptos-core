@@ -51,7 +51,7 @@ pub use self::{
         OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
-    jwk_consensus_config::{OIDCProvider, OnChainJWKConsensusConfig},
+    jwk_consensus_config::{OIDCProvider, OnChainJWKConsensusConfig, ConfigV1 as JWKConsensusConfigV1},
     randomness_config::OnChainRandomnessConfig,
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,
