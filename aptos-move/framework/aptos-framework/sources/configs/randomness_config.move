@@ -3,6 +3,7 @@ module aptos_framework::randomness_config {
     use std::string;
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
+    use aptos_std::fixed_point64::FixedPoint64;
     use aptos_framework::config_buffer;
     use aptos_framework::system_addresses;
 
@@ -23,7 +24,12 @@ module aptos_framework::randomness_config {
     struct ConfigOff has copy, drop, store {}
 
     /// A randomness config variant indicating the feature is enabled.
-    struct ConfigV1 has copy, drop, store {}
+    struct ConfigV1 has copy, drop, store {
+        /// Any validator subset should not be able to reconstruct randomness if `subset_power / total_power <= secrecy_threshold`,
+        secrecy_threshold: FixedPoint64,
+        /// Any validator subset should be able to reconstruct randomness if `subset_power / total_power > reconstruction_threshold`.
+        reconstruction_threshold: FixedPoint64,
+    }
 
     /// Initialize the configuration. Used in genesis or governance.
     public fun initialize(framework: &signer, config: RandomnessConfig) {
@@ -66,9 +72,12 @@ module aptos_framework::randomness_config {
     }
 
     /// Create a `ConfigV1` variant.
-    public fun new_v1(): RandomnessConfig {
+    public fun new_v1(secrecy_threshold: FixedPoint64, reconstruction_threshold: FixedPoint64): RandomnessConfig {
         RandomnessConfig {
-            variant: copyable_any::pack( ConfigV1 {} )
+            variant: copyable_any::pack( ConfigV1 {
+                secrecy_threshold,
+                reconstruction_threshold
+            } )
         }
     }
 
@@ -83,14 +92,16 @@ module aptos_framework::randomness_config {
         initialize_for_testing(&framework);
 
         // Enabling.
-        let config_1 = new_v1();
-        set_for_next_epoch(&framework, config_1);
+        let config = new_v1(
+            fixed_point64::create_from_rational(1, 2),
+            fixed_point64::create_from_rational(2, 3)
+        );
+        set_for_next_epoch(&framework, config);
         on_new_epoch();
         assert!(enabled(), 1);
 
         // Disabling.
-        let config_2 = new_off();
-        set_for_next_epoch(&framework, config_2);
+        set_for_next_epoch(&framework, new_off());
         on_new_epoch();
         assert!(!enabled(), 2);
     }

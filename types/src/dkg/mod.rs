@@ -19,6 +19,7 @@ use std::{
     collections::BTreeSet,
     fmt::{Debug, Formatter},
 };
+use crate::on_chain_config::OnChainRandomnessConfig;
 
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq, Eq, CryptoHasher, BCSCryptoHash)]
 pub struct DKGTranscriptMetadata {
@@ -151,7 +152,7 @@ pub trait DKGTrait: Debug {
     type DealtPubKeyShare;
     type NewValidatorDecryptKey: Uniform;
 
-    fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> Self::PublicParams;
+    fn new_public_params(randomness_config: &OnChainRandomnessConfig, dkg_session_metadata: &DKGSessionMetadata) -> Self::PublicParams;
     fn aggregate_input_secret(secrets: Vec<Self::InputSecret>) -> Self::InputSecret;
     fn dealt_secret_from_input(
         pub_params: &Self::PublicParams,
