@@ -5,12 +5,7 @@ use crate::{
     vuf_keys::VUF_SK,
     ProcessingFailure::{BadRequest, InternalError},
 };
-use aptos_keyless_pepper_common::{
-    jwt::Claims,
-    vuf::{self, VUF},
-    PepperInput, PepperRequest, PepperResponse,
-};
-use aptos_logger::info;
+use aptos_keyless_pepper_common::{jwt::Claims, vuf::{self, VUF}, PepperInput, PepperRequest, PepperResponse, PepperResponseV1, PepperRequestV1};
 use aptos_types::{
     keyless::{Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
@@ -18,7 +13,9 @@ use aptos_types::{
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
-use uuid::Uuid;
+use rand::thread_rng;
+use aptos_crypto::asymmetric_encryption::AsymmetricEncryption;
+use aptos_crypto::asymmetric_encryption::elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm;
 
 pub mod about;
 pub mod jwk;
@@ -34,10 +31,7 @@ pub enum ProcessingFailure {
     InternalError(String),
 }
 
-pub fn process(
-    session_id: &Uuid,
-    request: PepperRequest,
-) -> Result<PepperResponse, ProcessingFailure> {
+pub fn process_v0(request: PepperRequest) -> Result<PepperResponse, ProcessingFailure> {
     let PepperRequest {
         jwt,
         epk,
@@ -45,11 +39,33 @@ pub fn process(
         epk_blinder,
         uid_key,
     } = request;
+    let pepper = process_common(jwt, epk, exp_date_secs, epk_blinder, uid_key, false)?;
+    Ok(PepperResponse { signature: pepper })
+}
+
+pub fn process_v1(request: PepperRequestV1) -> Result<PepperResponseV1, ProcessingFailure> {
+    let PepperRequestV1 {
+        jwt,
+        epk,
+        exp_date_secs,
+        epk_blinder,
+        uid_key, ..
+    } = request;
+    let pepper_encrypted = process_common(jwt, epk, exp_date_secs, epk_blinder, uid_key, true)?;
+    Ok(PepperResponseV1 { signature_encrypted: pepper_encrypted })
+}
+
+fn process_common(jwt: String, epk: EphemeralPublicKey, exp_date_secs: u64, epk_blinder: Vec<u8>, uid_key: Option<String>, encrypts_pepper: bool) -> Result<Vec<u8>, ProcessingFailure> {
     let config = Configuration::new_for_devnet();
 
-    if !matches!(epk, EphemeralPublicKey::Ed25519 { .. }) {
-        return Err(BadRequest("Only Ed25519 epk is supported".to_string()));
-    }
+    let curve25519_pk_point = match &epk {
+        EphemeralPublicKey::Ed25519 { public_key } => {
+            public_key.to_compressed_edwards_y().decompress().ok_or_else(||BadRequest("the pk point is off-curve".to_string()))?
+        }
+        _ => {
+            return Err(BadRequest("Only Ed25519 epk is supported".to_string()));
+        }
+    };
 
     let claims = aptos_keyless_pepper_common::jwt::parse(jwt.as_str())
         .map_err(|e| BadRequest(format!("JWT decoding error: {e}")))?;
@@ -108,7 +124,7 @@ pub fn process(
         sig_pub_key.as_ref(),
         &validation_with_sig_verification,
     ) // Signature verification happens here.
-    .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
+        .map_err(|e| BadRequest(format!("JWT signature verification failed: {e}")))?;
 
     let input = PepperInput {
         iss: claims.claims.iss.clone(),
@@ -130,7 +146,13 @@ pub fn process(
     if !vuf_proof.is_empty() {
         return Err(InternalError("proof size should be 0".to_string()));
     }
-    Ok(PepperResponse { signature: pepper })
-}
 
-pub mod v1;
+    if encrypts_pepper {
+        let mut main_rng = thread_rng();
+        let mut aead_rng = aes_gcm::aead::OsRng;
+        let pepper_encrypted = ElGamalCurve25519Aes256Gcm::enc(&mut main_rng, &mut aead_rng, &curve25519_pk_point, &pepper).map_err(|e|InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}")))?;
+        Ok(pepper_encrypted)
+    } else {
+        Ok(pepper)
+    }
+}
