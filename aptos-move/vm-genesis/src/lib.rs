@@ -581,20 +581,6 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
                 vk.as_move_value(),
             ]),
         );
-
-        exec_function(
-            session,
-            JWKS_MODULE_NAME,
-            "upsert_oidc_provider",
-            vec![],
-            serialize_values(&vec![
-                MoveValue::Signer(CORE_CODE_ADDRESS),
-                "https://accounts.google.com".to_string().as_move_value(),
-                "https://accounts.google.com/.well-known/openid-configuration"
-                    .to_string()
-                    .as_move_value(),
-            ]),
-        );
     }
 }
 
