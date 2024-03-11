@@ -17,6 +17,8 @@ Structs and functions for on-chain randomness configurations.
 -  [Function `new_off`](#0x1_randomness_config_new_off)
 -  [Function `new_v1`](#0x1_randomness_config_new_v1)
 -  [Function `current`](#0x1_randomness_config_current)
+-  [Specification](#@Specification_1)
+    -  [Function `current`](#@Specification_1_current)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
@@ -333,6 +335,25 @@ Get the currently effective randomness configuration object.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_current"></a>
+
+### Function `current`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_current">current</a>(): <a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">randomness_config::RandomnessConfig</a>
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
