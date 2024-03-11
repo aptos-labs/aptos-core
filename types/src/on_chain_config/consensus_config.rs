@@ -454,7 +454,7 @@ impl Default for DagConsensusConfigV1 {
                     use_history_from_previous_epoch_max_count: 5,
                 }),
             ),
-            quorum_store_enabled: true,
+            quorum_store_enabled: false,
         }
     }
 }
