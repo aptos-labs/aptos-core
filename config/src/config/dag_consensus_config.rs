@@ -170,6 +170,7 @@ pub struct DagConsensusConfig {
     pub health_config: DagHealthConfig,
     #[serde(default = "QuorumStoreConfig::default_for_dag")]
     pub quorum_store: QuorumStoreConfig,
+    pub incoming_rpc_channel_per_key_size: usize,
 }
 
 impl Default for DagConsensusConfig {
@@ -181,6 +182,7 @@ impl Default for DagConsensusConfig {
             round_state_config: DagRoundStateConfig::default(),
             health_config: DagHealthConfig::default(),
             quorum_store: QuorumStoreConfig::default_for_dag(),
+            incoming_rpc_channel_per_key_size: 50,
         }
     }
 }
