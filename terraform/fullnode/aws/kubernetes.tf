@@ -28,6 +28,7 @@ resource "helm_release" "fullnode" {
       }
       storage = {
         class = var.fullnode_storage_class
+        size  = var.fullnode_storage_size
       }
       service = {
         type = "LoadBalancer"
