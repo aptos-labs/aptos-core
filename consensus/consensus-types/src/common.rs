@@ -308,6 +308,27 @@ impl Payload {
                 // TODO: What's the right logic here?
                 if m1.is_none() {
                     *m1 = m2;
+                } else if m2.is_some() {
+                    *m1 = Some(m1.unwrap() + m2.unwrap());
+                }
+            },
+            (
+                Payload::QuorumStoreInlineHybrid(_b1, p1, _m1),
+                Payload::InQuorumStore(p2),
+            ) => {
+                p1.extend(p2);
+                // TODO: How to update m1?
+            },
+            (
+                Payload::QuorumStoreInlineHybrid(_b1, p1, m1),
+                Payload::InQuorumStoreWithLimit(p2),
+            ) => {
+                p1.extend(p2.proof_with_data);
+                // TODO: What's the right logic here?
+                if m1.is_none() {
+                    *m1 = p2.max_txns_to_execute;
+                } else if p2.max_txns_to_execute.is_some() {
+                    *m1 = Some(m1.unwrap() + p2.max_txns_to_execute.unwrap());
                 }
             },
             (_, _) => unreachable!(),
