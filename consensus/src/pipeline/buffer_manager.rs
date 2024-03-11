@@ -556,10 +556,11 @@ impl BufferManager {
                                 ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
                             match protocol.to_bytes(&response) {
                                 Ok(bytes) => {
-                                    if let Err(reply_err) = response_sender.send(Ok(bytes.into())) {
-                                        error!(
-                                            error = format!("{:?}", reply_err.err().unwrap()),
-                                            "CommitMessage::Vote reply error"
+                                    if let Err(_) = response_sender.send(Ok(bytes.into())) {
+                                        // probably the connection was lost, nothing to be done about it
+                                        debug!(
+                                            // error = format!("{:?}", reply_err.err().unwrap()),
+                                            "CommitMessage::Vote could not send reply"
                                         )
                                     }
                                 }
@@ -614,10 +615,11 @@ impl BufferManager {
                             ConsensusMsg::CommitMessage(Box::new(CommitMessage::Ack(())));
                         match protocol.to_bytes(&response) {
                             Ok(bytes) => {
-                                if let Err(send_err) = response_sender.send(Ok(bytes.into())) {
+                                if let Err(_) = response_sender.send(Ok(bytes.into())) {
+                                    // probably the connection was lost, nothing to be done about it
                                     debug!(
-                                        error = format!("{:?}", send_err.err().unwrap()),
-                                        "CommitMessage::Decision send err"
+                                        // error = format!("{:?}", send_err.err().unwrap()),
+                                        "CommitMessage::Decision reply send err"
                                     )
                                 }
                             }
