@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_keyless_pepper_common::{
-    jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey,
-};
+use aptos_keyless_pepper_common::{jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, PepperResponseV1, PepperRequestV1};
 use aptos_types::{
     keyless::{test_utils::get_sample_esk, Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
@@ -16,6 +14,8 @@ use std::{
     io::stdin,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_crypto::asymmetric_encryption::AsymmetricEncryption;
+use aptos_crypto::asymmetric_encryption::elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm;
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
 
@@ -69,8 +69,8 @@ async fn main() {
     println!("Starting an interaction with aptos-oidb-pepper-service.");
     let url = get_pepper_service_url();
     println!();
-    let vuf_pub_key_url = format!("{url}/v0/vuf-pub-key");
-    let fetch_url = format!("{url}/v0/fetch");
+    let vuf_pub_key_url = format!("{url}/v1/vuf-pub-key");
+    let fetch_url = format!("{url}/v1/fetch");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
@@ -137,12 +137,13 @@ async fn main() {
         Err(_) => jwt_or_path,
     };
 
-    let pepper_request = PepperRequest {
+    let pepper_request = PepperRequestV1 {
         jwt: jwt.clone(),
         epk,
         exp_date_secs: epk_expiry_time_secs,
         uid_key: None,
         epk_blinder: blinder.to_vec(),
+        aud_override: None,
     };
     println!();
     println!(
@@ -157,13 +158,15 @@ async fn main() {
         .await
         .unwrap();
     assert_eq!(StatusCode::OK, raw_response.status());
-    let pepper_response = raw_response.json::<PepperResponse>().await.unwrap();
+    let pepper_response = raw_response.json::<PepperResponseV1>().await.unwrap();
     println!();
     println!(
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse { signature: pepper } = pepper_response;
+    let PepperResponseV1 { signature_encrypted } = pepper_response;
+    let curve25519_scalar_bytes = esk.derive_scalar().as_bytes().to_vec();
+    let pepper = ElGamalCurve25519Aes256Gcm::dec(&curve25519_scalar_bytes, &signature_encrypted).unwrap();
     println!();
     println!("pepper={:?}", pepper);
     let claims = jwt::parse(jwt.as_str()).unwrap();
