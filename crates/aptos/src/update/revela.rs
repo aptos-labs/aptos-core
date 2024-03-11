@@ -14,7 +14,7 @@ use self_update::{backends::github::Update, update::ReleaseUpdate};
 use std::path::PathBuf;
 
 const REVELA_BINARY_NAME: &str = "revela";
-const TARGET_REVELA_VERSION: &str = "1.0.0-rc3";
+const TARGET_REVELA_VERSION: &str = "1.0.0";
 
 const REVELA_EXE_ENV: &str = "REVELA_EXE";
 #[cfg(target_os = "windows")]
@@ -97,7 +97,13 @@ impl BinaryUpdater for RevelaUpdateTool {
 
         let install_dir = match self.install_dir.clone() {
             Some(dir) => dir,
-            None => get_additional_binaries_dir(),
+            None => {
+                let dir = get_additional_binaries_dir();
+                // Make the directory if it doesn't already exist.
+                std::fs::create_dir_all(&dir)
+                    .with_context(|| format!("Failed to create directory: {:?}", dir))?;
+                dir
+            },
         };
 
         let current_version = match &info.current_version {

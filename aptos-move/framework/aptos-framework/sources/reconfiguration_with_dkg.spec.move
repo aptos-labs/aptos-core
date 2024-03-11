@@ -32,6 +32,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         use aptos_framework::consensus_config;
         use aptos_framework::execution_config;
         use aptos_framework::gas_schedule;
+        use aptos_framework::jwks;
         account: signer;
         requires signer::address_of(account) == @aptos_framework;
         requires chain_status::is_operating();
@@ -44,15 +45,15 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;
         include config_buffer::OnNewEpochRequirement<execution_config::ExecutionConfig>;
         include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
+        include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
         aborts_if false;
     }
 
     spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
         use aptos_framework::dkg;
-        pragma verify = true; // TODO: set because of timeout (property proved).
-        pragma verify_duration_estimate = 600;
+        pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved).
         include FinishRequirement;
-        requires dkg::spec_in_progress();
+        requires dkg::has_incomplete_session();
         aborts_if false;
     }
 

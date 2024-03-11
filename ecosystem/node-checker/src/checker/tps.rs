@@ -127,7 +127,7 @@ impl Checker for TpsChecker {
             targets: Some(vec![target_url; self.config.repeat_target_count]),
             targets_file: None,
             coin_source_args: self.config.coin_source_args.clone(),
-            chain_id,
+            chain_id: Some(chain_id),
             node_api_key: None,
         };
         let cluster = Cluster::try_from_cluster_args(&cluster_config)

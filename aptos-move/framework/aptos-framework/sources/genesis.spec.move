@@ -112,12 +112,16 @@ spec aptos_framework::genesis {
         pragma verify_duration_estimate = 120;
 
         include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         include CompareTimeRequires;
         include aptos_coin::ExistsAptosCoin;
     }
 
     spec create_initialize_validators {
+        pragma verify_duration_estimate = 120;
+
         include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         include CompareTimeRequires;
         include aptos_coin::ExistsAptosCoin;
     }

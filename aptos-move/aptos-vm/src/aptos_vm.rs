@@ -92,7 +92,6 @@ use move_core_types::{
 use move_vm_runtime::{
     logging::expect_no_verification_errors,
     module_traversal::{TraversalContext, TraversalStorage},
-    session::SerializedReturnValues,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use num_cpus;
@@ -685,7 +684,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         senders: Vec<AccountAddress>,
         script: &Script,
-    ) -> Result<SerializedReturnValues, VMStatus> {
+    ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
@@ -713,7 +712,8 @@ impl AptosVM {
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
 
-        Ok(session.execute_script(script.code(), script.ty_args().to_vec(), args, gas_meter)?)
+        session.execute_script(script.code(), script.ty_args().to_vec(), args, gas_meter)?;
+        Ok(())
     }
 
     fn validate_and_execute_entry_function(
@@ -723,7 +723,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
-    ) -> Result<SerializedReturnValues, VMStatus> {
+    ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
         //       the error semantics.
@@ -758,13 +758,14 @@ impl AptosVM {
             &function,
             self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
         )?;
-        Ok(session.execute_entry_function(
+        session.execute_entry_function(
             entry_fn.module(),
             entry_fn.function(),
             entry_fn.ty_args().to_vec(),
             args,
             gas_meter,
-        )?)
+        )?;
+        Ok(())
     }
 
     fn execute_script_or_entry_function<'a>(
