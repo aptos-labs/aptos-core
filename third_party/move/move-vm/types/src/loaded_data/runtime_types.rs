@@ -27,7 +27,7 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-pub const TYPE_DEPTH_MAX: usize = 256;
+pub const TYPE_DEPTH_MAX: usize = 128;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 /// A formula describing the value depth of a type, using (the depths of) the type parameters as inputs.
