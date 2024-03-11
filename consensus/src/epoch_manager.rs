@@ -816,6 +816,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
             self.config.max_sending_block_txns,
             self.config.max_sending_block_bytes,
+            self.config.max_sending_inline_txns,
+            self.config.max_sending_inline_bytes,
             onchain_consensus_config.max_failed_authors_to_store(),
             pipeline_backpressure_config,
             chain_health_backoff_config,
@@ -1277,7 +1279,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             features.clone(),
         );
 
-        let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(
+            QueueStyle::FIFO,
+            10,
+            Some(&crate::dag::observability::counters::DAG_RPC_CHANNEL),
+        );
         self.dag_rpc_tx = Some(dag_rpc_tx);
         let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
         self.dag_shutdown_tx = Some(dag_shutdown_tx);

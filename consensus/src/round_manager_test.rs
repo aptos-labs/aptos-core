@@ -282,6 +282,8 @@ impl NodeSetup {
             Duration::ZERO,
             10,
             1000,
+            5,
+            500,
             10,
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
