@@ -57,15 +57,15 @@ pub struct DeltaHistory {
     pub max_achieved_positive_delta: u128,
     pub min_achieved_negative_delta: u128,
     // `min_overflow_positive_delta` is None in two possible cases:
-    // 1. No overflow occured in the try_add/try_sub functions throughout the
+    // 1. No overflow occurred in the try_add/try_sub functions throughout the
     // transaction execution.
-    // 2. The only overflows that occured in the try_add/try_sub functions in
+    // 2. The only overflows that occurred in the try_add/try_sub functions in
     // this transaction execution are with delta that exceeds limit.
     pub min_overflow_positive_delta: Option<u128>,
     // `max_underflow_negative_delta` is None in two possible cases:
-    // 1. No underflow occured in the try_add/try_sub functions throughout the
+    // 1. No underflow occurred in the try_add/try_sub functions throughout the
     // transaction execution.
-    // 2. The only underflows that occured in the try_add/try_sub functions in
+    // 2. The only underflows that occurred in the try_add/try_sub functions in
     // this transaction execution are with delta that drops below -limit.
     pub max_underflow_negative_delta: Option<u128>,
 }
