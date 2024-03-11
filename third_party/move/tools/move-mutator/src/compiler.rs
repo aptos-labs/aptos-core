@@ -1,4 +1,3 @@
-use anyhow::bail;
 use either::Either;
 use move_command_line_common::address::NumericalAddress;
 use move_command_line_common::parser::NumberFormat;
@@ -172,7 +171,6 @@ fn prepare_compiler_for_package(
         .into_iter()
         .partition_map(|(p, b)| if b { Either::Left(p) } else { Either::Right(p) });
 
-    // invoke the compiler
     let mut paths = src_deps;
     paths.push(sources_package_paths.clone());
 
@@ -184,23 +182,9 @@ fn prepare_compiler_for_package(
     let mut global_address_map = BTreeMap::new();
     for pack in paths.iter().chain(bytecode_deps.iter()) {
         for (name, val) in &pack.named_address_map {
-            let Some(old) = global_address_map.insert(name.as_str().to_owned(), *val) else {
+            let Some(_) = global_address_map.insert(name.as_str().to_owned(), *val) else {
                 continue;
             };
-
-            if old != *val {
-                let pack_name = pack
-                    .name
-                    .map_or_else(|| "<unnamed>".to_owned(), |s| s.as_str().to_owned());
-                bail!(
-                    "found remapped address alias `{}` (`{} != {}`) in package `{}`\
-                                , please use unique address aliases across dependencies",
-                    name,
-                    old,
-                    val,
-                    pack_name
-                )
-            }
         }
     }
 

@@ -16,7 +16,7 @@ separating and isolating the application parts.
 The Move mutator tool is the heart of the specification verification process,
 as depending on its quality, the verification process will be more or less
 efficient. The Move mutator tool is designed to be easily extensible, so it's
-possible to add new mutation operators, new mutation categories, etc.
+possible to add new mutation operators, etc.
 
 The mutation process is separated from the other parts of the verification
 process. It makes it possible to use mutator output (mutants) to verify the
@@ -149,9 +149,8 @@ If so, it chooses an appropriate category based on the expression. ALL
 mutations within the category are applied.
 
 The above means that the operator tool can produce many mutants within one
-place in the source code for each mutation. Concrete operators or categories
-can be filtered using the configuration file described in the data layer
-section.
+place in the source code for each mutation. Concrete operators or can be 
+filtered using the configuration file described in the data layer section.
 
 Once generated, mutants can be checked to see if they are valid. It's possible
 to run the Move compiler to check if the mutant is valid, as some of the
@@ -172,8 +171,7 @@ configuration files. It also provides data to the other layers.
 
 The configuration file is a JSON or TOML (both supported) file that contains
 the configuration of the Move mutator tool. It includes information on the
-project to mutate, mutation operators to use, mutation categories to use,
-and so on.
+project to mutate, mutation operators to use, and so on.
 
 Sample configuration file:
 ```json
@@ -189,11 +187,6 @@ Sample configuration file:
         "operators": [
             "binary_operator_replacement",
             "unary_operator_replacement"
-        ],
-        "categories": [
-            "arithmetic",
-            "bitwise",
-            "shifts"
         ]
     }
 }
@@ -205,7 +198,6 @@ move_sources = ["/path/to/move/source"]
 mutate_modules = {"Selected" = ["module1", "module2"]}      # Alternative: mutate_modules = "All"
 [mutation]
 operators = ["operator1", "operator2"]
-categories = ["category1", "category2"]
 [[individual]]
 file = "/path/to/file"
 verify_mutants = true
@@ -240,7 +232,7 @@ The Move mutator tool is designed to create mutants only. It does not perform
 the proving process as it is not the goal of the tool.
 
 The specification verification tool is a tool placed inside the `aptos`
-repository, which provides an additional `aptos` subcommand - `spec-verify` 
+repository, which provides an additional `aptos` subcommand - `spec-test` 
 which does the following:
 1. Takes arguments both for the Move Prover tool and for the Move mutator tool.
 It can also read the configuration from the JSON configuration file.
@@ -255,20 +247,13 @@ saved in the configurable (default: `mutants_output`) directory.
 
 ## Mutation operators
 
-Mutation operators can be applied alone or mixed with other ones. The decision
-is made based on the configuration file. The default behaviour is to use one
-mutation operator at a time (per file). It's worth noting that mixing operators
-within one file will significantly increase the number of generated mutants.
-
 The mutation tool reads the source file(-s) once and then works on the original
 AST. If any previous mutation changes the original file, it would demand
 reloading the modified source (as upon change, all current AST locations become
 outdated), parsing the AST and again for possible mutations. It would be very
 inefficient. Once mutation places are identified, mutants are generated in
-reversed order (based on localization) to avoid that. If operator mixing is
-allowed, they are applied only for non-overlapping expressions.
-
-The above behaviour can be discussed if it's really needed.
+reversed order (based on localization) to avoid that. Tools is ready to be
+extended to support the operator mixing, if needed.
 
 The Move mutator tool implements the following mutation operators.
 
@@ -342,7 +327,7 @@ the `a - b` expression can be replaced with the `b - a` expression.
 ## Extending the Move mutator tool
 
 The Move mutator tool is designed to be easily extensible. It's possible
-to add new mutation operators, new mutation categories and so on. The following
+to add new mutation operators and so on. The following
 sections describe how to do it.
 
 ### Adding a new mutation operator
@@ -359,18 +344,5 @@ newly created file.
 5. Update AST traversal code in the `mutate.rs` file - add or modify a place in
 the AST where the mutation operator should be applied.
 6. Add a test for the new mutation operator.
-
-### Adding a new mutation category
-
-Sometimes, it's helpful to group mutation operators into categories.
-For example, it's useful to group arithmetic operators together. It's possible
-to do it by adding a new mutation category.
-
-Categories exist only to group mutation operators. They are not used anywhere
-else. They reside in the file with the mutation operator in `operators` 
-directory, inside the `apply` function. To add a new category, simply modify
-the existing operator, adding or excluding new groups based on the already
-present code (look at the `BinaryOperator`, `ops` vector).
-
 
 

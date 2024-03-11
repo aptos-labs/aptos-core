@@ -1,8 +1,7 @@
 use crate::operator::{MutantInfo, MutationOperator};
 use crate::operators::{
-    MOVE_ADDR_MAX, MOVE_ADDR_ZERO, MOVE_FALSE, MOVE_MAX_INFERRED_NUM, MOVE_MAX_U128, MOVE_MAX_U16,
-    MOVE_MAX_U256, MOVE_MAX_U32, MOVE_MAX_U64, MOVE_MAX_U8, MOVE_TRUE, MOVE_ZERO, MOVE_ZERO_U128,
-    MOVE_ZERO_U16, MOVE_ZERO_U256, MOVE_ZERO_U32, MOVE_ZERO_U64, MOVE_ZERO_U8,
+    MOVE_ADDR_MAX, MOVE_ADDR_ZERO, MOVE_FALSE, MOVE_MAX_INFERRED_NUM, MOVE_MAX_U256, MOVE_TRUE,
+    MOVE_ZERO_U256,
 };
 use crate::report::{Mutation, Range};
 use codespan::FileId;
@@ -43,6 +42,13 @@ impl MutationOperator for Literal {
         let cur_op = &source[start..end];
 
         // Group of literal statements for possible Value types.
+        // For each group use minimum and maximum values and some additional values:
+        // - for u8, u16, u32, u64, u128 use minimum, maximum, value + 1, value - 1
+        // - for address use 0x0 and 0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF
+        // - for bool use true and false
+        // More values can be added.
+        // Please be aware that adding here even one additional case may increase
+        // the number of mutants significantly.
         let ops: Vec<String> = match &self.optype {
             Type::Primitive(PrimitiveType::Address) => {
                 vec![MOVE_ADDR_ZERO.to_owned(), MOVE_ADDR_MAX.to_owned()]
@@ -55,8 +61,8 @@ impl MutationOperator for Literal {
                     let u8_val = bigint.to_u8().expect("Invalid u8 value");
 
                     vec![
-                        MOVE_ZERO_U8.to_owned(),
-                        MOVE_MAX_U8.to_owned(),
+                        u8::MIN.to_string(),
+                        u8::MAX.to_string(),
                         u8_val.saturating_add(1).to_string(),
                         u8_val.saturating_sub(1).to_string(),
                     ]
@@ -69,8 +75,8 @@ impl MutationOperator for Literal {
                     let u16_val = bigint.to_u16().expect("Invalid u16 value");
 
                     vec![
-                        MOVE_ZERO_U16.to_owned(),
-                        MOVE_MAX_U16.to_owned(),
+                        u16::MIN.to_string(),
+                        u16::MAX.to_string(),
                         u16_val.saturating_add(1).to_string(),
                         u16_val.saturating_sub(1).to_string(),
                     ]
@@ -83,8 +89,8 @@ impl MutationOperator for Literal {
                     let u32_val = bigint.to_u32().expect("Invalid u32 value");
 
                     vec![
-                        MOVE_ZERO_U32.to_owned(),
-                        MOVE_MAX_U32.to_owned(),
+                        u32::MIN.to_string(),
+                        u32::MAX.to_string(),
                         u32_val.saturating_add(1).to_string(),
                         u32_val.saturating_sub(1).to_string(),
                     ]
@@ -96,8 +102,8 @@ impl MutationOperator for Literal {
                 if let Value::Number(bigint) = &self.operation {
                     let u64_val = bigint.to_u64().expect("Invalid u64 value");
                     vec![
-                        MOVE_ZERO_U64.to_owned(),
-                        MOVE_MAX_U64.to_owned(),
+                        u64::MIN.to_string(),
+                        u64::MAX.to_string(),
                         u64_val.saturating_add(1).to_string(),
                         u64_val.saturating_sub(1).to_string(),
                     ]
@@ -109,8 +115,8 @@ impl MutationOperator for Literal {
                 if let Value::Number(bigint) = &self.operation {
                     let u128_val = bigint.to_u128().expect("Invalid u128 value");
                     vec![
-                        MOVE_ZERO_U128.to_owned(),
-                        MOVE_MAX_U128.to_owned(),
+                        u128::MIN.to_string(),
+                        u128::MAX.to_string(),
                         u128_val.saturating_add(1).to_string(),
                         u128_val.saturating_sub(1).to_string(),
                     ]
@@ -122,7 +128,7 @@ impl MutationOperator for Literal {
                 vec![MOVE_ZERO_U256.to_owned(), MOVE_MAX_U256.to_owned()]
             },
             Type::Primitive(PrimitiveType::Num) => {
-                vec![MOVE_ZERO.to_owned(), MOVE_MAX_INFERRED_NUM.to_owned()]
+                vec!["0".to_owned(), MOVE_MAX_INFERRED_NUM.to_owned()]
             },
             _ => vec![],
         };
@@ -184,7 +190,12 @@ mod tests {
             loc,
         );
         let source = "51";
-        let expected = vec![MOVE_ZERO_U8, MOVE_MAX_U8, "52", "50"];
+        let expected = vec![
+            u8::MIN.to_string(),
+            u8::MAX.to_string(),
+            "52".to_owned(),
+            "50".to_owned(),
+        ];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -204,7 +215,12 @@ mod tests {
             loc,
         );
         let source = "963";
-        let expected = vec![MOVE_ZERO_U16, MOVE_MAX_U16, "964", "962"];
+        let expected = vec![
+            u16::MIN.to_string(),
+            u16::MAX.to_string(),
+            "964".to_owned(),
+            "962".to_owned(),
+        ];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -224,7 +240,12 @@ mod tests {
             loc,
         );
         let source = "1000963";
-        let expected = vec![MOVE_ZERO_U32, MOVE_MAX_U32, "1000964", "1000962"];
+        let expected = vec![
+            u32::MIN.to_string(),
+            u32::MAX.to_string(),
+            "1000964".to_owned(),
+            "1000962".to_owned(),
+        ];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -244,7 +265,12 @@ mod tests {
             loc,
         );
         let source = "963251000963";
-        let expected = vec![MOVE_ZERO_U64, MOVE_MAX_U64, "963251000964", "963251000962"];
+        let expected = vec![
+            u64::MIN.to_string(),
+            u64::MAX.to_string(),
+            "963251000964".to_owned(),
+            "963251000962".to_owned(),
+        ];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
@@ -265,10 +291,10 @@ mod tests {
         );
         let source = "123963251000963";
         let expected = vec![
-            MOVE_ZERO_U128,
-            MOVE_MAX_U128,
-            "123963251000964",
-            "123963251000962",
+            u128::MIN.to_string(),
+            u128::MAX.to_string(),
+            "123963251000964".to_owned(),
+            "123963251000962".to_owned(),
         ];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
