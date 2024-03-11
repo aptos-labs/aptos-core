@@ -165,8 +165,8 @@ async fn main() {
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
     let PepperResponseV1 { signature_encrypted } = pepper_response;
-    let curve25519_scalar_bytes = esk.derive_scalar().as_bytes().to_vec();
-    let pepper = ElGamalCurve25519Aes256Gcm::dec(&curve25519_scalar_bytes, &signature_encrypted).unwrap();
+    let esk_scalar = esk.derive_scalar();
+    let pepper = ElGamalCurve25519Aes256Gcm::dec(&esk_scalar, &signature_encrypted).unwrap();
     println!();
     println!("pepper={:?}", pepper);
     let claims = jwt::parse(jwt.as_str()).unwrap();

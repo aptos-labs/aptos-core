@@ -14,6 +14,7 @@ use aes_gcm::{
 };
 use anyhow::{anyhow, bail, ensure};
 use curve25519_dalek::{edwards::CompressedEdwardsY, scalar::Scalar};
+use curve25519_dalek::edwards::EdwardsPoint;
 use rand_core::{CryptoRng, RngCore};
 use sha3::{Digest, Sha3_256};
 
@@ -34,32 +35,23 @@ impl ElGamalCurve25519Aes256Gcm {
 const SCHEME_NAME: &str = "ElGamalCurve25519Aes256Gcm";
 
 impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
+    type PrivateKey = Scalar;
+    type PublicKey = EdwardsPoint;
+
     fn scheme_name() -> String {
         SCHEME_NAME.to_string()
     }
 
-    fn key_gen<R: CryptoRng + RngCore>(rng: &mut R) -> (Vec<u8>, Vec<u8>) {
-        let (sk, pk) = elgamal::key_gen::<Curve25519, _>(rng);
-        let sk_bytes = sk.to_bytes().to_vec();
-        let pk_bytes = pk.compress().to_bytes().to_vec();
-        (sk_bytes, pk_bytes)
+    fn key_gen<R: CryptoRng + RngCore>(rng: &mut R) -> (Scalar, EdwardsPoint) {
+        elgamal::key_gen::<Curve25519, _>(rng)
     }
 
     fn enc<R1: CryptoRng + RngCore, R2: AeadCryptoRng + AeadRngCore>(
         main_rng: &mut R1,
         aead_rng: &mut R2,
-        pk: &[u8],
+        pk: &EdwardsPoint,
         msg: &[u8],
     ) -> anyhow::Result<Vec<u8>> {
-        if pk.len() != 32 {
-            bail!("ElGamalCurve25519Aes256Gcm enc failed with incorrect pk length");
-        }
-        let pk = CompressedEdwardsY::from_slice(pk)
-            .decompress()
-            .ok_or_else(|| {
-                anyhow!("ElGamalCurve25519Aes256Gcm enc failed with invalid pk element")
-            })?;
-
         ensure!(
             pk.is_torsion_free(),
             "ElGamalCurve25519Aes256Gcm enc failed with non-prime-order PK"
@@ -99,13 +91,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
         Ok(serialized)
     }
 
-    fn dec(sk: &[u8], ciphertext: &[u8]) -> anyhow::Result<Vec<u8>> {
-        let sk = <[u8; 32]>::try_from(sk.to_vec()).map_err(|_e| {
-            anyhow!("ElGamalCurve25519Aes256Gcm dec failed with incorrect sk length")
-        })?;
-        let sk_scalar = Scalar::from_canonical_bytes(sk).ok_or_else(|| {
-            anyhow!("ElGamalCurve25519Aes256Gcm dec failed with sk deserialization error")
-        })?;
+    fn dec(sk: &Scalar, ciphertext: &[u8]) -> anyhow::Result<Vec<u8>> {
         ensure!(
             ciphertext.len() >= 76,
             "ElGamalCurve25519Aes256Gcm dec failed with invalid ciphertext length"
@@ -132,7 +118,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
             "ElGamalCurve25519Aes256Gcm dec failed with non-prime-order c1"
         );
 
-        let aes_key_element = elgamal::decrypt::<Curve25519>(&sk_scalar, &c0, &c1).compress();
+        let aes_key_element = elgamal::decrypt::<Curve25519>(&sk, &c0, &c1).compress();
         let aes_key_bytes = Self::hash_group_element_to_aes_key(&aes_key_element);
         let key = Key::<Aes256Gcm>::from_slice(aes_key_bytes.as_slice());
         let cipher = Aes256Gcm::new(key);
@@ -160,13 +146,13 @@ mod tests {
         let ciphertext = ElGamalCurve25519Aes256Gcm::enc(
             &mut main_rng,
             &mut aead_rng,
-            pk.as_slice(),
+            &pk,
             msg.as_slice(),
         )
             .unwrap();
         assert_eq!(
             msg,
-            ElGamalCurve25519Aes256Gcm::dec(sk.as_slice(), ciphertext.as_slice()).unwrap()
+            ElGamalCurve25519Aes256Gcm::dec(&sk, ciphertext.as_slice()).unwrap()
         );
     }
 }

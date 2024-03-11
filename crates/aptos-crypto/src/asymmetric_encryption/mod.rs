@@ -4,26 +4,33 @@
 
 use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
 use rand_core::{CryptoRng, RngCore};
+use crate::ed25519::PublicKey;
 
 /// Implement this to define an asymmetric encryption scheme.
 pub trait AsymmetricEncryption {
+    /// A.k.a the decrypt key.
+    type PrivateKey;
+
+    /// A.k.a the encrypt key.
+    type PublicKey;
+
     /// The name of the scheme.
     fn scheme_name() -> String;
 
     /// Generate a key pair. Return `(private_key, public_key)`.
-    fn key_gen<R: CryptoRng + RngCore>(rng: &mut R) -> (Vec<u8>, Vec<u8>);
+    fn key_gen<R: CryptoRng + RngCore>(rng: &mut R) -> (Self::PrivateKey, Self::PublicKey);
 
     /// The encryption algorithm.
     /// TODO: adjust the dependencies so they can share a RNG.
     fn enc<R1: CryptoRng + RngCore, R2: AeadCryptoRng + AeadRngCore>(
         rng: &mut R1,
         aead_rng: &mut R2,
-        pk: &[u8],
+        pk: &Self::PublicKey,
         msg: &[u8],
     ) -> anyhow::Result<Vec<u8>>;
 
     /// The decryption algorithm.
-    fn dec(sk: &[u8], ciphertext: &[u8]) -> anyhow::Result<Vec<u8>>;
+    fn dec(sk: &Self::PrivateKey, ciphertext: &[u8]) -> anyhow::Result<Vec<u8>>;
 }
 
 /// An asymmetric encryption which:

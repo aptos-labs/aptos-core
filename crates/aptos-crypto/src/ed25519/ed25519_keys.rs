@@ -17,6 +17,7 @@ use proptest::prelude::*;
 use serde::Serialize;
 use std::fmt;
 use anyhow::anyhow;
+use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::scalar::Scalar;
 use ed25519_dalek::ExpandedSecretKey;
 
@@ -134,6 +135,12 @@ impl Ed25519PublicKey {
             .to_edwards(sign)
             .ok_or(CryptoMaterialError::DeserializationError)?;
         Ed25519PublicKey::try_from(&ed_point.compress().as_bytes()[..])
+    }
+
+    /// Derive the actual curve point represented by the public key.
+    pub fn to_compressed_edwards_y(&self) -> CompressedEdwardsY {
+        let bytes = self.to_bytes();
+        CompressedEdwardsY::from_slice(bytes.as_slice())
     }
 }
 

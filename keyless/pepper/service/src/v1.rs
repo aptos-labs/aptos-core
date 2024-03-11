@@ -29,13 +29,13 @@ pub fn process(request: PepperRequestV1) -> Result<PepperResponseV1, ProcessingF
         exp_date_secs,
         epk_blinder,
         uid_key,
-        aud_override,
+        ..
     } = request;
     let config = Configuration::new_for_devnet();
 
-    let curve25519_pk_bytes = match &epk {
+    let curve25519_pk_point = match &epk {
         EphemeralPublicKey::Ed25519 { public_key } => {
-            public_key.to_bytes().to_vec()
+            public_key.to_compressed_edwards_y().decompress().ok_or_else(||BadRequest("the pk point is off-curve".to_string()))?
         }
         _ => {
             return Err(BadRequest("Only Ed25519 epk is supported".to_string()));
@@ -116,6 +116,6 @@ pub fn process(request: PepperRequestV1) -> Result<PepperResponseV1, ProcessingF
     }
     let mut main_rng = thread_rng();
     let mut aead_rng = aes_gcm::aead::OsRng;
-    let signature_encrypted = ElGamalCurve25519Aes256Gcm::enc(&mut main_rng, &mut aead_rng, &curve25519_pk_bytes, &pepper).map_err(|e|InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}")))?;
+    let signature_encrypted = ElGamalCurve25519Aes256Gcm::enc(&mut main_rng, &mut aead_rng, &curve25519_pk_point, &pepper).map_err(|e|InternalError(format!("ElGamalCurve25519Aes256Gcm enc error: {e}")))?;
     Ok(PepperResponseV1 { signature_encrypted })
 }
