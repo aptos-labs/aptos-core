@@ -3695,15 +3695,6 @@ pub struct FunctionData {
     pub(crate) transitive_closure_of_called_funs: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
 }
 
-impl FunctionData {
-    /// Gets the definition of the function.
-    /// The definition is available if the model
-    /// is build with option `ModelBuilderOptions::compile_via_model`.
-    pub fn get_def(&self) -> Option<&Exp> {
-        self.def.as_ref()
-    }
-}
-
 /// Kind of a function,
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FunctionKind {
@@ -3718,7 +3709,7 @@ pub struct FunctionEnv<'env> {
     pub module_env: ModuleEnv<'env>,
 
     /// Reference to the function data.
-    pub data: &'env FunctionData,
+    data: &'env FunctionData,
 }
 
 impl<'env> FunctionEnv<'env> {

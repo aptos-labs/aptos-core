@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use move_model::{
-    ast::{Exp, ExpData, Operation, VisitorPosition},
+    ast::{ExpData, Operation, VisitorPosition},
     model::{FunId, GlobalEnv, Loc, ModuleEnv, NodeId, QualifiedId, QualifiedInstId},
     ty::Type,
 };
@@ -8,8 +8,10 @@ use move_model::{
 /// Checks all modules in `env`
 pub fn check_cyclic_instantiations(env: &GlobalEnv) {
     for module in env.get_modules() {
-        let checker = CyclicInstantiationChecker::new(module);
-        checker.check();
+        if module.is_target() {
+            let checker = CyclicInstantiationChecker::new(module);
+            checker.check();
+        }
     }
 }
 
@@ -33,12 +35,14 @@ impl<'a> CyclicInstantiationChecker<'a> {
 
     /// Checks the given function
     fn check_fun(&self, fun_id: FunId) {
-        let fun_body = self.get_fun_def(fun_id);
-        let mut callers = self.gen_init_callers_chain(fun_id);
-        fun_body.visit_positions(&mut |pos, e| {
+        let fun_env = self.mod_env.get_function(fun_id);
+        if let Some(fun_body) = fun_env.get_def() {
+            let mut callers = self.gen_init_callers_chain(fun_id);
             let insts = self.gen_generic_insts_for_fun(fun_id);
-            self.visit(pos, e, insts, &mut callers)
-        });
+            fun_body.visit_positions(&mut |pos, e| {
+                self.visit(pos, e, insts.clone(), &mut callers)
+            });
+        }
     }
 
     /// Generates generic type instantiations for the given function
@@ -132,21 +136,19 @@ impl<'a> CyclicInstantiationChecker<'a> {
         insts: Vec<Type>,
         callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
     ) -> bool {
-        let caller_body = self.get_fun_def(caller.id);
-        let caller_loc = self.mod_env.env.get_node_loc(caller_node);
-        callers_chain.push((caller_loc, caller));
-        let res = caller_body.visit_positions(&mut |pos, exp| {
+        let fun_env = self.mod_env.get_function(caller.id);
+        if let Some(caller_body) = fun_env.get_def() {
+            let caller_loc = self.mod_env.env.get_node_loc(caller_node);
+            callers_chain.push((caller_loc, caller));
             let insts = Type::instantiate_vec(self.get_inst(caller_node), &insts);
-            self.visit(pos, exp, insts, callers_chain)
-        });
-        callers_chain.pop();
-        res.is_some()
-    }
-
-    /// Gets the funciton body
-    fn get_fun_def(&self, fun_id: FunId) -> &Exp {
-        let fun_env = self.mod_env.get_function(fun_id);
-        fun_env.data.get_def().expect("definition")
+            let res = caller_body.visit_positions(&mut |pos, exp| {
+                self.visit(pos, exp, insts.clone(), callers_chain)
+            });
+            callers_chain.pop();
+            res.is_some()
+        } else {
+            true
+        }
     }
 
     /// Shortcut for getting the node instantiation
