@@ -812,6 +812,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             chain_health_backoff_config,
             self.quorum_store_enabled,
             onchain_consensus_config.effective_validator_txn_config(),
+            self.config
+                .quorum_store
+                .allow_batches_without_pos_in_proposal,
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -1197,6 +1200,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.effective_validator_txn_config(),
             self.bounded_executor.clone(),
             features.clone(),
+            self.config
+                .quorum_store
+                .allow_batches_without_pos_in_proposal,
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);

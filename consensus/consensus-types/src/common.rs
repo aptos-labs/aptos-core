@@ -230,9 +230,13 @@ impl Payload {
         }
     }
 
-    pub fn empty(quorum_store_enabled: bool) -> Self {
+    pub fn empty(quorum_store_enabled: bool, allow_batches_without_pos_in_proposal: bool) -> Self {
         if quorum_store_enabled {
-            Payload::InQuorumStore(ProofWithData::new(Vec::new()))
+            if allow_batches_without_pos_in_proposal {
+                Payload::QuorumStoreInlineHybrid(Vec::new(), ProofWithData::new(Vec::new()), None)
+            } else {
+                Payload::InQuorumStore(ProofWithData::new(Vec::new()))
+            }
         } else {
             Payload::DirectMempool(Vec::new())
         }

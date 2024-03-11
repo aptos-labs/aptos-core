@@ -244,7 +244,7 @@ impl ProofManager {
 
                 let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() && inline_block.is_empty() {
-                        Payload::empty(true)
+                        Payload::empty(true, self.allow_batches_without_pos_in_proposal)
                     } else if inline_block.is_empty() {
                         trace!(
                             "QS: GetBlockRequest excluded len {}, block len {}",

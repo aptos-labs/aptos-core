@@ -180,9 +180,12 @@ pub struct ProposalGenerator {
     last_round_generated: Round,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
+
+    allow_batches_without_pos_in_proposal: bool,
 }
 
 impl ProposalGenerator {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         author: Author,
         block_store: Arc<dyn BlockReader + Send + Sync>,
@@ -198,6 +201,7 @@ impl ProposalGenerator {
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
+        allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         Self {
             author,
@@ -215,6 +219,7 @@ impl ProposalGenerator {
             last_round_generated: 0,
             quorum_store_enabled,
             vtxn_config,
+            allow_batches_without_pos_in_proposal,
         }
     }
 
@@ -268,7 +273,10 @@ impl ProposalGenerator {
             // after reconfiguration until it's committed
             (
                 vec![],
-                Payload::empty(self.quorum_store_enabled),
+                Payload::empty(
+                    self.quorum_store_enabled,
+                    self.allow_batches_without_pos_in_proposal,
+                ),
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
