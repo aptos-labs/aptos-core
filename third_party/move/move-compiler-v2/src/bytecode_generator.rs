@@ -386,13 +386,23 @@ impl<'env> Generator<'env> {
                 // appear where references are processed.
                 let rhs_temp = self.gen_arg(rhs, false);
                 let lhs_temp = self.gen_auto_ref_arg(lhs, ReferenceKind::Mutable);
-                if !self.temp_type(lhs_temp).is_mutable_reference() {
+                let lhs_type = self.get_node_type(lhs.node_id());
+
+                // For the case: `fun f(p: &mut S) { *(p :&S) =... },
+                // we need to check whether p (with explicit type annotation) is an immutable ref
+                if lhs_type.is_immutable_reference()
+                    || !self.temp_type(lhs_temp).is_mutable_reference()
+                {
+                    let err_type = if lhs_type.is_immutable_reference() {
+                        &lhs_type
+                    } else {
+                        self.temp_type(lhs_temp)
+                    };
                     self.error(
                         lhs.node_id(),
                         format!(
                             "expected `&mut` but found `{}`",
-                            self.temp_type(lhs_temp)
-                                .display(&self.func_env.get_type_display_ctx()),
+                            err_type.display(&self.func_env.get_type_display_ctx()),
                         ),
                     );
                 }
@@ -873,6 +883,47 @@ impl<'env> Generator<'env> {
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
         let args = self.gen_arg_list(&args, true);
+        let ret_type: Type = self.env().get_function(fun).get_result_type();
+        // For the code such as `let x: &u64; let y: &u64; (x,y) = f() where f returns (&mut, &mut)`
+        // we need to generate a new temp with mut ref type and then freeze it
+        if let Type::Tuple(ret_tys) = ret_type {
+            if ret_tys.len() == targets.len() {
+                let mut new_targets = vec![];
+                let mut target_map = BTreeMap::new();
+                for (target, ret_ty) in targets.iter().zip(ret_tys) {
+                    if self.temp_type(*target).is_immutable_reference()
+                        && ret_ty.is_mutable_reference()
+                    {
+                        let new_temp = self.new_temp(ret_ty);
+                        new_targets.push(new_temp);
+                        target_map.insert(target, new_temp);
+                    } else {
+                        new_targets.push(*target);
+                    }
+                }
+                self.emit_with(id, |attr| {
+                    Bytecode::Call(
+                        attr,
+                        new_targets,
+                        BytecodeOperation::Function(fun.module_id, fun.id, type_args),
+                        args,
+                        None,
+                    )
+                });
+                for (target, new_target) in target_map {
+                    self.emit_with(id, |attr| {
+                        Bytecode::Call(
+                            attr,
+                            vec![*target],
+                            BytecodeOperation::FreezeRef,
+                            vec![new_target],
+                            None,
+                        )
+                    });
+                }
+                return;
+            }
+        }
         self.emit_with(id, |attr| {
             Bytecode::Call(
                 attr,
@@ -1097,19 +1148,25 @@ impl<'env> Generator<'env> {
 
         // Compile operand in reference mode, defaulting to immutable mode.
         let oper_temp = self.gen_auto_ref_arg(oper, ReferenceKind::Immutable);
+        let oper_type = self.get_node_type(oper.node_id());
 
         // If we are in reference mode and a &mut is requested, the operand also needs to be
         // &mut.
         if self.reference_mode()
             && self.reference_mode_kind == ReferenceKind::Mutable
-            && !self.temp_type(oper_temp).is_mutable_reference()
+            && (oper_type.is_immutable_reference() // To check the corner case `&mut x...; (x:&T). = ...`, we need this condition
+                || !self.temp_type(oper_temp).is_mutable_reference())
         {
+            let err_type = if oper_type.is_immutable_reference() {
+                &oper_type
+            } else {
+                self.temp_type(oper_temp)
+            };
             self.error(
                 oper.node_id(),
                 format!(
                     "expected `&mut` but found `{}`",
-                    self.temp_type(oper_temp)
-                        .display(&self.func_env.get_type_display_ctx())
+                    err_type.display(&self.func_env.get_type_display_ctx())
                 ),
             )
         }
