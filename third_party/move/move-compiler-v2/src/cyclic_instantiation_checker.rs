@@ -174,7 +174,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
     }
 
     /// Reports a cyclic type instantiation error, in which the root caller eventually calls `callee`
-    /// with a cyclic type instantiation.
+    /// with a cyclic type instantiation. `callee` is the callee of the last caller in `callers_chain`.
     fn report_error(
         &self,
         _nid: NodeId,
@@ -184,9 +184,11 @@ impl<'a> CyclicInstantiationChecker<'a> {
         let labels = (0..callers_chain.len())
             .map(|i| {
                 let (caller_loc, caller) = &callers_chain[i];
+                // callee of `caller`
                 let callee = if i != callers_chain.len() - 1 {
                     &callers_chain[i + 1].1
                 } else {
+                    // callee of the last caller in the chain is the parameter `callee`
                     &callee
                 };
                 format!(
