@@ -125,6 +125,7 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
                         continue;
                     }
                     info!(
+                        network_id = self.network_context.network_id().as_str(),
                         peer = connection.metadata.remote_peer_id,
                         "listener_thread got connection {:?}, ok!", remote_addr,
                     );

@@ -43,13 +43,29 @@ pub const DESERIALIZATION_LABEL: &str = "deserialization";
 
 // previous APTOS_CONNECTIONS counter replaced by PeersAndMetadataGauge which translates PeersAndMetadata global singleton directly to Prometheus Metrics data
 
+// For a count of connections established outbound, use
+// aptos_network_connection_upgrade_time_seconds_count{direction="outbound"}
+
+pub static APTOS_CONNECTIONS_CLOSED: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "aptos_connections_closed",
+        "Count of connections that have been closed",
+        &["role_type", "network_id", "reason"]
+    )
+        .unwrap()
+});
+
+pub fn connection_closed(role: &'static str, network_id: &'static str, reason: &'static str) {
+    APTOS_CONNECTIONS_CLOSED.with_label_values(&[role, network_id, reason]).inc();
+}
+
 pub static APTOS_CONNECTIONS_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_connections_rejected",
         "Number of connections rejected per interface",
         &["role_type", "network_id", "peer_id", "direction"]
     )
-    .unwrap()
+        .unwrap()
 });
 
 pub fn connections_rejected(
