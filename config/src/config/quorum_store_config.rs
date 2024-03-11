@@ -122,7 +122,9 @@ impl QuorumStoreConfig {
     pub fn default_for_dag() -> Self {
         Self {
             batch_generation_poll_interval_ms: 300,
-            sender_max_batch_txns: 500,
+            batch_generation_min_non_empty_interval_ms: 600,
+            batch_generation_max_interval_ms: 750,
+            sender_max_batch_txns: 600,
             sender_max_batch_bytes: 4 * 1024 * 1024,
             sender_max_num_batches: 20,
             sender_max_total_txns: 3000,
@@ -135,8 +137,8 @@ impl QuorumStoreConfig {
             back_pressure: QuorumStoreBackPressureConfig {
                 backlog_txn_limit_count: 60_000,
                 backlog_per_validator_batch_limit_count: 20,
-                dynamic_min_txn_per_s: 1000,
-                dynamic_max_txn_per_s: 2000,
+                dynamic_min_txn_per_s: 1500,
+                dynamic_max_txn_per_s: 4000,
                 ..Default::default()
             },
             ..Default::default()
