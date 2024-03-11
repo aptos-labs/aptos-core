@@ -301,7 +301,9 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                 }
             };
             if let MultiplexMessage::Message(NetworkMessage::Error(ErrorCode::DisconnectCommand)) = &mm {
+                // some app code decided we should disconnect from this peer
                 close_reason = "got DisconnectCommand";
+                counters::connection_closed(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), "dc");
                 break;
             }
             let data_len = mm.data_len();
@@ -595,8 +597,10 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                     }
                 }
                 None => {
+                    // the other peer closed connection and there was nothing left to read
                     info!("read_thread {} None", self.remote_peer_network_id);
                     close_reason = "reader next none";
+                    counters::connection_closed(self.role_type.as_str(), self.remote_peer_network_id.network_id().as_str(), "hup");
                     break;
                 }
             };
