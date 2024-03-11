@@ -1,7 +1,7 @@
 use crate::cli;
 use crate::configuration::{Configuration, IncludeFunctions};
 use move_model::ast::{Exp, ExpData, Operation};
-use move_model::model::{FunctionEnv, GlobalEnv, Loc, ModuleEnv};
+use move_model::model::{FunctionEnv, GlobalEnv, ModuleEnv};
 use move_package::source_package::layout::SourcePackageLayout;
 use std::path::Path;
 
@@ -85,7 +85,7 @@ fn traverse_module_with_check(
 /// Checks all the functions and constants defined in the module.
 #[allow(clippy::unnecessary_to_owned)]
 fn traverse_module(module: &ModuleEnv<'_>, conf: &Configuration) -> anyhow::Result<Vec<Mutant>> {
-    let module_name = module.env.symbol_pool().string(module.get_name().name());
+    let module_name = module.get_name().display(module.env);
 
     trace!("Traversing module {}", &module_name);
     let mut mutants = module
@@ -97,7 +97,7 @@ fn traverse_module(module: &ModuleEnv<'_>, conf: &Configuration) -> anyhow::Resu
     // Set the module name for all the mutants.
     mutants
         .iter_mut()
-        .for_each(|m| m.set_module_name((*module_name).clone()));
+        .for_each(|m| m.set_module_name(module_name.to_string()));
 
     trace!(
         "Found {} possible mutations in module {}",
@@ -109,19 +109,14 @@ fn traverse_module(module: &ModuleEnv<'_>, conf: &Configuration) -> anyhow::Resu
 
 /// Traverses a single function and returns a list of mutants.
 /// Checks the body of the function by traversing its definition.
+#[allow(clippy::unnecessary_wraps)]
 fn traverse_function(
     function: &FunctionEnv<'_>,
     conf: &Configuration,
 ) -> anyhow::Result<Vec<Mutant>> {
-    let mut spec_blocks_loc = Vec::<Loc>::new();
+    let mut is_inside_spec = false;
 
-    let function_name = (*function
-        .module_env
-        .env
-        .symbol_pool()
-        .string(function.get_name()))
-    .clone();
-
+    let function_name = function.get_name_str();
     let filename = function.module_env.get_source_path();
 
     // Check if function is included in individual configuration.
@@ -137,24 +132,19 @@ fn traverse_function(
     trace!("Traversing function {}", &function_name);
     let mut result = Vec::<Mutant>::new();
     if let Some(exp) = function.get_def() {
-        exp.visit_pre_order(&mut |exp_data| {
+        exp.visit_pre_post(&mut |asc, exp_data| {
             // Collect the spec blocks locations.
             if let ExpData::SpecBlock(_, _) = exp_data {
-                spec_blocks_loc.push(function.module_env.env.get_node_loc(exp_data.node_id()));
+                // Mark that we are inside of the spec block when going desc - and remove that when going asc.
+                is_inside_spec = !asc;
             }
 
-            // Check if we are not inside of any spec block. If so, don't process the expression.
-            // We can't simply return false to stop visiting that tree branch as it will stop
-            // visiting the whole tree.
-            // Visiting pre-order ensures us that we can't process any expression below spec block before
-            // we have visited spec block itself.
-            let exp_loc = function.module_env.env.get_node_loc(exp_data.node_id());
-            if !spec_blocks_loc
-                .iter()
-                .any(|loc| !loc.span().disjoint(exp_loc.span()))
-            {
-                result.extend(parse_expression_and_find_mutants(function, exp_data));
+            // Skip any other operation in asc path to avoid double counting the same exprs.
+            if asc || is_inside_spec {
+                return true;
             }
+
+            result.extend(parse_expression_and_find_mutants(function, exp_data));
             true
         });
     };
@@ -169,6 +159,7 @@ fn traverse_function(
 /// This function does the actual parsing of the expression and checks if any of the mutation operators
 /// can be applied to it.
 /// When Move language is extended with new expressions, this function needs to be updated to support them.
+#[allow(clippy::too_many_lines)]
 fn parse_expression_and_find_mutants(function: &FunctionEnv<'_>, exp: &ExpData) -> Vec<Mutant> {
     let convert_exps_to_explocs = |exps: &[Exp]| -> Vec<ExpLoc> {
         exps.iter()
@@ -182,10 +173,12 @@ fn parse_expression_and_find_mutants(function: &FunctionEnv<'_>, exp: &ExpData) 
     trace!("Parsing expression {exp:?}");
     match exp {
         ExpData::Call(node_id, op, exps) => match op {
-            Operation::MoveTo => vec![Mutant::new(MutationOp::DeleteStmt(DeleteStmt::new(
-                exp.clone().into_exp(),
-                function.module_env.env.get_node_loc(*node_id),
-            )))],
+            Operation::MoveTo | Operation::Abort => {
+                vec![Mutant::new(MutationOp::DeleteStmt(DeleteStmt::new(
+                    exp.clone().into_exp(),
+                    function.module_env.env.get_node_loc(*node_id),
+                )))]
+            },
             Operation::Add
             | Operation::Sub
             | Operation::Mul
