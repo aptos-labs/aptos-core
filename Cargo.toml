@@ -70,6 +70,7 @@ members = [
     "crates/aptos-genesis",
     "crates/aptos-github-client",
     "crates/aptos-id-generator",
+    "crates/aptos-indexer-grpc-stream-server",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
     "crates/aptos-jwk-consensus",
@@ -348,6 +349,7 @@ aptos-indexer-grpc-fullnode = { path = "ecosystem/indexer-grpc/indexer-grpc-full
 aptos-indexer-grpc-table-info = { path = "ecosystem/indexer-grpc/indexer-grpc-table-info" }
 aptos-indexer-grpc-utils = { path = "ecosystem/indexer-grpc/indexer-grpc-utils" }
 aptos-indexer-grpc-server-framework = { path = "ecosystem/indexer-grpc/indexer-grpc-server-framework" }
+aptos-indexer-grpc-stream-server = { path = "crates/aptos-indexer-grpc-stream-server" }
 aptos-infallible = { path = "crates/aptos-infallible" }
 aptos-inspection-service = { path = "crates/aptos-inspection-service" }
 aptos-jellyfish-merkle = { path = "storage/jellyfish-merkle" }

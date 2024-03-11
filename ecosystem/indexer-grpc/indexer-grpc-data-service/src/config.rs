@@ -4,6 +4,7 @@
 use crate::service::RawDataServerWrapper;
 use anyhow::{bail, Result};
 use aptos_indexer_grpc_server_framework::RunnableConfig;
+use aptos_indexer_grpc_stream_server::GrpcServerBuilder;
 use aptos_indexer_grpc_utils::{
     compression_util::StorageFormat, config::IndexerGrpcFileStoreConfig, types::RedisUrl,
 };
@@ -16,22 +17,21 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, net::SocketAddr};
 use tonic::{
     codec::CompressionEncoding,
-    codegen::InterceptedService,
     metadata::{Ascii, MetadataValue},
-    transport::Server,
+    service::interceptor::InterceptedService,
     Request, Status,
 };
 
 pub const SERVER_NAME: &str = "idxdatasvc";
 
+pub const FILE_DESCRIPTOR_SETS: &[&[u8]] = &[
+    INDEXER_V1_FILE_DESCRIPTOR_SET,
+    TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET,
+    UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
+];
+
 // Default max response channel size.
 const DEFAULT_MAX_RESPONSE_CHANNEL_SIZE: usize = 3;
-
-// HTTP2 ping interval and timeout.
-// This can help server to garbage collect dead connections.
-// tonic server: https://docs.rs/tonic/latest/tonic/transport/server/struct.Server.html#method.http2_keepalive_interval
-const HTTP2_PING_INTERVAL_DURATION: std::time::Duration = std::time::Duration::from_secs(60);
-const HTTP2_PING_TIMEOUT_DURATION: std::time::Duration = std::time::Duration::from_secs(10);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -60,7 +60,6 @@ pub struct IndexerGrpcDataServiceConfig {
     #[serde(default = "IndexerGrpcDataServiceConfig::default_data_service_response_channel_size")]
     pub data_service_response_channel_size: usize,
     /// A list of auth tokens that are allowed to access the service.
-    #[serde(default)]
     pub whitelisted_auth_tokens: Vec<String>,
     /// If set, don't check for auth tokens.
     #[serde(default)]
@@ -145,24 +144,12 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                     Err(Status::unauthenticated("Missing token"))
                 }
             };
-        let reflection_service = tonic_reflection::server::Builder::configure()
-            // Note: It is critical that the file descriptor set is registered for every
-            // file that the top level API proto depends on recursively. If you don't,
-            // compilation will still succeed but reflection will fail at runtime.
-            //
-            // TODO: Add a test for this / something in build.rs, this is a big footgun.
-            .register_encoded_file_descriptor_set(INDEXER_V1_FILE_DESCRIPTOR_SET)
-            .register_encoded_file_descriptor_set(TRANSACTION_V1_TESTING_FILE_DESCRIPTOR_SET)
-            .register_encoded_file_descriptor_set(UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET)
-            .build()
-            .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?;
 
         let cache_storage_format: StorageFormat = if self.enable_cache_compression {
             StorageFormat::GzipCompressedProto
         } else {
             StorageFormat::Base64UncompressedProto
         };
-        // Add authentication interceptor.
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
             self.file_store_config.clone(),
@@ -172,10 +159,9 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip);
-        let svc_with_interceptor = InterceptedService::new(svc, authentication_inceptor);
+        let svc = InterceptedService::new(svc, authentication_inceptor);
 
-        let svc_with_interceptor_clone = svc_with_interceptor.clone();
-        let reflection_service_clone = reflection_service.clone();
+        let grpc_server_builder = GrpcServerBuilder::new(svc);
 
         let mut tasks = vec![];
         if let Some(config) = &self.data_service_grpc_non_tls_config {
@@ -184,12 +170,9 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 grpc_address = listen_address.to_string().as_str(),
                 "[data service] starting gRPC server with non-TLS."
             );
+            let router = grpc_server_builder.build_router(None, FILE_DESCRIPTOR_SETS);
             tasks.push(tokio::spawn(async move {
-                Server::builder()
-                    .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
-                    .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
-                    .add_service(svc_with_interceptor_clone)
-                    .add_service(reflection_service_clone)
+                router
                     .serve(listen_address)
                     .await
                     .map_err(|e| anyhow::anyhow!(e))
@@ -204,13 +187,10 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 grpc_address = listen_address.to_string().as_str(),
                 "[Data Service] Starting gRPC server with TLS."
             );
+            let tls_config = tonic::transport::ServerTlsConfig::new().identity(identity);
+            let router = grpc_server_builder.build_router(Some(tls_config), FILE_DESCRIPTOR_SETS);
             tasks.push(tokio::spawn(async move {
-                Server::builder()
-                    .http2_keepalive_interval(Some(HTTP2_PING_INTERVAL_DURATION))
-                    .http2_keepalive_timeout(Some(HTTP2_PING_TIMEOUT_DURATION))
-                    .tls_config(tonic::transport::ServerTlsConfig::new().identity(identity))?
-                    .add_service(svc_with_interceptor)
-                    .add_service(reflection_service)
+                router
                     .serve(listen_address)
                     .await
                     .map_err(|e| anyhow::anyhow!(e))
