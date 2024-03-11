@@ -219,6 +219,13 @@ impl DKGTrait for RealDKG {
         params: &Self::PublicParams,
         trx: &Self::Transcript,
     ) -> anyhow::Result<()> {
+        // Verify fast path is present if and only if fast_wconfig is present.
+        assert_eq!(
+            trx.fast.is_some(),
+            params.pvss_config.fast_wconfig.is_some()
+        );
+        let has_fast_path = trx.fast.is_some();
+
         // Verify dealer indices are valid.
         let dealers = trx
             .main
@@ -231,7 +238,7 @@ impl DKGTrait for RealDKG {
             dealers.iter().all(|id| *id < num_validators),
             "real_dkg::verify_transcript failed with invalid dealer index."
         );
-        if trx.fast.is_some() {
+        if has_fast_path {
             let _fast_dealers = trx
                 .fast
                 .as_ref()
@@ -273,7 +280,7 @@ impl DKGTrait for RealDKG {
             &aux,
         )?;
 
-        if trx.fast.is_some() && params.pvss_config.fast_wconfig.is_some() {
+        if has_fast_path {
             trx.fast.as_ref().unwrap().verify(
                 params.pvss_config.fast_wconfig.as_ref().unwrap(),
                 &params.pvss_config.pp,
@@ -318,20 +325,23 @@ impl DKGTrait for RealDKG {
             },
             dk,
         );
-        let (fast_sk, fast_pk) =
-            if trx.fast.is_some() && pub_params.pvss_config.fast_wconfig.is_some() {
-                let fast_trx = trx.fast.as_ref().unwrap();
-                let (fast_sk, fast_pk) = fast_trx.decrypt_own_share(
-                    pub_params.pvss_config.fast_wconfig.as_ref().unwrap(),
-                    &Player {
-                        id: player_idx as usize,
-                    },
-                    dk,
-                );
-                (Some(fast_sk), Some(fast_pk))
-            } else {
-                (None, None)
-            };
+        assert_eq!(
+            trx.fast.is_some(),
+            pub_params.pvss_config.fast_wconfig.is_some()
+        );
+        let (fast_sk, fast_pk) = if trx.fast.is_some() {
+            let fast_trx = trx.fast.as_ref().unwrap();
+            let (fast_sk, fast_pk) = fast_trx.decrypt_own_share(
+                pub_params.pvss_config.fast_wconfig.as_ref().unwrap(),
+                &Player {
+                    id: player_idx as usize,
+                },
+                dk,
+            );
+            (Some(fast_sk), Some(fast_pk))
+        } else {
+            (None, None)
+        };
         Ok((
             DealtSecretKeyShares {
                 main: sk,
