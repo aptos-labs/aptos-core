@@ -17,15 +17,19 @@ use aptos_types::transaction::{EntryFunction, TransactionPayload};
 use rand::{rngs::StdRng, Rng};
 
 use std::sync::Arc;
-const BASE_COIN_TYPES: [&str; 11] = ["AC", "BC", "DC", "EC", "FC", "GC", "HC", "IC", "JC", "KC", "LC"];
-const QUOTE_COIN_TYPES: [&str; 11] = ["QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC"];
+const BASE_COIN_TYPES: [&str; 104] = ["AAC", "ABC", "ACC", "ADC", "AEC", "AFC", "AGC", "AHC", "AIC", "AJC", "AKC", "ALC", "AMC", "ANC", "AOC", "APC", "AQC", "ARC", "ASC", "ATC", "AUC", "AVC", "AWC", "AXC", "AYC", "AZC",
+                                     "BAC", "BBC", "BCC", "BDC", "BEC", "BFC", "BGC", "BHC", "BIC", "BJC", "BKC", "BLC", "BMC", "BNC", "BOC", "BPC", "BQC", "BRC", "BSC", "BTC", "BUC", "BVC", "BWC", "BXC", "BYC", "BZC",
+                                     "CAC", "CBC", "CCC", "CDC", "CEC", "CFC", "CGC", "CHC", "CIC", "CJC", "CKC", "CLC", "CMC", "CNC", "COC", "CPC", "CQC", "CRC", "CSC", "CTC", "CUC", "CVC", "CWC", "CXC", "CYC", "CZC",                                    
+                                     "DAC", "DBC", "DCC", "DDC", "DEC", "DFC", "DGC", "DHC", "DIC", "DJC", "DKC", "DLC", "DMC", "DNC", "DOC", "DPC", "DQC", "DRC", "DSC", "DTC", "DUC", "DVC", "DWC", "DXC", "DYC", "DZC",
+                                    ];
+// const QUOTE_COIN_TYPES: [&str; 11] = ["QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC", "QC"];
 
 fn base_coin_type(market_id: u64) -> &'static str {
     BASE_COIN_TYPES[(market_id-1) as usize]
 }
 
-fn quote_coin_type(market_id: u64) -> &'static str {
-    QUOTE_COIN_TYPES[(market_id-1) as usize]
+fn quote_coin_type(_market_id: u64) -> &'static str {
+    "QC"
 }
 
 /// Placeas a bid limit order.
@@ -245,7 +249,7 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
         self.num_base_orders_placed += 1;
-        if self.num_base_orders_placed <= 100 || self.num_base_orders_placed % 2 == 0 {
+        if self.num_base_orders_placed <= (*num_markets as usize)*10 || self.num_base_orders_placed % 2 == 0 {
             Arc::new(move |account, package, publisher, txn_factory, rng| {
                 let mut requests = vec![];
                 let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
@@ -289,7 +293,7 @@ pub async fn register_econia_markets(
     num_markets: u64,
 ) {
     assert!(num_markets > 0, "num_markets must be greater than 0");
-    assert!(num_markets <= 11, "num_markets must be less than or equal to 11");        
+    assert!(num_markets <= 104, "num_markets must be less than or equal to 104");        
     let mut requests = vec![];
     for (package, publisher) in packages {
         let builder = init_txn_factory.payload(register_market(package.get_module_id("txn_generator_utils"), num_markets));
