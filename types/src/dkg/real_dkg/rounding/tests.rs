@@ -58,7 +58,7 @@ fn test_rounding_equal_stakes() {
         let dkg_rounding =
             DKGRounding::new(&validator_stakes, *SECRECY_THRESHOLD.deref(), *RECONSTRUCT_THRESHOLD.deref());
         let wconfig = WeightedConfig::new(
-            (U64F64::from_num(validator_num) * *RECONSTRUCT_THRESHOLD.deref()).ceil().to_num::<usize>(),
+            (U64F64::from_num(validator_num) * *SECRECY_THRESHOLD.deref()).ceil().to_num::<usize>(),
             vec![1; validator_num],
         )
         .unwrap();
