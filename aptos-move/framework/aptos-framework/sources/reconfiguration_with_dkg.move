@@ -29,6 +29,7 @@ module aptos_framework::reconfiguration_with_dkg {
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(
             cur_epoch,
+            randomness_config::current(),
             stake::cur_validator_consensus_infos(),
             stake::next_validator_consensus_infos(),
         );

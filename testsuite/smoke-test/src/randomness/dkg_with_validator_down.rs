@@ -22,7 +22,7 @@ async fn dkg_with_validator_down() {
 
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::V1);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build()
         .await;

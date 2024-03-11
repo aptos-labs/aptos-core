@@ -2,6 +2,7 @@
 
 use crate::{
     dkg::{real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait},
+    on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use anyhow::{anyhow, ensure};
@@ -15,7 +16,6 @@ use aptos_dkg::{
 };
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
-use rounding::{RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -50,12 +50,16 @@ impl DKGPvssConfig {
 
 pub fn build_dkg_pvss_config(
     cur_epoch: u64,
+    randomness_config: &OnChainRandomnessConfig,
     next_validators: &[ValidatorConsensusInfo],
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
 
-    let dkg_rounding =
-        DKGRounding::new(&validator_stakes, SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD);
+    let dkg_rounding = DKGRounding::new(
+        &validator_stakes,
+        randomness_config.secrecy_threshold().unwrap(),
+        randomness_config.reconstruct_threshold().unwrap(),
+    );
 
     println!(
         "[Randomness] rounding: epoch {} starts, profile = {:?}",
@@ -102,6 +106,7 @@ impl DKGTrait for RealDKG {
     fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> RealDKGPublicParams {
         let pvss_config = build_dkg_pvss_config(
             dkg_session_metadata.dealer_epoch,
+            &dkg_session_metadata.randomness_config,
             &dkg_session_metadata.target_validator_consensus_infos_cloned(),
         );
         let verifier = ValidatorVerifier::new(dkg_session_metadata.dealer_consensus_infos_cloned());
