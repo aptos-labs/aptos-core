@@ -127,7 +127,7 @@ impl DKGRoundingProfile {
         assert!(total_weight_max >= total_weight_min);
         assert!(secrecy_threshold_in_stake_ratio * U64F64::from_num(3) > U64F64::from_num(1));
         assert!(secrecy_threshold_in_stake_ratio < reconstruct_threshold_in_stake_ratio);
-        assert!(reconstruct_threshold_in_stake_ratio <= 2.0 / 3.0);
+        assert!(reconstruct_threshold_in_stake_ratio * U64F64::from_num(3) <= U64F64::from_num(2));
 
         let mut weight_low = total_weight_min as u64;
         let mut weight_high = total_weight_max as u64;
