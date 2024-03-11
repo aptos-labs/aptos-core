@@ -133,6 +133,20 @@ impl ProofWithData {
         }
     }
 
+    // pub fn extend(self, other: ProofWithData) -> Self {
+    //     let other_data_status = other.status.lock().as_mut().unwrap().take();
+    //     let mut status = self.status.lock();
+    //     if status.is_none() {
+    //         *status = Some(other_data_status);
+    //     } else {
+    //         status.as_mut().unwrap().extend(other_data_status);
+    //     }
+    //     ProofWithData {
+    //         proofs: [self.proofs, other.proofs].concat(),
+    //         status: self.status,
+    //     }
+    // }
+
     pub fn extend(&mut self, other: ProofWithData) {
         let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);
@@ -185,6 +199,21 @@ impl ProofWithDataWithTxnLimit {
             max_txns_to_execute,
         }
     }
+
+    // pub fn extend(self, other: ProofWithDataWithTxnLimit) -> Self{
+    //     // InQuorumStoreWithLimit TODO: what is the right logic here ???
+    //     let new_max_txns_to_execute = if self.max_txns_to_execute.is_none() {
+    //         other.max_txns_to_execute
+    //     } else if other.max_txns_to_execute.is_some() {
+    //         Some(self.max_txns_to_execute.unwrap() + other.max_txns_to_execute.unwrap())
+    //     } else {
+    //         self.max_txns_to_execute
+    //     };
+    //     Self {
+    //         proof_with_data: self.proof_with_data.extend(other.proof_with_data),
+    //         max_txns_to_execute: self.max_txns_to_execute,
+    //     }
+    // }
 
     pub fn extend(&mut self, other: ProofWithDataWithTxnLimit) {
         self.proof_with_data.extend(other.proof_with_data);
@@ -292,44 +321,77 @@ impl Payload {
         }
     }
 
-    pub fn extend(&mut self, other: Payload) {
+    pub fn extend(self, other: Payload) -> Self {
         match (self, other) {
-            (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => v1.extend(v2),
-            (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => p1.extend(p2),
+            (Payload::DirectMempool(v1), Payload::DirectMempool(v2)) => {
+                let mut v3 = v1;
+                v3.extend(v2);
+                Payload::DirectMempool(v3)
+            },
+            (Payload::InQuorumStore(p1), Payload::InQuorumStore(p2)) => {
+                let mut p3 = p1;
+                p3.extend(p2);
+                Payload::InQuorumStore(p3)
+            },
             (Payload::InQuorumStoreWithLimit(p1), Payload::InQuorumStoreWithLimit(p2)) => {
-                p1.extend(p2)
+                let mut p3 = p1;
+                p3.extend(p2);
+                Payload::InQuorumStoreWithLimit(p3)
             },
             (
                 Payload::QuorumStoreInlineHybrid(b1, p1, m1),
                 Payload::QuorumStoreInlineHybrid(b2, p2, m2),
             ) => {
-                b1.extend(b2);
-                p1.extend(p2);
+                let mut b3 = b1;
+                b3.extend(b2);
+                let mut p3 = p1;
+                p3.extend(p2);
                 // TODO: What's the right logic here?
-                if m1.is_none() {
-                    *m1 = m2;
-                } else if m2.is_some() {
-                    *m1 = Some(m1.unwrap() + m2.unwrap());
-                }
+                let m3 = if m1.is_none() {
+                    m2
+                } else if let Some(m2) = m2 {
+                    Some(m1.unwrap() + m2)
+                } else {
+                    m1
+                };
+                Payload::QuorumStoreInlineHybrid(b3, p3, m3)
             },
-            (
-                Payload::QuorumStoreInlineHybrid(_b1, p1, _m1),
-                Payload::InQuorumStore(p2),
-            ) => {
-                p1.extend(p2);
+            (Payload::QuorumStoreInlineHybrid(b1, p1, m1), Payload::InQuorumStore(p2)) => {
                 // TODO: How to update m1?
+                let mut p3 = p1;
+                p3.extend(p2);
+                Payload::QuorumStoreInlineHybrid(b1, p3, m1)
             },
-            (
-                Payload::QuorumStoreInlineHybrid(_b1, p1, m1),
-                Payload::InQuorumStoreWithLimit(p2),
-            ) => {
-                p1.extend(p2.proof_with_data);
+            (Payload::QuorumStoreInlineHybrid(b1, p1, m1), Payload::InQuorumStoreWithLimit(p2)) => {
                 // TODO: What's the right logic here?
-                if m1.is_none() {
-                    *m1 = p2.max_txns_to_execute;
-                } else if p2.max_txns_to_execute.is_some() {
-                    *m1 = Some(m1.unwrap() + p2.max_txns_to_execute.unwrap());
-                }
+                let m3 = if m1.is_none() {
+                    p2.max_txns_to_execute
+                } else if let Some(m2) = p2.max_txns_to_execute {
+                    Some(m1.unwrap() + m2)
+                } else {
+                    m1
+                };
+                let mut p3 = p1;
+                p3.extend(p2.proof_with_data);
+                Payload::QuorumStoreInlineHybrid(b1, p3, m3)
+            },
+            (Payload::InQuorumStore(p1), Payload::QuorumStoreInlineHybrid(b2, p2, m2)) => {
+                let mut p3 = p1;
+                p3.extend(p2);
+                Payload::QuorumStoreInlineHybrid(b2, p3, m2)
+            },
+            (Payload::InQuorumStoreWithLimit(p1), Payload::QuorumStoreInlineHybrid(b2, p2, m2)) => {
+                // TODO: What's the right logic here?
+                let m3 = if p1.max_txns_to_execute.is_none() {
+                    m2
+                } else if m2.is_some() {
+                    Some(p1.max_txns_to_execute.unwrap() + m2.unwrap())
+                } else {
+                    p1.max_txns_to_execute
+                };
+                let mut p3 = p1.proof_with_data;
+                p3.extend(p2);
+                Payload::QuorumStoreInlineHybrid(b2, p3, m3)
             },
             (_, _) => unreachable!(),
         }
