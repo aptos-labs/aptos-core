@@ -220,7 +220,7 @@ impl TestConfig {
             }
         } else if path.contains("/recursive-instantiation-checker") {
             Self {
-                stop_before_generating_bytecode: false,
+                stop_before_generating_bytecode: true,
                 dump_ast: AstDumpLevel::None,
                 env_pipeline,
                 pipeline,

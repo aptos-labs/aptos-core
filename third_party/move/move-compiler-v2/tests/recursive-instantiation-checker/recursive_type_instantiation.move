@@ -44,6 +44,10 @@ module 0x42::m0 {
 	fun test_vec<T>() {
 		test_vec<vector<T>>()
 	}
+
+	fun call_native() {
+		std::vector::empty<bool>();
+	}
 }
 
 module 0x42::m1 {

@@ -39,9 +39,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         if let Some(fun_body) = fun_env.get_def() {
             let mut callers = self.gen_init_callers_chain(fun_id);
             let insts = self.gen_generic_insts_for_fun(fun_id);
-            fun_body.visit_positions(&mut |pos, e| {
-                self.visit(pos, e, insts.clone(), &mut callers)
-            });
+            fun_body.visit_positions(&mut |pos, e| self.visit(pos, e, insts.clone(), &mut callers));
         }
     }
 
@@ -105,6 +103,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
                             // this happens when root caller `f` calls `g` which then calls `g` itself
                             return true;
                         } else {
+                            #[allow(clippy::collapsible_else_if)]
                             if let Some(_ty_param) = callee
                                 .inst
                                 .iter()
