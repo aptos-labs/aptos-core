@@ -204,10 +204,7 @@ impl TransactionsApi {
         // TODO: Use a new request type that can't return 507.
     ) -> BasicResultWith404<Transaction> {
         fail_point_poem("endpoint_transaction_by_hash")?;
-        self.context
-            .check_api_output_enabled("Get transactions by hash", &accept_type)?;
-        self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
-            .await
+        self.wait_transaction_by_hash(accept_type, txn_hash).await
     }
 
     /// Wait for transaction by hash
