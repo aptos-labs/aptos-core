@@ -193,16 +193,16 @@ impl<'a> CyclicInstantiationChecker<'a> {
                 };
                 format!(
                     "{} calls {} {}",
-                    self.display_call(&caller),
-                    self.display_call(&callee),
-                    caller_loc.display_line_only(&self.mod_env.env)
+                    self.display_call(caller),
+                    self.display_call(callee),
+                    caller_loc.display_line_only(self.mod_env.env)
                 )
             })
             .collect_vec();
         let root_loc = &callers_chain[0].0;
         self.mod_env
             .env
-            .error_with_notes(&root_loc, "cyclic type instantiation", labels)
+            .error_with_notes(root_loc, "cyclic type instantiation", labels)
     }
 
     /// Returns the display name of a function call with type parameters but without arguments
