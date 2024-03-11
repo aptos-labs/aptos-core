@@ -1457,8 +1457,11 @@ impl GlobalEnv {
                 panic!("attaching mismatching bytecode module")
             }
         }
-
+        let used_modules = self.get_used_modules_from_bytecode(&module);
+        let friend_modules = self.get_friend_modules_from_bytecode(&module);
         let mod_data = &mut self.module_data[module_id.0 as usize];
+        mod_data.used_modules = used_modules;
+        mod_data.friend_modules = friend_modules;
         mod_data.compiled_module = Some(module);
         mod_data.source_map = Some(source_map);
     }

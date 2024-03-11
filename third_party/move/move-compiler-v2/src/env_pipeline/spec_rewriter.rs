@@ -346,13 +346,15 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                 },
                 Call(id, MoveFunction(mid, fid), args) => {
                     // Rewrite to associated spec function
-                    let spec_fun_id =
-                        self.function_mapping
-                            .get(&mid.qualified(*fid))
-                            .expect(&format!(
+                    let spec_fun_id = self
+                        .function_mapping
+                        .get(&mid.qualified(*fid))
+                        .unwrap_or_else(|| {
+                            panic!(
                                 "associated spec fun for {}",
                                 self.env.get_function(mid.qualified(*fid)).get_name_str()
-                            ));
+                            )
+                        });
 
                     Call(
                         *id,

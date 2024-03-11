@@ -97,7 +97,7 @@ pub fn run_move_prover_with_model<W: WriteColor>(
     pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
     pipeline.run(env);
 
-    debug!("global env before prover run: {}", env.dump_env_all());
+    debug!("global env before prover run:\n{}", env.dump_env_all());
 
     let build_duration = now.elapsed();
     check_errors(

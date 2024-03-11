@@ -24,7 +24,5 @@ module 0x42::M {
       }
     }
 
-    // Type instantiation for global memory operations is not a struct type
-    invariant exists<u64>(@0x0);
     invariant<T> global<T>(@0x1) == global<T>(@0x2);
 }
