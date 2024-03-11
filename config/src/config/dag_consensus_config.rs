@@ -94,7 +94,7 @@ impl Default for DagFetcherConfig {
             retry_interval_ms: 1000,
             rpc_timeout_ms: 5000,
             min_concurrent_responders: 2,
-            max_concurrent_responders: 10,
+            max_concurrent_responders: 6,
             max_concurrent_fetches: 50,
             request_channel_size: 100,
             response_channel_size: 100,
@@ -115,9 +115,9 @@ pub struct ReliableBroadcastConfig {
 impl Default for ReliableBroadcastConfig {
     fn default() -> Self {
         Self {
-            // A backoff policy that starts at 100ms and doubles each iteration up to 10secs.
+            // A backoff policy that starts at 200ms and doubles each iteration up to 10secs.
             backoff_policy_base_ms: 2,
-            backoff_policy_factor: 50,
+            backoff_policy_factor: 100,
             backoff_policy_max_delay_ms: 10000,
 
             rpc_timeout_ms: 5000,
@@ -129,12 +129,14 @@ impl Default for ReliableBroadcastConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct DagRoundStateConfig {
     pub adaptive_responsive_minimum_wait_time_ms: u64,
+    pub wait_voting_power_pct: usize,
 }
 
 impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
-            adaptive_responsive_minimum_wait_time_ms: 500,
+            adaptive_responsive_minimum_wait_time_ms: 5000,
+            wait_voting_power_pct: 90,
         }
     }
 }

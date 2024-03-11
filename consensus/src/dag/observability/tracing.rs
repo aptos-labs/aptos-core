@@ -21,6 +21,7 @@ pub enum RoundStage {
     NodeBroadcastedAll,
     CertifiedNodeBroadcasted,
     StrongLinkReceived,
+    VotingPowerMet,
     Finished,
 }
 
