@@ -7,6 +7,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         use aptos_framework::chain_status;
         use aptos_framework::staking_config;
         use aptos_framework::reconfiguration;
+        pragma verify_duration_estimate = 120;
         requires exists<reconfiguration::Configuration>(@aptos_framework);
         requires chain_status::is_operating();
         include stake::ResourceRequirement;
