@@ -9,6 +9,7 @@ use crate::{
     context::{api_spawn_blocking, Context, FunctionStats},
     failpoint::fail_point_poem,
     generate_error_response, generate_success_response, metrics,
+    metrics::WAIT_TRANSACTION_GAUGE,
     page::Page,
     response::{
         api_disabled, api_forbidden, transaction_not_found_by_hash,
@@ -28,6 +29,7 @@ use aptos_api_types::{
     MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
+use aptos_logger::prelude::*;
 use aptos_types::{
     account_config::CoinStoreResource,
     mempool_status::MempoolStatusCode,
@@ -44,7 +46,7 @@ use poem_openapi::{
     payload::Json,
     ApiRequest, OpenApi,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -207,6 +209,52 @@ impl TransactionsApi {
             .check_api_output_enabled("Get transactions by hash", &accept_type)?;
         self.get_transaction_by_hash_inner(&accept_type, txn_hash.0)
             .await
+    }
+
+    /// Wait for transaction by hash
+    ///
+    /// Same as /transactions/by_hash, but will wait for the transaction to be committed. To be used as a long poll
+    /// on clients (the "long" poll will return on the order of several seconds, according to the server configuration).
+    /// The request will return immediately once the committed transaction is found.
+    /// If the committed transaction is not found within the timeout, a 404 will be returned.
+    /// In case of other errors, the request will return immediately with the error.
+    #[oai(
+        path = "/transactions/wait_by_hash/:txn_hash",
+        method = "get",
+        operation_id = "wait_transaction_by_hash",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn wait_transaction_by_hash(
+        &self,
+        accept_type: AcceptType,
+        /// Hash of transaction to retrieve
+        txn_hash: Path<HashValue>,
+        // TODO: Use a new request type that can't return 507.
+    ) -> BasicResultWith404<Transaction> {
+        fail_point_poem("endpoint_wait_transaction_by_hash")?;
+        self.context
+            .check_api_output_enabled("Get transactions by hash", &accept_type)?;
+
+        let start_time = std::time::Instant::now();
+        WAIT_TRANSACTION_GAUGE.inc();
+        let result = self
+            .wait_transaction_by_hash_inner(
+                &accept_type,
+                txn_hash.0,
+                self.context.node_config.api.wait_by_hash_timeout_ms,
+                self.context.node_config.api.wait_by_hash_poll_interval_ms,
+            )
+            .await;
+        WAIT_TRANSACTION_GAUGE.dec();
+        sample!(
+            SampleRate::Duration(Duration::from_secs(60)),
+            info!(
+                "get_transaction_by_hash long poll result: {}, duration ms: {}",
+                result.is_ok(),
+                start_time.elapsed().as_millis()
+            )
+        );
+        result
     }
 
     /// Get transaction by version
@@ -686,6 +734,49 @@ impl TransactionsApi {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
             },
+        }
+    }
+
+    async fn wait_transaction_by_hash_inner(
+        &self,
+        accept_type: &AcceptType,
+        hash: HashValue,
+        wait_by_hash_timeout_ms: u64,
+        wait_by_hash_poll_interval_ms: u64,
+    ) -> BasicResultWith404<Transaction> {
+        let start_time = std::time::Instant::now();
+        loop {
+            let context = self.context.clone();
+            let accept_type = accept_type.clone();
+
+            let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
+
+            let txn_data = self
+                .get_by_hash(hash.into(), &ledger_info)
+                .await
+                .context(format!("Failed to get transaction by hash {}", hash))
+                .map_err(|err| {
+                    BasicErrorWith404::internal_with_code(
+                        err,
+                        AptosErrorCode::InternalError,
+                        &ledger_info,
+                    )
+                })?
+                .context(format!("Failed to find transaction with hash: {}", hash))
+                .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
+
+            if let TransactionData::Pending(_) = txn_data {
+                if (start_time.elapsed().as_millis() as u64) < wait_by_hash_timeout_ms {
+                    tokio::time::sleep(Duration::from_millis(wait_by_hash_poll_interval_ms)).await;
+                    continue;
+                }
+            }
+
+            let api = self.clone();
+            return api_spawn_blocking(move || {
+                api.get_transaction_inner(&accept_type, txn_data, &ledger_info)
+            })
+            .await;
         }
     }
 
