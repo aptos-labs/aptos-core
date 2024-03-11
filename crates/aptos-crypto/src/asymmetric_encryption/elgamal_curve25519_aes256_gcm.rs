@@ -12,9 +12,11 @@ use aes_gcm::{
     },
     AeadCore, Aes256Gcm, Key, KeyInit,
 };
-use anyhow::{anyhow, bail, ensure};
-use curve25519_dalek::{edwards::CompressedEdwardsY, scalar::Scalar};
-use curve25519_dalek::edwards::EdwardsPoint;
+use anyhow::{anyhow, ensure};
+use curve25519_dalek::{
+    edwards::{CompressedEdwardsY, EdwardsPoint},
+    scalar::Scalar,
+};
 use rand_core::{CryptoRng, RngCore};
 use sha3::{Digest, Sha3_256};
 
@@ -59,7 +61,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
 
         let aes_key_g1 = Curve25519::rand_element(main_rng);
         let (elgamal_ciphertext_0, elgamal_ciphertext_1) =
-            elgamal::encrypt::<Curve25519, _>(main_rng, &pk, &aes_key_g1);
+            elgamal::encrypt::<Curve25519, _>(main_rng, pk, &aes_key_g1);
         let aes_key_bytes = Self::hash_group_element_to_aes_key(&aes_key_g1.compress());
         let key = Key::<Aes256Gcm>::from_slice(aes_key_bytes.as_slice());
         let cipher = Aes256Gcm::new(key);
@@ -86,7 +88,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
             nonce_bytes,                // 12 bytes
             aes_ciphertext,             // variable length
         ]
-            .concat();
+        .concat();
 
         Ok(serialized)
     }
@@ -118,7 +120,7 @@ impl AsymmetricEncryption for ElGamalCurve25519Aes256Gcm {
             "ElGamalCurve25519Aes256Gcm dec failed with non-prime-order c1"
         );
 
-        let aes_key_element = elgamal::decrypt::<Curve25519>(&sk, &c0, &c1).compress();
+        let aes_key_element = elgamal::decrypt::<Curve25519>(sk, &c0, &c1).compress();
         let aes_key_bytes = Self::hash_group_element_to_aes_key(&aes_key_element);
         let key = Key::<Aes256Gcm>::from_slice(aes_key_bytes.as_slice());
         let cipher = Aes256Gcm::new(key);
@@ -143,13 +145,9 @@ mod tests {
         let (sk, pk) = ElGamalCurve25519Aes256Gcm::key_gen(&mut main_rng);
         let msg = b"hello world again and again and again and again and again and again and again"
             .to_vec();
-        let ciphertext = ElGamalCurve25519Aes256Gcm::enc(
-            &mut main_rng,
-            &mut aead_rng,
-            &pk,
-            msg.as_slice(),
-        )
-            .unwrap();
+        let ciphertext =
+            ElGamalCurve25519Aes256Gcm::enc(&mut main_rng, &mut aead_rng, &pk, msg.as_slice())
+                .unwrap();
         assert_eq!(
             msg,
             ElGamalCurve25519Aes256Gcm::dec(&sk, ciphertext.as_slice()).unwrap()

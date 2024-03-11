@@ -85,18 +85,18 @@ pub struct PepperResponse {
 /// - `epk` variant is `EphemeralPublicKey::Ed25519`.
 /// - The pepper output is the `BLS12381_G1_BLS` VUF output of the input, encrypted by `epk`, wrapped in type `PepperResponseV1`.
 #[derive(Debug, Deserialize, Serialize)]
-pub struct PepperRequestV1{
+pub struct PepperRequestV1 {
     #[serde(rename = "jwt_b64")]
     pub jwt: String,
     #[serde(
-    serialize_with = "serialize_epk_to_hex",
-    deserialize_with = "deserialize_epk_from_hex"
+        serialize_with = "serialize_epk_to_hex",
+        deserialize_with = "deserialize_epk_from_hex"
     )]
     pub epk: EphemeralPublicKey,
     pub exp_date_secs: u64,
     #[serde(
-    serialize_with = "serialize_bytes_to_hex",
-    deserialize_with = "deserialize_bytes_from_hex"
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
     )]
     pub epk_blinder: Vec<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -110,8 +110,8 @@ pub struct PepperRequestV1{
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PepperResponseV1 {
     #[serde(
-    serialize_with = "serialize_bytes_to_hex",
-    deserialize_with = "deserialize_bytes_from_hex"
+        serialize_with = "serialize_bytes_to_hex",
+        deserialize_with = "deserialize_bytes_from_hex"
     )]
     pub signature_encrypted: Vec<u8>, // unique BLS signature encrypted
 }

@@ -1,17 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_keyless_pepper_common::{BadPepperRequestError, PepperRequest, PepperRequestV1, PepperResponse};
-use aptos_keyless_pepper_service::{about::ABOUT_JSON, jwk, process_v0, vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK}, ProcessingFailure::{BadRequest, InternalError}, process_v1, ProcessingFailure};
-use hyper::{header::{
-    ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
-    ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, CONTENT_TYPE,
-}, service::{make_service_fn, service_fn}, Body, Method, Server, StatusCode, Request, Response};
+use aptos_keyless_pepper_common::BadPepperRequestError;
+use aptos_keyless_pepper_service::{
+    about::ABOUT_JSON,
+    jwk, process_v0, process_v1,
+    vuf_keys::{PEPPER_VUF_VERIFICATION_KEY_JSON, VUF_SK},
+    ProcessingFailure,
+    ProcessingFailure::{BadRequest, InternalError},
+};
+use hyper::{
+    header::{
+        ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
+        ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, CONTENT_TYPE,
+    },
+    service::{make_service_fn, service_fn},
+    Body, Method, Request, Response, Server, StatusCode,
+};
 use log::{info, LevelFilter};
-use std::{convert::Infallible, net::SocketAddr, ops::Deref, time::Duration};
-use std::fmt::Debug;
-use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
+use std::{convert::Infallible, fmt::Debug, net::SocketAddr, ops::Deref, time::Duration};
 
 async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
     let origin = req
@@ -24,15 +32,13 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
         (&Method::GET, "/about") => {
             build_response(origin, StatusCode::OK, ABOUT_JSON.deref().clone())
         },
-        (&Method::GET, "/v0/vuf-pub-key") | (&Method::GET, "/v1/vuf-pub-key") => {
-            build_response(origin, StatusCode::OK, PEPPER_VUF_VERIFICATION_KEY_JSON.deref().clone())
-        },
-        (&Method::POST, "/v0/fetch") => {
-            handle_fetch_common(origin, req, process_v0).await
-        },
-        (&Method::POST, "/v1/fetch") => {
-            handle_fetch_common(origin, req, process_v1).await
-        },
+        (&Method::GET, "/v0/vuf-pub-key") | (&Method::GET, "/v1/vuf-pub-key") => build_response(
+            origin,
+            StatusCode::OK,
+            PEPPER_VUF_VERIFICATION_KEY_JSON.deref().clone(),
+        ),
+        (&Method::POST, "/v0/fetch") => handle_fetch_common(origin, req, process_v0).await,
+        (&Method::POST, "/v1/fetch") => handle_fetch_common(origin, req, process_v1).await,
         (&Method::OPTIONS, _) => hyper::Response::builder()
             .status(StatusCode::OK)
             .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
@@ -87,7 +93,11 @@ async fn main() {
     }
 }
 
-async fn handle_fetch_common<PREQ, PRES>(origin: String, req: Request<Body>, process_func: fn(PREQ) -> Result<PRES, ProcessingFailure>) -> Response<Body>
+async fn handle_fetch_common<PREQ, PRES>(
+    origin: String,
+    req: Request<Body>,
+    process_func: fn(PREQ) -> Result<PRES, ProcessingFailure>,
+) -> Response<Body>
 where
     PREQ: Debug + Serialize + DeserializeOwned,
     PRES: Debug + Serialize,
@@ -108,7 +118,7 @@ where
             serde_json::to_string_pretty(&BadPepperRequestError {
                 message: err.to_string(),
             })
-                .unwrap(),
+            .unwrap(),
         ),
         Ok(Err(InternalError(_))) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
         Err(err) => (
@@ -116,7 +126,7 @@ where
             serde_json::to_string_pretty(&BadPepperRequestError {
                 message: err.to_string(),
             })
-                .unwrap(),
+            .unwrap(),
         ),
     };
 

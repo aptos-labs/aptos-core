@@ -4,7 +4,6 @@
 
 use aes_gcm::aead::rand_core::{CryptoRng as AeadCryptoRng, RngCore as AeadRngCore};
 use rand_core::{CryptoRng, RngCore};
-use crate::ed25519::PublicKey;
 
 /// Implement this to define an asymmetric encryption scheme.
 pub trait AsymmetricEncryption {

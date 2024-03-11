@@ -1,8 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::ed25519::Ed25519PublicKey;
-use aptos_keyless_pepper_common::{jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, PepperResponseV1, PepperRequestV1};
+use aptos_crypto::{
+    asymmetric_encryption::{
+        elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption,
+    },
+    ed25519::Ed25519PublicKey,
+};
+use aptos_keyless_pepper_common::{
+    jwt, vuf, vuf::VUF, PepperInput, PepperRequestV1, PepperResponseV1, PepperV0VufPubKey,
+};
 use aptos_types::{
     keyless::{test_utils::get_sample_esk, Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
@@ -14,8 +21,6 @@ use std::{
     io::stdin,
     time::{SystemTime, UNIX_EPOCH},
 };
-use aptos_crypto::asymmetric_encryption::AsymmetricEncryption;
-use aptos_crypto::asymmetric_encryption::elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm;
 
 const TEST_JWT: &str = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjU1YzE4OGE4MzU0NmZjMTg4ZTUxNTc2YmE3MjgzNmUwNjAwZThiNzMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJhenAiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJhdWQiOiI0MDc0MDg3MTgxOTIuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTE2Mjc3NzI0NjA3NTIzNDIzMTIiLCJhdF9oYXNoIjoiOHNGRHVXTXlURkVDNWl5Q1RRY2F3dyIsIm5vbmNlIjoiMTE3NjI4MjY1NzkyNTY5MTUyNDYzNzU5MTE3MjkyNjg5Nzk3NzQzNzI2ODUwNjI5ODI2NDYxMDYxMjkxMDAzMjE1OTk2MjczMTgxNSIsIm5hbWUiOiJPbGl2ZXIgSGUiLCJnaXZlbl9uYW1lIjoiT2xpdmVyIiwiZmFtaWx5X25hbWUiOiJIZSIsImxvY2FsZSI6ImVuIiwiaWF0IjoxNzA4OTIwNzY3LCJleHAiOjE3MDg5MjQzNjd9.j6qdaQDaUcD5uhbTp3jWfpLlSACkVLlYQZvKZG2rrmLJOAmcz5ADN8EtIR_JHuTUWvciDOmEdF1w2fv7MseNmKPEgzrkASsfYmk0H50wVn1R9lGfXCkklr3V_hzIHA7jSFw0c1_--epHjBa7Uxlfe0xAV3pnbl7hmFrmin_HFAfw0_xQP-ohsjsnhxiviDgESychRSpwJZG_HBm-AHGDJ3lNTF2fYdsL1Vr8CYogBNQG_oqTLhipEiGS01eWjw7s02MydsKFIA3WhYu5HxUg8223iVdGq7dBMM8y6gFncabBEOHRnaZ1w_5jKlmX-m7bus7bHTDbAzjkmxNFqD-pPw";
 
@@ -164,7 +169,9 @@ async fn main() {
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponseV1 { signature_encrypted } = pepper_response;
+    let PepperResponseV1 {
+        signature_encrypted,
+    } = pepper_response;
     let esk_scalar = esk.derive_scalar();
     let pepper = ElGamalCurve25519Aes256Gcm::dec(&esk_scalar, &signature_encrypted).unwrap();
     println!();
