@@ -12,7 +12,7 @@ module aptos_framework::randomness_config {
     const EINVALID_CONFIG_VARIANT: u64 = 1;
 
     /// The configuration of the on-chain randomness feature.
-    struct RandomnessConfig has drop, key, store {
+    struct RandomnessConfig has copy, drop, key, store {
         /// A config variant packed as an `Any`.
         /// Currently the variant type is one of the following.
         /// - `ConfigOff`
@@ -78,6 +78,15 @@ module aptos_framework::randomness_config {
                 secrecy_threshold,
                 reconstruction_threshold
             } )
+        }
+    }
+
+    /// Get the currently effective randomness configuration object.
+    public fun current(): RandomnessConfig acquires RandomnessConfig {
+        if (exists<RandomnessConfig>(@aptos_framework)) {
+            *borrow_global<RandomnessConfig>(@aptos_framework)
+        } else {
+            new_off()
         }
     }
 

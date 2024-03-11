@@ -181,7 +181,9 @@ impl DKGRoundingProfile {
             validator_weights: vec![1; num_validators],
             secrecy_threshold_in_stake_ratio,
             reconstruct_threshold_in_stake_ratio,
-            reconstruct_threshold_in_weights: (U64F64::from_num(num_validators) * secrecy_threshold_in_stake_ratio).to_num::<u64>(),
+            reconstruct_threshold_in_weights: (U64F64::from_num(num_validators)
+                * secrecy_threshold_in_stake_ratio)
+                .to_num::<u64>(),
         }
     }
 }

@@ -15,7 +15,7 @@ impl FixedPoint64MoveStruct {
 
     pub fn from_u64f64(arg: U64F64) -> Self {
         Self {
-            value: arg.to_bits()
+            value: arg.to_bits(),
         }
     }
 }

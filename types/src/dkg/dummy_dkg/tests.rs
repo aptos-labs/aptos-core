@@ -5,12 +5,12 @@ use crate::{
         dummy_dkg::{DummyDKG, DummyDKGTranscript, DummySecret},
         DKGSessionMetadata, DKGTrait,
     },
+    on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
 use aptos_crypto::{bls12381, Uniform};
 use move_core_types::account_address::AccountAddress;
 use rand::thread_rng;
-use crate::on_chain_config::OnChainRandomnessConfig;
 
 struct DealerState {
     addr: AccountAddress,
@@ -96,11 +96,12 @@ fn test_dummy_dkg_correctness() {
     // Now imagine DKG starts.
     let dkg_session_metadata = DKGSessionMetadata {
         dealer_epoch: 999,
+        randomness_config: OnChainRandomnessConfig::default_enabled(),
         dealer_validator_set: dealer_infos.clone(),
         target_validator_set: new_validator_infos.clone(),
     };
 
-    let pub_params = DummyDKG::new_public_params(&OnChainRandomnessConfig::Off,  &dkg_session_metadata);
+    let pub_params = DummyDKG::new_public_params(&dkg_session_metadata);
     // Every current validator generates a transcript.
     for (idx, dealer_state) in dealer_states.iter_mut().enumerate() {
         let trx = DummyDKG::generate_transcript(
