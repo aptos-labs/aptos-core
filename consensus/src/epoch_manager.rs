@@ -1315,7 +1315,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(
             QueueStyle::FIFO,
-            50,
+            self.dag_config.incoming_rpc_channel_per_key_size,
             Some(&crate::dag::observability::counters::DAG_RPC_CHANNEL),
         );
         self.dag_rpc_tx = Some(dag_rpc_tx);
