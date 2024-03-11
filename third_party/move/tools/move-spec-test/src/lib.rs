@@ -143,11 +143,7 @@ pub fn run_spec_test(
             spec_report.increment_mutants_killed(original_file, qname.as_str());
         } else {
             trace!("Mutant hasn't been killed!");
-            spec_report.add_mutants_alive_diff(
-                original_file,
-                qname.as_str(),
-                elem.get_diff(),
-            );
+            spec_report.add_mutants_alive_diff(original_file, qname.as_str(), elem.get_diff());
         }
     }
 

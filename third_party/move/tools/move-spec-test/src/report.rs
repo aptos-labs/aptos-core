@@ -103,12 +103,11 @@ impl Report {
             .entry(path.to_path_buf())
             .or_insert(vec![MutantStats::new(module_func)]);
 
-        match entry.iter_mut().find(|s| s.module_func == module_func) {
-            Some(stat) => increment(stat),
-            None => {
-                entry.push(MutantStats::new(module_func));
-                increment(entry.last_mut().unwrap());
-            },
+        if let Some(stat) = entry.iter_mut().find(|s| s.module_func == module_func) {
+            increment(stat);
+        } else {
+            entry.push(MutantStats::new(module_func));
+            increment(entry.last_mut().unwrap());
         }
     }
 
@@ -247,7 +246,8 @@ mod tests {
         let entry = report.entries().get(&path).unwrap();
         assert!(entry
             .iter()
-            .any(|s| s.module_func == module_name && s.mutants_alive_diffs.contains(&diff.to_owned())));
+            .any(|s| s.module_func == module_name
+                && s.mutants_alive_diffs.contains(&diff.to_owned())));
     }
 
     #[test]
