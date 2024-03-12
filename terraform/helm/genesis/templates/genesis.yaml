@@ -75,6 +75,7 @@ subjects:
 
 ---
 
+{{- if .Values.enabled  }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -190,3 +191,4 @@ spec:
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}
       {{- end }}
+{{- end }}
