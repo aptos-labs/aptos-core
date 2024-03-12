@@ -3,12 +3,10 @@
 use std::str::FromStr;
 
 use crate::{
-    jwks::rsa::RSA_JWK,
-    keyless::{
+    jwks::rsa::RSA_JWK, keyless::{
         base64url_encode_str, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
         KeylessSignature,
-    },
-    serialize,
+    }, serialize
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
@@ -17,13 +15,24 @@ use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint::BigUint;
 use num_traits::{One, Zero};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_big_array::BigArray;
+
+use super::circuit_constants::MAX_EXTRA_FIELD_BYTES;
 
 // TODO(keyless): Some of this stuff, if not all, belongs to the aptos-crypto crate
 
 pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
+
+// When the extra_field is none, use this hash value which is equal to the hash of a single space string.
+static EMPTY_EXTRA_FIELD_HASH: Lazy<Fr> = Lazy::new(|| {
+    poseidon_bn254::pad_and_hash_string(
+        " ",
+        MAX_EXTRA_FIELD_BYTES as usize,
+    ).unwrap()
+});
 
 /// This will do the proper subgroup membership checks.
 pub fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine> {
@@ -245,8 +254,7 @@ pub fn get_public_inputs_hash(
         let (has_extra_field, extra_field_hash) = match &proof.extra_field {
             None => (
                 Fr::zero(),
-                // When extra_field is none, set the hash to the constant below which is equal to the hash of a single space string.
-                Fr::from_le_bytes_mod_order(&BigUint::from_str("8441624714246672702469557419929302030072955765775944993548127422079350103481")?.to_bytes_le())),
+                Lazy::force(&EMPTY_EXTRA_FIELD_HASH).clone()),
             Some(extra_field) => (
                 Fr::one(),
                 poseidon_bn254::pad_and_hash_string(
