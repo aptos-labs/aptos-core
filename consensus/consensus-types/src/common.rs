@@ -195,6 +195,14 @@ impl ProofWithDataWithTxnLimit {
     }
 }
 
+fn sum_max_txns_to_execute(m1: Option<usize>, m2: Option<usize>) -> Option<usize> {
+    match (m1, m2) {
+        (None, _) => m2,
+        (_, None) => m1,
+        (Some(m1), Some(m2)) => Some(m1 + m2),
+    }
+}
+
 /// The payload in block.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum Payload {
@@ -318,13 +326,7 @@ impl Payload {
                 let mut p3 = p1;
                 p3.extend(p2);
                 // TODO: What's the right logic here?
-                let m3 = if m1.is_none() {
-                    m2
-                } else if let Some(m2) = m2 {
-                    Some(m1.unwrap() + m2)
-                } else {
-                    m1
-                };
+                let m3 = sum_max_txns_to_execute(m1, m2);
                 Payload::QuorumStoreInlineHybrid(b3, p3, m3)
             },
             (Payload::QuorumStoreInlineHybrid(b1, p1, m1), Payload::InQuorumStore(p2)) => {
@@ -335,13 +337,7 @@ impl Payload {
             },
             (Payload::QuorumStoreInlineHybrid(b1, p1, m1), Payload::InQuorumStoreWithLimit(p2)) => {
                 // TODO: What's the right logic here?
-                let m3 = if m1.is_none() {
-                    p2.max_txns_to_execute
-                } else if let Some(m2) = p2.max_txns_to_execute {
-                    Some(m1.unwrap() + m2)
-                } else {
-                    m1
-                };
+                let m3 = sum_max_txns_to_execute(m1, p2.max_txns_to_execute);
                 let mut p3 = p1;
                 p3.extend(p2.proof_with_data);
                 Payload::QuorumStoreInlineHybrid(b1, p3, m3)
@@ -353,13 +349,7 @@ impl Payload {
             },
             (Payload::InQuorumStoreWithLimit(p1), Payload::QuorumStoreInlineHybrid(b2, p2, m2)) => {
                 // TODO: What's the right logic here?
-                let m3 = if p1.max_txns_to_execute.is_none() {
-                    m2
-                } else if m2.is_some() {
-                    Some(p1.max_txns_to_execute.unwrap() + m2.unwrap())
-                } else {
-                    p1.max_txns_to_execute
-                };
+                let m3 = sum_max_txns_to_execute(p1.max_txns_to_execute, m2);
                 let mut p3 = p1.proof_with_data;
                 p3.extend(p2);
                 Payload::QuorumStoreInlineHybrid(b2, p3, m3)
