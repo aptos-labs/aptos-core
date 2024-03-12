@@ -57,6 +57,7 @@ use aptos_types::{
 use aptos_vm::{
     block_executor::{AptosTransactionOutput, BlockAptosVM},
     data_cache::AsMoveResolver,
+    gas::get_gas_parameters,
     move_vm_ext::{AptosMoveResolver, MoveVmExt, SessionId},
     verifier, AptosVM, VMValidator,
 };
@@ -1100,13 +1101,30 @@ impl FakeExecutor {
         state_view: &impl AptosMoveResolver,
         features: Features,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
+        let (
+            gas_params_res,
+            storage_gas_params,
+            native_gas_params,
+            misc_gas_params,
+            gas_feature_version,
+        ) = get_gas_parameters(&features, state_view);
+
+        let gas_params = gas_params_res.unwrap();
+        let mut gas_meter =
+            MemoryTrackedGasMeter::new(StandardGasMeter::new(StandardGasAlgebra::new(
+                gas_feature_version,
+                gas_params.clone().vm,
+                storage_gas_params.unwrap(),
+                10000000000000,
+            )));
+
         let timed_features = TimedFeaturesBuilder::enable_all()
             .with_override_profile(TimedFeatureOverride::Testing)
             .build();
         let struct_constructors = features.is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let vm = MoveVmExt::new(
-            NativeGasParameters::zeros(),
-            MiscGasParameters::zeros(),
+            native_gas_params,
+            misc_gas_params,
             LATEST_GAS_FEATURE_VERSION,
             self.chain_id,
             features,
@@ -1131,7 +1149,7 @@ impl FakeExecutor {
                 entry_fn.function(),
                 entry_fn.ty_args().to_vec(),
                 args,
-                &mut UnmeteredGasMeter,
+                &mut gas_meter,
             )
             .map_err(|e| e.into_vm_status())?;
 
