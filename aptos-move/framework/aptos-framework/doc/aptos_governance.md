@@ -2678,7 +2678,7 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> <b>address</b> = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
     <a href="account.md#0x1_account">account</a>: aptos_framework

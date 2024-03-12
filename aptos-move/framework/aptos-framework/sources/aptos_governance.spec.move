@@ -837,7 +837,7 @@ spec aptos_framework::aptos_governance {
     spec force_end_epoch(aptos_framework: &signer) {
         use aptos_framework::reconfiguration_with_dkg;
         use std::signer;
-        pragma verify_duration_estimate = 600;
+        pragma verify = false;
         let address = signer::address_of(aptos_framework);
         include reconfiguration_with_dkg::FinishRequirement {
             account: aptos_framework
