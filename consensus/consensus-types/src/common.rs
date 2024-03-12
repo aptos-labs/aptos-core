@@ -133,20 +133,6 @@ impl ProofWithData {
         }
     }
 
-    // pub fn extend(self, other: ProofWithData) -> Self {
-    //     let other_data_status = other.status.lock().as_mut().unwrap().take();
-    //     let mut status = self.status.lock();
-    //     if status.is_none() {
-    //         *status = Some(other_data_status);
-    //     } else {
-    //         status.as_mut().unwrap().extend(other_data_status);
-    //     }
-    //     ProofWithData {
-    //         proofs: [self.proofs, other.proofs].concat(),
-    //         status: self.status,
-    //     }
-    // }
-
     pub fn extend(&mut self, other: ProofWithData) {
         let other_data_status = other.status.lock().as_mut().unwrap().take();
         self.proofs.extend(other.proofs);
@@ -199,21 +185,6 @@ impl ProofWithDataWithTxnLimit {
             max_txns_to_execute,
         }
     }
-
-    // pub fn extend(self, other: ProofWithDataWithTxnLimit) -> Self{
-    //     // InQuorumStoreWithLimit TODO: what is the right logic here ???
-    //     let new_max_txns_to_execute = if self.max_txns_to_execute.is_none() {
-    //         other.max_txns_to_execute
-    //     } else if other.max_txns_to_execute.is_some() {
-    //         Some(self.max_txns_to_execute.unwrap() + other.max_txns_to_execute.unwrap())
-    //     } else {
-    //         self.max_txns_to_execute
-    //     };
-    //     Self {
-    //         proof_with_data: self.proof_with_data.extend(other.proof_with_data),
-    //         max_txns_to_execute: self.max_txns_to_execute,
-    //     }
-    // }
 
     pub fn extend(&mut self, other: ProofWithDataWithTxnLimit) {
         self.proof_with_data.extend(other.proof_with_data);
