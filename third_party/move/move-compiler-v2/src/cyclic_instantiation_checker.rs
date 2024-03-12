@@ -87,7 +87,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
     ) -> bool {
         if let Operation::MoveFunction(mod_id, fun_id) = op {
             let callee_uninst = mod_id.qualified_inst(*fun_id, self.get_inst(*nid));
-            let callee = callee_uninst.instantiate(&insts);
+            let callee = callee_uninst.instantiate(insts);
             if *mod_id != self.mod_env.get_id() || self.def_not_recursive(callee.to_qualified_id())
             {
                 // skips if callee from another module (since there is no cyclic module dependency),

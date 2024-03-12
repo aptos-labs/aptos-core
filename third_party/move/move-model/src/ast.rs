@@ -1097,7 +1097,8 @@ impl ExpData {
             } else {
                 None
             }
-        }).is_some()
+        })
+        .is_some()
     }
 
     /// Visitor implementation uses `Option<()>` to implement short-cutting without verbosity.
