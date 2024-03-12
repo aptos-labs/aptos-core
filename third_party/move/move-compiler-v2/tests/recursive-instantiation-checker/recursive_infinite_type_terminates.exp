@@ -1,9 +1,12 @@
-error[E04019]: cyclic type instantiation
-   ┌─ tests/move_check/translated_ir_tests/move/generics/instantiation_loops/recursive_infinite_type_terminates.move:11:18
-   │
-11 │         unbox<T>(f<Box<T>>(n - 1, Box<T> { x }))
-   │                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │                  │ │
-   │                  │ The type parameter 'f::T' was instantiated with the type '0x8675309::M::Box<T>', which contains the type parameter 'f::T'. This recursive call causes the instantiation to recurse infinitely
-   │                  Invalid call to '0x8675309::M::f'
 
+Diagnostics:
+error: cyclic type instantiation
+   ┌─ tests/recursive-instantiation-checker/recursive_infinite_type_terminates.move:9:5
+   │
+ 9 │ ╭     fun f<T>(n: u64, x: T): T {
+10 │ │         if (n == 0) return x;
+11 │ │         unbox<T>(f<Box<T>>(n - 1, Box<T> { x }))
+12 │ │     }
+   │ ╰─────^
+   │
+   = f<T> calls f<M::Box<T>> at tests/recursive-instantiation-checker/recursive_infinite_type_terminates.move:9

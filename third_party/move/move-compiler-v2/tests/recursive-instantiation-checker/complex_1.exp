@@ -1,31 +1,37 @@
-error[E04019]: cyclic type instantiation
-   ┌─ tests/move_check/translated_ir_tests/move/generics/instantiation_loops/complex_1.move:10:9
-   │
-10 │         c<S<T2>, bool>()
-   │         ^^^^^^^^^^^^^^^^
-   │         │ │
-   │         │ The type parameter 'c::T1' was instantiated with the type '0x8675309::M::S<T2>', which contains the type parameter 'c::T2'. A cycle of recursive calls causes the instantiation to recurse infinitely
-   │         Invalid call to '0x8675309::M::c'
-   │         'b<_, c::T1>' calls 'c<0x8675309::M::S<c::T1>, _>'
-   ·
-14 │         c<u64, T1>();
-   │         ------------ 'c<c::T1, _>' calls 'c<_, c::T1>'
-15 │         d<T2>();
-   │         ------- 'c<_, c::T1>' calls 'd<c::T1>'
-   ·
-20 │         b<u64, T>()
-   │         ----------- 'd<c::T1>' calls 'b<_, c::T1>'
 
-error[E04019]: cyclic type instantiation
-   ┌─ tests/move_check/translated_ir_tests/move/generics/instantiation_loops/complex_1.move:31:9
+Diagnostics:
+error: cyclic type instantiation
+   ┌─ tests/recursive-instantiation-checker/complex_1.move:13:5
    │
-27 │         g<T>()
-   │         ------ 'f<f::T>' calls 'g<f::T>'
-   ·
-31 │         f<S<T>>()
-   │         ^^^^^^^^^
-   │         │ │
-   │         │ The type parameter 'g::T' was instantiated with the type '0x8675309::M::S<T>', which contains the type parameter 'f::T'. These mutually recursive calls causes the instantiation to recurse infinitely
-   │         Invalid call to '0x8675309::M::f'
-   │         'g<f::T>' calls 'f<0x8675309::M::S<f::T>>'
+13 │ ╭     fun c<T1, T2>() {
+14 │ │         c<u64, T1>();
+15 │ │         d<T2>();
+16 │ │         e<T2>()
+17 │ │     }
+   │ ╰─────^
+   │
+   = c<T1, T2> calls d<#1> at tests/recursive-instantiation-checker/complex_1.move:13
+   = d<#1> calls b<u64, T2> at tests/recursive-instantiation-checker/complex_1.move:15
+   = b<u64, T2> calls c<M::S<T2>, bool> at tests/recursive-instantiation-checker/complex_1.move:20
 
+error: cyclic type instantiation
+   ┌─ tests/recursive-instantiation-checker/complex_1.move:26:5
+   │
+26 │ ╭     fun f<T>() {
+27 │ │         g<T>()
+28 │ │     }
+   │ ╰─────^
+   │
+   = f<T> calls g<T> at tests/recursive-instantiation-checker/complex_1.move:26
+   = g<T> calls f<M::S<T>> at tests/recursive-instantiation-checker/complex_1.move:27
+
+error: cyclic type instantiation
+   ┌─ tests/recursive-instantiation-checker/complex_1.move:30:5
+   │
+30 │ ╭     fun g<T>() {
+31 │ │         f<S<T>>()
+32 │ │     }
+   │ ╰─────^
+   │
+   = g<T> calls f<M::S<T>> at tests/recursive-instantiation-checker/complex_1.move:30
+   = f<M::S<T>> calls g<M::S<T>> at tests/recursive-instantiation-checker/complex_1.move:31
