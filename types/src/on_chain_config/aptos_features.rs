@@ -100,6 +100,7 @@ pub enum FeatureFlag {
     /// AIP-105 (https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-105.md)
     NATIVE_MEMORY_OPERATIONS = 80,
     ENABLE_LOADER_V2 = 81,
+    ACCOUNT_ABSTRACTION = 82,
 }
 
 impl FeatureFlag {
@@ -179,6 +180,7 @@ impl FeatureFlag {
             FeatureFlag::NATIVE_MEMORY_OPERATIONS,
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::ENABLE_LOADER_V2,
+            FeatureFlag::ACCOUNT_ABSTRACTION,
         ]
     }
 }
@@ -252,6 +254,10 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {

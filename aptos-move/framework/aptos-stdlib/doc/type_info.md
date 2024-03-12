@@ -15,15 +15,12 @@
 -  [Function `type_name`](#0x1_type_info_type_name)
 -  [Function `chain_id_internal`](#0x1_type_info_chain_id_internal)
 -  [Function `size_of_val`](#0x1_type_info_size_of_val)
--  [Function `verify_type_of`](#0x1_type_info_verify_type_of)
--  [Function `verify_type_of_generic`](#0x1_type_info_verify_type_of_generic)
 -  [Specification](#@Specification_1)
     -  [Function `chain_id`](#@Specification_1_chain_id)
     -  [Function `type_of`](#@Specification_1_type_of)
     -  [Function `type_name`](#@Specification_1_type_name)
     -  [Function `chain_id_internal`](#@Specification_1_chain_id_internal)
     -  [Function `size_of_val`](#@Specification_1_size_of_val)
-    -  [Function `verify_type_of_generic`](#@Specification_1_verify_type_of_generic)
 
 
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
@@ -291,75 +288,18 @@ analysis of vector size dynamism.
 
 </details>
 
-<a id="0x1_type_info_verify_type_of"></a>
-
-## Function `verify_type_of`
-
-
-
-<pre><code>#[verify_only]
-<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of">verify_type_of</a>()
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of">verify_type_of</a>() {
-    <b>let</b> <a href="type_info.md#0x1_type_info">type_info</a> = <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>&gt;();
-    <b>let</b> account_address = <a href="type_info.md#0x1_type_info_account_address">account_address</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
-    <b>let</b> module_name = <a href="type_info.md#0x1_type_info_module_name">module_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
-    <b>let</b> struct_name = <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
-    <b>spec</b> {
-        <b>assert</b> account_address == @aptos_std;
-        <b>assert</b> module_name == b"<a href="type_info.md#0x1_type_info">type_info</a>";
-        <b>assert</b> struct_name == b"<a href="type_info.md#0x1_type_info_TypeInfo">TypeInfo</a>";
-    };
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_type_info_verify_type_of_generic"></a>
-
-## Function `verify_type_of_generic`
-
-
-
-<pre><code>#[verify_only]
-<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;() {
-    <b>let</b> <a href="type_info.md#0x1_type_info">type_info</a> = <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;();
-    <b>let</b> account_address = <a href="type_info.md#0x1_type_info_account_address">account_address</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
-    <b>let</b> module_name = <a href="type_info.md#0x1_type_info_module_name">module_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
-    <b>let</b> struct_name = <a href="type_info.md#0x1_type_info_struct_name">struct_name</a>(&<a href="type_info.md#0x1_type_info">type_info</a>);
-    <b>spec</b> {
-        <b>assert</b> account_address == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().account_address;
-        <b>assert</b> module_name == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().module_name;
-        <b>assert</b> struct_name == <a href="type_info.md#0x1_type_info_type_of">type_of</a>&lt;T&gt;().struct_name;
-    };
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+
+<a id="0x1_type_info_spec_is_struct"></a>
+
+
+<pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;(): bool;
+</code></pre>
+
 
 
 <a id="@Specification_1_chain_id"></a>
@@ -451,32 +391,6 @@ analysis of vector size dynamism.
 
 
 <pre><code><b>ensures</b> result == <a href="type_info.md#0x1_type_info_spec_size_of_val">spec_size_of_val</a>&lt;T&gt;(val_ref);
-</code></pre>
-
-
-
-<a id="@Specification_1_verify_type_of_generic"></a>
-
-### Function `verify_type_of_generic`
-
-
-<pre><code>#[verify_only]
-<b>fun</b> <a href="type_info.md#0x1_type_info_verify_type_of_generic">verify_type_of_generic</a>&lt;T&gt;()
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> !<a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;();
-</code></pre>
-
-
-
-
-<a id="0x1_type_info_spec_is_struct"></a>
-
-
-<pre><code><b>native</b> <b>fun</b> <a href="type_info.md#0x1_type_info_spec_is_struct">spec_is_struct</a>&lt;T&gt;(): bool;
 </code></pre>
 
 

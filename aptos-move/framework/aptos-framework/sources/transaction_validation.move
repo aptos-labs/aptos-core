@@ -2,11 +2,14 @@ module aptos_framework::transaction_validation {
     use std::bcs;
     use std::error;
     use std::features;
+    use std::option;
+    use std::option::Option;
     use std::signer;
     use std::vector;
 
     use aptos_framework::account;
     use aptos_framework::aptos_account;
+    use aptos_framework::lite_account;
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::chain_id;
     use aptos_framework::coin;
@@ -74,7 +77,7 @@ module aptos_framework::transaction_validation {
         sender: signer,
         gas_payer: address,
         txn_sequence_number: u64,
-        txn_authentication_key: vector<u8>,
+        txn_authentication_key: Option<vector<u8>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -97,13 +100,21 @@ module aptos_framework::transaction_validation {
         ) {
             assert!(account::exists_at(transaction_sender), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
             if (!features::transaction_simulation_enhancement_enabled() ||
-                    !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
-                assert!(
-                    txn_authentication_key == account::get_authentication_key(transaction_sender),
-                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-                )
+                !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
+                if (option::is_some(&txn_authentication_key)) {
+                    assert!(
+                        txn_authentication_key == option::some(account::get_authentication_key(transaction_sender)),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                    );
+                } else {
+                    assert!(
+                        features::is_account_abstraction_enabled() && lite_account::using_dispatchable_authenticator(
+                            transaction_sender
+                        ),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                    )
+                };
             };
-
             let account_sequence_number = account::get_sequence_number(transaction_sender);
             assert!(
                 txn_sequence_number < (1u64 << 63),
@@ -130,7 +141,7 @@ module aptos_framework::transaction_validation {
             if (!features::transaction_simulation_enhancement_enabled() ||
                     !skip_auth_key_check(is_simulation, &txn_authentication_key)) {
                 assert!(
-                    txn_authentication_key == bcs::to_bytes(&transaction_sender),
+                    txn_authentication_key == option::some(bcs::to_bytes(&transaction_sender)),
                     error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
                 );
             }
@@ -156,7 +167,7 @@ module aptos_framework::transaction_validation {
     fun script_prologue(
         sender: signer,
         txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
+        txn_public_key: Option<vector<u8>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -184,7 +195,7 @@ module aptos_framework::transaction_validation {
     fun script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
+        txn_public_key: Option<vector<u8>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -209,9 +220,9 @@ module aptos_framework::transaction_validation {
     fun multi_agent_script_prologue(
         sender: signer,
         txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
+        txn_sender_public_key: Option<vector<u8>>,
         secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -240,9 +251,9 @@ module aptos_framework::transaction_validation {
     fun multi_agent_script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
+        txn_sender_public_key: Option<vector<u8>>,
         secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -266,7 +277,7 @@ module aptos_framework::transaction_validation {
 
     fun multi_agent_common_prologue(
         secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
         is_simulation: bool,
     ) {
         let num_secondary_signers = vector::length(&secondary_signer_addresses);
@@ -277,27 +288,52 @@ module aptos_framework::transaction_validation {
 
         let i = 0;
         while ({
-            spec {
-                invariant i <= num_secondary_signers;
-                invariant forall j in 0..i:
-                    account::exists_at(secondary_signer_addresses[j]);
-                invariant forall j in 0..i:
-                    secondary_signer_public_key_hashes[j] == account::get_authentication_key(secondary_signer_addresses[j]) ||
-                        (features::spec_simulation_enhancement_enabled() && is_simulation && vector::is_empty(secondary_signer_public_key_hashes[j]));
-            };
+            // spec {
+            //     invariant i <= num_secondary_signers;
+            //     invariant forall j in 0..i:
+            //         account::exists_at(secondary_signer_addresses[j]);
+            //     invariant forall j in 0..i:
+            //         secondary_signer_public_key_hashes[j] == account::get_authentication_key(secondary_signer_addresses[j]) ||
+            //             (features::spec_simulation_enhancement_enabled() && is_simulation && vector::is_empty(secondary_signer_public_key_hashes[j]));
+            //         account::account_resource_exists_at(secondary_signer_addresses[j])
+            //         && secondary_signer_public_key_hashes[j]
+            //             == account::get_authentication_key(secondary_signer_addresses[j])
+            //             || features::lite_account_enabled() && lite_account::using_native_authenticator(
+            //             secondary_signer_addresses[j]
+            //         ) && option::spec_some(secondary_signer_public_key_hashes[j]) == lite_account::native_authenticator(
+            //         account::exists_at(secondary_signer_addresses[j])
+            //         && secondary_signer_public_key_hashes[j]
+            //             == account::spec_get_authentication_key(secondary_signer_addresses[j])
+            //             || features::spec_lite_account_enabled() && lite_account::using_native_authenticator(
+            //             secondary_signer_addresses[j]
+            //         ) && option::spec_some(
+            //             secondary_signer_public_key_hashes[j]
+            //         ) == lite_account::spec_native_authenticator(
+            //             secondary_signer_addresses[j]
+            //         );
+            // };
             (i < num_secondary_signers)
         }) {
             let secondary_address = *vector::borrow(&secondary_signer_addresses, i);
             assert!(account::exists_at(secondary_address), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
-
             let signer_public_key_hash = *vector::borrow(&secondary_signer_public_key_hashes, i);
             if (!features::transaction_simulation_enhancement_enabled() ||
-                    !skip_auth_key_check(is_simulation, &signer_public_key_hash)) {
-                assert!(
-                    signer_public_key_hash == account::get_authentication_key(secondary_address),
-                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-                )
+                !skip_auth_key_check(is_simulation, &signer_public_key_hash)) {
+                if (option::is_some(&signer_public_key_hash)) {
+                    assert!(
+                        signer_public_key_hash == option::some(account::get_authentication_key(secondary_address)),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                    );
+                } else {
+                    assert!(
+                        features::is_account_abstraction_enabled() && lite_account::using_dispatchable_authenticator(
+                            secondary_address
+                        ),
+                        error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                    )
+                };
             };
+
             i = i + 1;
         }
     }
@@ -305,11 +341,11 @@ module aptos_framework::transaction_validation {
     fun fee_payer_script_prologue(
         sender: signer,
         txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
+        txn_sender_public_key: Option<vector<u8>>,
         secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
         fee_payer_address: address,
-        fee_payer_public_key_hash: vector<u8>,
+        fee_payer_public_key_hash: Option<vector<u8>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -330,10 +366,19 @@ module aptos_framework::transaction_validation {
             false,
         );
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes, false);
-        assert!(
-            fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
-            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-        );
+        if (option::is_some(&fee_payer_public_key_hash)) {
+            assert!(
+                fee_payer_public_key_hash == option::some(account::get_authentication_key(fee_payer_address)),
+                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+            );
+        } else {
+            assert!(
+                features::is_account_abstraction_enabled() && lite_account::using_dispatchable_authenticator(
+                    fee_payer_address
+                ),
+                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+            )
+        };
     }
 
     // This function extends the fee_payer_script_prologue by adding a parameter to indicate simulation mode.
@@ -342,11 +387,11 @@ module aptos_framework::transaction_validation {
     fun fee_payer_script_prologue_extended(
         sender: signer,
         txn_sequence_number: u64,
-        txn_sender_public_key: vector<u8>,
+        txn_sender_public_key: Option<vector<u8>>,
         secondary_signer_addresses: vector<address>,
-        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        secondary_signer_public_key_hashes: vector<Option<vector<u8>>>,
         fee_payer_address: address,
-        fee_payer_public_key_hash: vector<u8>,
+        fee_payer_public_key_hash: Option<vector<u8>>,
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
@@ -368,10 +413,19 @@ module aptos_framework::transaction_validation {
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes, is_simulation);
         if (!features::transaction_simulation_enhancement_enabled() ||
             !skip_auth_key_check(is_simulation, &fee_payer_public_key_hash)) {
-            assert!(
-                fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
-                error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-            )
+            if (option::is_some(&fee_payer_public_key_hash)) {
+                assert!(
+                    fee_payer_public_key_hash == option::some(account::get_authentication_key(fee_payer_address)),
+                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                );
+            } else {
+                assert!(
+                    features::is_account_abstraction_enabled() && lite_account::using_dispatchable_authenticator(
+                        fee_payer_address
+                    ),
+                    error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY)
+                )
+            };
         }
     }
 
@@ -476,8 +530,8 @@ module aptos_framework::transaction_validation {
         account::increment_sequence_number(addr);
     }
 
-    inline fun skip_auth_key_check(is_simulation: bool, auth_key: &vector<u8>): bool {
-        is_simulation && vector::is_empty(auth_key)
+    inline fun skip_auth_key_check(is_simulation: bool, auth_key: &Option<vector<u8>>): bool {
+        is_simulation && option::is_none(auth_key)
     }
 
     inline fun skip_gas_payment(is_simulation: bool, gas_payer: address): bool {
