@@ -641,7 +641,7 @@ impl EntryPoints {
                     vec![TypeTag::Struct(Box::new(StructTag {
                         address: *other.expect("Must provide other"),
                         module: ident_str!("assets").to_owned(),
-                        name: ident_str!("AC").to_owned(),
+                        name: ident_str!("AAC").to_owned(),
                         type_params: vec![],
                     })), TypeTag::Struct(Box::new(StructTag {
                         address: *other.expect("Must provide other"),
@@ -658,7 +658,7 @@ impl EntryPoints {
                 vec![TypeTag::Struct(Box::new(StructTag {
                     address: *other.expect("Must provide other"),
                     module: ident_str!("assets").to_owned(),
-                    name: ident_str!("AC").to_owned(),
+                    name: ident_str!("AAC").to_owned(),
                     type_params: vec![],
                 })), TypeTag::Struct(Box::new(StructTag {
                     address: *other.expect("Must provide other"),
@@ -677,7 +677,7 @@ impl EntryPoints {
                     vec![TypeTag::Struct(Box::new(StructTag {
                         address: *other.expect("Must provide other"),
                         module: ident_str!("assets").to_owned(),
-                        name: ident_str!("AC").to_owned(),
+                        name: ident_str!("AAC").to_owned(),
                         type_params: vec![],
                     })), TypeTag::Struct(Box::new(StructTag {
                         address: *other.expect("Must provide other"),
@@ -700,7 +700,7 @@ impl EntryPoints {
                     vec![TypeTag::Struct(Box::new(StructTag {
                         address: *other.expect("Must provide other"),
                         module: ident_str!("assets").to_owned(),
-                        name: ident_str!("AC").to_owned(),
+                        name: ident_str!("AAC").to_owned(),
                         type_params: vec![],
                     })), TypeTag::Struct(Box::new(StructTag {
                         address: *other.expect("Must provide other"),
@@ -725,7 +725,7 @@ impl EntryPoints {
                     vec![TypeTag::Struct(Box::new(StructTag {
                         address: *other.expect("Must provide other"),
                         module: ident_str!("assets").to_owned(),
-                        name: ident_str!("AC").to_owned(),
+                        name: ident_str!("AAC").to_owned(),
                         type_params: vec![],
                     })), TypeTag::Struct(Box::new(StructTag {
                         address: *other.expect("Must provide other"),
@@ -752,7 +752,7 @@ impl EntryPoints {
                         vec![TypeTag::Struct(Box::new(StructTag {
                             address: *other.expect("Must provide other"),
                             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-                            name: Identifier::new(<&str as Into<Box<str>>>::into("AC")).unwrap(),
+                            name: Identifier::new(<&str as Into<Box<str>>>::into("AAC")).unwrap(),
                             type_params: vec![],
                         })), TypeTag::Struct(Box::new(StructTag {
                             address: *other.expect("Must provide other"),
@@ -773,7 +773,7 @@ impl EntryPoints {
                         vec![TypeTag::Struct(Box::new(StructTag {
                             address: *other.expect("Must provide other"),
                             module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
-                            name: Identifier::new(<&str as Into<Box<str>>>::into("AC")).unwrap(),
+                            name: Identifier::new(<&str as Into<Box<str>>>::into("AAC")).unwrap(),
                             type_params: vec![],
                         })), TypeTag::Struct(Box::new(StructTag {
                             address: *other.expect("Must provide other"),

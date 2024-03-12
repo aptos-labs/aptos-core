@@ -248,6 +248,7 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
         let num_markets = self.num_markets.clone();
         Arc::new(move |account, package, publisher, txn_factory, rng, txn_counter| {
             let mut requests = vec![];
+            println!("txn_counter: {}", txn_counter);
             let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
             let bid_size = rng.gen_range(4, 14);
             let ask_size = rng.gen_range(4, 14);
