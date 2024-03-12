@@ -30,7 +30,7 @@ async fn enable_feature_0() {
 
             // start with vtxn disabled and randomness off.
             conf.consensus_config.disable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::Off);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;

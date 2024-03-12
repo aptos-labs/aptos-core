@@ -299,8 +299,7 @@ impl From<(u64, NewEpochEvent)> for ContractEvent {
     }
 }
 
-impl TryFrom<&ContractEvent>
-for DKGStartEvent {
+impl TryFrom<&ContractEvent> for DKGStartEvent {
     type Error = Error;
 
     fn try_from(event: &ContractEvent) -> Result<Self> {
