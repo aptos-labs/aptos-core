@@ -358,6 +358,7 @@ pub async fn create_txn_generator_creator(
                             &mut EntryPointTransactionGenerator {
                                 entry_point: *entry_point,
                             },
+                            true,
                         )
                         .await,
                     ),

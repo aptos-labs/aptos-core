@@ -149,6 +149,7 @@ impl CustomModulesDelegationGeneratorCreator {
         num_modules: usize,
         package_name: &str,
         workload: &mut dyn UserModuleTransactionGenerator,
+        publish_packages: bool,
     ) -> Self {
         let mut packages = Self::publish_package(
             init_txn_factory.clone(),
@@ -157,6 +158,7 @@ impl CustomModulesDelegationGeneratorCreator {
             num_modules,
             package_name,
             None,
+            publish_packages,
         )
         .await;
         let worker = Self::create_worker(
