@@ -218,7 +218,7 @@ impl CustomModulesDelegationGeneratorCreator {
         package_name: &str,
         publisher_balance: Option<u64>,
     ) -> Vec<(Package, LocalAccount)> {
-        let mut rng = StdRng::from_entropy();
+        let mut rng = StdRng::from_seed([34,15,17,23]);
         let mut requests_create = Vec::with_capacity(num_modules);
         let mut requests_publish = Vec::with_capacity(num_modules);
         let mut package_handler = PackageHandler::new(package_name);
