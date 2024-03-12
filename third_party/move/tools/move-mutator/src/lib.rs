@@ -81,9 +81,9 @@ pub fn run_move_mutator(
     let mut report: Report = Report::new();
 
     for mutant in &mutants {
-        let fileid = &mutant.get_file_id();
-        let source = env.get_file_source(*fileid);
-        let filename = env.get_file(*fileid);
+        let file_id = &mutant.get_file_id();
+        let source = env.get_file_source(*file_id);
+        let filename = env.get_file(*file_id);
         let path = Path::new(filename);
 
         trace!("Processing file: {path:?}");

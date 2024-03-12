@@ -1,7 +1,7 @@
 use crate::report::Mutation;
 use codespan::FileId;
 use std::fmt;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 /// Mutation result that contains the mutated source code and the modification that was applied.
 #[derive(Debug, Clone, PartialEq)]
@@ -26,7 +26,7 @@ impl MutantInfo {
 /// Mutation operators are used to apply mutations to the source code. To keep adding new mutation operators simple,
 /// we use a trait that all mutation operators implement.
 #[allow(clippy::module_name_repetitions)]
-pub trait MutationOperator: std::fmt::Display + Debug + MutationOperatorClone {
+pub trait MutationOperator: Display + Debug + MutationOperatorClone {
     /// Applies the mutation operator to the given source code.
     /// Returns differently mutated source code listings in a vector.
     ///
@@ -96,7 +96,7 @@ impl MutationOperator for MutationOp {
     }
 }
 
-impl fmt::Display for MutationOp {
+impl Display for MutationOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.operator)
     }
