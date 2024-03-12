@@ -7,6 +7,7 @@ module aptos_framework::function_info {
 
     friend aptos_framework::fungible_asset;
     friend aptos_framework::dispatchable_fungible_asset;
+    friend aptos_framework::lite_account;
 
     /// String is not a valid Move identifier
     const EINVALID_IDENTIFIER: u64 = 1;
