@@ -328,10 +328,13 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                     {
                         continue;
                     }
-                    if filter_condition.skip_publish_txns
-                        && entry_function.function().as_str() == "publish_package_txn"
-                    {
-                        continue;
+                    if entry_function.function().as_str() == "publish_package_txn" {
+                        if filter_condition.skip_publish_txns {
+                            continue;
+                        }
+                        // For publish txn, we remove all items in the package_cache where module_id.address is the sender of this txn
+                        // to update the new package in the cache.
+                        package_cache.retain(|k, _| k.address != signed_trans.sender());
                     }
                     if !filter_condition.check_source_code {
                         txns.push((version, txn.clone(), None));
