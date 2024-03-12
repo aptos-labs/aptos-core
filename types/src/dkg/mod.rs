@@ -2,7 +2,7 @@
 
 use crate::{
     dkg::real_dkg::RealDKG,
-    on_chain_config::{OnChainConfig, OnChainRandomnessConfig},
+    on_chain_config::{OnChainConfig, RandomnessConfigMoveStruct},
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
 use anyhow::Result;
@@ -80,7 +80,7 @@ impl DKGTranscript {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DKGSessionMetadata {
     pub dealer_epoch: u64,
-    pub randomness_config: OnChainRandomnessConfig,
+    pub randomness_config: RandomnessConfigMoveStruct,
     pub dealer_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
     pub target_validator_set: Vec<ValidatorConsensusInfoMoveStruct>,
 }

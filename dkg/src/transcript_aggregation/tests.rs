@@ -10,7 +10,7 @@ use aptos_types::{
         DKGSessionMetadata, DKGTrait, DKGTranscript, DKGTranscriptMetadata,
     },
     epoch_state::EpochState,
-    on_chain_config::OnChainRandomnessConfig,
+    on_chain_config::RandomnessConfigMoveStruct,
     validator_verifier::{
         ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
     },
@@ -44,7 +44,7 @@ fn test_transcript_aggregation_state() {
     let verifier = ValidatorVerifier::new(validator_infos.clone());
     let pub_params = DummyDKG::new_public_params(&DKGSessionMetadata {
         dealer_epoch: 999,
-        randomness_config: OnChainRandomnessConfig::default_enabled(),
+        randomness_config: RandomnessConfigMoveStruct::default_enabled(),
         dealer_validator_set: validator_consensus_info_move_structs.clone(),
         target_validator_set: validator_consensus_info_move_structs.clone(),
     });

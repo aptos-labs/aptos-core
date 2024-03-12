@@ -67,7 +67,7 @@ use aptos_types::{
     ledger_info::LedgerInfo,
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
-        OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
+        OnChainJWKConsensusConfig, RandomnessConfigMoveStruct, ValidatorTxnConfig,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -113,7 +113,7 @@ pub struct NodeSetup {
     id: usize,
     onchain_consensus_config: OnChainConsensusConfig,
     local_consensus_config: ConsensusConfig,
-    onchain_randomness_config: OnChainRandomnessConfig,
+    onchain_randomness_config: RandomnessConfigMoveStruct,
     onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
 }
 
@@ -143,12 +143,12 @@ impl NodeSetup {
         proposer_indices: Option<Vec<usize>>,
         onchain_consensus_config: Option<OnChainConsensusConfig>,
         local_consensus_config: Option<ConsensusConfig>,
-        onchain_randomness_config: Option<OnChainRandomnessConfig>,
+        onchain_randomness_config: Option<RandomnessConfigMoveStruct>,
         onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     ) -> Vec<Self> {
         let onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
         let onchain_randomness_config =
-            onchain_randomness_config.unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
+            onchain_randomness_config.unwrap_or_else(RandomnessConfigMoveStruct::default_if_missing);
         let onchain_jwk_consensus_config = onchain_jwk_consensus_config
             .unwrap_or_else(OnChainJWKConsensusConfig::default_if_missing);
         let local_consensus_config = local_consensus_config.unwrap_or_default();
@@ -219,7 +219,7 @@ impl NodeSetup {
         id: usize,
         onchain_consensus_config: OnChainConsensusConfig,
         local_consensus_config: ConsensusConfig,
-        onchain_randomness_config: OnChainRandomnessConfig,
+        onchain_randomness_config: RandomnessConfigMoveStruct,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
     ) -> Self {
         let _entered_runtime = executor.enter();
@@ -2140,7 +2140,7 @@ fn no_vote_on_proposal_with_unexpected_vtxns() {
 /// Create a block, fill it with the given vtxns, and process it with the `RoundManager` from the setup.
 /// Assert the processing result.
 fn assert_process_proposal_result(
-    randomness_config: Option<OnChainRandomnessConfig>,
+    randomness_config: Option<RandomnessConfigMoveStruct>,
     jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     vtxns: Vec<ValidatorTransaction>,
     expected_result: bool,
@@ -2206,7 +2206,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         ..Default::default()
     };
 
-    let randomness_config = OnChainRandomnessConfig::default_enabled();
+    let randomness_config = RandomnessConfigMoveStruct::default_enabled();
     let mut nodes = NodeSetup::create_nodes(
         &mut playground,
         runtime.handle().clone(),

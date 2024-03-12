@@ -37,7 +37,7 @@ use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_sto
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, RandomnessConfigMoveStruct},
     validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
@@ -59,7 +59,7 @@ pub trait TExecutionClient: Send + Sync {
         payload_manager: Arc<PayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
-        onchain_randomness_config: &OnChainRandomnessConfig,
+        onchain_randomness_config: &RandomnessConfigMoveStruct,
         rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     );
@@ -271,7 +271,7 @@ impl TExecutionClient for ExecutionProxyClient {
         payload_manager: Arc<PayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
-        onchain_randomness_config: &OnChainRandomnessConfig,
+        onchain_randomness_config: &RandomnessConfigMoveStruct,
         rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
@@ -448,7 +448,7 @@ impl TExecutionClient for DummyExecutionClient {
         _payload_manager: Arc<PayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
-        _onchain_randomness_config: &OnChainRandomnessConfig,
+        _onchain_randomness_config: &RandomnessConfigMoveStruct,
         _rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {

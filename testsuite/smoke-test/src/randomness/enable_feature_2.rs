@@ -7,10 +7,10 @@ use crate::{
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
+use aptos_types::{dkg::DKGState, on_chain_config::RandomnessConfigMoveStruct};
 use std::{sync::Arc, time::Duration};
 
-/// Enable on-chain randomness by enabling validator transactions and feature `RECONFIGURE_WITH_DKG` simultaneously.
+/// Enable on-chain randomness by enabling validator transactions and randomness main logic.
 #[tokio::test]
 async fn enable_feature_2() {
     let epoch_duration_secs = 20;
@@ -25,7 +25,7 @@ async fn enable_feature_2() {
 
             // start with vtxn disabled and randomness off.
             conf.consensus_config.disable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::Off);
+            conf.randomness_config_override = Some(RandomnessConfigMoveStruct::default_disabled());
         }))
         .build_with_cli(0)
         .await;
@@ -53,11 +53,16 @@ script {{
     use aptos_framework::aptos_governance;
     use aptos_framework::consensus_config;
     use aptos_framework::randomness_config;
+    use aptos_std::fixed_point64;
+
     fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
         let consensus_config_bytes = vector{:?};
         consensus_config::set_for_next_epoch(&framework_signer, consensus_config_bytes);
-        let randomness_config = randomness_config::new_v1();
+        let randomness_config = randomness_config::new_v1(
+            fixed_point64::create_from_rational(1, 2),
+            fixed_point64::create_from_rational(2, 3)
+        );
         randomness_config::set_for_next_epoch(&framework_signer, randomness_config);
         aptos_governance::reconfigure(&framework_signer);
     }}
@@ -98,7 +103,7 @@ script {{
     let dkg_session = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_completed
-        .expect("dkg result for epoch 6 should be present");
+        .expect("dkg result for epoch 5 should be present");
     assert_eq!(5, dkg_session.target_epoch());
     assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
 }

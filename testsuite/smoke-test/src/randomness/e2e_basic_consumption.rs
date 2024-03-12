@@ -4,7 +4,7 @@ use crate::smoke_test_environment::SwarmBuilder;
 use aptos::{move_tool::MemberId, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
+use aptos_types::on_chain_config::RandomnessConfigMoveStruct;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};
 
@@ -23,7 +23,7 @@ async fn e2e_basic_consumption() {
 
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+            conf.randomness_config_override = Some(RandomnessConfigMoveStruct::default_enabled());
         }))
         .build_with_cli(0)
         .await;

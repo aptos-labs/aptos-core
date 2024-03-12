@@ -10,12 +10,12 @@ use crate::{
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
+use aptos_types::{dkg::DKGState, on_chain_config::RandomnessConfigMoveStruct};
 use std::{sync::Arc, time::Duration};
 
 /// Enable on-chain randomness in the following steps.
 /// - Enable validator transactions in consensus config in epoch `e`.
-/// - Enable feature `RECONFIGURE_WITH_DKG` in epoch `e + 1`.
+/// - Enable randomness main logic in epoch `e + 1`.
 #[tokio::test]
 async fn enable_feature_1() {
     let epoch_duration_secs = 20;
@@ -30,7 +30,7 @@ async fn enable_feature_1() {
 
             // start with vtxn disabled and randomness off.
             conf.consensus_config.disable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::Off);
+            conf.randomness_config_override = Some(RandomnessConfigMoveStruct::default_disabled());
         }))
         .build_with_cli(0)
         .await;

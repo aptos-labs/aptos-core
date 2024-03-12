@@ -50,7 +50,7 @@ use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        OnChainConsensusConfig, OnChainJWKConsensusConfig, RandomnessConfigMoveStruct,
         ValidatorTxnConfig,
     },
     validator_verifier::ValidatorVerifier,
@@ -214,7 +214,7 @@ pub struct RoundManager {
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
-    randomness_config: OnChainRandomnessConfig,
+    randomness_config: RandomnessConfigMoveStruct,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     broadcast_vote: bool,
 }
@@ -232,7 +232,7 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
-        randomness_config: OnChainRandomnessConfig,
+        randomness_config: RandomnessConfigMoveStruct,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         broadcast_vote: bool,
     ) -> Self {

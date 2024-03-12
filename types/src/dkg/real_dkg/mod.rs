@@ -7,7 +7,7 @@ use crate::{
         },
         DKGSessionMetadata, DKGTrait,
     },
-    on_chain_config::OnChainRandomnessConfig,
+    on_chain_config::RandomnessConfigMoveStruct,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use anyhow::{anyhow, ensure};
@@ -55,7 +55,7 @@ impl DKGPvssConfig {
 
 pub fn build_dkg_pvss_config(
     cur_epoch: u64,
-    randomness_config: &OnChainRandomnessConfig,
+    randomness_config: &RandomnessConfigMoveStruct,
     next_validators: &[ValidatorConsensusInfo],
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();

@@ -49,7 +49,7 @@ use aptos_types::{
     on_chain_config::{
         AnchorElectionMode, DagConsensusConfigV1,
         LeaderReputationType::{ProposerAndVoter, ProposerAndVoterV2},
-        OnChainJWKConsensusConfig, OnChainRandomnessConfig, ProposerAndVoterConfig,
+        OnChainJWKConsensusConfig, RandomnessConfigMoveStruct, ProposerAndVoterConfig,
         ValidatorTxnConfig,
     },
     validator_signer::ValidatorSigner,
@@ -335,7 +335,7 @@ pub struct DagBootstrapper {
     execution_client: Arc<dyn TExecutionClient>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
-    randomness_config: OnChainRandomnessConfig,
+    randomness_config: RandomnessConfigMoveStruct,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     executor: BoundedExecutor,
 }
@@ -359,7 +359,7 @@ impl DagBootstrapper {
         execution_client: Arc<dyn TExecutionClient>,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
-        randomness_config: OnChainRandomnessConfig,
+        randomness_config: RandomnessConfigMoveStruct,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         executor: BoundedExecutor,
     ) -> Self {
@@ -751,7 +751,7 @@ pub(super) fn bootstrap_dag_for_test(
         execution_client,
         false,
         ValidatorTxnConfig::default_enabled(),
-        OnChainRandomnessConfig::default_enabled(),
+        RandomnessConfigMoveStruct::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
     );

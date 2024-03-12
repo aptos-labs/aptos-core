@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    move_any,
     move_any::{Any as MoveAny, AsMoveAny},
     move_fixed_point::FixedPoint64MoveStruct,
     move_utils::as_move_value::AsMoveValue,
@@ -43,77 +42,92 @@ impl AsMoveAny for ConfigV1 {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+pub struct RandomnessConfigMoveStruct {
+    variant: MoveAny,
+}
+
 pub enum OnChainRandomnessConfig {
     Off,
     V1(ConfigV1),
 }
 
-impl OnChainRandomnessConfig {
+impl TryFrom<RandomnessConfigMoveStruct> for OnChainRandomnessConfig {
+    type Error = anyhow::Error;
+
+    fn try_from(value: RandomnessConfigMoveStruct) -> Result<Self, Self::Error> {
+        let RandomnessConfigMoveStruct { variant } = value;
+        let variant_type_name = variant.type_name.as_str();
+        match variant_type_name {
+            ConfigOff::MOVE_TYPE_NAME => Ok(OnChainRandomnessConfig::Off),
+            ConfigV1::MOVE_TYPE_NAME => {
+                let v1 = MoveAny::unpack(ConfigV1::MOVE_TYPE_NAME, variant)
+                    .map_err(|e| anyhow!("unpack as v1 failed: {e}"))?;
+                Ok(OnChainRandomnessConfig::V1(v1))
+            },
+            _ => Err(anyhow!("unknown variant type")),
+        }
+    }
+}
+
+impl From<OnChainRandomnessConfig> for RandomnessConfigMoveStruct {
+    fn from(value: OnChainRandomnessConfig) -> Self {
+        let variant = match value {
+            OnChainRandomnessConfig::Off => MoveAny::pack(ConfigOff::MOVE_TYPE_NAME, ConfigOff {}),
+            OnChainRandomnessConfig::V1(v1) => MoveAny::pack(ConfigV1::MOVE_TYPE_NAME, v1),
+        };
+        RandomnessConfigMoveStruct { variant }
+    }
+}
+
+impl RandomnessConfigMoveStruct {
     pub fn default_enabled() -> Self {
-        Self::V1(ConfigV1::default())
+        OnChainRandomnessConfig::V1(ConfigV1::default()).into()
     }
 
     pub fn default_disabled() -> Self {
-        Self::Off
+        OnChainRandomnessConfig::Off.into()
     }
 
     pub fn default_if_missing() -> Self {
-        Self::Off
+        OnChainRandomnessConfig::Off.into()
     }
 
     pub fn default_for_genesis() -> Self {
-        Self::Off //TODO: change to `V1` after randomness is ready.
+        OnChainRandomnessConfig::Off.into() //TODO: change to `V1` after randomness is ready.
     }
 
     pub fn randomness_enabled(&self) -> bool {
-        match self {
-            OnChainRandomnessConfig::Off => false,
-            OnChainRandomnessConfig::V1(_) => true,
+        match OnChainRandomnessConfig::try_from(self.clone()) {
+            Ok(OnChainRandomnessConfig::Off) => false,
+            Ok(OnChainRandomnessConfig::V1(_)) => true,
+            Err(_) => false,
         }
     }
 
     pub fn secrecy_threshold(&self) -> Option<U64F64> {
-        match self {
-            OnChainRandomnessConfig::Off => None,
-            OnChainRandomnessConfig::V1(v1) => Some(v1.secrecy_threshold.as_u64f64()),
+        match OnChainRandomnessConfig::try_from(self.clone()) {
+            Ok(OnChainRandomnessConfig::Off) => None,
+            Ok(OnChainRandomnessConfig::V1(v1)) => Some(v1.secrecy_threshold.as_u64f64()),
+            Err(_) => None,
         }
     }
 
     pub fn reconstruct_threshold(&self) -> Option<U64F64> {
-        match self {
-            OnChainRandomnessConfig::Off => None,
-            OnChainRandomnessConfig::V1(v1) => Some(v1.reconstruction_threshold.as_u64f64()),
+        match OnChainRandomnessConfig::try_from(self.clone()) {
+            Ok(OnChainRandomnessConfig::Off) => None,
+            Ok(OnChainRandomnessConfig::V1(v1)) => Some(v1.reconstruction_threshold.as_u64f64()),
+            Err(_) => None,
         }
     }
 }
 
-impl OnChainConfig for OnChainRandomnessConfig {
+impl OnChainConfig for RandomnessConfigMoveStruct {
     const MODULE_IDENTIFIER: &'static str = "randomness_config";
     const TYPE_IDENTIFIER: &'static str = "RandomnessConfig";
-
-    fn deserialize_into_config(bytes: &[u8]) -> anyhow::Result<Self> {
-        let variant = bcs::from_bytes::<MoveAny>(bytes)?;
-        let variant_type_name = variant.type_name.clone();
-        match variant_type_name.as_str() {
-            ConfigOff::MOVE_TYPE_NAME => Ok(OnChainRandomnessConfig::Off),
-            ConfigV1::MOVE_TYPE_NAME => {
-                let v1 = move_any::Any::unpack::<ConfigV1>(ConfigV1::MOVE_TYPE_NAME, variant)
-                    .map_err(|e| {
-                        anyhow!("deserialization failed with move any unpack error: {e}")
-                    })?;
-                Ok(OnChainRandomnessConfig::V1(v1))
-            },
-            _ => Err(anyhow!("unknown variant type name")),
-        }
-    }
 }
 
-impl AsMoveValue for OnChainRandomnessConfig {
+impl AsMoveValue for RandomnessConfigMoveStruct {
     fn as_move_value(&self) -> MoveValue {
-        let packed_variant = match self {
-            OnChainRandomnessConfig::Off => ConfigOff {}.as_move_any(),
-            OnChainRandomnessConfig::V1(v1) => v1.as_move_any(),
-        };
-        MoveValue::Struct(MoveStruct::Runtime(vec![packed_variant.as_move_value()]))
+        MoveValue::Struct(MoveStruct::Runtime(vec![self.variant.as_move_value()]))
     }
 }

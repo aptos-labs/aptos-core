@@ -9,7 +9,7 @@ use crate::{
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::{
-    dkg::DKGState, on_chain_config::OnChainRandomnessConfig, randomness::PerBlockRandomness,
+    dkg::DKGState, on_chain_config::RandomnessConfigMoveStruct, randomness::PerBlockRandomness,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -27,7 +27,7 @@ async fn disable_feature_0() {
 
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
+            conf.randomness_config_override = Some(RandomnessConfigMoveStruct::default_enabled());
         }))
         .build_with_cli(0)
         .await;

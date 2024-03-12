@@ -26,7 +26,7 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        OnChainJWKConsensusConfig, OnChainRandomnessConfig, TimedFeaturesBuilder,
+        OnChainJWKConsensusConfig, RandomnessConfigMoveStruct, TimedFeaturesBuilder,
         APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
@@ -83,7 +83,7 @@ pub struct GenesisConfiguration {
     pub employee_vesting_start: u64,
     pub employee_vesting_period_duration: u64,
     pub initial_features_override: Option<Features>,
-    pub randomness_config_override: Option<OnChainRandomnessConfig>,
+    pub randomness_config_override: Option<RandomnessConfigMoveStruct>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
 }
 
@@ -278,7 +278,7 @@ pub fn encode_genesis_change_set(
     let randomness_config = genesis_config
         .randomness_config_override
         .clone()
-        .unwrap_or_else(OnChainRandomnessConfig::default_for_genesis);
+        .unwrap_or_else(RandomnessConfigMoveStruct::default_for_genesis);
     initialize_randomness_config(&mut session, &randomness_config);
     initialize_randomness_resources(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
@@ -501,7 +501,7 @@ fn initialize_dkg(session: &mut SessionExt) {
 
 fn initialize_randomness_config(
     session: &mut SessionExt,
-    randomness_config: &OnChainRandomnessConfig,
+    randomness_config: &RandomnessConfigMoveStruct,
 ) {
     exec_function(
         session,

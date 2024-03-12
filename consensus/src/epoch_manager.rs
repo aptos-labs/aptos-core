@@ -83,7 +83,7 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
         LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        OnChainExecutionConfig, OnChainJWKConsensusConfig, RandomnessConfigMoveStruct,
         ProposerElectionType, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
@@ -723,7 +723,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         onchain_execution_config: OnChainExecutionConfig,
-        onchain_randomness_config: OnChainRandomnessConfig,
+        onchain_randomness_config: RandomnessConfigMoveStruct,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: Arc<NetworkSender>,
         payload_client: Arc<dyn PayloadClient>,
@@ -882,7 +882,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     fn try_get_rand_config_for_new_epoch(
         &self,
         new_epoch_state: &EpochState,
-        onchain_randomness_config: &OnChainRandomnessConfig,
+        onchain_randomness_config: &RandomnessConfigMoveStruct,
         maybe_dkg_state: anyhow::Result<DKGState>,
         consensus_config: &OnChainConsensusConfig,
     ) -> Result<RandConfig, NoRandomnessReason> {
@@ -984,7 +984,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = payload.get();
-        let onchain_randomness_config: anyhow::Result<OnChainRandomnessConfig> = payload.get();
+        let onchain_randomness_config: anyhow::Result<RandomnessConfigMoveStruct> = payload.get();
         let onchain_jwk_consensus_config: anyhow::Result<OnChainJWKConsensusConfig> = payload.get();
         let dkg_state = payload.get::<DKGState>();
 
@@ -1006,7 +1006,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let execution_config = onchain_execution_config
             .unwrap_or_else(|_| OnChainExecutionConfig::default_if_missing());
         let onchain_randomness_config = onchain_randomness_config
-            .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
+            .unwrap_or_else(|_| RandomnessConfigMoveStruct::default_if_missing());
         let jwk_consensus_config = onchain_jwk_consensus_config
             .unwrap_or_else(|_| OnChainJWKConsensusConfig::default_if_missing());
         let rand_config = self.try_get_rand_config_for_new_epoch(
@@ -1095,7 +1095,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: Arc<EpochState>,
         consensus_config: OnChainConsensusConfig,
         execution_config: OnChainExecutionConfig,
-        onchain_randomness_config: OnChainRandomnessConfig,
+        onchain_randomness_config: RandomnessConfigMoveStruct,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
@@ -1139,7 +1139,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         epoch_state: Arc<EpochState>,
         onchain_consensus_config: OnChainConsensusConfig,
         on_chain_execution_config: OnChainExecutionConfig,
-        onchain_randomness_config: OnChainRandomnessConfig,
+        onchain_randomness_config: RandomnessConfigMoveStruct,
         onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,

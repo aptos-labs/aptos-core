@@ -12,7 +12,7 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{Features, OnChainJWKConsensusConfig, OnChainRandomnessConfig},
+    on_chain_config::{Features, OnChainJWKConsensusConfig, RandomnessConfigMoveStruct},
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -62,7 +62,7 @@ pub struct MainnetGenesisInfo {
     /// An optional feature vec to replace the default one.
     initial_features_override: Option<Features>,
     /// An optional randomness config to replace `OnChainRandomnessConfig::default_for_genesis()`.
-    randomness_config_override: Option<OnChainRandomnessConfig>,
+    randomness_config_override: Option<RandomnessConfigMoveStruct>,
     /// An optional feature vec to replace `OnChainJWKConsensusConfig::default_for_genesis()`.
     jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
 }
