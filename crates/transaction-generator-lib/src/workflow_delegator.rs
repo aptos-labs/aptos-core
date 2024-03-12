@@ -480,12 +480,12 @@ impl WorkflowTxnGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for WorkflowTxnGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         Box::new(WorkflowTxnGenerator::new(
             self.stage.clone(),
             self.creators
                 .iter()
-                .map(|c| c.create_transaction_generator())
+                .map(|c| c.create_transaction_generator(txn_counter.clone()))
                 .collect(),
             self.pool_per_stage.clone(),
             self.num_for_first_stage,

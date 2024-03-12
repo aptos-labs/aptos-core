@@ -13,7 +13,7 @@ use aptos_sdk::{
 };
 use async_trait::async_trait;
 use rand::{rngs::StdRng, SeedableRng};
-use std::sync::Arc;
+use std::sync::{Arc, atomic::AtomicU64};
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
@@ -23,7 +23,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &LocalAccount,
         &TransactionFactory,
         &mut StdRng,
-        usize,
+        u64,
     ) -> Vec<SignedTransaction>
     + Send
     + Sync;
@@ -62,7 +62,7 @@ pub struct CustomModulesDelegationGenerator {
     txn_factory: TransactionFactory,
     packages: Arc<Vec<(Package, LocalAccount)>>,
     txn_generator: Arc<TransactionGeneratorWorker>,
-    txn_counter: usize,
+    txn_counter: Arc<AtomicU64>,
 }
 
 impl CustomModulesDelegationGenerator {
@@ -71,13 +71,14 @@ impl CustomModulesDelegationGenerator {
         txn_factory: TransactionFactory,
         packages: Arc<Vec<(Package, LocalAccount)>>,
         txn_generator: Arc<TransactionGeneratorWorker>,
+        txn_counter: Arc<AtomicU64>,
     ) -> Self {
         Self {
             rng,
             txn_factory,
             packages,
             txn_generator,
-            txn_counter: 0,
+            txn_counter,
         }
     }
 }
@@ -91,14 +92,14 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
         let mut all_requests = Vec::with_capacity(self.packages.len());
 
         for (package, publisher) in self.packages.iter() {
-            self.txn_counter +=1;
+            self.txn_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let mut requests = (self.txn_generator)(
                 account,
                 package,
                 publisher,
                 &self.txn_factory,
                 &mut self.rng,
-                self.txn_counter,
+                self.txn_counter.load(std::sync::atomic::Ordering::Relaxed),
             );
             all_requests.append(&mut requests);
         }
@@ -269,12 +270,13 @@ impl CustomModulesDelegationGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for CustomModulesDelegationGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         Box::new(CustomModulesDelegationGenerator::new(
             StdRng::from_entropy(),
             self.txn_factory.clone(),
             self.packages.clone(),
             self.txn_generator.clone(),
+            txn_counter,
         ))
     }
 }

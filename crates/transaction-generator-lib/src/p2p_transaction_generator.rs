@@ -14,7 +14,7 @@ use rand::{
 };
 use std::{
     cmp::{max, min},
-    sync::Arc,
+    sync::{atomic::AtomicU64, Arc},
 };
 
 pub enum SamplingMode {
@@ -322,7 +322,7 @@ impl P2PTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, _txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         let rng = StdRng::from_entropy();
         let sampler: Box<dyn Sampler<AccountAddress>> = match self.sampling_mode {
             SamplingMode::Basic => Box::new(BasicSampler::new()),

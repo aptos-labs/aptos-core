@@ -9,7 +9,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use rand::{rngs::StdRng, SeedableRng};
-use std::sync::Arc;
+use std::sync::{atomic::AtomicU64, Arc};
 
 pub struct AccountGenerator {
     rng: StdRng,
@@ -105,7 +105,7 @@ impl AccountGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for AccountGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, _txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         Box::new(AccountGenerator::new(
             StdRng::from_entropy(),
             self.txn_factory.clone(),

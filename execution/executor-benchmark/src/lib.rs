@@ -48,7 +48,7 @@ use std::{
     collections::HashMap,
     fs,
     path::Path,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{atomic::{AtomicUsize, AtomicU64}, Arc},
     time::Instant,
 };
 use tokio::runtime::Runtime;
@@ -122,6 +122,7 @@ pub fn run_benchmark<V>(
     config.storage.storage_pruner_config = pruner_config;
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
 
+    let txn_counter = Arc::new(AtomicU64::new(0));
     let (db, executor) = init_db_and_executor::<V>(&config);
     let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
@@ -160,7 +161,7 @@ pub fn run_benchmark<V>(
             &PipelineConfig::default(),
         );
         // need to initialize all workers and finish with all transactions before we start the timer:
-        ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
+        ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator(txn_counter.clone())).collect::<Vec<_>>(), phase)
     });
 
     let version = db.reader.get_latest_version().unwrap();

@@ -3,6 +3,7 @@
 
 use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use std::sync::atomic::AtomicU64;
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
@@ -79,10 +80,10 @@ impl AccountsPoolWrapperCreator {
 }
 
 impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         Box::new(AccountsPoolWrapperGenerator::new(
             StdRng::from_entropy(),
-            self.creator.create_transaction_generator(),
+            self.creator.create_transaction_generator(txn_counter),
             self.source_accounts_pool.clone(),
             self.destination_accounts_pool.clone(),
         ))
@@ -157,10 +158,10 @@ impl ReuseAccountsPoolWrapperCreator {
 }
 
 impl TransactionGeneratorCreator for ReuseAccountsPoolWrapperCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         Box::new(ReuseAccountsPoolWrapperGenerator::new(
             StdRng::from_entropy(),
-            self.creator.create_transaction_generator(),
+            self.creator.create_transaction_generator(txn_counter),
             self.source_accounts_pool.clone(),
         ))
     }
@@ -235,10 +236,10 @@ impl BypassAccountsPoolWrapperCreator {
 }
 
 impl TransactionGeneratorCreator for BypassAccountsPoolWrapperCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         Box::new(BypassAccountsPoolWrapperGenerator::new(
             StdRng::from_entropy(),
-            self.creator.create_transaction_generator(),
+            self.creator.create_transaction_generator(txn_counter),
             self.source_accounts_pool.clone(),
             self.destination_accounts_pool.clone(),
         ))

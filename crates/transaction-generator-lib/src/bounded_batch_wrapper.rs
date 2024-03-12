@@ -3,6 +3,7 @@
 
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use std::sync::{Arc, atomic::AtomicU64};
 
 struct BoundedBatchWrapperTransactionGenerator {
     batch_size: usize,
@@ -36,10 +37,10 @@ impl BoundedBatchWrapperTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for BoundedBatchWrapperTransactionGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         Box::new(BoundedBatchWrapperTransactionGenerator {
             batch_size: self.batch_size,
-            generator: self.generator_creator.create_transaction_generator(),
+            generator: self.generator_creator.create_transaction_generator(txn_counter),
         })
     }
 }

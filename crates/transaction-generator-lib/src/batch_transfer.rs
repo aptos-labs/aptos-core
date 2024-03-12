@@ -6,6 +6,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use std::sync::atomic::AtomicU64;
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
@@ -84,7 +85,7 @@ impl BatchTransferTransactionGeneratorCreator {
 }
 
 impl TransactionGeneratorCreator for BatchTransferTransactionGeneratorCreator {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator> {
+    fn create_transaction_generator(&self, _txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
         Box::new(BatchTransferTransactionGenerator::new(
             StdRng::from_entropy(),
             self.batch_size,

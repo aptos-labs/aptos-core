@@ -17,7 +17,7 @@ use rand::{rngs::StdRng, seq::SliceRandom, Rng};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicUsize, AtomicU64, Ordering},
         Arc,
     },
     time::Duration,
@@ -137,7 +137,7 @@ pub trait TransactionGenerator: Sync + Send {
 
 #[async_trait]
 pub trait TransactionGeneratorCreator: Sync + Send {
-    fn create_transaction_generator(&self) -> Box<dyn TransactionGenerator>;
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator>;
 }
 
 pub struct CounterState {
