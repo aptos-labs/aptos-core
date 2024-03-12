@@ -623,6 +623,17 @@ module std::features {
         is_enabled(PERMISSIONED_SIGNER)
     }
 
+    /// Whether the account abstraction is enabled.
+    ///
+    /// Lifetime: transient
+    const ACCOUNT_ABSTRACTION: u64 = 85;
+
+    public fun get_account_abstraction_feature(): u64 { ACCOUNT_ABSTRACTION }
+
+    public fun is_account_abstraction_enabled(): bool acquires Features {
+        is_enabled(ACCOUNT_ABSTRACTION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

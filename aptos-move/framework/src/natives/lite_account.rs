@@ -1,7 +1,8 @@
-use super::function_info::extract_function_info;
-use aptos_gas_schedule::gas_params::natives::aptos_framework::DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE;
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+
+use super::function_info::extract_function_info;
+use aptos_gas_schedule::gas_params::natives::aptos_framework::DISPATCHABLE_AUTHENTICATE_DISPATCH_BASE;
 use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
@@ -11,7 +12,7 @@ use smallvec::SmallVec;
 use std::collections::VecDeque;
 
 /***************************************************************************************************
- * native fun dispatchable_withdraw / dispatchable_deposit / dispatchable_derived_balance / dispatchable_derived_supply
+ * native fun dispatchable_authenticate
  *
  *   Directs control flow based on the last argument. We use the same native function implementation
  *   for all dispatching native.
@@ -35,7 +36,7 @@ pub(crate) fn native_dispatch(
 
     // Use Error to instruct the VM to perform a function call dispatch.
     Err(SafeNativeError::FunctionDispatch {
-        cost: context.eval_gas(DISPATCHABLE_FUNGIBLE_ASSET_DISPATCH_BASE),
+        cost: context.eval_gas(DISPATCHABLE_AUTHENTICATE_DISPATCH_BASE),
         module_name,
         func_name,
         ty_args,
@@ -50,12 +51,10 @@ pub(crate) fn native_dispatch(
 pub fn make_all(
     builder: &SafeNativeBuilder,
 ) -> impl Iterator<Item = (String, NativeFunction)> + '_ {
-    let natives = [
-        ("dispatchable_withdraw", native_dispatch as RawSafeNative),
-        ("dispatchable_deposit", native_dispatch),
-        ("dispatchable_derived_balance", native_dispatch),
-        ("dispatchable_derived_supply", native_dispatch),
-    ];
+    let natives = [(
+        "dispatchable_authenticate",
+        native_dispatch as RawSafeNative,
+    )];
 
     builder.make_named_natives(natives)
 }
