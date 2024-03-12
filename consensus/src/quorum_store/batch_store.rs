@@ -164,7 +164,7 @@ impl BatchStore {
                 expired_keys.push(digest);
             } else {
                 batch_store
-                    .insert_to_cache(value)
+                    .insert_to_cache(&value)
                     .expect("Storage limit exceeded upon BatchReader construction");
             }
         }
@@ -197,7 +197,7 @@ impl BatchStore {
     // Note: holds db_cache entry lock (due to DashMap), while accessing peer_quota
     // DashMap. Hence, peer_quota reference should never be held while accessing the
     // db_cache to avoid the deadlock (if needed, order is db_cache, then peer_quota).
-    pub(crate) fn insert_to_cache(&self, mut value: PersistedValue) -> anyhow::Result<bool> {
+    pub(crate) fn insert_to_cache(&self, value: &PersistedValue) -> anyhow::Result<bool> {
         let digest = *value.digest();
         let author = value.author();
         let expiration_time = value.expiration();
@@ -215,8 +215,7 @@ impl BatchStore {
                     return Ok(false);
                 }
             };
-
-            if self
+            let value_to_be_stored = if self
                 .peer_quota
                 .entry(author)
                 .or_insert(QuotaManager::new(
@@ -227,17 +226,19 @@ impl BatchStore {
                 .update_quota(value.num_bytes() as usize)?
                 == StorageMode::PersistedOnly
             {
-                value.remove_payload();
-            }
+                PersistedValue::new(value.batch_info().clone(), None)
+            } else {
+                value.clone()
+            };
 
             match cache_entry {
                 Occupied(entry) => {
-                    let (k, prev_value) = entry.replace_entry(value);
+                    let (k, prev_value) = entry.replace_entry(value_to_be_stored);
                     debug_assert!(k == digest);
                     self.free_quota(prev_value);
                 },
                 Vacant(slot) => {
-                    slot.insert(value);
+                    slot.insert(value_to_be_stored);
                 },
             }
         }
@@ -250,7 +251,7 @@ impl BatchStore {
         Ok(true)
     }
 
-    pub(crate) fn save(&self, value: PersistedValue) -> anyhow::Result<bool> {
+    pub(crate) fn save(&self, value: &PersistedValue) -> anyhow::Result<bool> {
         let last_certified_time = self.last_certified_time();
         if value.expiration() > last_certified_time {
             fail_point!("quorum_store::save", |_| {
@@ -300,7 +301,7 @@ impl BatchStore {
     }
 
     fn persist_inner(&self, persist_request: PersistedValue) -> Option<SignedBatchInfo> {
-        match self.save(persist_request.clone()) {
+        match self.save(&persist_request) {
             Ok(needs_db) => {
                 let batch_info = persist_request.batch_info().clone();
                 trace!("QS: sign digest {}", persist_request.digest());
