@@ -98,7 +98,9 @@ impl ProcessorManager {
             ending_version: None,
             number_concurrent_processing_tasks: None,
             enable_verbose_logging: None,
-            db_pool_size: None,
+            // The default at the time of writing is 30 but we don't need that
+            // many in a local testnet environment.
+            db_pool_size: Some(8),
             gap_detection_batch_size: 50,
         };
         let manager = Self {
