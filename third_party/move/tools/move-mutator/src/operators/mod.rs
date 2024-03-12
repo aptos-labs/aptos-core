@@ -1,5 +1,4 @@
-use move_model::ast::Exp;
-use move_model::model::Loc;
+use move_model::{ast::Exp, model::Loc};
 
 pub(crate) mod binary;
 pub(crate) mod binary_swap;

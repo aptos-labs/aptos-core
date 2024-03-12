@@ -1,6 +1,8 @@
 use serde::Serialize;
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 use tabled::{builder::Builder, settings::Style};
 
 /// This struct represents a report of the specification testing.

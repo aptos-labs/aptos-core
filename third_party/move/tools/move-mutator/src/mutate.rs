@@ -1,20 +1,19 @@
-use crate::cli;
-use crate::configuration::{Configuration, IncludeFunctions};
-use move_model::ast::{Exp, ExpData, Operation};
-use move_model::model::{FunctionEnv, GlobalEnv, ModuleEnv};
+use crate::{
+    cli,
+    configuration::{Configuration, IncludeFunctions},
+    mutant::Mutant,
+    operator::MutationOp,
+    operators::{
+        binary::Binary, binary_swap::BinarySwap, break_continue::BreakContinue,
+        delete_stmt::DeleteStmt, ifelse::IfElse, literal::Literal, unary::Unary, ExpLoc,
+    },
+};
+use move_model::{
+    ast::{Exp, ExpData, Operation},
+    model::{FunctionEnv, GlobalEnv, ModuleEnv},
+};
 use move_package::source_package::layout::SourcePackageLayout;
 use std::path::Path;
-
-use crate::mutant::Mutant;
-use crate::operator::MutationOp;
-use crate::operators::binary::Binary;
-use crate::operators::binary_swap::BinarySwap;
-use crate::operators::break_continue::BreakContinue;
-use crate::operators::delete_stmt::DeleteStmt;
-use crate::operators::ifelse::IfElse;
-use crate::operators::literal::Literal;
-use crate::operators::unary::Unary;
-use crate::operators::ExpLoc;
 
 /// Traverses the AST, identifies places where mutation operators can be applied
 /// and returns a list of mutants.

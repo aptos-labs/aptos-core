@@ -95,8 +95,7 @@ impl Benchmarks {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::thread;
-    use std::time::Duration;
+    use std::{thread, time::Duration};
 
     #[test]
     fn benchmark_records_correct_elapsed_time() {

@@ -65,11 +65,12 @@ impl fmt::Display for Mutant {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operators::binary::Binary;
-    use crate::operators::ExpLoc;
+    use crate::operators::{binary::Binary, ExpLoc};
     use codespan::Files;
-    use move_model::ast::{ExpData, Operation, Value};
-    use move_model::model::{Loc, NodeId};
+    use move_model::{
+        ast::{ExpData, Operation, Value},
+        model::{Loc, NodeId},
+    };
 
     #[test]
     fn test_new() {
@@ -110,7 +111,7 @@ mod tests {
 
         let mutant = Mutant::new(operator);
         let source = "2+1";
-        let expected = vec!["2-1", "2*1", "2/1", "2%1"];
+        let expected = ["2-1", "2*1", "2/1", "2%1"];
         let result = mutant.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {

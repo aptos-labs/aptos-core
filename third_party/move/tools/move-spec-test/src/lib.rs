@@ -7,13 +7,16 @@ extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
 
-use crate::benchmark::{Benchmark, Benchmarks};
-use crate::prover::prove;
+use crate::{
+    benchmark::{Benchmark, Benchmarks},
+    prover::prove,
+};
 use anyhow::anyhow;
-use move_package::source_package::layout::SourcePackageLayout;
-use move_package::BuildConfig;
-use std::fs;
-use std::path::{Path, PathBuf};
+use move_package::{source_package::layout::SourcePackageLayout, BuildConfig};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// This function runs the specification testing, which is a combination of the
 /// mutator tool and the prover tool

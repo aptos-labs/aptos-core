@@ -1,9 +1,10 @@
-use crate::operator::{MutantInfo, MutationOperator};
-use crate::operators::ExpLoc;
-use crate::report::{Mutation, Range};
+use crate::{
+    operator::{MutantInfo, MutationOperator},
+    operators::ExpLoc,
+    report::{Mutation, Range},
+};
 use codespan::FileId;
-use move_model::ast::Operation;
-use move_model::model::Loc;
+use move_model::{ast::Operation, model::Loc};
 use std::fmt;
 
 pub const OPERATOR_NAME: &str = "binary_operator_replacement";
@@ -124,8 +125,10 @@ impl fmt::Display for Binary {
 mod tests {
     use super::*;
     use codespan::Files;
-    use move_model::ast::{ExpData, Value};
-    use move_model::model::NodeId;
+    use move_model::{
+        ast::{ExpData, Value},
+        model::NodeId,
+    };
 
     #[test]
     fn test_apply_binary_operator() {
@@ -141,7 +144,7 @@ mod tests {
 
         let operator = Binary::new(Operation::Add, loc, vec![exp1, exp2]);
         let source = "5+2";
-        let expected = vec!["5-2", "5*2", "5/2", "5%2"];
+        let expected = ["5-2", "5*2", "5/2", "5%2"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
