@@ -135,14 +135,11 @@ async fn update_global_data_summary() {
             .response_sender
             .send(Ok(StorageServiceResponse::new(data_response, true).unwrap()));
 
-        // Advance time so the poller updates the global data summary
-        utils::advance_polling_timer(&mut mock_time, &data_client_config).await;
-
         // Verify that the advertised data ranges are valid
         verify_advertised_transaction_data(
-            &mut mock_time,
             &data_client_config,
             &client,
+            &mut mock_time,
             peer_version,
             index + 1,
             true,
@@ -154,9 +151,9 @@ async fn update_global_data_summary() {
     for (index, peer_version) in advertised_peer_versions.iter().enumerate() {
         let is_highest_version = index == advertised_peer_versions.len() - 1;
         verify_advertised_transaction_data(
-            &mut mock_time,
             &data_client_config,
             &client,
+            &mut mock_time,
             *peer_version,
             advertised_peer_versions.len(),
             is_highest_version,
@@ -353,9 +350,9 @@ async fn fetch_transactions_and_verify_failure(
 
 /// Verifies that the advertised transaction data is valid
 async fn verify_advertised_transaction_data(
-    mock_time: &mut MockTimeService,
     data_client_config: &AptosDataClientConfig,
     client: &AptosDataClient,
+    mock_time: &mut MockTimeService,
     advertised_version: Version,
     expected_num_advertisements: usize,
     is_highest_version: bool,
