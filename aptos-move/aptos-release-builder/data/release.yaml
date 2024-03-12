@@ -31,20 +31,17 @@ proposals:
       - FeatureFlag:
           enabled:
             - refundable_bytes
-  - name: step_4_enable_fairness_shuffler
+  - name: step_4_increase_parallelism_for_machine_upgrade
     metadata:
-      title: "AIP-68: Reordering transactions in a block for fairness"
-      description: "AIP-68: This AIP proposes to update the Transaction Shuffler logic to add other aspects of fairness to how transactions are ordered in the block."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/333"
+      title: "AIP-x: Increase parallelism for machine upgrade"
+      description: "AIP-x: ."
+      discussion_url: ""
     execution_mode: MultiStep
     update_sequence:
       - Execution:
           V4:
             transaction_shuffler_type:
-              fairness:
-                sender_conflict_window_size: 32
-                module_conflict_window_size: 1
-                entry_fun_conflict_window_size: 2
+              sender_aware_v2: 32
             block_gas_limit_type:
               complex_limit_v1:
                 effective_block_gas_limit: 30000
