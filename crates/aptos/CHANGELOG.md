@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Increased `max_connections` for postgres container created as part of local testnet to address occasional startup failures due to overloaded DB.
 
 ## [3.0.1] - 2024/03/05
 - Fix bug in `aptos update revela` if default install directory doesn't exist.
