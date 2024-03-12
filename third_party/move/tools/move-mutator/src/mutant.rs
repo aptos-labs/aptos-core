@@ -75,8 +75,8 @@ mod tests {
     fn test_new() {
         let mut files = Files::new();
         let fid = files.add("test", "test");
-        let loc = move_model::model::Loc::new(fid, codespan::Span::new(0, 0));
-        let operator = MutationOp::BinaryOp(Binary::new(Operation::Add, loc, vec![]));
+        let loc = Loc::new(fid, codespan::Span::new(0, 0));
+        let operator = MutationOp::new(Box::new(Binary::new(Operation::Add, loc, vec![])));
 
         let mutant = Mutant::new(operator);
         assert_eq!(format!("{}", mutant), "Mutant: BinaryOperator(Add, location: file id: FileId(1), index start: 0, index stop: 0)");
@@ -86,8 +86,8 @@ mod tests {
     fn test_get_file_hash() {
         let mut files = Files::new();
         let fid = files.add("test", "test");
-        let loc = move_model::model::Loc::new(fid, codespan::Span::new(0, 0));
-        let operator = MutationOp::BinaryOp(Binary::new(Operation::Add, loc, vec![]));
+        let loc = Loc::new(fid, codespan::Span::new(0, 0));
+        let operator = MutationOp::new(Box::new(Binary::new(Operation::Add, loc, vec![])));
 
         let mutant = Mutant::new(operator);
         assert_eq!(mutant.get_file_id(), fid);
@@ -105,7 +105,8 @@ mod tests {
         let exp1 = ExpLoc::new(e1.into_exp(), loc2);
         let exp2 = ExpLoc::new(e2.into_exp(), loc3);
 
-        let operator = MutationOp::BinaryOp(Binary::new(Operation::Add, loc, vec![exp1, exp2]));
+        let operator =
+            MutationOp::new(Box::new(Binary::new(Operation::Add, loc, vec![exp1, exp2])));
 
         let mutant = Mutant::new(operator);
         let source = "2+1";

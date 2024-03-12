@@ -174,10 +174,10 @@ fn parse_expression_and_find_mutants(function: &FunctionEnv<'_>, exp: &ExpData) 
     match exp {
         ExpData::Call(node_id, op, exps) => match op {
             Operation::MoveTo | Operation::Abort => {
-                vec![Mutant::new(MutationOp::DeleteStmt(DeleteStmt::new(
+                vec![Mutant::new(MutationOp::new(Box::new(DeleteStmt::new(
                     exp.clone().into_exp(),
                     function.module_env.env.get_node_loc(*node_id),
-                )))]
+                ))))]
             },
             Operation::Add
             | Operation::Sub
@@ -198,27 +198,27 @@ fn parse_expression_and_find_mutants(function: &FunctionEnv<'_>, exp: &ExpData) 
             | Operation::Shr
             | Operation::Xor => {
                 let exps_loc = convert_exps_to_explocs(exps);
-                let mut result = vec![Mutant::new(MutationOp::BinaryOp(Binary::new(
+                let mut result = vec![Mutant::new(MutationOp::new(Box::new(Binary::new(
                     op.clone(),
                     function.module_env.env.get_node_loc(*node_id),
                     exps_loc.clone(),
-                )))];
+                ))))];
 
-                result.push(Mutant::new(MutationOp::BinarySwap(BinarySwap::new(
+                result.push(Mutant::new(MutationOp::new(Box::new(BinarySwap::new(
                     op.clone(),
                     function.module_env.env.get_node_loc(*node_id),
                     exps_loc,
-                ))));
+                )))));
 
                 result
             },
             Operation::Not => {
                 let exps_loc = convert_exps_to_explocs(exps);
-                vec![Mutant::new(MutationOp::UnaryOp(Unary::new(
+                vec![Mutant::new(MutationOp::new(Box::new(Unary::new(
                     op.clone(),
                     function.module_env.env.get_node_loc(*node_id),
                     exps_loc,
-                )))]
+                ))))]
             },
             _ => vec![],
         },
@@ -235,23 +235,23 @@ fn parse_expression_and_find_mutants(function: &FunctionEnv<'_>, exp: &ExpData) 
                 exp: else_exp.clone(),
                 loc: function.module_env.env.get_node_loc(else_exp.node_id()),
             };
-            vec![Mutant::new(MutationOp::IfElse(IfElse::new(
+            vec![Mutant::new(MutationOp::new(Box::new(IfElse::new(
                 cond_loc,
                 if_exp_loc,
                 else_exp_loc,
-            )))]
+            ))))]
         },
         ExpData::Value(node_id, value) => {
-            let mutants = vec![Mutant::new(MutationOp::Literal(Literal::new(
+            let mutants = vec![Mutant::new(MutationOp::new(Box::new(Literal::new(
                 value.clone(),
                 function.module_env.env.get_node_type(*node_id),
                 function.module_env.env.get_node_loc(*node_id),
-            )))];
+            ))))];
             mutants
         },
-        ExpData::LoopCont(node_id, _) => vec![Mutant::new(MutationOp::BreakContinue(
+        ExpData::LoopCont(node_id, _) => vec![Mutant::new(MutationOp::new(Box::new(
             BreakContinue::new(function.module_env.env.get_node_loc(*node_id)),
-        ))],
+        )))],
 
         ExpData::Return(_, _)
         | ExpData::Mutate(_, _, _)
