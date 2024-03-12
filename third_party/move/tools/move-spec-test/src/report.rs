@@ -20,13 +20,13 @@ impl Report {
         }
     }
 
-    /// Increments the number of mutants tested for the given path.
+    /// Increments the number of mutants tested for the given path by 1.
     /// If the path is not in the report, it adds it with the number of mutants tested set to 1.
     pub fn increment_mutants_tested(&mut self, path: &Path, module_func: &str) {
         self.increment_stat(path, module_func, |stat| stat.tested += 1);
     }
 
-    /// Increments the number of mutants killed for the given path.
+    /// Increments the number of mutants killed for the given path by 1.
     /// If the path is not in the report, it adds it with the number of mutants tested set to 0 and killed
     /// count set to 1.
     pub fn increment_mutants_killed(&mut self, path: &Path, module_func: &str) {
