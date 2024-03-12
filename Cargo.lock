@@ -10870,6 +10870,7 @@ dependencies = [
  "move-symbol-pool",
  "num 0.4.1",
  "once_cell",
+ "petgraph 0.6.4",
  "serde",
 ]
 

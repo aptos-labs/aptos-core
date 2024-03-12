@@ -32,9 +32,10 @@ use move_model::{
     symbol::Symbol,
     ty::ReferenceKind,
 };
+use petgraph::prelude::DiGraphMap;
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    collections::{BTreeMap, BTreeSet},
 };
 
 pub fn run_spec_rewriter(env: &mut GlobalEnv) {
@@ -143,51 +144,62 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
     }
     targets.write_to_env(env);
 
-    // Now that all functions are defined, do a DFS traversal of all specification
-    // functions to compute transitive callee and used memory.
-    let mut todo: VecDeque<_> = env
+    // Now that all functions are defined, compute transitive callee and used memory.
+    // Since specification functions can be recursive we compute the strongly-connected
+    // components first and then process each in bottom-up order.
+    let mut graph: DiGraphMap<QualifiedId<SpecFunId>, ()> = DiGraphMap::new();
+    let spec_funs = env
         .get_modules()
         .flat_map(|m| {
             m.get_spec_funs()
                 .map(|(id, _)| m.get_id().qualified(*id))
                 .collect_vec()
         })
-        .collect();
-
-    let mut deps_scheduled = BTreeSet::new();
-    let mut done = BTreeSet::new();
-    while let Some(next) = todo.pop_front() {
-        if done.contains(&next) {
-            continue;
-        }
-        if deps_scheduled.insert(next) {
-            // First time visiting this function, compute the initial direct usage.
-            let decl = env.get_spec_fun(next);
-            let (callees, used_memory) = if let Some(exp) = &decl.body {
-                (exp.called_spec_funs(), exp.directly_used_memory(env))
-            } else {
-                Default::default()
-            };
-            // Schedule to process the deps, and after this to process  this one
-            // again.
-            todo.extend(callees.iter().filter(|id| !done.contains(*id)));
-            todo.push_back(next);
-            // Now store the usage.
-            let decl_mut = env.get_spec_fun_mut(next);
-            (decl_mut.callees, decl_mut.used_memory) = (callees, used_memory);
-        } else {
-            // The deps are processed, or we are hitting a cycle. In the case of
-            // a cycle, we will have `!done.contains(&callee)`, but this is fine,
-            // because the direct usage is sufficient to reach a fixpoint.
-            for callee in env.get_spec_fun(next).callees.iter().cloned().collect_vec() {
-                let callee_decl = env.get_spec_fun(callee);
-                let mut transitive_callee = callee_decl.callees.clone();
-                let mut transitive_usage = callee_decl.used_memory.clone();
-                let decl_mut = env.get_spec_fun_mut(next);
-                decl_mut.callees.append(&mut transitive_callee);
-                decl_mut.used_memory.append(&mut transitive_usage);
+        .collect_vec();
+    for qid in spec_funs {
+        graph.add_node(qid);
+        let (initial_callees, initial_usage) = if let Some(def) = &env.get_spec_fun(qid).body {
+            let callees = def.called_spec_funs(env);
+            for callee in &callees {
+                graph.add_edge(qid, callee.to_qualified_id(), ());
             }
-            done.insert(next);
+            (callees, def.directly_used_memory(env))
+        } else {
+            Default::default()
+        };
+        let decl_mut = env.get_spec_fun_mut(qid);
+        (decl_mut.callees, decl_mut.used_memory) = (initial_callees, initial_usage);
+    }
+    for scc in petgraph::algo::kosaraju_scc(&graph) {
+        // Within each cycle, the transitive usage is the union of the transitive
+        // usage of each member.
+        let mut transitive_callees = BTreeSet::new();
+        let mut transitive_usage = BTreeSet::new();
+        for qid in &scc {
+            let decl = env.get_spec_fun(*qid);
+            // Add direct usage.
+            transitive_callees.extend(decl.callees.iter().cloned());
+            transitive_usage.extend(decl.used_memory.iter().cloned());
+            // Add indirect usage
+            for callee in &decl.callees {
+                let decl = env.get_spec_fun(callee.to_qualified_id());
+                transitive_callees.extend(
+                    decl.callees
+                        .iter()
+                        .map(|id| id.clone().instantiate(&callee.inst)),
+                );
+                transitive_usage.extend(
+                    decl.used_memory
+                        .iter()
+                        .map(|mem| mem.clone().instantiate(&callee.inst)),
+                );
+            }
+        }
+        // Store result back
+        for qid in scc {
+            let decl_mut = env.get_spec_fun_mut(qid);
+            decl_mut.callees = transitive_callees.clone();
+            decl_mut.used_memory = transitive_usage.clone();
         }
     }
 

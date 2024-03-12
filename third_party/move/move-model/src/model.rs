@@ -1273,11 +1273,10 @@ impl GlobalEnv {
             }
             let module = env.get_module(caller.module_id);
             let decl = module.get_spec_fun(caller.id);
-            decl.callees.contains(&fun)
-                || decl
-                    .callees
-                    .iter()
-                    .any(|trans_caller| is_caller(env, visited, *trans_caller, fun))
+            decl.callees.iter().any(|c| c.to_qualified_id() == fun)
+                || decl.callees.iter().any(|trans_caller| {
+                    is_caller(env, visited, trans_caller.to_qualified_id(), fun)
+                })
         }
         let module = self.get_module(id.module_id);
         let is_recursive = *module.get_spec_fun(id.id).is_recursive.borrow();

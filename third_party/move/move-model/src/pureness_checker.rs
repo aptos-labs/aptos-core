@@ -8,10 +8,11 @@
 //! - It does not use Mutate
 //! - It does not call another impure function.
 //!
-//! In expression checking mode, in addition the following constructs are disallowed
+//! In specification checking mode, in addition the following constructs are disallowed
 //!
-//! - It does not use Assign
-//! - It does not use Return
+//! - No use of Assign
+//! - Not use of Return
+//! - No use of uninitialized let bindings
 //!
 //! The checker does a DFS search to figure whether transitive call chains are pure or not.
 
@@ -94,6 +95,15 @@ where
                     (self.impure_action)(
                         *id,
                         "return not allowed in specifications",
+                        &self.visiting,
+                    );
+                },
+                Block(id, _, None, _)
+                    if self.mode == FunctionPurenessCheckerMode::Specification =>
+                {
+                    (self.impure_action)(
+                        *id,
+                        "uninitialized let not allowed in specifications",
                         &self.visiting,
                     );
                 },

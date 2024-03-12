@@ -119,7 +119,7 @@ pub enum Constraint {
     /// The type variable must be instantiated with a struct which has the given fields with
     /// types.
     SomeStruct(BTreeMap<Symbol, Type>),
-    /// The type variable must be instanted with a type which has the given ability
+    /// The type variable must be instantiated with a type which has the given ability
     HasAbility(Ability),
     /// The type variable defaults to the given type if no other binding is found. This is
     /// a pseudo constraint which never fails, but used to generate a default for

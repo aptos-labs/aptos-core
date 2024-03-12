@@ -57,7 +57,7 @@ pub struct SpecFunDecl {
     pub is_move_fun: bool,
     pub is_native: bool,
     pub body: Option<Exp>,
-    pub callees: BTreeSet<QualifiedId<SpecFunId>>,
+    pub callees: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub is_recursive: RefCell<Option<bool>>,
 }
 
@@ -889,13 +889,14 @@ impl ExpData {
     }
 
     /// Returns the specification functions called by this expression
-    pub fn called_spec_funs(&self) -> BTreeSet<QualifiedId<SpecFunId>> {
+    pub fn called_spec_funs(&self, env: &GlobalEnv) -> BTreeSet<QualifiedInstId<SpecFunId>> {
         let mut called = BTreeSet::new();
         let mut visitor = |e: &ExpData| {
             #[allow(clippy::single_match)] // may need to extend match in the future
             match e {
-                ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) => {
-                    called.insert(mid.qualified(*fid));
+                ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
+                    let inst = env.get_node_instantiation(*id);
+                    called.insert(mid.qualified_inst(*fid, inst));
                 },
                 _ => {},
             }
