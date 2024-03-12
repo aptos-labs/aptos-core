@@ -348,6 +348,7 @@ impl Default for ConsensusConfigV1 {
                     voter_window_num_validators_multiplier: 1,
                     weight_by_voting_power: true,
                     use_history_from_previous_epoch_max_count: 5,
+                    proposers_per_round: 1,
                 }),
             ),
         }
@@ -421,6 +422,8 @@ pub struct ProposerAndVoterConfig {
     // representing a number of historical epochs (beyond the current one)
     // to consider.
     pub use_history_from_previous_epoch_max_count: u32,
+
+    pub proposers_per_round: usize,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -452,6 +455,7 @@ impl Default for DagConsensusConfigV1 {
                     voter_window_num_validators_multiplier: 1,
                     weight_by_voting_power: true,
                     use_history_from_previous_epoch_max_count: 5,
+                    proposers_per_round: 30,
                 }),
             ),
             quorum_store_enabled: false,

@@ -42,15 +42,16 @@ use aptos_channels::{
     aptos_channel::{self, Receiver},
     message_queues::QueueStyle,
 };
-use aptos_config::config::DagConsensusConfig;
+use aptos_config::{config::DagConsensusConfig, network_id::NetworkId};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{debug, info};
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        AnchorElectionMode, DagConsensusConfigV1,
+        AnchorElectionMode, DagConsensusConfigV1, FeatureFlag, Features, LeaderReputationType,
         LeaderReputationType::{ProposerAndVoter, ProposerAndVoterV2},
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ProposerAndVoterConfig,
         ValidatorTxnConfig,
@@ -448,6 +449,7 @@ impl DagBootstrapper {
                 metadata_adapter,
                 heuristic,
                 100,
+                config.proposers_per_round,
             ),
         );
 
@@ -519,7 +521,10 @@ impl DagBootstrapper {
         let (parent_block_info, ledger_info) =
             compute_initial_block_and_ledger_info(ledger_info_from_storage);
 
-        let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
+        let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(
+            self.epoch_state.clone(),
+            ledger_info,
+        )));
 
         let initial_ledger_info = ledger_info_provider
             .get_latest_ledger_info()
@@ -790,10 +795,26 @@ pub(super) fn bootstrap_dag_for_test(
     UnboundedReceiver<OrderedBlocks>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
+    let mut features = Features::default();
+    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
+    let mut onchain_config = DagConsensusConfigV1::default();
+    onchain_config.anchor_election_mode = AnchorElectionMode::LeaderReputation(
+        LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
+            active_weight: 1000,
+            inactive_weight: 10,
+            failed_weight: 1,
+            failure_threshold_percent: 10,
+            proposer_window_num_validators_multiplier: 10,
+            voter_window_num_validators_multiplier: 1,
+            weight_by_voting_power: true,
+            use_history_from_previous_epoch_max_count: 5,
+            proposers_per_round: 4,
+        }),
+    );
     let bootstraper = DagBootstrapper::new(
         self_peer,
         DagConsensusConfig::default(),
-        DagConsensusConfigV1::default(),
+        onchain_config,
         signer.into(),
         epoch_state.clone(),
         storage.clone(),

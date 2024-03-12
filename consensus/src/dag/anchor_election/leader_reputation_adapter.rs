@@ -24,7 +24,7 @@ use aptos_types::account_config::NewBlockEvent;
 use move_core_types::account_address::AccountAddress;
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::Arc,
+    sync::{Arc, MutexGuard},
 };
 
 pub struct MetadataBackendAdapter {
@@ -100,6 +100,7 @@ impl MetadataBackend for MetadataBackendAdapter {
 pub struct LeaderReputationAdapter {
     reputation: LeaderReputation,
     data_source: Arc<MetadataBackendAdapter>,
+    proposers_per_round: usize,
 }
 
 impl LeaderReputationAdapter {
@@ -110,6 +111,7 @@ impl LeaderReputationAdapter {
         backend: Arc<MetadataBackendAdapter>,
         heuristic: Box<dyn ReputationHeuristic>,
         window_for_chain_health: usize,
+        proposers_per_round: usize,
     ) -> Self {
         Self {
             reputation: LeaderReputation::new(
@@ -121,8 +123,10 @@ impl LeaderReputationAdapter {
                 0,
                 true,
                 window_for_chain_health,
+                proposers_per_round,
             ),
             data_source: backend,
+            proposers_per_round,
         }
     }
 }
@@ -134,6 +138,14 @@ impl AnchorElection for LeaderReputationAdapter {
 
     fn update_reputation(&self, commit_event: CommitEvent) {
         monitor!("dag_update_reputation", self.data_source.push(commit_event))
+    }
+
+    fn get_anchor_at_round_instance(&self, round: Round, instance: usize) -> Author {
+        unimplemented!("use CachedLeaderReputation")
+    }
+
+    fn get_max_instances(&self) -> usize {
+        self.proposers_per_round
     }
 }
 
@@ -155,7 +167,7 @@ impl CommitHistory for LeaderReputationAdapter {
 pub struct CachedLeaderReputation {
     epoch: u64,
     inner: LeaderReputationAdapter,
-    recent_elections: Mutex<BTreeMap<Round, (Author, f64)>>,
+    recent_elections: Mutex<BTreeMap<Round, (Author, f64, Vec<Author>)>>,
 }
 
 impl CachedLeaderReputation {
@@ -167,10 +179,12 @@ impl CachedLeaderReputation {
         }
     }
 
-    pub fn get_or_compute_entry(&self, round: Round) -> (Author, f64) {
-        let mut recent_elections = self.recent_elections.lock();
-
-        *recent_elections.entry(round).or_insert_with(|| {
+    pub fn get_or_compute_entry<'a>(
+        &'a self,
+        recent_elections: &'a mut MutexGuard<BTreeMap<Round, (Author, f64, Vec<Author>)>>,
+        round: Round,
+    ) -> &'a (Author, f64, Vec<Author>) {
+        recent_elections.entry(round).or_insert_with(|| {
             let result = monitor!(
                 "dag_compute_leader_rep",
                 self.inner
@@ -188,17 +202,38 @@ impl CachedLeaderReputation {
 
 impl AnchorElection for CachedLeaderReputation {
     fn get_anchor(&self, round: Round) -> Author {
-        monitor!("dag_get_anchor", self.get_or_compute_entry(round).0)
+        let mut recent_elections = self.recent_elections.lock();
+        monitor!(
+            "dag_get_anchor",
+            self.get_or_compute_entry(&mut recent_elections, round).0
+        )
     }
 
     fn update_reputation(&self, commit_event: CommitEvent) {
         self.inner.update_reputation(commit_event);
         self.recent_elections.lock().clear();
     }
+
+    fn get_anchor_at_round_instance(&self, round: Round, instance: usize) -> Author {
+        let mut recent_elections = self.recent_elections.lock();
+        monitor!(
+            "dag_get_multiple_anchors",
+            *self
+                .get_or_compute_entry(&mut recent_elections, round)
+                .2
+                .get(instance)
+                .expect("vector must support instance")
+        )
+    }
+
+    fn get_max_instances(&self) -> usize {
+        self.inner.proposers_per_round
+    }
 }
 
 impl CommitHistory for CachedLeaderReputation {
     fn get_voting_power_participation_ratio(&self, round: Round) -> VotingPowerRatio {
-        self.get_or_compute_entry(round).1
+        let mut recent_elections = self.recent_elections.lock();
+        self.get_or_compute_entry(&mut recent_elections, round).1
     }
 }

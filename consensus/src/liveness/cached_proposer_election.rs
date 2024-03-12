@@ -53,7 +53,7 @@ impl CachedProposerElection {
                 "ProposerElection for epoch {} and round {}: {:?}",
                 self.epoch, round, result
             );
-            result
+            (result.0, result.1)
         })
     }
 }

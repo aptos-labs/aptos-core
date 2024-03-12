@@ -74,7 +74,10 @@ use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_network::{
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
+    protocols::network::Event,
+};
 use aptos_safety_rules::SafetyRulesManager;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
@@ -365,6 +368,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     onchain_config.leader_reputation_exclude_round(),
                     leader_reputation_type.use_root_hash_for_seed(),
                     self.config.window_for_chain_health,
+                    1,
                 ));
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Arc::new(CachedProposerElection::new(
