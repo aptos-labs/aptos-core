@@ -6,8 +6,9 @@ use crate::{
     account_address::AccountAddress,
     block_executor::config::BlockExecutorConfigFromOnchain,
     chain_id::ChainId,
+    function_info::FunctionInfo,
     transaction::{
-        authenticator::AccountAuthenticator,
+        authenticator::{AccountAuthenticator, TransactionAuthenticator},
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
@@ -16,6 +17,7 @@ use crate::{
     },
 };
 use aptos_crypto::{ed25519::*, traits::*};
+use crate::transaction::authenticator::AbstractionAuthData;
 
 const MAX_GAS_AMOUNT: u64 = 1_000_000;
 const TEST_GAS_PRICE: u64 = 100;
@@ -247,4 +249,35 @@ pub fn get_test_raw_transaction(
         expiration_timestamp_secs.unwrap_or(expiration_time(10)),
         ChainId::test(),
     )
+}
+
+pub fn get_test_signed_aa_transaction(
+    sender: AccountAddress,
+    sequence_number: u64,
+    payload: Option<TransactionPayload>,
+    expiration_timestamp_secs: Option<u64>,
+    gas_unit_price: Option<u64>,
+    max_gas_amount: Option<u64>,
+) -> SignedTransaction {
+    let raw_txn = RawTransaction::new(
+        sender,
+        sequence_number,
+        payload.unwrap_or_else(|| {
+            TransactionPayload::Script(Script::new(EMPTY_SCRIPT.to_vec(), vec![], vec![]))
+        }),
+        max_gas_amount.unwrap_or(MAX_GAS_AMOUNT),
+        gas_unit_price.unwrap_or(TEST_GAS_PRICE),
+        expiration_timestamp_secs.unwrap_or(expiration_time(10)),
+        ChainId::test(),
+    );
+
+    let authenticator =
+        TransactionAuthenticator::single_sender(AccountAuthenticator::Abstraction {
+            function_info: FunctionInfo::new(AccountAddress::ONE, String::new(), String::new()),
+            auth_data: AbstractionAuthData::V1 {
+                signing_message_digest: vec![],
+                authenticator: vec![],
+            }
+        });
+    SignedTransaction::new_signed_transaction(raw_txn, authenticator)
 }

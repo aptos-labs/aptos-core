@@ -1358,6 +1358,16 @@ class MultiKeySignature(_message.Message):
         signatures_required: _Optional[int] = ...,
     ) -> None: ...
 
+class AbstractionSignature(_message.Message):
+    __slots__ = ["function_info", "signature"]
+    FUNCTION_INFO_FIELD_NUMBER: _ClassVar[int]
+    SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    function_info: str
+    signature: bytes
+    def __init__(
+        self, function_info: _Optional[str] = ..., signature: _Optional[bytes] = ...
+    ) -> None: ...
+
 class SingleSender(_message.Message):
     __slots__ = ["sender"]
     SENDER_FIELD_NUMBER: _ClassVar[int]
@@ -1373,6 +1383,7 @@ class AccountSignature(_message.Message):
         "multi_ed25519",
         "single_key_signature",
         "multi_key_signature",
+        "abstraction",
     ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -1382,21 +1393,25 @@ class AccountSignature(_message.Message):
         TYPE_MULTI_ED25519: _ClassVar[AccountSignature.Type]
         TYPE_SINGLE_KEY: _ClassVar[AccountSignature.Type]
         TYPE_MULTI_KEY: _ClassVar[AccountSignature.Type]
+        TYPE_ABSTRACTION: _ClassVar[AccountSignature.Type]
     TYPE_UNSPECIFIED: AccountSignature.Type
     TYPE_ED25519: AccountSignature.Type
     TYPE_MULTI_ED25519: AccountSignature.Type
     TYPE_SINGLE_KEY: AccountSignature.Type
     TYPE_MULTI_KEY: AccountSignature.Type
+    TYPE_ABSTRACTION: AccountSignature.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ED25519_FIELD_NUMBER: _ClassVar[int]
     MULTI_ED25519_FIELD_NUMBER: _ClassVar[int]
     SINGLE_KEY_SIGNATURE_FIELD_NUMBER: _ClassVar[int]
     MULTI_KEY_SIGNATURE_FIELD_NUMBER: _ClassVar[int]
+    ABSTRACTION_FIELD_NUMBER: _ClassVar[int]
     type: AccountSignature.Type
     ed25519: Ed25519Signature
     multi_ed25519: MultiEd25519Signature
     single_key_signature: SingleKeySignature
     multi_key_signature: MultiKeySignature
+    abstraction: AbstractionSignature
     def __init__(
         self,
         type: _Optional[_Union[AccountSignature.Type, str]] = ...,
@@ -1404,6 +1419,7 @@ class AccountSignature(_message.Message):
         multi_ed25519: _Optional[_Union[MultiEd25519Signature, _Mapping]] = ...,
         single_key_signature: _Optional[_Union[SingleKeySignature, _Mapping]] = ...,
         multi_key_signature: _Optional[_Union[MultiKeySignature, _Mapping]] = ...,
+        abstraction: _Optional[_Union[AbstractionSignature, _Mapping]] = ...,
     ) -> None: ...
 
 class TransactionSizeInfo(_message.Message):

@@ -22,28 +22,30 @@ use aptos_rest_client::{Client, PepperRequest, ProverRequest};
 pub use aptos_types::*;
 use aptos_types::{
     event::EventKey,
+    function_info::FunctionInfo,
     keyless::{
         Claims, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
         KeylessSignature, OpenIdSig, Pepper, ZeroKnowledgeSig,
     },
-    transaction::authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
+    transaction::{
+        authenticator::{AnyPublicKey, EphemeralPublicKey, EphemeralSignature},
+        Auth,
+    },
 };
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use keyless::FederatedKeylessPublicKey;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::{
-    str::FromStr,
-    sync::atomic::{AtomicU64, Ordering},
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::{fmt, str::FromStr, sync::atomic::{AtomicU64, Ordering}, time::{Duration, SystemTime, UNIX_EPOCH}};
+use std::sync::Arc;
 
 #[derive(Debug)]
 enum LocalAccountAuthenticator {
     PrivateKey(AccountKey),
     Keyless(KeylessAccount),
     FederatedKeyless(FederatedKeylessAccount),
+    Abstraction(AbstractedAccount), // TODO: Add support for keyless authentication
 }
 
 impl LocalAccountAuthenticator {
@@ -65,6 +67,7 @@ impl LocalAccountAuthenticator {
                     sig,
                 )
             },
+            LocalAccountAuthenticator::Abstraction(..) => unreachable!()
         }
     }
 
@@ -355,6 +358,32 @@ impl LocalAccount {
             .into_inner()
     }
 
+    pub fn sign_aa_transaction_with_transaction_builder(
+        &self,
+        secondary_signers: Vec<&Self>,
+        fee_payer_signer: Option<&Self>,
+        builder: TransactionBuilder,
+    ) -> SignedTransaction {
+        let secondary_signer_addresses = secondary_signers
+            .iter()
+            .map(|signer| signer.address())
+            .collect();
+        let secondary_signer_auths = secondary_signers.iter().map(|a| a.auth()).collect();
+        let raw_txn = builder
+            .sender(self.address())
+            .sequence_number(self.increment_sequence_number())
+            .build();
+        raw_txn
+            .sign_aa_transaction(
+                &self.auth(),
+                secondary_signer_addresses,
+                secondary_signer_auths,
+                fee_payer_signer.map(|fee_payer| (fee_payer.address(), fee_payer.auth())),
+            )
+            .expect("Signing aa txn failed")
+            .into_inner()
+    }
+
     pub fn address(&self) -> AccountAddress {
         self.address
     }
@@ -364,6 +393,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::PrivateKey(key) => key.private_key(),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
+            LocalAccountAuthenticator::Abstraction(..) => todo!(),
         }
     }
 
@@ -372,6 +402,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::PrivateKey(key) => key.public_key(),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
+            LocalAccountAuthenticator::Abstraction(..) => todo!(),
         }
     }
 
@@ -384,7 +415,24 @@ impl LocalAccount {
             LocalAccountAuthenticator::FederatedKeyless(federated_keyless_account) => {
                 federated_keyless_account.authentication_key()
             },
+            LocalAccountAuthenticator::Abstraction(..) => todo!(),
         }
+    }
+
+    pub fn auth(&self) -> Auth {
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => Auth::Ed25519(key.private_key()),
+            LocalAccountAuthenticator::Keyless(_) => todo!(),
+            LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
+            LocalAccountAuthenticator::Abstraction(aa) => Auth::Abstraction(aa.function_info.clone(), aa.sign_func.clone()),
+        }
+    }
+
+    pub fn set_abstraction_auth(&mut self, function_info: FunctionInfo, sign_func: Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync>) {
+        self.auth = LocalAccountAuthenticator::Abstraction(AbstractedAccount {
+            function_info,
+            sign_func,
+        })
     }
 
     pub fn sequence_number(&self) -> u64 {
@@ -409,6 +457,7 @@ impl LocalAccount {
             LocalAccountAuthenticator::PrivateKey(key) => std::mem::replace(key, new_key.into()),
             LocalAccountAuthenticator::Keyless(_) => todo!(),
             LocalAccountAuthenticator::FederatedKeyless(_) => todo!(),
+            LocalAccountAuthenticator::Abstraction(..) => todo!(),
         }
     }
 
@@ -711,6 +760,20 @@ pub struct FederatedKeylessAccount {
     zk_sig: ZeroKnowledgeSig,
     jwt_header_json: String,
     jwt: Option<String>,
+}
+
+pub struct AbstractedAccount {
+    function_info: FunctionInfo,
+    sign_func: Arc<dyn Fn(&[u8]) -> Vec<u8> + Send + Sync>,
+}
+
+impl fmt::Debug for AbstractedAccount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AbstractedAccount")
+            .field("function_info", &self.function_info)
+            .field("sign_func", &"<function pointer>") // Placeholder for the function
+            .finish()
+    }
 }
 
 impl KeylessAccount {
