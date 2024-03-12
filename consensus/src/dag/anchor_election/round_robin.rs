@@ -24,6 +24,14 @@ impl AnchorElection for RoundRobinAnchorElection {
     }
 
     fn update_reputation(&self, _event: CommitEvent) {}
+
+    fn get_anchor_at_round_instance(&self, round: Round, _instance: usize) -> Author {
+        self.get_anchor(round)
+    }
+
+    fn get_max_instances(&self) -> usize {
+        1
+    }
 }
 
 impl CommitHistory for RoundRobinAnchorElection {

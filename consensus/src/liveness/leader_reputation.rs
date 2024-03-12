@@ -23,6 +23,7 @@ use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_config::NewBlockEvent, epoch_change::EpochChangeProof, epoch_state::EpochState,
 };
+use itertools::Itertools;
 use std::{
     cmp::max,
     collections::{HashMap, HashSet},
@@ -558,6 +559,7 @@ pub struct LeaderReputation {
     exclude_round: u64,
     use_root_hash: bool,
     window_for_chain_health: usize,
+    proposers_per_round: usize,
 }
 
 impl LeaderReputation {
@@ -570,6 +572,7 @@ impl LeaderReputation {
         exclude_round: u64,
         use_root_hash: bool,
         window_for_chain_health: usize,
+        proposers_per_round: usize,
     ) -> Self {
         assert!(epoch_to_proposers.contains_key(&epoch));
         assert_eq!(epoch_to_proposers[&epoch].len(), voting_powers.len());
@@ -583,6 +586,7 @@ impl LeaderReputation {
             exclude_round,
             use_root_hash,
             window_for_chain_health,
+            proposers_per_round,
         }
     }
 
@@ -688,7 +692,7 @@ impl ProposerElection for LeaderReputation {
     fn get_valid_proposer_and_voting_power_participation_ratio(
         &self,
         round: Round,
-    ) -> (Author, VotingPowerRatio) {
+    ) -> (Author, f64, Vec<Author>) {
         let target_round = round.saturating_sub(self.exclude_round);
         let (sliding_window, root_hash) = self.backend.get_block_metadata(self.epoch, target_round);
         let voting_power_participation_ratio =
@@ -722,7 +726,15 @@ impl ProposerElection for LeaderReputation {
         };
 
         let chosen_index = choose_index(stake_weights, state);
-        (proposers[chosen_index], voting_power_participation_ratio)
+        let chosen_index = shift_number(chosen_index, self.proposers_per_round, proposers.len());
+        let chosen_proposers = (chosen_index..(chosen_index + self.proposers_per_round))
+            .map(|index| proposers[index % proposers.len()])
+            .collect();
+        (
+            proposers[chosen_index],
+            voting_power_participation_ratio,
+            chosen_proposers,
+        )
     }
 
     fn get_valid_proposer(&self, round: Round) -> Author {
@@ -810,4 +822,15 @@ pub fn extract_epoch_to_proposers(
         proposers,
         needed_rounds,
     )
+}
+
+fn shift_number(number: usize, x: usize, max_value: usize) -> usize {
+    // Ensure number + x is less than max_value
+    let number = if number + x >= max_value {
+        max_value - x
+    } else {
+        number
+    };
+
+    number
 }

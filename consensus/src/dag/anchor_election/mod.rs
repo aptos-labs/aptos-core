@@ -8,6 +8,10 @@ pub trait AnchorElection: Send + Sync {
     fn get_anchor(&self, round: Round) -> Author;
 
     fn update_reputation(&self, commit_event: CommitEvent);
+
+    fn get_anchor_at_round_instance(&self, round: Round, instance: usize) -> Author;
+
+    fn get_max_instances(&self) -> usize;
 }
 
 pub trait CommitHistory: Send + Sync {

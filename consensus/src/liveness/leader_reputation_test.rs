@@ -340,6 +340,7 @@ fn test_api(use_root_hash: bool) {
             4,
             use_root_hash,
             30,
+            1,
         );
         let round = 42u64;
 
