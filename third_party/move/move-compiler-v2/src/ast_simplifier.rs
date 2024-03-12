@@ -207,6 +207,7 @@ fn find_possibly_modified_vars(
     let mut modifying = false;
     // Use a stack to keep the modification status properly scoped.
     let mut modifying_stack = Vec::new();
+
     exp.visit_positions(&mut |pos, e| {
         use ExpData::*;
         match e {
@@ -289,32 +290,46 @@ fn find_possibly_modified_vars(
                 }
             },
             Call(_, op, _explist) => {
+                trace!(
+                    "In find_possibly_modified_vars, looking at Call expr `{}`",
+                    e.display_verbose(env)
+                );
                 match op {
                     // NOTE: we don't consider values in globals, so no need to
                     // consider BorrowGlobal(ReferenceKind::Mutable)} here.
-                    Operation::Borrow(ReferenceKind::Mutable) => {
+                    //
+                    // A top-level value in a Borrow(Mutable) is treated as if
+                    // it is mutated, though this is a tiny bit conservative
+                    // (possibly the value could be discarded).
+                    Operation::Borrow(ReferenceKind::Mutable) |
+                    // A top-level argument to a `Move` operation (always a variable)
+                    // is modified.
+                    //
+                    Operation::Move => {
                         match pos {
                             VisitorPosition::Pre => {
                                 // Add all mentioned vars to modified vars.
                                 modifying_stack.push(modifying);
                                 modifying = true;
-                                trace!("Entering Borrow");
+                                trace!("Entering Borrow/MoveTo/From");
                             },
                             VisitorPosition::Post => {
                                 // stop adding vars
                                 modifying = modifying_stack.pop().expect("unbalanced visit 1");
-                                trace!("Exiting Borrow");
+                                trace!("Exiting Borrow/MoveTo/From");
                             },
                             _ => {},
                         }
                     },
                     Operation::Select(..) => {
-                        // Variable appearing in Select may be modified if it occurs top-level in a
-                        // Borrow, so leave `modifying` state alone.
+                        // Variable appearing in Select argument may be borrowed if it occurs in
+                        // a Borrow parameter, so leave modifying state alone.  Note that other
+                        // modification contexts (e.g., MoveFrom) cannot have a `Select` in their
+                        // subexpressions.
                     },
                     _ => {
                         // Other operations don't modify argument variables, so turn off `modifying`
-                        // inside them.
+                        // inside.
                         match pos {
                             VisitorPosition::Pre => {
                                 modifying_stack.push(modifying);

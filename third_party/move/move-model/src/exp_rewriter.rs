@@ -8,6 +8,7 @@ use crate::{
     symbol::Symbol,
     ty::Type,
 };
+use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use log::trace;
 use move_binary_format::file_format::CodeOffset;
@@ -89,8 +90,25 @@ impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
     }
 
     // Note that any subpatterns are visited first
-    fn rewrite_pattern(&mut self, _pat: &Pattern, _entering_scope: bool) -> Option<Pattern> {
+    fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
         // Warning: any rewrites of variables won't happen in an `Assign` statement.
+        // Let's try to enforce that:
+        if !entering_scope {
+            if let Pattern::Var(id, sym) = pat {
+                let sym_replacement = (*self.replacer)(*id, RewriteTarget::LocalVar(*sym));
+                if let Some(exp) = &sym_replacement {
+                    let loc = self.env.get_node_loc(*id);
+                    self.env.diag(
+                        Severity::Bug,
+                        &loc,
+                        &format!(
+                            "Tried to replace symbol `{}` with expression `{}` in an `Assign` expression in `ExpRewriter`",
+                            sym.display(self.env.symbol_pool()),
+                            exp.display(self.env),
+                        ));
+                }
+            }
+        }
         None
     }
 

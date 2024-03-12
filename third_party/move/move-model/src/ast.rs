@@ -1724,7 +1724,7 @@ impl Pattern {
             .all(|b| b)
     }
 
-    // Returns a new pattern which is a copy of `self but with
+    // Returns a new pattern which is a copy of `self` but with
     // each `Var` subpattern contained in `vars` replaced by
     // a `Wildcard` subpattern.
     pub fn remove_vars(self, vars: &BTreeSet<Symbol>) -> Pattern {
@@ -1758,7 +1758,7 @@ impl Pattern {
     /// Does a variable substitution on a pattern.
     ///
     /// Calls `var_map` on every symbol `sym` occurring in a `Var` subpattern of `self`, and if any
-    /// call retuns `Some(sym2)` such that `sym != sym2`, then creates a `clone` of `self` but with
+    /// call returns `Some(sym2)` such that `sym != sym2`, then creates a `clone` of `self` but with
     /// every `sym3` replaced by `sym4` iff `Some(sym4) = var_map(sym3)`.  Otherwise, returns
     /// `None` as there are no substitutions to be done.
     pub fn replace_vars<'a, F>(&self, var_map: &'a F) -> Option<Pattern>
