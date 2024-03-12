@@ -176,9 +176,10 @@ impl DagFetcherService {
         FetchWaiter<Node>,
         FetchWaiter<CertifiedNode>,
     ) {
-        let (request_tx, request_rx) = tokio::sync::mpsc::channel(16);
-        let (node_tx, node_rx) = tokio::sync::mpsc::channel(100);
-        let (certified_node_tx, certified_node_rx) = tokio::sync::mpsc::channel(100);
+        let (request_tx, request_rx) = tokio::sync::mpsc::channel(config.request_channel_size);
+        let (node_tx, node_rx) = tokio::sync::mpsc::channel(config.response_channel_size);
+        let (certified_node_tx, certified_node_rx) =
+            tokio::sync::mpsc::channel(config.response_channel_size);
         let ordered_authors = epoch_state.verifier.get_ordered_account_addresses();
         (
             Self {
@@ -211,7 +212,6 @@ impl DagFetcherService {
                         Err(err) => error!("unable to complete fetch successfully: {}", err),
                     }
                 },
-                // TODO: Configure concurrency
                 Some(local_request) = self.request_rx.recv(), if self.futures.len() < self.max_concurrent_fetches => {
                     match self.fetch(local_request.node(), local_request.responders(&self.ordered_authors)) {
                         Ok(fut) => {

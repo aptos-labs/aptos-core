@@ -8,7 +8,7 @@ use crate::{
         dag_network::RpcHandler,
         errors::NodeBroadcastHandleError,
         observability::{
-            counters::RB_HANDLE_ACKS,
+            counters::{FETCH_ENQUEUE_FAILURES, RB_HANDLE_ACKS},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, NodeStage},
         },
@@ -33,6 +33,7 @@ use aptos_types::{
 use async_trait::async_trait;
 use claims::assert_some;
 use dashmap::DashSet;
+use futures::executor::block_on;
 use std::{collections::BTreeMap, mem, sync::Arc};
 use tokio::task::JoinHandle;
 
@@ -71,7 +72,7 @@ impl NodeBroadcastHandler {
         let epoch = epoch_state.epoch;
         let votes_by_round_peer = monitor!(
             "dag_rb_handler_storage_read",
-            read_votes_from_storage(&storage, epoch)
+            read_votes_from_storage(storage.clone(), epoch)
         );
 
         Self {
@@ -186,6 +187,7 @@ impl NodeBroadcastHandler {
             // because they are already GC'ed
             if current_round > lowest_round {
                 if let Err(err) = self.fetch_requester.request_for_node(node) {
+                    FETCH_ENQUEUE_FAILURES.with_label_values(&[&"node"]).inc();
                     error!("request to fetch failed: {}", err);
                 }
                 bail!(NodeBroadcastHandleError::MissingParents);
@@ -204,7 +206,7 @@ impl NodeBroadcastHandler {
 }
 
 fn read_votes_from_storage(
-    storage: &Arc<dyn DAGStorage>,
+    storage: Arc<dyn DAGStorage>,
     epoch: u64,
 ) -> BTreeMap<u64, BTreeMap<Author, Vote>> {
     let mut votes_by_round_peer = BTreeMap::new();
@@ -221,8 +223,16 @@ fn read_votes_from_storage(
             to_delete.push(node_id);
         }
     }
-    if let Err(err) = storage.delete_votes(to_delete) {
-        error!("unable to clear old signatures: {}", err);
+
+    let handle = tokio::task::spawn_blocking(move || {
+        monitor!("rb_handler_new_gc", {
+            if let Err(err) = storage.delete_votes(to_delete) {
+                error!("unable to clear old signatures: {}", err);
+            }
+        })
+    });
+    if cfg!(test) {
+        let _ = block_on(handle);
     }
 
     votes_by_round_peer
