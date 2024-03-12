@@ -74,7 +74,7 @@ pub(crate) fn setup_mutant_path(output_dir: &Path, file_path: &Path) -> anyhow::
     let filename = filename.to_os_string();
     for i in 0u32.. {
         let mut mutant_path = filename.clone();
-        mutant_path.push(OsString::from(format!("_{i}.move")));
+        mutant_path.push(OsString::from(format!("_mut{i}.move")));
 
         let mutant_path = output_struct.join(mutant_path);
         if !mutant_path.exists() {
@@ -84,7 +84,7 @@ pub(crate) fn setup_mutant_path(output_dir: &Path, file_path: &Path) -> anyhow::
 
     Err(anyhow::anyhow!(
         "There is more than {} mutants in {output_dir:?}",
-        u32::MAX.to_string()
+        u32::MAX
     ))
 }
 
@@ -139,7 +139,10 @@ mod tests {
         fs::remove_file(filename).unwrap();
         fs::remove_dir_all(output_dir).unwrap();
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), PathBuf::from("mutants_output/💖_0.move"));
+        assert_eq!(
+            result.unwrap(),
+            PathBuf::from("mutants_output/💖_mut0.move")
+        );
     }
 
     #[test]
@@ -153,7 +156,7 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            PathBuf::from("mutants_output_no_extension/file1_0.move")
+            PathBuf::from("mutants_output_no_extension/file1_mut0.move")
         );
     }
 
@@ -168,7 +171,7 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
-            PathBuf::from("mutants_output_correct/test_correct_0.move")
+            PathBuf::from("mutants_output_correct/test_correct_mut0.move")
         );
     }
 
@@ -180,7 +183,7 @@ mod tests {
         let result = setup_mutant_path(output_dir, filename);
         fs::remove_file(filename).unwrap();
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), PathBuf::from("test_empty_0.move"));
+        assert_eq!(result.unwrap(), PathBuf::from("test_empty_mut0.move"));
     }
 
     #[test]

@@ -139,12 +139,11 @@ fn traverse_function(
                 is_inside_spec = !asc;
             }
 
-            // Skip any other operation in asc path to avoid double counting the same exprs.
-            if asc || is_inside_spec {
-                return true;
+            // Parse only during the descend phase and when we are not inside the spec block.
+            if !asc && !is_inside_spec {
+                result.extend(parse_expression_and_find_mutants(function, exp_data));
             }
 
-            result.extend(parse_expression_and_find_mutants(function, exp_data));
             true
         });
     };

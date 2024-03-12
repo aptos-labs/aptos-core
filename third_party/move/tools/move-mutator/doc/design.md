@@ -252,7 +252,7 @@ AST. If any previous mutation changes the original file, it would demand
 reloading the modified source (as upon change, all current AST locations become
 outdated), parsing the AST and again for possible mutations. It would be very
 inefficient. Once mutation places are identified, mutants are generated in
-reversed order (based on localization) to avoid that. Tools is ready to be
+reversed order (based on localization) to avoid that. Tools are ready to be
 extended to support the operator mixing, if needed.
 
 The Move mutator tool implements the following mutation operators.
