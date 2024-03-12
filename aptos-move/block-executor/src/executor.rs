@@ -383,7 +383,7 @@ where
                 scheduler.queueing_commits_arm();
             }
 
-            Ok(SchedulerTask::NoTask)
+            Ok(SchedulerTask::Retry)
         }
     }
 
@@ -739,7 +739,7 @@ where
         drop(init_timer);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
-        let mut scheduler_task = SchedulerTask::NoTask;
+        let mut scheduler_task = SchedulerTask::Retry;
 
         let drain_commit_queue = || -> Result<(), PanicError> {
             while let Ok(txn_idx) = scheduler.pop_from_commit_queue() {
@@ -813,16 +813,19 @@ where
                     scheduler.finish_execution(txn_idx, incarnation, updates_outside)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
-                    let (lock, cvar) = &*condvar;
-                    // Mark dependency resolved.
-                    let mut lock = lock.lock();
-                    *lock = DependencyStatus::Resolved;
-                    // Wake up the process waiting for dependency.
-                    cvar.notify_one();
+                    {
+                        let (lock, cvar) = &*condvar;
+
+                        // Mark dependency resolved.
+                        let mut lock = lock.lock();
+                        *lock = DependencyStatus::Resolved;
+                        // Wake up the process waiting for dependency.
+                        cvar.notify_one();
+                    }
 
                     scheduler.next_task()
                 },
-                SchedulerTask::NoTask => scheduler.next_task(),
+                SchedulerTask::Retry => scheduler.next_task(),
                 SchedulerTask::Done => {
                     drain_commit_queue()?;
                     break Ok(());
