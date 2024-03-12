@@ -273,7 +273,7 @@ fn test_dag_bitmask() {
     let (signers, epoch_state, dag, _) = setup();
 
     assert_eq!(
-        dag.read().bitmask(TEST_DAG_WINDOW),
+        dag.read().bitmask(0, TEST_DAG_WINDOW),
         DagSnapshotBitmask::new(1, vec![vec![false; 4]; TEST_DAG_WINDOW as usize])
     );
 
@@ -290,9 +290,12 @@ fn test_dag_bitmask() {
             assert!(dag.write().add_node_for_test(node).is_ok());
         }
     }
-    let mut bitmask = vec![vec![true, true, true, false]; 2];
-    bitmask.resize(TEST_DAG_WINDOW as usize + 1, vec![false; 4]);
-    assert_eq!(dag.read().bitmask(8), DagSnapshotBitmask::new(3, bitmask));
+    let mut bitmask = vec![vec![true, true, true, false]; 4];
+    bitmask.resize(8, vec![false; 4]);
+    assert_eq!(
+        dag.read().bitmask(3, 8),
+        DagSnapshotBitmask::new(1, bitmask)
+    );
 
     // Populate the fourth author for all rounds
     for round in 1..5 {
@@ -307,11 +310,11 @@ fn test_dag_bitmask() {
         assert!(dag.write().add_node_for_test(node).is_ok());
     }
     assert_eq!(
-        dag.read().bitmask(10),
+        dag.read().bitmask(0, 10),
         DagSnapshotBitmask::new(5, vec![vec![false; 4]; 6])
     );
     assert_eq!(
-        dag.read().bitmask(6),
+        dag.read().bitmask(0, 6),
         DagSnapshotBitmask::new(5, vec![vec![false; 4]; 2])
     );
 }

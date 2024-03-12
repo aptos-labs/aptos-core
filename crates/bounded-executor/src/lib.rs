@@ -7,5 +7,5 @@
 mod concurrent_stream;
 mod executor;
 
-pub use concurrent_stream::concurrent_map;
+pub use concurrent_stream::ConcurrentStream;
 pub use executor::BoundedExecutor;

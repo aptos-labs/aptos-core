@@ -8,6 +8,7 @@ use crate::{
         dag_network::RpcHandler,
         errors::NodeBroadcastHandleError,
         observability::{
+            counters::RB_HANDLE_ACKS,
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, NodeStage},
         },
@@ -15,6 +16,7 @@ use crate::{
         types::{Node, NodeCertificate, Vote},
         NodeId,
     },
+    monitor,
     util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure};
@@ -32,6 +34,7 @@ use async_trait::async_trait;
 use claims::assert_some;
 use dashmap::DashSet;
 use std::{collections::BTreeMap, mem, sync::Arc};
+use tokio::task::JoinHandle;
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<DagStore>,
@@ -48,6 +51,7 @@ pub(crate) struct NodeBroadcastHandler {
     vtxn_config: ValidatorTxnConfig,
     features: Features,
     health_backoff: HealthBackoff,
+    quorum_store_enabled: bool,
 }
 
 impl NodeBroadcastHandler {
@@ -62,9 +66,13 @@ impl NodeBroadcastHandler {
         vtxn_config: ValidatorTxnConfig,
         features: Features,
         health_backoff: HealthBackoff,
+        quorum_store_enabled: bool,
     ) -> Self {
         let epoch = epoch_state.epoch;
-        let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
+        let votes_by_round_peer = monitor!(
+            "dag_rb_handler_storage_read",
+            read_votes_from_storage(&storage, epoch)
+        );
 
         Self {
             dag,
@@ -79,6 +87,7 @@ impl NodeBroadcastHandler {
             vtxn_config,
             features,
             health_backoff,
+            quorum_store_enabled,
         }
     }
 
@@ -89,7 +98,7 @@ impl NodeBroadcastHandler {
         }
     }
 
-    pub fn gc_before_round(&self, min_round: Round) -> anyhow::Result<()> {
+    pub fn gc_before_round(&self, min_round: Round) -> anyhow::Result<JoinHandle<()>> {
         let mut votes_by_round_peer_guard = self.votes_by_round_peer.lock();
         let to_retain = votes_by_round_peer_guard.split_off(&min_round);
         let to_delete = mem::replace(&mut *votes_by_round_peer_guard, to_retain);
@@ -103,7 +112,15 @@ impl NodeBroadcastHandler {
                     .map(|(author, _)| NodeId::new(self.epoch_state.epoch, *r, *author))
             })
             .collect();
-        self.storage.delete_votes(to_delete)
+        //TODO: limit spawn?
+        let storage = self.storage.clone();
+        Ok(tokio::task::spawn_blocking(move || {
+            monitor!("dag_votes_gc", {
+                if let Err(e) = storage.delete_votes(to_delete) {
+                    error!("Error deleting votes: {:?}", e);
+                }
+            });
+        }))
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
@@ -175,6 +192,13 @@ impl NodeBroadcastHandler {
             }
         }
 
+        ensure!(
+            node.payload()
+                .verify(&self.epoch_state.verifier, self.quorum_store_enabled)
+                .is_ok(),
+            "invalid payload"
+        );
+
         Ok(node)
     }
 }
@@ -237,6 +261,7 @@ impl RpcHandler for NodeBroadcastHandler {
             .or_default()
             .get(node.author())
         {
+            RB_HANDLE_ACKS.inc();
             return Ok(ack.clone());
         }
 

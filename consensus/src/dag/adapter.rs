@@ -14,6 +14,7 @@ use crate::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
+    monitor,
     pipeline::buffer_manager::OrderedBlocks,
 };
 use anyhow::{anyhow, bail, format_err};
@@ -211,14 +212,16 @@ impl OrderedNotifier for OrderedNotifierAdapter {
             callback: Box::new(
                 move |committed_blocks: &[Arc<PipelinedBlock>],
                       commit_decision: LedgerInfoWithSignatures| {
-                    block_created_ts
-                        .write()
-                        .retain(|&round, _| round > commit_decision.commit_info().round());
-                    dag.commit_callback(commit_decision.commit_info().round());
-                    ledger_info_provider
-                        .write()
-                        .notify_commit_proof(commit_decision);
-                    update_counters_for_committed_blocks(committed_blocks);
+                    monitor!("dag_block_commit_callback", {
+                        block_created_ts
+                            .write()
+                            .retain(|&round, _| round > commit_decision.commit_info().round());
+                        dag.commit_callback(commit_decision.commit_info().round());
+                        ledger_info_provider
+                            .write()
+                            .notify_commit_proof(commit_decision);
+                        update_counters_for_committed_blocks(committed_blocks);
+                    })
                 },
             ),
         };
