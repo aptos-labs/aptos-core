@@ -253,7 +253,7 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
             let bid_size = rng.gen_range(4, 14);
             let ask_size = rng.gen_range(4, 14);
 
-            if txn_counter <= (*num_market)*100 || txn_counter % 2 == 0 {
+            if txn_counter <= (*num_markets)*100 || txn_counter % 2 == 0 {
                 let bid_price = rng.gen_range(1, 200);
                 let ask_price = rng.gen_range(201, 400);
 
