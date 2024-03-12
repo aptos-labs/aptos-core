@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 
+use std::str::FromStr;
+
 use crate::{
     jwks::rsa::RSA_JWK,
     keyless::{
@@ -13,6 +15,7 @@ use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
 use ark_bn254::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_big_array::BigArray;
@@ -240,10 +243,10 @@ pub fn get_public_inputs_hash(
 ) -> anyhow::Result<Fr> {
     if let EphemeralCertificate::ZeroKnowledgeSig(proof) = &sig.cert {
         let (has_extra_field, extra_field_hash) = match &proof.extra_field {
-            None => (Fr::zero(), poseidon_bn254::pad_and_hash_string(
-                " ",
-                config.max_extra_field_bytes as usize,
-            )?),
+            None => (
+                Fr::zero(),
+                // When extra_field is none, set the hash to the constant below which is equal to the hash of a single space string.
+                Fr::from_le_bytes_mod_order(&BigUint::from_str("8441624714246672702469557419929302030072955765775944993548127422079350103481")?.to_bytes_le())),
             Some(extra_field) => (
                 Fr::one(),
                 poseidon_bn254::pad_and_hash_string(
