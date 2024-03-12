@@ -23,14 +23,13 @@ use aptos_types::{
     event::{EventHandle, EventKey},
     state_store::state_key::StateKey,
 };
-use move_core_types::{
-    identifier::Identifier, language_storage::StructTag, move_resource::MoveStructType,
-};
+use move_core_types::{identifier::Identifier, language_storage::StructTag};
 use poem_openapi::{
     param::{Path, Query},
     OpenApi,
 };
 use std::{collections::BTreeMap, convert::TryInto, sync::Arc};
+use move_core_types::move_resource::MoveStructType;
 
 /// API for accounts, their associated resources, and modules
 pub struct AccountsApi {

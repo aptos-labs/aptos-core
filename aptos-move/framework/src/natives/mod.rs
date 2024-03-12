@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod account;
+
 pub mod aggregator_natives;
 pub mod code;
 pub mod consensus_config;
@@ -22,6 +23,7 @@ pub mod string_utils;
 pub mod transaction_context;
 pub mod type_info;
 pub mod util;
+mod lite_account;
 
 use crate::natives::cryptography::multi_ed25519;
 use aggregator_natives::{aggregator, aggregator_factory, aggregator_v2};
@@ -95,6 +97,10 @@ pub fn all_natives(
     add_natives_from_module!(
         "permissioned_signer",
         permissioned_signer::make_all(builder)
+    );
+    add_natives_from_module!(
+        "lite_account",
+        lite_account::make_all(builder)
     );
 
     if inject_create_signer_for_gov_sim {

@@ -28,6 +28,7 @@ use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{convert::TryFrom, fmt, str::FromStr};
 use thiserror::Error;
+use crate::function_info::FunctionInfo;
 
 /// Maximum number of signatures supported in `TransactionAuthenticator`,
 /// across all `AccountAuthenticator`s included.
@@ -39,6 +40,28 @@ pub const MAX_NUM_OF_SIGS: usize = 32;
 pub enum AuthenticationError {
     /// The number of signatures exceeds the maximum supported.
     MaxSignaturesExceeded,
+}
+
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AuthenticationProof {
+    Key(Vec<u8>),
+    Abstraction(FunctionInfo, Vec<u8>),
+    None,
+}
+
+impl AuthenticationProof {
+    pub fn is_abstracted(&self) -> bool {
+        matches!(self, Self::Abstraction(..))
+    }
+
+    pub fn optional_auth_key(&self) -> Option<Vec<u8>> {
+        match self {
+            Self::Key(data) => Some(data.clone()),
+            Self::Abstraction(..) => None,
+            Self::None => None,
+        }
+    }
 }
 
 /// Each transaction submitted to the Aptos blockchain contains a `TransactionAuthenticator`. During
@@ -313,8 +336,8 @@ impl TransactionAuthenticator {
                 let mut account_authenticators: Vec<AccountAuthenticator> = vec![];
                 account_authenticators.push(self.sender());
                 account_authenticators.extend(self.secondary_signers());
-                if let Some(fee_payer) = self.fee_payer_signer() {
-                    account_authenticators.push(fee_payer);
+                if let Some(fee_payer_signer) = self.fee_payer_signer() {
+                    account_authenticators.push(fee_payer_signer);
                 }
                 account_authenticators
             },
@@ -364,6 +387,7 @@ impl TransactionAuthenticator {
                 AccountAuthenticator::NoAccountAuthenticator => {
                     //  This case adds no single key authenticators to the vector.
                 },
+                AccountAuthenticator::Abstraction { .. } => {}
             };
         }
         Ok(single_key_authenticators)
@@ -455,6 +479,7 @@ pub enum Scheme {
     MultiEd25519 = 1,
     SingleKey = 2,
     MultiKey = 3,
+    Abstraction = 4,
     NoScheme = 250,
     /// Scheme identifier used to derive addresses (not the authentication key) of objects and
     /// resources accounts. This application serves to domain separate hashes. Without such
@@ -476,6 +501,7 @@ impl fmt::Display for Scheme {
             Scheme::SingleKey => "SingleKey",
             Scheme::MultiKey => "MultiKey",
             Scheme::NoScheme => "NoScheme",
+            Scheme::Abstraction => "Abstraction",
             Scheme::DeriveAuid => "DeriveAuid",
             Scheme::DeriveObjectAddressFromObject => "DeriveObjectAddressFromObject",
             Scheme::DeriveObjectAddressFromGuid => "DeriveObjectAddressFromGuid",
@@ -486,7 +512,7 @@ impl fmt::Display for Scheme {
     }
 }
 
-/// An `AccountAuthenticator` is an an abstraction of a signature scheme. It must know:
+/// An `AccountAuthenticator` is an abstraction of a signature scheme. It must know:
 /// (1) How to check its signature against a message and public key
 /// (2) How to convert its public key into an `AuthenticationKeyPreimage` structured as
 /// (public_key | signature_scheme_id).
@@ -511,6 +537,10 @@ pub enum AccountAuthenticator {
         authenticator: MultiKeyAuthenticator,
     },
     NoAccountAuthenticator,
+    Abstraction {
+        function_info: FunctionInfo,
+        authenticator: Vec<u8>,
+    }
     // ... add more schemes here
 }
 
@@ -523,6 +553,7 @@ impl AccountAuthenticator {
             Self::SingleKey { .. } => Scheme::SingleKey,
             Self::MultiKey { .. } => Scheme::MultiKey,
             Self::NoAccountAuthenticator => Scheme::NoScheme,
+            Self::Abstraction { .. } => Scheme::Abstraction
         }
     }
 
@@ -555,6 +586,15 @@ impl AccountAuthenticator {
         Self::MultiKey { authenticator }
     }
 
+    /// Create a abstracted authenticator
+    pub fn abstraction(function_info: FunctionInfo, authenticator: Vec<u8>) -> Self {
+        Self::Abstraction { function_info, authenticator }
+    }
+
+    pub fn is_abstracted(&self) -> bool {
+        matches!(self, Self::Abstraction { .. })
+    }
+
     /// Return Ok if the authenticator's public key matches its signature, Err otherwise
     pub fn verify<T: Serialize + CryptoHash>(&self, message: &T) -> Result<()> {
         match self {
@@ -569,6 +609,8 @@ impl AccountAuthenticator {
             Self::SingleKey { authenticator } => authenticator.verify(message),
             Self::MultiKey { authenticator } => authenticator.verify(message),
             Self::NoAccountAuthenticator => bail!("No signature to verify."),
+            // Abstraction delayed the authentication after prologue.
+            Self::Abstraction { .. } => Ok(())
         }
     }
 
@@ -580,6 +622,7 @@ impl AccountAuthenticator {
             Self::SingleKey { authenticator } => authenticator.public_key_bytes(),
             Self::MultiKey { authenticator } => authenticator.public_key_bytes(),
             Self::NoAccountAuthenticator => vec![],
+            Self::Abstraction { .. } => vec![],
         }
     }
 
@@ -591,18 +634,16 @@ impl AccountAuthenticator {
             Self::SingleKey { authenticator } => authenticator.signature_bytes(),
             Self::MultiKey { authenticator } => authenticator.signature_bytes(),
             Self::NoAccountAuthenticator => vec![],
+            Self::Abstraction { .. } => vec![],
         }
     }
 
-    /// Return an authentication key derived from `self`'s public key and scheme id
-    pub fn authentication_key(&self) -> Option<AuthenticationKey> {
-        if let Self::NoAccountAuthenticator = self {
-            None
-        } else {
-            Some(AuthenticationKey::from_preimage(
-                self.public_key_bytes(),
-                self.scheme(),
-            ))
+    /// Return an authentication proof derived from `self`'s public key and scheme id
+    pub fn authentication_proof(&self) -> AuthenticationProof {
+        match self {
+            Self::NoAccountAuthenticator => AuthenticationProof::None,
+            Self::Abstraction { function_info, authenticator } => AuthenticationProof::Abstraction(function_info.clone(), authenticator.clone()),
+            _ => AuthenticationProof::Key(AuthenticationKey::from_preimage(self.public_key_bytes(), self.scheme()).to_vec())
         }
     }
 
@@ -614,6 +655,7 @@ impl AccountAuthenticator {
             Self::SingleKey { .. } => 1,
             Self::MultiKey { authenticator } => authenticator.signatures.len(),
             Self::NoAccountAuthenticator => 0,
+            Self::Abstraction { .. } => 0,
         }
     }
 }
@@ -1344,6 +1386,19 @@ mod tests {
     #[test]
     fn test_from_str_should_not_panic_by_given_empty_string() {
         assert!(AuthenticationKey::from_str("").is_err());
+    }
+
+    #[test]
+    fn verify_abstracted_key_auth() {
+        let signed_txn = crate::test_helpers::transaction_test_helpers::get_test_signed_aa_transaction(
+            AccountAddress::ONE,
+            0,
+            None,
+            None,
+            None,
+            None,
+        );
+        signed_txn.verify_signature().unwrap();
     }
 
     #[test]

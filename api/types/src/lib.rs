@@ -55,7 +55,7 @@ pub use transaction::{
     TransactionSignature, TransactionSigningMessage, TransactionsBatchSingleSubmissionFailure,
     TransactionsBatchSubmissionResult, UserCreateSigningMessageRequest, UserTransaction,
     UserTransactionRequest, VersionedEvent, WriteModule, WriteResource, WriteSet, WriteSetChange,
-    WriteSetPayload, WriteTableItem,
+    WriteSetPayload, WriteTableItem, AbstractionSignature
 };
 pub use view::{ViewFunction, ViewRequest};
 pub use wrappers::{EventGuid, IdentifierWrapper, StateKeyWrapper};
