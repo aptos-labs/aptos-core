@@ -1,0 +1,2 @@
+bucket = ""
+prefix = "state/validator"
