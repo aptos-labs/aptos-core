@@ -80,91 +80,85 @@ pub fn run_move_mutator(
     let output_dir = output::setup_output_dir(&mutator_configuration)?;
     let mut report: Report = Report::new();
 
-    for fileid in &env.get_source_file_ids() {
+    for mutant in &mutants {
+        let fileid = &mutant.get_file_id();
         let source = env.get_file_source(*fileid);
         let filename = env.get_file(*fileid);
         let path = Path::new(filename);
 
         trace!("Processing file: {path:?}");
 
-        // This `i` must be here as we must iterate over all mutants for a given file (ext and internal loop).
-        let mut mutant_file_idx = 0u64;
-        for mutant in mutants.iter().filter(|m| m.get_file_id() == *fileid) {
-            let mut mutated_sources = mutant.apply(source);
+        let mut mutated_sources = mutant.apply(source);
 
-            // If the downsample ratio is set, we need to downsample the mutants.
-            //TODO: currently we are downsampling the mutants after they are generated. This is not
-            // ideal as we are generating all mutants and then removing some of them.
-            if let Some(percentage) = mutator_configuration.project.downsampling_ratio_percentage {
-                let no_of_mutants_to_keep = mutated_sources
-                    .len()
-                    .saturating_sub((mutated_sources.len() * percentage).div_ceil(100));
-                assert!(
-                    no_of_mutants_to_keep <= mutated_sources.len(),
-                    "Invalid downsampling ratio"
-                );
+        // If the downsample ratio is set, we need to downsample the mutants.
+        //TODO: currently we are downsampling the mutants after they are generated. This is not
+        // ideal as we are generating all mutants and then removing some of them.
+        if let Some(percentage) = mutator_configuration.project.downsampling_ratio_percentage {
+            let no_of_mutants_to_keep = mutated_sources
+                .len()
+                .saturating_sub((mutated_sources.len() * percentage).div_ceil(100));
+            assert!(
+                no_of_mutants_to_keep <= mutated_sources.len(),
+                "Invalid downsampling ratio"
+            );
 
-                // Delete randomly elements from the vector.
-                let mut rng = thread_rng();
-                let chosen_elements: Vec<_> = mutated_sources
-                    .choose_multiple(&mut rng, no_of_mutants_to_keep)
-                    .cloned()
-                    .collect();
+            // Delete randomly elements from the vector.
+            let mut rng = thread_rng();
+            let chosen_elements: Vec<_> = mutated_sources
+                .choose_multiple(&mut rng, no_of_mutants_to_keep)
+                .cloned()
+                .collect();
 
-                mutated_sources = chosen_elements;
+            mutated_sources = chosen_elements;
+        }
+
+        for mutated in mutated_sources {
+            if let Some(mutation_conf) = &mutator_configuration.mutation {
+                if !mutation_conf.operators.is_empty()
+                    && !mutation_conf
+                        .operators
+                        .contains(&mutated.mutation.get_operator_name().to_owned())
+                {
+                    continue;
+                }
             }
 
-            for mutated in mutated_sources {
-                if let Some(mutation_conf) = &mutator_configuration.mutation {
-                    if !mutation_conf.operators.is_empty()
-                        && !mutation_conf
-                            .operators
-                            .contains(&mutated.mutation.get_operator_name().to_owned())
-                    {
-                        continue;
-                    }
+            if mutator_configuration.project.verify_mutants {
+                let res = verify_mutant(config, &mutated.mutated_source, path);
+
+                // In case the mutant is not a valid Move file, skip the mutant (do not save it).
+                if res.is_err() {
+                    warn!("Mutant {mutant} is not valid and will not be generated. Error: {res:?}");
+                    continue;
                 }
-
-                if mutator_configuration.project.verify_mutants {
-                    let res = verify_mutant(config, &mutated.mutated_source, path);
-
-                    // In case the mutant is not a valid Move file, skip the mutant (do not save it).
-                    if res.is_err() {
-                        warn!(
-                            "Mutant {mutant} is not valid and will not be generated. Error: {res:?}"
-                        );
-                        continue;
-                    }
-                }
-
-                let mutant_path = output::setup_mutant_path(&output_dir, path, mutant_file_idx)?;
-                mutant_file_idx += 1;
-
-                fs::write(&mutant_path, &mutated.mutated_source)?;
-
-                info!("{} written to {}", mutant, mutant_path.display());
-
-                let mod_name = if let Some(name) = mutant.get_module_name() {
-                    name
-                } else {
-                    "script".to_owned() // if there is no module name, it is a script
-                };
-
-                let mut entry = report::MutationReport::new(
-                    mutant_path.as_path(),
-                    path,
-                    mod_name.as_str(),
-                    mutant
-                        .get_function_name()
-                        .map_or_else(String::new, |f| f.to_string())
-                        .as_str(),
-                    &mutated.mutated_source,
-                    source,
-                );
-
-                entry.add_modification(mutated.mutation);
-                report.add_entry(entry);
             }
+
+            let mutant_path = output::setup_mutant_path(&output_dir, path)?;
+
+            fs::write(&mutant_path, &mutated.mutated_source)?;
+
+            info!("{} written to {}", mutant, mutant_path.display());
+
+            let mod_name = if let Some(name) = mutant.get_module_name() {
+                name
+            } else {
+                "script".to_owned() // if there is no module name, it is a script
+            };
+
+            let mut entry = report::MutationReport::new(
+                mutant_path.as_path(),
+                path,
+                mod_name.as_str(),
+                mutant
+                    .get_function_name()
+                    .map_or_else(String::new, |f| f.to_string())
+                    .as_str(),
+                &mutated.mutated_source,
+                source,
+            );
+
+            entry.add_modification(mutated.mutation);
+            report.add_entry(entry);
         }
     }
 
