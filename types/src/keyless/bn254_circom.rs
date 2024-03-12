@@ -240,7 +240,10 @@ pub fn get_public_inputs_hash(
 ) -> anyhow::Result<Fr> {
     if let EphemeralCertificate::ZeroKnowledgeSig(proof) = &sig.cert {
         let (has_extra_field, extra_field_hash) = match &proof.extra_field {
-            None => (Fr::zero(), Fr::zero()),
+            None => (Fr::zero(), poseidon_bn254::pad_and_hash_string(
+                " ",
+                config.max_extra_field_bytes as usize,
+            )?),
             Some(extra_field) => (
                 Fr::one(),
                 poseidon_bn254::pad_and_hash_string(
