@@ -3,6 +3,7 @@
 
 # Module `0x1::jwk_consensus_config`
 
+Structs and functions related to JWK consensus configurations.
 
 
 -  [Resource `JWKConsensusConfig`](#0x1_jwk_consensus_config_JWKConsensusConfig)
@@ -156,6 +157,7 @@ A JWK consensus config variant indicating JWK consensus should run to watch a gi
 
 <a id="0x1_jwk_consensus_config_EDUPLICATE_PROVIDERS"></a>
 
+<code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_ConfigV1">ConfigV1</a></code> creation failed with duplicated providers given.
 
 
 <pre><code><b>const</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_EDUPLICATE_PROVIDERS">EDUPLICATE_PROVIDERS</a>: u64 = 1;
@@ -167,6 +169,7 @@ A JWK consensus config variant indicating JWK consensus should run to watch a gi
 
 ## Function `initialize`
 
+Initialize the configuration. Used in genesis or governance.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_initialize">initialize</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">jwk_consensus_config::JWKConsensusConfig</a>)
@@ -194,6 +197,16 @@ A JWK consensus config variant indicating JWK consensus should run to watch a gi
 
 ## Function `set_for_next_epoch`
 
+This can be called by on-chain governance to update JWK consensus configs for the next epoch.
+Example usage:
+```
+use aptos_framework::jwk_consensus_config;
+use aptos_framework::aptos_governance;
+// ...
+let config = jwk_consensus_config::new_v1(vector[]);
+jwk_consensus_config::set_for_next_epoch(&framework_signer, config);
+aptos_governance::reconfigure(&framework_signer);
+```
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_set_for_next_epoch">set_for_next_epoch</a>(framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, config: <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">jwk_consensus_config::JWKConsensusConfig</a>)
@@ -219,6 +232,7 @@ A JWK consensus config variant indicating JWK consensus should run to watch a gi
 
 ## Function `on_new_epoch`
 
+Only used in reconfigurations to apply the pending <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a></code>, if there is any.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_on_new_epoch">on_new_epoch</a>()

@@ -1140,7 +1140,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         onchain_consensus_config: OnChainConsensusConfig,
         on_chain_execution_config: OnChainExecutionConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
-        onchain_jwkconsensus_config: OnChainJWKConsensusConfig,
+        onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
         network_sender: NetworkSender,
         payload_client: Arc<dyn PayloadClient>,
         payload_manager: Arc<PayloadManager>,
@@ -1205,7 +1205,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.effective_validator_txn_config(),
             onchain_randomness_config,
-            onchain_jwkconsensus_config,
+            onchain_jwk_consensus_config,
             self.bounded_executor.clone(),
         );
 

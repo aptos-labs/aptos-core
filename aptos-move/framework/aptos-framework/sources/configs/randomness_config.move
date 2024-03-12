@@ -43,6 +43,7 @@ module aptos_framework::randomness_config {
         config_buffer::upsert(new_config);
     }
 
+    /// Only used in reconfigurations to apply the pending `RandomnessConfig`, if there is any.
     public(friend) fun on_new_epoch() acquires RandomnessConfig {
         if (config_buffer::does_exist<RandomnessConfig>()) {
             let new_config = config_buffer::extract<RandomnessConfig>();
@@ -52,8 +53,8 @@ module aptos_framework::randomness_config {
 
     /// Check whether on-chain randomness main logic (e.g., `DKGManager`, `RandManager`, `BlockMetadataExt`) is enabled.
     ///
-    /// NOTE: the main logic is not the only dependency.
-    /// On-chain randomness works if and only if `consensus_config::validator_txn_enabled() && randomness_config::enabled()`.
+    /// NOTE: this returning true does not mean randomness will run.
+    /// The feature works if and only if `consensus_config::validator_txn_enabled() && randomness_config::enabled()`.
     public fun enabled(): bool acquires RandomnessConfig {
         if (exists<RandomnessConfig>(@aptos_framework)) {
             let config = borrow_global<RandomnessConfig>(@aptos_framework);
@@ -100,7 +101,7 @@ module aptos_framework::randomness_config {
     }
 
     #[test(framework = @0x1)]
-    fun basic(framework: signer) acquires RandomnessConfig {
+    fun init_buffer_apply(framework: signer) acquires RandomnessConfig {
         initialize_for_testing(&framework);
 
         // Enabling.

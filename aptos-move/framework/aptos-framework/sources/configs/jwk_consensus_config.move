@@ -1,3 +1,4 @@
+/// Structs and functions related to JWK consensus configurations.
 module aptos_framework::jwk_consensus_config {
     use std::error;
     use std::option;
@@ -15,6 +16,7 @@ module aptos_framework::jwk_consensus_config {
 
     friend aptos_framework::reconfiguration_with_dkg;
 
+    /// `ConfigV1` creation failed with duplicated providers given.
     const EDUPLICATE_PROVIDERS: u64 = 1;
 
     /// The configuration of the JWK consensus feature.
@@ -39,6 +41,7 @@ module aptos_framework::jwk_consensus_config {
         oidc_providers: vector<OIDCProvider>,
     }
 
+    /// Initialize the configuration. Used in genesis or governance.
     public fun initialize(framework: &signer, config: JWKConsensusConfig) {
         system_addresses::assert_aptos_framework(framework);
         if (!exists<JWKConsensusConfig>(@aptos_framework)) {
@@ -46,11 +49,22 @@ module aptos_framework::jwk_consensus_config {
         }
     }
 
+    /// This can be called by on-chain governance to update JWK consensus configs for the next epoch.
+    /// Example usage:
+    /// ```
+    /// use aptos_framework::jwk_consensus_config;
+    /// use aptos_framework::aptos_governance;
+    /// // ...
+    /// let config = jwk_consensus_config::new_v1(vector[]);
+    /// jwk_consensus_config::set_for_next_epoch(&framework_signer, config);
+    /// aptos_governance::reconfigure(&framework_signer);
+    /// ```
     public fun set_for_next_epoch(framework: &signer, config: JWKConsensusConfig) {
         system_addresses::assert_aptos_framework(framework);
         config_buffer::upsert(config);
     }
 
+    /// Only used in reconfigurations to apply the pending `JWKConsensusConfig`, if there is any.
     public(friend) fun on_new_epoch() acquires JWKConsensusConfig {
         if (config_buffer::does_exist<JWKConsensusConfig>()) {
             let new_config = config_buffer::extract<JWKConsensusConfig>();
@@ -101,18 +115,17 @@ module aptos_framework::jwk_consensus_config {
     }
 
     #[test(framework = @0x1)]
-    fun basic(framework: signer) acquires JWKConsensusConfig {
+    fun init_buffer_apply(framework: signer) acquires JWKConsensusConfig {
         initialize_for_testing(&framework);
-        let config_1 = new_v1(vector[
+        let config = new_v1(vector[
             new_oidc_provider(utf8(b"Bob"), utf8(b"https://bob.dev")),
             new_oidc_provider(utf8(b"Alice"), utf8(b"https://alice.io")),
         ]);
-        set_for_next_epoch(&framework, config_1);
+        set_for_next_epoch(&framework, config);
         on_new_epoch();
         assert!(enabled(), 1);
 
-        let config_2 = new_off();
-        set_for_next_epoch(&framework, config_2);
+        set_for_next_epoch(&framework, new_off());
         on_new_epoch();
         assert!(!enabled(), 2)
     }

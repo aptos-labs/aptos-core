@@ -184,6 +184,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 (should_run, Some(SupportedOIDCProviders { providers }))
             },
             Err(_) => {
+                //TODO: remove this case once the framework change of this commit is published.
                 let should_run = features.is_enabled(FeatureFlag::JWK_CONSENSUS)
                     && onchain_consensus_config.is_vtxn_enabled();
                 let providers = payload.get::<SupportedOIDCProviders>().ok();

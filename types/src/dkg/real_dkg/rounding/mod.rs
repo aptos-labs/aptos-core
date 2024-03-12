@@ -2,6 +2,7 @@
 
 use aptos_dkg::pvss::WeightedConfig;
 use fixed::types::U64F64;
+use once_cell::sync::Lazy;
 use std::{
     cmp::max,
     fmt,
@@ -244,3 +245,9 @@ fn compute_profile_fixed_point(
 
 #[cfg(test)]
 mod tests;
+
+pub static DEFAULT_SECRECY_THRESHOLD: Lazy<U64F64> =
+    Lazy::new(|| U64F64::from_num(1) / U64F64::from_num(2));
+
+pub static DEFAULT_RECONSTRUCT_THRESHOLD: Lazy<U64F64> =
+    Lazy::new(|| U64F64::from_num(2) / U64F64::from_num(3));

@@ -1,7 +1,12 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg::{real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait},
+    dkg::{
+        real_dkg::rounding::{
+            DKGRounding, DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
+        },
+        DKGSessionMetadata, DKGTrait,
+    },
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
@@ -57,8 +62,12 @@ pub fn build_dkg_pvss_config(
 
     let dkg_rounding = DKGRounding::new(
         &validator_stakes,
-        randomness_config.secrecy_threshold().unwrap(),
-        randomness_config.reconstruct_threshold().unwrap(),
+        randomness_config
+            .secrecy_threshold()
+            .unwrap_or_else(|| *DEFAULT_SECRECY_THRESHOLD),
+        randomness_config
+            .reconstruct_threshold()
+            .unwrap_or_else(|| *DEFAULT_RECONSTRUCT_THRESHOLD),
     );
 
     println!(

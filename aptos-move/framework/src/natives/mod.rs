@@ -14,7 +14,6 @@ pub mod hash;
 pub mod object;
 pub mod object_code_deployment;
 pub mod randomness;
-pub mod randomness_config;
 pub mod state_storage;
 pub mod string_utils;
 pub mod transaction_context;
@@ -84,7 +83,6 @@ pub fn all_natives(
     add_natives_from_module!("debug", debug::make_all(builder));
     add_natives_from_module!("string_utils", string_utils::make_all(builder));
     add_natives_from_module!("consensus_config", consensus_config::make_all(builder));
-    add_natives_from_module!("randomness_config", randomness_config::make_all(builder));
 
     make_table_from_iter(framework_addr, natives)
 }

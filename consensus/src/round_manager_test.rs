@@ -66,7 +66,7 @@ use aptos_types::{
     jwks::QuorumCertifiedUpdate,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, FeatureFlag, Features, OnChainConsensusConfig,
+        ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
         OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
     },
     transaction::SignedTransaction,
@@ -2120,8 +2120,7 @@ fn no_vote_on_proposal_with_unexpected_vtxns() {
     let vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(
         QuorumCertifiedUpdate::dummy(),
     )];
-    let mut features = Features::default();
-    features.disable(FeatureFlag::JWK_CONSENSUS);
+
     assert_process_proposal_result(
         None,
         Some(OnChainJWKConsensusConfig::default_disabled()),
@@ -2129,7 +2128,6 @@ fn no_vote_on_proposal_with_unexpected_vtxns() {
         false,
     );
 
-    features.enable(FeatureFlag::JWK_CONSENSUS);
     assert_process_proposal_result(
         None,
         Some(OnChainJWKConsensusConfig::default_enabled()),
