@@ -339,7 +339,7 @@ impl WorkflowTxnGeneratorCreator {
                     count,
                 )
             },
-            WorkflowKind::Econia { num_users, flow_type, num_markets, reuse_accounts_for_orders , publish_packages: bool } => {
+            WorkflowKind::Econia { num_users, flow_type, num_markets, reuse_accounts_for_orders , publish_packages } => {
                 let create_accounts = initial_account_pool.is_none();
                 let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());
