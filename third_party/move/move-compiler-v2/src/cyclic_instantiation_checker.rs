@@ -39,7 +39,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         if let Some(fun_body) = fun_env.get_def() {
             let mut callers = self.gen_init_callers_chain(fun_id);
             let insts = self.gen_generic_insts_for_fun(fun_id);
-            fun_body.visit_positions(&mut |pos, e| self.visit(pos, e, insts.clone(), &mut callers));
+            fun_body.visit_positions(&mut |pos, e| self.visit(pos, e, &insts, &mut callers));
         }
     }
 
@@ -65,7 +65,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         &self,
         position: VisitorPosition,
         e: &ExpData,
-        insts: Vec<Type>,
+        insts: &[Type],
         callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
     ) -> bool {
         use ExpData::*;
@@ -82,7 +82,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         &self,
         nid: &NodeId,
         op: &Operation,
-        insts: Vec<Type>,
+        insts: &[Type],
         callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
     ) -> bool {
         if let Operation::MoveFunction(mod_id, fun_id) = op {
@@ -132,16 +132,16 @@ impl<'a> CyclicInstantiationChecker<'a> {
         &self,
         caller_node: NodeId,
         caller: QualifiedInstId<FunId>,
-        insts: Vec<Type>,
+        insts: &[Type],
         callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
     ) -> bool {
         let fun_env = self.mod_env.get_function(caller.id);
         if let Some(caller_body) = fun_env.get_def() {
             let caller_loc = self.mod_env.env.get_node_loc(caller_node);
             callers_chain.push((caller_loc, caller));
-            let insts = Type::instantiate_vec(self.get_inst(caller_node), &insts);
+            let insts = Type::instantiate_vec(self.get_inst(caller_node), insts);
             let res = caller_body.visit_positions_with_return_val(&mut |pos, exp| {
-                self.visit(pos, exp, insts.clone(), callers_chain)
+                self.visit(pos, exp, &insts, callers_chain)
             });
             callers_chain.pop();
             res
