@@ -116,7 +116,7 @@ fn check_mutator_fails_on_non_existing_output_path() {
 
     let package_path = Path::new(PACKAGE_PATHS[0]);
 
-    let result = move_mutator::run_move_mutator(options.clone(), &config, &package_path);
+    let result = move_mutator::run_move_mutator(options.clone(), &config, package_path);
     assert!(result.is_err());
 }
 
@@ -140,7 +140,7 @@ fn check_mutator_works_with_single_files() {
 
     let package_path = Path::new(".");
 
-    let result = move_mutator::run_move_mutator(options.clone(), &config, &package_path);
+    let result = move_mutator::run_move_mutator(options.clone(), &config, package_path);
     assert!(result.is_ok());
 
     let report_path = outdir.join("report.json");
@@ -171,7 +171,7 @@ fn check_mutator_fails_verify_file_without_package() {
 
     let package_path = Path::new(".");
 
-    let result = move_mutator::run_move_mutator(options.clone(), &config, &package_path);
+    let result = move_mutator::run_move_mutator(options.clone(), &config, package_path);
     assert!(result.is_ok());
 
     let report_path = outdir.join("report.json");

@@ -1,9 +1,10 @@
-use crate::operator::{MutantInfo, MutationOperator};
-use crate::operators::ExpLoc;
-use crate::report::{Mutation, Range};
+use crate::{
+    operator::{MutantInfo, MutationOperator},
+    operators::ExpLoc,
+    report::{Mutation, Range},
+};
 use codespan::FileId;
-use move_model::ast::Operation;
-use move_model::model::Loc;
+use move_model::{ast::Operation, model::Loc};
 use std::fmt;
 
 pub const OPERATOR_NAME: &str = "binary_operator_swap";

@@ -1,9 +1,10 @@
-use crate::operator::{MutantInfo, MutationOperator};
-use crate::operators::ExpLoc;
-use crate::report::{Mutation, Range};
+use crate::{
+    operator::{MutantInfo, MutationOperator},
+    operators::ExpLoc,
+    report::{Mutation, Range},
+};
 use codespan::FileId;
-use std::fmt;
-use std::fmt::Debug;
+use std::{fmt, fmt::Debug};
 
 pub const OPERATOR_NAME: &str = "if_else_replacement";
 
@@ -85,8 +86,10 @@ impl fmt::Display for IfElse {
 mod tests {
     use super::*;
     use codespan::Files;
-    use move_model::ast::{ExpData, Value};
-    use move_model::model::Loc;
+    use move_model::{
+        ast::{ExpData, Value},
+        model::Loc,
+    };
 
     #[test]
     fn test_apply_ifelse() {
@@ -97,7 +100,7 @@ mod tests {
         let exp = ExpLoc::new(expr.into_exp(), loc);
         let operator = IfElse::new(exp.clone(), exp.clone(), exp);
         let source = "if (a) { }";
-        let expected = vec!["if (true) { }", "if (false) { }", "if (!(a)) { }"];
+        let expected = ["if (true) { }", "if (false) { }", "if (!(a)) { }"];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {

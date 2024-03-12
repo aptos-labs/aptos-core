@@ -14,15 +14,14 @@ mod operators;
 mod output;
 pub mod report;
 
-use crate::compiler::{generate_ast, verify_mutant};
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-use std::fs;
-use std::path::Path;
-
-use crate::configuration::Configuration;
-use crate::report::Report;
+use crate::{
+    compiler::{generate_ast, verify_mutant},
+    configuration::Configuration,
+    report::Report,
+};
 use move_package::BuildConfig;
+use rand::{seq::SliceRandom, thread_rng};
+use std::{fs, path::Path};
 
 /// Runs the Move mutator tool.
 /// Entry point for the Move mutator tool both for the CLI and the Rust API.

@@ -1,9 +1,10 @@
-use crate::operator::{MutantInfo, MutationOperator};
-use crate::operators::ExpLoc;
-use crate::report::{Mutation, Range};
+use crate::{
+    operator::{MutantInfo, MutationOperator},
+    operators::ExpLoc,
+    report::{Mutation, Range},
+};
 use codespan::FileId;
-use move_model::ast::Operation;
-use move_model::model::Loc;
+use move_model::{ast::Operation, model::Loc};
 use std::fmt;
 
 pub const OPERATOR_NAME: &str = "unary_operator_replacement";
@@ -89,8 +90,10 @@ impl fmt::Display for Unary {
 mod tests {
     use super::*;
     use codespan::Files;
-    use move_model::ast::{ExpData, Value};
-    use move_model::model::NodeId;
+    use move_model::{
+        ast::{ExpData, Value},
+        model::NodeId,
+    };
 
     #[test]
     fn test_apply_unary_operator() {
@@ -102,7 +105,7 @@ mod tests {
 
         let operator = Unary::new(Operation::Not, loc, vec![exp]);
         let source = "!";
-        let expected = vec![" "];
+        let expected = [" "];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {

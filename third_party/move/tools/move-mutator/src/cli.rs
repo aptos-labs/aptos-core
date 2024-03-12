@@ -1,7 +1,6 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-use std::str::FromStr;
+use std::{path::PathBuf, str::FromStr};
 
 pub const DEFAULT_OUTPUT_DIR: &str = "mutants_output";
 

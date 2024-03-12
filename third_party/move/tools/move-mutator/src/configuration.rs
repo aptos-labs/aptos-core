@@ -1,7 +1,9 @@
 use crate::cli::CLIOptions;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 /// Configuration file type.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -155,8 +157,7 @@ impl FromStr for IncludeFunctions {
 mod tests {
     use super::*;
     use crate::cli::ModuleFilter;
-    use std::fs;
-    use std::path::Path;
+    use std::{fs, path::Path};
 
     #[test]
     fn configuration_from_toml_file_loads_correctly() {
@@ -175,21 +176,20 @@ mod tests {
         fs::write("test.toml", toml_content).unwrap();
         let config = Configuration::from_toml_file(Path::new("test.toml")).unwrap();
         fs::remove_file("test.toml").unwrap();
-        assert_eq!(
-            config.project.move_sources,
-            vec![Path::new("/path/to/move/source")]
-        );
+        assert_eq!(config.project.move_sources, vec![Path::new(
+            "/path/to/move/source"
+        )]);
         assert_eq!(
             config.project.mutate_modules,
             ModuleFilter::Selected(vec!["module1".to_owned(), "module2".to_owned()])
         );
-        assert_eq!(
-            config.mutation.unwrap().operators,
-            vec!["operator1", "operator2"]
-        );
+        assert_eq!(config.mutation.unwrap().operators, vec![
+            "operator1",
+            "operator2"
+        ]);
         assert_eq!(config.individual.len(), 1);
         assert_eq!(config.individual[0].file, PathBuf::from("/path/to/file"));
-        assert_eq!(config.individual[0].verify_mutants, true);
+        assert!(config.individual[0].verify_mutants);
         assert_eq!(
             config.individual[0].include_functions,
             IncludeFunctions::All
@@ -248,27 +248,26 @@ mod tests {
         fs::write("test.json", json_content).unwrap();
         let config = Configuration::from_json_file(Path::new("test.json")).unwrap();
         fs::remove_file("test.json").unwrap();
-        assert_eq!(
-            config.project.move_sources,
-            vec![Path::new("/path/to/move/source")]
-        );
+        assert_eq!(config.project.move_sources, vec![Path::new(
+            "/path/to/move/source"
+        )]);
         assert_eq!(config.project.mutate_modules, ModuleFilter::All);
         assert_eq!(
             config.project.out_mutant_dir,
             Some(PathBuf::from("/path/to/output"))
         );
-        assert_eq!(config.project.verify_mutants, true);
-        assert_eq!(config.project.no_overwrite, false);
+        assert!(config.project.verify_mutants);
+        assert!(!config.project.no_overwrite);
         assert_eq!(config.project.downsample_filter.unwrap(), "filter");
         assert_eq!(
             config.project.configuration_file.unwrap(),
             Path::new("/path/to/configuration")
         );
         assert_eq!(config.project_path.unwrap(), Path::new("/path/to/project"));
-        assert_eq!(
-            config.mutation.unwrap().operators,
-            vec!["operator1", "operator2"]
-        );
+        assert_eq!(config.mutation.unwrap().operators, vec![
+            "operator1",
+            "operator2"
+        ]);
     }
 
     #[test]

@@ -1,10 +1,11 @@
-use crate::operator::{MutantInfo, MutationOperator};
-use crate::operators::{MOVE_BREAK, MOVE_CONTINUE, MOVE_EMPTY_STMT};
-use crate::report::{Mutation, Range};
+use crate::{
+    operator::{MutantInfo, MutationOperator},
+    operators::{MOVE_BREAK, MOVE_CONTINUE, MOVE_EMPTY_STMT},
+    report::{Mutation, Range},
+};
 use codespan::FileId;
 use move_model::model::Loc;
-use std::fmt;
-use std::fmt::Debug;
+use std::{fmt, fmt::Debug};
 
 pub const OPERATOR_NAME: &str = "break_continue_replacement";
 
@@ -91,7 +92,7 @@ mod tests {
 
         let operator = BreakContinue::new(loc);
         let source = MOVE_CONTINUE;
-        let expected = vec![MOVE_BREAK, MOVE_EMPTY_STMT];
+        let expected = [MOVE_BREAK, MOVE_EMPTY_STMT];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {
