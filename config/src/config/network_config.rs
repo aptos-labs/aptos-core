@@ -114,6 +114,7 @@ pub struct NetworkConfig {
     /// Number of failed healthcheck pings until a peer is marked unhealthy
     pub ping_failures_tolerated: u64,
     /// Maximum number of outbound connections, limited by ConnectivityManager
+    /// Doesn't apply to Validator network; Validators will make unlimited outbound connections to other Validators.
     pub max_outbound_connections: usize,
     /// Maximum number of outbound connections, limited by PeerManager
     pub max_inbound_connections: usize,
