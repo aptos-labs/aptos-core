@@ -357,12 +357,14 @@ impl WorkflowTxnGeneratorCreator {
                 )
                 .await;
                 
-                register_econia_markets(
-                    init_txn_factory.clone(),
-                    &mut packages,
-                    txn_executor,                    
-                    num_markets
-                ).await;
+                if publish_packages {
+                    register_econia_markets(
+                        init_txn_factory.clone(),
+                        &mut packages,
+                        txn_executor,                    
+                        num_markets
+                    ).await;
+                }
 
                 let econia_register_market_user_worker =
                     CustomModulesDelegationGeneratorCreator::create_worker(
