@@ -16,7 +16,7 @@ use crate::dag::{
 };
 use aptos_consensus_types::common::Round;
 use aptos_infallible::Mutex;
-use aptos_logger::debug;
+use aptos_logger::{debug, info};
 use aptos_types::epoch_state::EpochState;
 use std::sync::Arc;
 
@@ -45,6 +45,7 @@ impl OrderRule {
         dag_window_size_config: Round,
         commit_events: Option<Vec<CommitEvent>>,
     ) -> Self {
+        info!("Commit Events from storage: {:?}", commit_events);
         if let Some(commit_events) = commit_events {
             // make sure it's sorted
             assert!(commit_events
@@ -59,12 +60,19 @@ impl OrderRule {
                     if let Some(anchor) = maybe_anchor {
                         dag.write()
                             .reachable_mut(&anchor, None)
-                            .for_each(|node_status| node_status.mark_as_ordered());
+                            .for_each(|node_status| {
+                                debug!(
+                                    "Marking node as ordered from CommitEvent: {}",
+                                    node_status.as_node().id()
+                                );
+                                node_status.mark_as_ordered();
+                            });
                     }
                 }
                 anchor_election.update_reputation(event);
             }
         }
+
         let mut order_rule = Self {
             epoch_state,
             lowest_unordered_anchor_round,
@@ -73,6 +81,7 @@ impl OrderRule {
             notifier,
             dag_window_size_config,
         };
+
         // re-check if anything can be ordered to recover pending anchors
         order_rule.process_all();
         order_rule

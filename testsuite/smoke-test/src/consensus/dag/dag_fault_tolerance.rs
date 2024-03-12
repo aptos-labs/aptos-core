@@ -253,3 +253,66 @@ async fn test_changing_working_consensus() {
     )
     .await;
 }
+
+#[tokio::test]
+async fn test_changing_working_consensus_long() {
+    // with 7 nodes, consensus needs 5 to operate.
+    // we rotate in each cycle, which 2 nodes are down.
+    // we should consisnently be seeing progress.
+    let num_validators = 7;
+    run_dag_fail_point_test(
+        num_validators,
+        6,
+        30.0,
+        2,
+        1.0,
+        num_validators as u64,
+        Box::new(move |cycle, part| {
+            if part == 0 {
+                let client_1 = (cycle * 2) % num_validators;
+                let client_2 = (cycle * 2 + 1) % num_validators;
+                (
+                    vec![
+                        (
+                            client_1,
+                            "consensus::send::any".to_string(),
+                            "return".to_string(),
+                        ),
+                        (
+                            client_1,
+                            "consensus::process::any".to_string(),
+                            "return".to_string(),
+                        ),
+                        (
+                            client_2,
+                            "consensus::send::any".to_string(),
+                            "return".to_string(),
+                        ),
+                        (
+                            client_2,
+                            "consensus::process::any".to_string(),
+                            "return".to_string(),
+                        ),
+                    ],
+                    true,
+                )
+            } else {
+                (vec![], false)
+            }
+        }),
+        Box::new(|_, _, executed_rounds, executed_transactions, _, _| {
+            assert!(
+                executed_transactions >= 1,
+                "no progress with active consensus, only {} transactions",
+                executed_transactions
+            );
+            assert!(
+                executed_rounds >= 1,
+                "no progress with active consensus, only {} rounds",
+                executed_rounds
+            );
+            Ok(())
+        }),
+    )
+    .await;
+}

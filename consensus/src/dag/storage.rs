@@ -8,7 +8,7 @@ use aptos_crypto::HashValue;
 use aptos_types::ledger_info::LedgerInfoWithSignatures;
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CommitEvent {
     node_id: NodeId,
     parents: Vec<Author>,
