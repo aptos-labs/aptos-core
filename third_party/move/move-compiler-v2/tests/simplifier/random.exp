@@ -35,33 +35,36 @@ module 0x8675::M {
                 Tuple()
               };
               {
-                let x: &mut u64 = M::id_mut<u64>(Borrow(Mutable)(v));
+                let q: u64 = v;
                 {
-                  let y: &mut u64 = Borrow(Mutable)(v);
-                  Deref(x);
-                  Deref(y);
+                  let x: &mut u64 = M::id_mut<u64>(Borrow(Mutable)(v));
                   {
-                    let x: &u64 = Borrow(Immutable)(v);
+                    let y: &mut u64 = Borrow(Mutable)(v);
+                    Deref(x);
+                    Deref(y);
                     {
-                      let y: &mut u64 = Borrow(Mutable)(v);
-                      Deref(y);
-                      Deref(x);
-                      Deref(y);
+                      let x: &u64 = Borrow(Immutable)(v);
                       {
-                        let x: &u64 = Borrow(Immutable)(v);
+                        let y: &mut u64 = Borrow(Mutable)(v);
+                        Deref(y);
+                        Deref(x);
+                        Deref(y);
                         {
-                          let y: &u64 = Borrow(Immutable)(v);
-                          Deref(x);
-                          Deref(y);
-                          Deref(x);
+                          let x: &u64 = Borrow(Immutable)(v);
                           {
-                            let x: &u64 = M::id<u64>(Borrow(Immutable)(v));
+                            let y: &u64 = Borrow(Immutable)(v);
+                            Deref(x);
+                            Deref(y);
+                            Deref(x);
                             {
-                              let y: &u64 = Borrow(Immutable)(v);
-                              Deref(x);
-                              Deref(y);
-                              Deref(x);
-                              Tuple()
+                              let x: &u64 = M::id<u64>(Borrow(Immutable)(v));
+                              {
+                                let y: &u64 = Borrow(Immutable)(v);
+                                Deref(x);
+                                Deref(y);
+                                Deref(x);
+                                Tuple()
+                              }
                             }
                           }
                         }

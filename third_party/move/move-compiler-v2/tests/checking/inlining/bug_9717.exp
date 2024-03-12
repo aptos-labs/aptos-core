@@ -23,8 +23,11 @@ module 0xcafe::vectors {
           }
         };
         {
-          let _: vector<u8> = Copy(flips);
-          Tuple()
+          let _v: vector<u8> = Copy(flips);
+          {
+            let _v2: vector<u8> = flips;
+            Tuple()
+          }
         }
     }
     public entry fun guess_flips_directly(flips: vector<u8>) {
@@ -44,16 +47,22 @@ module 0xcafe::vectors {
             }
           };
           {
-            let _: vector<u8> = Copy(flips);
-            Tuple()
+            let _v: vector<u8> = Copy(flips);
+            {
+              let _v2: vector<u8> = flips;
+              Tuple()
+            }
           }
         }
     }
     public entry fun guess_with_break_without_inline(flips: vector<u8>) {
         vectors::loops_with_break_no_inline(Borrow(Immutable)(flips));
         {
-          let _: vector<u8> = Copy(flips);
-          Tuple()
+          let _v: vector<u8> = Copy(flips);
+          {
+            let _v2: vector<u8> = flips;
+            Tuple()
+          }
         }
     }
     public entry fun guess_without_break_with_inline(flips: vector<u8>) {
@@ -78,8 +87,11 @@ module 0xcafe::vectors {
           }
         };
         {
-          let _: vector<u8> = Copy(flips);
-          Tuple()
+          let _v: vector<u8> = flips;
+          {
+            let _v2: vector<u8> = Copy(flips);
+            Tuple()
+          }
         }
     }
     private fun loops_with_break_no_inline(flips: &vector<u8>) {

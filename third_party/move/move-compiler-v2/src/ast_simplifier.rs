@@ -987,33 +987,39 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             return Some(body.clone());
         }
 
-        // (3) If some pattern vars are unused in the body, turn them into wildcards.
-        let new_pat = if !unused_bound_vars.is_empty() {
-            Some(pat.clone().remove_vars(&unused_bound_vars))
-        } else {
-            None
-        };
+        // The following is disabled for now until we figure out whether there is a fix
+        // for #12475.  If that is fixed, then we can safely rewrite unused variable
+        // definitions to wildcards.
+        //
+        // // (3) If some pattern vars are unused in the body, turn them into wildcards.
+        // let new_pat = if !unused_bound_vars.is_empty() {
+        //     Some(pat.clone().remove_vars(&unused_bound_vars))
+        // } else {
+        //     None
+        // };
 
-        // Ideas not yet implemented:
-        //     (4) simplify the pattern: if subpat is wildcard and subexpr is side-effect-free,
-        //         can remove it and corresponding subexpr.
-        //     (5) simplify the pattern: if subpat is wildcard, corresponding subexpr can be
-        //         simplified to not produce a value
-        //     (6) if body is also a block and its binding has no references to our bound vars,
-        //         then merge patterns and blocks
-        //     (7) if pattern is a singleton `Tuple` and binding is a `Tuple`, turn it into let x = val.
+        // // Ideas not yet implemented:
+        // //     (4) simplify the pattern: if subpat is wildcard and subexpr is side-effect-free,
+        // //         can remove it and corresponding subexpr.
+        // //     (5) simplify the pattern: if subpat is wildcard, corresponding subexpr can be
+        // //         simplified to not produce a value
+        // //     (6) if body is also a block and its binding has no references to our bound vars,
+        // //         then merge patterns and blocks
+        // //     (7) if pattern is a singleton `Tuple` and binding is a `Tuple`, turn it into let x = val.
 
-        if let Some(pat) = new_pat {
-            let exp = ExpData::Block(id, pat, opt_binding.clone(), body.clone()).into_exp();
-            trace!(
-                "Dropping some vars  for rewrite_block(id={}), result = {}",
-                id.as_usize(),
-                exp.display_verbose(self.env()),
-            );
-            Some(exp)
-        } else {
-            None
-        }
+        // if let Some(pat) = new_pat {
+        //     let exp = ExpData::Block(id, pat, opt_binding.clone(), body.clone()).into_exp();
+        //     trace!(
+        //         "Dropping some vars  for rewrite_block(id={}), result = {}",
+        //         id.as_usize(),
+        //         exp.display_verbose(self.env()),
+        //     );
+        //     Some(exp)
+        // } else {
+        //     None
+        // }
+
+        None
     }
 
     fn rewrite_if_else(&mut self, _id: NodeId, cond: &Exp, then: &Exp, else_: &Exp) -> Option<Exp> {

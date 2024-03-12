@@ -1247,6 +1247,7 @@ impl<'env> Generator<'env> {
         match pat {
             Pattern::Wildcard(_) => {
                 // Nothing to do
+                // TODO(#12475) Should we copy to a temp here?
             },
             Pattern::Var(var_id, sym) => {
                 let local = self.find_local_for_pattern(*var_id, *sym, next_scope);

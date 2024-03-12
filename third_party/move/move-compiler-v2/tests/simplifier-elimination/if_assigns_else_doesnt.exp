@@ -15,12 +15,6 @@ warning: If condition is always true, so else branch code eliminated as dead cod
 10 │ │     };
    │ ╰─────' else branch eliminated
 
-warning: Expression value unused and side-effect free, so eliminated as dead code
-  ┌─ tests/simplifier-elimination/if_assigns_else_doesnt.move:9:9
-  │
-9 │         y;
-  │         ^
-
 // -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {
