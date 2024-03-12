@@ -181,6 +181,7 @@ impl ProofManager {
             "QS: got clean request from execution at block timestamp {}",
             block_timestamp
         );
+        self.batch_queue.remove_expired_batches();
         for batch in &batches {
             self.batch_queue.remove_batch(batch);
         }
@@ -213,8 +214,6 @@ impl ProofManager {
                 let (proof_block, proof_queue_fully_utilized) = self
                     .proofs_for_consensus
                     .pull_proofs(&excluded_batches, max_txns, max_bytes, return_non_full);
-
-                self.batch_queue.remove_expired_batches();
 
                 counters::NUM_BATCHES_WITHOUT_PROOF_OF_STORE.observe(self.batch_queue.len() as f64);
                 counters::PROOF_QUEUE_FULLY_UTILIZED
