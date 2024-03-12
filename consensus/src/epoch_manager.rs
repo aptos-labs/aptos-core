@@ -901,11 +901,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Duration::from_millis(self.config.quorum_store_poll_time_ms),
             self.config.max_sending_block_txns,
             self.config.max_sending_block_bytes,
+            self.config.max_sending_inline_txns,
+            self.config.max_sending_inline_bytes,
             onchain_consensus_config.max_failed_authors_to_store(),
             pipeline_backpressure_config,
             chain_health_backoff_config,
             self.quorum_store_enabled,
             onchain_consensus_config.effective_validator_txn_config(),
+            self.config
+                .quorum_store
+                .allow_batches_without_pos_in_proposal,
         );
         let (round_manager_tx, round_manager_rx) = aptos_channel::new(
             QueueStyle::LIFO,
@@ -1165,7 +1170,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.quorum_store_enabled(),
             onchain_consensus_config.effective_validator_txn_config(),
             self.bounded_executor.clone(),
-            features,
+            features.clone(),
+            self.config
+                .quorum_store
+                .allow_batches_without_pos_in_proposal,
         );
 
         let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
