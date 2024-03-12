@@ -105,7 +105,7 @@ pub enum FeatureFlag {
     ObjectCodeDeployment,
     MaxObjectNestingCheck,
     KeylessAccountsWithPasskeys,
-    TransactionContextExtension,
+    MultisinV2Enhancement,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -271,9 +271,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::KeylessAccountsWithPasskeys => {
                 AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS
             },
-            FeatureFlag::TransactionContextExtension => {
-                AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION
-            },
+            FeatureFlag::MultisinV2Enhancement => AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT,
         }
     }
 }
@@ -362,9 +360,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS => {
                 FeatureFlag::KeylessAccountsWithPasskeys
             },
-            AptosFeatureFlag::TRANSACTION_CONTEXT_EXTENSION => {
-                FeatureFlag::TransactionContextExtension
-            },
+            AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT => FeatureFlag::MultisinV2Enhancement,
         }
     }
 }
