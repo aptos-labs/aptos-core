@@ -116,7 +116,7 @@ impl DataCollection {
             package_name: package_name.clone(),
             upgrade_number,
         };
-        if compilation_cache.failed_packages.contains(&package_info) {
+        if compilation_cache.failed_packages_v1.contains(&package_info) {
             return None;
         }
         if !is_aptos_package(&package_name)
@@ -132,7 +132,7 @@ impl DataCollection {
                 None,
             );
             if res.is_err() {
-                eprintln!("{} at:{}", res.unwrap_err(), version);
+                eprintln!("{} at: {}", res.unwrap_err(), version);
                 return None;
             }
         }

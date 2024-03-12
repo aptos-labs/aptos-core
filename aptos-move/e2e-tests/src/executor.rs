@@ -482,12 +482,12 @@ impl FakeExecutor {
         }
     }
 
-    fn execute_transaction_block_impl_with_resolver(
+    fn execute_transaction_block_impl_with_state_view(
         &self,
         txn_block: &[SignatureVerifiedTransaction],
         onchain_config: BlockExecutorConfigFromOnchain,
         sequential: bool,
-        resolver: &(impl StateView + Sync),
+        state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
@@ -504,16 +504,16 @@ impl FakeExecutor {
         BlockAptosVM::execute_block::<_, NoOpTransactionCommitHook<AptosTransactionOutput, VMStatus>>(
             self.executor_thread_pool.clone(),
             txn_block,
-            &resolver,
+            &state_view,
             config,
             None,
         ).map(BlockOutput::into_transaction_outputs_forced)
     }
 
-    pub fn execute_transaction_block_with_resolver(
+    pub fn execute_transaction_block_with_state_view(
         &self,
         txn_block: Vec<Transaction>,
-        resolver: &(impl StateView + Sync),
+        state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
 
@@ -542,22 +542,22 @@ impl FakeExecutor {
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
-            Some(self.execute_transaction_block_impl_with_resolver(
+            Some(self.execute_transaction_block_impl_with_state_view(
                 &sig_verified_block,
                 onchain_config.clone(),
                 true,
-                resolver,
+                state_view,
             ))
         } else {
             None
         };
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            Some(self.execute_transaction_block_impl_with_resolver(
+            Some(self.execute_transaction_block_impl_with_state_view(
                 &sig_verified_block,
                 onchain_config,
                 false,
-                resolver,
+                state_view,
             ))
         } else {
             None
@@ -612,7 +612,7 @@ impl FakeExecutor {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        self.execute_transaction_block_with_resolver(txn_block, &self.data_store)
+        self.execute_transaction_block_with_state_view(txn_block, &self.data_store)
     }
 
     pub fn execute_transaction(&self, txn: SignedTransaction) -> TransactionOutput {
@@ -1093,11 +1093,11 @@ impl FakeExecutor {
         self.exec_module(&Self::module(module_name), function_name, type_params, args)
     }
 
-    pub fn try_exec_entry_with_resolver(
+    pub fn try_exec_entry_with_state_view(
         &mut self,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
-        resolver: &impl AptosMoveResolver,
+        state_view: &impl AptosMoveResolver,
         features: Features,
     ) -> Result<(WriteSet, Vec<ContractEvent>), VMStatus> {
         let timed_features = TimedFeaturesBuilder::enable_all()
@@ -1111,11 +1111,11 @@ impl FakeExecutor {
             self.chain_id,
             features,
             timed_features,
-            resolver,
+            state_view,
             false,
         )
         .unwrap();
-        let mut session = vm.new_session(resolver, SessionId::void());
+        let mut session = vm.new_session(state_view, SessionId::void());
         let function =
             session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
@@ -1140,7 +1140,7 @@ impl FakeExecutor {
                 LATEST_GAS_FEATURE_VERSION,
             ))
             .expect("Failed to generate txn effects");
-        change_set.try_materialize_aggregator_v1_delta_set(resolver)?;
+        change_set.try_materialize_aggregator_v1_delta_set(state_view)?;
         let (write_set, events) = change_set
             .try_into_storage_change_set()
             .expect("Failed to convert to ChangeSet")

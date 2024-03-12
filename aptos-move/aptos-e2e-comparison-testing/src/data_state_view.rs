@@ -66,7 +66,7 @@ impl TStateView for DataStateView {
                 && !reads.lock().unwrap().contains_key(state_key)
                 && ret.is_ok()
             {
-                let val = ret?.clone();
+                let val = ret?;
                 if val.is_some() {
                     reads
                         .lock()

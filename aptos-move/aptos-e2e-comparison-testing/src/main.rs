@@ -17,8 +17,7 @@ const BATCH_SIZE: u64 = 500;
 pub enum Cmd {
     /// Collect and dump the data
     Dump {
-        /// Endpoint url to obtain the txn data,
-        /// e.g. `https://api.mainnet.aptoslabs.com/v1` for mainnet.
+        /// Endpoint url to obtain the txn data, e.g. `https://api.mainnet.aptoslabs.com/v1` for mainnet.
         /// To avoid rate limiting, users need to apply for API key from `https://developers.aptoslabs.com/`
         /// and set the env variable X_API_KEY using the obtained key
         endpoint: String,
@@ -36,11 +35,11 @@ pub enum Cmd {
         /// Dump the write set of txns
         #[clap(long, default_value_t = false)]
         dump_write_set: bool,
-        /// Target account
+        /// With this set, only dump transactions that are sent to this account
         #[clap(long)]
         target_account: Option<AccountAddress>,
     },
-    /// Online execution
+    /// Collect and execute txns without dumping the state data
     Online {
         /// Endpoint url to obtain the txn data,
         /// e.g. `https://api.mainnet.aptoslabs.com/v1` for mainnet.

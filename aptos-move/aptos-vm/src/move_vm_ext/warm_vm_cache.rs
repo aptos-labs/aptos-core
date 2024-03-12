@@ -101,22 +101,7 @@ struct WarmVmId {
     natives: Bytes,
     vm_config: Bytes,
     core_packages_registry: Option<Bytes>,
-    optional_id: Option<OptId>,
-}
-
-/// Wrapper to optional id for WarmVmId, currently only used for comparison testing
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-struct OptId;
-
-/// helper function to extract OptId based on the resolver, currently only used for comparison testing
-fn extract_opt_id(resolver: &impl AptosMoveResolver) -> Option<OptId> {
-    let features = Features::fetch_config(resolver).unwrap_or_default();
-    if features.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
-        let opt_id = OptId;
-        Some(opt_id)
-    } else {
-        None
-    }
+    bin_v7_enabled: bool,
 }
 
 impl WarmVmId {
@@ -133,7 +118,9 @@ impl WarmVmId {
             natives,
             vm_config: Self::vm_config_bytes(vm_config),
             core_packages_registry: Self::core_packages_id_bytes(resolver)?,
-            optional_id: extract_opt_id(resolver),
+            bin_v7_enabled: Features::fetch_config(resolver)
+                .unwrap_or_default()
+                .is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
         })
     }
 

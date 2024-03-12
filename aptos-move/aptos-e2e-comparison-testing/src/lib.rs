@@ -342,7 +342,7 @@ pub async fn prepare_aptos_packages(path: PathBuf) {
 #[derive(Default)]
 struct CompilationCache {
     compiled_package_map: HashMap<PackageInfo, CompiledPackage>,
-    failed_packages: HashSet<PackageInfo>,
+    failed_packages_v1: HashSet<PackageInfo>,
     failed_packages_v2: HashSet<PackageInfo>,
     compiled_package_cache_v1: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
     compiled_package_cache_v2: HashMap<PackageInfo, HashMap<ModuleId, Vec<u8>>>,
@@ -454,7 +454,7 @@ fn compile_package(
         Ok(built_package.package)
     } else {
         Err(anyhow::Error::msg(format!(
-            "compilation failed for compiler:{:?}",
+            "compilation failed for compiler: {:?}",
             compiler_verion
         )))
     }
@@ -468,7 +468,7 @@ fn dump_and_compile_from_package_metadata(
     execution_mode: Option<ExecutionMode>,
 ) -> anyhow::Result<()> {
     let root_package_dir = root_dir.join(format!("{}", package_info,));
-    if compilation_cache.failed_packages.contains(&package_info) {
+    if compilation_cache.failed_packages_v1.contains(&package_info) {
         return Err(anyhow::Error::msg("compilation failed"));
     }
     if !root_package_dir.exists() {
@@ -562,7 +562,7 @@ fn dump_and_compile_from_package_metadata(
             Some(CompilerVersion::V1),
         );
         if let Ok(built_package) = package_v1 {
-            if execution_mode.is_some() && execution_mode.unwrap().is_v1_or_compare() {
+            if execution_mode.is_some_and(|mode| mode.is_v1_or_compare()) {
                 generate_compiled_blob(
                     &package_info,
                     &built_package,
@@ -573,12 +573,12 @@ fn dump_and_compile_from_package_metadata(
                 .compiled_package_map
                 .insert(package_info.clone(), built_package);
         } else {
-            if !compilation_cache.failed_packages.contains(&package_info) {
-                compilation_cache.failed_packages.insert(package_info);
+            if !compilation_cache.failed_packages_v1.contains(&package_info) {
+                compilation_cache.failed_packages_v1.insert(package_info);
             }
             return Err(anyhow::Error::msg("compilation failed at v1"));
         }
-        if execution_mode.is_some() && execution_mode.unwrap().is_v2_or_compare() {
+        if execution_mode.is_some_and(|mode| mode.is_v2_or_compare()) {
             let package_v2 =
                 compile_package(root_package_dir, &package_info, Some(CompilerVersion::V2));
             if let Ok(built_package) = package_v2 {
@@ -588,8 +588,8 @@ fn dump_and_compile_from_package_metadata(
                     &mut compilation_cache.compiled_package_cache_v2,
                 );
             } else {
-                if !compilation_cache.failed_packages.contains(&package_info) {
-                    compilation_cache.failed_packages.insert(package_info);
+                if !compilation_cache.failed_packages_v1.contains(&package_info) {
+                    compilation_cache.failed_packages_v1.insert(package_info);
                 }
                 return Err(anyhow::Error::msg("compilation failed at v2"));
             }
