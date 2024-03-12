@@ -1,33 +1,25 @@
-
-Diagnostics:
-warning: If condition is always true, so else branch code eliminated as dead code
-   ┌─ tests/simplifier-elimination/if_assigns_else_doesnt.move:5:9
-   │
- 5 │       if (true) {
-   │           ^^^^
-   │           │
-   │           condition is always true
- 6 │           x = 42;
- 7 │       } else {
-   │ ╭────────────'
- 8 │ │         y = 0;
- 9 │ │         y;
-10 │ │     };
-   │ ╰─────' else branch eliminated
-
 // -- Model dump before bytecode pipeline
 module <SELF>_0 {
     private fun main() {
         {
           let x: u64;
-          x: u64 = 42;
-          Tuple();
-          if Eq<u64>(x, 42) {
+          {
+            let y: u64;
+            if true {
+              x: u64 = 42;
+              Tuple()
+            } else {
+              y: u64 = 0;
+              y;
+              Tuple()
+            };
+            if Eq<u64>(x, 42) {
+              Tuple()
+            } else {
+              Abort(42)
+            };
             Tuple()
-          } else {
-            Abort(42)
-          };
-          Tuple()
+          }
         }
     }
     spec fun $main();

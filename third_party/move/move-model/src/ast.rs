@@ -2300,7 +2300,7 @@ impl ExpData {
                 Value(..) => {}, // Ok, keep going
                 LocalVar(..) | Temporary(..) => {
                     // Use of a var could affect borrow semantics, so we cannot
-                    // remove uses until borow analysis produces warnings about user code
+                    // remove uses until borrow analysis produces warnings about user code
                     is_pure = false;
                 },
                 Call(_, oper, _) => {

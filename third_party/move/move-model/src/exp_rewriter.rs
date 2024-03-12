@@ -89,11 +89,14 @@ impl<'env, 'rewriter> ExpRewriterFunctions for ExpRewriter<'env, 'rewriter> {
         }
     }
 
-    // Note that any subpatterns are visited first
-    fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
-        // Warning: any rewrites of variables won't happen in an `Assign` statement.
-        // Let's try to enforce that:
-        if !entering_scope {
+    // As `ExpRewriter` has no mechanism to rewrite a `Pattern::Var` to a `Pattern` we check to make
+    // sure that its `replacer` function doesn't want to rewrite a scoped symbol appearing in the
+    // pattern for an `Assign`.  Patterns that create scopes (Let and Lambda) are handled by
+    // `rewrite_enter_scope`, so are not addressed here.
+    fn rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> Option<Pattern> {
+        if !creating_scope {
+            // Any rewrites of variables won't happen in an `Assign` statement.
+            // Let's try to enforce that aren't rewriting any symbols we find.
             if let Pattern::Var(id, sym) = pat {
                 let sym_replacement = (*self.replacer)(*id, RewriteTarget::LocalVar(*sym));
                 if let Some(exp) = &sym_replacement {
@@ -219,8 +222,14 @@ pub trait ExpRewriterFunctions {
     ) -> Option<Exp> {
         None
     }
-    // Note that any subpatterns are visited first
-    fn rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> Option<Pattern> {
+    // Optionally rewrite a pattern, which may be in `Let`, `Lambda`, or `Assign` expression.
+    //
+    // Parameter`creating_scope` is `true` for `Let` and `Lambda` operations, which create a new
+    // variable scope.  It is `false` for `Assign` operations, which do not create a new variable
+    // scope.
+    //
+    // Note that any subpatterns in `pat` (if any) are visited before the enclosing `Pattern`.
+    fn rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> Option<Pattern> {
         None
     }
     fn rewrite_quant(
@@ -519,11 +528,11 @@ pub trait ExpRewriterFunctions {
     fn internal_rewrite_pattern_vector(
         &mut self,
         pat_vec: &[Pattern],
-        entering_scope: bool,
+        creating_scope: bool,
     ) -> (bool, Vec<Pattern>) {
         let rewritten: Vec<_> = pat_vec
             .iter()
-            .map(|pat| self.internal_rewrite_pattern(pat, entering_scope))
+            .map(|pat| self.internal_rewrite_pattern(pat, creating_scope))
             .collect();
         let changed = rewritten.iter().any(|(changed, pat)| *changed);
         (
@@ -532,11 +541,11 @@ pub trait ExpRewriterFunctions {
         )
     }
 
-    fn internal_rewrite_pattern(&mut self, pat: &Pattern, entering_scope: bool) -> (bool, Pattern) {
+    fn internal_rewrite_pattern(&mut self, pat: &Pattern, creating_scope: bool) -> (bool, Pattern) {
         match pat {
             Pattern::Tuple(_, pattern_vec) | Pattern::Struct(_, _, pattern_vec) => {
                 let (changed, final_pattern_vec) =
-                    self.internal_rewrite_pattern_vector(pattern_vec, entering_scope);
+                    self.internal_rewrite_pattern_vector(pattern_vec, creating_scope);
                 if changed {
                     let new_pat = match pat {
                         Pattern::Tuple(id, _) => Pattern::Tuple(*id, final_pattern_vec),
@@ -545,7 +554,7 @@ pub trait ExpRewriterFunctions {
                         },
                         _ => unreachable!(),
                     };
-                    if let Some(rewritten_new_pat) = self.rewrite_pattern(&new_pat, entering_scope)
+                    if let Some(rewritten_new_pat) = self.rewrite_pattern(&new_pat, creating_scope)
                     {
                         return (true, rewritten_new_pat);
                     } else {
@@ -555,7 +564,7 @@ pub trait ExpRewriterFunctions {
             },
             _ => {},
         }
-        if let Some(rewritten_pat) = self.rewrite_pattern(pat, entering_scope) {
+        if let Some(rewritten_pat) = self.rewrite_pattern(pat, creating_scope) {
             (true, rewritten_pat)
         } else {
             (false, pat.clone())

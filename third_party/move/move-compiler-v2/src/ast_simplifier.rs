@@ -18,7 +18,6 @@
 //!   - for safe symbols whose value is a constant value, propagate
 //!     the value to the use site to enable simplifying code:
 //!     - inline a constant value
-//!     - flag uses of uninitialized and unassigned variables
 //! - Implement ExpRewriterFunctions to allow bottom-up replacement
 //!   of some complex expressions by "simpler" ones:
 //!   - Constant folding of operations with constant parameters which
@@ -531,23 +530,21 @@ impl<'env> SimplifierRewriter<'env> {
     }
 
     fn debug_dump_variables(&self) {
-        if log_enabled!(Level::Trace) {
-            trace!(
-                "Possibly modified variables are ({:#?})",
-                self.possibly_modified_variables
-                    .iter()
-                    .map(|(sym, opt_node)| format!(
-                        "{}@{}",
-                        sym.display(self.env().symbol_pool()),
-                        if let Some(node) = opt_node {
-                            node.as_usize().to_string()
-                        } else {
-                            "None".to_string()
-                        }
-                    ))
-                    .join(", ")
-            )
-        }
+        trace!(
+            "Possibly modified variables are ({:#?})",
+            self.possibly_modified_variables
+                .iter()
+                .map(|(sym, opt_node)| format!(
+                    "{}@{}",
+                    sym.display(self.env().symbol_pool()),
+                    if let Some(node) = opt_node {
+                        node.as_usize().to_string()
+                    } else {
+                        "None".to_string()
+                    }
+                ))
+                .join(", ")
+        )
     }
 
     /// Process a function.
@@ -578,14 +575,9 @@ impl<'env> SimplifierRewriter<'env> {
             match simple_value {
                 SimpleValue::Value(val) => Some(ExpData::Value(id, val.clone()).into_exp()),
                 SimpleValue::Uninitialized => {
-                    let loc = self.env().get_node_loc(id);
-                    self.env().diag(
-                        Severity::Error,
-                        &loc,
-                        &format!(
-                            "use of unassigned local `{}`",
-                            sym.display(self.env().symbol_pool())
-                        ),
+                    trace!(
+                        "Var {} was uninitialized",
+                        sym.display(self.env().symbol_pool()),
                     );
                     None
                 },
@@ -656,7 +648,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
             old_id,
             exp.display_verbose(self.env())
         );
-        // Top-level vars in an argument to `Borrow` (possibly with a `Selexct` as well)
+        // Top-level vars in an argument to `Borrow` (possibly with a `Select` as well)
         // are borrowed directly, while if they occur in any other subexpression they will
         // be interpreted as a copy to a temp value which is borrowed instead of the var.
         //
@@ -1026,10 +1018,18 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         if self.eliminate_code {
             if let Some((truth_value, branch_name, result, eliminated_id)) = match cond.as_ref() {
                 ExpData::Value(_, Value::Bool(true)) => {
-                    Some((true, "else", then.clone(), else_.node_id()))
+                    if else_.as_ref().is_ok_to_remove_from_code() {
+                        Some((true, "else", then.clone(), else_.node_id()))
+                    } else {
+                        None
+                    }
                 },
                 ExpData::Value(_, Value::Bool(false)) => {
-                    Some((false, "then", else_.clone(), then.node_id()))
+                    if then.as_ref().is_ok_to_remove_from_code() {
+                        Some((false, "then", else_.clone(), then.node_id()))
+                    } else {
+                        None
+                    }
                 },
                 _ => None,
             } {
