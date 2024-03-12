@@ -79,8 +79,7 @@ pub fn check_mutator_output_path(options: &move_mutator::cli::CLIOptions) -> Opt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     #[test]
     fn cli_options_starts_empty() {
@@ -129,8 +128,10 @@ mod tests {
 
         fs::write("test_mutator_conf.json", json_content).unwrap();
 
-        let mut options = move_mutator::cli::CLIOptions::default();
-        options.configuration_file = Some(PathBuf::from("test_mutator_conf.json"));
+        let options = move_mutator::cli::CLIOptions {
+            configuration_file: Some(PathBuf::from("test_mutator_conf.json")),
+            ..Default::default()
+        };
 
         let path = check_mutator_output_path(&options);
         fs::remove_file("test_mutator_conf.json").unwrap();
@@ -149,8 +150,10 @@ mod tests {
 
         fs::write("test_prover_conf.toml", toml_content).unwrap();
 
-        let mut options = CLIOptions::default();
-        options.prover_conf = Some(PathBuf::from("test_prover_conf.toml"));
+        let options = CLIOptions {
+            prover_conf: Some(PathBuf::from("test_prover_conf.toml")),
+            ..Default::default()
+        };
 
         let prover_options = generate_prover_options(&options).unwrap();
         fs::remove_file("test_prover_conf.toml").unwrap();

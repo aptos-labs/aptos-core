@@ -1,21 +1,18 @@
-use either::Either;
-use move_command_line_common::address::NumericalAddress;
-use move_command_line_common::parser::NumberFormat;
-use std::collections::BTreeMap;
-use std::path::Path;
-use std::{fs, io};
-
 use crate::configuration::Configuration;
+use either::Either;
 use itertools::Itertools;
+use move_command_line_common::{address::NumericalAddress, parser::NumberFormat};
 use move_compiler::{attr_derivation, shared::Flags};
 use move_compiler_v2::run_checker;
 use move_model::model::GlobalEnv;
-use move_package::compilation::compiled_package::make_source_and_deps_for_compiler;
-use move_package::resolution::resolution_graph::ResolvedTable;
-use move_package::source_package::layout::SourcePackageLayout;
-use move_package::source_package::manifest_parser;
-use move_package::BuildConfig;
+use move_package::{
+    compilation::compiled_package::make_source_and_deps_for_compiler,
+    resolution::resolution_graph::ResolvedTable,
+    source_package::{layout::SourcePackageLayout, manifest_parser},
+    BuildConfig,
+};
 use move_symbol_pool::Symbol;
+use std::{collections::BTreeMap, fs, io, path::Path};
 
 /// Generate the AST from the Move sources.
 ///
@@ -438,7 +435,7 @@ mod tests {
         let src_dir = temp_dir.path().join("non_existent_src");
         let dst_dir = temp_dir.path().join("dst");
 
-        let result = copy_dir_all(&src_dir, &dst_dir);
+        let result = copy_dir_all(src_dir, dst_dir);
         assert!(result.is_err());
     }
 }

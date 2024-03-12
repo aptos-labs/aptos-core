@@ -1,9 +1,10 @@
-use crate::cli;
-use crate::configuration::Configuration;
+use crate::{cli, configuration::Configuration};
 use move_package::source_package::layout::SourcePackageLayout;
-use std::ffi::OsString;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    ffi::OsString,
+    fs,
+    path::{Path, PathBuf},
+};
 
 /// Sets up the path for the mutant.
 ///
@@ -125,9 +126,10 @@ pub(crate) fn setup_output_dir(mutator_configuration: &Configuration) -> anyhow:
 mod tests {
     use super::*;
     use crate::cli;
-    use std::fs;
-    use std::path::Path;
-    use std::path::PathBuf;
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
     use tempfile::tempdir;
 
     #[test]

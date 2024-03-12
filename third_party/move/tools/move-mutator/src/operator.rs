@@ -1,7 +1,9 @@
 use crate::report::Mutation;
 use codespan::FileId;
-use std::fmt;
-use std::fmt::{Debug, Display};
+use std::{
+    fmt,
+    fmt::{Debug, Display},
+};
 
 /// Mutation result that contains the mutated source code and the modification that was applied.
 #[derive(Debug, Clone, PartialEq)]
@@ -107,8 +109,7 @@ mod tests {
     use super::*;
     use crate::operators::binary::Binary;
     use codespan::Files;
-    use move_model::ast::Operation;
-    use move_model::model::Loc;
+    use move_model::{ast::Operation, model::Loc};
 
     #[test]
     fn test_get_file_id() {

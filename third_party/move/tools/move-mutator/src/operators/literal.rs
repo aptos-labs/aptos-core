@@ -1,16 +1,19 @@
-use crate::operator::{MutantInfo, MutationOperator};
-use crate::operators::{
-    MOVE_ADDR_MAX, MOVE_ADDR_ZERO, MOVE_FALSE, MOVE_MAX_INFERRED_NUM, MOVE_MAX_U256, MOVE_TRUE,
-    MOVE_ZERO_U256,
+use crate::{
+    operator::{MutantInfo, MutationOperator},
+    operators::{
+        MOVE_ADDR_MAX, MOVE_ADDR_ZERO, MOVE_FALSE, MOVE_MAX_INFERRED_NUM, MOVE_MAX_U256, MOVE_TRUE,
+        MOVE_ZERO_U256,
+    },
+    report::{Mutation, Range},
 };
-use crate::report::{Mutation, Range};
 use codespan::FileId;
-use move_model::ast::Value;
-use move_model::model::Loc;
-use move_model::ty::{PrimitiveType, Type};
+use move_model::{
+    ast::Value,
+    model::Loc,
+    ty::{PrimitiveType, Type},
+};
 use num_traits::cast::ToPrimitive;
-use std::fmt;
-use std::fmt::Debug;
+use std::{fmt, fmt::Debug};
 
 pub const OPERATOR_NAME: &str = "literal_replacement";
 
@@ -311,7 +314,7 @@ mod tests {
 
         let operator = Literal::new(Value::Bool(true), Type::Primitive(PrimitiveType::Bool), loc);
         let source = MOVE_TRUE;
-        let expected = vec![MOVE_FALSE];
+        let expected = [MOVE_FALSE];
         let result = operator.apply(source);
         assert_eq!(result.len(), expected.len());
         for (i, r) in result.iter().enumerate() {

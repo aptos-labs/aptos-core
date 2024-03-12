@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::io::{Error, ErrorKind, Result, Write};
-use std::path::{Path, PathBuf};
+use std::{
+    io::{Error, ErrorKind, Result, Write},
+    path::{Path, PathBuf},
+};
 
 /// The `Report` struct represents a report of mutations.
 /// It contains a vector of `MutationReport` instances.
@@ -250,8 +252,7 @@ impl MutationReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
-    use std::io::Read;
+    use std::{fs, io::Read};
 
     #[test]
     fn test_report() {

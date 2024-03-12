@@ -1,11 +1,11 @@
-use crate::operator::{MutantInfo, MutationOperator};
-use crate::operators::MOVE_EMPTY_STMT;
-use crate::report::{Mutation, Range};
+use crate::{
+    operator::{MutantInfo, MutationOperator},
+    operators::MOVE_EMPTY_STMT,
+    report::{Mutation, Range},
+};
 use codespan::FileId;
-use move_model::ast::Exp;
-use move_model::model::Loc;
-use std::fmt;
-use std::fmt::Debug;
+use move_model::{ast::Exp, model::Loc};
+use std::{fmt, fmt::Debug};
 
 pub const OPERATOR_NAME: &str = "delete_statement";
 
