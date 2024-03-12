@@ -1,7 +1,5 @@
 // Copyright © Aptos Foundation
 
-use std::str::FromStr;
-
 use crate::{
     jwks::rsa::RSA_JWK, keyless::{
         base64url_encode_str, Configuration, EphemeralCertificate, IdCommitment, KeylessPublicKey,
@@ -13,7 +11,6 @@ use aptos_crypto::{poseidon_bn254, CryptoMaterialError};
 use ark_bn254::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use num_bigint::BigUint;
 use num_traits::{One, Zero};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
