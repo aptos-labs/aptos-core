@@ -21,10 +21,13 @@
 //!     - flag uses of uninitialized and unassigned variables
 //! - Implement ExpRewriterFunctions to allow bottom-up replacement
 //!   of some complex expressions by "simpler" ones:
-//!   - Constant folding of operations with constant parameters
-//!   - Eliminate unused variables (with a warning)
+//!   - Constant folding of operations with constant parameters which
+//!     do not abort (have arguments in range).
+//!   - TODO(#12472) Flag In the future, we could warn about expressions
+//!     which are guaranteed to abort, but it's nontrivial so deferred.
+//!   - Eliminate unused expressions (with a warning)
 //!   - Eliminate used variables whose uses are all eliminated by
-//!     constant folding
+//!     other simplification optimizations (e.g., constant folding)
 //!   - Eliminate unused value expressions which are side-effect-free.
 //!   - Unwrap trivial compound expressions:
 //!     - a Sequence of 1 expression
@@ -65,7 +68,7 @@ use std::{
 };
 
 /// Run the AST simplification pass on all target functions in the `env`.
-/// Optionally do some aggressive simplfications that may eliminate code.
+/// Optionally do some aggressive simplifications that may eliminate code.
 pub fn run_simplifier(env: &mut GlobalEnv, eliminate_code: bool) {
     let mut new_definitions = Vec::new(); // Avoid borrowing issues for env.
     for module in env.get_modules() {
@@ -501,7 +504,7 @@ struct SimplifierRewriter<'env> {
 
 // Representation to record a known value of a variable to
 // allow simplification.  Currently we only track constant values
-// and definitely uninitialzed values (from `let` with no binding).
+// and definitely uninitialized values (from `let` with no binding).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum SimpleValue {
     Value(Value),
@@ -912,7 +915,7 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         // Simplify binding:
         //   A few ideas for simplification which are implemented below:
         //     (1) if no binding, then simplify to just the body.
-        //     (2) if all pattern vars are unused in body and binding is side-effect free, again return body.
+        //     (2) if all pattern vars are unused in body and binding is OK to remove, again return body.
         //     (3) if some pattern vars are unused in the body, turn them into wildcards.
 
         let pat_vars = pat.vars();
@@ -926,7 +929,8 @@ impl<'env> ExpRewriterFunctions for SimplifierRewriter<'env> {
         }
         let bound_vars = pat.vars();
 
-        // (2) If all pattern vars are unused in body and binding is side-effect free, again return
+        // (2) If all pattern vars are unused in body and binding is OK to remove
+        // (is side-effect free and has no potential impact on Move semantics) , again return
         // body.  But to avoid introducing a drop of a struct value that might not have "drop",
         // also check that opt_binding type has drop.
         let free_vars = body.free_vars();

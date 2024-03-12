@@ -1,4 +1,4 @@
-// -- Model dump before env processor pipeline:
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     public fun test(): u8 {
         {
@@ -19,127 +19,11 @@ module 0xc0ffee::m {
         }
     }
 } // end 0xc0ffee::m
-
-
-// -- Model dump after env processor unused checks:
-module 0xc0ffee::m {
-    public fun test(): u8 {
-        {
-          let x: u8 = 40;
-          {
-            let y: u8 = Move(x);
-            Add<u8>(x, y)
-          }
-        }
-    }
-    spec fun $test(): u8 {
-        {
-          let x: u256 = 40;
-          {
-            let y: u256 = Move(x);
-            Add(x, y)
-          }
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor type parameter check:
-module 0xc0ffee::m {
-    public fun test(): u8 {
-        {
-          let x: u8 = 40;
-          {
-            let y: u8 = Move(x);
-            Add<u8>(x, y)
-          }
-        }
-    }
-    spec fun $test(): u8 {
-        {
-          let x: u256 = 40;
-          {
-            let y: u256 = Move(x);
-            Add(x, y)
-          }
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor access and use check before inlining:
-module 0xc0ffee::m {
-    public fun test(): u8 {
-        {
-          let x: u8 = 40;
-          {
-            let y: u8 = Move(x);
-            Add<u8>(x, y)
-          }
-        }
-    }
-    spec fun $test(): u8 {
-        {
-          let x: u256 = 40;
-          {
-            let y: u256 = Move(x);
-            Add(x, y)
-          }
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor inlining:
-module 0xc0ffee::m {
-    public fun test(): u8 {
-        {
-          let x: u8 = 40;
-          {
-            let y: u8 = Move(x);
-            Add<u8>(x, y)
-          }
-        }
-    }
-    spec fun $test(): u8 {
-        {
-          let x: u256 = 40;
-          {
-            let y: u256 = Move(x);
-            Add(x, y)
-          }
-        }
-    }
-} // end 0xc0ffee::m
-
-
-// -- Model dump after env processor access and use check after inlining:
-module 0xc0ffee::m {
-    public fun test(): u8 {
-        {
-          let x: u8 = 40;
-          {
-            let y: u8 = Move(x);
-            Add<u8>(x, y)
-          }
-        }
-    }
-    spec fun $test(): u8 {
-        {
-          let x: u256 = 40;
-          {
-            let y: u256 = Move(x);
-            Add(x, y)
-          }
-        }
-    }
-} // end 0xc0ffee::m
-
 
 
 Diagnostics:
 error: cannot move local `x` since it is still in use
-  ┌─ tests/no-simplifier/move_check.move:4:17
+  ┌─ tests/no-simplifier/moved_var_not_simplified.move:4:17
   │
 4 │         let y = move x;
   │                 ^^^^^^ attempted to move here

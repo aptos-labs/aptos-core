@@ -1,34 +1,34 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-// Struct `ConstantFolder` implements `ExpRewriterFunctions` to try constant-folding on an
-// expression after types are finalized.  Usual entry point is `ConstantFolder::rewrite_exp`,
-// although functions `fold_binary_exp`, `fold_unary_exp`, and `fold_tuple` should work on arguments
-// which are `ExpData::Value` expressions with appropriate types set (in the `GlobalEnv`) for
-// `NodeId` values.
-//
-// Example usage for constant declarations:
-//    // Contextual code to show how types might be filled in:
-//    let mut et = ExpTranslator::new(...);
-//    let exp = et.translate_exp(...).into_exp();
-//    et.finalize_types();
-//    let mut reasons = Vec::new();
-//    if exp.is_valid_for_constant(&global_env, &mut reasons) {
-//        // This is the actual constant folding part:
-//        let constant_folder = ConstantFolder::new(&global_env, true);
-//        let rewritten: Exp = constant_folder.rewrite_exp(exp);
-//    }
+//! Struct `ConstantFolder` implements `ExpRewriterFunctions` to try constant-folding on an
+//! expression after types are finalized.  Usual entry point is `ConstantFolder::rewrite_exp`,
+//! although functions `fold_binary_exp`, `fold_unary_exp`, and `fold_tuple` should work on arguments
+//! which are `ExpData::Value` expressions with appropriate types set (in the `GlobalEnv`) for
+//! `NodeId` values.
+//!
+//! Example usage for constant declarations:
+//!    // Contextual code to show how types might be filled in:
+//!    let mut et = ExpTranslator::new(...);
+//!    let exp = et.translate_exp(...).into_exp();
+//!    et.finalize_types();
+//!    let mut reasons = Vec::new();
+//!    if exp.is_valid_for_constant(&global_env, &mut reasons) {
+//!        // This is the actual constant folding part:
+//!        let constant_folder = ConstantFolder::new(&global_env, true);
+//!        let rewritten: Exp = constant_folder.rewrite_exp(exp);
+//!    }
 
-// The current implementation handles
-// Operators not yet handled that match `ast::Operation::is_builtin_op`:
-// TODO:
-// | Index
-// | Slice
-// | Range
-// | Implies
-// | Iff
-// | Identical
-// | Len
+//! The current implementation handles most built-in operators with constant parameters.
+//! Operators not yet handled that match `ast::Operation::is_builtin_op`:
+//! TODO:
+//! | Index
+//! | Slice
+//! | Range
+//! | Implies
+//! | Iff
+//! | Identical
+//! | Len
 
 use crate::{
     ast::{Exp, ExpData, Operation, Value},
@@ -113,7 +113,7 @@ impl<'env> ConstantFolder<'env> {
         ty.display(&self.type_display_ctxt)
     }
 
-    /// Try constant folding of a non-tuple unary operation `oper` applied to arguement `arg0`,
+    /// Try constant folding of a non-tuple unary operation `oper` applied to argument `arg0`,
     /// returning `Some(exp)` where `exp` is a ExpData::Value(id, ..)` expression if constant
     /// folding is possible.  Operation result type may be obtained from `id`.
     ///
@@ -136,14 +136,14 @@ impl<'env> ConstantFolder<'env> {
                 (O::Not, _, T(PTBool), T(PTBool)) =>
                     self.constant_folding_error(
                         id,
-                        |_| "Argument to ! is not a constant".to_owned(),
+                        |_| "Argument to `!` is not a constant".to_owned(),
                     ),
                 (O::Not, _, _, _) =>
                     self.constant_folding_error(id,
                                                 |aself: &mut Self|
                                                 format!(
                                                     "Expected bool types for argument \
-                                                     and result of operator `Not` (`!`) but found {} and {}",
+                                                     and result of operator `Not` (`!`) but found `{}` and `{}`",
                                                     aself.display_type(&arg0_type),
                                                     aself.display_type(&result_type)
                                                 )),
@@ -155,7 +155,7 @@ impl<'env> ConstantFolder<'env> {
                                 self.constant_folding_error(
                                     id,
                                     |aself: &mut Self| format!(
-                                        "Cast argument value {} out of range for type {}",
+                                        "Cast argument value `{}` out of range for type `{}`",
                                         val0_bigint,
                                         aself.display_type(&result_type)))
                             })
@@ -164,7 +164,7 @@ impl<'env> ConstantFolder<'env> {
                             id,
                             |aself: &mut Self| format!(
                                 "Expected numeric types for argument and result \
-                                 of cast (`as`) but found {} and {}",
+                                 of cast (`as`) but found `{}` and `{}`",
                                 aself.display_type(&arg0_type),
                                 aself.display_type(&result_type)
                             ),
@@ -204,7 +204,7 @@ impl<'env> ConstantFolder<'env> {
             .or_else(|| {
                 self.constant_folding_error(id, |aself: &mut Self| {
                     format!(
-                        "Operator {} result value out of range for {}",
+                        "Operator `{}` result value out of range for `{}`",
                         binop_name,
                         aself.display_type(&Type::Primitive(*result_pty)),
                     )
@@ -282,14 +282,28 @@ impl<'env> ConstantFolder<'env> {
                     O::Shl => {
                         // result_pty should be same size as arg0
                         let arg0_size = Self::ptype_num_bits_bigint(result_pty);
-                        self.binop_num("shl (<<)", Self::checked_shl, id, result_pty, val0, val1)
-                            .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
+                        self.binop_num(
+                            "shift left (<<)",
+                            Self::checked_shl,
+                            id,
+                            result_pty,
+                            val0,
+                            val1,
+                        )
+                        .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
                     },
                     O::Shr => {
                         // result_pty should be same size as arg0
                         let arg0_size = Self::ptype_num_bits_bigint(result_pty);
-                        self.binop_num("shr (>>)", Self::checked_shr, id, result_pty, val0, val1)
-                            .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
+                        self.binop_num(
+                            "shift right (>>)",
+                            Self::checked_shr,
+                            id,
+                            result_pty,
+                            val0,
+                            val1,
+                        )
+                        .filter(|_r| val1 < &arg0_size) // shift fails if val1 >= bits in val0
                     },
                     O::BitAnd => Some(V(id, Number(val0.bitand(val1))).into_exp()),
                     O::BitOr => Some(V(id, Number(val0.bitor(val1))).into_exp()),
@@ -301,7 +315,7 @@ impl<'env> ConstantFolder<'env> {
                     O::Eq => Some(V(id, Bool(val0 == val1)).into_exp()),
                     O::Neq => Some(V(id, Bool(val0 != val1)).into_exp()),
                     _ => self.constant_folding_error(id, |_| {
-                        "Binary expresison with numeric parameters not foldable to constant"
+                        "Binary expression with numeric parameters not foldable to constant"
                             .to_owned()
                     }),
                 }

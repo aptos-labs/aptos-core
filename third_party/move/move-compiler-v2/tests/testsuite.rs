@@ -137,7 +137,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(AbilityProcessor {}));
             Self {
                 stop_before_generating_bytecode: false,
-                dump_ast: AstDumpLevel::AllStages,
+                dump_ast: AstDumpLevel::EndStage,
                 env_pipeline,
                 pipeline,
                 generate_file_format: false,
@@ -156,7 +156,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(AbilityProcessor {}));
             Self {
                 stop_before_generating_bytecode: false,
-                dump_ast: AstDumpLevel::AllStages,
+                dump_ast: AstDumpLevel::EndStage,
                 env_pipeline,
                 pipeline,
                 generate_file_format: false,
@@ -170,7 +170,7 @@ impl TestConfig {
             pipeline.add_processor(Box::new(AbilityProcessor {}));
             Self {
                 stop_before_generating_bytecode: false,
-                dump_ast: AstDumpLevel::AllStages,
+                dump_ast: AstDumpLevel::EndStage,
                 env_pipeline,
                 pipeline,
                 generate_file_format: false,

@@ -5,7 +5,7 @@ module 0xc0ffee::m {
           let x: u8 = 40;
           {
             let y: u8 = Move(x);
-            Add<u8>(x, y)
+            y
           }
         }
     }
@@ -14,18 +14,11 @@ module 0xc0ffee::m {
           let x: u256 = 40;
           {
             let y: u256 = Move(x);
-            Add(x, y)
+            {
+              let _z: u256 = x;
+              y
+            }
           }
         }
     }
 } // end 0xc0ffee::m
-
-
-Diagnostics:
-error: cannot move local `x` since it is still in use
-  ┌─ tests/simplifier-elimination/moved_var_not_simplified.move:4:17
-  │
-4 │         let y = move x;
-  │                 ^^^^^^ attempted to move here
-5 │         x + y
-  │         ----- used here

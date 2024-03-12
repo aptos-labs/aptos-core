@@ -2297,7 +2297,12 @@ impl ExpData {
                     // leave it alone to produce better errors.
                     is_pure = false;
                 },
-                Value(..) | LocalVar(..) | Temporary(..) => {}, // Ok, keep going
+                Value(..) => {}, // Ok, keep going
+                LocalVar(..) | Temporary(..) => {
+                    // Use of a var could affect borrow semantics, so we cannot
+                    // remove uses until borow analysis produces warnings about user code
+                    is_pure = false;
+                },
                 Call(_, oper, _) => {
                     if !oper.is_ok_to_remove_from_code() {
                         is_pure = false;

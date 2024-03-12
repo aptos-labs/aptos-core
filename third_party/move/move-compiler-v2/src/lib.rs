@@ -208,7 +208,6 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
 /// Returns the standard env_processor_pipeline
 pub fn create_env_processor_pipeline<'a, 'b>(env: &'a GlobalEnv) -> EnvProcessorPipeline<'b> {
     let options = env.get_extension::<Options>().expect("options");
-    let _safety_on = !options.experiment_on(Experiment::NO_SAFETY);
     let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
 
     let mut env_pipeline = EnvProcessorPipeline::default();
@@ -229,22 +228,14 @@ pub fn create_env_processor_pipeline<'a, 'b>(env: &'a GlobalEnv) -> EnvProcessor
         "access and use check after inlining",
         |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
     );
-    env_pipeline.add(
-        "simplifier",
-        if optimize_on {
-            |env: &mut GlobalEnv| {
-                ast_simplifier::run_simplifier(
-                    env, true, // eliminate code only if optimize is on
-                )
-            }
-        } else {
-            |env: &mut GlobalEnv| {
-                ast_simplifier::run_simplifier(
-                    env, false, // eliminate code only if optimize is on
-                )
-            }
-        },
-    );
+    env_pipeline.add("simplifier", {
+        move |env: &mut GlobalEnv| {
+            ast_simplifier::run_simplifier(
+                env,
+                optimize_on, // eliminate code only if optimize is on
+            )
+        }
+    });
     env_pipeline
 }
 
