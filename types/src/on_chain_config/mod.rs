@@ -54,7 +54,7 @@ pub use self::{
     jwk_consensus_config::{
         ConfigV1 as JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig,
     },
-    randomness_config::RandomnessConfigMoveStruct,
+    randomness_config::{OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,

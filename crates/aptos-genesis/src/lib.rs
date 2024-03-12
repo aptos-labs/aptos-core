@@ -25,7 +25,7 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{
         Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        OnChainJWKConsensusConfig, RandomnessConfigMoveStruct,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig,
     },
     transaction::Transaction,
     waypoint::Waypoint,
@@ -74,7 +74,7 @@ pub struct GenesisInfo {
     pub execution_config: OnChainExecutionConfig,
     pub gas_schedule: GasScheduleV2,
     pub initial_features_override: Option<Features>,
-    pub randomness_config_override: Option<RandomnessConfigMoveStruct>,
+    pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
 }
 

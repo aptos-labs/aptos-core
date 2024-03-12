@@ -2,7 +2,7 @@
 
 use crate::{
     dkg::real_dkg::RealDKG,
-    on_chain_config::{OnChainConfig, RandomnessConfigMoveStruct},
+    on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };
 use anyhow::Result;
@@ -100,6 +100,10 @@ impl DKGSessionMetadata {
             .into_iter()
             .map(|obj| obj.try_into().unwrap())
             .collect()
+    }
+
+    pub fn randomness_config_derived(&self) -> Option<OnChainRandomnessConfig> {
+        OnChainRandomnessConfig::try_from(self.randomness_config.clone()).ok()
     }
 }
 

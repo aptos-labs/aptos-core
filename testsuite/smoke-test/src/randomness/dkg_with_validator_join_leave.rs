@@ -6,7 +6,7 @@ use crate::{
 };
 use aptos::test::CliTestFramework;
 use aptos_forge::{Node, Swarm};
-use aptos_types::on_chain_config::RandomnessConfigMoveStruct;
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use std::sync::Arc;
 
 #[tokio::test]
@@ -24,7 +24,7 @@ async fn dkg_with_validator_join_leave() {
 
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-            conf.randomness_config_override = Some(RandomnessConfigMoveStruct::default_enabled());
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build()
         .await;

@@ -46,6 +46,7 @@ pub struct RandomnessConfigMoveStruct {
     variant: MoveAny,
 }
 
+#[derive(Clone, Debug)]
 pub enum OnChainRandomnessConfig {
     Off,
     V1(ConfigV1),
@@ -79,44 +80,41 @@ impl From<OnChainRandomnessConfig> for RandomnessConfigMoveStruct {
     }
 }
 
-impl RandomnessConfigMoveStruct {
+impl OnChainRandomnessConfig {
     pub fn default_enabled() -> Self {
-        OnChainRandomnessConfig::V1(ConfigV1::default()).into()
+        OnChainRandomnessConfig::V1(ConfigV1::default())
     }
 
     pub fn default_disabled() -> Self {
-        OnChainRandomnessConfig::Off.into()
+        OnChainRandomnessConfig::Off
     }
 
     pub fn default_if_missing() -> Self {
-        OnChainRandomnessConfig::Off.into()
+        OnChainRandomnessConfig::Off
     }
 
     pub fn default_for_genesis() -> Self {
-        OnChainRandomnessConfig::Off.into() //TODO: change to `V1` after randomness is ready.
+        OnChainRandomnessConfig::Off //TODO: change to `V1` after randomness is ready.
     }
 
     pub fn randomness_enabled(&self) -> bool {
-        match OnChainRandomnessConfig::try_from(self.clone()) {
-            Ok(OnChainRandomnessConfig::Off) => false,
-            Ok(OnChainRandomnessConfig::V1(_)) => true,
-            Err(_) => false,
+        match self {
+            OnChainRandomnessConfig::Off => false,
+            OnChainRandomnessConfig::V1(_) => true,
         }
     }
 
     pub fn secrecy_threshold(&self) -> Option<U64F64> {
-        match OnChainRandomnessConfig::try_from(self.clone()) {
-            Ok(OnChainRandomnessConfig::Off) => None,
-            Ok(OnChainRandomnessConfig::V1(v1)) => Some(v1.secrecy_threshold.as_u64f64()),
-            Err(_) => None,
+        match self {
+            OnChainRandomnessConfig::Off => None,
+            OnChainRandomnessConfig::V1(v1) => Some(v1.secrecy_threshold.as_u64f64()),
         }
     }
 
     pub fn reconstruct_threshold(&self) -> Option<U64F64> {
-        match OnChainRandomnessConfig::try_from(self.clone()) {
-            Ok(OnChainRandomnessConfig::Off) => None,
-            Ok(OnChainRandomnessConfig::V1(v1)) => Some(v1.reconstruction_threshold.as_u64f64()),
-            Err(_) => None,
+        match self {
+            OnChainRandomnessConfig::Off => None,
+            OnChainRandomnessConfig::V1(v1) => Some(v1.reconstruction_threshold.as_u64f64()),
         }
     }
 }

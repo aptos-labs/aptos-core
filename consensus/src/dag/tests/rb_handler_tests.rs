@@ -19,7 +19,7 @@ use aptos_config::config::DagPayloadConfig;
 use aptos_types::{
     aggregate_signature::PartialSignatures,
     epoch_state::EpochState,
-    on_chain_config::{OnChainJWKConsensusConfig, RandomnessConfigMoveStruct, ValidatorTxnConfig},
+    on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig},
     validator_verifier::random_validator_verifier,
 };
 use claims::{assert_ok, assert_ok_eq};
@@ -78,7 +78,7 @@ async fn test_node_broadcast_receiver_succeed() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
-        RandomnessConfigMoveStruct::default_disabled(),
+        OnChainRandomnessConfig::default_disabled(),
         OnChainJWKConsensusConfig::default_disabled(),
         health_backoff,
     );
@@ -129,7 +129,7 @@ async fn test_node_broadcast_receiver_failure() {
                 Arc::new(MockFetchRequester {}),
                 DagPayloadConfig::default(),
                 ValidatorTxnConfig::default_disabled(),
-                RandomnessConfigMoveStruct::default_disabled(),
+                OnChainRandomnessConfig::default_disabled(),
                 OnChainJWKConsensusConfig::default_disabled(),
                 HealthBackoff::new(
                     epoch_state.clone(),
@@ -221,7 +221,7 @@ async fn test_node_broadcast_receiver_storage() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
-        RandomnessConfigMoveStruct::default_disabled(),
+        OnChainRandomnessConfig::default_disabled(),
         OnChainJWKConsensusConfig::default_disabled(),
         HealthBackoff::new(
             epoch_state.clone(),
@@ -245,7 +245,7 @@ async fn test_node_broadcast_receiver_storage() {
         Arc::new(MockFetchRequester {}),
         DagPayloadConfig::default(),
         ValidatorTxnConfig::default_disabled(),
-        RandomnessConfigMoveStruct::default_disabled(),
+        OnChainRandomnessConfig::default_disabled(),
         OnChainJWKConsensusConfig::default_disabled(),
         HealthBackoff::new(
             epoch_state,

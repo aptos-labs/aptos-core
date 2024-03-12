@@ -9,7 +9,7 @@ use crate::{
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
-use aptos_types::{dkg::DKGState, on_chain_config::RandomnessConfigMoveStruct};
+use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
@@ -25,7 +25,7 @@ async fn randomness_correctness() {
 
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-            conf.randomness_config_override = Some(RandomnessConfigMoveStruct::default_enabled());
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build_with_cli(0)
         .await;

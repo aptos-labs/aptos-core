@@ -24,7 +24,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{OnChainJWKConsensusConfig, RandomnessConfigMoveStruct, ValidatorTxnConfig},
+    on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig},
     validator_signer::ValidatorSigner,
     validator_txn::ValidatorTransaction,
 };
@@ -46,7 +46,7 @@ pub(crate) struct NodeBroadcastHandler {
     fetch_requester: Arc<dyn TFetchRequester>,
     payload_config: DagPayloadConfig,
     vtxn_config: ValidatorTxnConfig,
-    randomness_config: RandomnessConfigMoveStruct,
+    randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
     health_backoff: HealthBackoff,
 }
@@ -61,7 +61,7 @@ impl NodeBroadcastHandler {
         fetch_requester: Arc<dyn TFetchRequester>,
         payload_config: DagPayloadConfig,
         vtxn_config: ValidatorTxnConfig,
-        randomness_config: RandomnessConfigMoveStruct,
+        randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
         health_backoff: HealthBackoff,
     ) -> Self {

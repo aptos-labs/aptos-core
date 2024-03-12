@@ -23,7 +23,7 @@ use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
         OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        RandomnessConfigMoveStruct, ValidatorSet,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, ValidatorSet,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -159,7 +159,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let onchain_randomness_config = payload
             .get::<RandomnessConfigMoveStruct>()
-            .unwrap_or_else(|_| RandomnessConfigMoveStruct::default_if_missing());
+            .and_then(OnChainRandomnessConfig::try_from)
+            .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
+
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);

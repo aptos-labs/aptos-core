@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
-use aptos_types::{dkg::DKGState, on_chain_config::RandomnessConfigMoveStruct};
+use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
 /// Enable on-chain randomness by enabling validator transactions and randomness main logic.
@@ -25,7 +25,7 @@ async fn enable_feature_2() {
 
             // start with vtxn disabled and randomness off.
             conf.consensus_config.disable_validator_txns();
-            conf.randomness_config_override = Some(RandomnessConfigMoveStruct::default_disabled());
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;

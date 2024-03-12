@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_types::{
-    on_chain_config::{OnChainJWKConsensusConfig, RandomnessConfigMoveStruct},
+    on_chain_config::{OnChainJWKConsensusConfig, OnChainRandomnessConfig},
     validator_txn::ValidatorTransaction,
 };
 
@@ -13,7 +13,7 @@ pub mod mock_time_service;
 pub mod time_service;
 
 pub fn is_vtxn_expected(
-    randomness_config: &RandomnessConfigMoveStruct,
+    randomness_config: &OnChainRandomnessConfig,
     jwk_consensus_config: &OnChainJWKConsensusConfig,
     vtxn: &ValidatorTransaction,
 ) -> bool {

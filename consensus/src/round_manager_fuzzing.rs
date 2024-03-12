@@ -40,7 +40,7 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     on_chain_config::{
-        OnChainConsensusConfig, OnChainJWKConsensusConfig, RandomnessConfigMoveStruct, ValidatorSet,
+        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorSet,
         ValidatorTxnConfig,
     },
     validator_info::ValidatorInfo,
@@ -213,7 +213,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         OnChainConsensusConfig::default(),
         round_manager_tx,
         ConsensusConfig::default(),
-        RandomnessConfigMoveStruct::default_enabled(),
+        OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
         true,
     )

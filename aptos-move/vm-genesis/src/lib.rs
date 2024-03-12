@@ -26,8 +26,8 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
-        OnChainJWKConsensusConfig, RandomnessConfigMoveStruct, TimedFeaturesBuilder,
-        APTOS_MAX_KNOWN_VERSION,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
+        TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
     write_set::TransactionWrite,
@@ -83,7 +83,7 @@ pub struct GenesisConfiguration {
     pub employee_vesting_start: u64,
     pub employee_vesting_period_duration: u64,
     pub initial_features_override: Option<Features>,
-    pub randomness_config_override: Option<RandomnessConfigMoveStruct>,
+    pub randomness_config_override: Option<OnChainRandomnessConfig>,
     pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
 }
 
@@ -278,8 +278,8 @@ pub fn encode_genesis_change_set(
     let randomness_config = genesis_config
         .randomness_config_override
         .clone()
-        .unwrap_or_else(RandomnessConfigMoveStruct::default_for_genesis);
-    initialize_randomness_config(&mut session, &randomness_config);
+        .unwrap_or_else(OnChainRandomnessConfig::default_for_genesis);
+    initialize_randomness_config(&mut session, randomness_config);
     initialize_randomness_resources(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
@@ -501,7 +501,7 @@ fn initialize_dkg(session: &mut SessionExt) {
 
 fn initialize_randomness_config(
     session: &mut SessionExt,
-    randomness_config: &RandomnessConfigMoveStruct,
+    randomness_config: OnChainRandomnessConfig,
 ) {
     exec_function(
         session,
@@ -510,7 +510,7 @@ fn initialize_randomness_config(
         vec![],
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
-            randomness_config.as_move_value(),
+            RandomnessConfigMoveStruct::from(randomness_config).as_move_value(),
         ]),
     );
 }
