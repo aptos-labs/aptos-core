@@ -278,6 +278,7 @@ impl WorkflowTxnGeneratorCreator {
                     num_modules,
                     mint_entry_point.package_name(),
                     Some(20_00000000),
+                    true,
                 )
                 .await;
 
@@ -338,7 +339,7 @@ impl WorkflowTxnGeneratorCreator {
                     count,
                 )
             },
-            WorkflowKind::Econia { num_users, flow_type, num_markets, reuse_accounts_for_orders } => {
+            WorkflowKind::Econia { num_users, flow_type, num_markets, reuse_accounts_for_orders , publish_packages: bool } => {
                 let create_accounts = initial_account_pool.is_none();
                 let created_pool = initial_account_pool.unwrap_or(Arc::new(ObjectPool::new()));
                 let register_market_accounts_pool = Arc::new(ObjectPool::new());
@@ -352,6 +353,7 @@ impl WorkflowTxnGeneratorCreator {
                     num_modules,
                     EntryPoints::EconiaRegisterMarket.package_name(),
                     Some(100_000_000_000_000),
+                    publish_packages,
                 )
                 .await;
                 

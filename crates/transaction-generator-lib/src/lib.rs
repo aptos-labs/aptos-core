@@ -104,6 +104,8 @@ pub enum WorkflowKind {
         num_markets: u64,
         // If this is flag is set, the same accounts will be reused for placing multiple orders
         reuse_accounts_for_orders: bool,
+        // Publish Econia package during the test
+        publish_packages: bool,
     },
 }
 
