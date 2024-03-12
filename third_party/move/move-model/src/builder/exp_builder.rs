@@ -1378,6 +1378,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let mut exp_tys = vec![];
                 for exp in ea_exps {
                     let (ty, exp) = self.translate_exp_free(exp);
+                    if ty.is_tuple() {
+                        self.error(
+                            &self.env().get_node_loc(exp.node_id()),
+                            "Expected a single type, but found a tuple type",
+                        );
+                    }
                     exps.push(exp.into_exp());
                     exp_tys.push(ty)
                 }

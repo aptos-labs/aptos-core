@@ -177,6 +177,12 @@ pub struct EmitArgs {
     #[clap(long)]
     pub expected_gas_per_txn: Option<u64>,
 
+    #[clap(long)]
+    pub expected_gas_per_transfer: Option<u64>,
+
+    #[clap(long)]
+    pub expected_gas_per_account_create: Option<u64>,
+
     #[clap(long, conflicts_with = "num_accounts")]
     pub max_transactions_per_account: Option<usize>,
 

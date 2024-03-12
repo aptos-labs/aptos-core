@@ -246,6 +246,22 @@ struct Transformer<'a> {
 
 impl<'a> Transformer<'a> {
     fn run(&mut self, code: Vec<Bytecode>) {
+        // Check and insert drop for parameters before the first instruction if it is a return
+        if !code.is_empty() && code.first().unwrap().is_return() {
+            let instr = code.first().unwrap();
+            for temp in self
+                .live_var
+                .0
+                .get(&0)
+                .unwrap()
+                .released_and_unused_temps(instr)
+            {
+                if temp < self.builder.fun_env.get_parameters().len() {
+                    self.copy_drop.get_mut(&0).unwrap().needs_drop.insert(temp);
+                }
+            }
+            self.check_and_add_implicit_drops(0, instr, true);
+        }
         for (offset, bc) in code.into_iter().enumerate() {
             self.transform_bytecode(offset as CodeOffset, bc)
         }
@@ -290,7 +306,7 @@ impl<'a> Transformer<'a> {
             _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
         }
         // Insert/check any drops needed after this program point
-        self.check_and_add_implicit_drops(code_offset, &bc)
+        self.check_and_add_implicit_drops(code_offset, &bc, false)
     }
 
     fn check_and_emit_bytecode(&mut self, _code_offset: CodeOffset, bc: Bytecode) {
@@ -422,9 +438,14 @@ impl<'a> Transformer<'a> {
 
 impl<'a> Transformer<'a> {
     /// Add implicit drops at the given code offset.
-    fn check_and_add_implicit_drops(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
-        // No drop after terminators
-        if !bytecode.is_always_branching() {
+    fn check_and_add_implicit_drops(
+        &mut self,
+        code_offset: CodeOffset,
+        bytecode: &Bytecode,
+        before: bool,
+    ) {
+        // No drop after terminators unless it is dropped before a return
+        if !bytecode.is_always_branching() || before {
             let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
             let id = bytecode.get_attr_id();
             for temp in copy_drop_at.check_drop.iter() {

@@ -117,8 +117,23 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
             return data;
         }
         let target = FunctionTarget::new(fun_env, &data);
-        let offset_to_live_refs = LiveVarAnnotation(self.analyze(&target));
-        data.annotations.set(offset_to_live_refs, true);
+        let mut live_info = self.analyze(&target);
+        // Add parameters to the before set at offset 0
+        if live_info.contains_key(&0) {
+            let live_info_at_zero = live_info.get_mut(&0).unwrap();
+            for (i, param) in fun_env.get_parameters().iter().enumerate() {
+                if let Entry::Vacant(e) = live_info_at_zero.before.entry(i) {
+                    let mut usages = BTreeSet::new();
+                    usages.insert(param.clone().2);
+                    let live_info = LiveVarInfo { usages };
+                    e.insert(live_info);
+                } else {
+                    let live_info = live_info_at_zero.before.get_mut(&i).unwrap();
+                    live_info.usages.insert(param.clone().2); // use the location info for the parameter
+                }
+            }
+        }
+        data.annotations.set(LiveVarAnnotation(live_info), true);
         data
     }
 

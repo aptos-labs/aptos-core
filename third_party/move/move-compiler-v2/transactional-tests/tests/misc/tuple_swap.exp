@@ -1,0 +1,36 @@
+processed 12 tasks
+
+task 1 'run'. lines 108-108:
+return values: 2, 1
+
+task 2 'run'. lines 110-110:
+return values: 30, 40, 20, 10
+
+task 3 'run'. lines 112-112:
+return values: 22, 11
+
+task 4 'run'. lines 114-114:
+return values: { 222 }, { 111 }
+
+task 5 'run'. lines 116-116:
+return values: 258, 147
+
+task 6 'run'. lines 118-118:
+return values: 41, 5
+
+task 7 'run'. lines 120-120:
+return values: 440, 44
+
+task 8 'run'. lines 122-122:
+return values: 8, 80, 80, 8
+
+task 9 'run'. lines 124-124:
+return values: 23, 51
+
+task 10 'run'. lines 126-126:
+return values: 88, 10
+
+task 11 'run'. lines 128-128:
+return values: 83, 53
+
+==> Compiler v2 delivered same results!

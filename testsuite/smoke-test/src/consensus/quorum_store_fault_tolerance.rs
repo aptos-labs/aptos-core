@@ -35,7 +35,7 @@ async fn generate_traffic_and_assert_committed(
         .await
         .unwrap();
 
-    let txn_stat = generate_traffic(swarm, nodes, duration, 1, vec![vec![
+    let txn_stat = generate_traffic(swarm, nodes, duration, 100, vec![vec![
         (
             TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
