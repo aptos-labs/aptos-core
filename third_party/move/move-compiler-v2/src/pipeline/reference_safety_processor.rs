@@ -105,6 +105,7 @@
 //!    have the same path appearing multiple times in the graph), if the last edge is mut, then
 //!    the set of temporaries associated with those paths must be a singleton. This basically
 //!    states that the same mutable reference in `temps` cannot be used twice.
+//! e. For any path `p`, if a certain edge is mut, then all edges in its prefix must be mut as well.
 
 use crate::{
     pipeline::livevar_analysis_processor::{LiveVarAnnotation, LiveVarInfoAtCodeOffset},
@@ -1125,27 +1126,12 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             ),
             _ => (BTreeSet::new(), "".to_string()),
         };
-        let (action, attempt) = if edge.kind.is_mut() {
-            ("mutably", "mutable")
-        } else {
-            ("immutably", "immutable")
-        };
-        let reason = if other_edge.kind.is_mut() {
-            "mutable references exist"
-        } else {
-            "immutable references exist"
-        };
         let mut info = self.borrow_info(label, |e| e != edge);
         info.push((self.cur_loc(), "requirement enforced here".to_string()));
-        self.error_with_hints(
-            &edge.loc,
-            format!(
-                "cannot {action} borrow {what}since {reason}",
-                action = action,
-                what = temp_str,
-                reason = reason
-            ),
-            format!("{} borrow attempted here", attempt),
+        self.edge_error(
+            edge,
+            other_edge,
+            temp_str,
             info.into_iter()
                 .chain(self.usage_info(&other_edge.target, |t| !temps.contains(t))),
         );
@@ -1221,6 +1207,36 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                 hints.collect(),
             )
         }
+    }
+
+    fn edge_error<'a>(
+        &self,
+        edge: &'a BorrowEdge,
+        other_edge: &'a BorrowEdge,
+        what: String,
+        hints: impl Iterator<Item = (Loc, String)>,
+    ) {
+        let (action, attempt) = if edge.kind.is_mut() {
+            ("mutably", "mutable")
+        } else {
+            ("immutably", "immutable")
+        };
+        let reason = if other_edge.kind.is_mut() {
+            "mutable references exist"
+        } else {
+            "immutable references exist"
+        };
+        self.error_with_hints(
+            &edge.loc,
+            format!(
+                "cannot {action} borrow {what}since {reason}",
+                action = action,
+                what = what,
+                reason = reason
+            ),
+            format!("{} borrow attempted here", attempt),
+            hints,
+        );
     }
 
     #[inline]
@@ -1405,10 +1421,40 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         let is_mut = self.ty(dest).is_mutable_reference();
         let struct_env = self.global_env().get_struct(struct_.to_qualified_id());
         let field_id = struct_env.get_field_by_offset(*field_offs).get_id();
-        self.state.add_edge(
-            label,
-            BorrowEdge::new(BorrowEdgeKind::BorrowField(is_mut, field_id), loc, child),
+        let edge = BorrowEdge::new(
+            BorrowEdgeKind::BorrowField(is_mut, field_id),
+            loc.clone(),
+            child,
         );
+        // Check condition (e) in the file header documentation.
+        let node_opt = self.state.graph.get(&label);
+        if node_opt.is_some() && is_mut {
+            let mut parent_node = None;
+            let mut parent_edge = None;
+            for parent in node_opt.unwrap().parents.iter() {
+                for ch in self.state.children(parent) {
+                    if ch.target.0 == label.0 && !ch.kind.is_mut() {
+                        parent_node = Some(parent);
+                        parent_edge = Some(ch);
+                        break;
+                    }
+                }
+                if parent_node.is_some() {
+                    break;
+                }
+            }
+            if parent_node.is_some() {
+                let name = format!("{} ", self.target().get_local_name_for_error_message(src));
+                self.edge_error(
+                    &edge,
+                    parent_edge.unwrap(),
+                    name,
+                    self.borrow_info(parent_node.unwrap(), |_| true).into_iter(),
+                );
+                return;
+            }
+        }
+        self.state.add_edge(label, edge);
     }
 
     /// Process a function call. For now we implement standard Move semantics, where every
