@@ -54,10 +54,10 @@ pub struct IndexerGrpcDataServiceConfig {
     #[serde(default = "IndexerGrpcDataServiceConfig::default_data_service_response_channel_size")]
     pub data_service_response_channel_size: usize,
     /// Deprecated: a list of auth tokens that are allowed to access the service.
-    #[serde(default)]
+    #[serde(skip)]
     pub whitelisted_auth_tokens: Vec<String>,
-    /// If set, don't check for auth tokens.
-    #[serde(default)]
+    /// Deprecated: if set, don't check for auth tokens.
+    #[serde(skip)]
     pub disable_auth_check: bool,
     /// File store config.
     pub file_store_config: IndexerGrpcFileStoreConfig,
@@ -67,7 +67,7 @@ pub struct IndexerGrpcDataServiceConfig {
     #[serde(default = "IndexerGrpcDataServiceConfig::default_enable_cache_compression")]
     pub enable_cache_compression: bool,
     /// Sender addresses to ignore. Transactions from these addresses will not be indexed.
-    #[serde(default)]
+    #[serde(default = "IndexerGrpcDataServiceConfig::default_sender_addresses_to_ignore")]
     pub sender_addresses_to_ignore: Vec<String>,
 }
 
@@ -102,6 +102,10 @@ impl IndexerGrpcDataServiceConfig {
 
     pub const fn default_enable_cache_compression() -> bool {
         false
+    }
+
+    pub const fn default_sender_addresses_to_ignore() -> Vec<String> {
+        vec![]
     }
 }
 
