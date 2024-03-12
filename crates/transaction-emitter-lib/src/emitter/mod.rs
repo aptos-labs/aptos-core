@@ -762,7 +762,7 @@ impl TxnEmitter {
         // traffic pattern to be correct.
         info!("Tx emitter creating workers");
         let mut submission_workers = Vec::with_capacity(num_accounts);
-        let txn_counter: Arc<AtomicU64> = Arc::new(0.into());
+        let txn_counter: Arc<AtomicU64> = Arc::new(AtomicU64::new(0));
         for index in 0..num_accounts {
             let client = &req.rest_clients[index % req.rest_clients.len()];
             let accounts = all_accounts.split_off(all_accounts.len() - 1);

@@ -214,14 +214,17 @@ pub fn deposit_coins(
 
 pub struct EconiaLimitOrderTransactionGenerator {
     num_markets: Arc<u64>,
+    num_prev_transactions: Arc<u64>,
 }
 
 impl EconiaLimitOrderTransactionGenerator {
     pub fn new(
-        num_markets: u64
+        num_markets: u64,
+        num_prev_transactions: u64,
     ) -> Self {
         Self {
-            num_markets: Arc::new(num_markets)
+            num_markets: Arc::new(num_markets),
+            num_prev_transactions: Arc::new(num_prev_transactions),
         }
     }
 }
@@ -246,14 +249,14 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
+        let num_prev_transactions = self.num_prev_transactions.clone();
         Arc::new(move |account, package, publisher, txn_factory, rng, txn_counter| {
             let mut requests = vec![];
-            println!("txn_counter: {}", txn_counter);
             let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
             let bid_size = rng.gen_range(4, 14);
             let ask_size = rng.gen_range(4, 14);
 
-            if txn_counter <= (*num_markets)*100 || txn_counter % 2 == 0 {
+            if txn_counter <= (*num_prev_transactions) + (*num_markets)*100 || txn_counter % 2 == 0 {
                 let bid_price = rng.gen_range(1, 200);
                 let ask_price = rng.gen_range(201, 400);
 
