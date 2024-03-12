@@ -10,7 +10,7 @@ use aptos_logger::{debug, info};
 use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
-/// Enable on-chain randomness by enabling validator transactions and feature `RECONFIGURE_WITH_DKG` simultaneously.
+/// Enable on-chain randomness by enabling validator transactions and randomness main logic.
 #[tokio::test]
 async fn enable_feature_2() {
     let epoch_duration_secs = 20;
@@ -103,7 +103,7 @@ script {{
     let dkg_session = get_on_chain_resource::<DKGState>(&client)
         .await
         .last_completed
-        .expect("dkg result for epoch 6 should be present");
+        .expect("dkg result for epoch 5 should be present");
     assert_eq!(5, dkg_session.target_epoch());
     assert!(verify_dkg_transcript(&dkg_session, &decrypt_key_map).is_ok());
 }

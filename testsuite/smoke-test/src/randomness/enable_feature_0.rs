@@ -14,7 +14,7 @@ use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
 /// Enable on-chain randomness in the following steps.
-/// - Enable feature `RECONFIGURE_WITH_DKG` in epoch `e`.
+/// - Enable randomness main logic in epoch `e`.
 /// - Enable validator transactions in consensus config in epoch `e + 1`.
 #[tokio::test]
 async fn enable_feature_0() {

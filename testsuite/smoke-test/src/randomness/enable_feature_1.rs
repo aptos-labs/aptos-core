@@ -15,7 +15,7 @@ use std::{sync::Arc, time::Duration};
 
 /// Enable on-chain randomness in the following steps.
 /// - Enable validator transactions in consensus config in epoch `e`.
-/// - Enable feature `RECONFIGURE_WITH_DKG` in epoch `e + 1`.
+/// - Enable randomness main logic in epoch `e + 1`.
 #[tokio::test]
 async fn enable_feature_1() {
     let epoch_duration_secs = 20;

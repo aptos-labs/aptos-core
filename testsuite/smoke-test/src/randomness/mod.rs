@@ -268,7 +268,7 @@ script {
 
     fun main(core_resources: &signer) {
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-        let randomness_config = randomness_config::new_v1(
+        let config = randomness_config::new_v1(
             fixed_point64::create_from_rational(1, 2),
             fixed_point64::create_from_rational(2, 3)
         );
