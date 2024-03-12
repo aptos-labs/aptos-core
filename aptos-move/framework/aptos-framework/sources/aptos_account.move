@@ -76,19 +76,18 @@ module aptos_framework::aptos_account {
     /// This would create the recipient account first, which also registers it to receive APT, before transferring.
     public entry fun transfer(source: &signer, to: address, amount: u64) {
         if (!account::exists_at(to)) {
-            create_account(to)
+            create_account(to);
         };
-
+        // Resource accounts can be created without registering them to receive APT.
+        // This conveniently does the registration if necessary.
+        if (!coin::is_account_registered<AptosCoin>(to)) {
+            coin::register<AptosCoin>(&create_signer(to));
+        };
         if (features::operations_default_to_fa_apt_store_enabled()) {
-            fungible_transfer_only(source, to, amount)
+            fungible_transfer_only(source, to, amount);
         } else {
-            // Resource accounts can be created without registering them to receive APT.
-            // This conveniently does the registration if necessary.
-            if (!coin::is_account_registered<AptosCoin>(to)) {
-                coin::register<AptosCoin>(&create_signer(to));
-            };
             coin::transfer<AptosCoin>(source, to, amount)
-        }
+        };
     }
 
     /// Batch version of transfer_coins.

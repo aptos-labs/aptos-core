@@ -1,10 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_gas_algebra::{
-    DynamicExpression, Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, NumBytes,
-    Octa,
-};
+use aptos_gas_algebra::{DynamicExpression, Fee, FeePerGasUnit, GasExpression, InternalGas, InternalGasUnit, NumBytes, Octa};
 use aptos_gas_meter::GasAlgebra;
 use aptos_gas_schedule::VMGasParameters;
 use aptos_vm_types::storage::{io_pricing::IoPricing, space_pricing::DiskSpacePricing};
