@@ -46,7 +46,7 @@ where
     impure_action: F,
     /// Map from functions to their known pureness status
     pureness: BTreeMap<QualifiedId<FunId>, bool>,
-    /// Stack of functions currently visting
+    /// Stack of functions currently visiting
     visiting: Vec<(QualifiedId<FunId>, NodeId)>,
     /// Whether the expression visited so far is impure
     is_impure: bool,

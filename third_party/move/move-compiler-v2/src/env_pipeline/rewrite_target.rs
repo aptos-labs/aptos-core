@@ -13,24 +13,33 @@ use std::{
 /// Represents a target for rewriting.
 #[derive(Debug, PartialOrd, Ord, PartialEq, Eq, Clone)]
 pub enum RewriteTarget {
+    /// A Move function
     MoveFun(QualifiedId<FunId>),
+    /// A specification function
     SpecFun(QualifiedId<SpecFunId>),
+    /// A specification block, which can be attached to a Move function, struct, or module.
     SpecBlock(SpecBlockTarget),
 }
 
 /// Represents the state of a rewriting target.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RewriteState {
+    /// The target has not been changed
     Unchanged,
+    /// The definition of a Move or spec function has changed
     Def(Exp),
+    /// A specification block has changed.
     Spec(Spec),
+    /// The target is 'abstract', i.e. does have a definition.
     Abstract,
 }
 
 /// Scope for collecting targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
 pub enum RewritingScope {
+    /// Including only targets for which `module.is_target()` is true.
     CompilationTarget,
+    /// Include everything.
     Everything,
 }
 

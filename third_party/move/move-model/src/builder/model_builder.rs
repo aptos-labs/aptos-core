@@ -238,6 +238,15 @@ impl<'env> ModelBuilder<'env> {
         name: QualifiedSymbol,
         entry: SpecOrBuiltinFunEntry,
     ) {
+        if self.fun_table.contains_key(&name) {
+            self.env.error(
+                &entry.loc,
+                &format!(
+                    "name clash between specification and Move function `{}`",
+                    name.symbol.display(self.env.symbol_pool())
+                ),
+            );
+        }
         // TODO: check whether overloads are distinguishable
         self.spec_fun_table.entry(name).or_default().push(entry);
     }
