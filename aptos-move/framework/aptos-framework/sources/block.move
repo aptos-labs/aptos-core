@@ -230,8 +230,8 @@ module aptos_framework::block {
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();
-        }
-        debug::print(&utf8(b"0312 - block_prologue_ext end"));
+        };
+        debug::print(&utf8(b"0312 - block_prologue_ext end"))
     }
 
     #[view]
