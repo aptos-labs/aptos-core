@@ -72,7 +72,7 @@ pub(crate) fn setup_mutant_path(output_dir: &Path, file_path: &Path) -> anyhow::
 
     // Deal with the file as OsString to avoid problems with non-UTF8 characters.
     let filename = filename.to_os_string();
-    for i in 0u32.. {
+    for i in 0u32..u32::MAX {
         let mut mutant_path = filename.clone();
         mutant_path.push(OsString::from(format!("_mut{i}.move")));
 
