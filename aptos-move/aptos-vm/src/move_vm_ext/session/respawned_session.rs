@@ -67,7 +67,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
     pub fn finish_with_squashed_change_set(
         mut self,
         change_set_configs: &ChangeSetConfigs,
-        assert_no_new_creation: bool,
+        assert_no_additional_creation: bool,
     ) -> Result<VMChangeSet, VMStatus> {
         let additional_change_set = self.with_session_mut(|session| {
             unwrap_or_invariant_violation(
@@ -77,7 +77,7 @@ impl<'r, 'l> RespawnedSession<'r, 'l> {
             .finish(change_set_configs)
             .map_err(|e| e.into_vm_status())
         })?;
-        if assert_no_new_creation && additional_change_set.has_creation() {
+        if assert_no_additional_creation && additional_change_set.has_creation() {
             // After respawning in the epilogue, there shouldn't be new slots
             // created, otherwise there's a potential vulnerability like this:
             // 1. slot created by the user
