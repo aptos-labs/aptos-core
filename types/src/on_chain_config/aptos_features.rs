@@ -104,6 +104,7 @@ pub enum FeatureFlag {
     /// that results in a new package created but without any code. With this feature, it is no
     /// longer possible and an explicit error is returned if publishing is attempted.
     DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES = 82,
+    ACCOUNT_ABSTRACTION = 83,
 }
 
 impl FeatureFlag {
@@ -186,6 +187,7 @@ impl FeatureFlag {
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::ENABLE_LOADER_V2,
             FeatureFlag::DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
+            FeatureFlag::ACCOUNT_ABSTRACTION,
         ]
     }
 }
@@ -259,6 +261,10 @@ impl Features {
 
     pub fn is_storage_slot_metadata_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::STORAGE_SLOT_METADATA)
+    }
+
+    pub fn is_account_abstraction_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION)
     }
 
     pub fn is_module_event_enabled(&self) -> bool {
