@@ -405,6 +405,12 @@ pub fn update_counters_for_processed_chunk<T, O>(
                                 .with_label_values(&[process_type, "NoAccountAuthenticator"])
                                 .inc();
                         },
+                        AccountAuthenticator::Abstraction { .. } => {
+                            signature_count += 1;
+                            metrics::APTOS_PROCESSED_TXNS_AUTHENTICATOR
+                                .with_label_values(&[process_type, "Abstraction"])
+                                .inc();
+                        }
                     };
                 }
 

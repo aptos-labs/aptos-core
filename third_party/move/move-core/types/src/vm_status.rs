@@ -229,12 +229,14 @@ impl VMStatus {
                 code_offset,
                 message,
                 ..
-            } => Ok(KeptVMStatus::ExecutionFailure {
+            } => {
+                Ok(KeptVMStatus::ExecutionFailure {
                 location,
                 function,
                 code_offset,
                 message,
-            }),
+                })
+            }
             VMStatus::Error {
                 status_code: code,
                 message,
@@ -589,7 +591,6 @@ pub enum StatusCode {
     GAS_PARAMS_MISSING = 38,
     REQUIRED_DEPOSIT_INCONSISTENT_WITH_TXN_MAX_GAS = 39,
     MULTISIG_TRANSACTION_PAYLOAD_DOES_NOT_MATCH = 40,
-
     // Reserved error code for future use
     RESERVED_VALIDATION_ERROR_6 = 41,
     RESERVED_VALIDATION_ERROR_7 = 42,

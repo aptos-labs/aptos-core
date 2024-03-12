@@ -43,6 +43,7 @@ use std::{
     str::FromStr,
     time::{SystemTime, UNIX_EPOCH},
 };
+use aptos_types::function_info::FunctionInfo;
 
 static DUMMY_GUID: Lazy<EventGuid> = Lazy::new(|| EventGuid {
     creation_number: U64::from(0u64),
@@ -1913,6 +1914,18 @@ impl VerifyInput for NoAccountSignature {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct AbstractionSignature {
+    pub function_info: String,
+    pub signature: HexEncodedBytes,
+}
+
+impl VerifyInput for AbstractionSignature {
+    fn verify(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
 impl TryFrom<NoAccountSignature> for TransactionAuthenticator {
     type Error = anyhow::Error;
 
@@ -1927,6 +1940,17 @@ impl TryFrom<NoAccountSignature> for AccountAuthenticator {
 
     fn try_from(_value: NoAccountSignature) -> Result<Self, Self::Error> {
         Ok(AccountAuthenticator::NoAccountAuthenticator)
+    }
+}
+
+impl TryFrom<AbstractionSignature> for AccountAuthenticator {
+    type Error = anyhow::Error;
+
+    fn try_from(value: AbstractionSignature) -> Result<Self, Self::Error> {
+        Ok(AccountAuthenticator::Abstraction {
+            function_info: FunctionInfo::from_str(&value.function_info)?,
+            authenticator: value.signature.into(),
+        })
     }
 }
 
@@ -1946,6 +1970,7 @@ pub enum AccountSignature {
     SingleKeySignature(SingleKeySignature),
     MultiKeySignature(MultiKeySignature),
     NoAccountSignature(NoAccountSignature),
+    AbstractionSignature(AbstractionSignature)
 }
 
 impl VerifyInput for AccountSignature {
@@ -1956,6 +1981,7 @@ impl VerifyInput for AccountSignature {
             AccountSignature::SingleKeySignature(inner) => inner.verify(),
             AccountSignature::MultiKeySignature(inner) => inner.verify(),
             AccountSignature::NoAccountSignature(inner) => inner.verify(),
+            AccountSignature::AbstractionSignature(inner) => inner.verify(),
         }
     }
 }
@@ -1970,6 +1996,7 @@ impl TryFrom<AccountSignature> for AccountAuthenticator {
             AccountSignature::SingleKeySignature(s) => s.try_into()?,
             AccountSignature::MultiKeySignature(s) => s.try_into()?,
             AccountSignature::NoAccountSignature(s) => s.try_into()?,
+            AccountSignature::AbstractionSignature(s) => s.try_into()?,
         })
     }
 }
@@ -2131,6 +2158,12 @@ impl From<&AccountAuthenticator> for AccountSignature {
                 })
             },
             NoAccountAuthenticator => AccountSignature::NoAccountSignature(NoAccountSignature),
+            Abstraction { function_info, authenticator } => Self::AbstractionSignature(
+                AbstractionSignature {
+                    function_info: function_info.to_string(),
+                    signature: authenticator.clone().into(),
+                }
+            )
         }
     }
 }
@@ -2189,6 +2222,7 @@ impl TryFrom<FeePayerSignature> for TransactionAuthenticator {
     type Error = anyhow::Error;
 
     fn try_from(value: FeePayerSignature) -> Result<Self, Self::Error> {
+        print!("SIG_DEBUG {:?}", value);
         let FeePayerSignature {
             sender,
             secondary_signer_addresses,
