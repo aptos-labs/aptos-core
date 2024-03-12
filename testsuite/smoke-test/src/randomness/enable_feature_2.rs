@@ -53,6 +53,8 @@ script {{
     use aptos_framework::aptos_governance;
     use aptos_framework::consensus_config;
     use aptos_framework::randomness_config;
+    use aptos_std::fixed_point64::FixedPoint64;
+
     fun main(core_resources: &signer) {{
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
         let consensus_config_bytes = vector{:?};
