@@ -13,7 +13,8 @@
 //!
 //! More details:
 //! - Do flow-insensitive constant propagation:
-//!   - identify "possibly modified" symbols which may have more than one value
+//!   - identify "possibly modified" symbols which may have more than one value,
+//!     or may have their value moved (possibly leaving none)
 //!   - for safe symbols whose value is a constant value, propagate
 //!     the value to the use site to enable simplifying code:
 //!     - inline a constant value
