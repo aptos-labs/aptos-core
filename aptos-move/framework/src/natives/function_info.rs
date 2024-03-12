@@ -83,10 +83,11 @@ fn native_check_dispatch_type_compatibility_impl(
 
     let (rhs, rhs_id) = {
         let (module, func) = extract_function_info(&mut arguments)?;
-        if !context
-            .traversal_context()
-            .visited
-            .contains_key(&(module.address(), module.name()))
+        if !module.address().is_special()
+            && !context
+                .traversal_context()
+                .visited
+                .contains_key(&(module.address(), module.name()))
         {
             return Err(SafeNativeError::Abort { abort_code: 2 });
         }

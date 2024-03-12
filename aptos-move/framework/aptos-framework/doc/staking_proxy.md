@@ -432,7 +432,7 @@ Grant permission to mutate staking on behalf of the master signer.
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
+<b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -489,6 +489,7 @@ Aborts if conditions of SetStackingContractVoter and SetStackPoolVoterAbortsIf a
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
+<b>pragma</b> verify_duration_estimate = 120;
 <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakingContractVoter">SetStakingContractVoter</a>;
 <b>include</b> <a href="staking_proxy.md#0x1_staking_proxy_SetStakePoolVoterAbortsIf">SetStakePoolVoterAbortsIf</a>;
 </code></pre>

@@ -12,7 +12,10 @@ use crate::{
 pub use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{ed25519::Ed25519PublicKey, HashValue};
 use aptos_global_constants::{GAS_UNIT_PRICE, MAX_GAS_AMOUNT};
-use aptos_types::transaction::{EntryFunction, Script};
+use aptos_types::{
+    function_info::FunctionInfo,
+    transaction::{EntryFunction, Script},
+};
 
 pub struct TransactionBuilder {
     sender: Option<AccountAddress>,
@@ -153,6 +156,19 @@ impl TransactionFactory {
         self.payload(aptos_stdlib::aptos_account_create_account(
             AuthenticationKey::ed25519(public_key).account_address(),
         ))
+    }
+
+    pub fn add_dispatchable_authentication_function(
+        &self,
+        function_info: FunctionInfo,
+    ) -> TransactionBuilder {
+        self.payload(
+            aptos_stdlib::lite_account_add_dispatchable_authentication_function(
+                function_info.module_address,
+                function_info.module_name.into_bytes(),
+                function_info.function_name.into_bytes(),
+            ),
+        )
     }
 
     pub fn implicitly_create_user_account_and_transfer(

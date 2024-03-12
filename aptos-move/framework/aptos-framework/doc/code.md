@@ -1169,7 +1169,7 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
+<b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -1346,6 +1346,19 @@ Native function to initiate module loading, including a list of allowed dependen
 
 
 <pre><code><b>pragma</b> opaque;
+</code></pre>
+
+
+
+
+<a id="0x1_code_AbortsIfPermissionedSigner"></a>
+
+
+<pre><code><b>schema</b> <a href="code.md#0x1_code_AbortsIfPermissionedSigner">AbortsIfPermissionedSigner</a> {
+    s: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    <b>let</b> perm = <a href="code.md#0x1_code_CodePermission">CodePermission</a> {};
+    <b>aborts_if</b> !<a href="permissioned_signer.md#0x1_permissioned_signer_spec_check_permission_exists">permissioned_signer::spec_check_permission_exists</a>(s, perm);
+}
 </code></pre>
 
 

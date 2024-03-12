@@ -1198,7 +1198,7 @@ to bypass the checks.
     capacity: u256,
     perm: PermKey
 ) <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a> {
-    <b>if</b>(<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(permissioned)) {
+    <b>if</b>(!<a href="permissioned_signer.md#0x1_permissioned_signer_is_permissioned_signer">is_permissioned_signer</a>(permissioned)) {
         <b>return</b>;
     };
     <a href="permissioned_signer.md#0x1_permissioned_signer_insert_or">insert_or</a>(
