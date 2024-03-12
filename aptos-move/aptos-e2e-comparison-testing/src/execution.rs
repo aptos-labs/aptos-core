@@ -22,7 +22,7 @@ use clap::ValueEnum;
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
 use move_package::CompilerVersion;
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{cmp, collections::HashMap, path::PathBuf, sync::Arc};
 
 fn load_packages_to_executor(
     executor: &mut FakeExecutor,
@@ -422,94 +422,98 @@ impl Execution {
             (Err(e1), Err(e2)) => {
                 if e1.message() != e2.message() || e1.status_code() != e2.status_code() {
                     self.output_result_str(format!(
-                        "error is different at version:{}",
+                        "error is different at version: {}",
                         cur_version
                     ));
-                    // self.output_result_str(format!("error {} is raised from V1", e1));
-                    // self.output_result_str(format!("error {} is raised from V2", e2));
+                    self.output_result_str(format!("error {} is raised from V1", e1));
+                    self.output_result_str(format!("error {} is raised from V2", e2));
                 }
             },
             (Err(_), Ok(_)) => {
                 self.output_result_str(format!(
-                    "V1 returns error while V2 does not at version:{}",
+                    "V1 returns error while V2 does not at version: {}",
                     cur_version
                 ));
-                // self.output_result_str(format!(
-                //     "output from V2 at version:{}\nwrite set:{:?}\n events:{:?}\n",
-                //     cur_version, res.0, res.1
-                // ));
             },
             (Ok(_), Err(_)) => {
                 self.output_result_str(format!(
-                    "V2 returns error while V1 does not at version:{}",
+                    "V2 returns error while V1 does not at version: {}",
                     cur_version
                 ));
-                // self.output_result_str(format!(
-                //     "output from V1 at version:{}\nwrite set:{:?}\n events:{:?}\n",
-                //     cur_version, res.0, res.1
-                // ));
             },
             (Ok(res_1), Ok(res_2)) => {
                 // compare events
-                let mut error = false;
+                let mut event_error = false;
                 if res_1.1.len() != res_2.1.len() {
-                    error = true;
+                    event_error = true;
                 }
-                for idx in 0..res_1.1.len() {
+                for idx in 0..cmp::min(res_1.1.len(), res_2.1.len()) {
                     let event_1 = &res_1.1[idx];
                     let event_2 = &res_2.1[idx];
                     if event_1 != event_2 {
-                        error = true;
-                        // self.output_result_str(format!(
-                        //     "event raised from V1: {} at index:{}",
-                        //     event_1, idx
-                        // ));
-                        // self.output_result_str(format!(
-                        //     "event raised from V2: {} at index:{}",
-                        //     event_2, idx
-                        // ));
+                        event_error = true;
+                        self.output_result_str(format!(
+                            "event raised from V1: {} at index: {}",
+                            event_1, idx
+                        ));
+                        self.output_result_str(format!(
+                            "event raised from V2: {} at index: {}",
+                            event_2, idx
+                        ));
                     }
                 }
-                if error {
+                if event_error {
                     self.output_result_str(format!(
-                        "event is different at version:{}",
+                        "event is different at version: {}",
                         cur_version
                     ));
                 }
                 // compare write set
+                let mut write_set_error = false;
                 let res_1_write_set_vec = res_1.0.iter().collect_vec();
                 let res_2_write_set_vec = res_2.0.iter().collect_vec();
-                for idx in 0..res_1_write_set_vec.len() {
+                if res_1_write_set_vec.len() != res_2_write_set_vec.len() {
+                    write_set_error = true;
+                }
+                for idx in 0..cmp::min(res_1_write_set_vec.len(), res_2_write_set_vec.len()) {
                     let write_set_1 = res_1_write_set_vec[idx];
                     let write_set_2 = res_2_write_set_vec[idx];
                     if write_set_1.0 != write_set_2.0 {
+                        write_set_error = true;
                         self.output_result_str(format!(
-                            "write set key is different at version:{}, index:{}",
+                            "write set key is different at version: {}, index: {}",
                             cur_version, idx
                         ));
-                        // self.output_result_str(format!(
-                        //     "state key at V1: {:?} at index:{}",
-                        //     write_set_1.0, idx
-                        // ));
-                        // self.output_result_str(format!(
-                        //     "state key at V2: {:?} at index:{}",
-                        //     write_set_2.0, idx
-                        // ));
+                        self.output_result_str(format!(
+                            "state key at V1: {:?} at index: {}",
+                            write_set_1.0, idx
+                        ));
+                        self.output_result_str(format!(
+                            "state key at V2: {:?} at index: {}",
+                            write_set_2.0, idx
+                        ));
                     }
                     if write_set_1.1 != write_set_2.1 {
+                        write_set_error = true;
                         self.output_result_str(format!(
-                            "write set value is different at version:{}, index:{}",
+                            "write set value is different at version: {}, index: {}",
                             cur_version, idx
                         ));
-                        // self.output_result_str(format!(
-                        //     "state value at V1: {:?} at index {}",
-                        //     write_set_1.1, idx
-                        // ));
-                        // self.output_result_str(format!(
-                        //     "state value at V2: {:?} at index {}",
-                        //     write_set_2.1, idx
-                        // ));
+                        self.output_result_str(format!(
+                            "state value at V1: {:?} at index: {}",
+                            write_set_1.1, idx
+                        ));
+                        self.output_result_str(format!(
+                            "state value at V2: {:?} at index: {}",
+                            write_set_2.1, idx
+                        ));
                     }
+                }
+                if write_set_error {
+                    self.output_result_str(format!(
+                        "write set is different at version: {}",
+                        cur_version
+                    ));
                 }
             },
         }
