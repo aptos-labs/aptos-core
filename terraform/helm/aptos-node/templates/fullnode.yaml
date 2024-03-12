@@ -223,6 +223,8 @@ spec:
         configMap:
           name: {{ include "aptos-validator.fullname" $ }}-{{$i}}
       - name: genesis-config
+        emptyDir: {}
+      - name: compressed-genesis-config
         secret:
           secretName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
       - name: writable-genesis
