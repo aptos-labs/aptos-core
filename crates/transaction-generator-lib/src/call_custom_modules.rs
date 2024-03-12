@@ -23,6 +23,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &LocalAccount,
         &TransactionFactory,
         &mut StdRng,
+        usize,
     ) -> Vec<SignedTransaction>
     + Send
     + Sync;
@@ -61,6 +62,7 @@ pub struct CustomModulesDelegationGenerator {
     txn_factory: TransactionFactory,
     packages: Arc<Vec<(Package, LocalAccount)>>,
     txn_generator: Arc<TransactionGeneratorWorker>,
+    txn_counter: usize,
 }
 
 impl CustomModulesDelegationGenerator {
@@ -75,6 +77,7 @@ impl CustomModulesDelegationGenerator {
             txn_factory,
             packages,
             txn_generator,
+            txn_counter: 0,
         }
     }
 }
@@ -88,12 +91,14 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
         let mut all_requests = Vec::with_capacity(self.packages.len());
 
         for (package, publisher) in self.packages.iter() {
+            self.txn_counter +=1;
             let mut requests = (self.txn_generator)(
                 account,
                 package,
                 publisher,
                 &self.txn_factory,
                 &mut self.rng,
+                self.txn_counter,
             );
             all_requests.append(&mut requests);
         }
