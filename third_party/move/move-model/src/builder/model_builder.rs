@@ -505,6 +505,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Generates error messages for recursive structs
     /// `path`: `path[0]` contains `path[1]` ... `path[-1]` contains `this_struct`
+    /// Precondition: `path` not empty.
     fn gen_error_msg_for_fields_loop(
         &self,
         path: &Vec<(Loc, Symbol, Type)>,
@@ -523,8 +524,8 @@ impl<'env> ModelBuilder<'env> {
         }
         loop_notes.push(format!(
             "`{}` contains field `{}: {}`, which forms a loop.",
-            self.get_struct_type_name(&path.last().unwrap().2, this_struct_id),
-            self.env.symbol_pool().string(path.last().unwrap().1),
+            self.get_struct_type_name(&path.last().expect("parent").2, this_struct_id),
+            self.env.symbol_pool().string(path.last().expect("parent").1),
             self.get_struct_display_name_simple(this_struct_id)
         ));
         loop_notes
