@@ -63,6 +63,17 @@ impl From<crate::on_chain_config::OIDCProvider> for OIDCProvider {
     }
 }
 
+impl TryFrom<OIDCProvider> for crate::on_chain_config::OIDCProvider {
+    type Error = anyhow::Error;
+
+    fn try_from(value: OIDCProvider) -> Result<Self, Self::Error> {
+        let OIDCProvider { name, config_url } = value;
+        let name = String::from_utf8(name)?;
+        let config_url = String::from_utf8(config_url)?;
+        Ok(crate::on_chain_config::OIDCProvider { name, config_url })
+    }
+}
+
 impl Debug for OIDCProvider {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OIDCProvider")

@@ -1,16 +1,26 @@
 ---
 remote_endpoint: ~
-name: "v1.10"
+name: "v1.10-plus"
 proposals:
+  - name: step_1_increase_max_txn_gas
+    metadata:
+      title: "Increase max txn gas temporarily for framework upgrade"
+      description: "Increase max txn gas temporarily for framework upgrade"
+    execution_mode: MultiStep
+    update_sequence:
+      - DefaultGasWithOverrideOld: # Use `DefaultGasWithOverrideOld` in 1.11 and change back to `DefaultGasWithOverride` in 1.12+.
+          - name: "txn.max_execution_gas"
+            value: 3676000000
   - name: step_2_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.10"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.10"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.10-plus"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.10 plus some others in main."
     execution_mode: MultiStep
     update_sequence:
       - Framework:
           bytecode_version: 6
           git_hash: ~
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move # Keep this in 1.11
       - DefaultGas
   - name: step_3_storage_fee_for_state_bytes_refundable
     metadata:
@@ -159,3 +169,17 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
+  - name: step_14_migrate_jwk_consensus_config
+    metadata:
+      title: "[1.11] Migrate JWK consensus config"
+      description: "Move JWK consensus on-off control and the supported OIDC provider list to its own resource."
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/jwk_consensus_config_migration.move
+  - name: step_15_enable_randomness # Keep this the last step, so any other governance gets the existing "immediate reconfig" experience (if they need a reconfig).
+    metadata:
+      title: "[1.11] Enable randomness"
+      description: "Move JWK consensus on-off control and the supported OIDC provider list to its own resource."
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/enable_randomness.move
