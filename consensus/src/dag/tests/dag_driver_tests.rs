@@ -5,7 +5,7 @@ use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
         anchor_election::RoundRobinAnchorElection,
-        dag_driver::DagDriver,
+        dag_driver::{DagDriver, PeersByLatency},
         dag_fetcher::TFetchRequester,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
         dag_store::DagStore,
@@ -24,9 +24,10 @@ use crate::{
     test_utils::MockPayloadManager as MockPayloadClient,
 };
 use aptos_bounded_executor::BoundedExecutor;
-use aptos_config::config::DagPayloadConfig;
+use aptos_config::{config::DagPayloadConfig, network_id::NetworkId};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::Mutex;
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -186,7 +187,10 @@ fn setup(
             NoPipelineBackpressure::new(),
         ),
         false,
-        true,
+        PeersByLatency::new(
+            signers.iter().map(|s| s.author()).collect(),
+            PeersAndMetadata::new(&[NetworkId::Validator]),
+        ),
     )
 }
 

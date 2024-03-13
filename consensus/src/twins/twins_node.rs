@@ -26,7 +26,10 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_event_notifications::{ReconfigNotification, ReconfigNotificationListener};
 use aptos_mempool::mocks::MockSharedMempool;
 use aptos_network::{
-    application::interface::{NetworkClient, NetworkServiceEvents},
+    application::{
+        interface::{NetworkClient, NetworkServiceEvents},
+        storage::PeersAndMetadata,
+    },
     peer_manager::{conn_notifs_channel, ConnectionRequestSender, PeerManagerRequestSender},
     protocols::{
         network,
@@ -164,6 +167,7 @@ impl SMRNode {
             aptos_time_service::TimeService::real(),
             vtxn_pool,
             Arc::new(InMemRandDb::new()),
+            PeersAndMetadata::new(&[NetworkId::Validator]),
         );
         let (network_task, network_receiver) =
             NetworkTask::new(network_service_events, self_receiver);
