@@ -65,6 +65,7 @@ impl Proposal {
                 | ReleaseEntry::CustomGas(_)
                 | ReleaseEntry::DefaultGas
                 | ReleaseEntry::DefaultGasWithOverride(_)
+                | ReleaseEntry::DefaultGasWithOverrideOld(_)
                 | ReleaseEntry::Version(_)
                 | ReleaseEntry::Consensus(_)
                 | ReleaseEntry::Execution(_)
@@ -113,6 +114,8 @@ pub enum ReleaseEntry {
     CustomGas(GasScheduleV2),
     DefaultGas,
     DefaultGasWithOverride(Vec<GasOverride>),
+    /// Only used before randomness framework upgrade.
+    DefaultGasWithOverrideOld(Vec<GasOverride>),
     Version(Version),
     FeatureFlag(Features),
     Consensus(OnChainConsensusConfig),
@@ -150,6 +153,7 @@ impl ReleaseEntry {
             ReleaseEntry::CustomGas(gas_schedule) => {
                 if !fetch_and_equals::<GasScheduleV2>(client, gas_schedule)? {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
+                        true,
                         gas_schedule,
                         is_testnet,
                         if is_multi_step {
@@ -164,6 +168,7 @@ impl ReleaseEntry {
                 let gas_schedule = aptos_gas_schedule_updator::current_gas_schedule();
                 if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
+                        true,
                         &gas_schedule,
                         is_testnet,
                         if is_multi_step {
@@ -178,6 +183,22 @@ impl ReleaseEntry {
                 let gas_schedule = gas_override_default(gas_overrides)?;
                 if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
                     result.append(&mut gas::generate_gas_upgrade_proposal(
+                        true,
+                        &gas_schedule,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            "".to_owned().into_bytes()
+                        },
+                    )?);
+                }
+            },
+            ReleaseEntry::DefaultGasWithOverrideOld(gas_overrides) => {
+                let gas_schedule = gas_override_default(gas_overrides)?;
+                if !fetch_and_equals::<GasScheduleV2>(client, &gas_schedule)? {
+                    result.append(&mut gas::generate_gas_upgrade_proposal(
+                        false,
                         &gas_schedule,
                         is_testnet,
                         if is_multi_step {
@@ -331,7 +352,8 @@ impl ReleaseEntry {
                     bail!("Gas schedule config mismatch: Expected Default");
                 }
             },
-            ReleaseEntry::DefaultGasWithOverride(gas_overrides) => {
+            ReleaseEntry::DefaultGasWithOverrideOld(gas_overrides)
+            | ReleaseEntry::DefaultGasWithOverride(gas_overrides) => {
                 if !fetch_and_equals(client_opt, &gas_override_default(gas_overrides)?)? {
                     bail!("Gas schedule config mismatch: Expected Default");
                 }
