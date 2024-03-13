@@ -260,13 +260,12 @@ module aptos_framework::object {
         create_object_internal(owner_address, unique_address, false)
     }
 
-    /// Create an object at a specific address. Used by framework.
-    public(friend) fun create_object_at_address(
+    /// Create a sticky object at a specific address. Only used by aptos_framework::coin.
+    public(friend) fun create_sticky_object_at_address(
         owner_address: address,
         object_address: address,
-        can_delete: bool
     ): ConstructorRef {
-        create_object_internal(owner_address, object_address, can_delete)
+        create_object_internal(owner_address, object_address, false)
     }
 
     #[deprecated]

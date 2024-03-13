@@ -48,7 +48,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Function `create_user_derived_object`](#0x1_object_create_user_derived_object)
 -  [Function `create_object`](#0x1_object_create_object)
 -  [Function `create_sticky_object`](#0x1_object_create_sticky_object)
--  [Function `create_object_at_address`](#0x1_object_create_object_at_address)
+-  [Function `create_sticky_object_at_address`](#0x1_object_create_sticky_object_at_address)
 -  [Function `create_object_from_account`](#0x1_object_create_object_from_account)
 -  [Function `create_object_from_object`](#0x1_object_create_object_from_object)
 -  [Function `create_object_from_guid`](#0x1_object_create_object_from_guid)
@@ -98,7 +98,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Function `create_user_derived_object`](#@Specification_1_create_user_derived_object)
     -  [Function `create_object`](#@Specification_1_create_object)
     -  [Function `create_sticky_object`](#@Specification_1_create_sticky_object)
-    -  [Function `create_object_at_address`](#@Specification_1_create_object_at_address)
+    -  [Function `create_sticky_object_at_address`](#@Specification_1_create_sticky_object_at_address)
     -  [Function `create_object_from_account`](#@Specification_1_create_object_from_account)
     -  [Function `create_object_from_object`](#@Specification_1_create_object_from_object)
     -  [Function `create_object_from_guid`](#@Specification_1_create_object_from_guid)
@@ -1084,14 +1084,14 @@ Same as <code>create_object</code> except the object to be created will be undel
 
 </details>
 
-<a id="0x1_object_create_object_at_address"></a>
+<a id="0x1_object_create_sticky_object_at_address"></a>
 
-## Function `create_object_at_address`
+## Function `create_sticky_object_at_address`
 
-Create an object at a specific address. Used by framework.
+Create a sticky object at a specific address. Only used by aptos_framework::coin.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_object_at_address">create_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>, can_delete: bool): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_sticky_object_at_address">create_sticky_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
 </code></pre>
 
 
@@ -1100,12 +1100,11 @@ Create an object at a specific address. Used by framework.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_object_at_address">create_object_at_address</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_sticky_object_at_address">create_sticky_object_at_address</a>(
     owner_address: <b>address</b>,
     object_address: <b>address</b>,
-    can_delete: bool
 ): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
-    <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, object_address, can_delete)
+    <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(owner_address, object_address, <b>false</b>)
 }
 </code></pre>
 
@@ -2534,12 +2533,12 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<a id="@Specification_1_create_object_at_address"></a>
+<a id="@Specification_1_create_sticky_object_at_address"></a>
 
-### Function `create_object_at_address`
+### Function `create_sticky_object_at_address`
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_object_at_address">create_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>, can_delete: bool): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_sticky_object_at_address">create_sticky_object_at_address</a>(owner_address: <b>address</b>, object_address: <b>address</b>): <a href="object.md#0x1_object_ConstructorRef">object::ConstructorRef</a>
 </code></pre>
 
 
