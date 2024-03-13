@@ -206,7 +206,7 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
 }
 
 /// Returns the standard env_processor_pipeline
-pub fn create_env_processor_pipeline<'a, 'b>(env: &'a GlobalEnv) -> EnvProcessorPipeline<'b> {
+pub fn create_env_processor_pipeline<'b>(env: &GlobalEnv) -> EnvProcessorPipeline<'b> {
     let options = env.get_extension::<Options>().expect("options");
     let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
 
