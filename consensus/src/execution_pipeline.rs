@@ -108,7 +108,6 @@ impl ExecutionPipeline {
         } = command;
 
         debug!("prepare_block received block {}.", block.id());
-        let num_vtxns = block.validator_txns().map(|txns| txns.len()).unwrap_or(0);
         let input_txns = block_preparer.prepare_block(&block).await;
         if let Err(e) = input_txns {
             result_tx.send(Err(e)).unwrap_or_else(|err| {
@@ -137,7 +136,6 @@ impl ExecutionPipeline {
                 });
             execute_block_tx
                 .send(ExecuteBlockCommand {
-                    num_vtxns,
                     input_txns,
                     block: (block.id(), sig_verified_txns).into(),
                     parent_block_id,
@@ -169,7 +167,6 @@ impl ExecutionPipeline {
         executor: Arc<dyn BlockExecutorTrait>,
     ) {
         while let Some(ExecuteBlockCommand {
-            num_vtxns,
             input_txns,
             block,
             parent_block_id,
@@ -200,7 +197,6 @@ impl ExecutionPipeline {
 
             ledger_apply_tx
                 .send(LedgerApplyCommand {
-                    num_vtxns,
                     input_txns,
                     block_id,
                     parent_block_id,
@@ -217,7 +213,6 @@ impl ExecutionPipeline {
         executor: Arc<dyn BlockExecutorTrait>,
     ) {
         while let Some(LedgerApplyCommand {
-            num_vtxns,
             input_txns,
             block_id,
             parent_block_id,
@@ -238,8 +233,7 @@ impl ExecutionPipeline {
                 .expect("Failed to spawn_blocking().")
             }
             .await;
-            let pipe_line_res =
-                res.map(|output| PipelineExecutionResult::new(num_vtxns, input_txns, output));
+            let pipe_line_res = res.map(|output| PipelineExecutionResult::new(input_txns, output));
             result_tx.send(pipe_line_res).unwrap_or_else(|err| {
                 error!(
                     block_id = block_id,
@@ -262,7 +256,6 @@ struct PrepareBlockCommand {
 }
 
 struct ExecuteBlockCommand {
-    num_vtxns: usize,
     input_txns: Vec<SignedTransaction>,
     block: ExecutableBlock,
     parent_block_id: HashValue,
@@ -271,7 +264,6 @@ struct ExecuteBlockCommand {
 }
 
 struct LedgerApplyCommand {
-    num_vtxns: usize,
     input_txns: Vec<SignedTransaction>,
     block_id: HashValue,
     parent_block_id: HashValue,

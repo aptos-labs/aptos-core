@@ -41,22 +41,13 @@ pub type StateComputeResultFut = BoxFuture<'static, ExecutorResult<PipelineExecu
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PipelineExecutionResult {
-    pub num_vtxns: usize,
     pub input_txns: Vec<SignedTransaction>,
     pub result: StateComputeResult,
 }
 
 impl PipelineExecutionResult {
-    pub fn new(
-        num_vtxns: usize,
-        input_txns: Vec<SignedTransaction>,
-        result: StateComputeResult,
-    ) -> Self {
-        Self {
-            num_vtxns,
-            input_txns,
-            result,
-        }
+    pub fn new(input_txns: Vec<SignedTransaction>, result: StateComputeResult) -> Self {
+        Self { input_txns, result }
     }
 }
 
@@ -177,6 +168,7 @@ impl StateComputer for ExecutionProxy {
         parent_block_id: HashValue,
         randomness: Option<Randomness>,
     ) -> StateComputeResultFut {
+        let num_vtxns = block.validator_txns().map(Vec::len).unwrap_or(0);
         let block_id = block.id();
         debug!(
             block = %block,
@@ -238,7 +230,7 @@ impl StateComputer for ExecutionProxy {
 
             // notify mempool about failed transaction
             if let Err(e) = txn_notifier
-                .notify_failed_txn(pipeline_execution_result.num_vtxns, input_txns, result)
+                .notify_failed_txn(num_vtxns, input_txns, result)
                 .await
             {
                 error!(

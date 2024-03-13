@@ -43,7 +43,6 @@ impl StateComputer for EmptyStateComputer {
         _randomness: Option<Randomness>,
     ) -> ExecutorResult<PipelineExecutionResult> {
         Ok(PipelineExecutionResult::new(
-            0,
             vec![],
             StateComputeResult::new_dummy(),
         ))
@@ -130,7 +129,7 @@ impl StateComputer for RandomComputeResultStateComputer {
                 self.random_compute_result_root_hash,
             ))
         };
-        let pipeline_execution_res = res.map(|res| PipelineExecutionResult::new(0, vec![], res));
+        let pipeline_execution_res = res.map(|res| PipelineExecutionResult::new(vec![], res));
         Box::pin(async move { pipeline_execution_res })
     }
 
