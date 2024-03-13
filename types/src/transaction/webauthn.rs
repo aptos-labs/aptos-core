@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction::authenticator::AnyPublicKey;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{
     hash::CryptoHash, secp256r1_ecdsa, signing_message, CryptoMaterialError, HashValue, Signature,
 };
@@ -99,6 +99,14 @@ impl PartialAuthenticatorAssertionResponse {
         &self.signature
     }
 
+    pub fn authenticator_data(&self) -> &Vec<u8> {
+        &self.authenticator_data
+    }
+
+    pub fn client_data_json(&self) -> &Vec<u8> {
+        &self.client_data_json
+    }
+
     pub fn signature_bytes(&self) -> Vec<u8> {
         bcs::to_bytes(&self.signature).expect("Only unhandleable errors happen here.")
     }
@@ -118,6 +126,11 @@ impl PartialAuthenticatorAssertionResponse {
         message: &T,
         public_key: &AnyPublicKey,
     ) -> Result<()> {
+        // PartialAuthenticatorAssertionResponse should not exceed MAX_WEBAUTHN_SIGNATURE_BYTES
+        // Note: if needed, MAX_WEBAUTHN_SIGNATURE_BYTES should ONLY be increased in the future (NOT decreased),
+        // otherwise it will not be backwards compatible
+        ensure!(self.to_bytes().len() <= MAX_WEBAUTHN_SIGNATURE_BYTES, format!("The PartialAuthenticatorAssertionResponse length is greater than the maximum number of {} bytes: found {} bytes.", MAX_WEBAUTHN_SIGNATURE_BYTES, self.to_bytes().len()));
+
         let collected_client_data: CollectedClientData =
             serde_json::from_slice(self.client_data_json.as_slice())?;
         let challenge_bytes = Bytes::try_from(collected_client_data.challenge.as_str())
@@ -165,7 +178,10 @@ mod tests {
         test_helpers::transaction_test_helpers::get_test_raw_transaction,
         transaction::{
             authenticator::{AnyPublicKey, AuthenticationKey},
-            webauthn::{AssertionSignature, PartialAuthenticatorAssertionResponse},
+            webauthn::{
+                AssertionSignature, PartialAuthenticatorAssertionResponse,
+                MAX_WEBAUTHN_SIGNATURE_BYTES,
+            },
             RawTransaction,
         },
     };
@@ -879,5 +895,30 @@ mod tests {
         // Correct
         let verification_result = paar.verify(&raw_txn, &any_public_key);
         assert!(verification_result.is_ok());
+    }
+
+    #[test]
+    fn verify_max_length_partial_authenticator_assertion_response_failure() {
+        // Parse passkey credential registration response to get the public key
+        let cose_key = parse_cose_key_from_att_obj(ATTESTATION_OBJECT).unwrap();
+        let secp256r1_public_key = generate_secp256r1_public_key_from_cose_key(&cose_key).unwrap();
+        let any_public_key = AnyPublicKey::Secp256r1Ecdsa {
+            public_key: secp256r1_public_key,
+        };
+
+        let raw_txn: RawTransaction = bcs::from_bytes(RAW_TXN_BCS_BYTES).unwrap();
+
+        let secp256r1_signature = Signature::try_from(SIGNATURE).unwrap();
+
+        // client_data_json is MAX_WEBAUTHN_SIGNATURE_BYTES (thus PAAR exceeds MAX_WEBAUTHN_SIGNATURE_BYTES)
+        let bad_paar = PartialAuthenticatorAssertionResponse::new(
+            AssertionSignature::Secp256r1Ecdsa {
+                signature: secp256r1_signature.clone(),
+            },
+            AUTHENTICATOR_DATA.to_vec(),
+            vec![0u8; MAX_WEBAUTHN_SIGNATURE_BYTES],
+        );
+        let verification_result = bad_paar.verify(&raw_txn, &any_public_key);
+        assert_eq!(verification_result.err().unwrap().to_string(), format!("The PartialAuthenticatorAssertionResponse length is greater than the maximum number of {} bytes: found {} bytes.", MAX_WEBAUTHN_SIGNATURE_BYTES, bad_paar.to_bytes().len()));
     }
 }
