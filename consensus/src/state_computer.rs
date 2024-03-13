@@ -47,8 +47,16 @@ pub struct PipelineExecutionResult {
 }
 
 impl PipelineExecutionResult {
-    pub fn new(num_vtxns: usize, input_txns: Vec<SignedTransaction>, result: StateComputeResult) -> Self {
-        Self { num_vtxns, input_txns, result }
+    pub fn new(
+        num_vtxns: usize,
+        input_txns: Vec<SignedTransaction>,
+        result: StateComputeResult,
+    ) -> Self {
+        Self {
+            num_vtxns,
+            input_txns,
+            result,
+        }
     }
 }
 
@@ -229,7 +237,10 @@ impl StateComputer for ExecutionProxy {
             observe_block(timestamp, BlockStage::EXECUTED);
 
             // notify mempool about failed transaction
-            if let Err(e) = txn_notifier.notify_failed_txn(pipeline_execution_result.num_vtxns, input_txns, result).await {
+            if let Err(e) = txn_notifier
+                .notify_failed_txn(pipeline_execution_result.num_vtxns, input_txns, result)
+                .await
+            {
                 error!(
                     error = ?e, "Failed to notify mempool of rejected txns",
                 );

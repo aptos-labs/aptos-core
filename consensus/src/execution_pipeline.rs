@@ -108,7 +108,7 @@ impl ExecutionPipeline {
         } = command;
 
         debug!("prepare_block received block {}.", block.id());
-        let num_vtxns = block.validator_txns().map(|txns|txns.len()).unwrap_or(0);
+        let num_vtxns = block.validator_txns().map(|txns| txns.len()).unwrap_or(0);
         let input_txns = block_preparer.prepare_block(&block).await;
         if let Err(e) = input_txns {
             result_tx.send(Err(e)).unwrap_or_else(|err| {
@@ -238,7 +238,8 @@ impl ExecutionPipeline {
                 .expect("Failed to spawn_blocking().")
             }
             .await;
-            let pipe_line_res = res.map(|output| PipelineExecutionResult::new(num_vtxns, input_txns, output));
+            let pipe_line_res =
+                res.map(|output| PipelineExecutionResult::new(num_vtxns, input_txns, output));
             result_tx.send(pipe_line_res).unwrap_or_else(|err| {
                 error!(
                     block_id = block_id,
