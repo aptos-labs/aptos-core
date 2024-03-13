@@ -368,11 +368,11 @@ module econia::txn_generator_utils {
     }
 
     public entry fun place_bid_limit_order<BaseCoinType, QuoteCoinType>(user: &signer, size: u64, price: u64, market_id: u64) {
-        market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, BID, size, price, 2, CANCEL_MAKER);
+        market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, BID, size, price, 0, CANCEL_MAKER);
     }
 
     public entry fun place_ask_limit_order<BaseCoinType, QuoteCoinType>(user: &signer, size: u64, price: u64, market_id: u64) {
-        market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, ASK, size, price, 2, CANCEL_MAKER);
+        market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, ASK, size, price, 0, CANCEL_MAKER);
     }
 
     public entry fun place_bid_market_order<BaseCoinType, QuoteCoinType>(user: &signer, size: u64, market_id: u64) {
