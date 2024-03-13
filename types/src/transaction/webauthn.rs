@@ -4,7 +4,7 @@
 use crate::transaction::authenticator::AnyPublicKey;
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{
-    hash::CryptoHash, secp256r1_ecdsa, signing_message, CryptoMaterialError, HashValue, Signature,
+    hash::CryptoHash, secp256r1_ecdsa, signing_message, CryptoMaterialError, HashValue, Length, Signature,
 };
 use passkey_types::{crypto::sha256, webauthn::CollectedClientData, Bytes};
 use serde::{Deserialize, Serialize};
@@ -129,7 +129,10 @@ impl PartialAuthenticatorAssertionResponse {
         // PartialAuthenticatorAssertionResponse should not exceed MAX_WEBAUTHN_SIGNATURE_BYTES
         // Note: if needed, MAX_WEBAUTHN_SIGNATURE_BYTES should ONLY be increased in the future (NOT decreased),
         // otherwise it will not be backwards compatible
-        let payload_len = secp256r1_ecdsa::Signature::LENGTH + self.authenticator_data().len() + self.client_data_json().len();
+        let signature_len = match self.signature() {
+            AssertionSignature::Secp256r1Ecdsa { signature } => signature.length(),
+        };
+        let payload_len = signature_len + self.authenticator_data().len() + self.client_data_json().len();
         ensure!(
             payload_len <= MAX_WEBAUTHN_SIGNATURE_BYTES,
             format!("The PartialAuthenticatorAssertionResponse content length is greater than the maximum number of {} bytes: found {} bytes.", MAX_WEBAUTHN_SIGNATURE_BYTES, payload_len)
