@@ -1638,29 +1638,25 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         )
     }
 
-    /// This checks whether result_exp contains mutable borrow of a field from an immutable reference
+    /// This checks whether `result_exp` contains mutable borrow of a field from an immutable reference
     /// It needs to be called after `post_process_body`
     pub fn check_mutable_borrow_field(&mut self, result_exp: &ExpData) {
         result_exp.visit_pre_order(&mut |e| {
             if let ExpData::Call(id, Operation::Borrow(ReferenceKind::Mutable), args) = &e {
-                if args.len() == 1 {
-                    if let ExpData::Call(_, Operation::Select(_, _, _), ref_targets) =
-                        args[0].as_ref()
+                debug_assert!(args.len() == 1);
+                if let ExpData::Call(_, Operation::Select(_, _, _), ref_targets) = args[0].as_ref()
+                {
+                    debug_assert!(ref_targets.len() == 1);
+                    if self
+                        .env()
+                        .get_node_type(ref_targets[0].node_id())
+                        .is_immutable_reference()
                     {
-                        if ref_targets.len() == 1
-                            && self
-                                .parent
-                                .parent
-                                .env
-                                .get_node_type(ref_targets[0].node_id())
-                                .is_immutable_reference()
-                        {
-                            self.error(
-                                &self.get_node_loc(*id),
-                                "cannot mutably borrow from an immutable ref",
-                            );
-                            return false;
-                        }
+                        self.error(
+                            &self.get_node_loc(*id),
+                            "cannot mutably borrow from an immutable ref",
+                        );
+                        return false;
                     }
                 }
             }
