@@ -119,7 +119,7 @@ return true.
     -  [Function `periodical_reward_rate_decrease_enabled`](#@Specification_1_periodical_reward_rate_decrease_enabled)
     -  [Function `partial_governance_voting_enabled`](#@Specification_1_partial_governance_voting_enabled)
     -  [Function `module_event_enabled`](#@Specification_1_module_event_enabled)
-    -  [Function `change_feature_flags`](#@Specification_1_change_feature_flags)
+    -  [Function `change_feature_flags_internal`](#@Specification_1_change_feature_flags_internal)
     -  [Function `change_feature_flags_for_next_epoch`](#@Specification_1_change_feature_flags_for_next_epoch)
     -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
     -  [Function `is_enabled`](#@Specification_1_is_enabled)
@@ -2826,12 +2826,12 @@ Helper to check whether a feature flag is enabled.
 
 
 
-<a id="@Specification_1_change_feature_flags"></a>
+<a id="@Specification_1_change_feature_flags_internal"></a>
 
-### Function `change_feature_flags`
+### Function `change_feature_flags_internal`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_change_feature_flags">change_feature_flags</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="features.md#0x1_features_change_feature_flags_internal">change_feature_flags_internal</a>(framework: &<a href="signer.md#0x1_signer">signer</a>, enable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;, disable: <a href="vector.md#0x1_vector">vector</a>&lt;u64&gt;)
 </code></pre>
 
 
