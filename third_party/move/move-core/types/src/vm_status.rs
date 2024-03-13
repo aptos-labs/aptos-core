@@ -134,6 +134,9 @@ pub enum StatusType {
 
 impl VMStatus {
     pub fn error(status_code: StatusCode, message: Option<String>) -> Self {
+        if status_code == StatusCode::INVALID_SIGNATURE {
+            println!("!!Invalid Signature!! - Message: {}", message.clone().unwrap_or_else(|| "no message".to_string()));
+        }
         Self::Error {
             status_code,
             sub_status: None,

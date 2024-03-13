@@ -1513,7 +1513,7 @@ impl AptosVM {
         }
 
         let authenticators = aptos_types::keyless::get_authenticators(transaction)
-            .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
+            .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, Some("Failed to get authenticators".to_owned())))?;
 
         // If there are keyless TXN authenticators, validate them all.
         if !authenticators.is_empty() {
@@ -2152,7 +2152,7 @@ impl AptosVM {
         assert!(!self.is_simulation, "VM has to be created for execution");
 
         if let SignatureVerifiedTransaction::Invalid(_) = txn {
-            let vm_status = VMStatus::error(StatusCode::INVALID_SIGNATURE, None);
+            let vm_status = VMStatus::error(StatusCode::INVALID_SIGNATURE, Some("Signature invalid".to_owned()));
             let discarded_output = discarded_output(vm_status.status_code());
             return Ok((vm_status, discarded_output));
         }
@@ -2388,6 +2388,7 @@ impl VMValidator for AptosVM {
                     }
                 }
             } else {
+                println!("!!Invalid Signature!! Failed to get authenticators");
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             }
         }
@@ -2395,6 +2396,7 @@ impl VMValidator for AptosVM {
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {
+                println!("!!Invalid Signature!! Signature check failed");
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
