@@ -80,7 +80,7 @@ impl IndexerGrpcDataServiceConfig {
         file_store_config: IndexerGrpcFileStoreConfig,
         redis_read_replica_address: RedisUrl,
         enable_cache_compression: bool,
-        blacklist_sender_addresses: Vec<String>,
+        sender_addresses_to_ignore: Vec<String>,
     ) -> Self {
         Self {
             data_service_grpc_tls_config,
@@ -92,7 +92,7 @@ impl IndexerGrpcDataServiceConfig {
             file_store_config,
             redis_read_replica_address,
             enable_cache_compression,
-            sender_addresses_to_ignore: blacklist_sender_addresses,
+            sender_addresses_to_ignore,
         }
     }
 
