@@ -567,8 +567,8 @@ module aptos_framework::aptos_governance {
         reconfiguration_with_dkg::finish(aptos_framework);
     }
 
-    /// `force_end_epoch()` but run as admin.
-    public entry fun force_end_epoch_by_admin(admin: &signer) acquires GovernanceResponsbility {
+    /// `force_end_epoch()` used in some move tests.
+    public entry fun force_end_epoch_test_only(admin: &signer) acquires GovernanceResponsbility {
         let core_signer = get_signer_testnet_only(admin, @0x1);
         system_addresses::assert_aptos_framework(&core_signer);
         reconfiguration_with_dkg::finish(&core_signer);

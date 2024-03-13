@@ -318,7 +318,7 @@ pub async fn reconfig(
         root_account.sign_with_transaction_builder(
             transaction_factory
                 .clone()
-                .payload(aptos_stdlib::aptos_governance_force_end_epoch_by_admin()),
+                .payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
         ),
     ];
 

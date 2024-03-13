@@ -146,7 +146,7 @@ fn test_reconfiguration() {
         2,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(aptos_stdlib::aptos_governance_force_end_epoch_by_admin()),
+        Some(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
     );
 
     let txn_block = into_signature_verified_block(vec![txn1, txn2, txn3, txn4]);
