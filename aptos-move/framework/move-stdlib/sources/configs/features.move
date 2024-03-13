@@ -458,8 +458,8 @@ module std::features {
     /// Genesis/tests should use `change_feature_flags_internal()` for feature vec initialization.
     ///
     /// Governance proposals should use `change_feature_flags_for_next_epoch()` to enable/disable features.
-    public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
-        change_feature_flags_internal(framework, enable, disable)
+    public fun change_feature_flags(_framework: &signer, _enable: vector<u64>, _disable: vector<u64>) {
+        abort(error::invalid_state(EAPI_DISABLED))
     }
 
     /// Update feature flags directly. Only used in genesis/tests.
@@ -553,6 +553,16 @@ module std::features {
         assert!(addr == @std || addr == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
     }
 
+    #[verify_only]
+    public fun change_feature_flags_for_verification(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+        change_feature_flags_internal(framework, enable, disable)
+    }
+
+    #[test_only]
+    public fun change_feature_flags_for_testing(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+        change_feature_flags_internal(framework, enable, disable)
+    }
+
     #[test]
     fun test_feature_sets() {
         let features = vector[];
@@ -574,11 +584,11 @@ module std::features {
 
     #[test(fx = @std)]
     fun test_change_feature_txn(fx: signer) acquires Features {
-        change_feature_flags(&fx, vector[1, 9, 23], vector[]);
+        change_feature_flags_for_testing(&fx, vector[1, 9, 23], vector[]);
         assert!(is_enabled(1), 1);
         assert!(is_enabled(9), 2);
         assert!(is_enabled(23), 3);
-        change_feature_flags(&fx, vector[17], vector[9]);
+        change_feature_flags_for_testing(&fx, vector[17], vector[9]);
         assert!(is_enabled(1), 1);
         assert!(!is_enabled(9), 2);
         assert!(is_enabled(17), 3);

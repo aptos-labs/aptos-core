@@ -79,7 +79,7 @@ module aptos_framework::delegation_pool_integration_tests {
             voting_power_increase_limit
         );
         reconfiguration::initialize_for_test(aptos_framework);
-        features::change_feature_flags(aptos_framework, vector[DELEGATION_POOLS, MODULE_EVENT], vector[]);
+        features::change_feature_flags_for_testing(aptos_framework, vector[DELEGATION_POOLS, MODULE_EVENT], vector[]);
     }
 
     #[test_only]
