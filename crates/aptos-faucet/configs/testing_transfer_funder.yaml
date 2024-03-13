@@ -7,7 +7,7 @@ bypasser_configs: []
 checker_configs: []
 funder_config:
   type: "TransferFunder"
-  node_url: "https://fullnode.devnet.aptoslabs.com"
+  node_url: "https://api.devnet.aptoslabs.com"
   chain_id: 36
   key_file_path: "/tmp/transfer_funder_devnet.key"
   minimum_funds: 10000000

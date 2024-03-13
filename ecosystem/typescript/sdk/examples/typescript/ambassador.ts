@@ -111,7 +111,7 @@ async function main(): Promise<void> {
   console.log(`    private_key: "${admin.toPrivateKeyObject().privateKeyHex}"`);
   console.log(`    public_key: "${admin.pubKey()}"`);
   console.log(`    account: ${admin.address()}`);
-  console.log(`    rest_url: "https://fullnode.devnet.aptoslabs.com"`);
+  console.log(`    rest_url: "https://api.devnet.aptoslabs.com"`);
   console.log(`    faucet_url: "https://faucet.devnet.aptoslabs.com"`);
 
   await waitForEnter();

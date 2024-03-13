@@ -2,7 +2,7 @@
 import { AptosClient, AptosAccount, FaucetClient, BCS, TxnBuilderTypes, Provider, Network, TokenClient } from "aptos";
 import assert from "assert";
 
-const NODE_URL = process.env.APTOS_NODE_URL || "https://fullnode.devnet.aptoslabs.com";
+const NODE_URL = process.env.APTOS_NODE_URL || "https://api.devnet.aptoslabs.com";
 const FAUCET_URL = process.env.APTOS_FAUCET_URL || "https://faucet.devnet.aptoslabs.com";
 
 export const aptosCoinStore = "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>";

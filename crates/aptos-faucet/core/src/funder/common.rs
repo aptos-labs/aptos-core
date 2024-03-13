@@ -49,7 +49,7 @@ const DEFAULT_KEY_FILE_PATH: &str = "/opt/aptos/etc/mint.key";
 pub struct ApiConnectionConfig {
     /// Aptos node (any node type with an open API) server URL.
     /// Include the port in this if not using the default for the scheme.
-    #[clap(long, default_value = "https://fullnode.testnet.aptoslabs.com/")]
+    #[clap(long, default_value = "https://api.testnet.aptoslabs.com/")]
     pub node_url: Url,
 
     /// Path to the private key for creating test account and minting coins in

@@ -60,7 +60,7 @@ async def main(args: List[str]):
     )
     parser.add_argument(
         "--rest-api",
-        help="The REST API to send queries to, e.g., https://testnet.aptoslabs.com/v1",
+        help="The REST API to send queries to, e.g., https://api.testnet.aptoslabs.com/v1",
         type=str,
     )
     parsed_args = parser.parse_args(args)

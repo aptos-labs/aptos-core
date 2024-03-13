@@ -6,16 +6,16 @@ export const NetworkToIndexerAPI: Record<string, string> = {
 };
 
 export const NetworkToNodeAPI: Record<string, string> = {
-  mainnet: "https://fullnode.mainnet.aptoslabs.com/v1",
-  testnet: "https://fullnode.testnet.aptoslabs.com/v1",
-  devnet: "https://fullnode.devnet.aptoslabs.com/v1",
+  mainnet: "https://api.mainnet.aptoslabs.com/v1",
+  testnet: "https://api.testnet.aptoslabs.com/v1",
+  devnet: "https://api.devnet.aptoslabs.com/v1",
   local: "http://127.0.0.1:8080/v1",
 };
 
 export const NodeAPIToNetwork: Record<string, string> = {
-  "https://fullnode.mainnet.aptoslabs.com/v1": "mainnet",
-  "https://fullnode.testnet.aptoslabs.com/v1": "testnet",
-  "https://fullnode.devnet.aptoslabs.com/v1": "devnet",
+  "https://api.mainnet.aptoslabs.com/v1": "mainnet",
+  "https://api.testnet.aptoslabs.com/v1": "testnet",
+  "https://api.devnet.aptoslabs.com/v1": "devnet",
   "http://127.0.0.1:8080/v1": "local",
 };
 

@@ -55,7 +55,7 @@ pub enum Commands {
     },
     /// Print out current values of on chain configs.
     PrintConfigs {
-        /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
+        /// Url endpoint for the desired network. e.g: https://api.mainnet.aptoslabs.com/v1.
         #[clap(short, long)]
         endpoint: url::Url,
         /// Whether to print out the full gas schedule.
@@ -66,7 +66,7 @@ pub enum Commands {
     /// Usage: --endpoint '<URL>'
     /// --package-address <ADDRESS> --package-name <PACKAGE_NAME> [--print-json]
     PrintPackageMetadata {
-        /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
+        /// Url endpoint for the desired network. e.g: https://api.mainnet.aptoslabs.com/v1.
         #[clap(short, long)]
         endpoint: url::Url,
         /// The address under which the package is published

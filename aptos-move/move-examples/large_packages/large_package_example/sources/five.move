@@ -31,9 +31,9 @@
 /// There are four well-supported networks for integrating with the Aptos blockchain:
 ///
 /// 1. [Local testnet](http://127.0.0.1:8080) -- our standalone tool for local development against a known version of the codebase with no external network.
-/// 1. [Devnet](https://fullnode.devnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
-/// 1. [Testnet](https://fullnode.testnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
-/// 1. [Mainnet](https://fullnode.mainnet.aptoslabs.com/v1/spec#/) -- a production network with real assets.
+/// 1. [Devnet](https://api.devnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data resets weekly, weekly update from aptos-core main branch.
+/// 1. [Testnet](https://api.testnet.aptoslabs.com/v1/spec#/) -- a shared resource for the community, data will be preserved, network configuration will mimic Mainnet.
+/// 1. [Mainnet](https://api.mainnet.aptoslabs.com/v1/spec#/) -- a production network with real assets.
 ///
 /// See [Aptos Blockchain Networks](../nodes/networks.md) for full details on each environment.
 ///
@@ -50,8 +50,8 @@
 /// <Tabs groupId="networks">
 ///   <TabItem value="devnet" label="Devnet">
 ///     <ul>
-///       <li>REST API: <a href="https://fullnode.devnet.aptoslabs.com/v1">https://fullnode.devnet.aptoslabs.com/v1</a></li>
-///       <li>REST API Spec: <a href="https://fullnode.devnet.aptoslabs.com/v1/spec#/">https://fullnode.devnet.aptoslabs.com/v1/spec#/</a></li>
+///       <li>REST API: <a href="https://api.devnet.aptoslabs.com/v1">https://api.devnet.aptoslabs.com/v1</a></li>
+///       <li>REST API Spec: <a href="https://api.devnet.aptoslabs.com/v1/spec#/">https://api.devnet.aptoslabs.com/v1/spec#/</a></li>
 ///       <li>Indexer API: <a href="https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
 ///       <li>Faucet API: <a href="https://faucet.devnet.aptoslabs.com">https://faucet.devnet.aptoslabs.com</a></li>
 ///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-devnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
@@ -59,8 +59,8 @@
 ///   </TabItem>
 ///   <TabItem value="testnet" label="Testnet">
 ///     <ul>
-///       <li>REST API: <a href="https://fullnode.testnet.aptoslabs.com/v1">https://fullnode.testnet.aptoslabs.com/v1</a></li>
-///       <li>REST API Spec: <a href="https://fullnode.testnet.aptoslabs.com/v1/spec#/">https://fullnode.testnet.aptoslabs.com/v1/spec#/</a></li>
+///       <li>REST API: <a href="https://api.testnet.aptoslabs.com/v1">https://api.testnet.aptoslabs.com/v1</a></li>
+///       <li>REST API Spec: <a href="https://api.testnet.aptoslabs.com/v1/spec#/">https://api.testnet.aptoslabs.com/v1/spec#/</a></li>
 ///       <li>Indexer API: <a href="https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql</a></li>
 ///       <li>Faucet API: <a href="https://faucet.testnet.aptoslabs.com">https://faucet.testnet.aptoslabs.com</a></li>
 ///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql">Indexer GraphQL</a></li>
@@ -68,8 +68,8 @@
 ///   </TabItem>
 ///   <TabItem value="mainnet" label="Mainnet">
 ///     <ul>
-///       <li>REST API: <a href="https://fullnode.mainnet.aptoslabs.com/v1">https://fullnode.mainnet.aptoslabs.com/v1</a></li>
-///       <li>REST API Spec: <a href="https://fullnode.mainnet.aptoslabs.com/v1/spec#/">https://fullnode.mainnet.aptoslabs.com/v1/spec#/</a></li>
+///       <li>REST API: <a href="https://api.mainnet.aptoslabs.com/v1">https://api.mainnet.aptoslabs.com/v1</a></li>
+///       <li>REST API Spec: <a href="https://api.mainnet.aptoslabs.com/v1/spec#/">https://api.mainnet.aptoslabs.com/v1/spec#/</a></li>
 ///       <li>Indexer API: <a href="https://indexer.mainnet.aptoslabs.com/v1/graphql">https://indexer.mainnet.aptoslabs.com/v1/graphql</a></li>
 ///       <li>Faucet: N/A</li>
 ///       <li><a href="https://cloud.hasura.io/public/graphiql?endpoint=https://indexer.mainnet.aptoslabs.com/v1/graphql">Indexer GraphQL</a></li>
@@ -163,9 +163,9 @@
 ///
 /// The REST API offers querying transactions and events in these ways:
 ///
-/// * [Transactions for an account](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
-/// * [Transactions by version](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
-/// * [Events by event handle](https://fullnode.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
+/// * [Transactions for an account](https://api.devnet.aptoslabs.com/v1/spec#/operations/get_account_transactions)
+/// * [Transactions by version](https://api.devnet.aptoslabs.com/v1/spec#/operations/get_transaction_by_version)
+/// * [Events by event handle](https://api.devnet.aptoslabs.com/v1/spec#/operations/get_events_by_event_handle)
 ///
 /// ## Exchanging and tracking coins
 ///
