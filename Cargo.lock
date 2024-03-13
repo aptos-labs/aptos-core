@@ -264,6 +264,8 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-genesis",
+ "aptos-vm-logging",
+ "aptos-vm-types",
  "async-trait",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -313,6 +315,7 @@ dependencies = [
  "tonic 0.11.0",
  "tracing",
  "tracing-subscriber 0.3.18",
+ "url",
  "version-compare",
 ]
 
@@ -2055,7 +2058,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-indexer-grpc-in-memory-cache-benchmark"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-indexer-grpc-utils",
