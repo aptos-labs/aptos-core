@@ -174,6 +174,7 @@ pub struct Claims {
     #[serde(flatten)]
     pub oidc_claims: OidcClaims,
     #[serde(default)]
+    #[serde(flatten)]
     pub additional_claims: BTreeMap<String, Value>,
 }
 

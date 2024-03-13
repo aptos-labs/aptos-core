@@ -560,6 +560,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
             ]),
         );
     }
+
     exec_function(
         session,
         JWKS_MODULE_NAME,
