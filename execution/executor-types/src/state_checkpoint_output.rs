@@ -41,6 +41,10 @@ impl TransactionsByStatus {
         self.statuses_for_input_txns.len()
     }
 
+    pub fn to_commit(&self) -> &TransactionsWithParsedOutput {
+        &self.to_commit
+    }
+
     pub fn into_inner(
         self,
     ) -> (
@@ -90,6 +94,10 @@ impl StateCheckpointOutput {
 
     pub fn txns_to_commit_len(&self) -> usize {
         self.txns.to_commit.len()
+    }
+
+    pub fn txns(&self) -> &TransactionsByStatus {
+        &self.txns
     }
 
     pub fn into_inner(

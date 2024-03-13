@@ -35,6 +35,7 @@ pub enum TransactionTypeArg {
     ModifyGlobalResourceAggV2,
     ModifyGlobalFlagAggV2,
     ModifyGlobalBoundedAggV2,
+    EmitEvents,
     // Complex EntryPoints
     CreateObjects10,
     CreateObjects10WithPayload10k,
@@ -126,6 +127,11 @@ impl TransactionTypeArg {
                 entry_point: EntryPoints::BytesMakeOrChange {
                     data_length: Some(10 * 1024),
                 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::EmitEvents => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::EmitEvents { count: 10000 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
