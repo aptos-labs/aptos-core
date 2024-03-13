@@ -53,7 +53,7 @@ pub fn generate_gas_upgrade_proposal(
             emit!(writer, "let gas_schedule_blob: vector<u8> = ");
             generate_blob(writer, &gas_schedule_blob);
             emitln!(writer, ";\n");
-            if post_randomness_framework {
+            if !post_randomness_framework {
                 emitln!(
                     writer,
                     "gas_schedule::set_gas_schedule({}, gas_schedule_blob)",
