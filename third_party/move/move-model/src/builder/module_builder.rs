@@ -807,7 +807,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         }
 
         for (_, struct_entry) in self.parent.struct_table.iter() {
-            self.parent.check_resursive_struct(struct_entry);
+            self.parent.check_recursive_struct(struct_entry);
         }
 
         // Analyze all constants.
