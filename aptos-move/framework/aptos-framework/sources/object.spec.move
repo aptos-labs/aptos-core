@@ -298,7 +298,7 @@ spec aptos_framework::object {
         ensures result == ConstructorRef { self: obj_addr, can_delete: true };
     }
 
-    spec create_object_at_address(owner_address: address, object_address: address, can_delete: bool): ConstructorRef {
+    spec create_sticky_object_at_address(owner_address: address, object_address: address): ConstructorRef {
         // TODO(fa_migration)
         pragma verify = false;
     }
