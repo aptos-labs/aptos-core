@@ -1027,7 +1027,7 @@ dependencies = [
  "curve25519-dalek 3.2.0",
  "curve25519-dalek-ng",
  "digest 0.9.0",
- "ed25519-dalek 1.0.1",
+ "ed25519-dalek 2.1.1",
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
@@ -7376,7 +7376,6 @@ version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91cff35c70bba8a626e3185d8cd48cc11b5437e1a5bcd15b9b5fa3c64b6dfee7"
 dependencies = [
- "serde",
  "signature 1.6.4",
 ]
 
@@ -7387,6 +7386,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
  "pkcs8 0.10.2",
+ "serde",
  "signature 2.2.0",
 ]
 
@@ -7400,7 +7400,6 @@ dependencies = [
  "ed25519 1.5.3",
  "rand 0.7.3",
  "serde",
- "serde_bytes",
  "sha2 0.9.9",
  "zeroize",
 ]
