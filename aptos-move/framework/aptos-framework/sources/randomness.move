@@ -22,7 +22,8 @@ module aptos_framework::randomness {
 
     const DST: vector<u8> = b"APTOS_RANDOMNESS";
 
-    /// Randomness APIs calls must originate from a private entry function. Otherwise, test-and-abort attacks are possible.
+    /// Randomness APIs calls must originate from a private entry function with
+    /// `#[randomness]` annotation. Otherwise, test-and-abort attacks are possible.
     const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
 
     const MAX_U256: u256 = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
@@ -71,7 +72,7 @@ module aptos_framework::randomness {
     /// Generate the next 32 random bytes. Repeated calls will yield different results (assuming the collision-resistance
     /// of the hash function).
     fun next_32_bytes(): vector<u8> acquires PerBlockRandomness {
-        assert!(is_safe_call(), E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT);
+        assert!(is_unbiasable(), E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT);
 
         let input = DST;
         let randomness = borrow_global<PerBlockRandomness>(@aptos_framework);
@@ -377,12 +378,14 @@ module aptos_framework::randomness {
     }
 
     /// Fetches and increments a transaction-specific 32-byte randomness-related counter.
+    /// Aborts with `E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT` if randomness is not unbiasable.
     native fun fetch_and_increment_txn_counter(): vector<u8>;
 
-    /// Called in each randomness generation function to ensure certain safety invariants.
-    ///  1. Ensure that the TXN that led to the call of this function had a private (or friend) entry function as its TXN payload.
-    ///  2. TBA
-    native fun is_safe_call(): bool;
+    /// Called in each randomness generation function to ensure certain safety invariants, namely:
+    ///  1. The transaction that led to the call of this function had a private (or friend) entry
+    ///     function as its payload.
+    ///  2. The entry function had `#[randomness]` annotation.
+    native fun is_unbiasable(): bool;
 
     #[test]
     fun test_safe_add_mod() {
@@ -403,8 +406,8 @@ module aptos_framework::randomness {
     fun randomness_smoke_test(fx: signer) acquires PerBlockRandomness {
         initialize(&fx);
         set_seed(x"0000000000000000000000000000000000000000000000000000000000000000");
-        // Test cases should always be a safe place to do a randomness call from.
-        assert!(is_safe_call(), 0);
+        // Test cases should always have no bias for any randomness call.
+        assert!(is_unbiasable(), 0);
         let num = u64_integer();
         debug::print(&num);
     }

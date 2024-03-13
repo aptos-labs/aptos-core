@@ -15,7 +15,7 @@ use crate::{
     ty::{ReferenceKind, Type, TypeDisplayContext},
 };
 use internment::LocalIntern;
-use itertools::Itertools;
+use itertools::{EitherOrBoth, Itertools};
 use move_binary_format::{
     file_format,
     file_format::{CodeOffset, Visibility},
@@ -27,7 +27,7 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt,
-    fmt::{Debug, Error, Formatter},
+    fmt::{Debug, Display, Error, Formatter},
     hash::Hash,
     ops::Deref,
 };
@@ -571,12 +571,13 @@ pub enum RewriteResult {
 
 /// Visitor position
 pub enum VisitorPosition {
-    Pre,        // before visiting any subexpressions
-    MidMutate,  // after RHS and before LHS of Mutate expression.
-    BeforeBody, // Before body of Block expression.
-    BeforeThen, // Before then clause of IfElse expression.
-    BeforeElse, // Before else clause of IfElse expression.
-    Post,       // after visiting all subexpressions
+    Pre,              // before visiting any subexpressions
+    MidMutate,        // after RHS and before LHS of Mutate expression.
+    BeforeBody,       // Before body of Block expression.
+    BeforeThen,       // Before then clause of IfElse expression.
+    BeforeElse,       // Before else clause of IfElse expression.
+    PreSequenceValue, // Before final expr in a Sequence (or before Post, if seq is empty)
+    Post,             // after visiting all subexpressions
 }
 
 impl ExpData {
@@ -593,6 +594,14 @@ impl ExpData {
                 | ExpData::Loop(_, _)
                 | ExpData::LoopCont(_, _)
                 | ExpData::Return(_, _)
+        )
+    }
+
+    pub fn is_directly_borrowable(&self) -> bool {
+        use ExpData::*;
+        matches!(
+            self,
+            LocalVar(..) | Temporary(..) | Call(_, Operation::Select(..), _)
         )
     }
 
@@ -645,9 +654,9 @@ impl ExpData {
     /// Result is ordered by occurrence.
     pub fn free_vars_with_types(&self, env: &GlobalEnv) -> Vec<(Symbol, Type)> {
         let mut vars = vec![];
-        let var_collector = |id: &NodeId, sym: &Symbol| {
-            if !vars.iter().any(|(s, _)| s == sym) {
-                vars.push((*sym, env.get_node_type(*id)));
+        let var_collector = |id: NodeId, sym: Symbol| {
+            if !vars.iter().any(|(s, _)| *s == sym) {
+                vars.push((sym, env.get_node_type(id)));
             }
         };
         self.visit_free_local_vars(var_collector);
@@ -675,61 +684,92 @@ impl ExpData {
     /// Visits free local variables with node id in this expression.
     fn visit_free_local_vars<F>(&self, mut node_symbol_visitor: F)
     where
-        F: FnMut(&NodeId, &Symbol),
+        F: FnMut(NodeId, Symbol),
     {
-        let mut shadowed: BTreeMap<Symbol, usize> = BTreeMap::new();
-        let mut visitor = |post: bool, e: &ExpData| {
+        fn shadow_or_unshadow_sym(
+            sym: &Symbol,
+            entering: bool,
+            shadow_map: &mut BTreeMap<Symbol, usize>,
+        ) {
+            if entering {
+                shadow_map
+                    .entry(*sym)
+                    .and_modify(|curr| *curr += 1)
+                    .or_insert(1);
+            } else if let Some(x) = shadow_map.get_mut(sym) {
+                *x -= 1;
+            }
+        }
+
+        fn for_syms_in_pat_shadow_or_unshadow(
+            pat: &Pattern,
+            entering: bool,
+            shadow_map: &mut BTreeMap<Symbol, usize>,
+        ) {
+            pat.vars()
+                .iter()
+                .for_each(|(_, sym)| shadow_or_unshadow_sym(sym, entering, shadow_map))
+        }
+
+        fn for_syms_in_ranges_shadow_or_unshadow(
+            ranges: &[(Pattern, Exp)],
+            entering: bool,
+            shadow_map: &mut BTreeMap<Symbol, usize>,
+        ) {
+            ranges
+                .iter()
+                .for_each(|(pat, _)| for_syms_in_pat_shadow_or_unshadow(pat, entering, shadow_map));
+        }
+
+        fn is_sym_free(sym: &Symbol, shadow_map: &BTreeMap<Symbol, usize>) -> bool {
+            shadow_map.get(sym).cloned().unwrap_or(0) == 0
+        }
+
+        let mut shadow_map: BTreeMap<Symbol, usize> = BTreeMap::new();
+        let mut visitor = |pos: VisitorPosition, e: &ExpData| {
             use ExpData::*;
-            let decls = match e {
-                Lambda(_, pat, _) | Block(_, pat, _, _) => {
-                    pat.vars().iter().map(|(_, d)| *d).collect_vec()
+            use VisitorPosition::*;
+            match (e, pos) {
+                (Lambda(_, pat, _), Pre) | (Block(_, pat, _, _), BeforeBody) => {
+                    // Add declared variables to shadow; in the Block case,
+                    // do it only after processing bindings.
+                    for_syms_in_pat_shadow_or_unshadow(pat, true, &mut shadow_map);
                 },
-                Quant(_, _, ranges, ..) => ranges
-                    .iter()
-                    .flat_map(|(pat, _)| pat.vars().into_iter().map(|(_, name)| name))
-                    .collect_vec(),
-                _ => vec![],
-            };
-            if !post {
-                // Visit the Assigned pat on the way down, before visiting the RHS expression
-                if let Assign(_, pat, _) = e {
+                (Lambda(_, pat, _), Post) | (Block(_, pat, _, _), Post) => {
+                    // Remove declared variables from shadow
+                    for_syms_in_pat_shadow_or_unshadow(pat, false, &mut shadow_map);
+                },
+                (Quant(_, _, ranges, ..), Pre) => {
+                    for_syms_in_ranges_shadow_or_unshadow(ranges, true, &mut shadow_map);
+                },
+                (Quant(_, _, ranges, ..), Post) => {
+                    for_syms_in_ranges_shadow_or_unshadow(ranges, false, &mut shadow_map);
+                },
+                (Assign(_, pat, _), Pre) => {
+                    // Visit the Assigned pat vars on the way down, before visiting the RHS expression
                     for (id, sym) in pat.vars().iter() {
-                        if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
-                            node_symbol_visitor(id, sym);
+                        if is_sym_free(sym, &shadow_map) {
+                            node_symbol_visitor(*id, *sym);
                         }
                     }
-                } else {
-                    for sym in &decls {
-                        shadowed
-                            .entry(*sym)
-                            .and_modify(|curr| *curr += 1)
-                            .or_insert(1);
+                },
+                (LocalVar(id, sym), Pre) => {
+                    if is_sym_free(sym, &shadow_map) {
+                        node_symbol_visitor(*id, *sym);
                     }
-                }
-            }
-            if post {
-                if let LocalVar(id, sym) = e {
-                    if shadowed.get(sym).cloned().unwrap_or(0) == 0 {
-                        node_symbol_visitor(id, sym);
-                    }
-                } else {
-                    for sym in &decls {
-                        if let Some(x) = shadowed.get_mut(sym) {
-                            *x -= 1;
-                        }
-                    }
-                }
-            }
+                },
+                _ => {},
+            };
             true // keep going
         };
-        self.visit_pre_post(&mut visitor);
+        self.visit_positions(&mut visitor);
     }
 
     /// Returns just the free local variables in this expression.
     pub fn free_vars(&self) -> BTreeSet<Symbol> {
         let mut vars = BTreeSet::new();
-        let just_vars_collector = |_id: &NodeId, sym: &Symbol| {
-            vars.insert(*sym);
+        let just_vars_collector = |_id: NodeId, sym: Symbol| {
+            vars.insert(sym);
         };
         self.visit_free_local_vars(just_vars_collector);
         vars
@@ -934,7 +974,7 @@ impl ExpData {
             let should_continue = match x {
                 Pre => visitor(false, e),
                 Post => visitor(true, e),
-                MidMutate | BeforeBody | BeforeThen | BeforeElse => true,
+                MidMutate | BeforeBody | BeforeThen | BeforeElse | PreSequenceValue => true,
             };
             if should_continue {
                 Some(())
@@ -1026,8 +1066,16 @@ impl ExpData {
             Loop(_, e) => e.visit_positions_impl(visitor)?,
             Return(_, e) => e.visit_positions_impl(visitor)?,
             Sequence(_, es) => {
-                for e in es {
-                    e.visit_positions_impl(visitor)?;
+                if es.is_empty() {
+                    visitor(VisitorPosition::PreSequenceValue, self);
+                } else {
+                    let last_elt = es.len() - 1;
+                    for (i, e) in es.iter().enumerate() {
+                        if i == last_elt {
+                            visitor(VisitorPosition::PreSequenceValue, self);
+                        }
+                        e.visit_positions_impl(visitor)?;
+                    }
                 }
             },
             Assign(_, _, e) => e.visit_positions_impl(visitor)?,
@@ -1469,6 +1517,16 @@ impl Pattern {
         }
     }
 
+    /// Returns true if this pattern contains no struct.
+    pub fn has_no_struct(&self) -> bool {
+        use Pattern::*;
+        match self {
+            Var(..) | Wildcard(..) | Error(..) => true,
+            Tuple(_, pats) => pats.iter().all(|p| p.has_no_struct()),
+            Struct(..) => false,
+        }
+    }
+
     fn collect_vars(r: &mut Vec<(NodeId, Symbol)>, p: &Pattern) {
         use Pattern::*;
         match p {
@@ -1480,6 +1538,471 @@ impl Pattern {
             Var(id, name) => r.push((*id, *name)),
             _ => {},
         }
+    }
+
+    /// Walks `self` and `exp` in parallel to pair any `Pattern` variables with subexpressions.
+    /// If pattern and expression are the same shape (e.g., `Pattern::Struct` on LHS matched with
+    /// `Operation::Pack` call on RHS with same `StructId`; `Pattern::Tuple` on LHS matched with
+    /// `Value::Tuple` or `Operation::Tuple` call with same arity and types on RHS), then each
+    /// `Symbol` in the result will be paired wtih `Some(exp)`.  If shapes differ, then symbols
+    /// in `Pattern::Var` subpatterns will be paired with `None` in the result vector.
+    pub fn vars_and_exprs(&self, exp: &Exp) -> Vec<(Symbol, Option<Exp>)> {
+        let mut result = vec![];
+        let _shape_matched = Self::collect_vars_exprs_from_expr(&mut result, self, Some(exp));
+        result
+    }
+
+    // Implementation of `vars_and_exprs`:
+    //
+    // Recursively walks `Pattern` `p` and (optional) `Exp` `opt_exp` in parallel to generate a list
+    // of pairs in output parameter `r`.
+    //
+    // Returns true if pattern matches exp
+    fn collect_vars_exprs_from_expr(
+        r: &mut Vec<(Symbol, Option<Exp>)>,
+        p: &Pattern,
+        opt_exp: Option<&Exp>,
+    ) -> bool {
+        use Pattern::*;
+        match p {
+            Struct(_nodeid, qsid, args) => {
+                if let Some(exp) = opt_exp {
+                    if let ExpData::Call(_, Operation::Pack(modid, sid), actuals) = exp.as_ref() {
+                        if *sid == qsid.id && *modid == qsid.module_id {
+                            Self::collect_vars_exprs_from_vector_exprs(r, args, actuals)
+                        } else {
+                            Self::collect_vars_exprs_from_vector_none(r, args);
+                            false
+                        }
+                    } else {
+                        Self::collect_vars_exprs_from_vector_none(r, args)
+                    }
+                } else {
+                    Self::collect_vars_exprs_from_vector_none(r, args)
+                }
+            },
+            Tuple(_, args) => {
+                if let Some(exp) = opt_exp {
+                    match exp.as_ref() {
+                        ExpData::Value(_, Value::Tuple(actuals)) => {
+                            Self::collect_vars_exprs_from_vector_values(r, args, actuals)
+                        },
+                        ExpData::Call(_, Operation::Tuple, actuals) => {
+                            Self::collect_vars_exprs_from_vector_exprs(r, args, actuals)
+                        },
+                        _ => Self::collect_vars_exprs_from_vector_none(r, args),
+                    }
+                } else {
+                    Self::collect_vars_exprs_from_vector_none(r, args)
+                }
+            },
+            Var(_, name) => match opt_exp {
+                Some(exp) => {
+                    r.push((*name, Some(exp.clone())));
+                    true
+                },
+                None => {
+                    r.push((*name, None));
+                    false
+                },
+            },
+            _ => true,
+        }
+    }
+
+    // Helper function for `vars_and_exprs`, to match variables in a `Pattern` with pieces of a
+    // `Value`.  Pieces are extracted as new `Value` expressions as needed to match vars.
+    //
+    // Recursively walks `Pattern` `p` and optional `Value` `opt_v` in tandem and appends matching
+    // pairs in output var `r`.  New `Value` expressions are created as needed to represent pieces
+    // of the input `Value`.
+    //
+    // Returns true if pattern matches value
+    fn collect_vars_exprs_from_value(
+        r: &mut Vec<(Symbol, Option<Exp>)>,
+        p: &Pattern,
+        opt_v: Option<&Value>,
+    ) -> bool {
+        use Pattern::*;
+        match p {
+            Struct(_nodeid, _qsid, args) => Self::collect_vars_exprs_from_vector_none(r, args),
+            Tuple(_, args) => {
+                if let Some(value) = opt_v {
+                    match value {
+                        Value::Tuple(actuals) => {
+                            Self::collect_vars_exprs_from_vector_values(r, args, actuals)
+                        },
+                        Value::Vector(actuals) => {
+                            Self::collect_vars_exprs_from_vector_values(r, args, actuals)
+                        },
+                        _ => {
+                            Self::collect_vars_exprs_from_vector_none(r, args);
+                            false
+                        },
+                    }
+                } else {
+                    Self::collect_vars_exprs_from_vector_none(r, args);
+                    false
+                }
+            },
+            Var(id, name) => {
+                if let Some(value) = opt_v {
+                    r.push((*name, Some(ExpData::Value(*id, value.clone()).into_exp())));
+                    true
+                } else {
+                    r.push((*name, None));
+                    false
+                }
+            },
+            _ => true,
+        }
+    }
+
+    // Helper function for `vars_and_exprs`, to match a vector of `Pattern` with a vector of `Exp`.
+    //
+    // Recursively walks `Pattern`s `pats` and `Exp`s `exps` in tandem and appends matching
+    // pairs in output var `r`.
+    //
+    // Returns true if slice sizes match and all patterns match expressions.
+    fn collect_vars_exprs_from_vector_exprs(
+        r: &mut Vec<(Symbol, Option<Exp>)>,
+        pats: &[Pattern],
+        exprs: &[Exp],
+    ) -> bool {
+        pats.iter()
+            .zip_longest(exprs.iter())
+            .map(|pair| {
+                match pair {
+                    EitherOrBoth::Both(pat, expr) => {
+                        Self::collect_vars_exprs_from_expr(r, pat, Some(expr))
+                    },
+                    EitherOrBoth::Left(pat) => Self::collect_vars_exprs_from_expr(r, pat, None),
+                    EitherOrBoth::Right(_) => {
+                        false // there are extra exprs
+                    },
+                }
+            })
+            .all(|b| b)
+    }
+
+    // Helper function for `vars_and_exprs`, to match a vector of `Pattern` with a vector of `Value`.
+    //
+    // Recursively walks `Pattern`s `pats` and `Exp`s `exps` in tandem and appends matching
+    // pairs in output var `r`.  New `Value` expressions are created as needed to represent pieces
+    // of input `Value`s.
+    //
+    // Returns true if slice sizes match and all patterns match values.
+    fn collect_vars_exprs_from_vector_values(
+        r: &mut Vec<(Symbol, Option<Exp>)>,
+        pats: &[Pattern],
+        vals: &[Value],
+    ) -> bool {
+        pats.iter()
+            .zip_longest(vals.iter())
+            .map(|pair| match pair {
+                EitherOrBoth::Both(pat, value) => {
+                    Self::collect_vars_exprs_from_value(r, pat, Some(value))
+                },
+                EitherOrBoth::Left(pat) => Self::collect_vars_exprs_from_value(r, pat, None),
+                EitherOrBoth::Right(_) => false,
+            })
+            .all(|b| b)
+    }
+
+    // Helper function for `vars_and_exprs`, to match a vector of `Pattern` with no binding.
+    //
+    // Recursively walks `Pattern`s `pats` and appends pairs matching variables in the pattern with `None`
+    // in output var `r`.
+    //
+    // Returns `false` unless the input slice `pats` is empty.
+    fn collect_vars_exprs_from_vector_none(
+        r: &mut Vec<(Symbol, Option<Exp>)>,
+        pats: &[Pattern],
+    ) -> bool {
+        pats.iter()
+            .map(|pat| Self::collect_vars_exprs_from_value(r, pat, None))
+            .all(|b| b)
+    }
+
+    // Returns a new pattern which is a copy of `self` but with
+    // each `Var` subpattern contained in `vars` replaced by
+    // a `Wildcard` subpattern.
+    pub fn remove_vars(self, vars: &BTreeSet<Symbol>) -> Pattern {
+        match self {
+            Pattern::Var(id, var) => {
+                if vars.contains(&var) {
+                    Pattern::Wildcard(id)
+                } else {
+                    Pattern::Var(id, var)
+                }
+            },
+            Pattern::Tuple(id, patvec) => Pattern::Tuple(
+                id,
+                patvec
+                    .into_iter()
+                    .map(|pat| pat.remove_vars(vars))
+                    .collect(),
+            ),
+            Pattern::Struct(id, qsid, patvec) => Pattern::Struct(
+                id,
+                qsid,
+                patvec
+                    .into_iter()
+                    .map(|pat| pat.remove_vars(vars))
+                    .collect(),
+            ),
+            Pattern::Error(..) | Pattern::Wildcard(..) => self,
+        }
+    }
+
+    /// Does a variable substitution on a pattern.
+    ///
+    /// Calls `var_map` on every symbol `sym` occurring in a `Var` subpattern of `self`, and if any
+    /// call returns `Some(sym2)` such that `sym != sym2`, then creates a `clone` of `self` but with
+    /// every `sym3` replaced by `sym4` iff `Some(sym4) = var_map(sym3)`.  Otherwise, returns
+    /// `None` as there are no substitutions to be done.
+    pub fn replace_vars<'a, F>(&self, var_map: &'a F) -> Option<Pattern>
+    where
+        F: Fn(&Symbol) -> Option<&'a Symbol>,
+    {
+        match self {
+            Pattern::Var(id, var) => {
+                if let Some(new_var) = var_map(var) {
+                    if new_var != var {
+                        Some(Pattern::Var(*id, *new_var))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            },
+            Pattern::Tuple(_, patvec) | Pattern::Struct(_, _, patvec) => {
+                let pat_out: Vec<_> = patvec.iter().map(|pat| pat.replace_vars(var_map)).collect();
+                if pat_out.iter().any(|opt_pat| opt_pat.is_some()) {
+                    // Need to build a new vec.
+                    let new_vec: Vec<_> = std::iter::zip(pat_out, patvec)
+                        .map(|(opt_pat, pat)| match opt_pat {
+                            Some(new_pat) => new_pat,
+                            None => pat.clone(),
+                        })
+                        .collect();
+                    match self {
+                        Pattern::Tuple(id, _) => Some(Pattern::Tuple(*id, new_vec)),
+                        Pattern::Struct(id, qsid, _) => {
+                            Some(Pattern::Struct(*id, qsid.clone(), new_vec))
+                        },
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            },
+            Pattern::Error(..) | Pattern::Wildcard(..) => None,
+        }
+    }
+
+    /// Visits pattern, calling visitor on each sub-pattern. `visitor(false, ..)` will be called
+    /// before descending into recursive pattern, and `visitor(true, ..)` after. Notice we use one
+    /// function instead of two so a lambda can be passed which encapsulates mutable references.
+    pub fn visit_pre_post<F>(&self, visitor: &mut F)
+    where
+        F: FnMut(bool, &Pattern),
+    {
+        use Pattern::*;
+        visitor(false, self);
+        match self {
+            Var(..) | Wildcard(..) | Error(..) => {},
+            Tuple(_, patvec) => {
+                for pat in patvec {
+                    pat.visit_pre_post(visitor);
+                }
+            },
+            Struct(_, _, patvec) => {
+                for pat in patvec {
+                    pat.visit_pre_post(visitor);
+                }
+            },
+        };
+        visitor(true, self);
+    }
+
+    pub fn to_string<'a>(&self, env: &GlobalEnv, tctx: &'a TypeDisplayContext<'a>) -> String {
+        match self {
+            Pattern::Var(id, name) => {
+                let ty = env.get_node_type(*id);
+                format!("{}: {}", name.display(env.symbol_pool()), ty.display(tctx))
+            },
+            Pattern::Tuple(_, args) => format!(
+                "({})",
+                args.iter().map(|pat| pat.to_string(env, tctx)).join(", ")
+            ),
+            Pattern::Struct(_, struct_id, args) => {
+                let inst_str = if !struct_id.inst.is_empty() {
+                    format!(
+                        "<{}>",
+                        struct_id.inst.iter().map(|ty| ty.display(tctx)).join(", ")
+                    )
+                } else {
+                    "".to_string()
+                };
+                let struct_env = env.get_struct(struct_id.to_qualified_id());
+                let field_names = struct_env.get_fields().map(|f| f.get_name());
+                let args_str = args
+                    .iter()
+                    .zip(field_names)
+                    .map(|(pat, sym)| {
+                        let field_name = env.symbol_pool().string(sym);
+                        let pattern_str = pat.to_string(env, tctx);
+                        if &pattern_str != field_name.as_ref() {
+                            format!("{}: {}", field_name.as_ref(), pat.to_string(env, tctx))
+                        } else {
+                            pattern_str
+                        }
+                    })
+                    .join(", ");
+                format!(
+                    "{}{}{{ {} }}",
+                    struct_env.get_full_name_str(),
+                    inst_str,
+                    args_str
+                )
+            },
+            Pattern::Wildcard(_) => "_".to_string(),
+            Pattern::Error(_) => "<error>".to_string(),
+        }
+    }
+
+    pub fn display<'a>(&'a self, env: &'a GlobalEnv) -> PatDisplay<'a> {
+        PatDisplay {
+            env,
+            pat: self,
+            fun_env: None,
+            verbose: true,
+        }
+    }
+
+    pub fn display_cont<'a>(&'a self, other: &PatDisplay<'a>) -> PatDisplay<'a> {
+        PatDisplay {
+            env: other.env,
+            pat: self,
+            fun_env: other.fun_env.clone(),
+            verbose: other.verbose,
+        }
+    }
+
+    pub fn display_for_exp<'a>(&'a self, other: &ExpDisplay<'a>) -> PatDisplay<'a> {
+        PatDisplay {
+            env: other.env,
+            pat: self,
+            fun_env: other.fun_env.clone(),
+            verbose: other.verbose,
+        }
+    }
+}
+
+pub struct PatDisplay<'a> {
+    env: &'a GlobalEnv,
+    pat: &'a Pattern,
+    fun_env: Option<FunctionEnv<'a>>,
+    verbose: bool,
+}
+
+impl<'a> PatDisplay<'a> {
+    fn type_ctx(&self) -> TypeDisplayContext<'a> {
+        if let Some(fe) = &self.fun_env {
+            fe.get_type_display_ctx()
+        } else {
+            TypeDisplayContext::new(self.env)
+        }
+    }
+
+    fn fmt_patterns(&self, f: &mut Formatter<'_>, patterns: &[Pattern]) -> Result<(), Error> {
+        if let Some(first) = patterns.first() {
+            first.display_cont(self).fmt_pattern(f, false)?;
+            for pat in patterns.iter().skip(1) {
+                write!(f, ", ")?;
+                pat.display_cont(self).fmt_pattern(f, false)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn fmt_pattern(&self, f: &mut Formatter<'_>, show_type: bool) -> Result<(), Error> {
+        use Pattern::*;
+        let node_id = self.pat.node_id();
+        let node_type = self.env.get_node_type(node_id);
+        let type_ctx = &self.type_ctx();
+        let mut showed_type = false;
+        match self.pat {
+            Var(_, sym) => {
+                write!(
+                    f,
+                    "{}: {}",
+                    sym.display(self.env.symbol_pool()),
+                    node_type.display(type_ctx)
+                )?;
+                showed_type = true;
+            },
+            Wildcard(_) => write!(f, "_")?,
+            Tuple(_, pattern_vec) => {
+                write!(f, "(")?;
+                self.fmt_patterns(f, pattern_vec)?;
+                write!(f, ")")?
+            },
+            Struct(_, struct_qfid, pattern_vec) => {
+                let inst_str = if !struct_qfid.inst.is_empty() {
+                    format!(
+                        "<{}>",
+                        struct_qfid
+                            .inst
+                            .iter()
+                            .map(|ty| ty.display(type_ctx))
+                            .join(", ")
+                    )
+                } else {
+                    "".to_string()
+                };
+                let struct_env = self.env.get_struct(struct_qfid.to_qualified_id());
+                let field_names = struct_env.get_fields().map(|f| f.get_name());
+                let args_str = pattern_vec
+                    .iter()
+                    .zip(field_names)
+                    .map(|(pat, sym)| {
+                        let field_name = self.env.symbol_pool().string(sym);
+                        let pattern_str = pat.to_string(self.env, type_ctx);
+                        if &pattern_str != field_name.as_ref() {
+                            format!(
+                                "{}: {}",
+                                field_name.as_ref(),
+                                pat.to_string(self.env, type_ctx)
+                            )
+                        } else {
+                            pattern_str
+                        }
+                    })
+                    .join(", ");
+                write!(
+                    f,
+                    "{}{}{{ {} }}",
+                    struct_env.get_full_name_str(),
+                    inst_str,
+                    args_str
+                )?
+            },
+            Error(_) => write!(f, "Pattern::Error")?,
+        }
+        if show_type && !showed_type {
+            write!(f, ": {}", node_type.display(type_ctx))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<'a> Display for PatDisplay<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        self.fmt_pattern(f, true)
     }
 }
 
@@ -1514,6 +2037,7 @@ pub enum Value {
     ByteArray(Vec<u8>),
     AddressArray(Vec<Address>), // TODO: merge AddressArray to Vector type in the future
     Vector(Vec<Value>),
+    Tuple(Vec<Value>),
 }
 
 // enables `env.display(&value)`
@@ -1525,8 +2049,9 @@ impl<'a> fmt::Display for EnvDisplay<'a, Value> {
             Value::Bool(b) => write!(f, "{}", b),
             // TODO(tzakian): Figure out a better story for byte array displays
             Value::ByteArray(bytes) => write!(f, "{:?}", bytes),
-            Value::AddressArray(array) => write!(f, "{:?}", array),
+            Value::AddressArray(array) => write!(f, "a{:?}", array),
             Value::Vector(array) => write!(f, "{:?}", array),
+            Value::Tuple(array) => write!(f, "({:?})", array),
         }
     }
 }
@@ -1583,6 +2108,114 @@ impl Operation {
                 | Len
                 | Vector
         )
+    }
+
+    /// Checks whether an expression calling the operation is OK to remove from code.  This includes
+    /// side-effect-free expressions which are not related to Specs, Assertions, and won't generate
+    /// errors or warnings in stackless-bytecode passes.
+    pub fn is_ok_to_remove_from_code(&self) -> bool {
+        use Operation::*;
+        match self {
+            MoveFunction(..) => false, // could abort
+            SpecFunction(..) => false, // Spec
+            Closure(..) => false,      // Spec
+            Pack(..) => false,         // Could yield an undroppable value
+            Tuple => true,
+            Select(..) => false,      // Move-related
+            UpdateField(..) => false, // Move-related
+
+            // Specification specific
+            Result(..) => false, // Spec
+            Index => false,      // Spec
+            Slice => false,      // Spec
+            Range => false,      // Spec
+            Implies => false,    // Spec
+            Iff => false,        // Spec
+            Identical => false,  // Spec
+
+            // Binary operators
+            Add => false, // can overflow
+            Sub => false, // can overflow
+            Mul => false, // can overflow
+            Mod => false, // can overflow
+            Div => false, // can overflow
+            BitOr => true,
+            BitAnd => true,
+            Xor => true,
+            Shl => false, // can overflow
+            Shr => false, // can overflow
+            And => false, // can overflow
+            Or => true,
+            Eq => true,
+            Neq => true,
+            Lt => true,
+            Gt => true,
+            Le => true,
+            Ge => true,
+
+            // Copy and Move
+            Copy => false, // Could yield an undroppable value
+            Move => false, // Move-related
+
+            // Unary operators
+            Not => true,
+            Cast => false, // can overflow
+
+            // Builtin functions (impl and spec)
+            Exists(..) => false, // Spec
+
+            // Builtin functions (impl only)
+            BorrowGlobal(..) => false, // Move-related
+            Borrow(..) => false,       // Move-related
+            Deref => false,            // Move-related
+            MoveTo => false,           // Move-related
+            MoveFrom => false,         // Move-related
+            Freeze => false,           // Move-related
+            Abort => false,            // Move-related
+            Vector => false,           // Move-related
+
+            // Builtin functions (spec only)
+            Len => false,            // Spec
+            TypeValue => false,      // Spec
+            TypeDomain => false,     // Spec
+            ResourceDomain => false, // Spec
+            Global(..) => false,     // Spec
+            CanModify => false,      // Spec
+            Old => false,            // Spec
+            Trace(..) => false,      // Spec
+
+            EmptyVec => false,     // Spec
+            SingleVec => false,    // Spec
+            UpdateVec => false,    // Spec
+            ConcatVec => false,    // Spec
+            IndexOfVec => false,   // Spec
+            ContainsVec => false,  // Spec
+            InRangeRange => false, // Spec
+            InRangeVec => false,   // Spec
+            RangeVec => false,     // Spec
+            MaxU8 => false,        // Spec
+            MaxU16 => false,       // Spec
+            MaxU32 => false,       // Spec
+            MaxU64 => false,       // Spec
+            MaxU128 => false,      // Spec
+            MaxU256 => false,      // Spec
+            Bv2Int => false,       // Spec
+            Int2Bv => false,       // Spec
+
+            // Functions which support the transformation and translation process.
+            AbortFlag => false,            // Spec
+            AbortCode => false,            // Spec
+            WellFormed => false,           // Spec
+            BoxValue => false,             // Spec
+            UnboxValue => false,           // Spec
+            EmptyEventStore => false,      // Spec
+            ExtendEventStore => false,     // Spec
+            EventStoreIncludes => false,   // Spec
+            EventStoreIncludedIn => false, // Spec
+
+            // Operation with no effect
+            NoOp => true,
+        }
     }
 
     /// Whether the operation allows to take reference parameters instead of values. This applies
@@ -1648,6 +2281,65 @@ impl ExpData {
             true // keep going
         };
         self.visit_pre_order(&mut visitor);
+        is_pure
+    }
+
+    /// Checks whether the expression is OK to remove from code.  This includes
+    /// side-effect-free expressions which are not related to Specs, Assertions,
+    /// and won't generate errors or warnings in stackless-bytecode passes.
+    pub fn is_ok_to_remove_from_code(&self) -> bool {
+        let mut is_pure = true;
+        let mut pure_stack = Vec::new();
+        let mut visitor = |post: bool, e: &ExpData| {
+            use ExpData::*;
+            match e {
+                Invalid(..) => {
+                    // leave it alone to produce better errors.
+                    is_pure = false;
+                },
+                Value(..) => {}, // Ok, keep going
+                LocalVar(..) | Temporary(..) => {
+                    // Use of a var could affect borrow semantics, so we cannot
+                    // remove uses until borrow analysis produces warnings about user code
+                    is_pure = false;
+                },
+                Call(_, oper, _) => {
+                    if !oper.is_ok_to_remove_from_code() {
+                        is_pure = false;
+                    }
+                },
+                Invoke(..) => {
+                    // Leave it alone for now, but with more analysis maybe we can do something.
+                    is_pure = false;
+                },
+                Lambda(..) => {
+                    // Lambda captures any side-effects.
+                    if !post {
+                        pure_stack.push(is_pure);
+                    } else {
+                        is_pure = pure_stack.pop().expect("unbalanced");
+                    }
+                },
+                Quant(..) => {
+                    // Technically pure, but we don't want to eliminate it.
+                    is_pure = false;
+                },
+                Block(..) | IfElse(..) => {}, // depends on contents
+                Return(..) => {
+                    is_pure = false;
+                },
+                Sequence(..) => {}, // depends on contents
+                Loop(..) | LoopCont(..) | Assign(..) | Mutate(..) => {
+                    is_pure = false;
+                },
+                SpecBlock(..) => {
+                    // Technically pure, but we don't want to eliminate it.
+                    is_pure = false;
+                },
+            }
+            true
+        };
+        self.visit_pre_post(&mut visitor);
         is_pure
     }
 }
@@ -1895,7 +2587,8 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         use ExpData::*;
         if self.verbose {
-            write!(f, "(")?;
+            let node_id = self.exp.node_id();
+            write!(f, "{}:(", node_id.as_usize())?;
         }
         match self.exp {
             Invalid(_) => write!(f, "*invalid*"),
@@ -1909,7 +2602,11 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     .as_ref()
                     .and_then(|fe| fe.get_parameters().get(*idx).map(|p| p.0))
                 {
-                    write!(f, "{}", name.display(self.env.symbol_pool()))
+                    if self.verbose {
+                        write!(f, "$t{}={}", idx, name.display(self.env.symbol_pool()))
+                    } else {
+                        write!(f, "{}", name.display(self.env.symbol_pool()))
+                    }
                 } else {
                     write!(f, "$t{}", idx)
                 }
@@ -1922,21 +2619,51 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
                     self.fmt_exps(args)
                 )
             },
-            Lambda(_, pat, body) => {
-                write!(f, "|{}| {}", self.fmt_pattern(pat), body.display_cont(self))
+            Lambda(id, pat, body) => {
+                if self.verbose {
+                    write!(
+                        f,
+                        "{}: |{}| {}",
+                        id.as_usize(),
+                        pat.display_for_exp(self),
+                        body.display_cont(self)
+                    )
+                } else {
+                    write!(
+                        f,
+                        "|{}| {}",
+                        pat.display_for_exp(self),
+                        body.display_cont(self)
+                    )
+                }
             },
-            Block(_, pat, binding, body) => {
-                write!(
-                    f,
-                    "{{\n  let {}{};\n  {}\n}}",
-                    indent(self.fmt_pattern(pat)),
-                    if let Some(exp) = binding {
-                        indent(format!(" = {}", exp.display_cont(self)))
-                    } else {
-                        "".to_string()
-                    },
-                    indent(body.display_cont(self))
-                )
+            Block(id, pat, binding, body) => {
+                if self.verbose {
+                    write!(
+                        f,
+                        "{{\n  {}: let {}{};\n  {}\n}}",
+                        indent(id.as_usize()),
+                        indent(pat.display_for_exp(self)),
+                        if let Some(exp) = binding {
+                            indent(format!(" = {}", exp.display_cont(self)))
+                        } else {
+                            "".to_string()
+                        },
+                        indent(body.display_cont(self))
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{{\n  let {}{};\n  {}\n}}",
+                        indent(pat.display_for_exp(self)),
+                        if let Some(exp) = binding {
+                            indent(format!(" = {}", exp.display_cont(self)))
+                        } else {
+                            "".to_string()
+                        },
+                        indent(body.display_cont(self))
+                    )
+                }
             },
             Quant(_, kind, ranges, triggers, opt_where, body) => {
                 let triggers_str = triggers
@@ -1987,7 +2714,12 @@ impl<'a> fmt::Display for ExpDisplay<'a> {
             LoopCont(_, false) => write!(f, "break"),
             Return(_, e) => write!(f, "return {}", e.display_cont(self)),
             Assign(_, lhs, rhs) => {
-                write!(f, "{} = {}", self.fmt_pattern(lhs), rhs.display_cont(self))
+                write!(
+                    f,
+                    "{} = {}",
+                    lhs.display_for_exp(self),
+                    rhs.display_cont(self)
+                )
             },
             Mutate(_, lhs, rhs) => {
                 write!(f, "{} = {}", lhs.display_cont(self), rhs.display_cont(self))
@@ -2021,64 +2753,15 @@ impl<'a> ExpDisplay<'a> {
         }
     }
 
-    fn fmt_patterns(&self, patterns: &[Pattern]) -> String {
-        patterns.iter().map(|pat| self.fmt_pattern(pat)).join(", ")
-    }
-
-    pub fn fmt_pattern(&self, pat: &Pattern) -> String {
-        match pat {
-            Pattern::Var(id, name) => {
-                let tctx = self.type_ctx();
-                let ty = self.env.get_node_type(*id);
-                format!(
-                    "{}: {}",
-                    name.display(self.env.symbol_pool()),
-                    ty.display(&tctx)
-                )
-            },
-            Pattern::Tuple(_, args) => format!("({})", self.fmt_patterns(args)),
-            Pattern::Struct(_, struct_id, args) => {
-                let tctx = self.type_ctx();
-                let inst_str = if !struct_id.inst.is_empty() {
-                    format!(
-                        "<{}>",
-                        struct_id.inst.iter().map(|ty| ty.display(&tctx)).join(", ")
-                    )
-                } else {
-                    "".to_string()
-                };
-                let struct_env = self.env.get_struct(struct_id.to_qualified_id());
-                let field_names = struct_env.get_fields().map(|f| f.get_name());
-                let args_str = args
-                    .iter()
-                    .zip(field_names)
-                    .map(|(pat, sym)| {
-                        let field_name = self.env.symbol_pool().string(sym);
-                        let pattern_str = self.fmt_pattern(pat);
-                        if &pattern_str != field_name.as_ref() {
-                            format!("{}: {}", field_name.as_ref(), self.fmt_pattern(pat))
-                        } else {
-                            pattern_str
-                        }
-                    })
-                    .join(", ");
-                format!(
-                    "{}{}{{ {} }}",
-                    struct_env.get_full_name_str(),
-                    inst_str,
-                    args_str
-                )
-            },
-            Pattern::Wildcard(_) => "_".to_string(),
-            Pattern::Error(_) => "<error>".to_string(),
-        }
-    }
-
     fn fmt_quant_ranges(&self, ranges: &[(Pattern, Exp)]) -> String {
         ranges
             .iter()
             .map(|(pat, domain)| {
-                format!("{}: {}", self.fmt_pattern(pat), domain.display_cont(self))
+                format!(
+                    "{}: {}",
+                    pat.display_for_exp(self),
+                    domain.display_cont(self)
+                )
             })
             .join(", ")
     }
@@ -2151,6 +2834,10 @@ impl<'a> fmt::Display for OperationDisplay<'a> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         use Operation::*;
         match self.oper {
+            Cast => {
+                let ty = self.env.get_node_type(self.node_id);
+                write!(f, "{:?}<{}>", self.oper, ty.display(&self.tctx))
+            },
             SpecFunction(mid, fid, labels_opt) => {
                 write!(f, "{}", self.fun_str(mid, fid))?;
                 if let Some(labels) = labels_opt {

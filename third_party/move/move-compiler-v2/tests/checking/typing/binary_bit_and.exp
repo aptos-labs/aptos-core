@@ -16,7 +16,7 @@ module 0x8675309::M {
         BitAnd<u64>(select M::R.f(r), select M::R.f(r));
         BitAnd<u64>(BitAnd<u64>(BitAnd<u64>(1, select M::R.f(r)), select M::R.f(r)), 0);
         {
-          let M::R{ f: _ } = r;
+          let M::R{ f: _ }: M::R = r;
           Tuple()
         }
     }

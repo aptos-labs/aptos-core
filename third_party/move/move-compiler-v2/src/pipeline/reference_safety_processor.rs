@@ -1322,8 +1322,8 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     infos.push((
                         loc.clone(),
                         format!(
-                            "conflicting reference {}used here",
-                            self.display_name_or_empty("", temp)
+                            "conflicting reference{} used here",
+                            self.display_name_or_empty(" ", temp)
                         ),
                     ))
                 }

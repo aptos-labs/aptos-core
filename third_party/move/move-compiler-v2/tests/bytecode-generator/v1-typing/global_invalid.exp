@@ -7,7 +7,7 @@ module 0x42::m {
           Abort(0)
         };
         {
-          let _ = BorrowGlobal(Immutable)<T>(addr);
+          let _: &T = BorrowGlobal(Immutable)<T>(addr);
           MoveFrom<T>(addr);
           Tuple()
         }

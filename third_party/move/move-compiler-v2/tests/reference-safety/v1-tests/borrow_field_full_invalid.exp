@@ -9,7 +9,7 @@ error: mutable reference in local `c` requires exclusive access but is borrowed
    │         ^^ requirement enforced here
 16 │         *inner;
 17 │         *f1;
-   │         --- conflicting reference `f1`used here
+   │         --- conflicting reference `f1` used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:16:9
@@ -20,7 +20,7 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 16 │         *inner;
    │         ^^^^^^ requirement enforced here
 17 │         *f1;
-   │         --- conflicting reference `f1`used here
+   │         --- conflicting reference `f1` used here
 
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:23:18
@@ -33,7 +33,7 @@ error: cannot immutably borrow since mutable references exist
    │         -- requirement enforced here
    ·
 28 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: cannot immutably borrow local `inner` since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:23:18
@@ -47,7 +47,7 @@ error: cannot immutably borrow local `inner` since mutable references exist
    │         ------ requirement enforced here
    ·
 28 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:23:18
@@ -61,7 +61,7 @@ error: cannot immutably borrow since mutable references exist
    │         --- requirement enforced here
 27 │         *inner;
 28 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:25:9
@@ -74,10 +74,10 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 25 │         *inner;
    │         ^^^^^^ requirement enforced here
 26 │         *f1;
-   │         --- conflicting reference `f1`used here
+   │         --- conflicting reference `f1` used here
 27 │         *inner;
 28 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:27:9
@@ -88,7 +88,7 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 27 │         *inner;
    │         ^^^^^^ requirement enforced here
 28 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: mutable reference in local `c` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:33:9
@@ -99,7 +99,7 @@ error: mutable reference in local `c` requires exclusive access but is borrowed
    │         ^^ requirement enforced here
 34 │         *inner;
 35 │         *f1;
-   │         --- conflicting reference `f1`used here
+   │         --- conflicting reference `f1` used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:34:9
@@ -110,7 +110,7 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 34 │         *inner;
    │         ^^^^^^ requirement enforced here
 35 │         *f1;
-   │         --- conflicting reference `f1`used here
+   │         --- conflicting reference `f1` used here
 
 error: cannot mutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:41:18
@@ -123,7 +123,7 @@ error: cannot mutably borrow since mutable references exist
    │         -- requirement enforced here
    ·
 46 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: cannot mutably borrow local `inner` since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:41:18
@@ -137,7 +137,7 @@ error: cannot mutably borrow local `inner` since mutable references exist
    │         ------ requirement enforced here
    ·
 46 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: cannot mutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:41:18
@@ -151,7 +151,7 @@ error: cannot mutably borrow since mutable references exist
    │         --- requirement enforced here
 45 │         *inner;
 46 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:43:9
@@ -164,10 +164,10 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 43 │         *inner;
    │         ^^^^^^ requirement enforced here
 44 │         *f1;
-   │         --- conflicting reference `f1`used here
+   │         --- conflicting reference `f1` used here
 45 │         *inner;
 46 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:45:9
@@ -178,4 +178,4 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 45 │         *inner;
    │         ^^^^^^ requirement enforced here
 46 │         *c;
-   │         -- conflicting reference `c`used here
+   │         -- conflicting reference `c` used here

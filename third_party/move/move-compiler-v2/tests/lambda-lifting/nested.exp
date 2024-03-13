@@ -7,7 +7,7 @@ module 0xcafe::m {
         (f)(x)
     }
     private fun nested(x: u64,c: u64): u64 {
-        m::map1(x, |y: u64| Cast(m::map2(Cast(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast(c)))))
+        m::map1(x, |y: u64| Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), |y: u8| Add<u8>(y, Cast<u8>(c)))))
     }
     spec fun $map1(x: u64,f: |u64|u64): u64 {
         (f)(x)
@@ -16,7 +16,7 @@ module 0xcafe::m {
         (f)(x)
     }
     spec fun $nested(x: u64,c: u64): u64 {
-        m::$map1(x, |y: num| Cast(m::$map2(Cast(Sub(y, c)), |y: num| Add(y, Cast(c)))))
+        m::$map1(x, |y: num| Cast<u64>(m::$map2(Cast<u8>(Sub(y, c)), |y: num| Add(y, Cast<u8>(c)))))
     }
 } // end 0xcafe::m
 
@@ -33,10 +33,10 @@ module 0xcafe::m {
         m::map1(x, closure m::nested$lambda$2(c))
     }
     private fun nested$lambda$1(c: u64,y: u8): u8 {
-        Add<u8>(y, Cast(c))
+        Add<u8>(y, Cast<u8>(c))
     }
     private fun nested$lambda$2(c: u64,y: u64): u64 {
-        Cast(m::map2(Cast(Sub<u64>(y, c)), closure m::nested$lambda$1(c)))
+        Cast<u64>(m::map2(Cast<u8>(Sub<u64>(y, c)), closure m::nested$lambda$1(c)))
     }
     spec fun $map1(x: u64,f: |u64|u64): u64 {
         (f)(x)
@@ -45,6 +45,6 @@ module 0xcafe::m {
         (f)(x)
     }
     spec fun $nested(x: u64,c: u64): u64 {
-        m::$map1(x, |y: num| Cast(m::$map2(Cast(Sub(y, c)), |y: num| Add(y, Cast(c)))))
+        m::$map1(x, |y: num| Cast<u64>(m::$map2(Cast<u8>(Sub(y, c)), |y: num| Add(y, Cast<u8>(c)))))
     }
 } // end 0xcafe::m
