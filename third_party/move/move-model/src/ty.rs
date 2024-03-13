@@ -869,6 +869,11 @@ impl Type {
             tys.pop().unwrap()
         }
     }
+
+    /// If this is a tuple and it is not a unit type, return true.
+    pub fn is_tuple(&self) -> bool {
+        matches!(self, Type::Tuple(ts) if !ts.is_empty())
+    }
 }
 
 /// A parameter for type unification that specifies the type compatibility rules to follow.
