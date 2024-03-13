@@ -120,12 +120,8 @@ impl FeatureFlag {
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
-<<<<<<< HEAD
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
-=======
-            FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
->>>>>>> a04bd56a9f (add feature gate)
         ]
     }
 }

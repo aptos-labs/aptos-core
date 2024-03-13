@@ -658,7 +658,7 @@ impl TestContext {
 
     pub async fn get_apt_balance(&self, account: AccountAddress) -> u64 {
         let coin_balance_option = self
-            .api_get_account_resource_option(
+            .try_api_get_account_resource(
                 account,
                 "0x1",
                 "coin",
@@ -676,7 +676,7 @@ impl TestContext {
             v
         } else {
             let fungible_store_option = self
-                .api_get_account_resource_option(
+                .try_api_get_account_resource(
                     get_apt_primary_store_address(account),
                     "0x1",
                     "fungible_asset",
@@ -740,7 +740,7 @@ impl TestContext {
     }
 
     // TODO: Add support for generic_type_params if necessary.
-    pub async fn api_get_account_resource_option(
+    pub async fn try_api_get_account_resource(
         &self,
         account: AccountAddress,
         resource_account_address: &str,
@@ -758,7 +758,7 @@ impl TestContext {
         module: &str,
         name: &str,
     ) -> Value {
-        self.api_get_account_resource_option(account, resource_account_address, module, name)
+        self.try_api_get_account_resource(account, resource_account_address, module, name)
             .await
             .unwrap()
     }
