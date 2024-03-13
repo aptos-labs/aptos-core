@@ -923,6 +923,6 @@ mod tests {
             vec![0u8; MAX_WEBAUTHN_SIGNATURE_BYTES],
         );
         let verification_result = bad_paar.verify(&raw_txn, &any_public_key);
-        assert!(verification_result.is_err());
+        assert!(verification_result.err().unwrap().to_string().contains("The PartialAuthenticatorAssertionResponse content length is greater than the maximum number of"));
     }
 }
