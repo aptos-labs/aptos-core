@@ -173,6 +173,7 @@ pub(crate) fn validate_authenticators(
                                 get_public_inputs_hash(sig, pk, &rsa_jwk, config).map_err(
                                     |_| invalid_signature!("Could not compute public inputs hash"),
                                 )?;
+                            println!("public_inputs_hash: {}", public_inputs_hash.to_string());
 
                             // The training wheels signature is only checked if a training wheels PK is set on chain
                             if training_wheels_pk.is_some() {
