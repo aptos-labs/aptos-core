@@ -28,9 +28,9 @@ warning: Function `0xc0ffee::m::unused_lambda_suppressed2` is unused: it has no 
 module 0xc0ffee::m {
     private fun unused_lambda() {
         {
-          let (p: u64) = Tuple(0);
+          let (p: u64): (u64) = Tuple(0);
           {
-            let (x: u64) = Tuple(p);
+            let (x: u64): (u64) = Tuple(p);
             1
           }
         };
@@ -38,9 +38,9 @@ module 0xc0ffee::m {
     }
     private fun unused_lambda_suppressed1() {
         {
-          let (p: u64) = Tuple(0);
+          let (p: u64): (u64) = Tuple(0);
           {
-            let (_x: u64) = Tuple(p);
+            let (_x: u64): (u64) = Tuple(p);
             1
           }
         };
@@ -48,9 +48,9 @@ module 0xc0ffee::m {
     }
     private fun unused_lambda_suppressed2() {
         {
-          let (p: u64) = Tuple(0);
+          let (p: u64): (u64) = Tuple(0);
           {
-            let (_) = Tuple(p);
+            let (_): (u64) = Tuple(p);
             1
           }
         };

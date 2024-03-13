@@ -8,7 +8,7 @@ error: mutable reference in local `s` requires exclusive access but is borrowed
 12 │         *s;
    │         ^^ requirement enforced here
 13 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: mutable reference in local `s` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/dereference_field_invalid.move:16:9
@@ -21,4 +21,4 @@ error: mutable reference in local `s` requires exclusive access but is borrowed
 16 │         *s;
    │         ^^ requirement enforced here
 17 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here

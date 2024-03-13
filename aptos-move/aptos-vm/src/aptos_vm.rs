@@ -20,13 +20,15 @@ use crate::{
     sharded_block_executor::{executor_client::ExecutorClient, ShardedBlockExecutor},
     system_module_names::*,
     transaction_metadata::TransactionMetadata,
-    transaction_validation, verifier, VMExecutor, VMValidator,
+    transaction_validation, verifier,
+    verifier::randomness::has_randomness_attribute,
+    VMExecutor, VMValidator,
 };
 use anyhow::anyhow;
 use aptos_block_executor::txn_commit_hook::NoOpTransactionCommitHook;
 use aptos_crypto::HashValue;
 use aptos_framework::{
-    natives::{code::PublishRequest, transaction_context::NativeTransactionContext},
+    natives::{code::PublishRequest, randomness::RandomnessContext},
     RuntimeModuleMetadataV1,
 };
 use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
@@ -733,6 +735,7 @@ impl AptosVM {
 
     fn validate_and_execute_entry_function(
         &self,
+        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
@@ -752,26 +755,27 @@ impl AptosVM {
             )])?;
         }
 
-        let is_friend_or_private = session.load_function_def_is_friend_or_private(
+        let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(
             entry_fn.module(),
             entry_fn.function(),
             entry_fn.ty_args(),
         )?;
-        if is_friend_or_private {
+
+        if is_friend_or_private && has_randomness_attribute(resolver, session, entry_fn)? {
             let txn_context = session
                 .get_native_extensions()
-                .get_mut::<NativeTransactionContext>();
-            txn_context.set_is_friend_or_private_entry_func();
+                .get_mut::<RandomnessContext>();
+            txn_context.mark_unbiasable();
         }
 
-        let function =
-            session.load_function(entry_fn.module(), entry_fn.function(), entry_fn.ty_args())?;
+        let struct_constructors_enabled =
+            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS);
         let args = verifier::transaction_arg_validation::validate_combine_signer_and_txn_args(
             session,
             senders,
             entry_fn.args().to_vec(),
             &function,
-            self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
+            struct_constructors_enabled,
         )?;
         session.execute_entry_function(
             entry_fn.module(),
@@ -820,6 +824,7 @@ impl AptosVM {
             TransactionPayload::EntryFunction(entry_fn) => {
                 session.execute(|session| {
                     self.validate_and_execute_entry_function(
+                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
@@ -921,6 +926,7 @@ impl AptosVM {
                         aptos_try!({
                             return_on_failure!(session.execute(|session| self
                                 .execute_multisig_entry_function(
+                                    resolver,
                                     session,
                                     gas_meter,
                                     traversal_context,
@@ -1042,6 +1048,7 @@ impl AptosVM {
             MultisigTransactionPayload::EntryFunction(entry_function) => {
                 session.execute(|session| {
                     self.execute_multisig_entry_function(
+                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
@@ -1142,6 +1149,7 @@ impl AptosVM {
 
     fn execute_multisig_entry_function(
         &self,
+        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
@@ -1152,6 +1160,7 @@ impl AptosVM {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
+            resolver,
             session,
             gas_meter,
             traversal_context,

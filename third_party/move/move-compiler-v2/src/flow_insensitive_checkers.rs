@@ -112,7 +112,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         }
                         self.seen_uses.exit_scope();
                     },
-                    Pre | MidMutate | BeforeThen | BeforeElse => {},
+                    Pre | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
                 };
             },
             Lambda(_, pat, _) => {
@@ -129,7 +129,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         }
                         self.seen_uses.exit_scope();
                     },
-                    BeforeBody | MidMutate | BeforeThen | BeforeElse => {},
+                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
                 };
             },
             Quant(_, _, ranges, ..) => {
@@ -141,7 +141,7 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
                         }
                         self.seen_uses.exit_scope();
                     },
-                    BeforeBody | MidMutate | BeforeThen | BeforeElse => {},
+                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
                 };
             },
             Assign(_, pat, _) => {

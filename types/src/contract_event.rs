@@ -311,9 +311,7 @@ impl TryFrom<&ContractEvent> for DKGStartEvent {
                 if event.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
                     bail!("conversion to dkg start event failed with wrong type tag")
                 }
-                let x = bcs::from_bytes(&event.event_data).map_err(Into::into);
-                println!("0312 - ContractEvent to DKGStartEvent: {}", x.is_ok());
-                x
+                bcs::from_bytes(&event.event_data).map_err(Into::into)
             },
         }
     }

@@ -356,7 +356,7 @@ impl<'input> Lexer<'input> {
             let offset = self.text.len() - text.len();
             let (found_token, length) = find_token(self.file_hash, text, offset)?;
             token = found_token;
-            current_offset += length;
+            current_offset = offset + length;
         }
         Ok(token)
     }

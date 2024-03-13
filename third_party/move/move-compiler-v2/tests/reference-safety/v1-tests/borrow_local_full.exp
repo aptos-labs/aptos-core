@@ -10,7 +10,7 @@ error: cannot mutably borrow since immutable references exist
 24 │         *y;
    │         -- requirement enforced here
 25 │         *x;
-   │         -- conflicting reference `x`used here
+   │         -- conflicting reference `x` used here
 
 error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_local_full.move:23:17

@@ -36,10 +36,9 @@
 ///
 /// - TODO(10858): add an anchor AST node so we can implement `Return` for inline functions and
 ///   `Lambda`.
-/// - TODO(10850): add a simplifier that simplifies certain code constructs.
 use codespan_reporting::diagnostic::Severity;
 use itertools::chain;
-use log::{info, trace};
+use log::{debug, trace};
 use move_model::{
     ast::{Exp, ExpData, Operation, Pattern, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
@@ -64,7 +63,7 @@ type CallSiteLocations = BTreeMap<(QualifiedFunId, QualifiedFunId), BTreeSet<Nod
 /// Run inlining on current program's AST.  For each function which is target of the compilation,
 /// visit that function body and inline any calls to functions marked as "inline".
 pub fn run_inlining(env: &mut GlobalEnv) {
-    info!("Inlining");
+    debug!("Inlining");
     // Get non-inline function roots for running inlining.
     // Also generate an error for any target inline functions lacking a body to inline.
     let mut todo = get_targets(env);
@@ -1026,7 +1025,11 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
 
     /// Record that the provided symbols have local definitions, so renaming should be done.
     /// Note that incoming vars are from a Pattern *after* renaming, so these are shadowed symbols.
-    fn rewrite_enter_scope<'a>(&mut self, vars: impl Iterator<Item = &'a (NodeId, Symbol)>) {
+    fn rewrite_enter_scope<'a>(
+        &mut self,
+        _id: NodeId,
+        vars: impl Iterator<Item = &'a (NodeId, Symbol)>,
+    ) {
         self.shadow_stack
             .enter_scope_after_renaming(vars.map(|(_, sym)| sym));
     }
@@ -1034,7 +1037,7 @@ impl<'env, 'rewriter> ExpRewriterFunctions for InlinedRewriter<'env, 'rewriter> 
     /// On exiting a scope defining some symbols shadowing lambda free vars, record that we have
     /// exited the scope so any occurrences of those free vars should be left alone (if there are
     /// not further shadowing scopes further out).
-    fn rewrite_exit_scope(&mut self) {
+    fn rewrite_exit_scope(&mut self, _id: NodeId) {
         self.shadow_stack.exit_scope();
     }
 
