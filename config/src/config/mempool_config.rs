@@ -127,12 +127,6 @@ impl ConfigOptimizer for MempoolConfig {
                 mempool_config.default_failovers = 0;
                 modified_config = true;
             }
-
-            // Set the shared_mempool_tick_interval_ms to 10 (default is 50)
-            if local_mempool_config_yaml["shared_mempool_tick_interval_ms"].is_null() {
-                mempool_config.shared_mempool_tick_interval_ms = 10;
-                modified_config = true;
-            }
         }
 
         Ok(modified_config)
@@ -247,10 +241,6 @@ mod tests {
         assert_eq!(
             mempool_config.max_broadcasts_per_peer,
             local_max_broadcasts_per_peer
-        );
-        assert_ne!(
-            mempool_config.shared_mempool_tick_interval_ms,
-            default_mempool_config.shared_mempool_tick_interval_ms
         );
     }
 }
