@@ -19,6 +19,7 @@ pub trait TxnNotifier: Send + Sync {
     /// state sync.)
     async fn notify_failed_txn(
         &self,
+        num_vtxns: usize,
         txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError>;
@@ -48,6 +49,7 @@ impl MempoolNotifier {
 impl TxnNotifier for MempoolNotifier {
     async fn notify_failed_txn(
         &self,
+        num_vtxns: usize,
         user_txns: Vec<SignedTransaction>,
         compute_results: &StateComputeResult,
     ) -> Result<(), MempoolError> {
@@ -57,8 +59,9 @@ impl TxnNotifier for MempoolNotifier {
             return Ok(());
         }
         let compute_status = compute_results.compute_status_for_input_txns();
-        // the length of compute_status is user_txns.len() + 1 due to having blockmetadata
-        let expected_len = user_txns.len() + 1;
+        // the length of compute_status is user_txns.len() + num_vtxns + 1 due to having blockmetadata
+        let padding = num_vtxns + 1; // Block Metadata + Validator txns
+        let expected_len = padding + user_txns.len();
         if expected_len != compute_status.len() {
             // reconfiguration suffix blocks don't have any transactions
             if compute_status.is_empty() {
@@ -72,7 +75,7 @@ impl TxnNotifier for MempoolNotifier {
                 compute_results.has_reconfiguration(),
             ).into());
         }
-        let user_txn_status = &compute_status[1..user_txns.len() + 1];
+        let user_txn_status = &compute_status[padding..padding + user_txns.len()];
         for (txn, status) in user_txns.iter().zip_eq(user_txn_status) {
             if let TransactionStatus::Discard(reason) = status {
                 rejected_txns.push(RejectedTransactionSummary {

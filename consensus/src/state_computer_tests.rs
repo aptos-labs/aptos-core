@@ -64,6 +64,7 @@ struct DummyTxnNotifier {}
 impl TxnNotifier for DummyTxnNotifier {
     async fn notify_failed_txn(
         &self,
+        _num_vtxns: usize,
         _txns: Vec<SignedTransaction>,
         _compute_results: &StateComputeResult,
     ) -> anyhow::Result<(), MempoolError> {
