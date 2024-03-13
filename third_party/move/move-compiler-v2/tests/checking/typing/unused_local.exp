@@ -146,13 +146,13 @@ module 0x8675309::M {
     }
     private fun t1() {
         {
-          let (x: u64, y: u64);
+          let (x: u64, y: u64): (u64, u64);
           Tuple()
         }
     }
     private fun t2() {
         {
-          let M::S{ f: f: u64, g: g: bool };
+          let M::S{ f: f: u64, g: g: bool }: M::S;
           Tuple()
         }
     }
@@ -167,7 +167,7 @@ module 0x8675309::M {
     }
     private fun unused_local_suppressed2() {
         {
-          let _;
+          let _: u64;
           Tuple()
         }
     }
@@ -195,13 +195,13 @@ module 0x8675309::M {
     }
     spec fun $t1() {
         {
-          let (x: u64, y: u64);
+          let (x: u64, y: u64): (u64, u64);
           Tuple()
         }
     }
     spec fun $t2() {
         {
-          let M::S{ f: f: u64, g: g: bool };
+          let M::S{ f: f: u64, g: g: bool }: M::S;
           Tuple()
         }
     }
@@ -216,7 +216,7 @@ module 0x8675309::M {
     }
     spec fun $unused_local_suppressed2() {
         {
-          let _;
+          let _: u64;
           Tuple()
         }
     }

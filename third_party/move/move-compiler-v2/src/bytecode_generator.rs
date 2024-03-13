@@ -254,7 +254,7 @@ impl<'env> Generator<'env> {
             self.label_counter += 1;
             Label::new(n as usize)
         } else {
-            self.internal_error(id, "too many labels");
+            self.internal_error(id, format!("too many labels: {}", self.label_counter));
             Label::new(0)
         }
     }
@@ -262,7 +262,13 @@ impl<'env> Generator<'env> {
     /// Require unary target.
     fn require_unary_target(&mut self, id: NodeId, target: Vec<TempIndex>) -> TempIndex {
         if target.len() != 1 {
-            self.internal_error(id, "inconsistent expression target arity");
+            self.internal_error(
+                id,
+                format!(
+                    "inconsistent expression target arity: {} and 1",
+                    target.len()
+                ),
+            );
             0
         } else {
             target[0]
@@ -273,7 +279,13 @@ impl<'env> Generator<'env> {
     /// interning.
     fn require_unary_arg(&self, id: NodeId, args: &[Exp]) -> Exp {
         if args.len() != 1 {
-            self.internal_error(id, "inconsistent expression argument arity");
+            self.internal_error(
+                id,
+                format!(
+                    "inconsistent expression argument arity: {} and 1",
+                    args.len()
+                ),
+            );
             ExpData::Invalid(self.env().new_node_id()).into_exp()
         } else {
             args[0].to_owned()
@@ -501,6 +513,18 @@ impl<'env> Generator<'env> {
             Value::Bool(x) => Constant::Bool(*x),
             Value::ByteArray(x) => Constant::ByteArray(x.clone()),
             Value::AddressArray(x) => Constant::AddressArray(x.clone()),
+            Value::Tuple(x) => {
+                if let Some(inner_ty) = ty.get_vector_element_type() {
+                    Constant::Vector(
+                        x.iter()
+                            .map(|v| self.to_constant(id, inner_ty.clone(), v))
+                            .collect(),
+                    )
+                } else {
+                    self.internal_error(id, format!("inconsistent tuple type: {:?}", ty));
+                    Constant::Bool(false)
+                }
+            },
             Value::Vector(x) => {
                 if let Some(inner_ty) = ty.get_vector_element_type() {
                     Constant::Vector(
@@ -546,7 +570,14 @@ impl<'env> Generator<'env> {
             Operation::Freeze => self.gen_op_call(targets, id, BytecodeOperation::FreezeRef, args),
             Operation::Tuple => {
                 if targets.len() != args.len() {
-                    self.internal_error(id, "inconsistent tuple arity")
+                    self.internal_error(
+                        id,
+                        format!(
+                            "inconsistent tuple arity: {} and {}",
+                            targets.len(),
+                            args.len()
+                        ),
+                    )
                 } else {
                     for (target, arg) in targets.into_iter().zip(args.iter()) {
                         self.gen(vec![target], arg)
@@ -1216,6 +1247,7 @@ impl<'env> Generator<'env> {
         match pat {
             Pattern::Wildcard(_) => {
                 // Nothing to do
+                // TODO(#12475) Should we copy to a temp here?
             },
             Pattern::Var(var_id, sym) => {
                 let local = self.find_local_for_pattern(*var_id, *sym, next_scope);

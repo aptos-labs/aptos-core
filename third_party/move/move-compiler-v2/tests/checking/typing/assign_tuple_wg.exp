@@ -2,7 +2,7 @@
 module 0xc0ffee::dummy1 {
     private fun bar(b: bool) {
         {
-          let () = if b {
+          let (): () = if b {
             dummy1::baz()
           } else {
             Tuple()
@@ -15,7 +15,7 @@ module 0xc0ffee::dummy1 {
     }
     spec fun $bar(b: bool) {
         {
-          let () = if b {
+          let (): () = if b {
             dummy1::$baz()
           } else {
             Tuple()
@@ -33,7 +33,7 @@ module 0xc0ffee::dummy2 {
     }
     private fun tuple_assignments(s: &signer,state: dummy2::State) {
         {
-          let () = MoveTo<dummy2::State>(s, state);
+          let (): () = MoveTo<dummy2::State>(s, state);
           Tuple()
         }
     }

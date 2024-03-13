@@ -14,7 +14,7 @@ module 0x8675309::M {
         if Or(true, false) {
           Tuple()
         } else {
-          Abort(Cast(0))
+          Abort(Cast<u64>(0))
         };
         Tuple()
     }

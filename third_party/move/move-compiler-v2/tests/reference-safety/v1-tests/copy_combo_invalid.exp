@@ -11,7 +11,7 @@ error: cannot copy local `s` which is still mutably borrowed
 14 │         copy s;
    │         ^^^^^^ copied here
 15 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_combo_invalid.move:23:9
@@ -21,7 +21,7 @@ error: cannot copy local `s` which is still mutably borrowed
 23 │         copy s;
    │         ^^^^^^ copied here
 24 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_combo_invalid.move:32:9
@@ -34,7 +34,7 @@ error: cannot copy local `s` which is still mutably borrowed
 32 │         copy s;
    │         ^^^^^^ copied here
 33 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_combo_invalid.move:40:21
@@ -47,4 +47,4 @@ error: cannot copy local `s` which is still mutably borrowed
 40 │         if (cond) { copy s; };
    │                     ^^^^^^ copied here
 41 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here

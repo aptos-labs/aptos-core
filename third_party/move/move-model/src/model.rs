@@ -1912,6 +1912,16 @@ impl GlobalEnv {
         id
     }
 
+    /// Allocates a new node id with same info as original.
+    pub fn clone_node(&self, node_id: NodeId) -> NodeId {
+        let id = self.new_node_id();
+        let opt_info = self.exp_info.borrow().get(&node_id).cloned();
+        if let Some(info) = opt_info {
+            self.exp_info.borrow_mut().insert(id, info.clone());
+        }
+        id
+    }
+
     /// Updates type for the given node id. Must have been set before.
     pub fn update_node_type(&self, node_id: NodeId, ty: Type) {
         let mut mods = self.exp_info.borrow_mut();
@@ -3946,6 +3956,10 @@ impl<'env> FunctionEnv<'env> {
         self.data.type_params.clone()
     }
 
+    pub fn get_type_parameters_ref(&self) -> &[TypeParameter] {
+        &self.data.type_params
+    }
+
     pub fn get_parameter_count(&self) -> usize {
         self.data.params.len()
     }
@@ -3978,6 +3992,11 @@ impl<'env> FunctionEnv<'env> {
     /// Returns the regular parameters associated with this function.
     pub fn get_parameters(&self) -> Vec<Parameter> {
         self.data.params.clone()
+    }
+
+    /// Returns the regular parameters associated with this function.
+    pub fn get_parameters_ref(&self) -> &[Parameter] {
+        &self.data.params
     }
 
     /// Returns the result type of this function, which is a tuple for multiple results.

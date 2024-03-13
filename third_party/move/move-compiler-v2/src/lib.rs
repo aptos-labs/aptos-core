@@ -2,21 +2,36 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pipeline::{
-    ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
-    copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-    exit_state_analysis::ExitStateAnalysisProcessor,
-    livevar_analysis_processor::LiveVarAnalysisProcessor,
-    reference_safety_processor::ReferenceSafetyProcessor,
-    split_critical_edges_processor::SplitCriticalEdgesProcessor,
-    uninitialized_use_checker::UninitializedUseChecker,
-    unreachable_code_analysis::UnreachableCodeProcessor,
-    unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
+pub mod ast_simplifier;
+mod bytecode_generator;
+pub mod env_pipeline;
+mod experiments;
+mod file_format_generator;
+pub mod flow_insensitive_checkers;
+pub mod function_checker;
+pub mod inliner;
+pub mod logging;
+pub mod options;
+pub mod pipeline;
+
+use crate::{
+    env_pipeline::EnvProcessorPipeline,
+    pipeline::{
+        ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+        exit_state_analysis::ExitStateAnalysisProcessor,
+        livevar_analysis_processor::LiveVarAnalysisProcessor,
+        reference_safety_processor::ReferenceSafetyProcessor,
+        split_critical_edges_processor::SplitCriticalEdgesProcessor,
+        uninitialized_use_checker::UninitializedUseChecker,
+        unreachable_code_analysis::UnreachableCodeProcessor,
+        unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
+    },
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
-use log::{debug, info, log_enabled, trace, Level};
+use log::{debug, info, log_enabled, Level};
 use move_binary_format::binary_views::BinaryIndexedView;
 use move_command_line_common::files::FileHash;
 use move_compiler::{
@@ -35,18 +50,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
-use std::{collections::BTreeSet, path::Path};
-
-mod bytecode_generator;
-pub mod env_pipeline;
-mod experiments;
-mod file_format_generator;
-pub mod flow_insensitive_checkers;
-pub mod function_checker;
-pub mod inliner;
-pub mod logging;
-pub mod options;
-pub mod pipeline;
+use std::{collections::BTreeSet, io::Write, path::Path};
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
@@ -57,41 +61,38 @@ pub fn run_move_compiler_to_stderr(
 }
 
 /// Run move compiler and print errors to given writer.
-pub fn run_move_compiler(
-    error_writer: &mut impl WriteColor,
+pub fn run_move_compiler<W>(
+    error_writer: &mut W,
     options: Options,
-) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
+) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)>
+where
+    W: WriteColor + Write,
+{
     logging::setup_logging();
     info!("Move Compiler v2");
     // Run context check.
     let mut env = run_checker(options.clone())?;
     check_errors(&env, error_writer, "checking errors")?;
 
-    trace!("After context check, GlobalEnv=\n{}", env.dump_env());
+    debug!("After context check, GlobalEnv=\n{}", env.dump_env());
 
-    // Flow-insensitive checks on AST
-    flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
-    function_checker::check_for_function_typed_parameters(&mut env);
-    function_checker::check_access_and_use(&mut env, true);
+    let env_pipeline = create_env_processor_pipeline(&env);
+    if log_enabled!(Level::Debug) {
+        env_pipeline.run_and_record(&mut env, error_writer)?;
+    } else {
+        env_pipeline.run(&mut env);
+    }
     check_errors(&env, error_writer, "checking errors")?;
 
-    trace!(
+    debug!(
         "After flow-insensitive checks, GlobalEnv=\n{}",
         env.dump_env()
     );
 
-    // Run inlining.
-    inliner::run_inlining(&mut env);
-    check_errors(&env, error_writer, "inlining")?;
-
-    debug!("After inlining, GlobalEnv=\n{}", env.dump_env());
-
-    function_checker::check_access_and_use(&mut env, false);
-    check_errors(&env, error_writer, "post-inlining access checks")?;
-
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;
+    debug!("After bytecode_gen, GlobalEnv={}", env.dump_env());
 
     // Run transformation pipeline
     let pipeline = bytecode_pipeline(&env);
@@ -204,6 +205,40 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
     file_format_generator::generate_file_format(env, targets)
 }
 
+/// Returns the standard env_processor_pipeline
+pub fn create_env_processor_pipeline<'b>(env: &GlobalEnv) -> EnvProcessorPipeline<'b> {
+    let options = env.get_extension::<Options>().expect("options");
+    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
+
+    let mut env_pipeline = EnvProcessorPipeline::default();
+    env_pipeline.add(
+        "unused vars and params checks",
+        flow_insensitive_checkers::check_for_unused_vars_and_params,
+    );
+    env_pipeline.add(
+        "function typed parameter check",
+        function_checker::check_for_function_typed_parameters,
+    );
+    env_pipeline.add(
+        "access and use check before inlining",
+        |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
+    );
+    env_pipeline.add("inlining", inliner::run_inlining);
+    env_pipeline.add(
+        "access and use check after inlining",
+        |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
+    );
+    env_pipeline.add("simplifier", {
+        move |env: &mut GlobalEnv| {
+            ast_simplifier::run_simplifier(
+                env,
+                optimize_on, // eliminate code only if optimize is on
+            )
+        }
+    });
+    env_pipeline
+}
+
 /// Returns the bytecode processing pipeline.
 pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
@@ -274,11 +309,14 @@ pub fn run_bytecode_verifier(units: &[AnnotatedCompiledUnit], env: &mut GlobalEn
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.
-pub fn check_errors<W: WriteColor>(
+pub fn check_errors<W>(
     env: &GlobalEnv,
     error_writer: &mut W,
     msg: &'static str,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    W: WriteColor + Write,
+{
     let options = env.get_extension::<Options>().unwrap_or_default();
     env.report_diag(error_writer, options.report_severity());
     if env.has_errors() {

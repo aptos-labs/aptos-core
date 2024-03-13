@@ -38,7 +38,7 @@ error: cannot immutably borrow since mutable references exist
 39 │         *y;
    │         -- requirement enforced here
 40 │         *x;
-   │         -- conflicting reference `x`used here
+   │         -- conflicting reference `x` used here
 
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_local_combo_invalid.move:38:17

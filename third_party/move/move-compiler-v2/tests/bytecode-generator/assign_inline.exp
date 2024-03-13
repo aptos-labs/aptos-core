@@ -2,8 +2,8 @@
 module 0x42::assign {
     public fun main(): (u64, u64) {
         {
-          let (a: u64, b: u64) = {
-            let (x: u64) = Tuple(3);
+          let (a: u64, b: u64): (u64, u64) = {
+            let (x: u64): (u64) = Tuple(3);
             Tuple(1, x)
           };
           Tuple(a, b)
@@ -14,7 +14,7 @@ module 0x42::assign {
     }
     spec fun $main(): (u64, u64) {
         {
-          let (a: u64, b: u64) = assign::$expose(3);
+          let (a: u64, b: u64): (u64, u64) = assign::$expose(3);
           Tuple(a, b)
         }
     }

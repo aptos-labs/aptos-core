@@ -1189,7 +1189,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 ok = false;
             }
             if ok {
-                let mut folder = ConstantFolder::new(self.parent.env);
+                let mut folder = ConstantFolder::new(self.parent.env, true);
                 let rewritten = folder.rewrite_exp(exp);
                 if let ExpData::Value(_, value) = rewritten.as_ref() {
                     value.clone()

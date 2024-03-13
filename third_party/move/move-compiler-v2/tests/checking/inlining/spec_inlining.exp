@@ -2,17 +2,11 @@
 module 0x42::Test {
     public fun test_apply() {
         {
-          let r1: bool = {
-            let (v: u64) = Tuple(0);
-            spec {
-              assert Ge($t0, 0);
-            }
-            ;
-            {
-              let (v: u64) = Tuple(v);
-              Ge<u64>(v, 0)
-            }
-          };
+          let r1: bool = spec {
+            assert true;
+          }
+          ;
+          true;
           spec {
             assert r1;
           }
@@ -23,17 +17,11 @@ module 0x42::Test {
             Abort(1)
           };
           {
-            let r2: bool = {
-              let (v: u64) = Tuple(0);
-              spec {
-                assert Ge($t0, 0);
-              }
-              ;
-              {
-                let (v: u64) = Tuple(v);
-                Neq<u64>(v, 0)
-              }
-            };
+            let r2: bool = spec {
+              assert true;
+            }
+            ;
+            false;
             spec {
               assert r2;
             }

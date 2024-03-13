@@ -1,0 +1,24 @@
+// -- Model dump before bytecode pipeline
+module 0x42::Test {
+    public fun test(): u64 {
+        625
+    }
+    spec fun $f1(x: u64): u64 {
+        Test::$f2(Test::$f2(Test::$f2(Test::$f2(Test::$f2(x)))))
+    }
+    spec fun $f2(x: u64): u64 {
+        Test::$f3(Test::$f3(Test::$f3(Test::$f3(Test::$f3(x)))))
+    }
+    spec fun $f3(x: u64): u64 {
+        Test::$f4(Test::$f4(Test::$f4(Test::$f4(Test::$f4(x)))))
+    }
+    spec fun $f4(x: u64): u64 {
+        Test::$f5(Test::$f5(Test::$f5(Test::$f5(Test::$f5(x)))))
+    }
+    spec fun $f5(x: u64): u64 {
+        Add(x, 1)
+    }
+    spec fun $test(): u64 {
+        Test::$f1(0)
+    }
+} // end 0x42::Test
