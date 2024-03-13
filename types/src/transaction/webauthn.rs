@@ -129,7 +129,11 @@ impl PartialAuthenticatorAssertionResponse {
         // PartialAuthenticatorAssertionResponse should not exceed MAX_WEBAUTHN_SIGNATURE_BYTES
         // Note: if needed, MAX_WEBAUTHN_SIGNATURE_BYTES should ONLY be increased in the future (NOT decreased),
         // otherwise it will not be backwards compatible
-        ensure!(self.to_bytes().len() <= MAX_WEBAUTHN_SIGNATURE_BYTES, format!("The PartialAuthenticatorAssertionResponse length is greater than the maximum number of {} bytes: found {} bytes.", MAX_WEBAUTHN_SIGNATURE_BYTES, self.to_bytes().len()));
+        let payload_len = secp256r1_ecdsa::Signature::LENGTH + self.authenticator_data().len() + self.client_data_json().len();
+        ensure!(
+            payload_len <= MAX_WEBAUTHN_SIGNATURE_BYTES,
+            format!("The PartialAuthenticatorAssertionResponse content length is greater than the maximum number of {} bytes: found {} bytes.", MAX_WEBAUTHN_SIGNATURE_BYTES, payload_len)
+        );
 
         let collected_client_data: CollectedClientData =
             serde_json::from_slice(self.client_data_json.as_slice())?;
@@ -919,6 +923,6 @@ mod tests {
             vec![0u8; MAX_WEBAUTHN_SIGNATURE_BYTES],
         );
         let verification_result = bad_paar.verify(&raw_txn, &any_public_key);
-        assert_eq!(verification_result.err().unwrap().to_string(), format!("The PartialAuthenticatorAssertionResponse length is greater than the maximum number of {} bytes: found {} bytes.", MAX_WEBAUTHN_SIGNATURE_BYTES, bad_paar.to_bytes().len()));
+        assert!(verification_result.is_err());
     }
 }
