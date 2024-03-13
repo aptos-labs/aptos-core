@@ -25,7 +25,6 @@ use aptos_types::{
     trusted_state::TrustedState,
     validator_signer::ValidatorSigner,
 };
-use move_core_types::account_address::AccountAddress;
 use move_core_types::move_resource::MoveStructType;
 
 #[test]

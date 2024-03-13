@@ -28,6 +28,7 @@ module std::features {
     use std::vector;
 
     const EINVALID_FEATURE: u64 = 1;
+    const EAPI_DISABLED: u64 = 2;
 
     // --------------------------------------------------------------------------------------------
     // Code Publishing
@@ -452,9 +453,17 @@ module std::features {
         features: vector<u8>,
     }
 
-    /// Function to enable and disable features. Can only be called by a signer of @std.
-    public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>)
-    acquires Features {
+    /// Deprecated to prevent validator set changes during DKG.
+    ///
+    /// Genesis/tests should use `change_feature_flags_internal()` for feature vec initialization.
+    ///
+    /// Governance proposals should use `change_feature_flags_for_next_epoch()` to enable/disable features.
+    public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+        change_feature_flags_internal(framework, enable, disable)
+    }
+
+    /// Update feature flags directly. Only used in genesis/tests.
+    fun change_feature_flags_internal(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
         if (!exists<Features>(@std)) {
             move_to<Features>(framework, Features { features: vector[] })
@@ -468,12 +477,7 @@ module std::features {
         });
     }
 
-    /// Enable and disable features *for the next epoch*.
-    ///
-    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
-    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
-    ///
-    /// Can only be called by a signer of @std.
+    /// Enable and disable features for the next epoch.
     public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires PendingFeatures, Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
 

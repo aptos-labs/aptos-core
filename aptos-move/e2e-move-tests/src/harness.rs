@@ -774,7 +774,10 @@ impl MoveHarness {
                     .simple_serialize()
                     .unwrap(),
             ]);
-        self.executor.exec("aptos_governance", "force_end_epoch", vec![], vec![core_signer_arg]);
+        self.executor
+            .exec("aptos_governance", "force_end_epoch", vec![], vec![
+                core_signer_arg,
+            ]);
     }
 
     pub fn modify_gas_scaling(&mut self, gas_scaling_factor: u64) {
