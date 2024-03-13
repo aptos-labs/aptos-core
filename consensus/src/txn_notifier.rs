@@ -53,9 +53,6 @@ impl TxnNotifier for MempoolNotifier {
     ) -> Result<(), MempoolError> {
         let mut rejected_txns = vec![];
 
-        if user_txns.is_empty() {
-            return Ok(());
-        }
         let compute_status = compute_results.compute_status_for_input_txns();
         // the length of compute_status is user_txns.len() + 1 due to having blockmetadata
         let expected_len = user_txns.len() + 1;
