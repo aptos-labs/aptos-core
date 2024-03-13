@@ -112,7 +112,7 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        OnChainRandomnessConfig::Off //TODO: change to `V1` after randomness is ready.
+        OnChainRandomnessConfig::V1(ConfigV1::default())
     }
 
     pub fn randomness_enabled(&self) -> bool {
