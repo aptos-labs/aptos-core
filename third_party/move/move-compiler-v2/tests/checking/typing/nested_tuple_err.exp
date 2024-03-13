@@ -1,0 +1,13 @@
+
+Diagnostics:
+error: Expected a single type, but found a tuple type
+  ┌─ tests/checking/typing/nested_tuple_err.move:3:10
+  │
+3 │         ((1, 2), (3, 4))
+  │          ^^^^^^
+
+error: Expected a single type, but found a tuple type
+  ┌─ tests/checking/typing/nested_tuple_err.move:3:18
+  │
+3 │         ((1, 2), (3, 4))
+  │                  ^^^^^^

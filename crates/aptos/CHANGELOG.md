@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 ## Unreleased
 
+## [3.0.2] - 2024/03/12
+- Increased `max_connections` for postgres container created as part of local testnet to address occasional startup failures due to overloaded DB.
+
 ## [3.0.1] - 2024/03/05
 - Fix bug in `aptos update revela` if default install directory doesn't exist.
 
