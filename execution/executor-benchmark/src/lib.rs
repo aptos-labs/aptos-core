@@ -569,6 +569,7 @@ struct OverallMeasuring {
     start_time: Instant,
     start_execution: ExecutionTimeMeasurement,
     start_gas: GasMeasurement,
+    event_summary: HashMap<String, usize>,
 }
 
 impl OverallMeasuring {
@@ -577,7 +578,12 @@ impl OverallMeasuring {
             start_time: Instant::now(),
             start_execution: ExecutionTimeMeasurement::now(),
             start_gas: GasMeasurement::now(),
+            event_summary: HashMap::new(),
         }
+    }
+
+    pub fn event_summary_mut(&mut self) -> &mut HashMap<String, usize> {
+        &mut self.event_summary
     }
 
     pub fn print_end(self, prefix: &str, num_txns: u64) {
@@ -683,6 +689,18 @@ impl OverallMeasuring {
             delta_execution.commit_total / elapsed,
             num_txns / delta_execution.commit_total
         );
+
+        info!("Summary of events emitted during the execution");
+        for (key, value) in self.event_summary {
+            println!(
+                "event : {}, #generated : {}",
+                key.replace(
+                    "0000000000000000000000000000000000000000000000000000000000000001",
+                    "0x1"
+                ),
+                value
+            );
+        }
     }
 }
 
