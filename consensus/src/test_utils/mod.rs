@@ -150,7 +150,7 @@ impl TreeInserter {
                 parent_qc,
                 parent.timestamp_usecs() + 1,
                 round,
-                Payload::empty(false),
+                Payload::empty(false, true),
                 vec![],
             ))
             .await

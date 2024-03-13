@@ -323,7 +323,6 @@ fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
         .gas_unit_price(1)
         .sign_fee_payer();
     let result = h.run_raw(transaction);
-    println!("result: {:?}", result.status());
     assert_eq!(result.gas_used(), PRICING.new_account_upfront(1) + 1);
 }
 

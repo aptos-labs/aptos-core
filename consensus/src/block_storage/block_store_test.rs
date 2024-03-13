@@ -357,7 +357,7 @@ async fn test_illegal_timestamp() {
     let block_store = build_empty_tree();
     let genesis = block_store.ordered_root();
     let block_with_illegal_timestamp = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         0,
         // This timestamp is illegal, it is the same as genesis
         genesis.timestamp_usecs(),
@@ -462,7 +462,7 @@ async fn test_need_sync_for_ledger_info() {
             certificate_for_genesis(),
             1,
             round,
-            Payload::empty(false),
+            Payload::empty(false, true),
             vec![],
         );
         gen_test_certificate(

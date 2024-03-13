@@ -23,7 +23,10 @@ use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
 use aptos_types::{
     chain_id::ChainId,
-    on_chain_config::{Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig},
+    on_chain_config::{
+        Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+    },
     transaction::Transaction,
     waypoint::Waypoint,
 };
@@ -71,6 +74,8 @@ pub struct GenesisInfo {
     pub execution_config: OnChainExecutionConfig,
     pub gas_schedule: GasScheduleV2,
     pub initial_features_override: Option<Features>,
+    pub randomness_config_override: Option<OnChainRandomnessConfig>,
+    pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
 }
 
 impl GenesisInfo {
@@ -108,6 +113,8 @@ impl GenesisInfo {
             execution_config: genesis_config.execution_config.clone(),
             gas_schedule: genesis_config.gas_schedule.clone(),
             initial_features_override: genesis_config.initial_features_override.clone(),
+            randomness_config_override: genesis_config.randomness_config_override.clone(),
+            jwk_consensus_config_override: genesis_config.jwk_consensus_config_override.clone(),
         })
     }
 
@@ -141,6 +148,8 @@ impl GenesisInfo {
                 employee_vesting_start: 1663456089,
                 employee_vesting_period_duration: 5 * 60, // 5 minutes
                 initial_features_override: self.initial_features_override.clone(),
+                randomness_config_override: self.randomness_config_override.clone(),
+                jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
             },
             &self.consensus_config,
             &self.execution_config,

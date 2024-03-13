@@ -5,7 +5,7 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::debug;
 use move_compiler_v2::{
-    annotate_units, disassemble_compiled_units,
+    annotate_units, ast_simplifier, disassemble_compiled_units,
     env_pipeline::{lambda_lifter, lambda_lifter::LambdaLiftingOptions, EnvProcessorPipeline},
     flow_insensitive_checkers, function_checker, inliner, logging, pipeline,
     pipeline::{
@@ -121,19 +121,49 @@ impl TestConfig {
         );
         // The bytecode transformation pipeline
         let mut pipeline = FunctionTargetPipeline::default();
-        if path.contains("/inlining/bug_11112") || path.contains("/inlining/bug_9717_looponly") {
+
+        if path.contains("/inlining/")
+            || path.contains("/folding/")
+            || path.contains("/simplifier/")
+        {
+            env_pipeline.add("simplifier", |env: &mut GlobalEnv| {
+                ast_simplifier::run_simplifier(
+                    env, false, // No code elimination
+                )
+            });
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(AbilityProcessor {}));
             Self {
                 stop_before_generating_bytecode: false,
                 dump_ast: AstDumpLevel::EndStage,
                 env_pipeline,
                 pipeline,
                 generate_file_format: false,
-                dump_annotated_targets: true,
+                dump_annotated_targets: false,
                 dump_for_only_some_stages: None,
             }
-        } else if path.contains("/inlining/") || path.contains("/folding/") {
+        } else if path.contains("/simplifier-elimination/") {
+            env_pipeline.add("simplifier", |env: &mut GlobalEnv| {
+                ast_simplifier::run_simplifier(
+                    env, true, // Enable code elimination
+                )
+            });
+            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
+            pipeline.add_processor(Box::new(AbilityProcessor {}));
+            Self {
+                stop_before_generating_bytecode: false,
+                dump_ast: AstDumpLevel::EndStage,
+                env_pipeline,
+                pipeline,
+                generate_file_format: false,
+                dump_annotated_targets: false,
+                dump_for_only_some_stages: None,
+            }
+        } else if path.contains("/no-simplifier/") {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
@@ -384,9 +414,11 @@ impl TestConfig {
         if ok {
             // Run env processor pipeline.
             if self.dump_ast == AstDumpLevel::AllStages {
-                let mut out = String::new();
+                let mut out = Buffer::no_color();
                 self.env_pipeline.run_and_record(&mut env, &mut out)?;
-                test_output.borrow_mut().push_str(&out);
+                test_output
+                    .borrow_mut()
+                    .push_str(&String::from_utf8_lossy(&out.into_inner()));
                 ok = Self::check_diags(&mut test_output.borrow_mut(), &env);
             } else {
                 self.env_pipeline.run(&mut env);

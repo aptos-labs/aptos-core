@@ -11,7 +11,7 @@ use aptos_types::{
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 
-#[derive(BCSCryptoHash, CryptoHasher, Deserialize, Serialize)]
+#[derive(BCSCryptoHash, Clone, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
     Txn {
         sender: AccountAddress,

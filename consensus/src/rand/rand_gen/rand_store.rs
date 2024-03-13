@@ -289,6 +289,7 @@ mod tests {
     };
     use aptos_types::{
         dkg::{real_dkg::maybe_dk_from_bls_sk, DKGSessionMetadata, DKGTrait, DefaultDKG},
+        on_chain_config::OnChainRandomnessConfig,
         randomness::{RandKeys, RandMetadata, WvufPP, WVUF},
         validator_verifier::{
             ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
@@ -343,6 +344,7 @@ mod tests {
             let verifier = ValidatorVerifier::new(consensus_infos.clone());
             let dkg_session_metadata = DKGSessionMetadata {
                 dealer_epoch: 999,
+                randomness_config: OnChainRandomnessConfig::default_enabled().into(),
                 dealer_validator_set: consensus_info_move_structs.clone(),
                 target_validator_set: consensus_info_move_structs.clone(),
             };

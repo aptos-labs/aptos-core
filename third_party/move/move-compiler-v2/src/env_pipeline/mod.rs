@@ -8,7 +8,7 @@
 
 use log::debug;
 use move_model::model::GlobalEnv;
-use std::fmt::Write;
+use std::io::Write;
 
 pub mod lambda_lifter;
 

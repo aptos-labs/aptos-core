@@ -227,7 +227,7 @@ module aptos_framework::block {
 
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();
-        }
+        };
     }
 
     #[view]

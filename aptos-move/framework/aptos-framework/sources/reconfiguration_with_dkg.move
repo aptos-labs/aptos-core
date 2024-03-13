@@ -6,7 +6,9 @@ module aptos_framework::reconfiguration_with_dkg {
     use aptos_framework::dkg;
     use aptos_framework::execution_config;
     use aptos_framework::gas_schedule;
+    use aptos_framework::jwk_consensus_config;
     use aptos_framework::jwks;
+    use aptos_framework::randomness_config;
     use aptos_framework::reconfiguration;
     use aptos_framework::reconfiguration_state;
     use aptos_framework::stake;
@@ -27,6 +29,7 @@ module aptos_framework::reconfiguration_with_dkg {
         let cur_epoch = reconfiguration::current_epoch();
         dkg::start(
             cur_epoch,
+            randomness_config::current(),
             stake::cur_validator_consensus_infos(),
             stake::next_validator_consensus_infos(),
         );
@@ -42,7 +45,9 @@ module aptos_framework::reconfiguration_with_dkg {
         execution_config::on_new_epoch();
         gas_schedule::on_new_epoch();
         std::version::on_new_epoch();
+        jwk_consensus_config::on_new_epoch();
         jwks::on_new_epoch();
+        randomness_config::on_new_epoch();
         features::on_new_epoch(account);
         reconfiguration::reconfigure();
     }

@@ -23,7 +23,6 @@ NOTE: on-chain config <code>0x1::state::ValidatorSet</code> implemented its own 
 -  [Function `upsert`](#0x1_config_buffer_upsert)
 -  [Function `extract`](#0x1_config_buffer_extract)
 -  [Specification](#@Specification_1)
-    -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `does_exist`](#@Specification_1_does_exist)
     -  [Function `upsert`](#@Specification_1_upsert)
     -  [Function `extract`](#@Specification_1_extract)
@@ -96,9 +95,11 @@ Config buffer operations failed with permission denied.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
-    <b>move_to</b>(aptos_framework, <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
-        configs: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>(),
-    })
+    <b>if</b> (!<b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(@aptos_framework)) {
+        <b>move_to</b>(aptos_framework, <a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a> {
+            configs: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_new">simple_map::new</a>(),
+        })
+    }
 }
 </code></pre>
 
@@ -204,22 +205,6 @@ Typically used in <code>X::on_new_epoch()</code> where X is an on-chaon config.
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-</code></pre>
-
-
-
-<a id="@Specification_1_initialize"></a>
-
-### Function `initialize`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="config_buffer.md#0x1_config_buffer_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
-</code></pre>
-
-
-
-
-<pre><code><b>aborts_if</b> <b>exists</b>&lt;<a href="config_buffer.md#0x1_config_buffer_PendingConfigs">PendingConfigs</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
 </code></pre>
 
 

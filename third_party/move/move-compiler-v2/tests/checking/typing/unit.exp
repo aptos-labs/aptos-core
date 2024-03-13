@@ -2,7 +2,7 @@
 module 0x8675309::M {
     private fun foo() {
         {
-          let () = Tuple();
+          let (): () = Tuple();
           Tuple();
           Tuple()
         }

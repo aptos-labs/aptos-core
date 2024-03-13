@@ -11,7 +11,7 @@ error: cannot immutably borrow since mutable references exist
    │         │    │
    │         │    immutable borrow attempted here
    │         │    requirement enforced here
-   │         conflicting reference `f`used here
+   │         conflicting reference `f` used here
 
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:24:18
@@ -23,7 +23,7 @@ error: cannot immutably borrow since mutable references exist
 25 │         r1.f = r2.f
    │         ----   ---- requirement enforced here
    │         │
-   │         conflicting reference `r1`used here
+   │         conflicting reference `r1` used here
 
 error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_global_mut_invalid.move:30:18
