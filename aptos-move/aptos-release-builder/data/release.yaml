@@ -33,9 +33,9 @@ proposals:
             - refundable_bytes
   - name: step_4_increase_parallelism_for_machine_upgrade
     metadata:
-      title: "AIP-x: Increase parallelism for machine upgrade"
-      description: "AIP-x: ."
-      discussion_url: ""
+      title: "AIP-74: Increase block gas limit to account for concurrency increase"
+      description: "AIP-74: Increase block gas limit to account for concurrency increase"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/375"
     execution_mode: MultiStep
     update_sequence:
       - Execution:
