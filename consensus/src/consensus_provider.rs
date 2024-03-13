@@ -23,7 +23,10 @@ use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListe
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_network::application::{
+    interface::{NetworkClient, NetworkServiceEvents},
+    storage::PeersAndMetadata,
+};
 use aptos_storage_interface::DbReaderWriter;
 use aptos_validator_transaction_pool::VTxnPoolState;
 use aptos_vm::AptosVM;
@@ -41,6 +44,7 @@ pub fn start_consensus(
     aptos_db: DbReaderWriter,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     vtxn_pool: VTxnPoolState,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (Runtime, Arc<StorageWriteProxy>, Arc<QuorumStoreDB>) {
     let runtime = aptos_runtimes::spawn_named_runtime("consensus".into(), None);
     let storage = Arc::new(StorageWriteProxy::new(node_config, aptos_db.reader.clone()));
@@ -94,6 +98,7 @@ pub fn start_consensus(
         aptos_time_service::TimeService::real(),
         vtxn_pool,
         rand_storage,
+        peers_and_metadata,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

@@ -23,6 +23,7 @@ use crate::{
     dag::{
         adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
         anchor_election::{LeaderReputationAdapter, MetadataBackendAdapter},
+        dag_driver::PeersByLatency,
         dag_state_sync::{SyncModeMessageHandler, SyncOutcome},
         observability::logging::{LogEvent, LogSchema},
         round_state::{AdaptiveResponsive, RoundState},
@@ -344,6 +345,8 @@ pub struct DagBootstrapper {
     jwk_consensus_config: OnChainJWKConsensusConfig,
     executor: BoundedExecutor,
     allow_batches_without_pos_in_proposal: bool,
+    features: Features,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl DagBootstrapper {
@@ -369,6 +372,8 @@ impl DagBootstrapper {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         executor: BoundedExecutor,
         allow_batches_without_pos_in_proposal: bool,
+        features: Features,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         info!("OnChainConfig: {:?}", onchain_config);
         Self {
@@ -392,6 +397,8 @@ impl DagBootstrapper {
             jwk_consensus_config,
             executor,
             allow_batches_without_pos_in_proposal,
+            features,
+            peers_and_metadata,
         }
     }
 
@@ -668,6 +675,10 @@ impl DagBootstrapper {
         );
         let health_backoff =
             HealthBackoff::new(self.epoch_state.clone(), chain_health, pipeline_health);
+        let peers_by_latency = PeersByLatency::new(
+            self.epoch_state.verifier.get_ordered_account_addresses(),
+            self.peers_and_metadata.clone(),
+        );
         let dag_driver = DagDriver::new(
             self.self_peer,
             self.epoch_state.clone(),
@@ -685,6 +696,7 @@ impl DagBootstrapper {
             health_backoff.clone(),
             self.quorum_store_enabled,
             self.allow_batches_without_pos_in_proposal,
+            peers_by_latency,
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag_store.clone(),
@@ -811,6 +823,7 @@ pub(super) fn bootstrap_dag_for_test(
             proposers_per_round: 4,
         }),
     );
+    let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
     let bootstraper = DagBootstrapper::new(
         self_peer,
         DagConsensusConfig::default(),
@@ -832,6 +845,8 @@ pub(super) fn bootstrap_dag_for_test(
         OnChainJWKConsensusConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
         true,
+        features,
+        peers_and_metadata,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap(None);
