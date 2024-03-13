@@ -233,7 +233,6 @@ mod tests {
 
         // Verify that only the relevant fields are modified
         let mempool_config = &node_config.mempool;
-        let default_mempool_config = MempoolConfig::default();
         assert_eq!(
             mempool_config.shared_mempool_max_concurrent_inbound_syncs,
             local_shared_mempool_max_concurrent_inbound_syncs
