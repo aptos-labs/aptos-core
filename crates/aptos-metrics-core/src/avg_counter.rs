@@ -24,3 +24,14 @@ pub fn register_avg_counter_vec(name: &str, desc: &str, labels: &[&str]) -> Hist
     )
     .unwrap()
 }
+
+pub fn register_avg_counter_vec(name: &str, desc: &str, labels: &[&str]) -> HistogramVec {
+    register_histogram_vec!(
+        name,
+        desc,
+        labels,
+        // We need to have at least one bucket in histogram, otherwise default buckets are used
+        vec![0.5],
+    )
+    .unwrap()
+}

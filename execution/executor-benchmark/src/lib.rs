@@ -697,11 +697,14 @@ mod tests {
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
-    use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
+    use aptos_transaction_generator_lib::{
+        args::TransactionTypeArg, EntryPoints, TransactionType, WorkflowProgress
+    };
     use aptos_vm::AptosVM;
 
+
     fn test_generic_benchmark<E>(
-        transaction_type: Option<TransactionTypeArg>,
+        transaction_type: Option<TransactionType>,
         verify_sequence_numbers: bool,
     ) where
         E: TransactionBlockExecutor + 'static,
@@ -730,8 +733,7 @@ mod tests {
         super::run_benchmark::<E>(
             10, /* block_size */
             30, /* num_blocks */
-            transaction_type
-                .map(|t| vec![(t.materialize(1, true, WorkflowProgress::MoveByPhases), 1)]),
+            transaction_type.map(|t| vec![(t, 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
@@ -759,7 +761,21 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
+            // Some(
+            //     TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize(
+            //         1,
+            //         true,
+            //         WorkflowProgress::MoveByPhases,
+            //     ),
+            // ),
+            Some(
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::VectorPictureRead { num_pictures: 1, length: 50000 },
+                    num_modules: 1,
+                    use_account_pool: false,
+                }
+            ),
+            // Some(TransactionType::CallCustomModules { entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { num_elements: 50000 }, num_modules: 1, use_account_pool: false }),
             true,
         );
     }

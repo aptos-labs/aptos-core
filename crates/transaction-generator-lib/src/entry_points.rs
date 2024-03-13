@@ -32,16 +32,17 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
         txn_factory: &TransactionFactory,
         rng: &mut StdRng,
     ) -> Vec<SignedTransaction> {
-        if let Some(initial_entry_point) = self.entry_point.initialize_entry_point() {
-            let payload = initial_entry_point.create_payload(
-                package.get_module_id(initial_entry_point.module_name()),
-                Some(rng),
-                Some(&publisher.address()),
-            );
-            vec![publisher.sign_with_transaction_builder(txn_factory.payload(payload))]
-        } else {
-            vec![]
-        }
+        self.entry_point.initialize_entry_point()
+            .into_iter()
+            .map(|initial_entry_point| {
+                let payload = initial_entry_point.create_payload(
+                    package.get_module_id(initial_entry_point.module_name()),
+                    Some(rng),
+                    Some(&publisher.address()),
+                );
+                publisher.sign_with_transaction_builder(txn_factory.payload(payload))
+            })
+            .collect()
     }
 
     async fn create_generator_fn(
