@@ -69,9 +69,15 @@ fn get_jwks_onchain(resolver: &impl AptosMoveResolver) -> anyhow::Result<Patched
 fn get_groth16_vk_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Groth16VerificationKey, VMStatus> {
-    get_resource_on_chain::<Groth16VerificationKey>(resolver)
+    let key = get_resource_on_chain::<Groth16VerificationKey>(resolver)?;
+    println!("verifying key");
+    println!("{:?}", hex::encode(key.clone().alpha_g1));
+    println!("{:?}", hex::encode(key.clone().beta_g2));
+    println!("{:?}", hex::encode(key.clone().delta_g2));
+    println!("{:?}", hex::encode(key.clone().gamma_g2));
+    // println!("{:?}", hex::encode(key.gamma_abc_g1));
+    Ok(key)
 }
-
 fn get_configs_onchain(
     resolver: &impl AptosMoveResolver,
 ) -> anyhow::Result<Configuration, VMStatus> {
