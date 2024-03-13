@@ -26,6 +26,7 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
         TimedFeaturesBuilder, APTOS_MAX_KNOWN_VERSION,
     },
     transaction::{authenticator::AuthenticationKey, ChangeSet, Transaction, WriteSetPayload},
@@ -54,7 +55,13 @@ const GENESIS_MODULE_NAME: &str = "genesis";
 const GOVERNANCE_MODULE_NAME: &str = "aptos_governance";
 const CODE_MODULE_NAME: &str = "code";
 const VERSION_MODULE_NAME: &str = "version";
+const JWK_CONSENSUS_CONFIG_MODULE_NAME: &str = "jwk_consensus_config";
 const JWKS_MODULE_NAME: &str = "jwks";
+const CONFIG_BUFFER_MODULE_NAME: &str = "config_buffer";
+const DKG_MODULE_NAME: &str = "dkg";
+const RANDOMNESS_CONFIG_MODULE_NAME: &str = "randomness_config";
+const RANDOMNESS_MODULE_NAME: &str = "randomness";
+const RECONFIGURATION_STATE_MODULE_NAME: &str = "reconfiguration_state";
 
 const NUM_SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60;
 const MICRO_SECONDS_PER_SECOND: u64 = 1_000_000;
@@ -75,6 +82,9 @@ pub struct GenesisConfiguration {
     pub voting_power_increase_limit: u64,
     pub employee_vesting_start: u64,
     pub employee_vesting_period_duration: u64,
+    pub initial_features_override: Option<Features>,
+    pub randomness_config_override: Option<OnChainRandomnessConfig>,
+    pub jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
 }
 
 pub static GENESIS_KEYPAIR: Lazy<(Ed25519PrivateKey, Ed25519PublicKey)> = Lazy::new(|| {
@@ -135,7 +145,13 @@ pub fn encode_aptos_mainnet_genesis_transaction(
         &execution_config,
         &gas_schedule,
     );
-    initialize_features(&mut session);
+    initialize_features(
+        &mut session,
+        genesis_config
+            .initial_features_override
+            .clone()
+            .map(Features::into_flag_vec),
+    );
     initialize_aptos_coin(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_accounts(&mut session, accounts);
@@ -244,18 +260,38 @@ pub fn encode_genesis_change_set(
         execution_config,
         gas_schedule,
     );
-    initialize_features(&mut session);
+    initialize_features(
+        &mut session,
+        genesis_config
+            .initial_features_override
+            .clone()
+            .map(Features::into_flag_vec),
+    );
     if genesis_config.is_test {
         initialize_core_resources_and_aptos_coin(&mut session, core_resources_key);
     } else {
         initialize_aptos_coin(&mut session);
     }
+    initialize_config_buffer(&mut session);
+    initialize_dkg(&mut session);
+    initialize_reconfiguration_state(&mut session);
+    let randomness_config = genesis_config
+        .randomness_config_override
+        .clone()
+        .unwrap_or_else(OnChainRandomnessConfig::default_for_genesis);
+    initialize_randomness_config(&mut session, randomness_config);
+    initialize_randomness_resources(&mut session);
     initialize_on_chain_governance(&mut session, genesis_config);
     create_and_initialize_validators(&mut session, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
-    initialize_jwks(&mut session);
+    let jwk_consensus_config = genesis_config
+        .jwk_consensus_config_override
+        .clone()
+        .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
+    initialize_jwk_consensus_config(&mut session, &jwk_consensus_config);
+    initialize_jwks_resources(&mut session);
     initialize_keyless_accounts(&mut session, chain_id);
     set_genesis_end(&mut session);
 
@@ -413,8 +449,9 @@ fn initialize(
     );
 }
 
-fn initialize_features(session: &mut SessionExt) {
-    let features: Vec<u64> = FeatureFlag::default_features()
+fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<FeatureFlag>>) {
+    let features: Vec<u64> = features_override
+        .unwrap_or_else(FeatureFlag::default_features)
         .into_iter()
         .map(|feature| feature as u64)
         .collect();
@@ -442,7 +479,79 @@ fn initialize_aptos_coin(session: &mut SessionExt) {
     );
 }
 
-fn initialize_jwks(session: &mut SessionExt) {
+fn initialize_config_buffer(session: &mut SessionExt) {
+    exec_function(
+        session,
+        CONFIG_BUFFER_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_dkg(session: &mut SessionExt) {
+    exec_function(
+        session,
+        DKG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_randomness_config(
+    session: &mut SessionExt,
+    randomness_config: OnChainRandomnessConfig,
+) {
+    exec_function(
+        session,
+        RANDOMNESS_CONFIG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            RandomnessConfigMoveStruct::from(randomness_config).as_move_value(),
+        ]),
+    );
+}
+
+fn initialize_randomness_resources(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RANDOMNESS_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_reconfiguration_state(session: &mut SessionExt) {
+    exec_function(
+        session,
+        RECONFIGURATION_STATE_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_jwk_consensus_config(
+    session: &mut SessionExt,
+    jwk_consensus_config: &OnChainJWKConsensusConfig,
+) {
+    exec_function(
+        session,
+        JWK_CONSENSUS_CONFIG_MODULE_NAME,
+        "initialize",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            jwk_consensus_config.as_move_value(),
+        ]),
+    );
+}
+
+fn initialize_jwks_resources(session: &mut SessionExt) {
     exec_function(
         session,
         JWKS_MODULE_NAME,
@@ -517,6 +626,21 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
                 vk.as_move_value(),
+            ]),
+        );
+    }
+    if !chain_id.id() > 100 {
+        exec_function(
+            session,
+            JWKS_MODULE_NAME,
+            "upsert_oidc_provider",
+            vec![],
+            serialize_values(&vec![
+                MoveValue::Signer(CORE_CODE_ADDRESS),
+                "https://accounts.google.com".to_string().as_move_value(),
+                "https://accounts.google.com/.well-known/openid-configuration"
+                    .to_string()
+                    .as_move_value(),
             ]),
         );
     }
@@ -831,6 +955,9 @@ pub fn generate_test_genesis(
             voting_power_increase_limit: 50,
             employee_vesting_start: 1663456089,
             employee_vesting_period_duration: 5 * 60, // 5 minutes
+            initial_features_override: None,
+            randomness_config_override: None,
+            jwk_consensus_config_override: None,
         },
         &OnChainConsensusConfig::default_for_genesis(),
         &OnChainExecutionConfig::default_for_genesis(),
@@ -878,6 +1005,9 @@ fn mainnet_genesis_config() -> GenesisConfiguration {
         voting_power_increase_limit: 30,
         employee_vesting_start: 1663456089,
         employee_vesting_period_duration: 5 * 60, // 5 minutes
+        initial_features_override: None,
+        randomness_config_override: None,
+        jwk_consensus_config_override: None,
     }
 }
 

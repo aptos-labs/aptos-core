@@ -8,7 +8,7 @@ use aptos_framework::natives::code::PackageRegistry;
 use aptos_infallible::RwLock;
 use aptos_metrics_core::TimerHelper;
 use aptos_native_interface::SafeNativeBuilder;
-use aptos_types::on_chain_config::OnChainConfig;
+use aptos_types::on_chain_config::{FeatureFlag, Features, OnChainConfig};
 use bytes::Bytes;
 use move_binary_format::errors::{Location, PartialVMError, VMResult};
 use move_core_types::{
@@ -101,6 +101,7 @@ struct WarmVmId {
     natives: Bytes,
     vm_config: Bytes,
     core_packages_registry: Option<Bytes>,
+    bin_v7_enabled: bool,
 }
 
 impl WarmVmId {
@@ -117,6 +118,9 @@ impl WarmVmId {
             natives,
             vm_config: Self::vm_config_bytes(vm_config),
             core_packages_registry: Self::core_packages_id_bytes(resolver)?,
+            bin_v7_enabled: Features::fetch_config(resolver)
+                .unwrap_or_default()
+                .is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7),
         })
     }
 

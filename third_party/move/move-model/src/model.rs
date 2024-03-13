@@ -1675,6 +1675,48 @@ impl GlobalEnv {
         data.def = Some(def);
     }
 
+    /// Adds a new function definition.
+    pub fn add_function_def(
+        &mut self,
+        module_id: ModuleId,
+        name: Symbol,
+        loc: Loc,
+        visibility: Visibility,
+        type_params: Vec<TypeParameter>,
+        params: Vec<Parameter>,
+        result_type: Type,
+        def: Exp,
+    ) {
+        let called_funs = def.called_funs();
+        let data = FunctionData {
+            name,
+            loc: loc.clone(),
+            id_loc: loc,
+            def_idx: None,
+            handle_idx: None,
+            visibility,
+            is_native: false,
+            kind: FunctionKind::Regular,
+            attributes: vec![],
+            type_params,
+            params,
+            result_type,
+            access_specifiers: None,
+            spec: RefCell::new(Default::default()),
+            def: Some(def),
+            called_funs: Some(called_funs),
+            calling_funs: RefCell::new(None),
+            transitive_closure_of_called_funs: RefCell::new(None),
+        };
+        assert!(self
+            .module_data
+            .get_mut(module_id.to_usize())
+            .expect("module defined")
+            .function_data
+            .insert(FunId::new(name), data)
+            .is_none())
+    }
+
     /// Return the `StructEnv` for `str`
     pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
         self.get_module(str.module_id).into_struct(str.id)
@@ -1867,6 +1909,16 @@ impl GlobalEnv {
     pub fn new_node(&self, loc: Loc, ty: Type) -> NodeId {
         let id = self.new_node_id();
         self.exp_info.borrow_mut().insert(id, ExpInfo::new(loc, ty));
+        id
+    }
+
+    /// Allocates a new node id with same info as original.
+    pub fn clone_node(&self, node_id: NodeId) -> NodeId {
+        let id = self.new_node_id();
+        let opt_info = self.exp_info.borrow().get(&node_id).cloned();
+        if let Some(info) = opt_info {
+            self.exp_info.borrow_mut().insert(id, info.clone());
+        }
         id
     }
 
@@ -3810,6 +3862,11 @@ impl<'env> FunctionEnv<'env> {
         self.data.kind == FunctionKind::Inline
     }
 
+    /// Returns kind of this function.
+    pub fn get_kind(&self) -> FunctionKind {
+        self.data.kind
+    }
+
     /// Return the visibility string for this function. Useful for formatted printing.
     pub fn visibility_str(&self) -> &str {
         match self.visibility() {
@@ -3899,6 +3956,10 @@ impl<'env> FunctionEnv<'env> {
         self.data.type_params.clone()
     }
 
+    pub fn get_type_parameters_ref(&self) -> &[TypeParameter] {
+        &self.data.type_params
+    }
+
     pub fn get_parameter_count(&self) -> usize {
         self.data.params.len()
     }
@@ -3933,6 +3994,11 @@ impl<'env> FunctionEnv<'env> {
         self.data.params.clone()
     }
 
+    /// Returns the regular parameters associated with this function.
+    pub fn get_parameters_ref(&self) -> &[Parameter] {
+        &self.data.params
+    }
+
     /// Returns the result type of this function, which is a tuple for multiple results.
     pub fn get_result_type(&self) -> Type {
         self.data.result_type.clone()
@@ -3965,11 +4031,11 @@ impl<'env> FunctionEnv<'env> {
     /// Get the name to be used for a local by index, if available.
     /// Otherwise generate a unique name.
     pub fn get_local_name(&self, idx: usize) -> Symbol {
+        if idx < self.data.params.len() {
+            return self.data.params[idx].0;
+        }
         if let Some(source_map) = &self.module_env.data.source_map {
             // Try to obtain user name from source map
-            if idx < self.data.params.len() {
-                return self.data.params[idx].0;
-            }
             if let Some(fmap) = self
                 .data
                 .def_idx

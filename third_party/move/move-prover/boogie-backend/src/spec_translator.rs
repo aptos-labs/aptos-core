@@ -699,6 +699,10 @@ impl<'env> SpecTranslator<'env> {
                 emit!(self.writer, ")");
             },
             ExpData::Invalid(_) => panic!("unexpected error expression"),
+            ExpData::Sequence(_, exp_vec) if exp_vec.len() == 1 => {
+                // Single-element sequence is just a wrapped value.
+                self.translate_exp(exp_vec.first().expect("list has an element"));
+            },
             ExpData::Return(..)
             | ExpData::Sequence(..)
             | ExpData::Loop(..)
@@ -739,6 +743,10 @@ impl<'env> SpecTranslator<'env> {
             ),
             Value::Vector(val) => {
                 emit!(self.writer, &boogie_value_blob(self.env, self.options, val))
+            },
+            Value::Tuple(val) => {
+                let loc = self.env.get_node_loc(node_id);
+                self.error(&loc, &format!("tuple value not yet supported: {:#?}", val))
             },
         }
     }
@@ -786,6 +794,7 @@ impl<'env> SpecTranslator<'env> {
             .get_extension::<GlobalNumberOperationState>()
             .expect("global number operation state");
         match oper {
+            Operation::Closure(..) => unimplemented!("closures in specs"),
             // Operators we introduced in the top level public entry `SpecTranslator::translate`,
             // mapping between Boogies single value domain and our typed world.
             Operation::BoxValue | Operation::UnboxValue => panic!("unexpected box/unbox"),

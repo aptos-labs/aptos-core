@@ -9,7 +9,7 @@ use jsonwebtoken::{
 };
 use log::{info, warn};
 use once_cell::sync::Lazy;
-use std::{sync::Arc, thread::sleep, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 /// The JWK in-mem cache.
 pub static DECODING_KEY_CACHE: Lazy<DashMap<Issuer, DashMap<KeyID, Arc<DecodingKey>>>> =
@@ -63,7 +63,7 @@ pub fn start_jwk_refresh_loop(issuer: &str, jwk_url: &str, refresh_interval: Dur
                     warn!("{}", msg);
                 },
             }
-            sleep(refresh_interval);
+            tokio::time::sleep(refresh_interval).await;
         }
     });
 }

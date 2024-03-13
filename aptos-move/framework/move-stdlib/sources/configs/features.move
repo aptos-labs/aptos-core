@@ -347,7 +347,14 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
-    /// Whether keyless accounts are enabled, possibly with the ZK-less verification mode.
+    /// Deprecated by `aptos_framework::randomness_config::RandomnessConfig`.
+    const RECONFIGURE_WITH_DKG: u64 = 45;
+    public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
+    public fun reconfigure_with_dkg_enabled(): bool acquires Features {
+        is_enabled(RECONFIGURE_WITH_DKG)
+    }
+
+    /// Whether the OIDB feature is enabled, possibly with the ZK-less verification mode.
     ///
     /// Lifetime: transient
     const KEYLESS_ACCOUNTS: u64 = 46;
@@ -369,9 +376,7 @@ module std::features {
         is_enabled(KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
-    /// The JWK consensus feature.
-    ///
-    /// Lifetime: permanent
+    /// Deprecated by `aptos_framework::jwk_consensus_config::JWKConsensusConfig`.
     const JWK_CONSENSUS: u64 = 49;
 
     public fun get_jwk_consensus_feature(): u64 { JWK_CONSENSUS }
@@ -408,6 +413,28 @@ module std::features {
         is_enabled(MAX_OBJECT_NESTING_CHECK)
     }
 
+    /// Whether keyless accounts support passkey-based ephemeral signatures.
+    ///
+    /// Lifetime: transient
+    const KEYLESS_ACCOUNTS_WITH_PASSKEYS: u64 = 54;
+
+    public fun get_keyless_accounts_with_passkeys_feature(): u64 { KEYLESS_ACCOUNTS_WITH_PASSKEYS }
+
+    public fun keyless_accounts_with_passkeys_feature_enabled(): bool acquires Features {
+        is_enabled(KEYLESS_ACCOUNTS_WITH_PASSKEYS)
+    }
+
+    /// Whether the Multisig V2 enhancement feature is enabled.
+    ///
+    /// Lifetime: transient
+    const MULTISIG_V2_ENHANCEMENT: u64 = 55;
+
+    public fun get_multisig_v2_enhancement_feature(): u64 { MULTISIG_V2_ENHANCEMENT }
+
+    public fun multisig_v2_enhancement_feature_enabled(): bool acquires Features {
+        is_enabled(MULTISIG_V2_ENHANCEMENT)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
@@ -416,6 +443,12 @@ module std::features {
 
     /// The enabled features, represented by a bitset stored on chain.
     struct Features has key {
+        features: vector<u8>,
+    }
+
+    /// This resource holds the feature vec updates received in the current epoch.
+    /// On epoch change, the updates take effect and this buffer is cleared.
+    struct PendingFeatures has key {
         features: vector<u8>,
     }
 
@@ -433,6 +466,45 @@ module std::features {
         vector::for_each_ref(&disable, |feature| {
             set(features, *feature, false);
         });
+    }
+
+    /// Enable and disable features *for the next epoch*.
+    ///
+    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
+    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
+    ///
+    /// Can only be called by a signer of @std.
+    public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires PendingFeatures, Features {
+        assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
+
+        // Figure out the baseline feature vec that the diff will be applied to.
+        let new_feature_vec = if (exists<PendingFeatures>(@std)) {
+            // If there is a buffered feature vec, use it as the baseline.
+            let PendingFeatures { features } = move_from<PendingFeatures>(@std);
+            features
+        } else if (exists<Features>(@std)) {
+            // Otherwise, use the currently effective feature flag vec as the baseline, if it exists.
+            borrow_global<Features>(@std).features
+        } else {
+            // Otherwise, use an empty feature vec.
+            vector[]
+        };
+
+        // Apply the diff and save it to the buffer.
+        apply_diff(&mut new_feature_vec, enable, disable);
+        move_to(framework, PendingFeatures { features: new_feature_vec });
+    }
+
+    /// Apply all the pending feature flag changes. Should only be used at the end of a reconfiguration with DKG.
+    ///
+    /// While the scope is public, it can only be usd in system transactions like `block_prologue` and governance proposals,
+    /// who have permission to set the flag that's checked in `extract()`.
+    public fun on_new_epoch(vm_or_framework: &signer) acquires Features, PendingFeatures {
+        ensure_vm_or_framework_signer(vm_or_framework);
+        if (exists<PendingFeatures>(@std)) {
+            let PendingFeatures { features } = move_from<PendingFeatures>(@std);
+            borrow_global_mut<Features>(@std).features = features;
+        }
     }
 
     #[view]
@@ -461,6 +533,20 @@ module std::features {
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
         byte_index < vector::length(features) && (*vector::borrow(features, byte_index) & bit_mask) != 0
+    }
+
+    fun apply_diff(features: &mut vector<u8>, enable: vector<u64>, disable: vector<u64>) {
+        vector::for_each(enable, |feature| {
+            set(features, feature, true);
+        });
+        vector::for_each(disable, |feature| {
+            set(features, feature, false);
+        });
+    }
+
+    fun ensure_vm_or_framework_signer(account: &signer) {
+        let addr = signer::address_of(account);
+        assert!(addr == @std || addr == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
     }
 
     #[test]

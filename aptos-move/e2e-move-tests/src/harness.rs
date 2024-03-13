@@ -655,6 +655,7 @@ impl MoveHarness {
     }
 
     /// Reads the resource data `T`.
+    /// WARNING: Does not work with resource groups (because set_resource does not work?).
     pub fn read_resource<T: DeserializeOwned>(
         &self,
         addr: &AccountAddress,
@@ -714,6 +715,7 @@ impl MoveHarness {
     }
 
     /// Write the resource data `T`.
+    /// WARNING: Does not work with resource groups.
     pub fn set_resource<T: Serialize>(
         &mut self,
         addr: AccountAddress,

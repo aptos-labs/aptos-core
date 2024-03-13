@@ -2,7 +2,7 @@
 
 use crate::{
     keyless::{
-        test_utils, G1Bytes, G2Bytes, Groth16ZkpAndStatement, Pepper,
+        test_utils, G1Bytes, G2Bytes, Groth16ProofAndStatement, Pepper,
         G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
     },
     transaction::authenticator::EphemeralPublicKey,
@@ -99,14 +99,14 @@ fn test_groth16_zkp_and_statement_serialization() {
     let groth16_zkp_and_statement = test_utils::get_sample_groth16_zkp_and_statement();
 
     assert_eq!(
-        serde_json::from_str::<Groth16ZkpAndStatement>(
+        serde_json::from_str::<Groth16ProofAndStatement>(
             &serde_json::to_string(&groth16_zkp_and_statement).unwrap()
         )
         .unwrap(),
         groth16_zkp_and_statement
     );
     assert_eq!(
-        bcs::from_bytes::<Groth16ZkpAndStatement>(
+        bcs::from_bytes::<Groth16ProofAndStatement>(
             &bcs::to_bytes(&groth16_zkp_and_statement).unwrap()
         )
         .unwrap(),
@@ -138,7 +138,8 @@ fn test_groth16_zkp_and_statement_serialization() {
 
     assert_eq!(
         serde_json::to_string(
-            &serde_json::from_str::<Groth16ZkpAndStatement>(groth16_zkp_and_statement_str).unwrap()
+            &serde_json::from_str::<Groth16ProofAndStatement>(groth16_zkp_and_statement_str)
+                .unwrap()
         )
         .unwrap()
         .as_str(),
@@ -146,7 +147,7 @@ fn test_groth16_zkp_and_statement_serialization() {
     );
     assert_eq!(
         bcs::to_bytes(
-            &bcs::from_bytes::<Groth16ZkpAndStatement>(&groth16_zkp_and_statement_bytes).unwrap()
+            &bcs::from_bytes::<Groth16ProofAndStatement>(&groth16_zkp_and_statement_bytes).unwrap()
         )
         .unwrap(),
         groth16_zkp_and_statement_bytes
@@ -155,17 +156,17 @@ fn test_groth16_zkp_and_statement_serialization() {
 
 #[test]
 fn test_g1_bytes_serialization() {
-    let groth16_zkp_and_statement = test_utils::get_sample_groth16_zkp_and_statement();
+    let zkp_and_stmt = test_utils::get_sample_groth16_zkp_and_statement();
 
-    let g1_bytes = groth16_zkp_and_statement.proof.get_a();
+    let g1_bytes = zkp_and_stmt.proof.get_a();
 
     assert_eq!(
-        serde_json::from_str::<G1Bytes>(&serde_json::to_string(&g1_bytes).unwrap()).unwrap(),
-        g1_bytes
+        serde_json::from_str::<G1Bytes>(&serde_json::to_string(g1_bytes).unwrap()).unwrap(),
+        *g1_bytes
     );
     assert_eq!(
-        bcs::from_bytes::<G1Bytes>(&bcs::to_bytes(&g1_bytes).unwrap()).unwrap(),
-        g1_bytes
+        bcs::from_bytes::<G1Bytes>(&bcs::to_bytes(g1_bytes).unwrap()).unwrap(),
+        *g1_bytes
     );
 
     // these values were generated as follows:
@@ -198,17 +199,17 @@ fn test_g1_bytes_serialization() {
 
 #[test]
 fn test_g2_bytes_serialization() {
-    let groth16_zkp_and_statement = test_utils::get_sample_groth16_zkp_and_statement();
+    let zkp_and_stmt = test_utils::get_sample_groth16_zkp_and_statement();
 
-    let g2_bytes = groth16_zkp_and_statement.proof.get_b();
+    let g2_bytes = zkp_and_stmt.proof.get_b();
 
     assert_eq!(
-        serde_json::from_str::<G2Bytes>(&serde_json::to_string(&g2_bytes).unwrap()).unwrap(),
-        g2_bytes
+        serde_json::from_str::<G2Bytes>(&serde_json::to_string(g2_bytes).unwrap()).unwrap(),
+        *g2_bytes
     );
     assert_eq!(
-        bcs::from_bytes::<G2Bytes>(&bcs::to_bytes(&g2_bytes).unwrap()).unwrap(),
-        g2_bytes
+        bcs::from_bytes::<G2Bytes>(&bcs::to_bytes(g2_bytes).unwrap()).unwrap(),
+        *g2_bytes
     );
 
     // these values were generated as follows:

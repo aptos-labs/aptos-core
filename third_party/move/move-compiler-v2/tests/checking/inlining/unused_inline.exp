@@ -6,7 +6,7 @@ warning: Function `0xc0ffee::m::foo` is unused: it has no current callers and is
 2 │     inline fun foo(): u64 {
   │                ^^^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     public fun bar(): u64 {
         {

@@ -181,7 +181,6 @@ members = [
     "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
-
     # third_party/move
     "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
@@ -514,6 +513,7 @@ datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 determinator = "0.12.0"
+derive_more = "0.99.11"
 diesel = "2.1"
 diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
@@ -601,6 +601,7 @@ sec1 = "0.7.0"
 pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+pathsearch = "0.2.0"
 passkey-authenticator = { version = "0.2.0", features = ["testable"] }
 passkey-client = { version = "0.2.0" }
 passkey-types = { version = "0.2.0" }
@@ -705,14 +706,15 @@ tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { version = "0.10.2", features = [
+tonic = { version = "0.11.0", features = [
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
+    "zstd",
 ] }
-tonic-reflection = "0.10.2"
+tonic-reflection = "0.11.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
@@ -788,7 +790,7 @@ codegen-units = 1
 
 [profile.ci]
 inherits = "release"
-debug = true
+debug = "line-tables-only"
 overflow-checks = true
 debug-assertions = true
 

@@ -8,4 +8,4 @@ error: mutable reference in local `x` requires exclusive access but is borrowed
 18 │         *x;
    │         ^^ requirement enforced here
 19 │         *y;
-   │         -- conflicting reference `y`used here
+   │         -- conflicting reference `y` used here

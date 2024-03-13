@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `u64` but found `bool` (from assignment or declaration context)
+error: cannot assign `bool` to left-hand side of type `u64`
   ┌─ tests/checking/typing/pack_reference_2.move:7:9
   │
 7 │         x = false

@@ -192,6 +192,37 @@ pub trait ModuleAccess: Sync {
             .collect()
     }
 
+    /// Returns an iterator that iterates over all immediate dependencies of the module.
+    ///
+    /// This is more efficient than `immediate_dependencies` as it does not make new
+    /// copies of module ids on the heap.
+    fn immediate_dependencies_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.module_handles()
+            .iter()
+            .filter(|&handle| handle != self.self_handle())
+            .map(|handle| {
+                let addr = self.address_identifier_at(handle.address);
+                let name = self.identifier_at(handle.name);
+                (addr, name)
+            })
+    }
+
+    /// Returns an iterator that iterates over all immediate friends of the module.
+    ///
+    /// This is more efficient than `immediate_dependencies` as it does not make new
+    /// copies of module ids on the heap.
+    fn immediate_friends_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.friend_decls().iter().map(|handle| {
+            let addr = self.address_identifier_at(handle.address);
+            let name = self.identifier_at(handle.name);
+            (addr, name)
+        })
+    }
+
     fn find_struct_def(&self, idx: StructHandleIndex) -> Option<&StructDefinition> {
         self.struct_defs().iter().find(|d| d.struct_handle == idx)
     }
@@ -293,6 +324,20 @@ pub trait ScriptAccess: Sync {
                 )
             })
             .collect()
+    }
+
+    /// Returns an iterator that iterates over all immediate dependencies of the module.
+    ///
+    /// This is more efficient than `immediate_dependencies` as it does not make new
+    /// copies of module ids on the heap.
+    fn immediate_dependencies_iter(
+        &self,
+    ) -> impl DoubleEndedIterator<Item = (&AccountAddress, &IdentStr)> {
+        self.module_handles().iter().map(|handle| {
+            let addr = self.address_identifier_at(handle.address);
+            let name = self.identifier_at(handle.name);
+            (addr, name)
+        })
     }
 }
 

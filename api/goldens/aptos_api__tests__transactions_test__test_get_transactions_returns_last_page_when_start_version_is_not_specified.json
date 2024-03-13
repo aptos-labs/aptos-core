@@ -100,6 +100,21 @@
         "type": "write_resource"
       },
       {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x0d000000",
@@ -416,6 +431,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "7000000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
           }
         },
         "type": "write_resource"
@@ -742,6 +772,21 @@
         "type": "write_resource"
       },
       {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x0f000000",
@@ -1058,6 +1103,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "8000000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
           }
         },
         "type": "write_resource"
@@ -1384,6 +1444,21 @@
         "type": "write_resource"
       },
       {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x11000000",
@@ -1700,6 +1775,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "9000000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
           }
         },
         "type": "write_resource"
@@ -2026,6 +2116,21 @@
         "type": "write_resource"
       },
       {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
         "state_key_hash": "",
         "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
         "key": "0x13000000",
@@ -2342,6 +2447,21 @@
           "type": "0x1::timestamp::CurrentTimeMicroseconds",
           "data": {
             "microseconds": "10000000"
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
           }
         },
         "type": "write_resource"

@@ -13,7 +13,7 @@ error: cannot assign to borrowed local `s`
 14 │         s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
 15 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot assign to borrowed local `s`
    ┌─ tests/reference-safety/v1-tests/assign_local_combo_invalid.move:23:9
@@ -26,7 +26,7 @@ error: cannot assign to borrowed local `s`
 23 │         s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
 24 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot assign to borrowed local `s`
    ┌─ tests/reference-safety/v1-tests/assign_local_combo_invalid.move:32:9
@@ -36,7 +36,7 @@ error: cannot assign to borrowed local `s`
 32 │         s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
 33 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot assign to borrowed local `s`
    ┌─ tests/reference-safety/v1-tests/assign_local_combo_invalid.move:41:9
@@ -49,7 +49,7 @@ error: cannot assign to borrowed local `s`
 41 │         s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
 42 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot assign to borrowed local `s`
    ┌─ tests/reference-safety/v1-tests/assign_local_combo_invalid.move:49:19
@@ -62,4 +62,4 @@ error: cannot assign to borrowed local `s`
 49 │         if (cond) s = S { f: 0, g: 0 };
    │                   ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
 50 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here

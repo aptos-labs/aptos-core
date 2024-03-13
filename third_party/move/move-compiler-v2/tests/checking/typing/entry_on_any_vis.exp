@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x2::M {
     private entry fun f1() {
         Tuple()

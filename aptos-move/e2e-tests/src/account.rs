@@ -13,10 +13,11 @@ use aptos_types::{
     account_config::{self, AccountResource, CoinStoreResource},
     chain_id::ChainId,
     event::{EventHandle, EventKey},
+    keyless::KeylessPublicKey,
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::AuthenticationKey, EntryFunction, RawTransaction, Script, SignedTransaction,
-        TransactionPayload,
+        authenticator::{AnyPublicKey, AuthenticationKey},
+        EntryFunction, RawTransaction, Script, SignedTransaction, TransactionPayload,
     },
     write_set::{WriteOp, WriteSet, WriteSetMut},
 };
@@ -26,17 +27,42 @@ use move_core_types::move_resource::MoveStructType;
 // TTL is 86400s. Initial time was set to 0.
 pub const DEFAULT_EXPIRATION_TIME: u64 = 4_000_000;
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum AccountPublicKey {
+    Ed25519(Ed25519PublicKey),
+    Keyless(KeylessPublicKey),
+}
+
+impl AccountPublicKey {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            AccountPublicKey::Ed25519(pk) => pk.to_bytes().to_vec(),
+            AccountPublicKey::Keyless(pk) => pk.to_bytes(),
+        }
+    }
+
+    pub fn as_ed25519(&self) -> Option<Ed25519PublicKey> {
+        match self {
+            AccountPublicKey::Ed25519(pk) => Some(pk.clone()),
+            AccountPublicKey::Keyless(_) => None,
+        }
+    }
+}
+
 /// Details about a Aptos account.
 ///
 /// Tests will typically create a set of `Account` instances to run transactions on. This type
 /// encodes the logic to operate on and verify operations on any Aptos account.
+///
+/// TODO: This is pleistocene-age code must be brought up to speed, since our accounts are not just Ed25519-based.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Account {
     addr: AccountAddress,
     /// The current private key for this account.
+    /// TODO: When `pubkey` is of type `AccountPublicKey::Keyless`, this will be undefined.
     pub privkey: Ed25519PrivateKey,
     /// The current public key for this account.
-    pub pubkey: Ed25519PublicKey,
+    pub pubkey: AccountPublicKey,
 }
 
 impl Account {
@@ -58,6 +84,17 @@ impl Account {
         Self::with_keypair(privkey, pubkey)
     }
 
+    /// Creates an account with a specific address
+    /// TODO: Currently stores a dummy SK/PK pair.
+    pub fn new_from_addr(addr: AccountAddress, pubkey: AccountPublicKey) -> Self {
+        let (privkey, _) = KeyGen::from_os_rng().generate_ed25519_keypair();
+        Self {
+            addr,
+            privkey,
+            pubkey,
+        }
+    }
+
     /// Creates a new account with the given keypair.
     ///
     /// Like with [`Account::new`], the account returned by this constructor is a purely logical
@@ -67,7 +104,7 @@ impl Account {
         Account {
             addr,
             privkey,
-            pubkey,
+            pubkey: AccountPublicKey::Ed25519(pubkey),
         }
     }
 
@@ -83,7 +120,7 @@ impl Account {
         Account {
             addr,
             privkey,
-            pubkey,
+            pubkey: AccountPublicKey::Ed25519(pubkey),
         }
     }
 
@@ -94,7 +131,7 @@ impl Account {
     pub fn new_genesis_account(address: AccountAddress) -> Self {
         Account {
             addr: address,
-            pubkey: GENESIS_KEYPAIR.1.clone(),
+            pubkey: AccountPublicKey::Ed25519(GENESIS_KEYPAIR.1.clone()),
             privkey: GENESIS_KEYPAIR.0.clone(),
         }
     }
@@ -134,14 +171,20 @@ impl Account {
     /// Changes the keys for this account to the provided ones.
     pub fn rotate_key(&mut self, privkey: Ed25519PrivateKey, pubkey: Ed25519PublicKey) {
         self.privkey = privkey;
-        self.pubkey = pubkey;
+        self.pubkey = AccountPublicKey::Ed25519(pubkey);
     }
 
     /// Computes the authentication key for this account, as stored on the chain.
     ///
     /// This is the same as the account's address if the keys have never been rotated.
     pub fn auth_key(&self) -> Vec<u8> {
-        AuthenticationKey::ed25519(&self.pubkey).to_vec()
+        match &self.pubkey {
+            AccountPublicKey::Ed25519(pk) => AuthenticationKey::ed25519(pk),
+            AccountPublicKey::Keyless(pk) => {
+                AuthenticationKey::any_key(AnyPublicKey::keyless(pk.clone()))
+            },
+        }
+        .to_vec()
     }
 
     pub fn transaction(&self) -> TransactionBuilder {
@@ -232,31 +275,26 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn raw(self) -> RawTransaction {
+    pub fn raw(&self) -> RawTransaction {
         RawTransaction::new(
             *self.sender.address(),
             self.sequence_number.expect("sequence number not set"),
-            self.program.expect("transaction payload not set"),
+            self.program.clone().expect("transaction payload not set"),
             self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
             self.gas_unit_price.unwrap_or(0),
             self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
-            ChainId::test(),
+            self.chain_id.unwrap_or_else(ChainId::test), //ChainId::test(),
         )
     }
 
     pub fn sign(self) -> SignedTransaction {
-        RawTransaction::new(
-            *self.sender.address(),
-            self.sequence_number.expect("sequence number not set"),
-            self.program.expect("transaction payload not set"),
-            self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
-            self.gas_unit_price.unwrap_or(0),
-            self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
-            self.chain_id.unwrap_or_else(ChainId::test),
-        )
-        .sign(&self.sender.privkey, self.sender.pubkey)
-        .unwrap()
-        .into_inner()
+        self.raw()
+            .sign(
+                &self.sender.privkey,
+                self.sender.pubkey.as_ed25519().unwrap(),
+            )
+            .unwrap()
+            .into_inner()
     }
 
     pub fn sign_multi_agent(self) -> SignedTransaction {
@@ -270,22 +308,14 @@ impl TransactionBuilder {
             .iter()
             .map(|signer| &signer.privkey)
             .collect();
-        RawTransaction::new(
-            *self.sender.address(),
-            self.sequence_number.expect("sequence number not set"),
-            self.program.expect("transaction payload not set"),
-            self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
-            self.gas_unit_price.unwrap_or(0),
-            self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
-            ChainId::test(),
-        )
-        .sign_multi_agent(
-            &self.sender.privkey,
-            secondary_signer_addresses,
-            secondary_private_keys,
-        )
-        .unwrap()
-        .into_inner()
+        self.raw()
+            .sign_multi_agent(
+                &self.sender.privkey,
+                secondary_signer_addresses,
+                secondary_private_keys,
+            )
+            .unwrap()
+            .into_inner()
     }
 
     pub fn sign_fee_payer(self) -> SignedTransaction {
@@ -299,25 +329,17 @@ impl TransactionBuilder {
             .iter()
             .map(|signer| &signer.privkey)
             .collect();
-        let fee_payer = self.fee_payer.unwrap();
-        RawTransaction::new(
-            *self.sender.address(),
-            self.sequence_number.expect("sequence number not set"),
-            self.program.expect("transaction payload not set"),
-            self.max_gas_amount.unwrap_or(gas_costs::TXN_RESERVED),
-            self.gas_unit_price.unwrap_or(0),
-            self.ttl.unwrap_or(DEFAULT_EXPIRATION_TIME),
-            ChainId::test(),
-        )
-        .sign_fee_payer(
-            &self.sender.privkey,
-            secondary_signer_addresses,
-            secondary_private_keys,
-            *fee_payer.address(),
-            &fee_payer.privkey,
-        )
-        .unwrap()
-        .into_inner()
+        let fee_payer = self.fee_payer.clone().unwrap();
+        self.raw()
+            .sign_fee_payer(
+                &self.sender.privkey,
+                secondary_signer_addresses,
+                secondary_private_keys,
+                *fee_payer.address(),
+                &fee_payer.privkey,
+            )
+            .unwrap()
+            .into_inner()
     }
 }
 
@@ -448,7 +470,7 @@ impl AccountData {
     pub fn to_bytes(&self) -> Vec<u8> {
         let account = AccountResource::new(
             self.sequence_number,
-            AuthenticationKey::ed25519(&self.account.pubkey).to_vec(),
+            self.account.auth_key(),
             self.coin_register_events.clone(),
             self.key_rotation_events.clone(),
         );

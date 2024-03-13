@@ -3,7 +3,7 @@
 //! Implements the Poseidon hash function for BN-254, which hashes $\le$ 16 field elements and
 //! produces a single field element as output.
 use anyhow::bail;
-use ark_ff::PrimeField;
+use ark_ff::{BigInteger, PrimeField};
 use once_cell::sync::Lazy;
 // TODO(keyless): Figure out the right library for Poseidon.
 use poseidon_ark::Poseidon;
@@ -204,6 +204,14 @@ pub fn pack_bytes_to_one_scalar(chunk: &[u8]) -> anyhow::Result<ark_bn254::Fr> {
     }
     let fr = ark_bn254::Fr::from_le_bytes_mod_order(chunk);
     Ok(fr)
+}
+
+/// Utility method to convert an Fr to a 32-byte slice.
+pub fn fr_to_bytes_le(fr: &ark_bn254::Fr) -> [u8; 32] {
+    fr.into_bigint()
+        .to_bytes_le()
+        .try_into()
+        .expect("expected 32-byte public inputs hash")
 }
 
 #[cfg(test)]

@@ -24,7 +24,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{Features, OnChainConsensusConfig, OnChainExecutionConfig},
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
     transaction::SignedTransaction,
 };
 use futures::{channel::mpsc, SinkExt};
@@ -96,7 +96,7 @@ impl TExecutionClient for MockExecutionClient {
         _payload_manager: Arc<PayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
-        _features: &Features,
+        _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
@@ -121,7 +121,10 @@ impl TExecutionClient for MockExecutionClient {
         for block in blocks {
             self.block_cache.lock().insert(
                 block.id(),
-                block.payload().unwrap_or(&Payload::empty(false)).clone(),
+                block
+                    .payload()
+                    .unwrap_or(&Payload::empty(false, true))
+                    .clone(),
             );
         }
 
