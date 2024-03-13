@@ -29,6 +29,7 @@ use std::{
     fmt,
     fmt::{Debug, Display, Error, Formatter},
     hash::Hash,
+    iter,
     ops::Deref,
 };
 
@@ -2113,10 +2114,56 @@ pub enum Value {
     Address(Address),
     Number(BigInt),
     Bool(bool),
+    // Note that the following are slightly redundant, and may represent the same values, depending
+    // on type (e.g., a `Vector<Vec<Value::Number>>` might be the same as a `ByteArray(Vec<u8>)`,
+    // depending on values and types.
     ByteArray(Vec<u8>),
     AddressArray(Vec<Address>), // TODO: merge AddressArray to Vector type in the future
     Vector(Vec<Value>),
     Tuple(Vec<Value>),
+}
+
+impl Value {
+    /// Implement an equality relation on values which identifies representations which
+    /// implement the same runtime value, assuming that types match.
+    pub fn equivalent(&self, other: &Value) -> bool {
+        if self != other {
+            // Check for a few cases of overlapping representations
+            match (self, other) {
+                (Value::Vector(x), Value::ByteArray(y))
+                | (Value::ByteArray(y), Value::Vector(x)) => {
+                    if x.len() == y.len() {
+                        iter::zip(x, y).all(|(value, byte)| {
+                            if let Value::Number(bigint) = value {
+                                bigint == &BigInt::from(*byte)
+                            } else {
+                                false
+                            }
+                        })
+                    } else {
+                        false
+                    }
+                },
+                (Value::Vector(x), Value::AddressArray(y))
+                | (Value::AddressArray(y), Value::Vector(x)) => {
+                    if x.len() == y.len() {
+                        iter::zip(x, y).all(|(value, addr)| {
+                            if let Value::Address(addr1) = value {
+                                addr1 == addr
+                            } else {
+                                false
+                            }
+                        })
+                    } else {
+                        false
+                    }
+                },
+                _ => false,
+            }
+        } else {
+            true
+        }
+    }
 }
 
 // enables `env.display(&value)`
@@ -3073,5 +3120,80 @@ impl<'a> fmt::Display for EnvDisplay<'a, Spec> {
             writeln!(f, "{} -> {}", code_offset, self.env.display(spec))?
         }
         Ok(())
+    }
+}
+
+impl Value {
+    #[test]
+    fn test_equivalent() {
+        // Some test values
+        let v_true = Value::Bool(true);
+        let v_false = Value::Bool(false);
+
+        let v_3 = Value::Number(BigInt::from(3));
+        let v_5 = Value::Number(BigInt::from(5));
+        let v_1000 = Value::Number(BigInt::from(1000));
+
+        let bv_empty = Value::ByteArray(vec![]);
+        let bv_3_5 = Value::ByteArray(vec![3, 5]);
+        let bv_5_3 = Value::ByteArray(vec![5, 3]);
+        let bv_3_5_5 = Value::ByteArray(vec![3, 5, 5]);
+
+        let addr_01 = Address::Numerical(AccountAddress::from_hex_literal("0xcafebeef"));
+        let addr_02 = Address::Numerical(AccountAddress::from_hex_literal("0x01"));
+        let av_01 = Value::Address(addr_01);
+        let av_02 = Value::Address(addr_02);
+
+        let av_empty = Value::AddressArray(vec![]);
+        let av_a1_a2 = Value::AddressArray(vec![addr_01, addr_02]);
+        let av_a2_a1 = Value::AddressArray(vec![addr_02, addr_01]);
+        let av_a1_a2_a2 = Value::AddressArray(vec![addr_01, addr_02, addr_02]);
+
+        let vect_empty = Value::Vector(vec![]);
+        let vect_3_5 = Value::Vector(vec![v_3, v_5]);
+        let vect_5_3 = Value::Vector(vec![v_5, v_3]);
+        let vect_3_5_5 = Value::Vector(vec![v_3, v_5, v_5]);
+
+        let vect_a1_a2 = Value::Vector(vec![av_01, av_02]);
+        let vect_a2_a1 = Value::Vector(vec![av_02, av_01]);
+        let vect_a1_a2_a2 = Value::Vector(vec![av_01, av_02, av_02]);
+
+        // Each of these should be different from the others.
+        let distinct_entities = vec![
+            v_true,
+            v_false,
+            v_3,
+            v_5,
+            v_1000,
+            av_01,
+            av_02,
+            av_a1_a2,
+            av_a2_a1,
+            av_a1_a2_a2,
+            vect_3_5,
+            vect_5_3,
+            vect_3_5_5,
+        ];
+        // These entities are equivalent, although not equal.
+        let overlapping_entities = vec![
+            (bv_empty, vec_empty),
+            (bv_3_5, vect_3_5),
+            (bv_5_3, vect_5_3),
+            (bv_3_5_5, vect_3_5_5),
+            (av_empty, vec_empty),
+            (av_a1_a2, vect_a1_a2),
+            (av_a2_a1, vect_a2_a1),
+            (av_a1_a2_a2, vect_a1_a2_a2),
+        ];
+
+        for val1 in &distinct_entities {
+            for val2 in &distinct_entities {
+                assert!((val1 == val2) == (val1.equivalent(val2)));
+            }
+        }
+
+        for (val1, val2) in &overlapping_entities {
+            assert!(val1.equivalent(val2));
+        }
     }
 }
