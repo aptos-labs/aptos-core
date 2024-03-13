@@ -21,6 +21,8 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Formatter},
 };
+use crate::jwks::unsupported::UnsupportedJWK;
+use crate::validator_txn::ValidatorTransaction;
 
 pub mod jwk;
 pub mod rsa;
@@ -231,3 +233,28 @@ impl MoveStructType for ObservedJWKsUpdated {
 
 pub static OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG: Lazy<TypeTag> =
     Lazy::new(|| TypeTag::Struct(Box::new(ObservedJWKsUpdated::struct_tag())));
+
+#[test]
+fn hhhh() {
+    let min_jwk = JWKMoveStruct::from(JWK::Unsupported(UnsupportedJWK::new_for_testing("", "")));
+    let bytelen_limit = 2 << 20;
+    let mut lo = 1;
+    let mut hi = 2 << 20;
+    while lo + 1 < hi {
+        let md = (lo + hi) / 2;
+        let txn = ValidatorTransaction::ObservedJWKUpdate(QuorumCertifiedUpdate {
+            update: ProviderJWKs {
+                issuer: vec![],
+                version: 0,
+                jwks: vec![min_jwk.clone(); md],
+            },
+            multi_sig: AggregateSignature::empty()
+        });
+        if txn.size_in_bytes() < bytelen_limit {
+            lo = md;
+        } else {
+            hi = md;
+        }
+    }
+    println!("lo={lo}");
+}

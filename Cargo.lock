@@ -4162,6 +4162,7 @@ dependencies = [
  "ciborium",
  "claims",
  "coset",
+ "criterion",
  "derivative",
  "fixed",
  "hex",

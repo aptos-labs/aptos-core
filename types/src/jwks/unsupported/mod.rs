@@ -24,7 +24,6 @@ impl Debug for UnsupportedJWK {
 }
 
 impl UnsupportedJWK {
-    #[cfg(any(test, feature = "fuzzing"))]
     pub fn new_for_testing(id: &str, payload: &str) -> Self {
         Self {
             id: id.as_bytes().to_vec(),
