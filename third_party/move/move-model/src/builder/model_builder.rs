@@ -538,7 +538,7 @@ impl<'env> ModelBuilder<'env> {
     /// `path`: `path[0]` contains `path[1]` ... `path[-1]` contains `ty`
     /// `checking`: the root struct which we are checking for recursive definition for
     /// `loc_checking`: location of the struct we are checking for
-    fn check_recusive_struct_with_parents(
+    fn check_recursive_struct_with_parents(
         &self,
         ty: &Type,
         ty_loc: Loc,
@@ -547,13 +547,13 @@ impl<'env> ModelBuilder<'env> {
         loc_checking: &Loc,
     ) -> bool {
         match ty {
-            Type::Struct(mid, sid, insts) => {
-                let this_struct_id = mid.qualified(*sid);
+            Type::Struct(ty_mid, sid, insts) => {
+                let this_struct_id = ty_mid.qualified(*sid);
                 let this_struct_entry = self.lookup_struct_entry(this_struct_id);
                 // checks if `ty` occurs in `path`
                 for (_parent_loc, _field_symbol, parent) in path.iter() {
-                    if let Type::Struct(mid, sid, _) = parent {
-                        let parent_id = mid.qualified(*sid);
+                    if let Type::Struct(parent_mid, sid, _) = parent {
+                        let parent_id = parent_mid.qualified(*sid);
                         if parent_id == this_struct_id {
                             if checking == this_struct_id {
                                 let loop_notes = self.gen_error_msg_for_fields_loop(
@@ -586,7 +586,7 @@ impl<'env> ModelBuilder<'env> {
                         path.push((ty_loc.clone(), *field_name, ty.clone()));
                         let field_ty_instantiated = field_ty_uninstantiated.instantiate(insts);
                         // short-curcuit upon first recursive occurence found
-                        if !self.check_recusive_struct_with_parents(
+                        if !self.check_recursive_struct_with_parents(
                             &field_ty_instantiated,
                             field_loc.clone(),
                             path,
@@ -603,19 +603,19 @@ impl<'env> ModelBuilder<'env> {
                 }
             },
             Type::Vector(ty) => {
-                self.check_recusive_struct_with_parents(ty, ty_loc, path, checking, loc_checking)
+                self.check_recursive_struct_with_parents(ty, ty_loc, path, checking, loc_checking)
             },
             _ => true,
         }
     }
 
     /// Checks for recursive definition of structs and adds diagnostics
-    pub fn check_resursive_struct(&self, struct_entry: &StructEntry) {
+    pub fn check_recursive_struct(&self, struct_entry: &StructEntry) {
         let num_params = struct_entry.type_params.len() as u16;
         let params = (0..num_params).map(Type::TypeParameter).collect_vec();
         let struct_ty = Type::Struct(struct_entry.module_id, struct_entry.struct_id, params);
         let mut parents = Vec::new();
-        self.check_recusive_struct_with_parents(
+        self.check_recursive_struct_with_parents(
             &struct_ty,
             struct_entry.loc.clone(),
             &mut parents,
