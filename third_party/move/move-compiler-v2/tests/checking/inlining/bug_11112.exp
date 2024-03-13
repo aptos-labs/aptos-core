@@ -33,5 +33,4 @@ module 0xcafe::vectors {
           }
         }
     }
-    spec fun $test_for_each_mut();
 } // end 0xcafe::vectors

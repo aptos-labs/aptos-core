@@ -17,13 +17,4 @@ module <SELF>_0 {
           }
         }
     }
-    spec fun $main() {
-        {
-          let x: u64;
-          {
-            let y: u64 = x;
-            Tuple()
-          }
-        }
-    }
 } // end <SELF>_0

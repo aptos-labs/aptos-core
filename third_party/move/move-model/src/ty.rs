@@ -119,6 +119,8 @@ pub enum Constraint {
     /// The type variable must be instantiated with a struct which has the given fields with
     /// types.
     SomeStruct(BTreeMap<Symbol, Type>),
+    /// The type variable must be instantiated with a type which has the given ability
+    HasAbility(Ability),
     /// The type variable defaults to the given type if no other binding is found. This is
     /// a pseudo constraint which never fails, but used to generate a default for
     /// inference.
@@ -149,7 +151,7 @@ impl Constraint {
     }
 
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
-    /// Otherwise returns true if `self` absorbs the `other` constraint (and waives the `other`).
+    /// Otherwise, returns true if `self` absorbs the `other` constraint (and waives the `other`).
     pub fn join(
         &mut self,
         context: &impl UnificationContext,
@@ -190,6 +192,7 @@ impl Constraint {
                 }
                 Ok(true)
             },
+            (Constraint::HasAbility(_), _) | (_, Constraint::HasAbility(_)) => Ok(false),
             (Constraint::WithDefault(_), _) | (_, Constraint::WithDefault(_)) => Ok(false),
             (_, _) => Err(TypeUnificationError::ConstraintsIncompatible(
                 loc.clone(),
@@ -225,6 +228,9 @@ impl Constraint {
                         .map(|s| s.display(display_context.env.symbol_pool()).to_string())
                         .join(",")
                 )
+            },
+            Constraint::HasAbility(ability) => {
+                format!("{}", ability)
             },
             Constraint::WithDefault(_ty) => "".to_owned(),
         }
@@ -961,6 +967,9 @@ impl WideningOrder {
 pub trait UnificationContext {
     /// Get the field map for a struct, with field types instantiated.
     fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type>;
+
+    /// Get the abilities of the type.
+    fn get_type_abilities(&self, ty: &Type) -> AbilitySet;
 }
 
 /// A struct representing an empty unification context.
@@ -970,23 +979,43 @@ impl UnificationContext for NoUnificationContext {
     fn get_struct_field_map(&self, _id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
         BTreeMap::new()
     }
+
+    fn get_type_abilities(&self, _ty: &Type) -> AbilitySet {
+        AbilitySet::ALL
+    }
 }
 
 /// A struct representing a cached unification context.
 #[derive(Debug)]
-pub struct CachedUnificationContext(pub BTreeMap<QualifiedId<StructId>, BTreeMap<Symbol, Type>>);
+pub struct CachedUnificationContext(
+    pub BTreeMap<QualifiedId<StructId>, (BTreeMap<Symbol, Type>, AbilitySet)>,
+);
 
 impl UnificationContext for CachedUnificationContext {
     fn get_struct_field_map(&self, id: &QualifiedInstId<StructId>) -> BTreeMap<Symbol, Type> {
         self.0
             .get(&id.to_qualified_id())
-            .map(|field_map| {
+            .map(|(field_map, _)| {
                 field_map
                     .iter()
                     .map(|(n, ty)| (*n, ty.instantiate(&id.inst)))
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    fn get_type_abilities(&self, ty: &Type) -> AbilitySet {
+        // TODO(#12437): this currently does not do ability inference, which should be fixed
+        //   once the new type unification context lands.
+        match ty {
+            Type::Struct(mid, sid, _) => self
+                .0
+                .get(&mid.qualified(*sid))
+                .map(|(_, abilities)| *abilities)
+                .unwrap_or_else(|| AbilitySet::ALL),
+            Type::TypeParameter(_) => AbilitySet::ALL,
+            _ => AbilitySet::PRIMITIVES,
+        }
     }
 }
 
@@ -1156,6 +1185,13 @@ impl Substitution {
                         }
                     }
                     Ok(())
+                },
+                (Constraint::HasAbility(ability), ty) => {
+                    if context.get_type_abilities(ty).has_ability(*ability) {
+                        Ok(())
+                    } else {
+                        constraint_unsatisfied_error()
+                    }
                 },
                 (Constraint::WithDefault(_), _) => Ok(()),
                 _ => constraint_unsatisfied_error(),
@@ -1942,6 +1978,11 @@ impl TypeUnificationError {
                 Constraint::SomeStruct(field_map) => {
                     Self::message_for_struct(unification_context, display_context, field_map, ty)
                 },
+                Constraint::HasAbility(ability) => format!(
+                    "type `{}` does not have expected ability `{}`",
+                    ty.display(display_context),
+                    ability
+                ),
                 Constraint::WithDefault(_) => unreachable!("default constraint in error message"),
             },
             TypeUnificationError::ConstraintsIncompatible(_, c1, c2) => {
@@ -2468,7 +2509,12 @@ pub fn gen_get_ty_param_kinds(
         if let Some(tp) = ty_params.get(i as usize) {
             tp.1.clone()
         } else {
-            panic!("ICE unbound type parameter")
+            // TODO(12437): bring this panic back
+            //panic!("ICE unbound type parameter")
+            TypeParameterKind {
+                abilities: AbilitySet::PRIMITIVES,
+                is_phantom: false,
+            }
         }
     }
 }

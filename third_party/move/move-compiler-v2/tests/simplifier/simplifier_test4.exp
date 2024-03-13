@@ -38,14 +38,6 @@ module 0x8675309::M {
         M::bar(Borrow(Mutable)(select M::S.f(s)), select M::S.f(s) = 0;
         1)
     }
-    spec fun $bar(_s: u64,_u: u64) {
-        Tuple()
-    }
-    spec fun $foo(_s: M::S,_u: u64) {
-        Tuple()
-    }
-    spec fun $t0(s: &mut M::S);
-    spec fun $t1(s: &mut M::S);
 } // end 0x8675309::M
 
 

@@ -19,7 +19,7 @@ use crate::{
     ast::{
         AccessSpecifier, Address, AddressSpecifier, Attribute, ConditionKind, Exp, ExpData,
         FriendDecl, GlobalInvariant, ModuleName, PropertyBag, PropertyValue, ResourceSpecifier,
-        Spec, SpecBlockInfo, SpecFunDecl, SpecVarDecl, UseDecl, Value,
+        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, UseDecl, Value,
     },
     code_writer::CodeWriter,
     emit, emitln,
@@ -1255,6 +1255,11 @@ impl GlobalEnv {
         self.used_spec_funs.contains(&id)
     }
 
+    /// Marks a spec fun to be used
+    pub fn add_used_spec_fun(&mut self, id: QualifiedId<SpecFunId>) {
+        self.used_spec_funs.insert(id);
+    }
+
     /// Determines whether the given spec fun is recursive.
     pub fn is_spec_fun_recursive(&self, id: QualifiedId<SpecFunId>) -> bool {
         fn is_caller(
@@ -1268,11 +1273,10 @@ impl GlobalEnv {
             }
             let module = env.get_module(caller.module_id);
             let decl = module.get_spec_fun(caller.id);
-            decl.callees.contains(&fun)
-                || decl
-                    .callees
-                    .iter()
-                    .any(|trans_caller| is_caller(env, visited, *trans_caller, fun))
+            decl.callees.iter().any(|c| c.to_qualified_id() == fun)
+                || decl.callees.iter().any(|trans_caller| {
+                    is_caller(env, visited, trans_caller.to_qualified_id(), fun)
+                })
         }
         let module = self.get_module(id.module_id);
         let is_recursive = *module.get_spec_fun(id.id).is_recursive.borrow();
@@ -1366,7 +1370,7 @@ impl GlobalEnv {
             function_idx_to_id: Default::default(),
             spec_vars,
             spec_funs,
-            module_spec,
+            module_spec: RefCell::new(module_spec),
             loc,
             attributes,
             use_decls,
@@ -1452,7 +1456,6 @@ impl GlobalEnv {
                 panic!("attaching mismatching bytecode module")
             }
         }
-
         let used_modules = self.get_used_modules_from_bytecode(&module);
         let friend_modules = self.get_friend_modules_from_bytecode(&module);
         let mod_data = &mut self.module_data[module_id.0 as usize];
@@ -1492,6 +1495,7 @@ impl GlobalEnv {
         called_funs
     }
 
+    #[allow(unused)]
     fn get_used_modules_from_bytecode(
         &self,
         compiled_module: &CompiledModule,
@@ -1505,6 +1509,7 @@ impl GlobalEnv {
             .collect()
     }
 
+    #[allow(unused)]
     fn get_friend_modules_from_bytecode(
         &self,
         compiled_module: &CompiledModule,
@@ -1554,7 +1559,7 @@ impl GlobalEnv {
             abilities: AbilitySet::ALL,
             spec_var_opt: Some(var_id),
             field_data,
-            spec: Spec::default(),
+            spec: RefCell::new(Spec::default()),
         }
     }
 
@@ -1715,6 +1720,94 @@ impl GlobalEnv {
             .function_data
             .insert(FunId::new(name), data)
             .is_none())
+    }
+
+    /// Returns a reference to the declaration of a spec fun.
+    pub fn get_spec_fun(&self, fun: QualifiedId<SpecFunId>) -> &SpecFunDecl {
+        self.module_data
+            .get(fun.module_id.to_usize())
+            .unwrap()
+            .spec_funs
+            .get(&fun.id)
+            .unwrap()
+    }
+
+    /// Returns a mutable reference to the declaration of a spec fun.
+    pub fn get_spec_fun_mut(&mut self, fun: QualifiedId<SpecFunId>) -> &mut SpecFunDecl {
+        self.module_data
+            .get_mut(fun.module_id.to_usize())
+            .unwrap()
+            .spec_funs
+            .get_mut(&fun.id)
+            .unwrap()
+    }
+
+    /// Adds a new specification function and returns id of it.
+    pub fn add_spec_function_def(
+        &mut self,
+        module_id: ModuleId,
+        decl: SpecFunDecl,
+    ) -> QualifiedId<SpecFunId> {
+        let spec_funs = &mut self
+            .module_data
+            .get_mut(module_id.to_usize())
+            .unwrap()
+            .spec_funs;
+        let id = SpecFunId::new(spec_funs.len());
+        assert!(spec_funs.insert(id, decl).is_none());
+        module_id.qualified(id)
+    }
+
+    /// Gets the spec block associated with the spec block target. Only
+    /// module, struct, and function specs are supported.
+    pub fn get_spec_block(&self, target: &SpecBlockTarget) -> Ref<Spec> {
+        use SpecBlockTarget::*;
+        match target {
+            Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow(),
+            Struct(mid, sid) => self.module_data[mid.to_usize()]
+                .struct_data
+                .get(sid)
+                .unwrap()
+                .spec
+                .borrow(),
+            Function(mid, fid) => self.module_data[mid.to_usize()]
+                .function_data
+                .get(fid)
+                .unwrap()
+                .spec
+                .borrow(),
+            FunctionCode(..) | Schema(_, _, _) | Inline => {
+                // Schemas are expanded, inline spec blocks are part of the AST,
+                // and function code is nested inside of a function spec block
+                panic!("spec not available for schema or inline blocks")
+            },
+        }
+    }
+
+    /// Gets the spec block associated with the spec block target. Only
+    /// module, struct, and function specs are supported.
+    pub fn get_spec_block_mut(&self, target: &SpecBlockTarget) -> RefMut<Spec> {
+        use SpecBlockTarget::*;
+        match target {
+            Module(mid) => self.module_data[mid.to_usize()].module_spec.borrow_mut(),
+            Struct(mid, sid) => self.module_data[mid.to_usize()]
+                .struct_data
+                .get(sid)
+                .unwrap()
+                .spec
+                .borrow_mut(),
+            Function(mid, fid) => self.module_data[mid.to_usize()]
+                .function_data
+                .get(fid)
+                .unwrap()
+                .spec
+                .borrow_mut(),
+            FunctionCode(..) | Schema(_, _, _) | Inline => {
+                // Schemas are expanded, inline spec blocks are part of the AST,
+                // and function code is nested inside of a function spec block
+                panic!("spec not available for schema or inline blocks")
+            },
+        }
     }
 
     /// Return the `StructEnv` for `str`
@@ -2003,7 +2096,7 @@ impl GlobalEnv {
             .unwrap_or_else(|_| {
                 panic!("Expect one and only one module for {:?}", mid);
             });
-        module_data.module_spec = spec;
+        *module_data.module_spec.borrow_mut() = spec;
     }
 
     /// Override the specification for a given function
@@ -2083,16 +2176,16 @@ impl GlobalEnv {
             let module_id = module_data.id;
             module_data
                 .function_data
-                .retain(|fun_id, _| !predicate(&module_id.qualified(*fun_id)));
+                .retain(|fun_id, _| predicate(&module_id.qualified(*fun_id)));
             module_data
                 .function_idx_to_id
-                .retain(|_, fun_id| !predicate(&module_id.qualified(*fun_id)));
+                .retain(|_, fun_id| predicate(&module_id.qualified(*fun_id)));
             module_data.function_data.values_mut().for_each(|fun_data| {
                 if let Some(called_funs) = fun_data.called_funs.as_mut() {
-                    called_funs.retain(|qfun_id| !predicate(qfun_id))
+                    called_funs.retain(|qfun_id| predicate(qfun_id))
                 }
                 if let Some(calling_funs) = &mut *fun_data.calling_funs.borrow_mut() {
-                    calling_funs.retain(|qfun_id| !predicate(qfun_id))
+                    calling_funs.retain(|qfun_id| predicate(qfun_id))
                 }
             });
         }
@@ -2107,11 +2200,19 @@ impl Default for GlobalEnv {
 
 impl GlobalEnv {
     pub fn dump_env(&self) -> String {
+        self.internal_dump_env(false)
+    }
+
+    pub fn dump_env_all(&self) -> String {
+        self.internal_dump_env(true)
+    }
+
+    pub fn internal_dump_env(&self, all: bool) -> String {
         let spool = self.symbol_pool();
         let tctx = &self.get_type_display_ctx();
         let writer = CodeWriter::new(self.internal_loc());
         for module in self.get_modules() {
-            if !module.is_target() {
+            if !all && !module.is_target() {
                 continue;
             }
             emitln!(writer, "module {} {{", module.get_full_name_str());
@@ -2157,6 +2258,10 @@ impl GlobalEnv {
                     },
                 )
             }
+            let module_spec = module.get_spec();
+            if !module_spec.is_empty() {
+                emitln!(writer, "{}", self.display(&*module_spec));
+            }
             for str in module.get_structs() {
                 emitln!(writer, "struct {} {{", str.get_name().display(spool));
                 writer.indent();
@@ -2171,8 +2276,8 @@ impl GlobalEnv {
                 writer.unindent();
                 emitln!(writer, "}");
                 let spec = str.get_spec();
-                if !spec.conditions.is_empty() {
-                    emitln!(writer, "{}", self.display(spec))
+                if !spec.is_empty() {
+                    emitln!(writer, "{}", self.display(&*spec))
                 }
             }
             for fun in module.get_functions() {
@@ -2269,7 +2374,7 @@ impl GlobalEnv {
             emitln!(writer, ";");
         }
         let spec = fun.get_spec();
-        if !spec.conditions.is_empty() {
+        if !spec.is_empty() {
             emitln!(writer, "{}", self.display(&*spec))
         }
     }
@@ -2357,7 +2462,7 @@ pub struct ModuleData {
     pub(crate) spec_funs: BTreeMap<SpecFunId, SpecFunDecl>,
 
     /// Module level specification.
-    pub(crate) module_spec: Spec,
+    pub(crate) module_spec: RefCell<Spec>,
 
     /// The location of this module.
     pub(crate) loc: Loc,
@@ -2519,9 +2624,9 @@ impl<'env> ModuleEnv<'env> {
                     add_usage_of_exp(usage, &cond.exp);
                 }
             };
-            add_usage_of_spec(&mut usage, self.get_spec());
+            add_usage_of_spec(&mut usage, &self.get_spec());
             for struct_env in self.get_structs() {
-                add_usage_of_spec(&mut usage, struct_env.get_spec())
+                add_usage_of_spec(&mut usage, &struct_env.get_spec())
             }
             for func_env in self.get_functions() {
                 add_usage_of_spec(&mut usage, &func_env.get_spec())
@@ -2926,8 +3031,8 @@ impl<'env> ModuleEnv<'env> {
     }
 
     /// Gets module specification.
-    pub fn get_spec(&self) -> &Spec {
-        &self.data.module_spec
+    pub fn get_spec(&self) -> Ref<Spec> {
+        self.data.module_spec.borrow()
     }
 
     /// Returns whether a spec fun is ever called or not.
@@ -3057,7 +3162,7 @@ pub struct StructData {
     pub(crate) field_data: BTreeMap<FieldId, FieldData>,
 
     /// Associated specification.
-    pub(crate) spec: Spec,
+    pub(crate) spec: RefCell<Spec>,
 }
 
 #[derive(Debug, Clone)]
@@ -3077,11 +3182,22 @@ impl<'env> StructEnv<'env> {
 
     /// Gets full name as string.
     pub fn get_full_name_str(&self) -> String {
-        format!(
-            "{}::{}",
-            self.module_env.get_name().display(self.module_env.env),
-            self.get_name().display(self.symbol_pool())
-        )
+        let module_name = self.module_env.get_name().display(self.module_env.env);
+        if self.is_ghost_memory() {
+            let spec_var = self.get_ghost_memory_spec_var().expect("spec var");
+            let spec_var_name = self.module_env.get_spec_var(spec_var.id);
+            format!(
+                "{}::{}",
+                module_name,
+                spec_var_name.name.display(self.symbol_pool())
+            )
+        } else {
+            format!(
+                "{}::{}",
+                module_name,
+                self.get_name().display(self.symbol_pool())
+            )
+        }
     }
 
     /// Gets full name with module address as string.
@@ -3140,8 +3256,8 @@ impl<'env> StructEnv<'env> {
     }
 
     /// Returns properties from pragmas.
-    pub fn get_properties(&self) -> &PropertyBag {
-        &self.data.spec.properties
+    pub fn get_properties(&self) -> PropertyBag {
+        self.data.spec.borrow().properties.clone()
     }
 
     /// Gets the id associated with this struct.
@@ -3260,12 +3376,12 @@ impl<'env> StructEnv<'env> {
 
     /// Returns true if this struct has specification conditions.
     pub fn has_conditions(&self) -> bool {
-        !self.data.spec.conditions.is_empty()
+        !self.data.spec.borrow().conditions.is_empty()
     }
 
     /// Returns the data invariants associated with this struct.
-    pub fn get_spec(&'env self) -> &'env Spec {
-        &self.data.spec
+    pub fn get_spec(&self) -> Ref<Spec> {
+        self.data.spec.borrow()
     }
 
     /// Returns the value of a boolean pragma for this struct. This first looks up a
@@ -4210,12 +4326,11 @@ impl<'env> FunctionEnv<'env> {
     }
 
     /// Get the transitive closure of the called functions. This requires that all functions
-    /// in the closure have `get_called_functions` available; if one of them not, None is returned.
-    pub fn get_transitive_closure_of_called_functions(
-        &self,
-    ) -> Option<BTreeSet<QualifiedId<FunId>>> {
+    /// in the closure have `get_called_functions` available; if one of them not, this
+    /// function panics.
+    pub fn get_transitive_closure_of_called_functions(&self) -> BTreeSet<QualifiedId<FunId>> {
         if let Some(trans_called) = &*self.data.transitive_closure_of_called_funs.borrow() {
-            return Some(trans_called.clone());
+            return trans_called.clone();
         }
 
         let mut set = BTreeSet::new();
@@ -4225,21 +4340,16 @@ impl<'env> FunctionEnv<'env> {
         // BFS in reachable_funcs to collect all reachable functions
         while !reachable_funcs.is_empty() {
             let fnc = reachable_funcs.pop_front().unwrap();
-            if let Some(callees) = fnc.get_called_functions() {
-                for callee in callees {
-                    let f = self.module_env.env.get_function(*callee);
-                    let qualified_id = f.get_qualified_id();
-                    if !set.contains(&qualified_id) {
-                        set.insert(qualified_id);
-                        reachable_funcs.push_back(f.clone());
-                    }
+            for callee in fnc.get_called_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                let qualified_id = f.get_qualified_id();
+                if set.insert(qualified_id) {
+                    reachable_funcs.push_back(f.clone());
                 }
-            } else {
-                return None;
             }
         }
         *self.data.transitive_closure_of_called_funs.borrow_mut() = Some(set.clone());
-        Some(set)
+        set
     }
 
     /// Returns the function name excluding the address and the module name

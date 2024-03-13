@@ -13,10 +13,6 @@ module 0x42::reference_conversion {
           }
         }
     }
-    spec fun $deref(r: u64): u64 {
-        r
-    }
-    spec fun $use_it(): u64;
 } // end 0x42::reference_conversion
 
 ============ initial bytecode ================

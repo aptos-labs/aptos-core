@@ -6,11 +6,14 @@
 
 // TODO: move all other `&mut GlobalEnv` processors into this module.
 
-use log::debug;
+use log::trace;
 use move_model::model::GlobalEnv;
 use std::io::Write;
 
 pub mod lambda_lifter;
+pub mod rewrite_target;
+pub mod spec_checker;
+pub mod spec_rewriter;
 
 /// Represents a pipeline of processors working on the global environment.
 #[derive(Default)]
@@ -32,10 +35,10 @@ impl<'a> EnvProcessorPipeline<'a> {
     /// Runs the pipeline. Running will be ended if any of the steps produces an error.
     /// The function returns true if all steps succeeded without errors.
     pub fn run(&self, env: &mut GlobalEnv) -> bool {
-        debug!("before env processor pipeline: {}", env.dump_env());
+        trace!("before env processor pipeline: {}", env.dump_env());
         for (name, proc) in &self.processors {
             proc(env);
-            debug!("after env processor {}", name);
+            trace!("after env processor {}", name);
             if env.has_errors() {
                 return false;
             }
@@ -47,13 +50,13 @@ impl<'a> EnvProcessorPipeline<'a> {
     /// only.
     pub fn run_and_record(&self, env: &mut GlobalEnv, w: &mut impl Write) -> anyhow::Result<bool> {
         let msg = format!("before env processor pipeline:\n{}\n", env.dump_env());
-        debug!("{}", msg);
+        trace!("{}", msg);
         writeln!(w, "// -- Model dump {}", msg)?;
         for (name, proc) in &self.processors {
             proc(env);
             if !env.has_errors() {
                 let msg = format!("after env processor {}:\n{}\n", name, env.dump_env());
-                debug!("{}", msg);
+                trace!("{}", msg);
                 writeln!(w, "// -- Model dump {}", msg)?;
             } else {
                 return Ok(false);

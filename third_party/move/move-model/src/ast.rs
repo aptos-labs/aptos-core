@@ -57,7 +57,7 @@ pub struct SpecFunDecl {
     pub is_move_fun: bool,
     pub is_native: bool,
     pub body: Option<Exp>,
-    pub callees: BTreeSet<QualifiedId<SpecFunId>>,
+    pub callees: BTreeSet<QualifiedInstId<SpecFunId>>,
     pub is_recursive: RefCell<Option<bool>>,
 }
 
@@ -307,6 +307,13 @@ impl Spec {
         !self.conditions.is_empty()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.conditions.is_empty()
+            && self.on_impl.is_empty()
+            && self.properties.is_empty()
+            && self.update_map.is_empty()
+    }
+
     pub fn filter<P>(&self, pred: P) -> impl Iterator<Item = &Condition>
     where
         P: FnMut(&&Condition) -> bool,
@@ -332,6 +339,19 @@ impl Spec {
     pub fn any_kind(&self, kind: ConditionKind) -> bool {
         self.any(move |c| c.kind == kind)
     }
+
+    pub fn called_funs_with_callsites(&self) -> BTreeMap<QualifiedId<FunId>, BTreeSet<NodeId>> {
+        let mut result = BTreeMap::new();
+        for cond in self.conditions.iter().chain(self.update_map.values()) {
+            for exp in cond.all_exps() {
+                result.append(&mut exp.called_funs_with_callsites())
+            }
+        }
+        for on_impl in self.on_impl.values() {
+            result.append(&mut on_impl.called_funs_with_callsites())
+        }
+        result
+    }
 }
 
 /// Information about a specification block in the source. This is used for documentation
@@ -351,11 +371,18 @@ pub struct SpecBlockInfo {
 /// Describes the target of a spec block.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SpecBlockTarget {
-    Module,
+    /// The block is associated with the current module.
+    Module(ModuleId),
+    /// The block is associated with the structure.
     Struct(ModuleId, StructId),
+    /// The block is associated with the function.
     Function(ModuleId, FunId),
+    /// The block is associated with bytecode of the given function at given code offset.
     FunctionCode(ModuleId, FunId, usize),
+    /// The block is associated with a specification schema.
     Schema(ModuleId, SchemaId, Vec<TypeParameter>),
+    /// The block is inline in an expression.
+    Inline,
 }
 
 /// Describes a global invariant.
@@ -809,6 +836,26 @@ impl ExpData {
         result
     }
 
+    /// Returns the directly used memory of this expression, without label.
+    pub fn directly_used_memory(&self, env: &GlobalEnv) -> BTreeSet<QualifiedInstId<StructId>> {
+        let mut result = BTreeSet::new();
+        let mut visitor = |e: &ExpData| {
+            use ExpData::*;
+            use Operation::*;
+            match e {
+                Call(id, Exists(_), _) | Call(id, Global(_), _) => {
+                    let inst = &env.get_node_instantiation(*id);
+                    let (mid, sid, sinst) = inst[0].require_struct();
+                    result.insert(mid.qualified_inst(sid, sinst.to_owned()));
+                },
+                _ => {},
+            }
+            true // keep going
+        };
+        self.visit_post_order(&mut visitor);
+        result
+    }
+
     /// Returns the temporaries used in this expression. Result is ordered by occurrence.
     pub fn used_temporaries(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
         let mut temps = vec![];
@@ -832,6 +879,24 @@ impl ExpData {
                 ExpData::Call(_, Operation::MoveFunction(mid, fid), _)
                 | ExpData::Call(_, Operation::Closure(mid, fid), _) => {
                     called.insert(mid.qualified(*fid));
+                },
+                _ => {},
+            }
+            true // keep going
+        };
+        self.visit_post_order(&mut visitor);
+        called
+    }
+
+    /// Returns the specification functions called by this expression
+    pub fn called_spec_funs(&self, env: &GlobalEnv) -> BTreeSet<QualifiedInstId<SpecFunId>> {
+        let mut called = BTreeSet::new();
+        let mut visitor = |e: &ExpData| {
+            #[allow(clippy::single_match)] // may need to extend match in the future
+            match e {
+                ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
+                    let inst = env.get_node_instantiation(*id);
+                    called.insert(mid.qualified_inst(*fid, inst));
                 },
                 _ => {},
             }
@@ -940,6 +1005,20 @@ impl ExpData {
                 visitor(e)
             } else {
                 true // keep going
+            }
+        });
+    }
+
+    /// Visits all inline specification blocks in the expression.
+    pub fn visit_inline_specs<F>(&self, visitor: &mut F)
+    where
+        F: FnMut(&Spec) -> bool,
+    {
+        self.visit_pre_order(&mut |e| {
+            if let ExpData::SpecBlock(_, spec) = e {
+                visitor(spec)
+            } else {
+                true
             }
         });
     }
@@ -2990,6 +3069,9 @@ impl<'a> fmt::Display for EnvDisplay<'a, Spec> {
             writeln!(f, "  {}", self.env.display(cond))?
         }
         writeln!(f, "}}")?;
+        for (code_offset, spec) in &self.val.on_impl {
+            writeln!(f, "{} -> {}", code_offset, self.env.display(spec))?
+        }
         Ok(())
     }
 }
