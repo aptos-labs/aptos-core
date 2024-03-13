@@ -277,7 +277,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(600); // args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -1919,12 +1919,67 @@ fn realistic_env_max_load_test(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.chain_health_backoff = vec![];
+        }))
         .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
+                    mempool_backlog: 1000,
                 })
-                .init_gas_price_multiplier(20),
+                .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
+                .transaction_mix_per_phase(
+                    vec![
+                        // TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+                        // TransactionTypeArg::PublishPackage.materialize_default(),
+                        TransactionType::CallCustomModules {
+                            entry_point: EntryPoints::PopulateOrReadVectorOfStringSnapshots {
+                                num_elements: 20000,
+                                string_length: 2,
+                            },
+                            num_modules: 1,
+                            use_account_pool: false,
+                        },
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::PopulateOrReadVectorOfStringSnapshots {
+                        //         num_elements: 30,
+                        //         string_length: 2,
+                        //     },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
+                        TransactionType::CallCustomModules {
+                            entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots {
+                                num_elements: 50000,
+                            },
+                            num_modules: 1,
+                            use_account_pool: false,
+                        },
+                        TransactionTypeArg::AccountGeneration.materialize_default(),
+
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots {
+                        //         num_elements: 30,
+                        //     },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::VectorPictureRead { num_pictures: 3000, length: 64 },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::VectorPictureRead { num_pictures: 100, length: 50000 },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
+                    ].into_iter()
+                     .map(|workload| vec![(workload, 1)])
+                     .collect::<Vec<_>>()
+                )
+                .init_gas_price_multiplier(2),
             inner_success_criteria: SuccessCriteria::new(
                 if ha_proxy {
                     4600

@@ -182,7 +182,15 @@ pub enum EntryPoints {
     ModifyGlobalBoundedAggV2 {
         step: u64,
     },
-
+    /// Populate or read resource which is vector of snapshots
+    PopulateOrReadVectorOfStringSnapshots {
+        num_elements: u64,
+        string_length: usize,
+    },
+    /// Populate or read resource which is vector of snapshots
+    PopulateOrReadVectorOfIntegerSnapshots {
+        num_elements: u64,
+    },
     /// Modifying a single random tag in a resource group (which contains 8 tags),
     /// from a global resource (at module publishers' address)
     ResourceGroupsGlobalWriteTag {
@@ -228,13 +236,16 @@ pub enum EntryPoints {
     /// Burn an NFT token, only works with numbered=false tokens.
     TokenV2AmbassadorBurn,
 
-    InitializeVectorPicture {
+    // Adds one more vector picture
+    CreateVectorPicture {
         length: u64,
     },
     VectorPicture {
+        num_pictures: u64,
         length: u64,
     },
     VectorPictureRead {
+        num_pictures: u64,
         length: u64,
     },
     InitializeSmartTablePicture,
@@ -270,6 +281,8 @@ impl EntryPoints {
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
+            | EntryPoints::PopulateOrReadVectorOfStringSnapshots { .. }
+            | EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { .. }
             | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
             | EntryPoints::TokenV1InitializeCollection
@@ -286,7 +299,7 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
-            EntryPoints::InitializeVectorPicture { .. }
+            EntryPoints::CreateVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
@@ -318,7 +331,9 @@ impl EntryPoints {
             | EntryPoints::MakeOrChangeTableRandom { .. } => "simple",
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
-            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => "aggregator_example",
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
+            | EntryPoints::PopulateOrReadVectorOfStringSnapshots { .. }
+            | EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { .. } => "aggregator_example",
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
             },
@@ -336,7 +351,7 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador"
             },
-            EntryPoints::InitializeVectorPicture { .. }
+            EntryPoints::CreateVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. } => "vector_picture",
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
@@ -451,6 +466,29 @@ impl EntryPoints {
             EntryPoints::IncGlobalAggV2 => inc_global_agg_v2(module_id),
             EntryPoints::ModifyGlobalBoundedAggV2 { step } => {
                 modify_bounded_agg_v2(module_id, rng.expect("Must provide RNG"), *step)
+            },
+            EntryPoints::PopulateOrReadVectorOfStringSnapshots {
+                num_elements,
+                string_length,
+            } => {
+                let rng = rng.expect("Must provide RNG");
+                let value: String = rand_string(rng, *string_length);
+                get_payload(
+                    module_id,
+                    ident_str!("populate_or_read_string").to_owned(),
+                    vec![
+                        bcs::to_bytes(&num_elements).unwrap(),
+                        bcs::to_bytes(&value).unwrap(),
+                    ],
+                )
+            },
+            EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { num_elements } => {
+                let rng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("populate_or_read_u64_snapshot").to_owned(),
+                    vec![bcs::to_bytes(&num_elements).unwrap()],
+                )
             },
             EntryPoints::CreateObjects {
                 num_objects,
@@ -576,27 +614,27 @@ impl EntryPoints {
                 ident_str!("burn_named_by_user").to_owned(),
                 vec![],
             ),
-            EntryPoints::InitializeVectorPicture { length } => {
+            EntryPoints::CreateVectorPicture { length } => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![
-                    bcs::to_bytes(&length).unwrap(), // length
+                    bcs::to_bytes(length).unwrap(), // length
                 ])
             },
-            EntryPoints::VectorPicture { length } => {
+            EntryPoints::VectorPicture { num_pictures, length } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(module_id, ident_str!("update").to_owned(), vec![
                     bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
-                    bcs::to_bytes(&0u64).unwrap(), // palette_index
+                    bcs::to_bytes(&rng.gen_range(0u64, num_pictures)).unwrap(), // palette_index
                     bcs::to_bytes(&rng.gen_range(0u64, length)).unwrap(), // index
                     bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color R
                     bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color G
                     bcs::to_bytes(&rng.gen_range(0u8, 255u8)).unwrap(), // color B
                 ])
             },
-            EntryPoints::VectorPictureRead { length } => {
+            EntryPoints::VectorPictureRead { num_pictures, length } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(module_id, ident_str!("check").to_owned(), vec![
                     bcs::to_bytes(&other.expect("Must provide other")).unwrap(),
-                    bcs::to_bytes(&0u64).unwrap(), // palette_index
+                    bcs::to_bytes(&rng.gen_range(0u64, num_pictures)).unwrap(), // palette_index
                     bcs::to_bytes(&rng.gen_range(0u64, length)).unwrap(), // index
                 ])
             },
@@ -626,7 +664,7 @@ impl EntryPoints {
         }
     }
 
-    pub fn initialize_entry_point(&self) -> Option<EntryPoints> {
+    pub fn initialize_entry_point(&self) -> Vec<EntryPoints> {
         match self {
             EntryPoints::TokenV1MintAndStoreNFTParallel
             | EntryPoints::TokenV1MintAndStoreNFTSequential
@@ -634,13 +672,16 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferNFTSequential
             | EntryPoints::TokenV1MintAndStoreFT
             | EntryPoints::TokenV1MintAndTransferFT => {
-                Some(EntryPoints::TokenV1InitializeCollection)
+                vec![EntryPoints::TokenV1InitializeCollection]
             },
-            EntryPoints::VectorPicture { length } | EntryPoints::VectorPictureRead { length } => {
-                Some(EntryPoints::InitializeVectorPicture { length: *length })
+            EntryPoints::VectorPicture { num_pictures, length }
+            | EntryPoints::VectorPictureRead { num_pictures, length } => {
+                (0..*num_pictures)
+                    .map(|i| EntryPoints::CreateVectorPicture { length: *length })
+                    .collect::<Vec<_>>()
             },
-            EntryPoints::SmartTablePicture { .. } => Some(EntryPoints::InitializeSmartTablePicture),
-            _ => None,
+            EntryPoints::SmartTablePicture { .. } => vec![EntryPoints::InitializeSmartTablePicture],
+            _ => vec![],
         }
     }
 
@@ -682,6 +723,8 @@ impl EntryPoints {
             EntryPoints::IncGlobal
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => AutomaticArgs::None,
+            EntryPoints::PopulateOrReadVectorOfStringSnapshots { .. }
+            | EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { .. } => AutomaticArgs::Signer,
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 AutomaticArgs::Signer
             },
@@ -701,7 +744,7 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 AutomaticArgs::SignerAndMultiSig
             },
-            EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
+            EntryPoints::CreateVectorPicture { .. } => AutomaticArgs::Signer,
             EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
                 AutomaticArgs::None
             },

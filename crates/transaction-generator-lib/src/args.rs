@@ -35,6 +35,8 @@ pub enum TransactionTypeArg {
     ModifyGlobalResourceAggV2,
     ModifyGlobalFlagAggV2,
     ModifyGlobalBoundedAggV2,
+    PopulateOrReadVectorOfStringSnapshots,
+    PopulateOrReadVectorOfIntegerSnapshots,
     // Complex EntryPoints
     CreateObjects10,
     CreateObjects10WithPayload10k,
@@ -149,6 +151,25 @@ impl TransactionTypeArg {
                 entry_point: EntryPoints::ModifyGlobalBoundedAggV2 { step: 10 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::PopulateOrReadVectorOfStringSnapshots => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::PopulateOrReadVectorOfStringSnapshots {
+                        num_elements: 1000,
+                        string_length: 2,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
+            },
+            TransactionTypeArg::PopulateOrReadVectorOfIntegerSnapshots => {
+                TransactionType::CallCustomModules {
+                    entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots {
+                        num_elements: 1000,
+                    },
+                    num_modules: module_working_set_size,
+                    use_account_pool: sender_use_account_pool,
+                }
             },
             TransactionTypeArg::NoOp => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::Nop,
@@ -339,32 +360,32 @@ impl TransactionTypeArg {
                 progress_type: workflow_progress_type,
             },
             TransactionTypeArg::VectorPictureCreate30k => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
+                entry_point: EntryPoints::CreateVectorPicture { length: 30 * 1024 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::VectorPicture30k => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::VectorPicture { length: 30 * 1024 },
+                entry_point: EntryPoints::VectorPicture { num_pictures: 1, length: 30 * 1024 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::VectorPictureRead30k => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::VectorPictureRead { length: 30 * 1024 },
+                entry_point: EntryPoints::VectorPictureRead { num_pictures: 1, length: 30 * 1024 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::VectorPictureCreate40 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::InitializeVectorPicture { length: 40 },
+                entry_point: EntryPoints::CreateVectorPicture { length: 40 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::VectorPicture40 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::VectorPicture { length: 40 },
+                entry_point: EntryPoints::VectorPicture { num_pictures: 1, length: 40 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::VectorPictureRead40 => TransactionType::CallCustomModules {
-                entry_point: EntryPoints::VectorPictureRead { length: 40 },
+                entry_point: EntryPoints::VectorPictureRead { num_pictures: 1, length: 40 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

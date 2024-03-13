@@ -244,6 +244,13 @@ impl DelayedFieldValue {
             },
         })
     }
+
+    pub fn get_memory_size(&self) -> usize {
+        match &self {
+            DelayedFieldValue::Aggregator(_) | DelayedFieldValue::Snapshot(_) => 1 + 16,
+            DelayedFieldValue::Derived(v) => 1 + 8 + 8 + v.len(),
+        }
+    }
 }
 
 impl TryFromMoveValue for DelayedFieldValue {

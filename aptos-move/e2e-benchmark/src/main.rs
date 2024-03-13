@@ -113,14 +113,14 @@ fn main() {
             num_objects: 100,
             object_payload_size: 10 * 1024,
         }),
-        (61, EntryPoints::InitializeVectorPicture { length: 40 }),
-        (14, EntryPoints::VectorPicture { length: 40 }),
-        (14, EntryPoints::VectorPictureRead { length: 40 }),
-        (27303, EntryPoints::InitializeVectorPicture {
+        (61, EntryPoints::CreateVectorPicture { length: 40 }),
+        (14, EntryPoints::VectorPicture { num_pictures: 1, length: 40 }),
+        (14, EntryPoints::VectorPictureRead { num_pictures: 1,length: 40 }),
+        (27303, EntryPoints::CreateVectorPicture {
             length: 30 * 1024,
         }),
-        (4507, EntryPoints::VectorPicture { length: 30 * 1024 }),
-        (4469, EntryPoints::VectorPictureRead { length: 30 * 1024 }),
+        (4507, EntryPoints::VectorPicture { num_pictures: 1,length: 30 * 1024 }),
+        (4469, EntryPoints::VectorPictureRead { num_pictures: 1,length: 30 * 1024 }),
         (33129, EntryPoints::SmartTablePicture {
             length: 30 * 1024,
             num_points_per_txn: 200,
@@ -160,7 +160,8 @@ fn main() {
             0,
             package.publish_transaction_payload(),
         );
-        if let Some(init_entry_point) = entry_point.initialize_entry_point() {
+
+        for init_entry_point in entry_point.initialize_entry_point() {
             execute_txn(
                 &mut executor,
                 &publisher,
