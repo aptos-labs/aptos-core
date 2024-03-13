@@ -31,6 +31,7 @@ module aptos_framework::aptos_governance {
     use aptos_framework::system_addresses;
     use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::consensus_config;
+    use aptos_framework::randomness_config;
     use aptos_framework::reconfiguration_with_dkg;
     use aptos_framework::timestamp;
     use aptos_framework::voting;
@@ -548,7 +549,7 @@ module aptos_framework::aptos_governance {
     /// since such updates are applied whenever we enter an new epoch.
     public fun reconfigure(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        if (consensus_config::validator_txn_enabled() && features::reconfigure_with_dkg_enabled()) {
+        if (consensus_config::validator_txn_enabled() && randomness_config::enabled()) {
             reconfiguration_with_dkg::try_start();
         } else {
             reconfiguration_with_dkg::finish(aptos_framework);

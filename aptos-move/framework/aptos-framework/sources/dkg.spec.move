@@ -14,6 +14,7 @@ spec aptos_framework::dkg {
 
     spec start(
         dealer_epoch: u64,
+        randomness_config: RandomnessConfig,
         dealer_validator_set: vector<ValidatorConsensusInfo>,
         target_validator_set: vector<ValidatorConsensusInfo>,
     ) {

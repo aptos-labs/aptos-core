@@ -21,6 +21,8 @@ module aptos_framework::config_buffer {
     friend aptos_framework::execution_config;
     friend aptos_framework::gas_schedule;
     friend aptos_framework::jwks;
+    friend aptos_framework::jwk_consensus_config;
+    friend aptos_framework::randomness_config;
     friend aptos_framework::version;
 
     /// Config buffer operations failed with permission denied.
@@ -31,9 +33,11 @@ module aptos_framework::config_buffer {
     }
 
     public fun initialize(aptos_framework: &signer) {
-        move_to(aptos_framework, PendingConfigs {
-            configs: simple_map::new(),
-        })
+        if (!exists<PendingConfigs>(@aptos_framework)) {
+            move_to(aptos_framework, PendingConfigs {
+                configs: simple_map::new(),
+            })
+        }
     }
 
     /// Check whether there is a pending config payload for `T`.

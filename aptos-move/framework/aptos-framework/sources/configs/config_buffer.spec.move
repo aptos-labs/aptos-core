@@ -3,11 +3,6 @@ spec aptos_framework::config_buffer {
         pragma verify = true;
     }
 
-    spec initialize(aptos_framework: &signer) {
-        use std::signer;
-        aborts_if exists<PendingConfigs>(signer::address_of(aptos_framework));
-    }
-
     spec does_exist<T: store>(): bool {
         aborts_if false;
         let type_name = type_info::type_name<T>();

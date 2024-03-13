@@ -22,8 +22,8 @@ use aptos_types::{
     dkg::{DKGStartEvent, DKGState, DKGTrait, DefaultDKG},
     epoch_state::EpochState,
     on_chain_config::{
-        FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        ValidatorSet,
+        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, ValidatorSet,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -157,16 +157,20 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get(&self.my_addr)
             .copied();
 
-        let features = payload.get::<Features>().unwrap_or_default();
+        let onchain_randomness_config = payload
+            .get::<RandomnessConfigMoveStruct>()
+            .and_then(OnChainRandomnessConfig::try_from)
+            .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
+
         let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
         if let Err(error) = &onchain_consensus_config {
             error!("Failed to read on-chain consensus config {}", error);
         }
         let consensus_config = onchain_consensus_config.unwrap_or_default();
 
-        // Check both validator txn and DKG features are enabled
-        let randomness_enabled = consensus_config.is_vtxn_enabled()
-            && features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
+        // Check both validator txn and randomness features are enabled
+        let randomness_enabled =
+            consensus_config.is_vtxn_enabled() && onchain_randomness_config.randomness_enabled();
         if let (true, Some(my_index)) = (randomness_enabled, my_index) {
             let DKGState {
                 in_progress: in_progress_session,

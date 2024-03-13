@@ -446,9 +446,7 @@ Lifetime: transient
 
 <a id="0x1_features_JWK_CONSENSUS"></a>
 
-The JWK consensus feature.
-
-Lifetime: permanent
+Deprecated by <code>aptos_framework::jwk_consensus_config::JWKConsensusConfig</code>.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_JWK_CONSENSUS">JWK_CONSENSUS</a>: u64 = 49;
@@ -602,9 +600,7 @@ Lifetime: transient
 
 <a id="0x1_features_RECONFIGURE_WITH_DKG"></a>
 
-The on-chain randomness feature.
-
-Lifetime: transient
+Deprecated by <code>aptos_framework::randomness_config::RandomnessConfig</code>.
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_RECONFIGURE_WITH_DKG">RECONFIGURE_WITH_DKG</a>: u64 = 45;

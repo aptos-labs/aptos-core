@@ -47,9 +47,10 @@ use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        AnchorElectionMode, DagConsensusConfigV1, FeatureFlag, Features,
+        AnchorElectionMode, DagConsensusConfigV1,
         LeaderReputationType::{ProposerAndVoter, ProposerAndVoterV2},
-        ProposerAndVoterConfig, ValidatorTxnConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, ProposerAndVoterConfig,
+        ValidatorTxnConfig,
     },
     validator_signer::ValidatorSigner,
 };
@@ -334,8 +335,9 @@ pub struct DagBootstrapper {
     execution_client: Arc<dyn TExecutionClient>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
+    randomness_config: OnChainRandomnessConfig,
+    jwk_consensus_config: OnChainJWKConsensusConfig,
     executor: BoundedExecutor,
-    features: Features,
     allow_batches_without_pos_in_proposal: bool,
 }
 
@@ -358,8 +360,9 @@ impl DagBootstrapper {
         execution_client: Arc<dyn TExecutionClient>,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
+        randomness_config: OnChainRandomnessConfig,
+        jwk_consensus_config: OnChainJWKConsensusConfig,
         executor: BoundedExecutor,
-        features: Features,
         allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         Self {
@@ -379,8 +382,9 @@ impl DagBootstrapper {
             execution_client,
             quorum_store_enabled,
             vtxn_config,
+            randomness_config,
+            jwk_consensus_config,
             executor,
-            features,
             allow_batches_without_pos_in_proposal,
         }
     }
@@ -647,7 +651,8 @@ impl DagBootstrapper {
             fetch_requester,
             self.config.node_payload_config.clone(),
             self.vtxn_config.clone(),
-            self.features.clone(),
+            self.randomness_config.clone(),
+            self.jwk_consensus_config.clone(),
             health_backoff,
         );
         let fetch_handler = FetchRequestHandler::new(dag_store.clone(), self.epoch_state.clone());
@@ -734,8 +739,6 @@ pub(super) fn bootstrap_dag_for_test(
     UnboundedReceiver<OrderedBlocks>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
-    let mut features = Features::default();
-    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let bootstraper = DagBootstrapper::new(
         self_peer,
         DagConsensusConfig::default(),
@@ -753,8 +756,9 @@ pub(super) fn bootstrap_dag_for_test(
         execution_client,
         false,
         ValidatorTxnConfig::default_enabled(),
+        OnChainRandomnessConfig::default_enabled(),
+        OnChainJWKConsensusConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
-        features,
         true,
     );
 

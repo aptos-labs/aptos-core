@@ -1,7 +1,13 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg::{real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait},
+    dkg::{
+        real_dkg::rounding::{
+            DKGRounding, DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
+        },
+        DKGSessionMetadata, DKGTrait,
+    },
+    on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
 use anyhow::{anyhow, ensure};
@@ -13,9 +19,9 @@ use aptos_dkg::{
         Player,
     },
 };
+use fixed::types::U64F64;
 use num_traits::Zero;
 use rand::{CryptoRng, RngCore};
-use rounding::{RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -50,12 +56,13 @@ impl DKGPvssConfig {
 
 pub fn build_dkg_pvss_config(
     cur_epoch: u64,
+    secrecy_threshold: U64F64,
+    reconstruct_threshold: U64F64,
     next_validators: &[ValidatorConsensusInfo],
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
-
     let dkg_rounding =
-        DKGRounding::new(&validator_stakes, SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD);
+        DKGRounding::new(&validator_stakes, secrecy_threshold, reconstruct_threshold);
 
     println!(
         "[Randomness] rounding: epoch {} starts, profile = {:?}",
@@ -100,8 +107,20 @@ impl DKGTrait for RealDKG {
     type Transcript = WTrx;
 
     fn new_public_params(dkg_session_metadata: &DKGSessionMetadata) -> RealDKGPublicParams {
+        let randomness_config = dkg_session_metadata
+            .randomness_config_derived()
+            .unwrap_or_else(OnChainRandomnessConfig::default_enabled);
+        let secrecy_threshold = randomness_config
+            .secrecy_threshold()
+            .unwrap_or_else(|| *DEFAULT_SECRECY_THRESHOLD);
+        let reconstruct_threshold = randomness_config
+            .reconstruct_threshold()
+            .unwrap_or_else(|| *DEFAULT_RECONSTRUCT_THRESHOLD);
+
         let pvss_config = build_dkg_pvss_config(
             dkg_session_metadata.dealer_epoch,
+            secrecy_threshold,
+            reconstruct_threshold,
             &dkg_session_metadata.target_validator_consensus_infos_cloned(),
         );
         let verifier = ValidatorVerifier::new(dkg_session_metadata.dealer_consensus_infos_cloned());
