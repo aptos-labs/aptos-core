@@ -973,7 +973,7 @@ module aptos_framework::aptos_governance {
         assert!(get_remaining_voting_power(voter_2_addr, 0) == 10, 2);
 
         initialize_partial_voting(&aptos_framework);
-        features::change_feature_flags(&aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
+        features::change_feature_flags_for_testing(&aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
 
         coin::register<AptosCoin>(&voter_1);
         coin::register<AptosCoin>(&voter_2);
@@ -1132,7 +1132,7 @@ module aptos_framework::aptos_governance {
         voter_2: &signer,
     ) acquires GovernanceResponsbility {
         initialize_partial_voting(aptos_framework);
-        features::change_feature_flags(aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
+        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_partial_governance_voting()], vector[]);
         setup_voting(aptos_framework, proposer, voter_1, voter_2);
     }
 

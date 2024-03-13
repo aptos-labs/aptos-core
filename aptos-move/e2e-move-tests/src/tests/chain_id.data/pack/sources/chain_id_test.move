@@ -18,7 +18,7 @@ module 0x1::chain_id_test {
             }
         );
 
-        features::change_feature_flags(sender, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
+        features::change_feature_flags_for_testing(sender, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
     }
 
     /// Fetches the chain ID (via aptos_framework::chain_id::get()) and stores it in the ChainIdStore resource.
