@@ -52,6 +52,4 @@ module 0x8675309::M {
     private fun t1() {
         Tuple()
     }
-    spec fun $t0();
-    spec fun $t1();
 } // end 0x8675309::M

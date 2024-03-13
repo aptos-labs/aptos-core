@@ -8,41 +8,35 @@ module 0x8675::M {
     }
     private fun test1(r: u64): u64 {
         {
-          let x: u64 = 3;
+          let tref: &mut u64 = Borrow(Mutable)(if Lt<u64>(r, 4) {
+            r
+          } else {
+            3
+          });
+          tref = 10;
           {
-            let tref: &mut u64 = Borrow(Mutable)(if Lt<u64>(r, 4) {
-              r
-            } else {
-              x
-            });
-            tref = 10;
+            let y: u64 = r;
             {
-              let y: u64 = r;
+              let tref2: &mut u64 = Borrow(Mutable)(y);
+              tref2 = Add<u64>(Deref(tref2), 1);
               {
-                let tref2: &mut u64 = Borrow(Mutable)(y);
-                tref2 = Add<u64>(Deref(tref2), 1);
+                let z: u64 = y;
                 {
-                  let z: u64 = y;
+                  let tref3: &mut u64 = Borrow(Mutable)(Add<u64>(z, 0));
+                  tref3 = Add<u64>(Deref(tref3), 2);
                   {
-                    let tref3: &mut u64 = Borrow(Mutable)(Add<u64>(z, 0));
-                    tref3 = Add<u64>(Deref(tref3), 2);
+                    let a: u64 = z;
                     {
-                      let a: u64 = z;
+                      let tref4: &mut u64 = Borrow(Mutable)(a);
+                      tref4 = Add<u64>(Deref(tref4), 4);
                       {
-                        let tref4: &mut u64 = Borrow(Mutable)({
-                          let _q: u64 = 1;
-                          a
-                        });
-                        tref4 = Add<u64>(Deref(tref4), 4);
+                        let tref5: &mut u64 = Borrow(Mutable)(a);
+                        tref5 = Add<u64>(Deref(tref5), 8);
                         {
-                          let tref5: &mut u64 = Borrow(Mutable)(a);
-                          tref5 = Add<u64>(Deref(tref5), 8);
-                          {
-                            let tref6: &mut u64 = Borrow(Mutable)(3;
-                            a);
-                            tref6 = Add<u64>(Deref(tref6), 16);
-                            a
-                          }
+                          let tref6: &mut u64 = Borrow(Mutable)(3;
+                          a);
+                          tref6 = Add<u64>(Deref(tref6), 16);
+                          a
                         }
                       }
                     }
@@ -76,10 +70,7 @@ module 0x8675::M {
                     {
                       let a: M::S = z;
                       {
-                        let tref4: &mut u64 = Borrow(Mutable)({
-                          let _q: u64 = 1;
-                          select M::S.f(a)
-                        });
+                        let tref4: &mut u64 = Borrow(Mutable)(select M::S.f(a));
                         tref4 = Add<u64>(Deref(tref4), 1);
                         {
                           let tref5: &mut u64 = Borrow(Mutable)(select M::S.f(a));
@@ -103,10 +94,6 @@ module 0x8675::M {
     public fun testb(): u64 {
         Add<u64>(M::test1b(pack M::S(7)), M::test1b(pack M::S(2)))
     }
-    spec fun $test(): u64;
-    spec fun $test1(r: u64): u64;
-    spec fun $test1b(r: M::S): u64;
-    spec fun $testb(): u64;
 } // end 0x8675::M
 
 ============ initial bytecode ================
@@ -130,108 +117,100 @@ public fun M::test(): u64 {
 [variant baseline]
 fun M::test1($t0: u64): u64 {
      var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: &mut u64
-     var $t5: &mut u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: u64
+     var $t5: bool
      var $t6: u64
-     var $t7: bool
+     var $t7: u64
      var $t8: u64
-     var $t9: u64
-     var $t10: u64
-     var $t11: &mut u64
-     var $t12: &mut u64
+     var $t9: &mut u64
+     var $t10: &mut u64
+     var $t11: u64
+     var $t12: u64
      var $t13: u64
      var $t14: u64
-     var $t15: u64
-     var $t16: u64
-     var $t17: &mut u64
-     var $t18: &mut u64
+     var $t15: &mut u64
+     var $t16: &mut u64
+     var $t17: u64
+     var $t18: u64
      var $t19: u64
      var $t20: u64
      var $t21: u64
      var $t22: u64
-     var $t23: u64
-     var $t24: u64
-     var $t25: &mut u64
-     var $t26: &mut u64
+     var $t23: &mut u64
+     var $t24: &mut u64
+     var $t25: u64
+     var $t26: u64
      var $t27: u64
      var $t28: u64
-     var $t29: u64
-     var $t30: u64
+     var $t29: &mut u64
+     var $t30: &mut u64
      var $t31: u64
      var $t32: u64
-     var $t33: &mut u64
-     var $t34: &mut u64
-     var $t35: u64
-     var $t36: u64
+     var $t33: u64
+     var $t34: u64
+     var $t35: &mut u64
+     var $t36: &mut u64
      var $t37: u64
      var $t38: u64
-     var $t39: &mut u64
-     var $t40: &mut u64
+     var $t39: u64
+     var $t40: u64
      var $t41: u64
-     var $t42: u64
-     var $t43: u64
-     var $t44: u64
-     var $t45: u64
-  0: $t3 := 3
-  1: $t2 := infer($t3)
-  2: $t8 := 4
-  3: $t7 := <($t0, $t8)
-  4: if ($t7) goto 5 else goto 8
-  5: label L0
-  6: $t6 := infer($t0)
-  7: goto 10
-  8: label L1
-  9: $t6 := infer($t2)
- 10: label L2
- 11: $t5 := borrow_local($t6)
- 12: $t4 := infer($t5)
- 13: $t9 := 10
- 14: write_ref($t4, $t9)
- 15: $t10 := infer($t0)
- 16: $t12 := borrow_local($t10)
- 17: $t11 := infer($t12)
- 18: $t14 := read_ref($t11)
- 19: $t15 := 1
- 20: $t13 := +($t14, $t15)
- 21: write_ref($t11, $t13)
- 22: $t16 := infer($t10)
- 23: $t20 := 0
- 24: $t19 := +($t16, $t20)
- 25: $t18 := borrow_local($t19)
- 26: $t17 := infer($t18)
- 27: $t22 := read_ref($t17)
- 28: $t23 := 2
- 29: $t21 := +($t22, $t23)
- 30: write_ref($t17, $t21)
- 31: $t24 := infer($t16)
- 32: $t29 := 1
- 33: $t28 := infer($t29)
- 34: $t27 := infer($t24)
- 35: $t26 := borrow_local($t27)
- 36: $t25 := infer($t26)
- 37: $t31 := read_ref($t25)
- 38: $t32 := 4
- 39: $t30 := +($t31, $t32)
- 40: write_ref($t25, $t30)
- 41: $t35 := infer($t24)
- 42: $t34 := borrow_local($t35)
- 43: $t33 := infer($t34)
- 44: $t37 := read_ref($t33)
- 45: $t38 := 8
- 46: $t36 := +($t37, $t38)
- 47: write_ref($t33, $t36)
- 48: $t42 := 3
- 49: $t41 := infer($t24)
- 50: $t40 := borrow_local($t41)
- 51: $t39 := infer($t40)
- 52: $t44 := read_ref($t39)
- 53: $t45 := 16
- 54: $t43 := +($t44, $t45)
- 55: write_ref($t39, $t43)
- 56: $t1 := infer($t24)
- 57: return $t1
+  0: $t6 := 4
+  1: $t5 := <($t0, $t6)
+  2: if ($t5) goto 3 else goto 6
+  3: label L0
+  4: $t4 := infer($t0)
+  5: goto 8
+  6: label L1
+  7: $t4 := 3
+  8: label L2
+  9: $t3 := borrow_local($t4)
+ 10: $t2 := infer($t3)
+ 11: $t7 := 10
+ 12: write_ref($t2, $t7)
+ 13: $t8 := infer($t0)
+ 14: $t10 := borrow_local($t8)
+ 15: $t9 := infer($t10)
+ 16: $t12 := read_ref($t9)
+ 17: $t13 := 1
+ 18: $t11 := +($t12, $t13)
+ 19: write_ref($t9, $t11)
+ 20: $t14 := infer($t8)
+ 21: $t18 := 0
+ 22: $t17 := +($t14, $t18)
+ 23: $t16 := borrow_local($t17)
+ 24: $t15 := infer($t16)
+ 25: $t20 := read_ref($t15)
+ 26: $t21 := 2
+ 27: $t19 := +($t20, $t21)
+ 28: write_ref($t15, $t19)
+ 29: $t22 := infer($t14)
+ 30: $t25 := infer($t22)
+ 31: $t24 := borrow_local($t25)
+ 32: $t23 := infer($t24)
+ 33: $t27 := read_ref($t23)
+ 34: $t28 := 4
+ 35: $t26 := +($t27, $t28)
+ 36: write_ref($t23, $t26)
+ 37: $t31 := infer($t22)
+ 38: $t30 := borrow_local($t31)
+ 39: $t29 := infer($t30)
+ 40: $t33 := read_ref($t29)
+ 41: $t34 := 8
+ 42: $t32 := +($t33, $t34)
+ 43: write_ref($t29, $t32)
+ 44: $t38 := 3
+ 45: $t37 := infer($t22)
+ 46: $t36 := borrow_local($t37)
+ 47: $t35 := infer($t36)
+ 48: $t40 := read_ref($t35)
+ 49: $t41 := 16
+ 50: $t39 := +($t40, $t41)
+ 51: write_ref($t35, $t39)
+ 52: $t1 := infer($t22)
+ 53: return $t1
 }
 
 
@@ -276,32 +255,30 @@ fun M::test1b($t0: M::S): u64 {
      var $t37: &mut u64
      var $t38: &mut u64
      var $t39: u64
-     var $t40: u64
-     var $t41: u64
-     var $t42: &M::S
-     var $t43: &u64
+     var $t40: &M::S
+     var $t41: &u64
+     var $t42: u64
+     var $t43: u64
      var $t44: u64
-     var $t45: u64
-     var $t46: u64
-     var $t47: &mut u64
-     var $t48: &mut u64
-     var $t49: u64
-     var $t50: &M::S
-     var $t51: &u64
+     var $t45: &mut u64
+     var $t46: &mut u64
+     var $t47: u64
+     var $t48: &M::S
+     var $t49: &u64
+     var $t50: u64
+     var $t51: u64
      var $t52: u64
-     var $t53: u64
-     var $t54: u64
-     var $t55: &mut u64
-     var $t56: &mut u64
-     var $t57: u64
-     var $t58: u64
-     var $t59: &M::S
-     var $t60: &u64
+     var $t53: &mut u64
+     var $t54: &mut u64
+     var $t55: u64
+     var $t56: u64
+     var $t57: &M::S
+     var $t58: &u64
+     var $t59: u64
+     var $t60: u64
      var $t61: u64
-     var $t62: u64
-     var $t63: u64
-     var $t64: &M::S
-     var $t65: &u64
+     var $t62: &M::S
+     var $t63: &u64
   0: $t4 := 3
   1: $t3 := pack M::S($t4)
   2: $t2 := infer($t3)
@@ -346,40 +323,38 @@ fun M::test1b($t0: M::S): u64 {
  41: $t33 := +($t34, $t35)
  42: write_ref($t30, $t33)
  43: $t36 := infer($t29)
- 44: $t41 := 1
- 45: $t40 := infer($t41)
- 46: $t42 := borrow_local($t36)
- 47: $t43 := borrow_field<M::S>.f($t42)
- 48: $t39 := read_ref($t43)
- 49: $t38 := borrow_local($t39)
- 50: $t37 := infer($t38)
- 51: $t45 := read_ref($t37)
- 52: $t46 := 1
- 53: $t44 := +($t45, $t46)
- 54: write_ref($t37, $t44)
- 55: $t50 := borrow_local($t36)
- 56: $t51 := borrow_field<M::S>.f($t50)
- 57: $t49 := read_ref($t51)
- 58: $t48 := borrow_local($t49)
- 59: $t47 := infer($t48)
- 60: $t53 := read_ref($t47)
- 61: $t54 := 8
- 62: $t52 := +($t53, $t54)
- 63: write_ref($t47, $t52)
- 64: $t58 := 3
- 65: $t59 := borrow_local($t36)
- 66: $t60 := borrow_field<M::S>.f($t59)
- 67: $t57 := read_ref($t60)
- 68: $t56 := borrow_local($t57)
- 69: $t55 := infer($t56)
- 70: $t62 := read_ref($t55)
- 71: $t63 := 16
- 72: $t61 := +($t62, $t63)
- 73: write_ref($t55, $t61)
- 74: $t64 := borrow_local($t36)
- 75: $t65 := borrow_field<M::S>.f($t64)
- 76: $t1 := read_ref($t65)
- 77: return $t1
+ 44: $t40 := borrow_local($t36)
+ 45: $t41 := borrow_field<M::S>.f($t40)
+ 46: $t39 := read_ref($t41)
+ 47: $t38 := borrow_local($t39)
+ 48: $t37 := infer($t38)
+ 49: $t43 := read_ref($t37)
+ 50: $t44 := 1
+ 51: $t42 := +($t43, $t44)
+ 52: write_ref($t37, $t42)
+ 53: $t48 := borrow_local($t36)
+ 54: $t49 := borrow_field<M::S>.f($t48)
+ 55: $t47 := read_ref($t49)
+ 56: $t46 := borrow_local($t47)
+ 57: $t45 := infer($t46)
+ 58: $t51 := read_ref($t45)
+ 59: $t52 := 8
+ 60: $t50 := +($t51, $t52)
+ 61: write_ref($t45, $t50)
+ 62: $t56 := 3
+ 63: $t57 := borrow_local($t36)
+ 64: $t58 := borrow_field<M::S>.f($t57)
+ 65: $t55 := read_ref($t58)
+ 66: $t54 := borrow_local($t55)
+ 67: $t53 := infer($t54)
+ 68: $t60 := read_ref($t53)
+ 69: $t61 := 16
+ 70: $t59 := +($t60, $t61)
+ 71: write_ref($t53, $t59)
+ 72: $t62 := borrow_local($t36)
+ 73: $t63 := borrow_field<M::S>.f($t62)
+ 74: $t1 := read_ref($t63)
+ 75: return $t1
 }
 
 

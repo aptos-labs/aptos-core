@@ -1,15 +1,15 @@
 // -- Model dump before bytecode pipeline
 module 0x42::Test {
-    public fun test_apply() {
+    public fun test_apply(x: u64) {
         {
           let r1: bool = {
-            let (v: u64) = Tuple(0);
+            let (v: u64): (u64) = Tuple(x);
             spec {
               assert Ge(v, 0);
             }
             ;
             {
-              let (v: u64) = Tuple(v);
+              let (v: u64): (u64) = Tuple(v);
               Ge<u64>(v, 0)
             }
           };
@@ -24,13 +24,13 @@ module 0x42::Test {
           };
           {
             let r2: bool = {
-              let (v: u64) = Tuple(0);
+              let (v: u64): (u64) = Tuple(x);
               spec {
                 assert Ge(v, 0);
               }
               ;
               {
-                let (v: u64) = Tuple(v);
+                let (v: u64): (u64) = Tuple(v);
                 Neq<u64>(v, 0)
               }
             };

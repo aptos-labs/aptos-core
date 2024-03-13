@@ -9,10 +9,7 @@ warning: Unused parameter `f`. Consider removing or prefixing with an underscore
 // -- Model dump before bytecode pipeline
 module 0x42::m {
     private fun g() {
-        {
-          let (): ();
-          Tuple()
-        };
+        Tuple();
         Tuple()
     }
 } // end 0x42::m

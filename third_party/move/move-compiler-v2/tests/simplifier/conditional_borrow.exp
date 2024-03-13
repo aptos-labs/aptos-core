@@ -94,8 +94,4 @@ module 0x8675::M {
     public fun testb(): u64 {
         Add<u64>(M::test1b(pack M::S(7)), M::test1b(pack M::S(2)))
     }
-    spec fun $test(): u64;
-    spec fun $test1(r: u64): u64;
-    spec fun $test1b(r: M::S): u64;
-    spec fun $testb(): u64;
 } // end 0x8675::M

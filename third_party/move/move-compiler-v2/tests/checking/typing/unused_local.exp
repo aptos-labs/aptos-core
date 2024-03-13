@@ -139,20 +139,14 @@ module 0x8675309::M {
         g: bool,
     }
     private fun t0() {
-        {
-          let x: u64;
-          Tuple()
-        }
+        Tuple()
     }
     private fun t1() {
-        {
-          let (x: u64, y: u64);
-          Tuple()
-        }
+        Tuple()
     }
     private fun t2() {
         {
-          let M::S{ f: f: u64, g: g: bool };
+          let M::S{ f: f: u64, g: g: bool }: M::S;
           Tuple()
         }
     }
@@ -160,16 +154,10 @@ module 0x8675309::M {
         Tuple()
     }
     private fun unused_local_suppressed1() {
-        {
-          let _x: u64;
-          Tuple()
-        }
+        Tuple()
     }
     private fun unused_local_suppressed2() {
-        {
-          let _;
-          Tuple()
-        }
+        Tuple()
     }
     private native fun unused_native_ok(x: u64,y: bool);
     private fun unused_param(x: u64) {

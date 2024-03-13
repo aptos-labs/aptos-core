@@ -5,15 +5,12 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::debug;
 use move_compiler_v2::{
-    annotate_units, check_and_rewrite_pipeline, disassemble_compiled_units,
+    annotate_units, ast_simplifier, check_and_rewrite_pipeline, disassemble_compiled_units,
     env_pipeline::{
         lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
         spec_rewriter, EnvProcessorPipeline,
     },
     logging, pipeline,
-    annotate_units, ast_simplifier, disassemble_compiled_units,
-    env_pipeline::{lambda_lifter, lambda_lifter::LambdaLiftingOptions, EnvProcessorPipeline},
-    flow_insensitive_checkers, function_checker, inliner, logging, pipeline,
     pipeline::{
         ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -105,7 +102,8 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
 impl TestConfig {
     fn get_config_from_path(path: &Path, options: &mut Options) -> TestConfig {
         // The transformation pipeline on the GlobalEnv
-        let mut env_pipeline = check_and_rewrite_pipeline(false, RewritingScope::CompilationTarget);
+        let mut env_pipeline =
+            check_and_rewrite_pipeline(options, false, RewritingScope::CompilationTarget);
         // Add the specification rewriter for testing here as well, even though it is not run
         // as part of regular compilation, but only as part of a prover run.
         env_pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);

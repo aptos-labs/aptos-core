@@ -18,20 +18,14 @@ module 0x8675309::M {
     }
     private fun t1() {
         loop {
-          if {
-            let foo: bool = true;
-            foo
-          } {
+          if true {
             Tuple()
           } else {
             break
           }
         };
         loop {
-          if {
-            let bar: bool = false;
-            bar
-          } {
+          if false {
             Tuple()
           } else {
             break

@@ -76,10 +76,6 @@ module 0x8675309::M {
           }
         }
     }
-    spec fun $tborrow1(cond: bool);
-    spec fun $tborrow2(cond: bool);
-    spec fun $tcopy(cond: bool);
-    spec fun $tmove(cond: bool);
 } // end 0x8675309::M
 
 

@@ -43,10 +43,14 @@ pub fn test_runner(
         false,
         KnownAttribute::get_all_attribute_names(),
     )?;
-    env.set_extension(move_compiler_v2::Options::default());
-    let mut pipeline =
-        move_compiler_v2::check_and_rewrite_pipeline(true, RewritingScope::Everything);
+    let compiler_options = move_compiler_v2::Options::default();
+    let mut pipeline = move_compiler_v2::check_and_rewrite_pipeline(
+        &compiler_options,
+        true,
+        RewritingScope::Everything,
+    );
     pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
+    env.set_extension(compiler_options);
     pipeline.run(&mut env);
     let out = if env.has_errors() {
         let mut error_writer = Buffer::no_color();

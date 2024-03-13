@@ -1,42 +1,45 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Inlining Overview:
+//! - We visit function calling inline functions reachable from compilation targets in a bottom-up
+//!   fashion, storing rewritten functions in a map to simplify further processing.
+//!   - Change to the program happens at the end.
+//!
+//! Summary of structs/impls in this file.  Note that these duplicate comments in the body of this file,
+//! and ideally should be updated if those are changed significantly.
+//! - function `run_inlining` is the main entry point for the inlining pass
+//!
+//! - struct `Inliner`
+//!   - holds the map recording function bodies which are rewritten due to inlining so that we don't
+//!     need to modify the program until the end.
+//!   - `do_inlining_in` function is the entry point for each function needing inlining.
+//!
+//! - struct `OuterInlinerRewriter` uses trait `ExpRewriterFunctions` to rewrite each call in the
+//!   target.
+//!
+//! - struct `InlinedRewriter` rewrites a call to an inlined function
+//!   - `inline_call` is the external entry point for rewriting a call to an inline function.
+//!
+//!   - `construct_inlined_call_expression` is a helper to build the `Block` expression corresponding
+//!      to { let params=actuals; body } used for both lambda inlining and inline function inlining.
+//!
+//! - struct `InlinedRewriter` uses trait `ExpRewriterFunctions` to rewrite the inlined function
+//!      body.
+//!   - `rewrite_exp` is the entry point to rewrite the body of an inline function.
+//!
+//! - struct ShadowStack implements the free variable shadowing stack:
+//!   For a given set of "free" variables, the `ShadowStack` tracks which variables are
+//!   still directly visible, and which variables have been hidden by local variable
+//!   declarations with the same symbol.  In the latter case, the ShadowStack provides
+//!   a "shadow" symbol which can be used in place of the original.
+//!
+//! - TODO(10858): add an anchor AST node so we can implement `Return` for inline functions and
+//!   `Lambda`.
 
-/// Inlining Overview:
-/// - We visit function calling inline functions reachable from compilation targets in a bottom-up
-///   fashion, storing rewritten functions in a map to simplify further processing.
-///   - Change to the program happens at the end.
-///
-/// Summary of structs/impls in this file.  Note that these duplicate comments in the body of this file,
-/// and ideally should be updated if those are changed significantly.
-/// - function `run_inlining` is the main entry point for the inlining pass
-///
-/// - struct `Inliner`
-///   - holds the map recording function bodies which are rewritten due to inlining so that we don't
-///     need to modify the program until the end.
-///   - `do_inlining_in` function is the entry point for each function needing inlining.
-///
-/// - struct `OuterInlinerRewriter` uses trait `ExpRewriterFunctions` to rewrite each call in the
-///   target.
-///
-/// - struct `InlinedRewriter` rewrites a call to an inlined function
-///   - `inline_call` is the external entry point for rewriting a call to an inline function.
-///
-///   - `construct_inlined_call_expression` is a helper to build the `Block` expression corresponding
-///      to { let params=actuals; body } used for both lambda inlining and inline function inlining.
-///
-/// - struct `InlinedRewriter` uses trait `ExpRewriterFunctions` to rewrite the inlined function
-///      body.
-///   - `rewrite_exp` is the entry point to rewrite the body of an inline function.
-///
-/// - struct ShadowStack implements the free variable shadowing stack:
-///   For a given set of "free" variables, the `ShadowStack` tracks which variables are
-///   still directly visible, and which variables have been hidden by local variable
-///   declarations with the same symbol.  In the latter case, the ShadowStack provides
-///   a "shadow" symbol which can be used in place of the original.
-///
-/// - TODO(10858): add an anchor AST node so we can implement `Return` for inline functions and
-///   `Lambda`.
+use crate::env_pipeline::rewrite_target::{
+    RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
+};
 use codespan_reporting::diagnostic::Severity;
 use log::{debug, trace};
 use move_model::{
@@ -52,9 +55,6 @@ use std::{
     iter,
     iter::{zip, IntoIterator, Iterator},
     vec::Vec,
-};
-use crate::env_pipeline::rewrite_target::{
-    RewriteState, RewriteTarget, RewriteTargets, RewritingScope,
 };
 
 type QualifiedFunId = QualifiedId<FunId>;

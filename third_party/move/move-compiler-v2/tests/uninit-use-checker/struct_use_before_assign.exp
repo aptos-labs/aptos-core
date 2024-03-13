@@ -73,22 +73,20 @@ fun M::main() {
 [variant baseline]
 fun M::main2() {
      var $t0: u64
-     var $t1: u64
-     var $t2: u64
-     var $t3: M::R
-     var $t4: M::R
+     var $t1: M::R
+     var $t2: M::R
+     var $t3: u64
+     var $t4: u64
      var $t5: u64
      var $t6: u64
      var $t7: u64
-     var $t8: u64
-  0: $t1 := 0
-  1: $t0 := infer($t1)
-  2: $t4 := pack M::R($t0, $t2)
-  3: $t3 := infer($t4)
-  4: ($t5, $t6) := unpack M::R($t3)
-  5: $t7 := infer($t6)
-  6: $t8 := infer($t5)
-  7: return ()
+  0: $t3 := 0
+  1: $t2 := pack M::R($t3, $t0)
+  2: $t1 := infer($t2)
+  3: ($t4, $t5) := unpack M::R($t1)
+  4: $t6 := infer($t5)
+  5: $t7 := infer($t4)
+  6: return ()
 }
 
 
@@ -181,30 +179,27 @@ fun M::main() {
 [variant baseline]
 fun M::main2() {
      var $t0: u64
-     var $t1: u64
-     var $t2: u64
-     var $t3: M::R
-     var $t4: M::R
+     var $t1: M::R
+     var $t2: M::R
+     var $t3: u64
+     var $t4: u64
      var $t5: u64
      var $t6: u64
      var $t7: u64
-     var $t8: u64
-     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }
-  0: $t1 := 0
-     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8 }
-  1: $t0 := infer($t1)
-     # before: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t2, $t3, $t5, $t6, $t7, $t8 }
-  2: $t4 := pack M::R($t0, $t2)
-     # before: { no: $t2, $t3, $t5, $t6, $t7, $t8 }, after: { no: $t2, $t5, $t6, $t7, $t8 }
-  3: $t3 := infer($t4)
-     # before: { no: $t2, $t5, $t6, $t7, $t8 }, after: { no: $t2, $t7, $t8 }
-  4: ($t5, $t6) := unpack M::R($t3)
-     # before: { no: $t2, $t7, $t8 }, after: { no: $t2, $t8 }
-  5: $t7 := infer($t6)
-     # before: { no: $t2, $t8 }, after: { no: $t2 }
-  6: $t8 := infer($t5)
-     # before: { no: $t2 }, after: { no: $t2 }
-  7: return ()
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t1, $t2, $t4, $t5, $t6, $t7 }
+  0: $t3 := 0
+     # before: { no: $t0, $t1, $t2, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t1, $t4, $t5, $t6, $t7 }
+  1: $t2 := pack M::R($t3, $t0)
+     # before: { no: $t0, $t1, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t4, $t5, $t6, $t7 }
+  2: $t1 := infer($t2)
+     # before: { no: $t0, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t6, $t7 }
+  3: ($t4, $t5) := unpack M::R($t1)
+     # before: { no: $t0, $t6, $t7 }, after: { no: $t0, $t7 }
+  4: $t6 := infer($t5)
+     # before: { no: $t0, $t7 }, after: { no: $t0 }
+  5: $t7 := infer($t4)
+     # before: { no: $t0 }, after: { no: $t0 }
+  6: return ()
 }
 
 

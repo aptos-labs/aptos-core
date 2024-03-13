@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod ast_simplifier;
 mod bytecode_generator;
 pub mod env_pipeline;
 mod experiments;
@@ -158,9 +159,9 @@ pub fn run_checker_and_rewriters(
     options: Options,
     scope: RewritingScope,
 ) -> anyhow::Result<GlobalEnv> {
+    let env_pipeline = check_and_rewrite_pipeline(&options, false, scope);
     let mut env = run_checker(options)?;
     if !env.has_errors() {
-        let env_pipeline = check_and_rewrite_pipeline(false, scope);
         env_pipeline.run(&mut env);
     }
     Ok(env)
@@ -204,72 +205,16 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
     file_format_generator::generate_file_format(env, targets)
 }
 
-/// Returns the standard env_processor_pipeline
-pub fn create_env_processor_pipeline<'b>(env: &GlobalEnv) -> EnvProcessorPipeline<'b> {
-    let options = env.get_extension::<Options>().expect("options");
-    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
-
-    let mut env_pipeline = EnvProcessorPipeline::default();
-    env_pipeline.add(
-        "unused vars and params checks",
-        flow_insensitive_checkers::check_for_unused_vars_and_params,
-    );
-    env_pipeline.add(
-        "function typed parameter check",
-        function_checker::check_for_function_typed_parameters,
-    );
-    env_pipeline.add(
-        "access and use check before inlining",
-        |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
-    );
-    env_pipeline.add("inlining", inliner::run_inlining);
-    env_pipeline.add(
-        "access and use check after inlining",
-        |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
-    );
-    env_pipeline.add("simplifier", {
-        move |env: &mut GlobalEnv| {
-            ast_simplifier::run_simplifier(
-                env,
-                optimize_on, // eliminate code only if optimize is on
-            )
-        }
-    });
-    env_pipeline
-}
-
-/// Returns the bytecode processing pipeline.
-pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
-    let options = env.get_extension::<Options>().expect("options");
-    let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
-    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
-    let mut pipeline = FunctionTargetPipeline::default();
-    if options.experiment_on(Experiment::SPLIT_CRITICAL_EDGES) {
-        pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
-    }
-    if safety_on {
-        pipeline.add_processor(Box::new(UninitializedUseChecker {}));
-    }
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-    pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-    pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
-    pipeline.add_processor(Box::new(AbilityProcessor {}));
-    if optimize_on {
-        add_default_optimization_pipeline(&mut pipeline);
-    }
-    // Run live var analysis again because it could be invalidated by previous pipeline steps,
-    // but it is needed by file format generator.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-    pipeline
-}
-
 /// Constructs the env checking and rewriting processing pipeline. `inlining_scope` can be set to
 /// `Everything` for use with the Move Prover, otherwise `CompilationTarget`
 /// should be used.
 pub fn check_and_rewrite_pipeline<'a>(
+    options: &Options,
     for_v1_model: bool,
     inlining_scope: RewritingScope,
 ) -> EnvProcessorPipeline<'a> {
+    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
+
     // The default transformation pipeline on the GlobalEnv
     let mut env_pipeline = EnvProcessorPipeline::default();
     env_pipeline.add(
@@ -300,11 +245,44 @@ pub fn check_and_rewrite_pipeline<'a>(
             |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
         );
     }
+    env_pipeline.add("simplifier", {
+        move |env: &mut GlobalEnv| {
+            ast_simplifier::run_simplifier(
+                env,
+                optimize_on, // eliminate code only if optimize is on
+            )
+        }
+    });
     env_pipeline.add("specification checker", |env| {
         let env: &GlobalEnv = env;
         spec_checker::run_spec_checker(env)
     });
     env_pipeline
+}
+
+/// Returns the bytecode processing pipeline.
+pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
+    let options = env.get_extension::<Options>().expect("options");
+    let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
+    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
+    let mut pipeline = FunctionTargetPipeline::default();
+    if options.experiment_on(Experiment::SPLIT_CRITICAL_EDGES) {
+        pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
+    }
+    if safety_on {
+        pipeline.add_processor(Box::new(UninitializedUseChecker {}));
+    }
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
+    pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(AbilityProcessor {}));
+    if optimize_on {
+        add_default_optimization_pipeline(&mut pipeline);
+    }
+    // Run live var analysis again because it could be invalidated by previous pipeline steps,
+    // but it is needed by file format generator.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+    pipeline
 }
 
 /// Add the default optimization pipeline to the given function target pipeline.

@@ -521,7 +521,7 @@ pub trait ExpRewriterFunctions {
                 }
             },
             SpecBlock(id, spec) => {
-                let (id_changed, new_id) = self.internal_rewrite_id(id);
+                let (id_changed, new_id) = self.internal_rewrite_id(*id);
                 let (spec_changed, new_spec) =
                     self.rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
                 if id_changed || spec_changed {
@@ -543,9 +543,7 @@ pub trait ExpRewriterFunctions {
     ) -> (bool, Vec<Pattern>) {
         let rewritten: Vec<_> = pat_vec
             .iter()
-            .map(|pat| {
-                self.internal_rewrite_pattern(pat, creating_scope)
-            })
+            .map(|pat| self.internal_rewrite_pattern(pat, creating_scope))
             .collect();
         let changed = rewritten.iter().any(|(changed, pat)| *changed);
         (
@@ -676,6 +674,7 @@ pub trait ExpRewriterFunctions {
         // First go over all top-level conditions in this block.
         for cond in &spec.conditions {
             let (this_changed, new_cond) = self.internal_rewrite_condition(target, cond);
+            conditions.push(new_cond);
             changed |= this_changed;
         }
         let mut update_map = BTreeMap::new();

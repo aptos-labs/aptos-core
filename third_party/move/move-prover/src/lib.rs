@@ -91,9 +91,13 @@ pub fn run_move_prover_with_model<W: WriteColor>(
     let now = timer.unwrap_or_else(Instant::now);
 
     // Run the compiler v2 checking and rewriting pipeline
-    env.set_extension(move_compiler_v2::Options::default());
-    let mut pipeline =
-        move_compiler_v2::check_and_rewrite_pipeline(true, RewritingScope::Everything);
+    let compiler_options = move_compiler_v2::Options::default();
+    env.set_extension(compiler_options.clone());
+    let mut pipeline = move_compiler_v2::check_and_rewrite_pipeline(
+        &compiler_options,
+        true,
+        RewritingScope::Everything,
+    );
     pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
     pipeline.run(env);
 
