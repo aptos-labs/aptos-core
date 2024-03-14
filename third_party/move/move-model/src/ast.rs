@@ -2199,7 +2199,7 @@ impl Value {
                         Some(false)
                     }
                 },
-                (Value::Vector(x), Value::Vector(y)) => {
+                (Value::Vector(x), Value::Vector(y)) | (Value::Tuple(x), Value::Tuple(y)) => {
                     if x.len() == y.len() {
                         iter::zip(x, y)
                             .map(|(val1, val2)| val1.equivalent(val2))
