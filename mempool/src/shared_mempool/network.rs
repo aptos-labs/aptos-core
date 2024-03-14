@@ -153,11 +153,11 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> (Vec<PeerNetworkId>, Vec<PeerNetworkId>) {
         // Get the upstream peers to add or disable, using a read lock
         let (to_add, to_disable) = self.get_upstream_peers_to_add_and_disable(all_connected_peers);
-        if to_add.is_empty() && to_disable.is_empty() {
-            return (vec![], vec![]);
-        }
+
         // If there are updates, apply using a write lock
         self.add_and_disable_upstream_peers(&to_add, &to_disable);
+
+        // Update the prioritized peers based on their metadata
         self.update_prioritized_peers();
 
         (to_add.iter().map(|(peer, _)| *peer).collect(), to_disable)
@@ -187,6 +187,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             .sorted_by(|peer_a, peer_b| self.prioritized_peers_comparator.compare(peer_a, peer_b))
             .map(|(peer, _)| *peer)
             .collect();
+        info!("Updating prioritized peers: {:?}", peers);
         let _ = std::mem::replace(&mut *prioritized_peers, peers);
     }
 

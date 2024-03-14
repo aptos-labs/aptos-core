@@ -40,6 +40,7 @@ pub struct MempoolConfig {
     pub shared_mempool_max_concurrent_inbound_syncs: usize,
     /// Interval to broadcast to upstream nodes.
     pub shared_mempool_tick_interval_ms: u64,
+    /// Interval to update peers and priorities in shared mempool.
     pub shared_mempool_peer_update_interval_ms: u64,
     /// Number of seconds until the transaction will be removed from the Mempool ignoring if the transaction has expired.
     ///
@@ -71,7 +72,7 @@ impl Default for MempoolConfig {
             capacity_bytes: 2 * 1024 * 1024 * 1024,
             capacity_per_user: 100,
             default_failovers: 1,
-            shared_mempool_peer_update_interval_ms: 1_000,
+            shared_mempool_peer_update_interval_ms: 3_000,
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),
