@@ -277,7 +277,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = 2 * Duration::from_secs(args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -601,7 +601,7 @@ fn k8s_test_suite() -> ForgeConfig {
 fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
-    test_cmd: &TestCommand,
+    _test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
@@ -987,7 +987,7 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(100, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
