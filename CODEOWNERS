@@ -10,9 +10,12 @@
 /aptos-move/aptos-aggregator/ @georgemitenkov @gelash @zekun000
 /aptos-move/aptos-gas/ @vgao1996
 /aptos-move/aptos-vm/ @davidiw @wrwg @zekun000 @vgao1996 @georgemitenkov
+/aptos-move/aptos-vm/src/keyless_validation.rs @alinush @heliuchuan
 /aptos-move/aptos-vm-types/ @georgemitenkov @gelash @vgao1996
 /aptos-move/framework/ @davidiw @movekevin @wrwg
 /aptos-move/framework/aptos-framework/sources/account.move @alinush
+/aptos-move/framework/aptos-framework/sources/jwks.move @zjma
+/aptos-move/framework/aptos-framework/sources/keyless_account.move @alinush
 /aptos-move/framework/aptos-stdlib/sources/cryptography/ @alinush @zjma @mstraka100
 /aptos-move/framework/**/*.spec.move @junkil-park
 /aptos-move/framework/aptos-stdlib/sources/hash.move @alinush
@@ -115,4 +118,5 @@
 # Owners for the `aptos-dkg` crate.
 /crates/aptos-dkg @alinush @rex1fernando
 
+/types/src/keyless/ @alinush @heliuchuan
 /types/src/transaction/authenticator.rs @alinush @mstraka100

@@ -46,6 +46,7 @@ dashmap = { workspace = true }
 derive_more = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
+hex = { workspace = true }
 jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
@@ -63,7 +64,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }
 tracing = { workspace = true }
-hex = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
