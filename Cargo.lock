@@ -2391,6 +2391,7 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "move-model",
+ "move-vm-runtime",
  "move-vm-types",
  "num_cpus",
  "once_cell",
@@ -4132,6 +4133,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
  "proptest",
@@ -4255,6 +4257,7 @@ dependencies = [
  "handlebars",
  "move-compiler",
  "move-core-types",
+ "move-vm-runtime",
  "move-vm-types",
  "serde",
  "tempfile",
@@ -11022,6 +11025,7 @@ dependencies = [
  "move-vm-runtime",
  "move-vm-test-utils",
  "move-vm-types",
+ "smallvec",
  "tempfile",
 ]
 

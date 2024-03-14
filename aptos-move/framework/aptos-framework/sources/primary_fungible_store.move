@@ -12,6 +12,7 @@
 /// 4. The fungible asset metadata object calls `deposit` on the recipient's primary store to deposit `amount` of
 /// fungible asset to it. This emits an deposit event.
 module aptos_framework::primary_fungible_store {
+    use aptos_framework::dispatchable_fungible_asset;
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
 
@@ -147,14 +148,14 @@ module aptos_framework::primary_fungible_store {
         let store = ensure_primary_store_exists(signer::address_of(owner), metadata);
         // Check if the store object has been burnt or not. If so, unburn it first.
         may_be_unburn(owner, store);
-        fungible_asset::withdraw(owner, store, amount)
+        dispatchable_fungible_asset::withdraw(owner, store, amount)
     }
 
     /// Deposit fungible asset `fa` to the given account's primary store.
     public fun deposit(owner: address, fa: FungibleAsset) acquires DeriveRefPod {
         let metadata = fungible_asset::asset_metadata(&fa);
         let store = ensure_primary_store_exists(owner, metadata);
-        fungible_asset::deposit(store, fa);
+        dispatchable_fungible_asset::deposit(store, fa);
     }
 
     /// Deposit fungible asset `fa` to the given account's primary store.
@@ -175,7 +176,23 @@ module aptos_framework::primary_fungible_store {
         // Check if the sender store object has been burnt or not. If so, unburn it first.
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
-        fungible_asset::transfer(sender, sender_store, recipient_store, amount);
+        dispatchable_fungible_asset::transfer(sender, sender_store, recipient_store, amount);
+    }
+
+    /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.
+    /// Use the minimum deposit assertion api to make sure receipient will receive a minimum amount of fund.
+    public entry fun transfer_assert_minimum_deposit<T: key>(
+        sender: &signer,
+        metadata: Object<T>,
+        recipient: address,
+        amount: u64,
+        expected: u64,
+    ) acquires DeriveRefPod {
+        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
+        // Check if the sender store object has been burnt or not. If so, unburn it first.
+        may_be_unburn(sender, sender_store);
+        let recipient_store = ensure_primary_store_exists(recipient, metadata);
+        dispatchable_fungible_asset::transfer_assert_minimum_deposit(sender, sender_store, recipient_store, amount, expected);
     }
 
     /// Mint to the primary store of `owner`.
@@ -304,6 +321,25 @@ module aptos_framework::primary_fungible_store {
         assert!(!is_frozen(aaron_address, metadata), 6);
         burn(&burn_ref, aaron_address, 50);
         assert!(balance(aaron_address, metadata) == 0, 7);
+    }
+
+    #[test(creator = @0xcafe, aaron = @0xface)]
+    fun test_basic_flow_with_min_balance(
+        creator: &signer,
+        aaron: &signer,
+    ) acquires DeriveRefPod {
+        let (creator_ref, metadata) = create_test_token(creator);
+        let (mint_ref, transfer_ref, _) = init_test_metadata_with_primary_store_enabled(&creator_ref);
+        let creator_address = signer::address_of(creator);
+        let aaron_address = signer::address_of(aaron);
+        assert!(balance(creator_address, metadata) == 0, 1);
+        assert!(balance(aaron_address, metadata) == 0, 2);
+        mint(&mint_ref, creator_address, 100);
+        transfer_assert_minimum_deposit(creator, metadata, aaron_address, 80, 80);
+        let fa = withdraw(aaron, metadata, 10);
+        deposit(creator_address, fa);
+        assert!(balance(creator_address, metadata) == 30, 3);
+        assert!(balance(aaron_address, metadata) == 70, 4);
     }
 
     #[test(user_1 = @0xcafe, user_2 = @0xface)]
