@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
+use crate::{bootstrap_api, indexer, mpsc::Receiver, network2::ApplicationNetworkInterfaces};
 use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
@@ -18,7 +18,8 @@ use aptos_indexer_grpc_table_info::runtime::bootstrap as bootstrap_indexer_table
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{network::MempoolSyncMsg, MempoolClientRequest, QuorumStoreRequest};
 use aptos_mempool_notifications::MempoolNotificationListener;
-use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
+use aptos_network2::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
+use aptos_network2::protocols::health_checker::{HealthChecker,HealthCheckerMsg,HealthCheckerNetwork,HealthCheckNetworkInterface};
 use aptos_network_benchmark::{run_netbench_service, NetbenchMessage};
 use aptos_peer_monitoring_service_server::{
     network::PeerMonitoringServiceNetworkEvents, storage::StorageReader,
@@ -120,7 +121,7 @@ pub fn start_consensus_runtime(
     let consensus = aptos_consensus::consensus_provider::start_consensus(
         node_config,
         consensus_network_interfaces.network_client,
-        consensus_network_interfaces.network_service_events,
+        consensus_network_interfaces.network_events,
         Arc::new(consensus_notifier),
         consensus_to_mempool_sender,
         db_rw,
@@ -152,7 +153,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
         node_config,
         Arc::clone(&db_rw.reader),
         network_interfaces.network_client,
-        network_interfaces.network_service_events,
+        network_interfaces.network_events,
         mempool_client_receiver,
         consensus_to_mempool_receiver,
         mempool_listener,
@@ -182,6 +183,21 @@ pub fn start_node_inspection_service(
     )
 }
 
+pub fn start_health_checker(
+    networks: Vec<HealthCheckerNetwork>,
+    health_checker_network_interfaces: ApplicationNetworkInterfaces<HealthCheckerMsg>,
+    handle: Handle,
+) {
+    let ApplicationNetworkInterfaces::<HealthCheckerMsg>{network_client: hc_client, network_events: hc_events} = health_checker_network_interfaces;
+    let hc_client = HealthCheckNetworkInterface::new(hc_client, hc_events);
+    let hc = HealthChecker::new(
+        networks,
+        TimeService::real(),
+        hc_client,
+    );
+    handle.spawn(hc.start(handle.clone()));
+}
+
 /// Starts the peer monitoring service and returns the runtime
 pub fn start_peer_monitoring_service(
     node_config: &NodeConfig,
@@ -190,7 +206,7 @@ pub fn start_peer_monitoring_service(
 ) -> Runtime {
     // Get the network client and events
     let network_client = network_interfaces.network_client;
-    let network_service_events = network_interfaces.network_service_events;
+    let network_service_events = network_interfaces.network_events;
 
     // Create a new runtime for the monitoring service
     let peer_monitoring_service_runtime =
@@ -236,8 +252,9 @@ pub fn start_netbench_service(
     runtime.spawn(run_netbench_service(
         node_config.clone(),
         network_client,
-        network_interfaces.network_service_events,
+        network_interfaces.network_events,
         TimeService::real(),
+        runtime.clone(),
     ));
 }
 

@@ -38,6 +38,8 @@ impl<T> RwLock<T> {
     }
 }
 
+unsafe impl<T> Send for RwLock<T> {}
+
 #[cfg(test)]
 mod tests {
 

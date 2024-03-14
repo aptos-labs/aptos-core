@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_config::{config::AptosDataClientConfig, network_id::PeerNetworkId};
 use aptos_logger::{sample, sample::SampleRate, warn};
-use aptos_network::application::{metadata::PeerMetadata, storage::PeersAndMetadata};
+use aptos_network2::application::{metadata::PeerMetadata, storage::PeersAndMetadata};
 use maplit::hashset;
 use ordered_float::OrderedFloat;
 use rand::seq::{IteratorRandom, SliceRandom};

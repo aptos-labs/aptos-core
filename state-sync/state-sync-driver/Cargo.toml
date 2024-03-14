@@ -49,7 +49,7 @@ aptos-db = { workspace = true }
 aptos-executor = { workspace = true }
 aptos-executor-test-helpers = { workspace = true }
 aptos-genesis = { workspace = true, features = ["testing"] }
-aptos-network = { workspace = true }
+aptos-network2 = { workspace = true }
 aptos-storage-service-client = { workspace = true }
 aptos-storage-service-types = { workspace = true }
 aptos-temppath = { workspace = true }

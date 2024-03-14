@@ -4,11 +4,11 @@
 #![forbid(unsafe_code)]
 
 use crate::{
-    metrics, storage::StorageReader, tests::database_mock::MockDatabaseReader,
+    storage::StorageReader, tests::database_mock::MockDatabaseReader,
     PeerMonitoringServiceNetworkEvents, PeerMonitoringServiceServer, MAX_DISTANCE_FROM_VALIDATORS,
     PEER_MONITORING_SERVER_VERSION,
 };
-use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+// use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{BaseConfig, NodeConfig, PeerMonitoringServiceConfig, PeerRole, RoleType},
     network_id::{NetworkId, PeerNetworkId},
@@ -16,14 +16,14 @@ use aptos_config::{
 use aptos_crypto::HashValue;
 use aptos_logger::Level;
 use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use aptos_network2::{
     application::{
-        interface::NetworkServiceEvents, metadata::ConnectionState, storage::PeersAndMetadata,
+        metadata::ConnectionState, storage::PeersAndMetadata, // interface::NetworkServiceEvents,
     },
-    peer_manager::PeerManagerNotification,
+    // peer_manager::PeerManagerNotification,
     protocols::{
         network::{NetworkEvents, NewNetworkEvents},
-        rpc::InboundRpcRequest,
+        // rpc::InboundRpcRequest,
         wire::handshake::v1::{MessagingProtocolVersion, ProtocolId, ProtocolIdSet},
     },
     transport::{ConnectionId, ConnectionMetadata},
@@ -70,6 +70,8 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use aptos_network2::protocols::network::{NetworkSender, NetworkSource, OutboundPeerConnections, ReceivedMessage};
+use aptos_network2::protocols::wire::messaging::v1::{NetworkMessage, RpcRequest};
 
 // Useful test constants
 const LOCAL_HOST_NET_ADDR: &str = "/ip4/127.0.0.1/tcp/8081";
@@ -501,10 +503,12 @@ async fn verify_node_information(
 // A wrapper around the inbound network interface/channel for easily sending
 /// mock client requests to a peer monitoring service server.
 struct MockClient {
-    peer_manager_notifiers:
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    // peer_manager_notifiers:
+    //     HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    network_sources: BTreeMap<NetworkId, tokio::sync::mpsc::Sender<ReceivedMessage>>,
 }
 
+// #[cfg(obsolete)]
 impl MockClient {
     fn new(
         base_config: Option<BaseConfig>,
@@ -531,23 +535,27 @@ impl MockClient {
         let network_ids = vec![NetworkId::Validator, NetworkId::Vfn, NetworkId::Public];
         let peers_and_metadata = PeersAndMetadata::new(&network_ids);
         let mut network_and_events = HashMap::new();
-        let mut peer_manager_notifiers = HashMap::new();
+        let mut network_sources = HashMap::new();
+        let peer_senders = Arc::new(OutboundPeerConnections::new());
         for network_id in network_ids {
-            let queue_cfg = aptos_channel::Config::new(
-                peer_monitoring_config.max_network_channel_size as usize,
-            )
-            .queue_style(QueueStyle::FIFO)
-            .counters(&metrics::PENDING_PEER_MONITORING_SERVER_NETWORK_EVENTS);
-            let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
-            let (_, connection_notification_receiver) = queue_cfg.build();
-
+            // let queue_cfg = aptos_channel::Config::new(
+            //     peer_monitoring_config.max_network_channel_size as usize,
+            // )
+            // .queue_style(QueueStyle::FIFO)
+            // .counters(&metrics::PENDING_PEER_MONITORING_SERVER_NETWORK_EVENTS);
+            // let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
+            // let (_, connection_notification_receiver) = queue_cfg.build();
+            let contexts = Arc::new(BTreeMap::new());
+            let (sender, receiver) = tokio::sync::mpsc::channel(peer_monitoring_config.max_network_channel_size as usize);
+            let network_source = NetworkSource::new_single_source(receiver);
             let network_events = NetworkEvents::new(
-                peer_manager_notification_receiver,
-                connection_notification_receiver,
-                None,
+                network_source,
+                peer_senders.clone(),
+                "pmtest",
+                contexts,
             );
             network_and_events.insert(network_id, network_events);
-            peer_manager_notifiers.insert(network_id, peer_manager_notifier);
+            network_sources.insert(network_id, sender);
         }
         let peer_monitoring_network_events =
             PeerMonitoringServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
@@ -568,7 +576,7 @@ impl MockClient {
 
         // Create the client
         let mock_client = Self {
-            peer_manager_notifiers,
+            network_sources,
         };
 
         (
@@ -589,22 +597,30 @@ impl MockClient {
         let network_id = get_random_network_id();
 
         // Create an inbound RPC request
-        let request_data = protocol_id
+        let raw_request = protocol_id
             .to_bytes(&PeerMonitoringServiceMessage::Request(request))
             .unwrap();
-        let (request_sender, request_receiver) = oneshot::channel();
-        let inbound_rpc = InboundRpcRequest {
+        // let (request_sender, request_receiver) = oneshot::channel();
+        // let inbound_rpc = InboundRpcRequest {
+        //     protocol_id,
+        //     data: request_data.into(),
+        //     res_tx: request_sender,
+        // };
+        // let request_notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
+        let sender = PeerNetworkId::new(network_id, peer_id);
+        let msg = ReceivedMessage{ message: NetworkMessage::RpcRequest(RpcRequest{
             protocol_id,
-            data: request_data.into(),
-            res_tx: request_sender,
-        };
-        let request_notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
+            request_id: 123,
+            priority: 0,
+            raw_request,
+        }), sender };
+
 
         // Send the request to the peer monitoring service
-        self.peer_manager_notifiers
+        self.network_sources
             .get(&network_id)
             .unwrap()
-            .push((peer_id, protocol_id), request_notification)
+            .push(msg)
             .unwrap();
 
         // Wait for the response from the peer monitoring service

@@ -19,7 +19,7 @@ use aptos_consensus_types::{
     vote_msg::VoteMsg,
 };
 use aptos_infallible::{Mutex, RwLock};
-use aptos_network::{
+use aptos_network2::{
     application::storage::PeersAndMetadata,
     peer_manager::{
         conn_notifs_channel, ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
@@ -490,7 +490,7 @@ mod tests {
         common::Payload,
     };
     use aptos_crypto::HashValue;
-    use aptos_network::{
+    use aptos_network2::{
         application::{
             interface::{NetworkClient, NetworkServiceEvents},
             storage::PeersAndMetadata,

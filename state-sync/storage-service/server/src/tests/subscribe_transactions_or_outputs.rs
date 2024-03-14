@@ -6,7 +6,7 @@ use aptos_config::{
     config::StorageServiceConfig,
     network_id::{NetworkId, PeerNetworkId},
 };
-use aptos_network::protocols::network::RpcError;
+use aptos_network2::protocols::network::RpcError;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::LedgerInfoWithSignatures,
