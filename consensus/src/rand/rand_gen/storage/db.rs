@@ -17,7 +17,6 @@ use crate::{
 use anyhow::Result;
 use aptos_logger::info;
 use aptos_schemadb::{schema::Schema, Options, ReadOptions, SchemaBatch, DB};
-use futures::FutureExt;
 use std::{path::Path, sync::Arc, time::Instant};
 
 pub struct RandDb {
@@ -75,11 +74,10 @@ impl RandDb {
         let mut iter = self.db.iter::<S>(ReadOptions::default())?;
         iter.seek_to_first();
         Ok(iter
-            .map(|e| match e {
+            .filter_map(|e| match e {
                 Ok((k, v)) => Some((k, v)),
                 Err(_) => None,
             })
-            .flatten()
             .collect::<Vec<(S::Key, S::Value)>>())
     }
 }
