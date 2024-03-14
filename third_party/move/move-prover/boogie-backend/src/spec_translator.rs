@@ -768,23 +768,39 @@ impl<'env> SpecTranslator<'env> {
     }
 
     fn translate_block(&self, pat: &Pattern, binding: &Option<Exp>, scope: &Exp) {
-        match (pat, binding) {
-            (Pattern::Var(_, name), Some(exp)) => {
-                let name_str = self.env.symbol_pool().string(*name);
-                emit!(self.writer, "(var {} := ", name_str);
-                self.translate_exp(exp);
-                emit!(self.writer, "; ");
-                self.translate_exp(scope);
-                emit!(self.writer, ")");
-            },
-            (_, Some(_)) => {
+        let binding = binding.as_ref().expect("valid specification binding");
+        let pats = pat.clone().flatten();
+        let bindings = if let ExpData::Call(_, Operation::Tuple, args) = binding.as_ref() {
+            args.clone()
+        } else {
+            vec![binding.clone()]
+        };
+        assert_eq!(pats.len(), bindings.len(), "valid specification binding");
+        let mut vars = vec![];
+        for pat in pats {
+            if let Pattern::Var(_, sym) = pat {
+                vars.push(sym.display(self.env.symbol_pool()).to_string())
+            } else {
                 self.error(
                     &self.env.get_node_loc(pat.node_id()),
                     "patterns not supported in specification language",
                 );
-            },
-            _ => panic!("unexpected missing binding in specification block"),
+                return;
+            }
         }
+        emit!(self.writer, "(var {} := ", vars.into_iter().join(","));
+        let mut first = true;
+        for binding in bindings {
+            if first {
+                first = false
+            } else {
+                emit!(self.writer, ", ")
+            }
+            self.translate_exp(&binding);
+        }
+        emit!(self.writer, "; ");
+        self.translate_exp(scope);
+        emit!(self.writer, ")");
     }
 
     fn translate_call(&self, node_id: NodeId, oper: &Operation, args: &[Exp]) {
@@ -810,6 +826,7 @@ impl<'env> SpecTranslator<'env> {
                 self.translate_spec_fun_call(node_id, *module_id, *fun_id, args, memory_labels)
             },
             Operation::Pack(mid, sid) => self.translate_pack(node_id, *mid, *sid, args),
+            Operation::Tuple if args.len() == 1 => self.translate_exp(&args[0]),
             Operation::Tuple => self.error(&loc, "Tuple not yet supported"),
             Operation::Select(module_id, struct_id, field_id) => {
                 self.translate_select(node_id, *module_id, *struct_id, *field_id, args)

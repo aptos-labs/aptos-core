@@ -18,9 +18,6 @@ module 0x42::M {
     public fun f(r: M::R): M::T {
         pack M::T(select M::S.x(select M::R.s(r)))
     }
-    spec fun $f(r: M::R): M::T {
-        pack M::T(select M::S.x(select M::R.s(r)))
-    }
     spec fun struct_access(s: M::S): u64 {
         select M::S.x(s)
     }

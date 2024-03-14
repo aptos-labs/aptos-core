@@ -12,15 +12,6 @@ module 0xcafe::m {
           Add<u64>(x, y)
         })
     }
-    spec fun $consume<T>(s: m::S<#0>,x: #0,f: |(m::S<#0>, #0)|#0): #0 {
-        (f)(s, x)
-    }
-    spec fun $pattern(s: m::S<u64>,x: u64): u64 {
-        m::$consume<u64>(s, x, |(m::S<num>{ x: x: num }, _y: u64): (m::S<num>, u64)| {
-          let y: num = x;
-          Add(x, y)
-        })
-    }
 } // end 0xcafe::m
 
 
@@ -43,14 +34,5 @@ module 0xcafe::m {
             Add<u64>(x, y)
           }
         }
-    }
-    spec fun $consume<T>(s: m::S<#0>,x: #0,f: |(m::S<#0>, #0)|#0): #0 {
-        (f)(s, x)
-    }
-    spec fun $pattern(s: m::S<u64>,x: u64): u64 {
-        m::$consume<u64>(s, x, |(m::S<num>{ x: x: num }, _y: u64): (m::S<num>, u64)| {
-          let y: num = x;
-          Add(x, y)
-        })
     }
 } // end 0xcafe::m

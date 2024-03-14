@@ -22,5 +22,4 @@ module <SELF>_0 {
           }
         }
     }
-    spec fun $main();
 } // end <SELF>_0

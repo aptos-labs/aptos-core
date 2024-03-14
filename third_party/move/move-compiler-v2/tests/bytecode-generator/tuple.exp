@@ -12,15 +12,6 @@ module 0x42::tuple {
           Add<u64>(x, y)
         }
     }
-    spec fun $tuple(x: u64): (u64, tuple::S) {
-        Tuple(x, pack tuple::S(Add(x, 1)))
-    }
-    spec fun $use_tuple(x: u64): u64 {
-        {
-          let (x: u64, tuple::S{ f: y: u64 }): (u64, tuple::S) = tuple::$tuple(x);
-          Add(x, y)
-        }
-    }
 } // end 0x42::tuple
 
 ============ initial bytecode ================

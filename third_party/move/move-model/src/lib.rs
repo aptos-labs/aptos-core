@@ -56,6 +56,7 @@ pub mod intrinsics;
 pub mod model;
 pub mod options;
 pub mod pragmas;
+pub mod pureness_checker;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
@@ -387,18 +388,6 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
     }
     // Perform any remaining friend-declaration checks and update friend module id information.
     check_and_update_friend_info(builder);
-    // Compute information derived from AST (currently callgraph)
-    for module in env.module_data.iter_mut() {
-        for fun_data in module.function_data.values_mut() {
-            fun_data.called_funs = Some(
-                fun_data
-                    .def
-                    .as_ref()
-                    .map(|e| e.called_funs())
-                    .unwrap_or_default(),
-            )
-        }
-    }
 }
 
 /// Checks if any friend declarations are invalid because:

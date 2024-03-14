@@ -11,6 +11,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 use log::{debug, info, warn};
 use move_abigen::Abigen;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
+use move_compiler_v2::env_pipeline::{rewrite_target::RewritingScope, spec_rewriter};
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{
@@ -47,7 +48,7 @@ pub fn run_move_prover<W: WriteColor>(
     let now = Instant::now();
     // Run the model builder.
     let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
-    let env = run_model_builder_with_options(
+    let mut env = run_model_builder_with_options(
         vec![PackagePaths {
             name: None,
             paths: options.move_sources.clone(),
@@ -62,7 +63,7 @@ pub fn run_move_prover<W: WriteColor>(
         options.skip_attribute_checks,
         KnownAttribute::get_all_attribute_names(),
     )?;
-    run_move_prover_with_model(&env, error_writer, options, Some(now))
+    run_move_prover_with_model(&mut env, error_writer, options, Some(now))
 }
 
 /// Create the initial number operation state for each function and struct
@@ -82,12 +83,25 @@ pub fn create_init_num_operation_state(env: &GlobalEnv) {
 }
 
 pub fn run_move_prover_with_model<W: WriteColor>(
-    env: &GlobalEnv,
+    env: &mut GlobalEnv,
     error_writer: &mut W,
     options: Options,
     timer: Option<Instant>,
 ) -> anyhow::Result<()> {
     let now = timer.unwrap_or_else(Instant::now);
+
+    // Run the compiler v2 checking and rewriting pipeline
+    let compiler_options = move_compiler_v2::Options::default();
+    env.set_extension(compiler_options.clone());
+    let mut pipeline = move_compiler_v2::check_and_rewrite_pipeline(
+        &compiler_options,
+        true,
+        RewritingScope::Everything,
+    );
+    pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
+    pipeline.run(env);
+
+    debug!("global env before prover run:\n{}", env.dump_env_all());
 
     let build_duration = now.elapsed();
     check_errors(

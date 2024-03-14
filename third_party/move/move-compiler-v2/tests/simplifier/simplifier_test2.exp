@@ -27,6 +27,4 @@ module 0x8675::M {
           }
         }
     }
-    spec fun $test(): u64;
-    spec fun $test1(r: u64): u64;
 } // end 0x8675::M

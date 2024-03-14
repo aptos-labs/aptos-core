@@ -23,5 +23,4 @@ module 0x8675309::M {
           }
         }
     }
-    spec fun $t(account: &signer);
 } // end 0x8675309::M

@@ -105,9 +105,6 @@ pub(crate) enum ExpTranslationMode {
     Spec,
     /// Translate the implementation language fragment
     Impl,
-    /// Special mode attempting to translate implementation code into specification language.
-    /// If successful, allows to call implementation functions from specs.
-    TryImplAsSpec,
 }
 
 #[derive(Debug, PartialEq)]
@@ -128,7 +125,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         for id in parent.parent.get_struct_ids() {
             struct_cache.insert(
                 id,
-                parent.parent.lookup_struct_fields(id.instantiate(vec![])),
+                (
+                    parent.parent.lookup_struct_fields(id.instantiate(vec![])),
+                    parent.parent.lookup_struct_abilities(id),
+                ),
             );
         }
         Self {
@@ -187,15 +187,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.mode = ExpTranslationMode::Impl;
     }
 
-    pub fn set_translate_fun_as_spec_fun(&mut self) {
-        self.mode = ExpTranslationMode::TryImplAsSpec;
-    }
-
     pub fn is_spec_mode(&self) -> bool {
-        matches!(
-            self.mode,
-            ExpTranslationMode::Spec | ExpTranslationMode::TryImplAsSpec
-        )
+        matches!(self.mode, ExpTranslationMode::Spec)
     }
 
     pub fn type_variance(&self) -> Variance {
@@ -215,10 +208,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             (self.mode, visibility),
             (_, EntryVisibility::SpecAndImpl)
                 | (ExpTranslationMode::Impl, EntryVisibility::Impl)
-                | (
-                    ExpTranslationMode::Spec | ExpTranslationMode::TryImplAsSpec,
-                    EntryVisibility::Spec,
-                )
+                | (ExpTranslationMode::Spec, EntryVisibility::Spec,)
         )
     }
 
@@ -262,17 +252,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Shortcut for reporting an error.
     pub fn error_with_notes(&mut self, loc: &Loc, msg: &str, notes: Vec<String>) {
         self.had_errors = true;
-        if self.mode != ExpTranslationMode::TryImplAsSpec {
-            self.parent.parent.error_with_notes(loc, msg, notes);
-        }
+        self.parent.parent.error_with_notes(loc, msg, notes);
     }
 
     /// Shortcut for reporting an error.
     pub fn error_with_labels(&mut self, loc: &Loc, msg: &str, labels: Vec<(Loc, String)>) {
         self.had_errors = true;
-        if self.mode != ExpTranslationMode::TryImplAsSpec {
-            self.env().error_with_labels(loc, msg, labels);
-        }
+        self.env().error_with_labels(loc, msg, labels);
     }
 
     /// Shortcut for reporting a bug
@@ -1444,12 +1430,6 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let id = self.new_node_id_with_type_loc(&result_ty, &loc);
                 ExpData::Mutate(id, lhs.into_exp(), rhs.into_exp())
             },
-            EA::Exp_::Dereference(exp) | EA::Exp_::Borrow(_, exp)
-                if self.mode == ExpTranslationMode::TryImplAsSpec =>
-            {
-                // Skip reference operators when interpreting as specification expression.
-                self.translate_exp(exp, expected_type)
-            },
             EA::Exp_::Dereference(exp) => {
                 self.require_impl_language(&loc);
                 let var = self.fresh_type_var_constr(
@@ -2104,32 +2084,20 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         module_name: self.parent.module_name.clone(),
                         symbol: remapped_sym,
                     };
-                    let spec_fun_entry = match self.parent.parent.spec_fun_table.get(&spec_fun_sym)
-                    {
+                    let fun_entry = match self.parent.parent.fun_table.get(&spec_fun_sym) {
                         None => {
                             self.error(
                                 loc,
                                 &format!(
-                                    "Unable to find spec function from lifted lambda: {}",
-                                    remapped_sym.display(self.symbol_pool())
+                                    "Unable to find function from lifted \
+                                    lambda: {} (for parameter {})",
+                                    remapped_sym.display(self.symbol_pool()),
+                                    sym.display(self.symbol_pool())
                                 ),
                             );
                             return Some(self.new_error_exp());
                         },
-                        Some(entries) => {
-                            if entries.len() != 1 {
-                                self.error(
-                                    loc,
-                                    &format!(
-                                        "Expect a unique spec function from lifted lambda: {}, found {}",
-                                        remapped_sym.display(self.symbol_pool()),
-                                        entries.len()
-                                    ),
-                                );
-                                return Some(self.new_error_exp());
-                            }
-                            entries.last().unwrap().clone()
-                        },
+                        Some(entry) => entry.clone(),
                     };
 
                     // the preset arguments always appears in front
@@ -2158,10 +2126,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
                     // type checking
                     let return_type_error =
-                        self.check_type(loc, &spec_fun_entry.result_type, expected_type, context)
+                        self.check_type(loc, &fun_entry.result_type, expected_type, context)
                             == Type::Error;
 
-                    if full_arg_types.len() != spec_fun_entry.params.len() {
+                    if full_arg_types.len() != fun_entry.params.len() {
                         self.error(
                             loc,
                             &format!(
@@ -2173,7 +2141,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     }
                     let param_type_error = full_arg_types
                         .iter()
-                        .zip(spec_fun_entry.params.iter().map(|p| &p.1))
+                        .zip(fun_entry.params.iter().map(|p| &p.1))
                         .any(|(actual_ty, expected_ty)| {
                             self.check_type(
                                 loc,
@@ -2187,32 +2155,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     }
 
                     // construct the call
-                    match &spec_fun_entry.oper {
-                        Operation::SpecFunction(module_id, spec_fun_id, None) => {
-                            if self.mode != ExpTranslationMode::TryImplAsSpec {
-                                // Record the usage of spec function in specs, used later in spec
-                                // translator.
-                                self.parent
-                                    .parent
-                                    .add_used_spec_fun(module_id.qualified(*spec_fun_id));
-                            }
-                            self.called_spec_funs.insert((*module_id, *spec_fun_id));
-                        },
-                        _ => {
-                            self.error(
-                                loc,
-                                &format!(
-                                    "Invalid spec function entry for {}",
-                                    remapped_sym.display(self.symbol_pool())
-                                ),
-                            );
-                            return Some(self.new_error_exp());
-                        },
-                    }
                     let call_exp_id = self.new_node_id_with_type_loc(expected_type, loc);
                     return Some(ExpData::Call(
                         call_exp_id,
-                        spec_fun_entry.oper.clone(),
+                        Operation::MoveFunction(fun_entry.module_id, fun_entry.fun_id),
                         full_arg_exprs,
                     ));
                 }
@@ -2316,16 +2262,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.exit_scope();
                     self.new_bind_exp(loc, pat, binding, rest.into_exp())
                 },
-                Seq(exp)
-                    if self.mode != ExpTranslationMode::Impl
-                        && matches!(exp.value, EA::Exp_::Spec(..)) =>
-                {
-                    // Skip specification blocks if we are not in Impl translation mode.
-                    // This is specifically relevant for the TryImplAsSpec mode where the spec
-                    // blocks must be ignored.
-                    self.translate_seq_recursively(loc, &items[1..], expected_type, context)
-                },
                 Seq(exp) if items.len() > 1 => {
+                    // This is an actual impl language sequence `s;rest`.
+                    self.require_impl_language(loc);
                     // There is an item after this one, so the value can be dropped. The default
                     // type of the expression is `()`.
                     let exp_loc = self.to_loc(&exp.loc);
@@ -2346,32 +2285,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             )
                             .expect("success on fresh var");
                     }
-
-                    if self.mode == ExpTranslationMode::TryImplAsSpec
-                        && matches!(exp, ExpData::Call(_, Operation::NoOp, _))
-                    {
-                        // Skip assert! statements (marked via NoOp) when translating move functions
-                        // as spec functions
-                        self.translate_seq_recursively(loc, &items[1..], expected_type, context)
-                    } else {
-                        // This is an actual impl language sequence `s;rest`.
-                        self.require_impl_language(loc);
-                        let rest = self.translate_seq_recursively(
-                            loc,
-                            &items[1..],
-                            expected_type,
-                            context,
-                        );
-                        let id = self.new_node_id_with_type_loc(expected_type, loc);
-                        let exps = match exp {
-                            ExpData::Sequence(_, mut exps) => {
-                                exps.push(rest.into_exp());
-                                exps
-                            },
-                            _ => vec![exp.into_exp(), rest.into_exp()],
-                        };
-                        ExpData::Sequence(id, exps)
-                    }
+                    let rest =
+                        self.translate_seq_recursively(loc, &items[1..], expected_type, context);
+                    let id = self.new_node_id_with_type_loc(expected_type, loc);
+                    let exps = match exp {
+                        ExpData::Sequence(_, mut exps) => {
+                            exps.push(rest.into_exp());
+                            exps
+                        },
+                        _ => vec![exp.into_exp(), rest.into_exp()],
+                    };
+                    ExpData::Sequence(id, exps)
                 },
                 Seq(exp) => self.translate_exp_in_context(exp, expected_type, context),
             }
@@ -2541,12 +2465,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let id = self.new_node_id_with_type_loc(&ty, loc);
             if let Some(oper) = oper_opt {
                 Some(ExpData::Call(id, oper, vec![]))
-            } else if let Some(index) =
-                index_opt.filter(|_| self.mode != ExpTranslationMode::TryImplAsSpec)
-            {
-                // Only create a temporary if we are not currently translating a move function as
-                // a spec function, or a let. In this case, the LocalVarEntry has a bytecode index, but
-                // we do not want to use this if interpreted as a spec fun.
+            } else if let Some(index) = index_opt {
                 Some(ExpData::Temporary(id, index))
             } else {
                 Some(ExpData::LocalVar(id, sym))
@@ -2746,11 +2665,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     }
                 }))
             }
-            if self.mode == ExpTranslationMode::Impl {
-                // Add user function.
-                if let Some(entry) = self.parent.parent.fun_table.get(&full_name) {
-                    cands.push(entry.clone().into())
-                }
+            // Add user function.
+            if let Some(entry) = self.parent.parent.fun_table.get(&full_name) {
+                cands.push(entry.clone().into())
             }
         }
         if cands.is_empty() {
@@ -2901,51 +2818,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 };
 
                 if let Operation::SpecFunction(module_id, spec_fun_id, None) = oper {
-                    if self.mode != ExpTranslationMode::TryImplAsSpec {
-                        // Record the usage of spec function in specs, used later
-                        // in spec translator.
-                        self.parent
-                            .parent
-                            .add_used_spec_fun(module_id.qualified(spec_fun_id));
-                    }
-                    let module_name = match module {
-                        Some(m) => m,
-                        _ => &self.parent.module_name,
-                    }
-                    .clone();
-                    let qsym = QualifiedSymbol {
-                        module_name,
-                        symbol: name,
-                    };
-                    // If the spec function called is from a Move function,
-                    // error if it is not pure.
-                    if let Some(entry) = self.parent.parent.fun_table.get(&qsym) {
-                        if !entry.is_pure {
-                            if self.mode == ExpTranslationMode::TryImplAsSpec {
-                                // The Move function is calling another impure Move function,
-                                // so it should be considered impure.
-                                if module_id.to_usize() < self.parent.module_id.to_usize() {
-                                    self.error(loc, "Move function calls impure Move function");
-                                    return self.new_error_exp();
-                                }
-                            } else {
-                                let display = self.display_call_target(module, name);
-                                let notes = vec![format!(
-                                    "impure function `{}`",
-                                    self.display_call_cand(module, name, cand),
-                                )];
-                                self.env().error_with_notes(
-                                    loc,
-                                    &format!(
-                                        "calling impure function `{}` is not allowed",
-                                        display
-                                    ),
-                                    notes,
-                                );
-                                return self.new_error_exp();
-                            }
-                        }
-                    }
+                    // Record the usage of spec function in specs, used later
+                    // in spec translator.
+                    self.parent
+                        .parent
+                        .add_used_spec_fun(module_id.qualified(spec_fun_id));
                     self.called_spec_funs.insert((module_id, spec_fun_id));
                 }
                 self.add_conversions(cand, &instantiation, &mut translated_args);
@@ -3717,30 +3594,13 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         type_args: &Option<Vec<EA::Type>>,
         args: &Spanned<Vec<EA::Exp>>,
         expected_type: &Type,
-        context: &ErrorMessageContext,
+        _context: &ErrorMessageContext,
     ) -> ExpData {
         let loc = &self.to_loc(&maccess.loc);
         if type_args.is_some() {
             self.error(loc, "macro invocation cannot have type arguments");
             self.new_error_exp()
         } else if let EA::ModuleAccess_::Name(name) = &maccess.value {
-            let name_sym = self.symbol_pool().make(name.value.as_str());
-            if self.mode == ExpTranslationMode::TryImplAsSpec
-                && name_sym == self.parent.parent.assert_symbol()
-            {
-                // In specification expressions, ignore assert! macro. The assert macro does not
-                // influence the semantics of the specification function. This allows us to
-                // interpret (some) implementation functions as spec functions.
-                // TODO: we should rework this in the process of integration spec/impl functions in
-                //   one unique concept, with `FunctionKind::Spec` a new function kind.
-                let loc = self.to_loc(&maccess.loc);
-                let ty = self.check_type(&loc, &Type::unit(), expected_type, context);
-                return ExpData::Call(
-                    self.new_node_id_with_type_loc(&ty, &self.to_loc(&maccess.loc)),
-                    Operation::NoOp,
-                    vec![],
-                );
-            }
             let expansion = self
                 .parent
                 .parent

@@ -37,5 +37,4 @@ module 0xcafe::vectors {
           }
         }
     }
-    spec fun $guess_flips_break2(flips: vector<u8>): u64;
 } // end 0xcafe::vectors

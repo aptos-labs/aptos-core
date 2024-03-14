@@ -5,9 +5,12 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::debug;
 use move_compiler_v2::{
-    annotate_units, ast_simplifier, disassemble_compiled_units,
-    env_pipeline::{lambda_lifter, lambda_lifter::LambdaLiftingOptions, EnvProcessorPipeline},
-    flow_insensitive_checkers, function_checker, inliner, logging, pipeline,
+    annotate_units, ast_simplifier, check_and_rewrite_pipeline, disassemble_compiled_units,
+    env_pipeline::{
+        lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
+        spec_rewriter, EnvProcessorPipeline,
+    },
+    logging, pipeline,
     pipeline::{
         ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
@@ -98,30 +101,16 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
 
 impl TestConfig {
     fn get_config_from_path(path: &Path, options: &mut Options) -> TestConfig {
-        // Construct options, compiler and collect output.
-        let path = path.to_string_lossy();
-        // The default transformation pipeline on the GlobalEnv
-        let mut env_pipeline = EnvProcessorPipeline::default();
-        env_pipeline.add(
-            "unused checks",
-            flow_insensitive_checkers::check_for_unused_vars_and_params,
-        );
-        env_pipeline.add(
-            "type parameter check",
-            function_checker::check_for_function_typed_parameters,
-        );
-        env_pipeline.add(
-            "access and use check before inlining",
-            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
-        );
-        env_pipeline.add("inlining", inliner::run_inlining);
-        env_pipeline.add(
-            "access and use check after inlining",
-            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
-        );
+        // The transformation pipeline on the GlobalEnv
+        let mut env_pipeline =
+            check_and_rewrite_pipeline(options, false, RewritingScope::CompilationTarget);
+        // Add the specification rewriter for testing here as well, even though it is not run
+        // as part of regular compilation, but only as part of a prover run.
+        env_pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
+
         // The bytecode transformation pipeline
         let mut pipeline = FunctionTargetPipeline::default();
-
+        let path = path.to_string_lossy();
         if path.contains("/inlining/")
             || path.contains("/folding/")
             || path.contains("/simplifier/")
