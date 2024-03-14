@@ -503,12 +503,12 @@ impl<'a> ExtendedChecker<'a> {
             fun.get_parameter_types().iter().for_each(| parameter_type| {
                 match parameter_type {
                     Type::Primitive(inner) => match inner {
-                        PrimitiveType::Signer => self.env.error(&fun.get_id_loc(), "view function must return values"),
+                        PrimitiveType::Signer => self.env.error(&fun.get_id_loc(), "view function cannot use the signer paremter"),
                         _ => ()
                     },
                     Type::Reference(_, inner) => match inner.as_ref() {
                         Type::Primitive(inner) => match inner {
-                            PrimitiveType::Signer => self.env.error(&fun.get_id_loc(), "view function must return values"),
+                            PrimitiveType::Signer => self.env.error(&fun.get_id_loc(), "view function cannot use the & signer paremter"),
                             _ => ()
                         },
                         _ => ()

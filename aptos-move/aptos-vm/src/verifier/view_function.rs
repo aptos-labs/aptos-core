@@ -63,7 +63,7 @@ pub(crate) fn validate_view_function(
                 match inner.as_ref() {
                     &Signer => return Err(
                         PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                            .with_message("view function cannot use the signer paremter".to_string())),
+                            .with_message("view function cannot use the & signer paremter".to_string())),
                     _ => ()
                 } ,
             _ => ()
