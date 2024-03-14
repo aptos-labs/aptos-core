@@ -216,7 +216,7 @@ impl DagStateSynchronizer {
 
         // Create a new DAG store and Fetch blocks
         let target_round = node.round();
-        let commit_round = commit_li.commit_info().round();
+        let commit_round = commit_info_anchor_round;
         let start_round = commit_round.saturating_sub(self.dag_window_size_config);
         let sync_dag_store = Arc::new(DagStore::new_empty(
             self.epoch_state.clone(),
