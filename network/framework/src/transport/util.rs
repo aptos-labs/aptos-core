@@ -141,10 +141,9 @@ async fn connect_outbound<TTransport, TSocket>(
             warn!(
                 addr = addr,
                 peer = remote_peer_network_id,
-                error = err,
-                "dial err 1",
+                "dial err 1: {:?}", err,
             );
-            // TODO: counter
+            // TODO: counter?
             return Err(err);
         }
     };
@@ -162,10 +161,9 @@ async fn connect_outbound<TTransport, TSocket>(
             warn!(
                 addr = addr,
                 peer = remote_peer_network_id,
-                error = err,
-                "dial err 2",
+                "dial err 2: {:?}", err,
             );
-            // TODO: counter
+            // TODO: counter?
             return Err(err);
         }
     };
