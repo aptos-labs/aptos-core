@@ -132,7 +132,7 @@ pub struct JWTHeader {
 }
 
 impl KeylessSignature {
-    /// A reasonable upper bound for the number of bytes we expect in a keyless public key. This is
+    /// A reasonable upper bound for the number of bytes we expect in a keyless signature. This is
     /// enforced by our full nodes when they receive TXNs.
     pub const MAX_LEN: usize = 4000;
 
