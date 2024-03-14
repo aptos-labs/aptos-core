@@ -1,5 +1,6 @@
 // Initialize on-chain randomness resources.
 script {
+    use aptos_framework::aptos_governance;
     use aptos_framework::config_buffer;
     use aptos_framework::dkg;
     use aptos_framework::randomness;
