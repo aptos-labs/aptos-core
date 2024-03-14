@@ -29,6 +29,7 @@ use aptos_api_types::{
     MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
+use aptos_logger::prelude::*;
 use aptos_types::{
     account_config::CoinStoreResource,
     mempool_status::MempoolStatusCode,
@@ -45,7 +46,7 @@ use poem_openapi::{
     payload::Json,
     ApiRequest, OpenApi,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 generate_success_response!(SubmitTransactionResponse, (202, Accepted));
 
@@ -203,8 +204,18 @@ impl TransactionsApi {
         txn_hash: Path<HashValue>,
         // TODO: Use a new request type that can't return 507.
     ) -> BasicResultWith404<Transaction> {
+        let start_time = std::time::Instant::now();
         fail_point_poem("endpoint_transaction_by_hash")?;
-        self.wait_transaction_by_hash(accept_type, txn_hash).await
+        let result = self.wait_transaction_by_hash(accept_type, txn_hash).await;
+        sample!(
+            SampleRate::Duration(Duration::from_secs(60)),
+            info!(
+                "get_transaction_by_hash long poll result: {}, duration ms: {}",
+                result.is_ok(),
+                start_time.elapsed().as_millis()
+            )
+        );
+        result
     }
 
     /// Wait for transaction by hash
