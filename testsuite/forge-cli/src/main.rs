@@ -601,11 +601,11 @@ fn k8s_test_suite() -> ForgeConfig {
 fn get_land_blocking_test(
     test_name: &str,
     duration: Duration,
-    test_cmd: &TestCommand,
+    _test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "realistic_env_max_load" => pfn_performance(duration, false, true, false), // realistic_env_max_load_test(duration, test_cmd, 7, 5)
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -2450,7 +2450,7 @@ fn pfn_performance(
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
         .with_initial_fullnode_count(7)
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .add_network_test(PFNPerformance::new(4, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
