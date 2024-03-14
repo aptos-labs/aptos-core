@@ -1014,7 +1014,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     fn check_borrow_safety(&mut self, temps_vec: &[TempIndex]) {
         // First check direct duplicates
         for (i, temp) in temps_vec.iter().enumerate() {
-            if temps_vec[i + 1..].contains(temp) {
+            if self.ty(*temp).is_mutable_reference() && temps_vec[i + 1..].contains(temp) {
                 self.exclusive_access_direct_dup_error(*temp)
             }
         }

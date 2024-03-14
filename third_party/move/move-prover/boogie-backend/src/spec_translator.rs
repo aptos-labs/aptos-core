@@ -952,7 +952,7 @@ impl<'env> SpecTranslator<'env> {
             | Operation::Abort
             | Operation::Vector
             | Operation::Old => {
-                panic!("operation unexpected: {:?}", oper)
+                panic!("operation unexpected: {}", oper.display(self.env, node_id))
             },
         }
     }

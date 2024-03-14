@@ -1,12 +1,6 @@
 ============ initial bytecode ================
 
 [variant baseline]
-fun m::g<#0>($t0: &mut vector<#0>) {
-  0: return ()
-}
-
-
-[variant baseline]
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
@@ -18,18 +12,17 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
   3: m::g<#0>($t4)
   4: $t1 := infer($t2)
   5: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+  0: return ()
 }
 
 ============ after LiveVarAnalysisProcessor: ================
 
 [variant baseline]
-fun m::g<#0>($t0: &mut vector<#0>) {
-     # live vars: $t0
-  0: return ()
-}
-
-
-[variant baseline]
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
@@ -47,22 +40,18 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
   4: $t1 := infer($t2)
      # live vars: $t1
   5: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+     # live vars: $t0
+  0: return ()
 }
 
 ============ after ReferenceSafetyProcessor: ================
 
 [variant baseline]
-fun m::g<#0>($t0: &mut vector<#0>) {
-     # live vars: $t0
-     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
-     #
-  0: return ()
-}
-
-
-[variant baseline]
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
@@ -104,23 +93,22 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
      # globals: {}
      #
   5: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+     # live vars: $t0
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
+     #
+  0: return ()
 }
 
 ============ after AbortAnalysisProcessor: ================
 
 [variant baseline]
-fun m::g<#0>($t0: &mut vector<#0>) {
-     # abort state: {returns}
-     # live vars: $t0
-     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
-     # locals: {$t0=@2000000}
-     # globals: {}
-     #
-  0: return ()
-}
-
-
-[variant baseline]
 public fun m::singleton<#0>($t0: #0): vector<#0> {
      var $t1: vector<#0>
      var $t2: vector<#0>
@@ -170,14 +158,19 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
   5: return $t1
 }
 
-============ after AbilityProcessor: ================
 
 [variant baseline]
 fun m::g<#0>($t0: &mut vector<#0>) {
-  0: drop($t0)
-  1: return ()
+     # abort state: {returns}
+     # live vars: $t0
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
+     #
+  0: return ()
 }
 
+============ after AbilityProcessor: ================
 
 [variant baseline]
 public fun m::singleton<#0>($t0: #0): vector<#0> {
@@ -191,4 +184,11 @@ public fun m::singleton<#0>($t0: #0): vector<#0> {
   3: m::g<#0>($t4)
   4: $t1 := move($t2)
   5: return $t1
+}
+
+
+[variant baseline]
+fun m::g<#0>($t0: &mut vector<#0>) {
+  0: drop($t0)
+  1: return ()
 }

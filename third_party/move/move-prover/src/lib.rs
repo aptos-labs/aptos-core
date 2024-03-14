@@ -26,6 +26,7 @@ use move_prover_bytecode_pipeline::{
 };
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use std::{
+    cell::RefCell,
     fs,
     path::{Path, PathBuf},
     time::Instant,
@@ -46,7 +47,6 @@ pub fn run_move_prover<W: WriteColor>(
     options: Options,
 ) -> anyhow::Result<()> {
     let now = Instant::now();
-    // Run the model builder.
     let addrs = parse_addresses_from_options(options.move_named_address_values.clone())?;
     let mut env = run_model_builder_with_options(
         vec![PackagePaths {
@@ -64,6 +64,29 @@ pub fn run_move_prover<W: WriteColor>(
         KnownAttribute::get_all_attribute_names(),
     )?;
     run_move_prover_with_model(&mut env, error_writer, options, Some(now))
+}
+
+pub fn run_move_prover_v2<W: WriteColor>(
+    error_writer: &mut W,
+    options: Options,
+) -> anyhow::Result<()> {
+    let now = Instant::now();
+    let cloned_options = options.clone();
+    let compiler_options = move_compiler_v2::Options {
+        dependencies: cloned_options.move_deps,
+        named_address_mapping: cloned_options.move_named_address_values,
+        output_dir: cloned_options.output_path,
+        skip_attribute_checks: true,
+        known_attributes: Default::default(),
+        testing: cloned_options.backend.stable_test_output,
+        experiments: vec![],
+        experiment_cache: RefCell::new(Default::default()),
+        sources: cloned_options.move_sources,
+        warn_unused: false,
+        whole_program: false,
+    };
+    let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;
+    run_move_prover_with_model_v2(&mut env, error_writer, options, now)
 }
 
 /// Create the initial number operation state for each function and struct
@@ -89,6 +112,7 @@ pub fn run_move_prover_with_model<W: WriteColor>(
     timer: Option<Instant>,
 ) -> anyhow::Result<()> {
     let now = timer.unwrap_or_else(Instant::now);
+    debug!("global env before prover run: {}", env.dump_env_all());
 
     // Run the compiler v2 checking and rewriting pipeline
     let compiler_options = move_compiler_v2::Options::default();
@@ -100,10 +124,18 @@ pub fn run_move_prover_with_model<W: WriteColor>(
     );
     pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
     pipeline.run(env);
+    run_move_prover_with_model_v2(env, error_writer, options, now)
+}
 
+pub fn run_move_prover_with_model_v2<W: WriteColor>(
+    env: &mut GlobalEnv,
+    error_writer: &mut W,
+    options: Options,
+    start_time: Instant,
+) -> anyhow::Result<()> {
     debug!("global env before prover run:\n{}", env.dump_env_all());
 
-    let build_duration = now.elapsed();
+    let build_duration = start_time.elapsed();
     check_errors(
         env,
         &options,
@@ -121,16 +153,16 @@ pub fn run_move_prover_with_model<W: WriteColor>(
 
     // Until this point, prover and docgen have same code. Here we part ways.
     if options.run_docgen {
-        return run_docgen(env, &options, error_writer, now);
+        return run_docgen(env, &options, error_writer, start_time);
     }
     // Same for ABI generator.
     if options.run_abigen {
-        return run_abigen(env, &options, now);
+        return run_abigen(env, &options, start_time);
     }
     // Same for the error map generator
     if options.run_errmapgen {
         return {
-            run_errmapgen(env, &options, now);
+            run_errmapgen(env, &options, start_time);
             Ok(())
         };
     }
