@@ -1,0 +1,10 @@
+[package]
+name = "BCSStream"
+version = "0.0.0"
+
+[addresses]
+bcs_stream = "_"
+
+[dependencies]
+AptosStdlib = { local = "../../framework/aptos-stdlib" }
+AptosFramework = { local = "../../framework/aptos-framework" }
