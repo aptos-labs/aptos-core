@@ -39,14 +39,14 @@ fn init_feature_gating(
 }
 
 fn test_feature_gating(
-    mut h: &mut MoveHarness,
+    h: &mut MoveHarness,
     recipient: &Account,
     get_sig_and_pk: fn() -> (KeylessSignature, KeylessPublicKey),
     should_succeed: bool,
 ) {
     let (sig, pk) = get_sig_and_pk();
 
-    let transaction = get_keyless_txn(&mut h, sig, pk, *recipient.address());
+    let transaction = get_keyless_txn(h, sig, pk, *recipient.address());
     let output = h.run_raw(transaction);
 
     if !should_succeed {
