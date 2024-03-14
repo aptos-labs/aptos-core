@@ -13,7 +13,7 @@ use aptos_protos::{
     util::timestamp::FILE_DESCRIPTOR_SET as UTIL_TIMESTAMP_FILE_DESCRIPTOR_SET,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, net::SocketAddr};
+use std::{collections::HashSet, net::SocketAddr, sync::Arc};
 use tonic::{codec::CompressionEncoding, transport::Server};
 
 pub const SERVER_NAME: &str = "idxdatasvc";
@@ -138,6 +138,18 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         } else {
             StorageFormat::Base64UncompressedProto
         };
+
+        let redis_conn = redis::Client::open(self.redis_read_replica_address.0.clone())?
+            .get_tokio_connection_manager()
+            .await?;
+
+        // InMemoryCache.
+        let in_memory_cache =
+            aptos_indexer_grpc_utils::in_memory_cache::InMemoryCache::new_with_redis_connection(
+                redis_conn,
+                cache_storage_format,
+            )
+            .await?;
         // Add authentication interceptor.
         let server = RawDataServerWrapper::new(
             self.redis_read_replica_address.clone(),
@@ -148,6 +160,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
                 .into_iter()
                 .collect::<HashSet<_>>(),
             cache_storage_format,
+            Arc::new(in_memory_cache),
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)
