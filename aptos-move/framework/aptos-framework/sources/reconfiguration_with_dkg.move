@@ -2,8 +2,6 @@
 module aptos_framework::reconfiguration_with_dkg {
     use std::features;
     use std::option;
-    use std::string::utf8;
-    use aptos_std::debug;
     use aptos_framework::consensus_config;
     use aptos_framework::dkg;
     use aptos_framework::execution_config;
@@ -20,12 +18,10 @@ module aptos_framework::reconfiguration_with_dkg {
     /// Trigger a reconfiguration with DKG.
     /// Do nothing if one is already in progress.
     public(friend) fun try_start() {
-        debug::print(&utf8(b"0312 - try_start begin"));
         let incomplete_dkg_session = dkg::incomplete_session();
         if (option::is_some(&incomplete_dkg_session)) {
             let session = option::borrow(&incomplete_dkg_session);
             if (dkg::session_dealer_epoch(session) == reconfiguration::current_epoch()) {
-                debug::print(&utf8(b"0312 - try_start abort"));
                 return
             }
         };
@@ -37,7 +33,6 @@ module aptos_framework::reconfiguration_with_dkg {
             stake::cur_validator_consensus_infos(),
             stake::next_validator_consensus_infos(),
         );
-        debug::print(&utf8(b"0312 - try_start end"))
     }
 
     /// Clear incomplete DKG session, if it exists.

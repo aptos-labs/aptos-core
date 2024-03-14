@@ -6,8 +6,6 @@ module aptos_framework::block {
     use std::option;
     use aptos_std::table_with_length::{Self, TableWithLength};
     use std::option::Option;
-    use std::string::utf8;
-    use aptos_std::debug;
     use aptos_framework::randomness;
 
     use aptos_framework::account;
@@ -215,7 +213,6 @@ module aptos_framework::block {
         timestamp: u64,
         randomness_seed: Option<vector<u8>>,
     ) acquires BlockResource, CommitHistory {
-        debug::print(&utf8(b"0312 - block_prologue_ext begin"));
         let epoch_interval = block_prologue_common(
             &vm,
             hash,
@@ -231,7 +228,6 @@ module aptos_framework::block {
         if (timestamp - reconfiguration::last_reconfiguration_time() >= epoch_interval) {
             reconfiguration_with_dkg::try_start();
         };
-        debug::print(&utf8(b"0312 - block_prologue_ext end"))
     }
 
     #[view]

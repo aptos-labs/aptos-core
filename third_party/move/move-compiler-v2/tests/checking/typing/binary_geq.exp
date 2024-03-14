@@ -4,14 +4,14 @@ module 0x8675309::M {
         f: u64,
     }
     private fun t0(x: u64,r: M::R) {
-        Ge<u64>(0, 0);
-        Ge<u64>(1, 0);
-        Ge<u64>(0, 1);
-        Ge<u8>(0, 1);
-        Ge<u8>(0, 1);
-        Ge<u128>(0, 1);
-        Ge<u128>(0, 1);
-        Ge<u64>(0, 1);
+        true;
+        true;
+        false;
+        false;
+        false;
+        false;
+        false;
+        false;
         Ge<u64>(Copy(x), Move(x));
         Ge<u64>(select M::R.f(r), select M::R.f(r));
         And(Ge<u64>(1, select M::R.f(r)), Ge<u64>(select M::R.f(r), 0));
@@ -20,5 +20,4 @@ module 0x8675309::M {
           Tuple()
         }
     }
-    spec fun $t0(x: u64,r: M::R);
 } // end 0x8675309::M

@@ -10870,6 +10870,7 @@ dependencies = [
  "move-symbol-pool",
  "num 0.4.1",
  "once_cell",
+ "petgraph 0.6.4",
  "serde",
 ]
 
@@ -11170,6 +11171,7 @@ dependencies = [
  "move-binary-format",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-core-types",
  "move-docgen",
  "move-errmapgen",
@@ -11318,6 +11320,7 @@ dependencies = [
  "codespan-reporting",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-model",
  "move-prover-test-utils",
  "move-stackless-bytecode",

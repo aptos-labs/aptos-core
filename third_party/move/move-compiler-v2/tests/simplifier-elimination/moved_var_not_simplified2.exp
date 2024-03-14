@@ -12,18 +12,6 @@ module 0xc0ffee::m {
           }
         }
     }
-    spec fun $test(): u8 {
-        {
-          let x: u256 = 40;
-          {
-            let y: u256 = Move(x);
-            {
-              let _z: u256 = x;
-              y
-            }
-          }
-        }
-    }
 } // end 0xc0ffee::m
 
 

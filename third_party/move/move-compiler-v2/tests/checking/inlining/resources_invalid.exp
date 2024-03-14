@@ -3,9 +3,6 @@ module 0x42::objects {
     struct ReaderRef {
         addr: address,
     }
-    spec fun $reader<T>(ref: objects::ReaderRef<#0>): #0 {
-        global<#0>(select objects::ReaderRef.addr(ref))
-    }
 } // end 0x42::objects
 module 0x42::token {
     use 0x42::objects as obj; // resolved as: 0x42::objects
@@ -17,8 +14,5 @@ module 0x42::token {
           let (ref: &objects::ReaderRef<token::Token>): (&objects::ReaderRef<token::Token>) = Tuple(ref);
           BorrowGlobal(Immutable)<token::Token>(select objects::ReaderRef.addr(ref))
         })
-    }
-    spec fun $get_value(ref: objects::ReaderRef<token::Token>): u64 {
-        select token::Token.val(objects::$reader<token::Token>(ref))
     }
 } // end 0x42::token

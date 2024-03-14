@@ -15,7 +15,7 @@ use move_compiler::{command_line::SKIP_ATTRIBUTE_CHECKS, shared::NumericalAddres
 use move_docgen::DocgenOptions;
 use move_errmapgen::ErrmapOptions;
 use move_model::{model::VerificationScope, options::ModelBuilderOptions};
-use move_prover_boogie_backend::options::{BoogieOptions, VectorTheory};
+use move_prover_boogie_backend::options::{BoogieOptions, CustomNativeOptions, VectorTheory};
 use move_prover_bytecode_pipeline::options::{AutoTraceLevel, ProverOptions};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
@@ -156,6 +156,12 @@ impl Options {
                     .long("print-config")
                     .action(SetTrue)
                     .help("prints the effective toml configuration, then exits")
+            )
+            .arg(
+                Arg::new("aptos")
+                    .long("aptos")
+                    .action(SetTrue)
+                    .help("configures the prover to use Aptos natives")
             )
             .arg(
                 Arg::new("output")
@@ -761,6 +767,23 @@ impl Options {
 
         if matches.get_flag("ban-int-2-bv") {
             options.prover.ban_int_2_bv = true;
+        }
+
+        if matches.get_flag("aptos") {
+            options.backend.custom_natives = Some(CustomNativeOptions {
+                template_bytes: include_bytes!(
+                    "../../../../aptos-move/framework/src/aptos-natives.bpl"
+                )
+                .to_vec(),
+                module_instance_names: vec![(
+                    "0x1::object".to_string(),
+                    "object_instances".to_string(),
+                    true,
+                )],
+            });
+            options
+                .move_named_address_values
+                .push("Extensions=0x1".to_string())
         }
 
         options.backend.derive_options();

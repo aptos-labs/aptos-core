@@ -13,7 +13,6 @@ module 0x42::update_field_ok {
       ensures Eq<update_field_ok::R>(Freeze($t0), update_field_ok::assign_x_1(Old<update_field_ok::R>($t0)));
     }
 
-    spec fun $f(r: &mut update_field_ok::R);
     spec fun assign_x_1(r: update_field_ok::R): update_field_ok::R {
         update update_field_ok::R.x<update_field_ok::R>(r, 1)
     }
