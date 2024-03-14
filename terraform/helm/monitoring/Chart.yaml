@@ -1,0 +1,13 @@
+apiVersion: v2
+name: aptos-monitoring
+version: 0.2.0
+
+dependencies:
+  - name: prometheus-node-exporter
+    condition: prometheus-node-exporter.enabled
+    version: 4.0.0
+    repository: "https://prometheus-community.github.io/helm-charts"
+  - name: kube-state-metrics
+    condition: kube-state-metrics.enabled
+    version: 4.16.0
+    repository: "https://prometheus-community.github.io/helm-charts"
