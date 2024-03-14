@@ -789,6 +789,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config.clone(),
                 rand_msg_rx,
+                recovery_data.root_block().round(),
             )
             .await;
 
@@ -1227,6 +1228,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.decoupled_execution(),
             "decoupled execution must be enabled"
         );
+        let highest_committed_round = self
+            .storage
+            .aptos_db()
+            .get_latest_ledger_info()
+            .unwrap()
+            .commit_info()
+            .round();
 
         self.execution_client
             .start_epoch(
@@ -1239,6 +1247,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 rand_config,
                 fast_rand_config,
                 rand_msg_rx,
+                highest_committed_round,
             )
             .await;
 
