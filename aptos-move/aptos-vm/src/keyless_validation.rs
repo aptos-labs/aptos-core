@@ -95,6 +95,25 @@ fn get_jwk_for_authenticator(
 
     let jwk = JWK::try_from(jwk_move_struct)
         .map_err(|_| invalid_signature!("Could not unpack Any in JWK Move struct"))?;
+
+    match &jwk {
+        JWK::RSA(rsa_jwk) => {
+            if rsa_jwk.alg != jwt_header.alg {
+                return Err(invalid_signature!(format!(
+                    "JWK alg ({}) does not match JWT header's alg ({})",
+                    rsa_jwk.alg, jwt_header.alg
+                )));
+            }
+        },
+        JWK::Unsupported(jwk) => {
+            return Err(invalid_signature!(format!(
+                "JWK with KID {} and hex-encoded payload {} is not supported",
+                jwt_header.kid,
+                hex::encode(&jwk.payload)
+            )))
+        },
+    }
+
     Ok(jwk)
 }
 

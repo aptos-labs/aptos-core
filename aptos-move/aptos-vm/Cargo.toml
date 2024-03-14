@@ -63,6 +63,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 smallvec = { workspace = true }
 tracing = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
