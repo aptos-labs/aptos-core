@@ -98,17 +98,22 @@ fn get_jwk_for_authenticator(
     Ok(jwk)
 }
 
+/// Ensures that **all** keyless authenticators in the transaction are valid.
 pub(crate) fn validate_authenticators(
     authenticators: &Vec<(KeylessPublicKey, KeylessSignature)>,
     features: &Features,
     resolver: &impl AptosMoveResolver,
 ) -> Result<(), VMStatus> {
     for (_, sig) in authenticators {
-        // Feature-gating for keyless-but-zkless TXNs: If keyless TXNs *are* enabled, and (1) this
-        // is a ZKless transaction but (2) ZKless TXNs are not yet enabled, discard the TXN from
-        // being put on-chain.
+        // Feature-gating for keyless TXNs (whether ZK or ZKless, whether passkey-based or not)
+        if matches!(sig.cert, EphemeralCertificate::ZeroKnowledgeSig { .. })
+            && !features.is_zk_keyless_enabled()
+        {
+            return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
+        }
+
         if matches!(sig.cert, EphemeralCertificate::OpenIdSig { .. })
-            && !features.is_keyless_zkless_enabled()
+            && !features.is_zkless_keyless_enabled()
         {
             return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
         }

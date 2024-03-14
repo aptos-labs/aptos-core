@@ -24,81 +24,106 @@ use move_core_types::{
     vm_status::StatusCode::FEATURE_UNDER_GATING,
 };
 
-#[test]
-fn test_keyless_disabled() {
-    let mut h = MoveHarness::new_with_features(vec![], vec![FeatureFlag::KEYLESS_ACCOUNTS]);
+fn init_feature_gating(
+    enabled_features: Vec<FeatureFlag>,
+    disabled_features: Vec<FeatureFlag>,
+) -> (MoveHarness, Account) {
+    let mut h = MoveHarness::new_with_features(enabled_features, disabled_features);
 
-    let (sig, pk) = get_sample_groth16_sig_and_pk();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let recipient = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
 
-    let transaction = get_keyless_txn(&mut h, sig, pk, bob);
+    // initialize JWKs
+    run_setup_script(&mut h);
 
+    (h, recipient)
+}
+
+fn test_feature_gating(
+    mut h: &mut MoveHarness,
+    recipient: &Account,
+    get_sig_and_pk: fn() -> (KeylessSignature, KeylessPublicKey),
+    should_succeed: bool,
+) {
+    let (sig, pk) = get_sig_and_pk();
+
+    let transaction = get_keyless_txn(&mut h, sig, pk, *recipient.address());
     let output = h.run_raw(transaction);
-    match output.status() {
-        TransactionStatus::Discard(status) => {
-            assert_eq!(*status, FEATURE_UNDER_GATING)
-        },
-        _ => {
-            panic!("Expected to get FEATURE_UNDER_GATING DiscardedVMStatus")
-        },
+
+    if !should_succeed {
+        match output.status() {
+            TransactionStatus::Discard(status) => {
+                assert_eq!(
+                    *status, FEATURE_UNDER_GATING,
+                    "Expected TransactionStatus::Discard to be FEATURE_UNDER_GATING, but got: {:?}",
+                    status
+                )
+            },
+            _ => {
+                panic!(
+                    "Expected to get a TransactionStatus::Discard, but got: {:?}",
+                    output.status()
+                )
+            },
+        }
+    } else {
+        assert_success!(
+            output.status().clone(),
+            "Expected TransactionStatus::Keep(ExecutionStatus::Success), but got: {:?}",
+            output.status()
+        );
     }
 }
 
 #[test]
-fn test_keyless_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::KEYLESS_ACCOUNTS], vec![]);
+fn test_feature_gating_with_zk_on() {
+    //
+    // ZK & ZKless
+    let (mut h, recipient) = init_feature_gating(
+        vec![
+            FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
+        ],
+        vec![],
+    );
+    // Groth16-based sig => success
+    test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, true);
+    // OIDC-based sig => success
+    test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, true);
 
-    let (sig, pk) = get_sample_groth16_sig_and_pk();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-
-    // initialize JWK
-    run_setup_script(&mut h);
-
-    let transaction = get_keyless_txn(&mut h, sig, pk, bob);
-
-    let output = h.run_raw(transaction);
-    assert_success!(output.status().clone());
-}
-
-#[test]
-fn test_keyless_enabled_but_zkless_disabled() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::KEYLESS_ACCOUNTS], vec![
+    //
+    // ZK & !ZKless
+    let (mut h, recipient) = init_feature_gating(vec![FeatureFlag::KEYLESS_ACCOUNTS], vec![
         FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
     ]);
-
-    let (sig, pk) = get_sample_openid_sig_and_pk();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-
-    // initialize JWK
-    run_setup_script(&mut h);
-
-    let transaction = get_keyless_txn(&mut h, sig, pk, bob);
-
-    let output = h.run_raw(transaction);
-    match output.status() {
-        TransactionStatus::Discard(status) => {
-            assert_eq!(*status, FEATURE_UNDER_GATING)
-        },
-        _ => {
-            panic!("Expected to get FEATURE_UNDER_GATING DiscardedVMStatus")
-        },
-    }
+    // Groth16-based sig => success
+    test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, true);
+    // OIDC-based sig => discard
+    test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, false);
 }
 
 #[test]
-fn test_keyless_enabled_but_zkless_enabled() {
-    let mut h = MoveHarness::new_with_features(vec![FeatureFlag::KEYLESS_ACCOUNTS], vec![]);
+fn test_feature_gating_with_zk_off() {
+    //
+    // !ZK & ZKless
+    let (mut h, recipient) =
+        init_feature_gating(vec![FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS], vec![
+            FeatureFlag::KEYLESS_ACCOUNTS,
+        ]);
+    // Groth16-based sig => discard
+    test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, false);
+    // OIDC-based sig => success
+    test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, true);
 
-    let (sig, pk) = get_sample_openid_sig_and_pk();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
-
-    // initialize JWK
-    run_setup_script(&mut h);
-
-    let transaction = get_keyless_txn(&mut h, sig, pk, bob);
-
-    let output = h.run_raw(transaction);
-    assert_success!(output.status().clone());
+    //
+    // !ZK & !ZKless
+    let (mut h, recipient) = init_feature_gating(vec![], vec![
+        FeatureFlag::KEYLESS_ACCOUNTS,
+        FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
+    ]);
+    // Groth16-based sig => discard
+    test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, false);
+    // OIDC-based sig => discard
+    test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, false);
 }
 
 /// Creates and funds a new account at `pk` and sends coins to `recipient`.
@@ -106,7 +131,7 @@ fn get_keyless_txn(
     h: &mut MoveHarness,
     mut sig: KeylessSignature,
     pk: KeylessPublicKey,
-    recipient: Account,
+    recipient: AccountAddress,
 ) -> SignedTransaction {
     let apk = AnyPublicKey::keyless(pk.clone());
     let addr = AuthenticationKey::any_key(apk.clone()).account_address();
@@ -119,7 +144,7 @@ fn get_keyless_txn(
     println!("Actual address: {}", addr.to_hex());
     println!("Account address: {}", account.address().to_hex());
 
-    let payload = aptos_stdlib::aptos_coin_transfer(*recipient.address(), 1);
+    let payload = aptos_stdlib::aptos_coin_transfer(recipient, 1);
     //println!("Payload: {:?}", payload);
     let raw_txn = TransactionBuilder::new(account.clone())
         .payload(payload)
