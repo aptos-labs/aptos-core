@@ -17,7 +17,7 @@ script {
             utf8(b"https://accounts.google.com/.well-known/openid-configuration"),
         );
         let config = jwk_consensus_config::new_v1(vector[provider_google]);
-        jwks_consensus_config::initialize(&framework, config);
+        jwk_consensus_config::initialize(&framework, config);
         aptos_governance::reconfigure(&framework);
     }
 }
