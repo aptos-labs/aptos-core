@@ -10,7 +10,7 @@ use crate::rand::rand_gen::{
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_types::validator_signer::ValidatorSigner;
 use std::{collections::HashMap, sync::Arc};
 
@@ -49,12 +49,22 @@ impl<D: TAugmentedData> AugDataStore<D> {
         db: Arc<dyn RandStorage<D>>,
     ) -> Self {
         let all_data = db.get_all_aug_data().unwrap_or_default();
+        for (id, _) in &all_data {
+            info!("[AugDataStore] Aug data: {} {}", id.epoch(), id.author());
+        }
         let (to_remove, aug_data) = Self::filter_by_epoch(epoch, all_data.into_iter());
         if let Err(e) = db.remove_aug_data(to_remove) {
             error!("[AugDataStore] failed to remove aug data: {:?}", e);
         }
 
         let all_certified_data = db.get_all_certified_aug_data().unwrap_or_default();
+        for (id, _) in &all_certified_data {
+            info!(
+                "[AugDataStore] Certified Aug data: {} {}",
+                id.epoch(),
+                id.author()
+            );
+        }
         let (to_remove, certified_data) =
             Self::filter_by_epoch(epoch, all_certified_data.into_iter());
         if let Err(e) = db.remove_certified_aug_data(to_remove) {
