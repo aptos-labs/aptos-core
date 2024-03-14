@@ -828,12 +828,13 @@ pub enum StatusCode {
     ACCESS_STACK_LIMIT_EXCEEDED = 4035,
     // We tried to create resource with more than currently allowed number of DelayedFields
     TOO_MANY_DELAYED_FIELDS = 4036,
-
+    // Dynamic function call errors.
+    RUNTIME_DISPATCH_ERROR = 4037,
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4037,
-    RESERVED_RUNTIME_ERROR_2 = 4038,
-    RESERVED_RUNTIME_ERROR_3 = 4039,
-    RESERVED_RUNTIME_ERROR_4 = 4040,
+    RESERVED_RUNTIME_ERROR_1 = 4038,
+    RESERVED_RUNTIME_ERROR_2 = 4039,
+    RESERVED_RUNTIME_ERROR_3 = 4040,
+    RESERVED_RUNTIME_ERROR_4 = 4041,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

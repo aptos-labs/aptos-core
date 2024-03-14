@@ -21,7 +21,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{NumArgs, NumBytes, NumTypeNodes},
-    language_storage::TypeTag,
+    language_storage::{ModuleId, TypeTag},
     vm_status::{StatusCode, StatusType},
 };
 use move_vm_types::{
@@ -40,7 +40,7 @@ use move_vm_types::{
 };
 use std::{
     cmp::min,
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fmt::Write,
     sync::Arc,
 };
@@ -65,6 +65,8 @@ pub(crate) struct Interpreter {
     paranoid_type_checks: bool,
     /// The access control state.
     access_control: AccessControlState,
+    /// Set of modules that exists on call stack.
+    executed_modules: HashSet<ModuleId>,
 }
 
 struct TypeWithLoader<'a, 'b> {
@@ -96,6 +98,7 @@ impl Interpreter {
             call_stack: CallStack::new(),
             paranoid_type_checks: loader.vm_config().paranoid_type_checks,
             access_control: AccessControlState::default(),
+            executed_modules: HashSet::new(),
         }
         .execute_main(
             loader,
@@ -139,9 +142,14 @@ impl Interpreter {
                 .map_err(|e| self.set_location(e))?;
         }
 
+        if let Some(module_id) = function.module_id() {
+            self.executed_modules.insert(module_id.clone());
+        }
+
         let mut current_frame = self
             .make_new_frame(gas_meter, loader, module_store, function, ty_args, locals)
             .map_err(|err| self.set_location(err))?;
+
         // Access control for the new frame.
         self.access_control
             .enter_function(&current_frame, current_frame.function.as_ref())
@@ -170,6 +178,11 @@ impl Interpreter {
                         .map_err(|e| self.set_location(e))?;
 
                     if let Some(frame) = self.call_stack.pop() {
+                        if frame.function.module_id() != current_frame.function.module_id() {
+                            if let Some(module_id) = current_frame.function.module_id() {
+                                self.executed_modules.remove(module_id);
+                            }
+                        }
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
@@ -212,37 +225,31 @@ impl Interpreter {
 
                     if func.is_native() {
                         self.call_native(
+                            &mut current_frame,
                             &resolver,
                             data_store,
+                            module_store,
                             gas_meter,
                             extensions,
                             func,
                             vec![],
                         )?;
-                        current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
-                    let frame = self
-                        .make_call_frame(gas_meter, loader, module_store, func, vec![])
-                        .map_err(|err| {
-                            self.attach_state_if_invariant_violation(
-                                self.set_location(err),
-                                &current_frame,
-                            )
-                        })?;
-
-                    // Access control for the new frame.
-                    self.access_control
-                        .enter_function(&frame, frame.function.as_ref())
-                        .map_err(|e| self.set_location(e))?;
-
-                    self.call_stack.push(current_frame).map_err(|frame| {
-                        let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
-                        let err = set_err_info!(frame, err);
-                        self.attach_state_if_invariant_violation(err, &frame)
+                    self.set_new_call_frame(
+                        &mut current_frame,
+                        gas_meter,
+                        loader,
+                        module_store,
+                        func,
+                        vec![],
+                    )
+                    .map_err(|err| {
+                        self.attach_state_if_invariant_violation(
+                            self.set_location(err),
+                            &current_frame,
+                        )
                     })?;
-                    // Note: the caller will find the the callee's return values at the top of the shared operand stack
-                    current_frame = frame;
                 },
                 ExitCode::CallGeneric(idx) => {
                     let ty_args = resolver
@@ -278,34 +285,71 @@ impl Interpreter {
 
                     if func.is_native() {
                         self.call_native(
-                            &resolver, data_store, gas_meter, extensions, func, ty_args,
+                            &mut current_frame,
+                            &resolver,
+                            data_store,
+                            module_store,
+                            gas_meter,
+                            extensions,
+                            func,
+                            ty_args,
                         )?;
-                        current_frame.pc += 1; // advance past the Call instruction in the caller
                         continue;
                     }
-                    let frame = self
-                        .make_call_frame(gas_meter, loader, module_store, func, ty_args)
-                        .map_err(|err| {
-                            self.attach_state_if_invariant_violation(
-                                self.set_location(err),
-                                &current_frame,
-                            )
-                        })?;
-
-                    // Access control for the new frame.
-                    self.access_control
-                        .enter_function(&frame, frame.function.as_ref())
-                        .map_err(|e| self.set_location(e))?;
-
-                    self.call_stack.push(current_frame).map_err(|frame| {
-                        let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
-                        let err = set_err_info!(frame, err);
-                        self.attach_state_if_invariant_violation(err, &frame)
+                    self.set_new_call_frame(
+                        &mut current_frame,
+                        gas_meter,
+                        loader,
+                        module_store,
+                        func,
+                        ty_args,
+                    )
+                    .map_err(|err| {
+                        self.attach_state_if_invariant_violation(
+                            self.set_location(err),
+                            &current_frame,
+                        )
                     })?;
-                    current_frame = frame;
                 },
             }
         }
+    }
+
+    fn set_new_call_frame(
+        &mut self,
+        current_frame: &mut Frame,
+        gas_meter: &mut impl GasMeter,
+        loader: &Loader,
+        module_store: &ModuleStorageAdapter,
+        func: Arc<Function>,
+        ty_args: Vec<Type>,
+    ) -> PartialVMResult<()> {
+        if let Some(module_id) = func.module_id() {
+            if let Some(current_module_id) = current_frame.function.module_id() {
+                if module_id != current_module_id {
+                    if self.executed_modules.contains(module_id) {
+                        return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                            .with_message(format!(
+                                "Re-entrancy detected: {} already exists on top of the stack",
+                                module_id
+                            )));
+                    }
+                }
+            }
+            self.executed_modules.insert(module_id.clone());
+        }
+        let mut frame = self.make_call_frame(gas_meter, loader, module_store, func, ty_args)?;
+
+        // Access control for the new frame.
+        self.access_control
+            .enter_function(&frame, frame.function.as_ref())?;
+
+        std::mem::swap(current_frame, &mut frame);
+        self.call_stack
+            .push(frame)
+            .map_err(|_| PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW))?;
+
+        Ok(())
     }
 
     /// Returns a `Frame` if the call is to a Move function. Calls to native functions are
@@ -394,8 +438,10 @@ impl Interpreter {
     /// Call a native functions.
     fn call_native(
         &mut self,
+        current_frame: &mut Frame,
         resolver: &Resolver,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -403,8 +449,10 @@ impl Interpreter {
     ) -> VMResult<()> {
         // Note: refactor if native functions push a frame on the stack
         self.call_native_impl(
+            current_frame,
             resolver,
             data_store,
+            module_store,
             gas_meter,
             extensions,
             function.clone(),
@@ -430,8 +478,10 @@ impl Interpreter {
 
     fn call_native_impl(
         &mut self,
+        current_frame: &mut Frame,
         resolver: &Resolver,
         data_store: &mut TransactionDataCache,
+        module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
@@ -443,6 +493,7 @@ impl Interpreter {
         for _ in 0..expected_args {
             args.push_front(self.operand_stack.pop()?);
         }
+        let mut args_ty = VecDeque::new();
 
         if self.paranoid_type_checks {
             for i in 0..expected_args {
@@ -450,6 +501,7 @@ impl Interpreter {
                     resolver.subst(&function.parameter_types()[expected_args - i - 1], &ty_args)?;
                 let ty = self.operand_stack.pop_ty()?;
                 ty.check_eq(&expected_ty)?;
+                args_ty.push_front(ty);
             }
         }
 
@@ -474,14 +526,42 @@ impl Interpreter {
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
-        let return_values = match result {
-            NativeResult::Success { cost, ret_vals } => {
-                gas_meter.charge_native_function(cost, Some(ret_vals.iter()))?;
-                ret_vals
+        match result {
+            NativeResult::Success {
+                cost,
+                ret_vals: return_values,
+            } => {
+                gas_meter.charge_native_function(cost, Some(return_values.iter()))?;
+                // Paranoid check to protect us against incorrect native function implementations. A native function that
+                // returns a different number of values than its declared types will trigger this check
+                if return_values.len() != return_type_count {
+                    return Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(
+                            "Arity mismatch: return value count does not match return type count"
+                                .to_string(),
+                        ),
+                    );
+                }
+                // Put return values on the top of the operand stack, where the caller will find them.
+                // This is one of only two times the operand stack is shared across call stack frames; the other is in handling
+                // the Return instruction for normal calls
+                for value in return_values {
+                    self.operand_stack.push(value)?;
+                }
+
+                if self.paranoid_type_checks {
+                    for ty in function.return_types() {
+                        self.operand_stack.push_ty(resolver.subst(ty, &ty_args)?)?;
+                    }
+                }
+
+                current_frame.pc += 1; // advance past the Call instruction in the caller
+                Ok(())
             },
             NativeResult::Abort { cost, abort_code } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
-                return Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code));
+                Err(PartialVMError::new(StatusCode::ABORTED).with_sub_status(abort_code))
             },
             NativeResult::OutOfGas { partial_cost } => {
                 let err = match gas_meter.charge_native_function(
@@ -494,33 +574,62 @@ impl Interpreter {
                     ),
                 };
 
-                return Err(err);
+                Err(err)
             },
-        };
+            NativeResult::CallFunction {
+                module_name,
+                func_name,
+                ty_args,
+                args,
+            } => {
+                resolver
+                    .loader()
+                    .load_module(&module_name, data_store, module_store)
+                    .map_err(|_| {
+                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
+                            format!(
+                                "Dispatch destination {}::{} doesn't exist",
+                                module_name, func_name
+                            ),
+                        )
+                    })?;
+                let func = resolver.function_from_name(&module_name, &func_name)?;
 
-        // Paranoid check to protect us against incorrect native function implementations. A native function that
-        // returns a different number of values than its declared types will trigger this check
-        if return_values.len() != return_type_count {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    "Arity mismatch: return value count does not match return type count"
-                        .to_string(),
-                ),
-            );
-        }
-        // Put return values on the top of the operand stack, where the caller will find them.
-        // This is one of only two times the operand stack is shared across call stack frames; the other is in handling
-        // the Return instruction for normal calls
-        for value in return_values {
-            self.operand_stack.push(value)?;
-        }
+                if func.is_friend_or_private() {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message(
+                            "Invoking private or friend function during dispatch".to_string(),
+                        ));
+                }
 
-        if self.paranoid_type_checks {
-            for ty in function.return_types() {
-                self.operand_stack.push_ty(resolver.subst(ty, &ty_args)?)?;
-            }
+                for value in args {
+                    self.operand_stack.push(value)?;
+                }
+
+                // Maintaining the type stack for the paranoid mode.
+                //
+                // Calling convention here assumes the native function that performs the dispatch will have the same
+                // type signature as the dispatch target function except the native function will have an extra argument
+                // in the end to determine which function to jump to. The native function shouldn't switch ordering of arguments.
+                //
+                // Runtime will use such convention to reconstruct the type stack required to perform paranoid mode checks.
+                if self.paranoid_type_checks {
+                    args_ty.pop_back();
+                    for ty in args_ty {
+                        self.operand_stack.push_ty(ty)?;
+                    }
+                }
+
+                self.set_new_call_frame(
+                    current_frame,
+                    gas_meter,
+                    resolver.loader(),
+                    module_store,
+                    func,
+                    ty_args,
+                )
+            },
         }
-        Ok(())
     }
 
     /// Make sure only private/friend function can only be invoked by modules under the same address.
