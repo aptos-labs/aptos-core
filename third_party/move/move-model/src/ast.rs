@@ -2126,42 +2126,93 @@ pub enum Value {
 impl Value {
     /// Implement an equality relation on values which identifies representations which
     /// implement the same runtime value, assuming that types match.
-    pub fn equivalent(&self, other: &Value) -> bool {
+    ///
+    /// If `Address` values are symbolic and differ, then no answer can be given.
+    pub fn equivalent(&self, other: &Value) -> Option<bool> {
+        // For 2 structurally unequal addresses, are they definitely different?
+        // We can only be sure if both are numeric.
+        let unequal_addresses_equivalent = |a: &Address, b: &Address| {
+            if let (Address::Numerical(_), Address::Numerical(_)) = (a, b) {
+                Some(false)
+            } else {
+                None // Symbolic inequality is not definitive.
+            }
+        };
+        let addresses_equivalent = |a: &Address, b: &Address| {
+            if a == b {
+                Some(true)
+            } else {
+                unequal_addresses_equivalent(a, b)
+            }
+        };
+        // Reduce with fuzzy AND
+        let option_bool_and = |a: Option<bool>, b: Option<bool>| match (a, b) {
+            (Some(false), _) | (_, Some(false)) => Some(false),
+            (Some(true), Some(true)) => Some(true),
+            _ => None,
+        };
         if self != other {
-            // Check for a few cases of overlapping representations
+            // Check for a few cases of overlapping/ambiguous representations
             match (self, other) {
+                // Symbolic addresses may be incomparable.
+                (Value::Address(addr1), Value::Address(addr2)) => {
+                    unequal_addresses_equivalent(addr1, addr2)
+                },
                 (Value::Vector(x), Value::ByteArray(y))
                 | (Value::ByteArray(y), Value::Vector(x)) => {
                     if x.len() == y.len() {
-                        iter::zip(x, y).all(|(value, byte)| {
+                        Some(iter::zip(x, y).all(|(value, byte)| {
                             if let Value::Number(bigint) = value {
                                 bigint == &BigInt::from(*byte)
                             } else {
                                 false
                             }
-                        })
+                        }))
                     } else {
-                        false
+                        Some(false)
                     }
                 },
                 (Value::Vector(x), Value::AddressArray(y))
                 | (Value::AddressArray(y), Value::Vector(x)) => {
                     if x.len() == y.len() {
-                        iter::zip(x, y).all(|(value, addr)| {
-                            if let Value::Address(addr1) = value {
-                                addr1 == addr
-                            } else {
-                                false
-                            }
-                        })
+                        iter::zip(x, y)
+                            .map(|(value, addr2)| {
+                                if let Value::Address(addr1) = value {
+                                    addresses_equivalent(addr1, addr2)
+                                } else {
+                                    Some(false)
+                                }
+                            })
+                            .reduce(&option_bool_and)
+                            .unwrap_or(Some(true))
                     } else {
-                        false
+                        Some(false)
                     }
                 },
-                _ => false,
+                (Value::AddressArray(x), Value::AddressArray(y)) => {
+                    if x.len() == y.len() {
+                        iter::zip(x, y)
+                            .map(|(addr1, addr2)| addresses_equivalent(addr1, addr2))
+                            .reduce(&option_bool_and)
+                            .unwrap_or(Some(true))
+                    } else {
+                        Some(false)
+                    }
+                },
+                (Value::Vector(x), Value::Vector(y)) => {
+                    if x.len() == y.len() {
+                        iter::zip(x, y)
+                            .map(|(val1, val2)| val1.equivalent(val2))
+                            .reduce(&option_bool_and)
+                            .unwrap_or(Some(true))
+                    } else {
+                        Some(false)
+                    }
+                },
+                _ => Some(false),
             }
         } else {
-            true
+            Some(true)
         }
     }
 }
@@ -3123,77 +3174,182 @@ impl<'a> fmt::Display for EnvDisplay<'a, Spec> {
     }
 }
 
-impl Value {
-    #[test]
-    fn test_equivalent() {
-        // Some test values
-        let v_true = Value::Bool(true);
-        let v_false = Value::Bool(false);
+#[test]
+fn test_value_equivalence() {
+    // Some test values
+    let v_true = Value::Bool(true);
+    let v_false = Value::Bool(false);
 
-        let v_3 = Value::Number(BigInt::from(3));
-        let v_5 = Value::Number(BigInt::from(5));
-        let v_1000 = Value::Number(BigInt::from(1000));
+    let v_3 = Value::Number(BigInt::from(3));
+    let v_5 = Value::Number(BigInt::from(5));
+    let v_1000 = Value::Number(BigInt::from(1000));
 
-        let bv_empty = Value::ByteArray(vec![]);
-        let bv_3_5 = Value::ByteArray(vec![3, 5]);
-        let bv_5_3 = Value::ByteArray(vec![5, 3]);
-        let bv_3_5_5 = Value::ByteArray(vec![3, 5, 5]);
+    let bv_empty = Value::ByteArray(vec![]);
+    let bv_3_5 = Value::ByteArray(vec![3, 5]);
+    let bv_5_3 = Value::ByteArray(vec![5, 3]);
+    let bv_3_5_5 = Value::ByteArray(vec![3, 5, 5]);
 
-        let addr_01 = Address::Numerical(AccountAddress::from_hex_literal("0xcafebeef"));
-        let addr_02 = Address::Numerical(AccountAddress::from_hex_literal("0x01"));
-        let av_01 = Value::Address(addr_01);
-        let av_02 = Value::Address(addr_02);
+    let addr_01 =
+        Address::Numerical(AccountAddress::from_hex_literal("0xcafebeef").expect("success"));
+    let addr_02 = Address::Numerical(AccountAddress::from_hex_literal("0x01").expect("success"));
+    let addr_s1 = Address::Symbolic(Symbol::new(1));
+    let addr_s2 = Address::Symbolic(Symbol::new(2));
+    let av_01 = Value::Address(addr_01.clone());
+    let av_02 = Value::Address(addr_02.clone());
+    let av_s1 = Value::Address(addr_s1.clone());
+    let av_s2 = Value::Address(addr_s2.clone());
 
-        let av_empty = Value::AddressArray(vec![]);
-        let av_a1_a2 = Value::AddressArray(vec![addr_01, addr_02]);
-        let av_a2_a1 = Value::AddressArray(vec![addr_02, addr_01]);
-        let av_a1_a2_a2 = Value::AddressArray(vec![addr_01, addr_02, addr_02]);
+    let av_empty = Value::AddressArray(vec![]);
+    let av_a1_a2 = Value::AddressArray(vec![addr_01.clone(), addr_02.clone()]);
+    let av_a2_a1 = Value::AddressArray(vec![addr_02.clone(), addr_01.clone()]);
+    let av_a1_a2_a2 = Value::AddressArray(vec![addr_01.clone(), addr_02.clone(), addr_02.clone()]);
 
-        let vect_empty = Value::Vector(vec![]);
-        let vect_3_5 = Value::Vector(vec![v_3, v_5]);
-        let vect_5_3 = Value::Vector(vec![v_5, v_3]);
-        let vect_3_5_5 = Value::Vector(vec![v_3, v_5, v_5]);
+    let av_s1_s2 = Value::AddressArray(vec![addr_s1.clone(), addr_s2.clone()]);
+    let av_s2_s1 = Value::AddressArray(vec![addr_s2.clone(), addr_s1.clone()]);
+    let av_s1_s2_s2 = Value::AddressArray(vec![addr_s1.clone(), addr_s2.clone(), addr_s2.clone()]);
+    let av_a1_s1_a2 = Value::AddressArray(vec![addr_01.clone(), addr_s1.clone(), addr_02.clone()]);
+    let av_a1_s2_a2 = Value::AddressArray(vec![addr_01.clone(), addr_s2.clone(), addr_02.clone()]);
+    let av_a2_s1_a1 = Value::AddressArray(vec![addr_02.clone(), addr_s1.clone(), addr_01.clone()]);
+    let av_a2_s2_a1 = Value::AddressArray(vec![addr_02.clone(), addr_s2.clone(), addr_01.clone()]);
+    let av_s1_a1_s2 = Value::AddressArray(vec![addr_s1.clone(), addr_01.clone(), addr_s2.clone()]);
+    let av_s1_a2_s2 = Value::AddressArray(vec![addr_s1.clone(), addr_02.clone(), addr_s1.clone()]);
 
-        let vect_a1_a2 = Value::Vector(vec![av_01, av_02]);
-        let vect_a2_a1 = Value::Vector(vec![av_02, av_01]);
-        let vect_a1_a2_a2 = Value::Vector(vec![av_01, av_02, av_02]);
+    let vect_empty = Value::Vector(vec![]);
+    let vect_3_5 = Value::Vector(vec![v_3.clone(), v_5.clone()]);
+    let vect_5_3 = Value::Vector(vec![v_5.clone(), v_3.clone()]);
+    let vect_3_5_5 = Value::Vector(vec![v_3.clone(), v_5.clone(), v_5.clone()]);
 
-        // Each of these should be different from the others.
-        let distinct_entities = vec![
-            v_true,
-            v_false,
-            v_3,
-            v_5,
-            v_1000,
-            av_01,
-            av_02,
-            av_a1_a2,
-            av_a2_a1,
-            av_a1_a2_a2,
-            vect_3_5,
-            vect_5_3,
-            vect_3_5_5,
-        ];
-        // These entities are equivalent, although not equal.
-        let overlapping_entities = vec![
-            (bv_empty, vec_empty),
-            (bv_3_5, vect_3_5),
-            (bv_5_3, vect_5_3),
-            (bv_3_5_5, vect_3_5_5),
-            (av_empty, vec_empty),
-            (av_a1_a2, vect_a1_a2),
-            (av_a2_a1, vect_a2_a1),
-            (av_a1_a2_a2, vect_a1_a2_a2),
-        ];
+    let vect_a1_a2 = Value::Vector(vec![av_01.clone(), av_02.clone()]);
+    let vect_a2_a1 = Value::Vector(vec![av_02.clone(), av_01.clone()]);
+    let vect_a1_a2_a2 = Value::Vector(vec![av_01.clone(), av_02.clone(), av_02.clone()]);
+    let vect_s1_s2 = Value::Vector(vec![av_s1.clone(), av_s2.clone()]);
+    let vect_s2_s1 = Value::Vector(vec![av_s2.clone(), av_s1.clone()]);
 
-        for val1 in &distinct_entities {
-            for val2 in &distinct_entities {
-                assert!((val1 == val2) == (val1.equivalent(val2)));
-            }
+    let vect_s1_s2_s2 = Value::Vector(vec![av_s1.clone(), av_s2.clone(), av_s2.clone()]);
+    let vect_a1_s1_a2 = Value::Vector(vec![av_01.clone(), av_s1.clone(), av_02.clone()]);
+    let vect_a1_s2_a2 = Value::Vector(vec![av_01.clone(), av_s2.clone(), av_02.clone()]);
+    let vect_a2_s1_a1 = Value::Vector(vec![av_02.clone(), av_s1.clone(), av_01.clone()]);
+    let vect_a2_s2_a1 = Value::Vector(vec![av_02.clone(), av_s2.clone(), av_01.clone()]);
+    let vect_s1_a1_s2 = Value::Vector(vec![av_s1.clone(), av_01.clone(), av_s2.clone()]);
+    let vect_s1_a2_s2 = Value::Vector(vec![av_s1.clone(), av_02.clone(), av_s2.clone()]);
+
+    // Each of these should be different from the others.
+    let distinct_entities = vec![
+        &v_true,
+        &v_false,
+        &v_3,
+        &v_5,
+        &v_1000,
+        &av_01,
+        &av_02,
+        &av_a1_a2,
+        &av_a2_a1,
+        &av_a1_a2_a2,
+        &vect_3_5,
+        &vect_5_3,
+        &vect_3_5_5,
+    ];
+
+    for val1 in &distinct_entities {
+        for val2 in &distinct_entities {
+            assert!(Some(val1 == val2) == val1.equivalent(val2));
+            assert!(Some(val1 == val2) == val2.equivalent(val1));
         }
+    }
 
-        for (val1, val2) in &overlapping_entities {
-            assert!(val1.equivalent(val2));
-        }
+    // These entities are equivalent, although not equal.
+    let overlapping_entities = vec![
+        (&bv_empty, &vect_empty),
+        (&bv_3_5, &vect_3_5),
+        (&bv_5_3, &vect_5_3),
+        (&bv_3_5_5, &vect_3_5_5),
+        (&av_empty, &vect_empty),
+        (&av_a1_a2, &vect_a1_a2),
+        (&av_a2_a1, &vect_a2_a1),
+        (&av_a1_a2_a2, &vect_a1_a2_a2),
+    ];
+
+    for (val1, val2) in &overlapping_entities {
+        assert!(val1.equivalent(val2) == Some(true));
+        assert!(val2.equivalent(val1) == Some(true));
+    }
+
+    // With symbolic addresses, things are not always clear.
+
+    // symbolic AddressArrays of different lengths are distinct, as are AddressArrays pairs that
+    // have some distinct numerical address element pairs.
+    let symbolic_entities_distinct = vec![
+        (&av_s1, &av_s1_s2),
+        (&av_s1_s2, &av_s1_s2_s2),
+        (&av_s1_a1_s2, &av_s1_a2_s2),
+        (&av_s1, &av_empty),
+        (&av_s1_s2, &av_empty),
+        (&av_a1_s1_a2, &av_a2_s1_a1),
+        (&av_a1_s1_a2, &av_a2_s2_a1),
+        (&av_s1, &vect_s1_s2),
+        (&av_s1_s2, &vect_s1_s2_s2),
+        (&av_s1_a1_s2, &vect_s1_a2_s2),
+        (&av_s1, &vect_empty),
+        (&av_s1_s2, &vect_empty),
+        (&av_a1_s1_a2, &vect_a2_s1_a1),
+        (&av_a1_s1_a2, &vect_a2_s2_a1),
+        (&vect_s1_s2, &vect_s1_s2_s2),
+        (&vect_s1_a1_s2, &vect_s1_a2_s2),
+        (&vect_s1_s2, &vect_empty),
+        (&vect_a1_s1_a2, &vect_a2_s1_a1),
+        (&vect_a1_s1_a2, &vect_a2_s2_a1),
+    ];
+
+    for (val1, val2) in &symbolic_entities_distinct {
+        assert!(val1.equivalent(val2) == Some(false));
+        assert!(val2.equivalent(val1) == Some(false));
+    }
+
+    let ambiguous_pairs = vec![
+        (&av_s1_s2, &av_s2_s1),
+        (&av_s1_s2, &av_a1_a2),
+        (&av_a1_s1_a2, &av_a1_s2_a2),
+        (&av_a1_s1_a2, &av_a1_a2_a2),
+        (&av_s1_s2, &vect_s2_s1),
+        (&av_s1_s2, &vect_a1_a2),
+        (&av_a1_s1_a2, &vect_a1_s2_a2),
+        (&av_a1_s1_a2, &vect_a1_a2_a2),
+        (&vect_s1_s2, &vect_s2_s1),
+        (&vect_s1_s2, &vect_a1_a2),
+        (&vect_a1_s1_a2, &vect_a1_s2_a2),
+        (&vect_a1_s1_a2, &vect_a1_a2_a2),
+    ];
+
+    for (val1, val2) in &ambiguous_pairs {
+        assert!(val1.equivalent(val2) == None);
+        assert!(val2.equivalent(val1) == None);
+    }
+
+    let symbolic_examples = vec![
+        &av_s1,
+        &av_s2,
+        &av_a1_a2,
+        &av_a2_a1,
+        &av_a1_a2_a2,
+        &av_s1_s2,
+        &av_s2_s1,
+        &av_s1_s2_s2,
+        &av_a1_s1_a2,
+        &av_a1_s2_a2,
+        &av_a2_s1_a1,
+        &av_s1_a1_s2,
+        &av_s1_a2_s2,
+        &vect_s1_s2,
+        &vect_s2_s1,
+        &vect_s1_s2_s2,
+        &vect_a1_s1_a2,
+        &vect_a1_s2_a2,
+        &vect_a2_s1_a1,
+        &vect_s1_a1_s2,
+        &vect_s1_a2_s2,
+    ];
+
+    for val1 in &symbolic_examples {
+        assert!(val1.equivalent(&((*val1).clone())) == Some(true));
     }
 }
