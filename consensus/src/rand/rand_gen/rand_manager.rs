@@ -20,12 +20,8 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel;
-<<<<<<< HEAD
 use aptos_config::config::ReliableBroadcastConfig;
-use aptos_consensus_types::common::Author;
-=======
 use aptos_consensus_types::common::{Author, Round};
->>>>>>> 538f7472e9 ([rand] fix randomness bootstrap)
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, spawn_named, warn};
 use aptos_network::{protocols::network::RpcError, ProtocolId};
