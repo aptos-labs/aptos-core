@@ -336,20 +336,12 @@ impl<'env> ConstantFolder<'env> {
                 }
             } else {
                 match oper {
-                    O::Eq => {
-                        if let Some(equivalence) = val0.equivalent(val1) {
-                            Some(V(id, Bool(equivalence)).into_exp())
-                        } else {
-                            None
-                        }
-                    },
-                    O::Neq => {
-                        if let Some(equivalence) = val0.equivalent(val1) {
-                            Some(V(id, Bool(!equivalence)).into_exp())
-                        } else {
-                            None
-                        }
-                    },
+                    O::Eq => val0
+                        .equivalent(val1)
+                        .map(|equivalence| V(id, Bool(equivalence)).into_exp()),
+                    O::Neq => val0
+                        .equivalent(val1)
+                        .map(|equivalence| V(id, Bool(!equivalence)).into_exp()),
                     _ => self.constant_folding_error(id, |_| {
                         "Unknown binary expression in `const`".to_owned()
                     }),
