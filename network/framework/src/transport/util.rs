@@ -138,7 +138,12 @@ async fn connect_outbound<TTransport, TSocket>(
             outbound
         }
         Err(err) => {
-            warn!("dial err: {:?}", err);
+            warn!(
+                addr = addr,
+                peer = remote_peer_network_id,
+                error = err,
+                "dial err 1",
+            );
             // TODO: counter
             return Err(err);
         }
@@ -154,7 +159,12 @@ async fn connect_outbound<TTransport, TSocket>(
         Err(err) => {
             let elapsed_time = (transport.time_service.now() - upgrade_start).as_secs_f64();
             counters::connection_upgrade_time(&network_context, ConnectionOrigin::Outbound, counters::FAILED_LABEL).observe(elapsed_time);
-            warn!("dial err 2: {:?}", err);
+            warn!(
+                addr = addr,
+                peer = remote_peer_network_id,
+                error = err,
+                "dial err 2",
+            );
             // TODO: counter
             return Err(err);
         }
