@@ -19,6 +19,7 @@ use aptos_indexer_grpc_utils::{
     },
     counters::{log_grpc_step, IndexerGrpcStep, NUM_MULTI_FETCH_OVERLAPPED_VERSIONS},
     file_store_operator::FileStoreOperator,
+    in_memory_cache::InMemoryCache,
     time_diff_since_pb_timestamp_in_secs,
     types::RedisUrl,
 };
@@ -81,6 +82,7 @@ pub struct RawDataServerWrapper {
     pub data_service_response_channel_size: usize,
     pub sender_addresses_to_ignore: HashSet<String>,
     pub cache_storage_format: StorageFormat,
+    in_memory_cache: Arc<InMemoryCache>,
 }
 
 impl RawDataServerWrapper {
@@ -90,6 +92,7 @@ impl RawDataServerWrapper {
         data_service_response_channel_size: usize,
         sender_addresses_to_ignore: HashSet<String>,
         cache_storage_format: StorageFormat,
+        in_memory_cache: Arc<InMemoryCache>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             redis_client: Arc::new(
@@ -101,6 +104,7 @@ impl RawDataServerWrapper {
             data_service_response_channel_size,
             sender_addresses_to_ignore,
             cache_storage_format,
+            in_memory_cache,
         })
     }
 }
@@ -176,6 +180,7 @@ impl RawData for RawDataServerWrapper {
         let cache_storage_format = self.cache_storage_format;
         let request_metadata = Arc::new(request_metadata);
         let sender_addresses_to_ignore = self.sender_addresses_to_ignore.clone();
+        let in_memory_cache = self.in_memory_cache.clone();
         tokio::spawn({
             let request_metadata = request_metadata.clone();
             async move {
@@ -188,6 +193,7 @@ impl RawData for RawDataServerWrapper {
                     tx,
                     sender_addresses_to_ignore,
                     current_version,
+                    in_memory_cache,
                 )
                 .await;
             }
@@ -219,7 +225,28 @@ async fn get_data_with_tasks(
     file_store_operator: Arc<Box<dyn FileStoreOperator>>,
     request_metadata: Arc<IndexerGrpcRequestMetadata>,
     cache_storage_format: StorageFormat,
+    in_memory_cache: Arc<InMemoryCache>,
 ) -> DataFetchSubTaskResult {
+    let start_time = Instant::now();
+    let in_memory_transactions = in_memory_cache.get_transactions(start_version).await;
+    if !in_memory_transactions.is_empty() {
+        log_grpc_step(
+            SERVICE_TYPE,
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache,
+            Some(start_version as i64),
+            Some(in_memory_transactions.last().as_ref().unwrap().version as i64),
+            None,
+            None,
+            Some(start_time.elapsed().as_secs_f64()),
+            None,
+            Some(in_memory_transactions.len() as i64),
+            Some(&request_metadata),
+        );
+        return DataFetchSubTaskResult::BatchSuccess(chunk_transactions(
+            in_memory_transactions,
+            MESSAGE_SIZE_LIMIT,
+        ));
+    }
     let cache_coverage_status = cache_operator
         .check_cache_coverage_status(start_version)
         .await;
@@ -357,6 +384,7 @@ async fn data_fetcher_task(
     tx: tokio::sync::mpsc::Sender<Result<TransactionsResponse, Status>>,
     sender_addresses_to_ignore: HashSet<String>,
     mut current_version: u64,
+    in_memory_cache: Arc<InMemoryCache>,
 ) {
     let mut connection_start_time = Some(std::time::Instant::now());
     let mut transactions_count = transactions_count;
@@ -450,6 +478,7 @@ async fn data_fetcher_task(
             file_store_operator.clone(),
             request_metadata.clone(),
             cache_storage_format,
+            in_memory_cache.clone(),
         )
         .await
         {
