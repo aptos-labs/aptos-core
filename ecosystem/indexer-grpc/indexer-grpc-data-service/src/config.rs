@@ -54,10 +54,10 @@ pub struct IndexerGrpcDataServiceConfig {
     #[serde(default = "IndexerGrpcDataServiceConfig::default_data_service_response_channel_size")]
     pub data_service_response_channel_size: usize,
     /// Deprecated: a list of auth tokens that are allowed to access the service.
-    #[serde(skip)]
+    #[serde(default)]
     pub whitelisted_auth_tokens: Vec<String>,
     /// Deprecated: if set, don't check for auth tokens.
-    #[serde(skip)]
+    #[serde(default)]
     pub disable_auth_check: bool,
     /// File store config.
     pub file_store_config: IndexerGrpcFileStoreConfig,
