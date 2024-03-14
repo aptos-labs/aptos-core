@@ -249,7 +249,7 @@ impl NetworkSender {
         )?;
         let response = match response_msg {
             ConsensusMsg::BlockRetrievalResponse(resp) => *resp,
-            _ => return Err(anyhow!("Invalid response to request")),
+            m => return Err(anyhow!("Invalid response to request {:?}", m)),
         };
         response
             .verify(retrieval_request, &self.validators)
@@ -641,7 +641,7 @@ impl NetworkTask {
             Some(&counters::QUORUM_STORE_CHANNEL_MSGS),
         );
         let (rpc_tx, rpc_rx) =
-            aptos_channel::new(QueueStyle::FIFO, 10, Some(&counters::RPC_CHANNEL_MSGS));
+            aptos_channel::new(QueueStyle::FIFO, 100, Some(&counters::RPC_CHANNEL_MSGS));
 
         // Verify the network events have been constructed correctly
         let network_and_events = network_service_events.into_network_and_events();

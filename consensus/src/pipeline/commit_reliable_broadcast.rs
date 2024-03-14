@@ -105,7 +105,7 @@ impl RBNetworkSender<CommitMessage> for NetworkSender {
         let msg = ConsensusMsg::CommitMessage(Box::new(message));
         let response = match self.send_rpc(receiver, msg, timeout_duration).await? {
             ConsensusMsg::CommitMessage(resp) if matches!(*resp, CommitMessage::Ack(_)) => *resp,
-            _ => bail!("Invalid response to request"),
+            m => bail!("Invalid response to request: {:?}", m),
         };
 
         Ok(response)
