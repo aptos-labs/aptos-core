@@ -89,33 +89,44 @@ error: recursive definition S
    = `type_param::S` contains field `f: type_param::G<type_param::S>`...
    = `type_param::G<type_param::S>` contains field `f: S`, which forms a loop.
 
-error: recursive definition S1
-   ┌─ tests/checking/typing/recursive_struct.move:39:2
+error: recursive definition U
+   ┌─ tests/checking/typing/recursive_struct.move:35:2
    │
-39 │ ╭     struct S1 {
-40 │ │         f: vector<S1>
-41 │ │     }
+35 │ ╭     struct U<T> {
+36 │ │         f: G<U<T>>
+37 │ │     }
+   │ ╰─────^
+   │
+   = `type_param::U<T>` contains field `f: type_param::G<type_param::U<T>>`...
+   = `type_param::G<type_param::U<T>>` contains field `f: U`, which forms a loop.
+
+error: recursive definition S1
+   ┌─ tests/checking/typing/recursive_struct.move:43:2
+   │
+43 │ ╭     struct S1 {
+44 │ │         f: vector<S1>
+45 │ │     }
    │ ╰─────^
    │
    = `type_param::S1` contains field `f: S1`, which forms a loop.
 
 error: recursive definition S2
-   ┌─ tests/checking/typing/recursive_struct.move:43:2
+   ┌─ tests/checking/typing/recursive_struct.move:47:2
    │
-43 │ ╭     struct S2<T1, T2> {
-44 │ │         f: S3<u8, S2<T1, T2>>
-45 │ │     }
+47 │ ╭     struct S2<T1, T2> {
+48 │ │         f: S3<u8, S2<T1, T2>>
+49 │ │     }
    │ ╰─────^
    │
    = `type_param::S2<T1, T2>` contains field `f: type_param::S3<u8, type_param::S2<T1, T2>>`...
    = `type_param::S3<u8, type_param::S2<T1, T2>>` contains field `f: S2`, which forms a loop.
 
 error: recursive definition S3
-   ┌─ tests/checking/typing/recursive_struct.move:47:2
+   ┌─ tests/checking/typing/recursive_struct.move:51:2
    │
-47 │ ╭     struct S3<T1, T2> {
-48 │ │         f: S2<u8, S3<u8, u8>>
-49 │ │     }
+51 │ ╭     struct S3<T1, T2> {
+52 │ │         f: S2<u8, S3<u8, u8>>
+53 │ │     }
    │ ╰─────^
    │
    = `type_param::S3<T1, T2>` contains field `f: type_param::S2<u8, type_param::S3<u8, u8>>`...

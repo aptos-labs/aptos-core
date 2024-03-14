@@ -32,6 +32,10 @@ module 0x42::type_param {
 		f: G<S>
 	}
 
+	struct U<T> {
+		f: G<U<T>>
+	}
+
 	struct G<T> {
 		f: T
 	}
