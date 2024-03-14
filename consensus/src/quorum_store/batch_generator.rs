@@ -407,7 +407,7 @@ impl BatchGenerator {
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
                         let pull_max_txn = std::cmp::min(
                             dynamic_pull_max_txn,
-                            self.config.sender_max_batch_txns as u64,
+                            self.config.sender_max_total_txns as u64,
                         );
                         let batches = self.handle_scheduled_pull(pull_max_txn).await;
                         if !batches.is_empty() {
