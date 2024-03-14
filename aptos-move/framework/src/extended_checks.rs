@@ -25,6 +25,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{AttrId, Bytecode, Operation},
     stackless_bytecode_generator::StacklessBytecodeGenerator,
 };
+use move_vm_types::loaded_data::runtime_types::Type::{Signer, Reference, MutableReference};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -498,6 +499,24 @@ impl<'a> ExtendedChecker<'a> {
                 self.env
                     .error(&fun.get_id_loc(), "view function must return values")
             }
+
+            fun.get_parameter_types().iter().for_each(| parameter_type| {
+                match parameter_type {
+                    Type::Primitive(inner) => match inner {
+                        PrimitiveType::Signer => self.env.error(&fun.get_id_loc(), "view function must return values"),
+                        _ => ()
+                    },
+                    Type::Reference(_, inner) => match inner.as_ref() {
+                        Type::Primitive(inner) => match inner {
+                            PrimitiveType::Signer => self.env.error(&fun.get_id_loc(), "view function must return values"),
+                            _ => ()
+                        },
+                        _ => ()
+                    },
+                    _ => ()
+                }
+            });
+
             // Remember the runtime info that this is a view function
             let module_id = self.get_runtime_module_id(module);
             self.output
