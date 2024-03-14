@@ -9,7 +9,7 @@ use crate::{
 use aptos_config::{config::LatencyMonitoringConfig, network_id::PeerNetworkId};
 use aptos_infallible::RwLock;
 use aptos_logger::{error, warn};
-use aptos_network::application::metadata::PeerMetadata;
+use aptos_network2::application::metadata::PeerMetadata;
 use aptos_peer_monitoring_service_types::{
     request::{LatencyPingRequest, PeerMonitoringServiceRequest},
     response::PeerMonitoringServiceResponse,
@@ -232,7 +232,7 @@ mod test {
         network_id::{NetworkId, PeerNetworkId},
     };
     use aptos_netcore::transport::ConnectionOrigin;
-    use aptos_network::{
+    use aptos_network2::{
         application::metadata::PeerMetadata,
         protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
         transport::{ConnectionId, ConnectionMetadata},

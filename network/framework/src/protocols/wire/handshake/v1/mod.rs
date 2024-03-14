@@ -41,7 +41,7 @@ pub const RECURSION_LIMIT: usize = 64;
 
 /// Unique identifier associated with each application protocol.
 #[repr(u8)]
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Hash, Eq, PartialEq, PartialOrd, Ord, Deserialize, Serialize)] // PartialOrd
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 pub enum ProtocolId {
     ConsensusRpcBcs = 0,
@@ -184,6 +184,11 @@ impl ProtocolId {
         }
     }
 
+    #[cfg(test)]
+    pub fn mock() -> Self {
+        ProtocolId::DiscoveryDirectSend
+    }
+
     /// Serializes the given message into bytes (based on the protocol ID
     /// and encoding to use).
     pub fn to_bytes<T: Serialize>(&self, value: &T) -> anyhow::Result<Vec<u8>> {
@@ -267,6 +272,50 @@ impl fmt::Display for ProtocolId {
     }
 }
 
+// impl PartialOrd for ProtocolId {
+//     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+//         Some(self.cmp(other))
+//     }
+// }
+//
+// impl Ord for ProtocolId {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         if self < other {
+//             Ordering::Less
+//         } else if self > other {
+//             Ordering::Greater
+//         } else /* if self == other */ {
+//             Ordering::Equal
+//         }
+//     }
+//
+//     fn max(self, other: Self) -> Self where Self: Sized {
+//         if self > other {
+//             self
+//         } else {
+//             other
+//         }
+//     }
+//
+//     fn min(self, other: Self) -> Self where Self: Sized {
+//         if self < other {
+//             self
+//         } else {
+//             other
+//         }
+//     }
+//
+//     fn clamp(self, min: Self, max: Self) -> Self where Self: Sized, Self: PartialOrd {
+//         if self < min {
+//             min
+//         } else if self > max {
+//             max
+//         } else {
+//             self
+//         }
+//     }
+// }
+
 //
 // ProtocolIdSet
 //
@@ -292,7 +341,7 @@ impl ProtocolIdSet {
 
     #[cfg(test)]
     pub fn mock() -> Self {
-        Self::from_iter([ProtocolId::DiscoveryDirectSend])
+        Self::from_iter([ProtocolId::mock()])
     }
 
     pub fn is_empty(&self) -> bool {

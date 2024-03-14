@@ -12,12 +12,12 @@ use aptos_config::{
     network_id::NetworkId,
 };
 use aptos_crypto::HashValue;
-use aptos_network::{
-    application::{interface::NetworkServiceEvents, storage::PeersAndMetadata},
-    peer_manager::PeerManagerNotification,
+use aptos_network2::{
+    application::storage::PeersAndMetadata,
+    // peer_manager::PeerManagerNotification,
     protocols::{
         network::{NetworkEvents, NewNetworkEvents},
-        rpc::InboundRpcRequest,
+        // rpc::InboundRpcRequest,
         wire::handshake::v1::ProtocolId,
     },
 };
@@ -49,8 +49,10 @@ use aptos_types::{
 use futures::channel::{oneshot, oneshot::Receiver};
 use mockall::mock;
 use rand::{rngs::OsRng, Rng};
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::{BTreeMap, HashMap}, sync::Arc, time::Duration};
 use tokio::time::timeout;
+use aptos_network2::protocols::network::{NetworkSource, OutboundPeerConnections, ReceivedMessage};
+use aptos_network2::protocols::wire::messaging::v1::{NetworkMessage, RpcRequest};
 
 // Useful test constants
 const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
@@ -58,8 +60,7 @@ const MAX_RESPONSE_TIMEOUT_SECS: u64 = 60;
 /// A wrapper around the inbound network interface/channel for easily sending
 /// mock client requests to a [`StorageServiceServer`].
 pub struct MockClient {
-    peer_manager_notifiers:
-        HashMap<NetworkId, aptos_channel::Sender<(PeerId, ProtocolId), PeerManagerNotification>>,
+    peer_manager_notifiers: HashMap<NetworkId, tokio::sync::mpsc::Sender<ReceivedMessage>>,
 }
 
 impl MockClient {
@@ -91,21 +92,26 @@ impl MockClient {
         let mut network_and_events = HashMap::new();
         let mut peer_manager_notifiers = HashMap::new();
         for network_id in network_ids.clone() {
-            let queue_cfg = aptos_channel::Config::new(
-                storage_service_config.max_network_channel_size as usize,
-            )
-            .queue_style(QueueStyle::FIFO)
-            .counters(&metrics::PENDING_STORAGE_SERVER_NETWORK_EVENTS);
-            let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
-            let (_, connection_notification_receiver) = queue_cfg.build();
+            // let queue_cfg = aptos_channel::Config::new(
+            //     storage_service_config.max_network_channel_size as usize,
+            // )
+            // .queue_style(QueueStyle::FIFO)
+            // .counters(&metrics::PENDING_STORAGE_SERVER_NETWORK_EVENTS);
+            // let (peer_manager_notifier, peer_manager_notification_receiver) = queue_cfg.build();
+            // let (_, connection_notification_receiver) = queue_cfg.build();
+            let (received_message_sender, rx) = tokio::sync::mpsc::channel(storage_service_config.max_network_channel_size as usize);
+            let network_source = NetworkSource::new_single_source(rx);
+            let peer_senders = Arc::new(OutboundPeerConnections::new());
+            let contexts = Arc::new(BTreeMap::new());
 
             let network_events = NetworkEvents::new(
-                peer_manager_notification_receiver,
-                connection_notification_receiver,
-                None,
+                network_source,
+                peer_senders,
+                "test",
+                contexts,
             );
             network_and_events.insert(network_id, network_events);
-            peer_manager_notifiers.insert(network_id, peer_manager_notifier);
+            peer_manager_notifiers.insert(network_id, received_message_sender);
         }
         let storage_service_network_events =
             StorageServiceNetworkEvents::new(NetworkServiceEvents::new(network_and_events));
@@ -157,7 +163,7 @@ impl MockClient {
         request: StorageServiceRequest,
         peer_id: Option<AccountAddress>,
         network_id: Option<NetworkId>,
-    ) -> Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>> {
+    ) -> Receiver<Result<bytes::Bytes, aptos_network2::protocols::network::RpcError>> {
         // Create the inbound rpc request
         let peer_id = peer_id.unwrap_or_else(PeerId::random);
         let network_id = network_id.unwrap_or_else(get_random_network_id);
@@ -165,19 +171,29 @@ impl MockClient {
         let data = protocol_id
             .to_bytes(&StorageServiceMessage::Request(request))
             .unwrap();
-        let (res_tx, res_rx) = oneshot::channel();
-        let inbound_rpc = InboundRpcRequest {
-            protocol_id,
-            data: data.into(),
-            res_tx,
+        let rmsg = ReceivedMessage{
+            message: NetworkMessage::RpcRequest(RpcRequest{
+                protocol_id,
+                request_id: OsRng.gen(),
+                priority: 0,
+                raw_request: vec![],
+            }),
+            sender: PeerId::random(),
+            rx_at: 0,
         };
-        let notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
+        // let (res_tx, res_rx) = oneshot::channel();
+        // let inbound_rpc = InboundRpcRequest {
+        //     protocol_id,
+        //     data: data.into(),
+        //     res_tx,
+        // };
+        // let notification = PeerManagerNotification::RecvRpc(peer_id, inbound_rpc);
 
         // Push the request up to the storage service
         self.peer_manager_notifiers
             .get(&network_id)
             .unwrap()
-            .push((peer_id, protocol_id), notification)
+            .send(rmsg).await
             .unwrap();
 
         res_rx
@@ -186,7 +202,7 @@ impl MockClient {
     /// Helper method to wait for and deserialize a response on the specified receiver
     pub async fn wait_for_response(
         &mut self,
-        receiver: Receiver<Result<bytes::Bytes, aptos_network::protocols::network::RpcError>>,
+        receiver: Receiver<Result<bytes::Bytes, aptos_network2::protocols::network::RpcError>>,
     ) -> Result<StorageServiceResponse, StorageServiceError> {
         if let Ok(response) =
             timeout(Duration::from_secs(MAX_RESPONSE_TIMEOUT_SECS), receiver).await

@@ -35,7 +35,7 @@ use aptos_consensus_types::{
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
-use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_network2::{application::interface::NetworkClient, protocols::network::Event};
 use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_types::{
     epoch_state::EpochState,

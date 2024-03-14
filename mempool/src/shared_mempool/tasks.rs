@@ -22,7 +22,7 @@ use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::HistogramTimer;
-use aptos_network::application::interface::NetworkClientInterface;
+use aptos_network2::application::interface::NetworkClientInterface;
 use aptos_storage_interface::state_view::LatestDbStateCheckpointView;
 use aptos_types::{
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -62,6 +62,7 @@ pub(crate) async fn execute_broadcast<NetworkClient, TransactionValidator>(
             .execute_broadcast(peer, backoff, smp)
             .await
         {
+            counters::network_send_fail_inc("eb");
             match err {
                 BroadcastError::NetworkError(peer, error) => warn!(LogSchema::event_log(
                     LogEntry::BroadcastTransaction,
@@ -434,8 +435,13 @@ fn log_txn_process_results(results: &[SubmissionStatusBundle], sender: Option<Pe
                 vm_status = vm_status,
                 sender = sender,
             );
+            let status = match vm_status {
+                DiscardedVMStatus::RESOURCE_DOES_NOT_EXIST => {"RDNE"}
+                DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD => {"OLD"}
+                _ => {counters::VM_VALIDATION_LABEL}
+            };
             counters::shared_mempool_transactions_processed_inc(
-                counters::VM_VALIDATION_LABEL,
+                status,
                 &network,
             );
             continue;

@@ -959,6 +959,7 @@ fn update_active_subscription_metrics(
             NetworkId::Validator => num_validator_subscriptions += 1,
             NetworkId::Vfn => num_vfn_subscriptions += 1,
             NetworkId::Public => num_public_subscriptions += 1,
+            NetworkId::Internal => {},
         }
     }
 
