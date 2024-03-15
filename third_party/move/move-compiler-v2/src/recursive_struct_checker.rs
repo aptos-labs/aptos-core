@@ -4,7 +4,7 @@
 //! Implements an AST pass that checks any struct `S` cannot contain descendant of type `S`.
 
 use move_model::{
-    model::{FieldEnv, GlobalEnv, Loc, ModuleEnv, QualifiedId, StructEnv, StructId},
+    model::{FieldEnv, GlobalEnv, Loc, ModuleEnv, StructEnv, StructId},
     symbol::Symbol,
     ty::Type,
 };
@@ -73,36 +73,35 @@ impl<'a> RecursiveStructChecker<'a> {
         let struct_env = self.mod_env.get_struct(struct_id);
         for field_env in struct_env.get_fields() {
             let field_name = field_env.get_name();
+            path.push((loc.clone(), field_name, struct_id));
             match field_env.get_type() {
                 Type::Struct(field_mod_id, field_struct_id, insts) => {
                     // make sure the field struct has been checked
                     if field_mod_id == self.mod_env.get_id() && !checked.contains(&field_struct_id)
                     {
-                        path.push((loc.clone(), field_name, struct_id));
                         self.check_struct_as_required_by(
                             path,
                             field_struct_id,
                             field_env.get_loc().clone(),
                             checked,
                         );
-                        path.pop();
                     }
                     // check the type parameters of the fields cannot contain the struct we are checking
-                    if insts
-                        .iter()
-                        .any(|ty| ty_contains_struct(ty, field_mod_id.qualified(struct_id)))
-                    {
+                    if insts.iter().any(|ty| {
+                        self.ty_contains_struct(path, &ty, loc.clone(), struct_id, checked)
+                    }) {
                         self.report_invalid_field(&struct_env, &field_env);
                     }
                 },
                 Type::Vector(ty) => {
-                    if ty_contains_struct(&ty, self.mod_env.get_id().qualified(struct_id)) {
+                    if self.ty_contains_struct(path, &ty, loc.clone(), struct_id, checked) {
                         self.report_invalid_field(&struct_env, &field_env);
                     }
                 },
                 Type::Primitive(_) | Type::TypeParameter(_) => {},
                 _ => panic!("invalid field type"),
             }
+            path.pop();
         }
         checked.insert(struct_id);
     }
@@ -153,30 +152,47 @@ impl<'a> RecursiveStructChecker<'a> {
             let field_name = self.mod_env.symbol_pool().string(path[i].1);
             let child_name = self.get_struct_name(path[i + 1].2);
             cycle_note.push(format!(
-                "`{}` contains field `{}: {}`...",
-                parent_name, field_name, child_name
+                "field `{}` of `{}` contains `{}`",
+                field_name, parent_name, child_name,
             ));
         }
         cycle_note.push(format!(
-            "`{}` contains field `{}: {}`, which forms a cycle.",
-            self.get_struct_name(path.last().expect("parent").2),
+            "field `{}` of `{}` contains `{}`, which forms a cycle.",
             self.mod_env
                 .symbol_pool()
                 .string(path.last().expect("parent").1),
-            self.get_struct_name(struct_id)
+            self.get_struct_name(path.last().expect("parent").2),
+            self.get_struct_name(struct_id),
         ));
         cycle_note
     }
-}
 
-/// Checks whether the given type contains the given struct.
-fn ty_contains_struct(ty: &Type, qid: QualifiedId<StructId>) -> bool {
-    match ty {
-        Type::Vector(ty) => ty_contains_struct(ty, qid),
-        Type::Struct(mid, sid, insts) => {
-            mid.qualified(*sid) == qid || insts.iter().any(|ty| ty_contains_struct(ty, qid))
-        },
-        Type::Primitive(_) | Type::TypeParameter(_) => false,
-        _ => panic!("ICE: {:?} used as a type parameter", ty),
+    /// Checks whether the given type contains the given struct.
+    fn ty_contains_struct(
+        &self,
+        path: &mut Vec<(Loc, Symbol, StructId)>,
+        ty: &Type,
+        loc: Loc,
+        struct_id: StructId,
+        checked: &mut BTreeSet<StructId>,
+    ) -> bool {
+        match ty {
+            Type::Vector(ty) => self.ty_contains_struct(path, ty, loc, struct_id, checked),
+            Type::Struct(mid, sid, insts) => {
+                if *mid == self.mod_env.get_id() {
+                    if *sid == struct_id {
+                        return true;
+                    }
+                    if !checked.contains(sid) {
+                        self.check_struct_as_required_by(path, *sid, loc.clone(), checked);
+                    }
+                }
+                insts
+                    .iter()
+                    .any(|ty| self.ty_contains_struct(path, ty, loc.clone(), struct_id, checked))
+            },
+            Type::Primitive(_) | Type::TypeParameter(_) => false,
+            _ => panic!("ICE: {:?} used as a type parameter", ty),
+        }
     }
 }
