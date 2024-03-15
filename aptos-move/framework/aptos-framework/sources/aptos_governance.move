@@ -567,9 +567,10 @@ module aptos_framework::aptos_governance {
         reconfiguration_with_dkg::finish(aptos_framework);
     }
 
-    /// `force_end_epoch()` used in some move tests.
-    public entry fun force_end_epoch_test_only(admin: &signer) acquires GovernanceResponsbility {
-        let core_signer = get_signer_testnet_only(admin, @0x1);
+    /// `force_end_epoch()` equivalent but only called in testnet,
+    /// where the core resources account exists and has been granted power to mint Aptos coins.
+    public entry fun force_end_epoch_test_only(aptos_framework: &signer) acquires GovernanceResponsbility {
+        let core_signer = get_signer_testnet_only(aptos_framework, @0x1);
         system_addresses::assert_aptos_framework(&core_signer);
         reconfiguration_with_dkg::finish(&core_signer);
     }

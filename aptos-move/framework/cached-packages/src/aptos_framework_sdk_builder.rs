@@ -235,7 +235,8 @@ pub enum EntryFunctionCall {
     /// TODO: migrate these tests to be aware of async reconfiguration.
     AptosGovernanceForceEndEpoch {},
 
-    /// `force_end_epoch()` used in some move tests.
+    /// `force_end_epoch()` equivalent but only called in testnet,
+    /// where the core resources account exists and has been granted power to mint Aptos coins.
     AptosGovernanceForceEndEpochTestOnly {},
 
     /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
@@ -2071,7 +2072,8 @@ pub fn aptos_governance_force_end_epoch() -> TransactionPayload {
     ))
 }
 
-/// `force_end_epoch()` used in some move tests.
+/// `force_end_epoch()` equivalent but only called in testnet,
+/// where the core resources account exists and has been granted power to mint Aptos coins.
 pub fn aptos_governance_force_end_epoch_test_only() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
