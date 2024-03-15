@@ -1083,11 +1083,11 @@ impl ExpData {
     where
         F: FnMut(VisitorPosition, &ExpData) -> bool,
     {
-        self.visit_positions_with_return_val(visitor);
+        self.visit_positions_all_visits_return_true(visitor);
     }
 
     /// Same as `visit_positions`, but returns false iff any visit of a subexpression returns false
-    pub fn visit_positions_with_return_val<F>(&self, visitor: &mut F) -> bool
+    pub fn visit_positions_all_visits_return_true<F>(&self, visitor: &mut F) -> bool
     where
         F: FnMut(VisitorPosition, &ExpData) -> bool,
     {

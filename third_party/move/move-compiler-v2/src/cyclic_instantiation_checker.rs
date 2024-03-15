@@ -140,7 +140,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
             let caller_loc = self.mod_env.env.get_node_loc(caller_node);
             callers_chain.push((caller_loc, caller));
             let insts = Type::instantiate_vec(self.get_inst(caller_node), insts);
-            let res = caller_body.visit_positions_with_return_val(&mut |pos, exp| {
+            let res = caller_body.visit_positions_all_visits_return_true(&mut |pos, exp| {
                 self.visit(pos, exp, &insts, callers_chain)
             });
             callers_chain.pop();
