@@ -6,7 +6,7 @@ use crate::experiments::{DefaultValue, EXPERIMENTS};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_command_line_common::env::read_env_var;
+use move_command_line_common::env::{read_env_var, OVERRIDE_EXP_CACHE};
 use move_compiler::command_line as cli;
 use move_model::metadata::LanguageVersion;
 use once_cell::sync::Lazy;
@@ -129,8 +129,15 @@ impl Options {
                 visited.iter().clone().join(",")
             )
         }
-        if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
-            return on;
+        let experiments_to_override = read_env_var(OVERRIDE_EXP_CACHE);
+        let experiments = experiments_to_override
+            .split(',')
+            .map(|s| s.to_string())
+            .collect_vec();
+        if !experiments.contains(&name.to_string()) {
+            if let Some(on) = self.experiment_cache.borrow().get(name).cloned() {
+                return on;
+            }
         }
         if let Some(exp) = EXPERIMENTS.get(&name.to_string()) {
             // First we look at experiments provided via the command line, second
@@ -219,6 +226,14 @@ fn compiler_exp_var() -> Vec<String> {
         }
         vec![]
     });
+    if !read_env_var(OVERRIDE_EXP_CACHE).is_empty() {
+        for s in ["MVC_EXP", "MOVE_COMPILER_EXP"] {
+            let s = read_env_var(s);
+            if !s.is_empty() {
+                return s.split(',').map(|s| s.to_string()).collect();
+            }
+        }
+    }
     (*EXP_VAR).clone()
 }
 
