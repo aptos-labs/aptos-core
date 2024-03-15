@@ -684,6 +684,10 @@ impl SignedTransaction {
         self.raw_txn.max_gas_amount
     }
 
+    pub fn set_max_gmount(&mut self, new_value: u64) {
+        self.raw_txn.max_gas_amount = new_value;
+    }
+
     pub fn gas_unit_price(&self) -> u64 {
         self.raw_txn.gas_unit_price
     }
