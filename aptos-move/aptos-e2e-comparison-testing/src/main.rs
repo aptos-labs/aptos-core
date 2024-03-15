@@ -3,12 +3,14 @@
 
 use anyhow::Result;
 use aptos_comparison_testing::{
-    prepare_aptos_packages, DataCollection, Execution, ExecutionMode, OnlineExecutor, APTOS_COMMONS,
+    prepare_aptos_packages, DataCollection, Execution, ExecutionMode, OnlineExecutor, APTOS_COMMONS, APTOS_COMMONS_V2, DISABLE_SPEC_CHECK, SAMPLING_RATE
 };
 use aptos_rest_client::Client;
 use clap::{Parser, Subcommand};
+// use move_command_line_common::env::OVERRIDE_EXP_CACHE;
+use move_compiler_v2::Experiment;
 use move_core_types::account_address::AccountAddress;
-use std::path::PathBuf;
+use std::{env, path::PathBuf};
 use url::Url;
 
 const BATCH_SIZE: u64 = 500;
@@ -38,6 +40,12 @@ pub enum Cmd {
         /// With this set, only dump transactions that are sent to this account
         #[clap(long)]
         target_account: Option<AccountAddress>,
+         /// Sampling rate (1-10)
+        #[clap(long, default_value_t = SAMPLING_RATE)]
+        rate: u32,
+        /// Branch of framework
+        #[clap(long)]
+        branch: Option<String>,
     },
     /// Collect and execute txns without dumping the state data
     Online {
@@ -58,6 +66,12 @@ pub enum Cmd {
         /// Used when execution_only is true
         #[clap(long)]
         execution_mode: Option<ExecutionMode>,
+        /// Packages to be skipped for reference safety check
+        #[clap(long)]
+        skip_ref_packages: Option<String>,
+        /// Sampling rate (1-10)
+        #[clap(long, default_value_t = SAMPLING_RATE)]
+        rate: u32,
     },
     /// Execution of txns
     Execute {
@@ -66,6 +80,15 @@ pub enum Cmd {
         /// Whether to execute against V1, V2 alone or both compilers for comparison
         #[clap(long)]
         execution_mode: Option<ExecutionMode>,
+        /// Packages to be skipped for reference safety check
+        #[clap(long)]
+        skip_ref_packages: Option<String>,
+        /// Branch of framework for v1
+        #[clap(long)]
+        branch_v1: Option<String>,
+        /// Branch of framework for v2
+        #[clap(long)]
+        branch_v2: Option<String>,
     },
 }
 
@@ -86,7 +109,15 @@ pub struct Argument {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Argument::parse();
-
+    // env::set_var(
+    //     OVERRIDE_EXP_CACHE,
+    //     format!(
+    //         "{},{}",
+    //         Experiment::SPEC_CHECK,
+    //         Experiment::REFERENCE_SAFETY
+    //     ),
+    // );
+    // env::set_var("MOVE_COMPILER_EXP", DISABLE_SPEC_CHECK);
     match args.cmd {
         Cmd::Dump {
             endpoint,
@@ -96,6 +127,8 @@ async fn main() -> Result<()> {
             skip_source_code_check: skip_source_code,
             dump_write_set,
             target_account,
+            rate,
+            branch
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -107,7 +140,7 @@ async fn main() -> Result<()> {
                 std::fs::create_dir_all(output.as_path()).unwrap();
             }
             if !skip_source_code {
-                prepare_aptos_packages(output.join(APTOS_COMMONS)).await;
+                prepare_aptos_packages(output.join(APTOS_COMMONS), branch).await;
             }
             let data_collector = DataCollection::new_with_rest_client(
                 Client::new(Url::parse(&endpoint)?),
@@ -120,7 +153,7 @@ async fn main() -> Result<()> {
                 target_account,
             )?;
             data_collector
-                .dump_data(args.begin_version, args.limit)
+                .dump_data(args.begin_version, args.limit, rate)
                 .await?;
         },
         Cmd::Online {
@@ -129,6 +162,8 @@ async fn main() -> Result<()> {
             skip_failed_txns,
             skip_publish_txns,
             execution_mode,
+            skip_ref_packages,
+            rate
         } => {
             let batch_size = BATCH_SIZE;
             let output = if let Some(path) = output_path {
@@ -139,7 +174,7 @@ async fn main() -> Result<()> {
             if !output.exists() {
                 std::fs::create_dir_all(output.as_path()).unwrap();
             }
-            prepare_aptos_packages(output.join(APTOS_COMMONS)).await;
+            prepare_aptos_packages(output.join(APTOS_COMMONS), None).await;
             let online = OnlineExecutor::new_with_rest_client(
                 Client::new(Url::parse(&endpoint)?),
                 output.clone(),
@@ -148,20 +183,31 @@ async fn main() -> Result<()> {
                 skip_publish_txns,
                 execution_mode.unwrap_or_default(),
                 endpoint,
+                skip_ref_packages,
             )?;
-            online.execute(args.begin_version, args.limit).await?;
+            online.execute(args.begin_version, args.limit, rate).await?;
         },
         Cmd::Execute {
             input_path,
             execution_mode,
+            skip_ref_packages,
+            branch_v1,
+            branch_v2,
         } => {
             let input = if let Some(path) = input_path {
                 path
             } else {
                 PathBuf::from(".")
             };
-            prepare_aptos_packages(input.join(APTOS_COMMONS)).await;
-            let executor = Execution::new(input, execution_mode.unwrap_or_default());
+            let exec_mode = execution_mode.unwrap_or_default();
+            if exec_mode.is_v1_or_compare() {
+                prepare_aptos_packages(input.join(APTOS_COMMONS), branch_v1).await;
+            }
+            if exec_mode.is_v2_or_compare() {
+                prepare_aptos_packages(input.join(APTOS_COMMONS_V2), branch_v2).await;
+            }
+            let executor =
+                Execution::new(input, exec_mode, skip_ref_packages);
             executor
                 .execute_txns(args.begin_version, args.limit)
                 .await?;
