@@ -116,3 +116,11 @@ pub static INCOMING_MSG_PROCESSING: Lazy<Histogram> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static TIMEOUT_WAIT_VOTING_POWER_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_dag_round_timeout_count",
+        "round timeout count"
+    )
+    .unwrap()
+});
