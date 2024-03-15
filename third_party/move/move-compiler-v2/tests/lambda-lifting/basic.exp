@@ -1,0 +1,47 @@
+// -- Model dump before env processor pipeline:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, |y: u64| Add<u64>(y, c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>(x, c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, |x: u64| Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x))
+    }
+} // end 0xcafe::m
+
+
+// -- Model dump after env processor lambda-lifting:
+module 0xcafe::m {
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
+    private fun no_name_clash(x: u64,c: u64): u64 {
+        m::map(x, closure m::no_name_clash$lambda$1(c))
+    }
+    private fun with_name_clash1(x: u64,c: u64): u64 {
+        m::map(x, closure m::with_name_clash1$lambda$1(c))
+    }
+    private fun with_name_clash2(x: u64,c: u64): u64 {
+        m::map(x, closure m::with_name_clash2$lambda$1(c))
+    }
+    private fun no_name_clash$lambda$1(c: u64,y: u64): u64 {
+        Add<u64>(y, c)
+    }
+    private fun with_name_clash1$lambda$1(c: u64,x: u64): u64 {
+        Add<u64>(x, c)
+    }
+    private fun with_name_clash2$lambda$1(c: u64,x: u64): u64 {
+        Add<u64>({
+          let x: u64 = Add<u64>(c, 1);
+          x
+        }, x)
+    }
+} // end 0xcafe::m

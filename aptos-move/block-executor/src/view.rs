@@ -426,7 +426,7 @@ fn wait_for_dependency(
             // eventually finish and lead to unblocking txn_idx, contradiction.
             let (lock, cvar) = &*dep_condition;
             let mut dep_resolved = lock.lock();
-            while let DependencyStatus::Unresolved = *dep_resolved {
+            while matches!(*dep_resolved, DependencyStatus::Unresolved) {
                 dep_resolved = cvar.wait(dep_resolved).unwrap();
             }
             // dep resolved status is either resolved or execution halted.

@@ -9,10 +9,7 @@ use crate::{
 };
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
-use aptos_types::{
-    dkg::DKGState,
-    on_chain_config::{FeatureFlag, Features},
-};
+use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
 use std::{sync::Arc, time::Duration};
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
@@ -26,13 +23,9 @@ async fn randomness_correctness() {
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
 
-            // Ensure vtxn is enabled.
+            // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-
-            // Ensure randomness flag is set.
-            let mut features = Features::default();
-            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build_with_cli(0)
         .await;

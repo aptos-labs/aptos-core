@@ -171,7 +171,8 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
         )?;
         let svc = aptos_protos::indexer::v1::raw_data_server::RawDataServer::new(server)
             .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip);
+            .accept_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Zstd);
         let svc_with_interceptor = InterceptedService::new(svc, authentication_inceptor);
 
         let svc_with_interceptor_clone = svc_with_interceptor.clone();

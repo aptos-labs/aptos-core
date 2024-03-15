@@ -5,7 +5,7 @@ use crate::{
     smoke_test_environment::SwarmBuilder,
 };
 use aptos_forge::NodeExt;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use std::sync::Arc;
 
 #[tokio::test]
@@ -20,14 +20,10 @@ async fn dkg_with_validator_down() {
         .with_init_genesis_config(Arc::new(|conf| {
             conf.epoch_duration_secs = 10;
 
-            // Ensure vtxn is enabled.
+            // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-
-            // Ensure randomness flag is set.
-            let mut features = Features::default();
-            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
             features.enable(FeatureFlag::FAST_RANDOMNESS);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build()
         .await;

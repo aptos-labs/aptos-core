@@ -1,0 +1,22 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    public fun test(): u8 {
+        {
+          let x: u8 = 40;
+          {
+            let y: u8 = Move(x);
+            Add<u8>(x, y)
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+
+Diagnostics:
+error: cannot move local `x` since it is still in use
+  ┌─ tests/no-simplifier/moved_var_not_simplified.move:4:17
+  │
+4 │         let y = move x;
+  │                 ^^^^^^ attempted to move here
+5 │         x + y
+  │         ----- used here

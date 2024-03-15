@@ -11,7 +11,7 @@ error: cannot move local `s` which is still borrowed
 13 │         move s;
    │         ^^^^^^ moved here
 14 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot move local `s` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_field_invalid.move:18:9
@@ -24,7 +24,7 @@ error: cannot move local `s` which is still borrowed
 18 │         move s;
    │         ^^^^^^ moved here
 19 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot move local `s` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_field_invalid.move:23:9
@@ -37,7 +37,7 @@ error: cannot move local `s` which is still borrowed
 23 │         move s;
    │         ^^^^^^ moved here
 24 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot move local `s` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_field_invalid.move:28:9
@@ -50,4 +50,4 @@ error: cannot move local `s` which is still borrowed
 28 │         move s;
    │         ^^^^^^ moved here
 29 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here

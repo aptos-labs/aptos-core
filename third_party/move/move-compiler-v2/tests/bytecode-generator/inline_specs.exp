@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::inline_specs {
     private fun specs(): u64 {
         {
@@ -17,10 +17,6 @@ module 0x42::inline_specs {
     }
     private fun succ(x: u64): u64 {
         Add<u64>(x, 1)
-    }
-    spec fun $specs(): u64;
-    spec fun $succ(x: u64): u64 {
-        Add(x, 1)
     }
 } // end 0x42::inline_specs
 

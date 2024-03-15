@@ -2,18 +2,20 @@
 
 use crate::dkg::real_dkg::rounding::{
     is_valid_profile, total_weight_lower_bound, total_weight_upper_bound, DKGRounding,
-    FAST_PATH_SECRECY_THRESHOLD, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD,
+    FAST_PATH_SECRECY_THRESHOLD, DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
 };
 use aptos_dkg::pvss::WeightedConfig;
+use fixed::types::U64F64;
 use rand::Rng;
+use std::ops::Deref;
 
 #[test]
 fn compute_mainnet_rounding() {
     let validator_stakes = MAINNET_STAKES.to_vec();
     let dkg_rounding = DKGRounding::new(
         &validator_stakes,
-        SECRECY_THRESHOLD,
-        RECONSTRUCT_THRESHOLD,
+        *DEFAULT_SECRECY_THRESHOLD.deref(),
+        *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
         Some(FAST_PATH_SECRECY_THRESHOLD),
     );
     // println!("mainnet rounding profile: {:?}", dkg_rounding.profile);
@@ -21,15 +23,18 @@ fn compute_mainnet_rounding() {
     // mainnet rounding profile: total_weight: 437, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.5859020899996102, reconstruct_threshold_in_weights: 237, fast_reconstruct_threshold_in_stake_ratio: Some(0.7525687566662769), fast_reconstruct_threshold_in_weights: Some(341), validator_weights: [10, 1, 9, 9, 1, 1, 9, 9, 1, 7, 8, 5, 2, 1, 9, 7, 1, 2, 1, 9, 2, 1, 1, 9, 1, 8, 10, 1, 1, 9, 1, 1, 1, 7, 9, 1, 1, 9, 1, 9, 1, 3, 1, 8, 1, 1, 7, 10, 3, 2, 1, 9, 1, 9, 1, 3, 8, 1, 10, 1, 1, 1, 9, 3, 8, 8, 3, 10, 1, 1, 7, 9, 2, 5, 2, 9, 9, 1, 4, 1, 1, 1, 1, 1, 2, 10, 1, 1, 9, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 9, 8, 1, 1, 9, 2, 1]
 
     let total_weight_min = total_weight_lower_bound(&validator_stakes);
-    let total_weight_max =
-        total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
+    let total_weight_max = total_weight_upper_bound(
+        &validator_stakes,
+        *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+        *DEFAULT_SECRECY_THRESHOLD.deref(),
+    );
     let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
     assert!(total_weight >= total_weight_min as u64);
     assert!(total_weight <= total_weight_max as u64);
 
     assert!(is_valid_profile(
         &dkg_rounding.profile,
-        RECONSTRUCT_THRESHOLD
+        *DEFAULT_RECONSTRUCT_THRESHOLD.deref()
     ));
 }
 
@@ -38,8 +43,8 @@ fn test_rounding_single_validator() {
     let validator_stakes = vec![1_000_000];
     let dkg_rounding = DKGRounding::new(
         &validator_stakes,
-        SECRECY_THRESHOLD,
-        RECONSTRUCT_THRESHOLD,
+        *DEFAULT_SECRECY_THRESHOLD.deref(),
+        *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
         Some(FAST_PATH_SECRECY_THRESHOLD),
     );
     let wconfig = WeightedConfig::new(1, vec![1]).unwrap();
@@ -55,12 +60,14 @@ fn test_rounding_equal_stakes() {
         let validator_stakes = vec![1_000_000; validator_num];
         let dkg_rounding = DKGRounding::new(
             &validator_stakes,
-            SECRECY_THRESHOLD,
-            RECONSTRUCT_THRESHOLD,
+            *DEFAULT_SECRECY_THRESHOLD.deref(),
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
             Some(FAST_PATH_SECRECY_THRESHOLD),
         );
         let wconfig = WeightedConfig::new(
-            (validator_num as f64 * SECRECY_THRESHOLD).ceil() as usize,
+            (U64F64::from_num(validator_num) * *DEFAULT_SECRECY_THRESHOLD.deref())
+                .ceil()
+                .to_num::<usize>(),
             vec![1; validator_num],
         )
         .unwrap();
@@ -80,20 +87,23 @@ fn test_rounding_small_stakes() {
         }
         let dkg_rounding = DKGRounding::new(
             &validator_stakes,
-            SECRECY_THRESHOLD,
-            RECONSTRUCT_THRESHOLD,
+            *DEFAULT_SECRECY_THRESHOLD.deref(),
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
             Some(FAST_PATH_SECRECY_THRESHOLD),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
-        let total_weight_max =
-            total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
+        let total_weight_max = total_weight_upper_bound(
+            &validator_stakes,
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+            *DEFAULT_SECRECY_THRESHOLD.deref(),
+        );
         let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
         assert!(total_weight >= total_weight_min as u64);
         assert!(total_weight <= total_weight_max as u64);
         assert!(is_valid_profile(
             &dkg_rounding.profile,
-            RECONSTRUCT_THRESHOLD
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref()
         ));
     }
 }
@@ -112,20 +122,23 @@ fn test_rounding_uniform_distribution() {
         }
         let dkg_rounding = DKGRounding::new(
             &validator_stakes,
-            SECRECY_THRESHOLD,
-            RECONSTRUCT_THRESHOLD,
+            *DEFAULT_SECRECY_THRESHOLD.deref(),
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
             Some(FAST_PATH_SECRECY_THRESHOLD),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
-        let total_weight_max =
-            total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
+        let total_weight_max = total_weight_upper_bound(
+            &validator_stakes,
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+            *DEFAULT_SECRECY_THRESHOLD.deref(),
+        );
         let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
         assert!(total_weight >= total_weight_min as u64);
         assert!(total_weight <= total_weight_max as u64);
         assert!(is_valid_profile(
             &dkg_rounding.profile,
-            RECONSTRUCT_THRESHOLD
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref()
         ));
     }
 }
@@ -157,20 +170,23 @@ fn test_rounding_zipf_distribution() {
         let validator_stakes = generate_approximate_zipf(validator_num, 1_000_000, 50_000_000, 5.0);
         let dkg_rounding = DKGRounding::new(
             &validator_stakes,
-            SECRECY_THRESHOLD,
-            RECONSTRUCT_THRESHOLD,
+            *DEFAULT_SECRECY_THRESHOLD.deref(),
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
             Some(FAST_PATH_SECRECY_THRESHOLD),
         );
 
         let total_weight_min = total_weight_lower_bound(&validator_stakes);
-        let total_weight_max =
-            total_weight_upper_bound(&validator_stakes, RECONSTRUCT_THRESHOLD, SECRECY_THRESHOLD);
+        let total_weight_max = total_weight_upper_bound(
+            &validator_stakes,
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
+            *DEFAULT_SECRECY_THRESHOLD.deref(),
+        );
         let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
         assert!(total_weight >= total_weight_min as u64);
         assert!(total_weight <= total_weight_max as u64);
         assert!(is_valid_profile(
             &dkg_rounding.profile,
-            RECONSTRUCT_THRESHOLD
+            *DEFAULT_RECONSTRUCT_THRESHOLD.deref()
         ));
     }
 }

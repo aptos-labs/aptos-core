@@ -75,6 +75,7 @@ subjects:
 
 ---
 
+{{- if .Values.enabled  }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -142,6 +143,10 @@ spec:
           value: {{ .Values.genesis.multicluster.enabled | quote }}
         - name: MULTICLUSTER_DOMAIN_SUFFIXES_STRING
           value: {{ .Values.genesis.multicluster.domain_suffixes | quote }}
+        - name: GENESIS_BLOB_UPLOAD_URL
+          value: {{ .Values.genesis.genesis_blob_upload_url | quote }}
+        - name: CLUSTER_NAME
+          value: {{ .Values.genesis.cluster_name | quote }}
         volumeMounts:
         - name: layout
           mountPath: /tmp/layout.yaml
@@ -190,3 +195,4 @@ spec:
       imagePullSecrets:
       - name: {{.Values.imagePullSecret}}
       {{- end }}
+{{- end }}

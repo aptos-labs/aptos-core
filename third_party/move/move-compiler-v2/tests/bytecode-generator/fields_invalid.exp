@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::fields {
     struct T {
         h: u64,
@@ -11,7 +11,6 @@ module 0x42::fields {
         select fields::T.h(select fields::S.g(x)) = 42;
         Tuple()
     }
-    spec fun $write_ref(x: &fields::S);
 } // end 0x42::fields
 
 

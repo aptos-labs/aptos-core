@@ -1,0 +1,10 @@
+
+Diagnostics:
+error: duplicate declaration, item, or annotation
+  ┌─ tests/checking/specs/clash_move_spec_function.move:5:14
+  │
+3 │     fun f(): u64 { 1 }
+  │         - Alias previously defined here
+4 │
+5 │     spec fun f(): u64 { 1 }
+  │              ^ Duplicate module member or alias 'f'. Top level names in a namespace must be unique

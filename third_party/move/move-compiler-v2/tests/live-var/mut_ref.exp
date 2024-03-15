@@ -387,13 +387,13 @@ fun m::id($t0: &mut m::R): &mut m::R {
 
 [variant baseline]
 fun m::some($t0: &mut m::R) {
-     # live vars:
+     # live vars: $t0
   0: return ()
 }
 
 
 [variant baseline]
 fun m::some2($t0: &mut m::R, $t1: &mut m::R) {
-     # live vars:
+     # live vars: $t0, $t1
   0: return ()
 }

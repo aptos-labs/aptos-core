@@ -60,6 +60,7 @@ pub(crate) struct DagDriver {
     payload_config: DagPayloadConfig,
     health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
+    allow_batches_without_pos_in_proposal: bool,
 }
 
 impl DagDriver {
@@ -80,6 +81,7 @@ impl DagDriver {
         payload_config: DagPayloadConfig,
         health_backoff: HealthBackoff,
         quorum_store_enabled: bool,
+        allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -104,6 +106,7 @@ impl DagDriver {
             payload_config,
             health_backoff,
             quorum_store_enabled,
+            allow_batches_without_pos_in_proposal,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -255,6 +258,9 @@ impl DagDriver {
                 Duration::from_millis(self.payload_config.payload_pull_max_poll_time_ms),
                 max_txns,
                 max_size_bytes,
+                // TODO: Set max_inline_items and max_inline_bytes correctly
+                100,
+                100 * 1024,
                 sys_payload_filter,
                 payload_filter,
                 Box::pin(async {}),
@@ -267,7 +273,13 @@ impl DagDriver {
             Ok(payload) => payload,
             Err(e) => {
                 error!("error pulling payload: {}", e);
-                (vec![], Payload::empty(self.quorum_store_enabled))
+                (
+                    vec![],
+                    Payload::empty(
+                        self.quorum_store_enabled,
+                        self.allow_batches_without_pos_in_proposal,
+                    ),
+                )
             },
         };
 

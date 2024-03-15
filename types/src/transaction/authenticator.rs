@@ -1164,12 +1164,20 @@ impl<'de> Deserialize<'de> for EphemeralPublicKey {
             #[derive(::serde::Deserialize)]
             #[serde(rename = "EphemeralPublicKey")]
             enum Value {
-                Ed25519 { public_key: Ed25519PublicKey },
+                Ed25519 {
+                    public_key: Ed25519PublicKey,
+                },
+                Secp256r1Ecdsa {
+                    public_key: secp256r1_ecdsa::PublicKey,
+                },
             }
 
             let value = Value::deserialize(deserializer)?;
             Ok(match value {
                 Value::Ed25519 { public_key } => EphemeralPublicKey::Ed25519 { public_key },
+                Value::Secp256r1Ecdsa { public_key } => {
+                    EphemeralPublicKey::Secp256r1Ecdsa { public_key }
+                },
             })
         }
     }

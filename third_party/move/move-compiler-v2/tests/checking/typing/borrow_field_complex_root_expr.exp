@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
@@ -35,5 +35,4 @@ module 0x8675309::M {
         }));
         Tuple()
     }
-    spec fun $t0(cond: bool,s: &M::S,s_mut: &mut M::S);
 } // end 0x8675309::M

@@ -132,6 +132,10 @@ impl BatchInfo {
     pub fn gas_bucket_start(&self) -> u64 {
         self.gas_bucket_start
     }
+
+    pub fn is_expired(&self) -> bool {
+        self.expiration() < aptos_infallible::duration_since_epoch().as_micros() as u64
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     struct Box {
         f1: #0,
@@ -15,5 +15,4 @@ module 0x42::M {
           }
         }
     }
-    spec fun $t0();
 } // end 0x42::M

@@ -7,7 +7,7 @@ use crate::{
 };
 use aptos_types::{state_store::StateView, transaction::SignedTransaction};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::output::VMOutput;
+use aptos_vm_types::{change_set::VMChangeSet, output::VMOutput};
 use move_binary_format::errors::VMResult;
 use move_core_types::vm_status::VMStatus;
 
@@ -77,6 +77,7 @@ impl AptosVM {
 
         let resolver = state_view.as_move_resolver();
         self.failed_transaction_cleanup(
+            VMChangeSet::empty(),
             error_vm_status,
             &mut gas_meter,
             &txn_data,

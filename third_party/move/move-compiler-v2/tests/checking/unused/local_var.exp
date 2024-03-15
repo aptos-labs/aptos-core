@@ -1,33 +1,6 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     public fun test(): u64 {
-        {
-          let x: u64 = 1;
-          {
-            let x: u64 = Add<u64>(x, 1);
-            {
-              let y: u64 = 2;
-              {
-                let y: u64 = Add<u64>(y, 1);
-                Add<u64>(x, y)
-              }
-            }
-          }
-        }
-    }
-    spec fun $test(): u64 {
-        {
-          let x: u256 = 1;
-          {
-            let x: num = Add(x, 1);
-            {
-              let y: u256 = 2;
-              {
-                let y: num = Add(y, 1);
-                Add(x, y)
-              }
-            }
-          }
-        }
+        5
     }
 } // end 0xc0ffee::m

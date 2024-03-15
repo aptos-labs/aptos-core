@@ -104,6 +104,34 @@ INTEGRATION_TEST_CRATES="\
   -p aptos-framework\
 "
 
+if [ ! -z "$CHECK" ]; then
+  echo "*************** [move-pr] Running checks"
+  (
+    cd $BASE
+    cargo xclippy
+    cargo +nightly fmt
+    cargo sort --grouped --workspace
+  )
+fi
+
+# Artifact generation needs to be run before testing as tests may depend on its result
+if [ ! -z "$GEN_ARTIFACTS" ]; then
+  for dir in $ARTIFACT_CRATE_PATHS; do
+    echo "*************** [move-pr] Generating artifacts for crate $dir"
+    (
+      cd $MOVE_BASE/$dir
+      cargo run --profile $MOVE_PR_PROFILE
+    )
+  done
+  # Add hoc treatment
+  (
+    cd $BASE
+    cargo build --profile $MOVE_PR_PROFILE -p aptos-cached-packages
+  )
+fi
+
+
+
 if [ ! -z "$TEST" ]; then
   echo "*************** [move-pr] Running tests"
   (
@@ -124,31 +152,6 @@ if [ ! -z "$INTEGRATION_TEST" ]; then
   )
 fi
 
-
-if [ ! -z "$CHECK" ]; then
-  echo "*************** [move-pr] Running checks"
-  (
-    cd $BASE
-    cargo xclippy
-    cargo +nightly fmt
-    cargo sort --grouped --workspace 
-  )
-fi
-
-if [ ! -z "$GEN_ARTIFACTS" ]; then
-  for dir in $ARTIFACT_CRATE_PATHS; do
-    echo "*************** [move-pr] Generating artifacts for crate $dir"
-    (
-      cd $MOVE_BASE/$dir
-      cargo run --profile $MOVE_PR_PROFILE
-    )
-  done
-  # Add hoc treatment
-  (
-    cd $BASE
-    cargo build --profile $MOVE_PR_PROFILE -p aptos-cached-packages
-  )
-fi
 
 if [ ! -z "$GIT_CHECKS" ]; then
    echo "*************** [move-pr] Running git checks"

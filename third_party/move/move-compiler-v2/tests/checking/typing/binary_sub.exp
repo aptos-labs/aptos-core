@@ -1,11 +1,11 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         f: u64,
     }
     private fun t0(x: u64,r: M::R) {
-        Sub<u64>(0, 0);
-        Sub<u64>(1, 0);
+        0;
+        1;
         Sub<u64>(0, 1);
         Sub<u8>(0, 1);
         Sub<u8>(0, 1);
@@ -16,9 +16,8 @@ module 0x8675309::M {
         Sub<u64>(select M::R.f(r), select M::R.f(r));
         Sub<u64>(Sub<u64>(Sub<u64>(1, select M::R.f(r)), select M::R.f(r)), 0);
         {
-          let M::R{ f: _ } = r;
+          let M::R{ f: _ }: M::R = r;
           Tuple()
         }
     }
-    spec fun $t0(x: u64,r: M::R);
 } // end 0x8675309::M

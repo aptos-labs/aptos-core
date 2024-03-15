@@ -347,9 +347,7 @@ module std::features {
         is_enabled(BN254_STRUCTURES)
     }
 
-    /// The on-chain randomness feature.
-    ///
-    /// Lifetime: transient
+    /// Deprecated by `aptos_framework::randomness_config::RandomnessConfig`.
     const RECONFIGURE_WITH_DKG: u64 = 45;
     public fun get_reconfigure_with_dkg_feature(): u64 { RECONFIGURE_WITH_DKG }
     public fun reconfigure_with_dkg_enabled(): bool acquires Features {
@@ -378,9 +376,7 @@ module std::features {
         is_enabled(KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
-    /// The JWK consensus feature.
-    ///
-    /// Lifetime: permanent
+    /// Deprecated by `aptos_framework::jwk_consensus_config::JWKConsensusConfig`.
     const JWK_CONSENSUS: u64 = 49;
 
     public fun get_jwk_consensus_feature(): u64 { JWK_CONSENSUS }

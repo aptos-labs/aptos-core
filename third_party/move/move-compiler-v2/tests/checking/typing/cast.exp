@@ -1,89 +1,29 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     private fun t0(x8: u8,x64: u64,x128: u128) {
         {
-          let _ = Cast(0);
+          let _: u8 = x8;
           {
-            let _ = Cast(0);
+            let _: u64 = x64;
             {
-              let _ = Cast(0);
+              let _: u128 = x128;
               {
-                let _ = Cast(x8);
+                let _: u8 = Cast<u8>(x64);
                 {
-                  let _ = Cast(x64);
+                  let _: u64 = Cast<u64>(x128);
                   {
-                    let _ = Cast(x128);
+                    let _: u128 = Cast<u128>(x8);
                     {
-                      let _ = Cast(x64);
+                      let _: u8 = Cast<u8>(x128);
                       {
-                        let _ = Cast(x128);
+                        let _: u64 = Cast<u64>(x8);
                         {
-                          let _ = Cast(x8);
+                          let _: u128 = Cast<u128>(x64);
                           {
-                            let _ = Cast(x128);
+                            let _: u8 = Cast<u8>(340282366920938463463374607431768211455);
                             {
-                              let _ = Cast(x8);
-                              {
-                                let _ = Cast(x64);
-                                {
-                                  let _ = Cast(340282366920938463463374607431768211455);
-                                  {
-                                    let _ = Cast(340282366920938463463374607431768211455);
-                                    {
-                                      let _ = Cast(340282366920938463463374607431768211455);
-                                      Tuple()
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-    }
-    spec fun $t0(x8: u8,x64: u64,x128: u128) {
-        {
-          let _ = Cast(0);
-          {
-            let _ = Cast(0);
-            {
-              let _ = Cast(0);
-              {
-                let _ = Cast(x8);
-                {
-                  let _ = Cast(x64);
-                  {
-                    let _ = Cast(x128);
-                    {
-                      let _ = Cast(x64);
-                      {
-                        let _ = Cast(x128);
-                        {
-                          let _ = Cast(x8);
-                          {
-                            let _ = Cast(x128);
-                            {
-                              let _ = Cast(x8);
-                              {
-                                let _ = Cast(x64);
-                                {
-                                  let _ = Cast(340282366920938463463374607431768211455);
-                                  {
-                                    let _ = Cast(340282366920938463463374607431768211455);
-                                    {
-                                      let _ = Cast(340282366920938463463374607431768211455);
-                                      Tuple()
-                                    }
-                                  }
-                                }
-                              }
+                              let _: u64 = Cast<u64>(340282366920938463463374607431768211455);
+                              Tuple()
                             }
                           }
                         }

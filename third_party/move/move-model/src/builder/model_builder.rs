@@ -55,8 +55,6 @@ pub(crate) struct ModelBuilder<'env> {
     pub fun_table: BTreeMap<QualifiedSymbol, FunEntry>,
     /// A symbol table for constants.
     pub const_table: BTreeMap<QualifiedSymbol, ConstEntry>,
-    /// A call graph mapping callers to callees that are Move functions.
-    pub move_fun_call_graph: BTreeMap<QualifiedId<SpecFunId>, BTreeSet<QualifiedId<SpecFunId>>>,
     /// A list of intrinsic declarations
     pub intrinsics: Vec<IntrinsicDecl>,
     /// A module lookup table from names to their ids.
@@ -138,7 +136,6 @@ pub(crate) struct FunEntry {
     pub type_params: Vec<TypeParameter>,
     pub params: Vec<Parameter>,
     pub result_type: Type,
-    pub is_pure: bool,
     pub attributes: Vec<Attribute>,
     pub inline_specs: BTreeMap<EA::SpecId, EA::SpecBlock>,
 }
@@ -208,7 +205,6 @@ impl<'env> ModelBuilder<'env> {
             reverse_struct_table: BTreeMap::new(),
             fun_table: BTreeMap::new(),
             const_table: BTreeMap::new(),
-            move_fun_call_graph: BTreeMap::new(),
             intrinsics: Vec::new(),
             module_table: BTreeMap::new(),
         };
@@ -242,6 +238,15 @@ impl<'env> ModelBuilder<'env> {
         name: QualifiedSymbol,
         entry: SpecOrBuiltinFunEntry,
     ) {
+        if self.fun_table.contains_key(&name) {
+            self.env.error(
+                &entry.loc,
+                &format!(
+                    "name clash between specification and Move function `{}`",
+                    name.symbol.display(self.env.symbol_pool())
+                ),
+            );
+        }
         // TODO: check whether overloads are distinguishable
         self.spec_fun_table.entry(name).or_default().push(entry);
     }
@@ -384,6 +389,13 @@ impl<'env> ModelBuilder<'env> {
             .unwrap_or_default()
     }
 
+    /// Looks up the abilities of a struct.
+    /// TODO(#12437): get rid of this once we have new UnificationContext
+    pub fn lookup_struct_abilities(&self, id: QualifiedId<StructId>) -> AbilitySet {
+        let entry = self.lookup_struct_entry(id);
+        entry.abilities
+    }
+
     /// Get all the structs which have been build so far.
     pub fn get_struct_ids(&self) -> impl Iterator<Item = QualifiedId<StructId>> + '_ {
         self.struct_table
@@ -507,11 +519,6 @@ impl<'env> ModelBuilder<'env> {
         self.env.symbol_pool().make("old")
     }
 
-    /// Returns the symbol for the builtin Move function `assert`.
-    pub fn assert_symbol(&self) -> Symbol {
-        self.env.symbol_pool().make("assert")
-    }
-
     /// Returns the name for the pseudo builtin module.
     pub fn builtin_module(&self) -> ModuleName {
         ModuleName::new(
@@ -523,34 +530,6 @@ impl<'env> ModelBuilder<'env> {
     /// Adds a spec function to used_spec_funs set.
     pub fn add_used_spec_fun(&mut self, qid: QualifiedId<SpecFunId>) {
         self.env.used_spec_funs.insert(qid);
-        self.propagate_move_fun_usage(qid);
-    }
-
-    /// Adds an edge from the caller to the callee to the Move fun call graph. The callee is
-    /// is instantiated in dependency of the type parameters of the caller.
-    pub fn add_edge_to_move_fun_call_graph(
-        &mut self,
-        caller: QualifiedId<SpecFunId>,
-        callee: QualifiedId<SpecFunId>,
-    ) {
-        self.move_fun_call_graph
-            .entry(caller)
-            .or_default()
-            .insert(callee);
-    }
-
-    /// Runs DFS to propagate the usage of Move functions from callers
-    /// to callees on the call graph.
-    pub fn propagate_move_fun_usage(&mut self, qid: QualifiedId<SpecFunId>) {
-        if let Some(neighbors) = self.move_fun_call_graph.get(&qid) {
-            neighbors.clone().iter().for_each(|n| {
-                if self.env.used_spec_funs.insert(*n) {
-                    // If the callee's usage has not been recorded, recursively
-                    // propagate the usage to the callee's callees, and so on.
-                    self.propagate_move_fun_usage(*n);
-                }
-            });
-        }
     }
 
     /// Pass model-level information to the global env

@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     struct T {
         x: u64,
@@ -16,9 +16,6 @@ module 0x42::M {
         z: vector<u64>,
     }
     public fun f(r: M::R): M::T {
-        pack M::T(select M::S.x(select M::R.s(r)))
-    }
-    spec fun $f(r: M::R): M::T {
         pack M::T(select M::S.x(select M::R.s(r)))
     }
     spec fun struct_access(s: M::S): u64 {

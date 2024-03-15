@@ -5,8 +5,8 @@ use crate::{
     account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
     entry_points::EntryPointTransactionGenerator, EntryPoints, ObjectPool,
-    ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind,
-    WorkflowProgress,
+    ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
+    TransactionGeneratorCreator, WorkflowKind, WorkflowProgress,
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -229,7 +229,7 @@ impl WorkflowTxnGeneratorCreator {
         workflow_kind: WorkflowKind,
         txn_factory: TransactionFactory,
         init_txn_factory: TransactionFactory,
-        root_account: &mut LocalAccount,
+        root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,
@@ -256,13 +256,49 @@ impl WorkflowTxnGeneratorCreator {
             }
         );
         match workflow_kind {
-            WorkflowKind::CreateThenMint {
+            WorkflowKind::CreateMintBurn {
                 count,
                 creation_balance,
             } => {
                 let created_pool = Arc::new(ObjectPool::new());
                 let minted_pool = Arc::new(ObjectPool::new());
-                let entry_point = EntryPoints::TokenV2AmbassadorMint;
+                let burnt_pool = Arc::new(ObjectPool::new());
+
+                let mint_entry_point = EntryPoints::TokenV2AmbassadorMint { numbered: false };
+                let burn_entry_point = EntryPoints::TokenV2AmbassadorBurn;
+
+                let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    num_modules,
+                    mint_entry_point.package_name(),
+                    Some(20_00000000),
+                )
+                .await;
+
+                let mint_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    &mut packages,
+                    &mut EntryPointTransactionGenerator {
+                        entry_point: mint_entry_point,
+                    },
+                )
+                .await;
+                let burn_worker = CustomModulesDelegationGeneratorCreator::create_worker(
+                    init_txn_factory.clone(),
+                    root_account,
+                    txn_executor,
+                    &mut packages,
+                    &mut EntryPointTransactionGenerator {
+                        entry_point: burn_entry_point,
+                    },
+                )
+                .await;
+
+                let packages = Arc::new(packages);
 
                 let creators: Vec<Box<dyn TransactionGeneratorCreator>> = vec![
                     Box::new(AccountGeneratorCreator::new(
@@ -273,26 +309,28 @@ impl WorkflowTxnGeneratorCreator {
                         creation_balance,
                     )),
                     Box::new(AccountsPoolWrapperCreator::new(
-                        Box::new(
-                            CustomModulesDelegationGeneratorCreator::new(
-                                txn_factory.clone(),
-                                init_txn_factory.clone(),
-                                root_account,
-                                txn_executor,
-                                num_modules,
-                                entry_point.package_name(),
-                                &mut EntryPointTransactionGenerator { entry_point },
-                            )
-                            .await,
-                        ),
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            mint_worker,
+                        )),
                         created_pool.clone(),
                         Some(minted_pool.clone()),
+                    )),
+                    Box::new(AccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            burn_worker,
+                        )),
+                        minted_pool.clone(),
+                        Some(burnt_pool.clone()),
                     )),
                 ];
                 Self::new(
                     stage_tracking,
                     creators,
-                    vec![created_pool, minted_pool],
+                    vec![created_pool, minted_pool, burnt_pool],
                     count,
                 )
             },

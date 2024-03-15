@@ -82,7 +82,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-    ) -> VMResult<SerializedReturnValues> {
+    ) -> VMResult<()> {
         let bypass_declared_entry_check = false;
         self.move_vm.runtime.execute_function(
             module,
@@ -94,7 +94,8 @@ impl<'r, 'l> Session<'r, 'l> {
             gas_meter,
             &mut self.native_extensions,
             bypass_declared_entry_check,
-        )
+        )?;
+        Ok(())
     }
 
     /// Similar to execute_entry_function, but it bypasses visibility checks
@@ -161,7 +162,7 @@ impl<'r, 'l> Session<'r, 'l> {
         ty_args: Vec<TypeTag>,
         args: Vec<impl Borrow<[u8]>>,
         gas_meter: &mut impl GasMeter,
-    ) -> VMResult<SerializedReturnValues> {
+    ) -> VMResult<()> {
         self.move_vm.runtime.execute_script(
             script,
             ty_args,
@@ -351,13 +352,13 @@ impl<'r, 'l> Session<'r, 'l> {
     }
 
     /// Note: Cannot return a `Function` struct here due to its `pub(crate)` visibility.
-    pub fn load_function_def_is_friend_or_private(
+    pub fn load_function_and_is_friend_or_private_def(
         &mut self,
         module_id: &ModuleId,
         function_name: &IdentStr,
         type_arguments: &[TypeTag],
-    ) -> VMResult<bool> {
-        let (_, func, _) = self.move_vm.runtime.loader().load_function(
+    ) -> VMResult<(LoadedFunctionInstantiation, bool)> {
+        let (_, func, instantiation) = self.move_vm.runtime.loader().load_function(
             module_id,
             function_name,
             type_arguments,
@@ -365,7 +366,7 @@ impl<'r, 'l> Session<'r, 'l> {
             &self.module_store,
         )?;
 
-        Ok(func.is_friend_or_private())
+        Ok((instantiation, func.is_friend_or_private()))
     }
 
     /// Load a module, a function, and all of its types into cache

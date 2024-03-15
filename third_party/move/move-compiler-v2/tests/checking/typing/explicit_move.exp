@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         dummy_field: bool,
@@ -15,11 +15,10 @@ module 0x8675309::M {
               let r: M::R = pack M::R(false);
               Move(u);
               Move(s);
-              M::R{ dummy_field: _ } = Move(r);
+              M::R{ dummy_field: _ }: M::R = Move(r);
               Tuple()
             }
           }
         }
     }
-    spec fun $t();
 } // end 0x8675309::M
