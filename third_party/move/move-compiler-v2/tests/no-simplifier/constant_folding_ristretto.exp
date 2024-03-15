@@ -14,13 +14,4 @@ module 0xcafe::Ristretto {
           }
         }
     }
-    spec fun $test() {
-        {
-          let non_canonical_highbit: vector<u256> = Vector<u256>(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128);
-          {
-            let non_canonical_highbit_hex: vector<u8> = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128];
-            Tuple()
-          }
-        }
-    }
 } // end 0xcafe::Ristretto

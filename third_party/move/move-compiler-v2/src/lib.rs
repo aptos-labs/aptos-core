@@ -159,7 +159,16 @@ pub fn run_checker_and_rewriters(
     options: Options,
     scope: RewritingScope,
 ) -> anyhow::Result<GlobalEnv> {
-    let env_pipeline = check_and_rewrite_pipeline(&options, false, scope);
+    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
+    let mut env_pipeline = check_and_rewrite_pipeline(&options, false, scope);
+    env_pipeline.add("simplifier", {
+        move |env: &mut GlobalEnv| {
+            ast_simplifier::run_simplifier(
+                env,
+                optimize_on, // eliminate code only if optimize is on
+            )
+        }
+    });
     let mut env = run_checker(options)?;
     if !env.has_errors() {
         env_pipeline.run(&mut env);
@@ -209,12 +218,10 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
 /// `Everything` for use with the Move Prover, otherwise `CompilationTarget`
 /// should be used.
 pub fn check_and_rewrite_pipeline<'a>(
-    options: &Options,
+    _options: &Options,
     for_v1_model: bool,
     inlining_scope: RewritingScope,
 ) -> EnvProcessorPipeline<'a> {
-    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
-
     // The default transformation pipeline on the GlobalEnv
     let mut env_pipeline = EnvProcessorPipeline::default();
     env_pipeline.add(
@@ -245,14 +252,6 @@ pub fn check_and_rewrite_pipeline<'a>(
             |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
         );
     }
-    env_pipeline.add("simplifier", {
-        move |env: &mut GlobalEnv| {
-            ast_simplifier::run_simplifier(
-                env,
-                optimize_on, // eliminate code only if optimize is on
-            )
-        }
-    });
     env_pipeline.add("specification checker", |env| {
         let env: &GlobalEnv = env;
         spec_checker::run_spec_checker(env)
