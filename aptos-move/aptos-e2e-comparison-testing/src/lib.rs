@@ -57,6 +57,9 @@ const ERR_LOG: &str = "err_log.txt";
 const ROCKS_INDEX_DB: &str = "rocks_txn_idx_db";
 pub const APTOS_COMMONS: &str = "aptos-commons";
 const MAX_TO_FLUSH: usize = 50000;
+pub const DISABLE_SPEC_CHECK: &str = "spec-check=off";
+pub const DISABLE_REF_CHECK: &str = "reference-safety=off";
+pub const ENABLE_REF_CHECK: &str = "reference-safety=on";
 
 struct IndexWriter {
     index_writer: BufWriter<File>,
@@ -436,10 +439,10 @@ fn compile_aptos_packages(
 fn compile_package(
     root_dir: PathBuf,
     package_info: &PackageInfo,
-    compiler_verion: Option<CompilerVersion>,
+    compiler_version: Option<CompilerVersion>,
 ) -> anyhow::Result<CompiledPackage> {
     let mut build_options = aptos_framework::BuildOptions {
-        compiler_version: compiler_verion,
+        compiler_version,
         ..Default::default()
     };
     build_options
@@ -450,8 +453,9 @@ fn compile_package(
         Ok(built_package.package)
     } else {
         Err(anyhow::Error::msg(format!(
-            "compilation failed for compiler: {:?}",
-            compiler_verion
+            "compilation failed for the package:{} when using compiler: {:?}",
+            package_info.package_name.clone(),
+            compiler_version
         )))
     }
 }
@@ -465,7 +469,16 @@ fn dump_and_compile_from_package_metadata(
 ) -> anyhow::Result<()> {
     let root_package_dir = root_dir.join(format!("{}", package_info,));
     if compilation_cache.failed_packages_v1.contains(&package_info) {
-        return Err(anyhow::Error::msg("compilation failed"));
+        return Err(anyhow::Error::msg(format!(
+            "compilation failed for the package:{} when using compiler v1",
+            package_info.package_name
+        )));
+    }
+    if compilation_cache.failed_packages_v2.contains(&package_info) {
+        return Err(anyhow::Error::msg(format!(
+            "compilation failed for the package:{} when using compiler v2",
+            package_info.package_name
+        )));
     }
     if !root_package_dir.exists() {
         std::fs::create_dir_all(root_package_dir.as_path())?;
@@ -570,9 +583,14 @@ fn dump_and_compile_from_package_metadata(
                 .insert(package_info.clone(), built_package);
         } else {
             if !compilation_cache.failed_packages_v1.contains(&package_info) {
-                compilation_cache.failed_packages_v1.insert(package_info);
+                compilation_cache
+                    .failed_packages_v1
+                    .insert(package_info.clone());
             }
-            return Err(anyhow::Error::msg("compilation failed at v1"));
+            return Err(anyhow::Error::msg(format!(
+                "compilation failed for the package:{} when using compiler v1",
+                package_info.package_name
+            )));
         }
         if execution_mode.is_some_and(|mode| mode.is_v2_or_compare()) {
             let package_v2 = compile_package(
@@ -587,10 +605,15 @@ fn dump_and_compile_from_package_metadata(
                     &mut compilation_cache.compiled_package_cache_v2,
                 );
             } else {
-                if !compilation_cache.failed_packages_v1.contains(&package_info) {
-                    compilation_cache.failed_packages_v1.insert(package_info);
+                if !compilation_cache.failed_packages_v2.contains(&package_info) {
+                    compilation_cache
+                        .failed_packages_v2
+                        .insert(package_info.clone());
                 }
-                return Err(anyhow::Error::msg("compilation failed at v2"));
+                return Err(anyhow::Error::msg(format!(
+                    "compilation failed for the package:{} when using compiler v2",
+                    package_info.package_name
+                )));
             }
         }
     }
