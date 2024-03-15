@@ -134,6 +134,8 @@ pub enum FeatureFlag {
     /// Whether function values are enabled.
     ENABLE_FUNCTION_VALUES = 89,
     NEW_ACCOUNTS_DEFAULT_TO_FA_STORE = 90,
+    TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE = 99,
+    FAKE_FEATURE_FOR_COMPARISON_TESTING = 1000,
 }
 
 impl FeatureFlag {
