@@ -25,12 +25,12 @@ pub fn generate_jwk_consensus_config_update_proposal(
                     emitln!(writer, "jwk_consensus_config::set_for_next_epoch({}, jwk_consensus_config::new_off());", signer_arg);
                 },
                 OnChainJWKConsensusConfig::V1(v1) => {
-                    emitln!(writer, "let v1 = jwk_consensus_config::new_v1(vector[");
+                    emitln!(writer, "let config = jwk_consensus_config::new_v1(vector[");
                     for p in v1.oidc_providers.iter() {
                         emitln!(writer, "jwk_consensus_config::new_oidc_provider(utf8(b\"{}\"), utf8(b\"{}\")),", p.name, p.config_url);
                     }
                     emitln!(writer, "]);");
-                    emitln!(writer, "jwk_consensus_config::set_for_next_epoch({}, jwk_consensus_config::new_v1(v1));", signer_arg);
+                    emitln!(writer, "jwk_consensus_config::set_for_next_epoch({}, config);", signer_arg);
                 },
             }
             emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
