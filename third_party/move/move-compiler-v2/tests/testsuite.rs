@@ -12,8 +12,9 @@ use move_compiler_v2::{
     },
     logging, pipeline,
     pipeline::{
-        ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
-        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+        self, ability_processor::AbilityProcessor,
+        avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
+        dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
         reference_safety_processor::ReferenceSafetyProcessor,
@@ -21,7 +22,7 @@ use move_compiler_v2::{
         unreachable_code_analysis::UnreachableCodeProcessor,
         unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
     },
-    run_bytecode_verifier, run_file_format_gen, Options,
+    recursive_struct_checker, run_bytecode_verifier, run_file_format_gen, Options,
 };
 use move_model::model::GlobalEnv;
 use move_prover_test_utils::{baseline_test, extract_test_directives};
