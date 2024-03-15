@@ -85,6 +85,8 @@ pub struct ApiConfig {
     pub wait_by_hash_timeout_ms: u64,
     /// The interval at which wait_by_hash will poll the storage for the transaction.
     pub wait_by_hash_poll_interval_ms: u64,
+    /// The number of active wait_by_hash requests that can be active at any given time.
+    pub wait_by_hash_max_active_connections: usize,
 }
 
 const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -135,6 +137,7 @@ impl Default for ApiConfig {
             periodic_function_stats_sec: Some(60),
             wait_by_hash_timeout_ms: 2_000,
             wait_by_hash_poll_interval_ms: 20,
+            wait_by_hash_max_active_connections: 100,
         }
     }
 }

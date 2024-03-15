@@ -29,7 +29,6 @@ use aptos_api_types::{
     MAX_RECURSIVE_TYPES_ALLOWED, U64,
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
-use aptos_logger::prelude::*;
 use aptos_types::{
     account_config::CoinStoreResource,
     mempool_status::MempoolStatusCode,
@@ -213,11 +212,10 @@ impl TransactionsApi {
 
     /// Wait for transaction by hash
     ///
-    /// Same as /transactions/by_hash, but will wait for the transaction to be committed. To be used as a long poll
-    /// on clients (the "long" poll will return on the order of several seconds, according to the server configuration).
-    /// The request will return immediately once the committed transaction is found.
-    /// If the committed transaction is not found within the timeout, a 404 will be returned.
-    /// In case of other errors, the request will return immediately with the error.
+    /// Same as /transactions/by_hash, but will wait for a pending transaction to be committed. To be used as a long
+    /// poll optimization by clients, to reduce latency caused by polling. The "long" poll is generally a second or
+    /// less but dictated by the server; the client must deal with the result as if the request was a normal
+    /// /transactions/by_hash request, e.g., by retrying if the transaction is pending.
     #[oai(
         path = "/transactions/wait_by_hash/:txn_hash",
         method = "get",
@@ -235,8 +233,31 @@ impl TransactionsApi {
         self.context
             .check_api_output_enabled("Get transactions by hash", &accept_type)?;
 
+        // Short poll if the active connections are too high
+        if self
+            .context
+            .wait_for_hash_active_connections
+            .load(std::sync::atomic::Ordering::Relaxed)
+            >= self
+                .context
+                .node_config
+                .api
+                .wait_by_hash_max_active_connections
+        {
+            metrics::WAIT_TRANSACTION_POLL_TIME
+                .with_label_values(&["short"])
+                .observe(0.0);
+            return self
+                .get_transaction_by_hash_inner(&accept_type, txn_hash.0)
+                .await;
+        }
+
         let start_time = std::time::Instant::now();
+        self.context
+            .wait_for_hash_active_connections
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         WAIT_TRANSACTION_GAUGE.inc();
+
         let result = self
             .wait_transaction_by_hash_inner(
                 &accept_type,
@@ -245,15 +266,14 @@ impl TransactionsApi {
                 self.context.node_config.api.wait_by_hash_poll_interval_ms,
             )
             .await;
+
         WAIT_TRANSACTION_GAUGE.dec();
-        sample!(
-            SampleRate::Duration(Duration::from_secs(60)),
-            info!(
-                "get_transaction_by_hash long poll result: {}, duration ms: {}",
-                result.is_ok(),
-                start_time.elapsed().as_millis()
-            )
-        );
+        self.context
+            .wait_for_hash_active_connections
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        metrics::WAIT_TRANSACTION_POLL_TIME
+            .with_label_values(&["long"])
+            .observe(start_time.elapsed().as_secs_f64());
         result
     }
 

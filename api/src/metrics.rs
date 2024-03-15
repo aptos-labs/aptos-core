@@ -95,3 +95,13 @@ pub static WAIT_TRANSACTION_GAUGE: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static WAIT_TRANSACTION_POLL_TIME: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_api_wait_transaction_poll_time",
+        "Time spent on long poll for transactions, or 0 on short poll",
+        &["poll_type"],
+        SUB_MS_BUCKETS.to_vec()
+    )
+    .unwrap()
+});
