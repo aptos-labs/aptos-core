@@ -12,7 +12,7 @@ use move_compiler_v2::{
     },
     logging, pipeline,
     pipeline::{
-        self, ability_processor::AbilityProcessor,
+        ability_processor::AbilityProcessor,
         avail_copies_analysis::AvailCopiesAnalysisProcessor, copy_propagation::CopyPropagation,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
