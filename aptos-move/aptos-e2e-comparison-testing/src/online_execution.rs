@@ -4,6 +4,7 @@
 use crate::{
     compile_aptos_packages, dump_and_compile_from_package_metadata, is_aptos_package,
     CompilationCache, ExecutionMode, IndexWriter, PackageInfo, TxnIndex, APTOS_COMMONS,
+    DISABLE_REF_CHECK, DISABLE_SPEC_CHECK, ENABLE_REF_CHECK,
 };
 use anyhow::Result;
 use aptos_framework::natives::code::PackageMetadata;
@@ -14,6 +15,7 @@ use aptos_validator_interface::{AptosValidatorInterface, FilterCondition, RestDe
 use move_core_types::account_address::AccountAddress;
 use std::{
     collections::HashMap,
+    env,
     path::PathBuf,
     sync::{Arc, Mutex},
 };
@@ -26,6 +28,7 @@ pub struct OnlineExecutor {
     filter_condition: FilterCondition,
     execution_mode: ExecutionMode,
     endpoint: String,
+    skip_ref_packages: Option<String>,
 }
 
 impl OnlineExecutor {
@@ -37,6 +40,7 @@ impl OnlineExecutor {
         skip_publish_txns: bool,
         execution_mode: ExecutionMode,
         endpoint: String,
+        skip_ref_packages: Option<String>,
     ) -> Self {
         Self {
             debugger,
@@ -50,6 +54,7 @@ impl OnlineExecutor {
             },
             execution_mode,
             endpoint,
+            skip_ref_packages,
         }
     }
 
@@ -61,6 +66,7 @@ impl OnlineExecutor {
         skip_publish_txns: bool,
         execution_mode: ExecutionMode,
         endpoint: String,
+        skip_ref_packages: Option<String>,
     ) -> Result<Self> {
         Ok(Self::new(
             Arc::new(RestDebuggerInterface::new(rest_client)),
@@ -70,6 +76,7 @@ impl OnlineExecutor {
             skip_publish_txns,
             execution_mode,
             endpoint,
+            skip_ref_packages,
         ))
     }
 
@@ -176,10 +183,15 @@ impl OnlineExecutor {
                     let current_dir = self.current_dir.clone();
                     let execution_mode = self.execution_mode;
                     let endpoint = self.endpoint.clone();
+                    let skip_ref_packages = self.skip_ref_packages.clone();
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
-                        let executor = crate::Execution::new(current_dir.clone(), execution_mode);
-
+                        println!("skip packages:{:?}", skip_ref_packages);
+                        let executor = crate::Execution::new(
+                            current_dir.clone(),
+                            execution_mode,
+                            skip_ref_packages,
+                        );
                         let mut version_idx = TxnIndex {
                             version,
                             txn: txn.clone(),
@@ -188,6 +200,17 @@ impl OnlineExecutor {
 
                         // handle source code
                         if let Some((address, package_name, map)) = source_code_data {
+                            if executor.check_package_skip(&package_name) {
+                                env::set_var(
+                                    "MOVE_COMPILER_EXP",
+                                    format!("{},{}", DISABLE_SPEC_CHECK, DISABLE_REF_CHECK),
+                                );
+                            } else {
+                                env::set_var(
+                                    "MOVE_COMPILER_EXP",
+                                    format!("{},{}", DISABLE_SPEC_CHECK, ENABLE_REF_CHECK),
+                                );
+                            }
                             let execution_mode_opt = Some(execution_mode);
                             let package_info_opt = Self::dump_and_check_src(
                                 version,
@@ -222,7 +245,7 @@ impl OnlineExecutor {
                             executor.execute_and_compare(
                                 version,
                                 state_store,
-                                &version_idx,
+                                &mut version_idx,
                                 &cache_v1,
                                 &cache_v2,
                                 Some(debugger),
