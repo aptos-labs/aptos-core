@@ -394,9 +394,16 @@ impl UserModuleTransactionGenerator for EconiaRealOrderTransactionGenerator {
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         Arc::new(move |account, package, publisher, txn_factory, rng, _txn_counter, history| {
-            println!("account: {}, history: {:?}", account.address(), history);
+            // println!("account: {}, history: {:?}", account.address(), history);
+            let num_prev_limit_orders = history.iter().map(|s| if s == "place_limit_order" {1} else {0}).sum::<u64>();
+            let num_prev_cancel_orders = history.iter().map(|s| if s == "place_cancel_order" {1} else {0}).sum::<u64>();
+            if num_prev_limit_orders > num_prev_cancel_orders {
+                if rng.gen_range(1, 100) < 96 { // 95% probability
+                    return vec![account.sign_with_transaction_builder(txn_factory.payload(place_cancel_order(package.get_module_id("txn_generator_utils"))))];
+                }
+            }
             let size = rng.gen_range(4, 10000);
-            if rng.gen_range(1, 10000) < 265 {  // Market order with 2.65% probability
+            if rng.gen_range(1, 100) <= 5 {  // Market order with 5% probability
                 let market_id = if rng.gen_range(1, 1000) < 885 {   // Market 1 with 88.5% probability
                     1
                 } else {
@@ -413,7 +420,7 @@ impl UserModuleTransactionGenerator for EconiaRealOrderTransactionGenerator {
                     3
                 };
                 vec![account.sign_with_transaction_builder(txn_factory.payload(place_market_order(package.get_module_id("txn_generator_utils"), publisher.address(), size, market_id, direction, self_matching_behavior)))]
-            } else { // Limit order with 97.35% probability
+            } else { // Limit order with 95% probability
                 let market_id = if rng.gen_range(1, 1000) < 740 {   // Market 1 with 74% probability
                     1
                 } else {
