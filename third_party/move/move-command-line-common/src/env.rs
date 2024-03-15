@@ -50,6 +50,8 @@ pub fn get_move_compiler_block_v1_from_env() -> bool {
     read_bool_env_var(MOVE_COMPILER_BLOCK_V1_ENV_VAR) || read_bool_env_var(MVC_BLOCK_V1_ENV_VAR)
 }
 
+pub const OVERRIDE_EXP_CACHE: &str = "OVERRIDE_EXP_CACHE";
+
 pub fn read_env_var(v: &str) -> String {
     std::env::var(v).unwrap_or_else(|_| String::new())
 }
