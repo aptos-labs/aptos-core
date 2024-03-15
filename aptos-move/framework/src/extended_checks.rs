@@ -25,7 +25,6 @@ use move_stackless_bytecode::{
     stackless_bytecode::{AttrId, Bytecode, Operation},
     stackless_bytecode_generator::StacklessBytecodeGenerator,
 };
-use move_vm_types::loaded_data::runtime_types::Type::{MutableReference, Reference, Signer};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -503,22 +502,23 @@ impl<'a> ExtendedChecker<'a> {
             fun.get_parameter_types()
                 .iter()
                 .for_each(|parameter_type| match parameter_type {
-                    Type::Primitive(inner) => match inner {
-                        PrimitiveType::Signer => self.env.error(
-                            &fun.get_id_loc(),
-                            "view function cannot use the signer paremter",
-                        ),
-                        _ => (),
-                    },
-                    Type::Reference(_, inner) => match inner.as_ref() {
-                        Type::Primitive(inner) => match inner {
-                            PrimitiveType::Signer => self.env.error(
+                    Type::Primitive(inner) => {
+                        if inner == &PrimitiveType::Signer {
+                            self.env.error(
                                 &fun.get_id_loc(),
-                                "view function cannot use the & signer paremter",
-                            ),
-                            _ => (),
-                        },
-                        _ => (),
+                                "view function cannot use the signer paremter",
+                            )
+                        }
+                    },
+                    Type::Reference(_, inner) => {
+                        if let Type::Primitive(inner) = inner.as_ref() {
+                            if inner == &PrimitiveType::Signer {
+                                self.env.error(
+                                    &fun.get_id_loc(),
+                                    "view function cannot use the & signer paremter",
+                                )
+                            }
+                        }
                     },
                     _ => (),
                 });

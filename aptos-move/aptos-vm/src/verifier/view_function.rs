@@ -62,16 +62,15 @@ pub(crate) fn validate_view_function(
                         .with_message("view function cannot use the signer paremter".to_string()),
                 )
             },
-            Reference(inner) | MutableReference(inner) => match inner.as_ref() {
-                &Signer => {
+            Reference(inner) | MutableReference(inner) => {
+                if inner.as_ref() == &Signer {
                     return Err(
                         PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
                             .with_message(
                                 "view function cannot use the & signer paremter".to_string(),
                             ),
-                    )
-                },
-                _ => (),
+                    );
+                }
             },
             _ => (),
         }
