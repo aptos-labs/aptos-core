@@ -1425,11 +1425,6 @@ impl AptosVM {
 
         // If there are keyless TXN authenticators, validate them all.
         if !authenticators.is_empty() {
-            // Feature-gating keyless TXNs: if they are *not* enabled, return `FEATURE_UNDER_GATING`,
-            // which will discard the TXN from being put on-chain.
-            if !self.features.is_keyless_enabled() {
-                return Err(VMStatus::error(StatusCode::FEATURE_UNDER_GATING, None));
-            }
             keyless_validation::validate_authenticators(&authenticators, &self.features, resolver)?;
         }
 

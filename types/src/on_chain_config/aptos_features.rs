@@ -223,7 +223,7 @@ impl Features {
 
     /// Whether the keyless accounts feature is enabled, specifically the ZK path with ZKP-based signatures.
     /// The ZK-less path is controlled via a different `FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS` flag.
-    pub fn is_keyless_enabled(&self) -> bool {
+    pub fn is_zk_keyless_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS)
     }
 
@@ -233,7 +233,7 @@ impl Features {
     /// safety precaution in case of emergency (e.g., if the ZK-based signatures must be temporarily
     /// turned off due to a zeroday exploit, the ZK-less path will still allow users to transact,
     /// but without privacy).
-    pub fn is_keyless_zkless_enabled(&self) -> bool {
+    pub fn is_zkless_keyless_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
