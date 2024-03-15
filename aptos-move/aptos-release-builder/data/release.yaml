@@ -176,10 +176,26 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/jwk_consensus_config_migration.move
-  - name: step_15_enable_randomness # Keep this the last step, so any other governance gets the existing "immediate reconfig" experience (if they need a reconfig).
+  - name: step_15_enable_randomness # Keep this the last step, so the above steps use fast reconfig and we save time.
     metadata:
       title: "[probably 1.11] Enable randomness"
       description: "Move JWK consensus on-off control and the supported OIDC provider list to its own resource."
     execution_mode: MultiStep
     update_sequence:
-      - RawScript: aptos-move/aptos-release-builder/data/proposals/enable_randomness.move
+      - Randomness: # Generated script should be like: aptos-move/aptos-release-builder/data/proposals/enable_randomness.move
+          V1:
+            secrecy_threshold_in_percentage: 50
+            reconstruct_threshold_in_percentage: 66
+  - name: step_16_update_oidc_providers_test_only #
+    metadata:
+      title: "test only step"
+      description: "test only step"
+    execution_mode: MultiStep
+    update_sequence:
+      - JwkConsensus:
+          V1:
+            oidc_providers:
+              - name: "https://www.facebook.com"
+                config_url: "https://www.facebook.com/.well-known/openid-configuration"
+              - name: "https://accounts.google.com"
+                config_url: "https://accounts.google.com/.well-known/openid-configuration"

@@ -3450,6 +3450,7 @@ dependencies = [
  "aptos-framework",
  "aptos-gas-schedule-updator",
  "aptos-genesis",
+ "aptos-infallible",
  "aptos-keygen",
  "aptos-rest-client",
  "aptos-temppath",
