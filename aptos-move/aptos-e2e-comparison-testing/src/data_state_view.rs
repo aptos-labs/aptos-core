@@ -1,8 +1,10 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
+use aptos_replay_benchmark::overrides::OverrideConfig;
 use aptos_transaction_simulation::InMemoryStateStore;
 use aptos_types::{
+    on_chain_config::FeatureFlag,
     state_store::{
         state_key::StateKey, state_storage_usage::StateStorageUsage, state_value::StateValue,
         StateViewResult, TStateView,
@@ -18,9 +20,9 @@ use std::{
 
 pub struct DataStateView {
     debugger_view: DebuggerStateView,
-    debugger: Arc<dyn AptosValidatorInterface + Send>,
     code_data: Option<InMemoryStateStore>,
     data_read_state_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
+    config: Option<HashMap<StateKey, StateValue>>,
 }
 
 impl DataStateView {
@@ -31,30 +33,33 @@ impl DataStateView {
     ) -> Self {
         Self {
             debugger_view: DebuggerStateView::new(db.clone(), version),
-            debugger: db,
             code_data: Some(code_data),
             data_read_state_keys: None,
+            config: None,
         }
     }
 
-    pub fn new_with_data_reads(
+    pub fn new_with_data_reads_and_code(
         db: Arc<dyn AptosValidatorInterface + Send>,
         version: Version,
+        code_data: InMemoryStateStore,
+        features_to_enable: Vec<FeatureFlag>,
+        features_to_disable: Vec<FeatureFlag>,
     ) -> Self {
+        let debugger_view = DebuggerStateView::new(db.clone(), version);
+        let config =
+            OverrideConfig::new(features_to_enable, features_to_disable, None, vec![]).unwrap();
+        let features = config.get_state_override(&debugger_view);
         Self {
-            debugger_view: DebuggerStateView::new(db.clone(), version),
-            debugger: db,
-            code_data: None,
-            data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
+            debugger_view,
+            code_data: Some(code_data),
+            data_read_state_keys: Some(Arc::new(Mutex::new(features.clone()))),
+            config: Some(features),
         }
     }
 
     pub fn get_state_keys(self) -> Arc<Mutex<HashMap<StateKey, StateValue>>> {
         self.data_read_state_keys.unwrap()
-    }
-
-    pub fn debugger(&self) -> &Arc<dyn AptosValidatorInterface + Send> {
-        &self.debugger
     }
 }
 
@@ -65,6 +70,11 @@ impl TStateView for DataStateView {
         if let Some(code) = &self.code_data {
             if code.contains_state_value(state_key)? {
                 return code.get_state_value(state_key);
+            }
+        }
+        if let Some(config) = &self.config {
+            if config.contains_key(state_key) {
+                return Ok(config.get(state_key).cloned());
             }
         }
         let ret = self.debugger_view.get_state_value(state_key);
