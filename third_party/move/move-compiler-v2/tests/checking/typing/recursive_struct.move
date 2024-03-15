@@ -25,6 +25,14 @@ module 0x42::simple_recursion {
 	struct S5 {
 		f: S5
 	}
+
+	struct S6 {
+		f: S7
+	}
+
+	struct S7 {
+		f: S7
+	}
 }
 
 module 0x42::type_param {
@@ -50,6 +58,10 @@ module 0x42::type_param {
 
 	struct S3<T1, T2> {
 		f: S2<u8, S3<u8, u8>>
+	}
+
+	struct S4<T> {
+		f: S4<S4<T>>
 	}
 }
 

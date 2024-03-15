@@ -1,17 +1,6 @@
 
 Diagnostics:
-error: recursive definition S
-  ┌─ tests/checking/typing/recursive_struct.move:2:2
-  │
-2 │ ╭     struct S {
-3 │ │         f: T
-4 │ │     }
-  │ ╰─────^
-  │
-  = `simple_recursion::S` contains field `f: simple_recursion::T`...
-  = `simple_recursion::T` contains field `f: S`, which forms a loop.
-
-error: recursive definition T
+error: cyclic data3
   ┌─ tests/checking/typing/recursive_struct.move:5:2
   │
 5 │ ╭     struct T {
@@ -19,10 +8,10 @@ error: recursive definition T
 7 │ │     }
   │ ╰─────^
   │
-  = `simple_recursion::T` contains field `f: simple_recursion::S`...
-  = `simple_recursion::S` contains field `f: T`, which forms a loop.
+  = `T` contains field `f: S`...
+  = `S` contains field `f: T`, which forms a cycle.
 
-error: recursive definition S1
+error: cyclic data3
    ┌─ tests/checking/typing/recursive_struct.move:9:2
    │
  9 │ ╭     struct S1 {
@@ -30,35 +19,11 @@ error: recursive definition S1
 11 │ │     }
    │ ╰─────^
    │
-   = `simple_recursion::S1` contains field `f: simple_recursion::S2`...
-   = `simple_recursion::S2` contains field `f: simple_recursion::S3`...
-   = `simple_recursion::S3` contains field `f: S1`, which forms a loop.
+   = `S1` contains field `f: S2`...
+   = `S2` contains field `f: S3`...
+   = `S3` contains field `f: S1`, which forms a cycle.
 
-error: recursive definition S2
-   ┌─ tests/checking/typing/recursive_struct.move:13:2
-   │
-13 │ ╭     struct S2 {
-14 │ │         f: S3
-15 │ │     }
-   │ ╰─────^
-   │
-   = `simple_recursion::S2` contains field `f: simple_recursion::S3`...
-   = `simple_recursion::S3` contains field `f: simple_recursion::S1`...
-   = `simple_recursion::S1` contains field `f: S2`, which forms a loop.
-
-error: recursive definition S3
-   ┌─ tests/checking/typing/recursive_struct.move:17:2
-   │
-17 │ ╭     struct S3 {
-18 │ │         f: S1
-19 │ │     }
-   │ ╰─────^
-   │
-   = `simple_recursion::S3` contains field `f: simple_recursion::S1`...
-   = `simple_recursion::S1` contains field `f: simple_recursion::S2`...
-   = `simple_recursion::S2` contains field `f: S3`, which forms a loop.
-
-error: recursive definition S4
+error: cyclic data3
    ┌─ tests/checking/typing/recursive_struct.move:21:2
    │
 21 │ ╭     struct S4<T> {
@@ -66,9 +31,9 @@ error: recursive definition S4
 23 │ │     }
    │ ╰─────^
    │
-   = `simple_recursion::S4<T>` contains field `f: S4`, which forms a loop.
+   = `S4` contains field `f: S4`, which forms a cycle.
 
-error: recursive definition S5
+error: cyclic data3
    ┌─ tests/checking/typing/recursive_struct.move:25:2
    │
 25 │ ╭     struct S5 {
@@ -76,58 +41,89 @@ error: recursive definition S5
 27 │ │     }
    │ ╰─────^
    │
-   = `simple_recursion::S5` contains field `f: S5`, which forms a loop.
+   = `S5` contains field `f: S5`, which forms a cycle.
 
-error: recursive definition S
-   ┌─ tests/checking/typing/recursive_struct.move:31:2
+error: cyclic data3
+   ┌─ tests/checking/typing/recursive_struct.move:33:2
    │
-31 │ ╭     struct S {
-32 │ │         f: G<S>
-33 │ │     }
+33 │ ╭     struct S7 {
+34 │ │         f: S7
+35 │ │     }
    │ ╰─────^
    │
-   = `type_param::S` contains field `f: type_param::G<type_param::S>`...
-   = `type_param::G<type_param::S>` contains field `f: S`, which forms a loop.
+   = `S7` contains field `f: S7`, which forms a cycle.
 
-error: recursive definition U
-   ┌─ tests/checking/typing/recursive_struct.move:35:2
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct.move:39:2
    │
-35 │ ╭     struct U<T> {
-36 │ │         f: G<U<T>>
-37 │ │     }
+39 │ ╭     struct S {
+40 │ │         f: G<S>
+   │ │         - invalid field f of S containing S itself
+41 │ │     }
    │ ╰─────^
-   │
-   = `type_param::U<T>` contains field `f: type_param::G<type_param::U<T>>`...
-   = `type_param::G<type_param::U<T>>` contains field `f: U`, which forms a loop.
 
-error: recursive definition S1
+error: cyclic data
    ┌─ tests/checking/typing/recursive_struct.move:43:2
    │
-43 │ ╭     struct S1 {
-44 │ │         f: vector<S1>
+43 │ ╭     struct U<T> {
+44 │ │         f: G<U<T>>
+   │ │         - invalid field f of U containing U itself
 45 │ │     }
    │ ╰─────^
-   │
-   = `type_param::S1` contains field `f: S1`, which forms a loop.
 
-error: recursive definition S2
-   ┌─ tests/checking/typing/recursive_struct.move:47:2
-   │
-47 │ ╭     struct S2<T1, T2> {
-48 │ │         f: S3<u8, S2<T1, T2>>
-49 │ │     }
-   │ ╰─────^
-   │
-   = `type_param::S2<T1, T2>` contains field `f: type_param::S3<u8, type_param::S2<T1, T2>>`...
-   = `type_param::S3<u8, type_param::S2<T1, T2>>` contains field `f: S2`, which forms a loop.
-
-error: recursive definition S3
+error: cyclic data
    ┌─ tests/checking/typing/recursive_struct.move:51:2
    │
-51 │ ╭     struct S3<T1, T2> {
-52 │ │         f: S2<u8, S3<u8, u8>>
+51 │ ╭     struct S1 {
+52 │ │         f: vector<S1>
+   │ │         - invalid field f of S1 containing S1 itself
 53 │ │     }
    │ ╰─────^
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct.move:55:2
    │
-   = `type_param::S3<T1, T2>` contains field `f: type_param::S2<u8, type_param::S3<u8, u8>>`...
-   = `type_param::S2<u8, type_param::S3<u8, u8>>` contains field `f: S3`, which forms a loop.
+55 │ ╭     struct S2<T1, T2> {
+56 │ │         f: S3<u8, S2<T1, T2>>
+   │ │         - invalid field f of S2 containing S2 itself
+57 │ │     }
+   │ ╰─────^
+
+error: cyclic data3
+   ┌─ tests/checking/typing/recursive_struct.move:55:2
+   │
+55 │ ╭     struct S2<T1, T2> {
+56 │ │         f: S3<u8, S2<T1, T2>>
+57 │ │     }
+   │ ╰─────^
+   │
+   = `S2` contains field `f: S3`...
+   = `S3` contains field `f: S2`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct.move:59:2
+   │
+59 │ ╭     struct S3<T1, T2> {
+60 │ │         f: S2<u8, S3<u8, u8>>
+   │ │         - invalid field f of S3 containing S3 itself
+61 │ │     }
+   │ ╰─────^
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_struct.move:63:2
+   │
+63 │ ╭     struct S4<T> {
+64 │ │         f: S4<S4<T>>
+   │ │         - invalid field f of S4 containing S4 itself
+65 │ │     }
+   │ ╰─────^
+
+error: cyclic data3
+   ┌─ tests/checking/typing/recursive_struct.move:63:2
+   │
+63 │ ╭     struct S4<T> {
+64 │ │         f: S4<S4<T>>
+65 │ │     }
+   │ ╰─────^
+   │
+   = `S4` contains field `f: S4`, which forms a cycle.
