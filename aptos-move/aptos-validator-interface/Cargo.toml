@@ -27,3 +27,4 @@ bcs = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }
 tokio = { workspace = true }
+rand = { workspace = true }

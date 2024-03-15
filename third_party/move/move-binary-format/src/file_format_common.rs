@@ -585,6 +585,7 @@ pub(crate) mod versioned_data {
                 },
             };
             if version == 0 || version > u32::min(max_version, VERSION_MAX) {
+                // println!("unsupported bytecode");
                 Err(PartialVMError::new(StatusCode::UNKNOWN_VERSION)
                     .with_message(format!("bytecode version {} unsupported", version)))
             } else {
