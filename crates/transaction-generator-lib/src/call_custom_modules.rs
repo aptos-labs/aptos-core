@@ -14,6 +14,7 @@ use aptos_sdk::{
 use async_trait::async_trait;
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::{Arc, atomic::AtomicU64};
+use move_core_types::identifier::Identifier;
 
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
@@ -24,6 +25,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &TransactionFactory,
         &mut StdRng,
         u64,
+        &Vec<String>,
     ) -> Vec<SignedTransaction>
     + Send
     + Sync;
@@ -88,6 +90,7 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
         &mut self,
         account: &LocalAccount,
         _num_to_create: usize,
+        history: &Vec<String>,
     ) -> Vec<SignedTransaction> {
         let mut all_requests = Vec::with_capacity(self.packages.len());
 
@@ -100,23 +103,10 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
                 &self.txn_factory,
                 &mut self.rng,
                 self.txn_counter.load(std::sync::atomic::Ordering::Relaxed),
+                history,
             );
             all_requests.append(&mut requests);
         }
-        // for _ in 0..num_to_create {
-        //     let (package, publisher) = self.packages.choose(&mut self.rng).unwrap();
-        //     let mut requests = (self.txn_generator)(
-        //         account,
-        //         package,
-        //         publisher,
-        //         &self.txn_factory,
-        //         &mut self.rng,
-        //     );
-        //     all_requests.append(&mut requests);
-        //     // if let Some(request) = request {
-        //     //     all_requests.push(request);
-        //     // }
-        // }
         all_requests
     }
 }

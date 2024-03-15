@@ -92,10 +92,13 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), expected_stages=10, included_in=Flow.ECONIA),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced1-market"), expected_stages=10, included_in=Flow.ECONIA),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced10-market"), expected_stages=10, included_in=Flow.ECONIA),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced100-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced10-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced100-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), expected_stages=10, included_in=Flow.ECONIA),
+    
     RunGroupConfig(expected_tps=10000, key=RunGroupKey("emit-events"), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),

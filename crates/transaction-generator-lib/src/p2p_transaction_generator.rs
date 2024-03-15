@@ -251,6 +251,7 @@ impl TransactionGenerator for P2PTransactionGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
+        _history: &Vec<String>,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
         let invalid_size = if self.invalid_transaction_ratio != 0 {

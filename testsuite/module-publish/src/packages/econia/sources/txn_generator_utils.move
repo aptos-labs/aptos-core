@@ -4,6 +4,7 @@ module econia::txn_generator_utils {
     use econia::assets::{Self, QC, UC, AAC, ABC, ACC, ADC, AEC, AFC, AGC, AHC, AIC, AJC, AKC, ALC, AMC, ANC, AOC, APC, AQC, ARC, ASC, ATC, AUC, AVC, AWC, AXC, AYC, AZC, BAC, BBC, BCC, BDC, BEC, BFC, BGC, BHC, BIC, BJC, BKC, BLC, BMC, BNC, BOC, BPC, BQC, BRC, BSC, BTC, BUC, BVC, BWC, BXC, BYC, BZC, CAC, CBC, CCC, CDC, CEC, CFC, CGC, CHC, CIC, CJC, CKC, CLC, CMC, CNC, COC, CPC, CQC, CRC, CSC, CTC, CUC, CVC, CWC, CXC, CYC, CZC, DAC, DBC, DCC, DDC, DEC, DFC, DGC, DHC, DIC, DJC, DKC, DLC, DMC, DNC, DOC, DPC, DQC, DRC, DSC, DTC, DUC, DVC, DWC, DXC, DYC, DZC};
     use econia::user;
     use aptos_framework::signer;
+    use std::vector;
     // use aptos_framework::account;
 
     const E_NUM_MARKETS_ZERO: u64 = 101;
@@ -363,16 +364,16 @@ module econia::txn_generator_utils {
     }
 
     public entry fun deposit_coins<BaseCoinType, QuoteCoinType>(user: &signer, publisher: &signer, market_id: u64) {
-        user::deposit_coins<QuoteCoinType>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<QuoteCoinType>(publisher, 1000000));
-        user::deposit_coins<BaseCoinType>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<BaseCoinType>(publisher, 1000000));
+        user::deposit_coins<QuoteCoinType>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<QuoteCoinType>(publisher, 1000000000));
+        user::deposit_coins<BaseCoinType>(signer::address_of(user), market_id, NO_CUSTODIAN, assets::mint<BaseCoinType>(publisher, 1000000000));
     }
 
     public entry fun place_bid_limit_order<BaseCoinType, QuoteCoinType>(user: &signer, size: u64, price: u64, market_id: u64) {
-        market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, BID, size, price, 0, CANCEL_MAKER);
+        market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, BID, size, price, 3, ABORT);
     }
 
     public entry fun place_ask_limit_order<BaseCoinType, QuoteCoinType>(user: &signer, size: u64, price: u64, market_id: u64) {
-        market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, ASK, size, price, 0, CANCEL_MAKER);
+        market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, ASK, size, price, 3, ABORT);
     }
 
     public entry fun place_bid_market_order<BaseCoinType, QuoteCoinType>(user: &signer, size: u64, market_id: u64) {
@@ -381,5 +382,52 @@ module econia::txn_generator_utils {
 
     public entry fun place_ask_market_order<BaseCoinType, QuoteCoinType>(user: &signer, size: u64, market_id: u64) {
         market::place_market_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, ASK, size, CANCEL_MAKER);
+    }
+
+    struct Order has drop, store {
+        market_id: u64,
+        direction: bool,
+        order_id: u128,
+    }
+
+    struct Orders has key, drop {
+        orders: vector<Order>
+    }
+
+    public entry fun place_limit_order<BaseCoinType, QuoteCoinType>(user: &signer, market_id: u64, direction: bool, size: u64, price: u64, restriction: u8, self_match_behavior: u8) acquires Orders {
+        let (order_id, _, _, _) = market::place_limit_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, direction, size, price, restriction, self_match_behavior);
+
+        if (exists<Orders>(signer::address_of(user))) {
+            vector::push_back(&mut borrow_global_mut<Orders>(signer::address_of(user)).orders, 
+                                Order{
+                                    market_id: market_id, 
+                                    direction: direction, 
+                                    order_id: order_id
+                                }
+                            );
+        } else {
+            let orders = vector::empty();
+            vector::push_back(&mut orders, Order{
+                                            market_id: market_id, 
+                                            direction: direction, 
+                                            order_id: order_id
+                                        }
+                            );
+            move_to<Orders>(user, Orders {orders: orders});
+        }
+    }
+
+    public entry fun place_market_order<BaseCoinType, QuoteCoinType>(user: &signer, market_id: u64, direction: bool, size: u64, self_match_behavior: u8) {
+        market::place_market_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, direction, size, self_match_behavior);
+    }
+
+    public entry fun cancel_order(user: &signer) acquires Orders {
+        if (exists<Orders>(signer::address_of(user))) {
+            let orders = borrow_global_mut<Orders>(signer::address_of(user));
+            if (!vector::is_empty(&orders.orders)) {
+                let order = vector::pop_back(&mut orders.orders);
+                market::cancel_order_user(user, order.market_id, order.direction, order.order_id);                
+            }
+        }
     }
 }

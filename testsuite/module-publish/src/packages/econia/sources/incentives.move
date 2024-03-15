@@ -254,7 +254,6 @@ module econia::incentives {
 
     // Uses >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin::{Self, Coin};
     use aptos_std::type_info::{Self, TypeInfo};
     use econia::resource_account;
@@ -276,7 +275,7 @@ module econia::incentives {
     #[test_only]
     use aptos_framework::account;
 
-    use econia::assets::{Self, QC, UC};
+    use econia::assets::UC;
 
     // Test-only uses <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 

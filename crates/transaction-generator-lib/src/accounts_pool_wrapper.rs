@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::types::{transaction::{SignedTransaction, TransactionPayload}, LocalAccount};
 use std::sync::atomic::AtomicU64;
 use rand::{rngs::StdRng, SeedableRng};
-use std::sync::Arc;
+use std::{sync::Arc, collections::HashMap};
 
 /// Wrapper that allows inner transaction generator to have unique accounts
 /// for all transactions (instead of having 5-20 transactions per account, as default)
@@ -40,6 +40,7 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         &mut self,
         _account: &LocalAccount,
         num_to_create: usize,
+        history: &Vec<String>,
     ) -> Vec<SignedTransaction> {
         let mut accounts_to_use =
             self.source_accounts_pool
@@ -49,7 +50,7 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         }
         let txns = accounts_to_use
             .iter_mut()
-            .flat_map(|account| self.generator.generate_transactions(account, 1))
+            .flat_map(|account| self.generator.generate_transactions(account, 1, &Vec::new()))
             .collect();
 
         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
@@ -93,22 +94,81 @@ impl TransactionGeneratorCreator for AccountsPoolWrapperCreator {
 
 
 
+pub struct AddHistoryWrapperGenerator {
+    rng: StdRng,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    destination_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
+}
+
+impl AddHistoryWrapperGenerator {
+    pub fn new(
+        rng: StdRng,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+        destination_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
+    ) -> Self {
+        Self {
+            rng,
+            source_accounts_pool,
+            destination_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGenerator for AddHistoryWrapperGenerator {
+    fn generate_transactions(
+        &mut self,
+        _account: &LocalAccount,
+        _num_to_create: usize,
+        _history: &Vec<String>,
+    ) -> Vec<SignedTransaction> {
+        let length = self.source_accounts_pool.len();
+        let all_source_accounts = self.source_accounts_pool.take_from_pool(length, true, &mut self.rng);
+        self.destination_accounts_pool.add_to_pool(all_source_accounts.into_iter().map(|account| (account, Vec::new())).collect());
+        vec![]
+    }
+}
 
 
+pub struct AddHistoryWrapperCreator {
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    destination_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
+}
+
+impl AddHistoryWrapperCreator {
+    pub fn new(
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+        destination_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
+    ) -> Self {
+        Self {
+            source_accounts_pool,
+            destination_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGeneratorCreator for AddHistoryWrapperCreator {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
+        Box::new(AddHistoryWrapperGenerator::new(
+            StdRng::from_entropy(),
+            self.source_accounts_pool.clone(),
+            self.destination_accounts_pool.clone(),
+        ))
+    }
+}
 
 
 
 pub struct ReuseAccountsPoolWrapperGenerator {
     rng: StdRng,
     generator: Box<dyn TransactionGenerator>,
-    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
 }
 
 impl ReuseAccountsPoolWrapperGenerator {
     pub fn new(
         rng: StdRng,
         generator: Box<dyn TransactionGenerator>,
-        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+        source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
     ) -> Self {
         Self {
             rng,
@@ -123,6 +183,7 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
         &mut self,
         _account: &LocalAccount,
         num_to_create: usize,
+        _history: &Vec<String>,
     ) -> Vec<SignedTransaction> {
         let mut accounts_to_use =
             self.source_accounts_pool
@@ -130,10 +191,28 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
         if accounts_to_use.is_empty() {
             return Vec::new();
         }
-        let txns = accounts_to_use
+        let txns: Vec<SignedTransaction> = accounts_to_use
             .iter_mut()
-            .flat_map(|account| self.generator.generate_transactions(account, 1))
+            .flat_map(|(account, history)| self.generator.generate_transactions(account, 1, history))
             .collect();
+
+        let mut function_calls = HashMap::new();
+        for txn in txns.iter() {
+            if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                let function_name = entry_function.function().as_str();
+                function_calls.insert(txn.sender(), function_name.to_string());
+            }
+        }
+        let accounts_to_use = accounts_to_use.into_iter().map(|(account, history)| {
+                                                        if let Some(function_name) = function_calls.get(&account.address()) {
+                                                            let mut history = history.clone();
+                                                            history.push(function_name.clone()); 
+                                                            (account, history)
+                                                        } else {
+                                                            (account, history)
+                                                        }
+                                                    }
+                                                ).collect();
 
         self.source_accounts_pool.add_to_pool(accounts_to_use);
         txns
@@ -142,13 +221,13 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
 
 pub struct ReuseAccountsPoolWrapperCreator {
     creator: Box<dyn TransactionGeneratorCreator>,
-    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
 }
 
 impl ReuseAccountsPoolWrapperCreator {
     pub fn new(
         creator: Box<dyn TransactionGeneratorCreator>,
-        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+        source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
     ) -> Self {
         Self {
             creator,
@@ -172,76 +251,76 @@ impl TransactionGeneratorCreator for ReuseAccountsPoolWrapperCreator {
 
 
 
-pub struct BypassAccountsPoolWrapperGenerator {
-    rng: StdRng,
-    generator: Box<dyn TransactionGenerator>,
-    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-    destination_accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
-}
+// pub struct BypassAccountsPoolWrapperGenerator {
+//     rng: StdRng,
+//     generator: Box<dyn TransactionGenerator>,
+//     source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+//     destination_accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
+// }
 
-impl BypassAccountsPoolWrapperGenerator {
-    pub fn new(
-        rng: StdRng,
-        generator: Box<dyn TransactionGenerator>,
-        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-        destination_accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
-    ) -> Self {
-        Self {
-            rng,
-            generator,
-            source_accounts_pool,
-            destination_accounts_pool,
-        }
-    }
-}
+// impl BypassAccountsPoolWrapperGenerator {
+//     pub fn new(
+//         rng: StdRng,
+//         generator: Box<dyn TransactionGenerator>,
+//         source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+//         destination_accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
+//     ) -> Self {
+//         Self {
+//             rng,
+//             generator,
+//             source_accounts_pool,
+//             destination_accounts_pool,
+//         }
+//     }
+// }
 
-impl TransactionGenerator for BypassAccountsPoolWrapperGenerator {
-    fn generate_transactions(
-        &mut self,
-        account: &LocalAccount,
-        _num_to_create: usize,
-    ) -> Vec<SignedTransaction> {
-        let accounts_to_use =
-            self.source_accounts_pool
-                .take_from_pool(self.source_accounts_pool.len(), true, &mut self.rng);
-        if accounts_to_use.is_empty() {
-            return Vec::new();
-        }
-        if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
-            destination_accounts_pool.add_to_pool(accounts_to_use);
-        }
-        let txns = self.generator.generate_transactions(account, 1);
-        txns
-    }
-}
+// impl TransactionGenerator for BypassAccountsPoolWrapperGenerator {
+//     fn generate_transactions(
+//         &mut self,
+//         account: &LocalAccount,
+//         _num_to_create: usize,
+//     ) -> Vec<SignedTransaction> {
+//         let accounts_to_use =
+//             self.source_accounts_pool
+//                 .take_from_pool(self.source_accounts_pool.len(), true, &mut self.rng);
+//         if accounts_to_use.is_empty() {
+//             return Vec::new();
+//         }
+//         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
+//             destination_accounts_pool.add_to_pool(accounts_to_use);
+//         }
+//         let txns = self.generator.generate_transactions(account, 1);
+//         txns
+//     }
+// }
 
-pub struct BypassAccountsPoolWrapperCreator {
-    creator: Box<dyn TransactionGeneratorCreator>,
-    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-    destination_accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
-}
+// pub struct BypassAccountsPoolWrapperCreator {
+//     creator: Box<dyn TransactionGeneratorCreator>,
+//     source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+//     destination_accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
+// }
 
-impl BypassAccountsPoolWrapperCreator {
-    pub fn new(
-        creator: Box<dyn TransactionGeneratorCreator>,
-        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
-        destination_accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
-    ) -> Self {
-        Self {
-            creator,
-            source_accounts_pool,
-            destination_accounts_pool,
-        }
-    }
-}
+// impl BypassAccountsPoolWrapperCreator {
+//     pub fn new(
+//         creator: Box<dyn TransactionGeneratorCreator>,
+//         source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+//         destination_accounts_pool: Option<Arc<ObjectPool<LocalAccount>>>,
+//     ) -> Self {
+//         Self {
+//             creator,
+//             source_accounts_pool,
+//             destination_accounts_pool,
+//         }
+//     }
+// }
 
-impl TransactionGeneratorCreator for BypassAccountsPoolWrapperCreator {
-    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
-        Box::new(BypassAccountsPoolWrapperGenerator::new(
-            StdRng::from_entropy(),
-            self.creator.create_transaction_generator(txn_counter),
-            self.source_accounts_pool.clone(),
-            self.destination_accounts_pool.clone(),
-        ))
-    }
-}
+// impl TransactionGeneratorCreator for BypassAccountsPoolWrapperCreator {
+//     fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
+//         Box::new(BypassAccountsPoolWrapperGenerator::new(
+//             StdRng::from_entropy(),
+//             self.creator.create_transaction_generator(txn_counter),
+//             self.source_accounts_pool.clone(),
+//             self.destination_accounts_pool.clone(),
+//         ))
+//     }
+// }

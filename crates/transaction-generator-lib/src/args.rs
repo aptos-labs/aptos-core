@@ -73,6 +73,8 @@ pub enum TransactionTypeArg {
     EconiaAdvanced1MarketReuseAccounts,
     EconiaAdvanced10MarketReuseAccounts,
     EconiaAdvanced100MarketReuseAccounts,
+    EconiaReal,
+    EconiaRealNoPublish,
     SmartTablePicture1MWith256Change,
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
@@ -542,13 +544,13 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::EconiaAdvanced10MarketReuseAccounts => TransactionType::Workflow {
                 workflow_kind: WorkflowKind::Econia {
-                    num_users: 600000,
+                    num_users: 1000,
                     flow_type: crate::EconiaFlowType::Advanced,
                     num_markets: 10,
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                progress_type: WorkflowProgress::MoveByPhases,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
@@ -564,6 +566,30 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::EconiaReal => TransactionType::Workflow { 
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 12000,
+                    flow_type: crate::EconiaFlowType::Real,
+                    num_markets: 2,
+                    reuse_accounts_for_orders: true,
+                    publish_packages: true,
+                },
+                progress_type: WorkflowProgress::MoveByPhases,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::EconiaRealNoPublish => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Econia {
+                    num_users: 1000000,
+                    flow_type: crate::EconiaFlowType::Real,
+                    num_markets: 2,
+                    reuse_accounts_for_orders: true,
+                    publish_packages: true,
+                },
+                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            }
         }
     }
 

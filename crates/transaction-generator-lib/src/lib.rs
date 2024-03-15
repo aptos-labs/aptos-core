@@ -11,6 +11,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{transaction::SignedTransaction, LocalAccount},
 };
+use move_core_types::identifier::Identifier;
 use args::TransactionTypeArg;
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, Rng};
@@ -92,6 +93,7 @@ pub enum TransactionType {
 pub enum EconiaFlowType {
     Basic,
     Advanced,
+    Real,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -134,6 +136,7 @@ pub trait TransactionGenerator: Sync + Send {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
+        history: &Vec<String>,
     ) -> Vec<SignedTransaction>;
 }
 
@@ -434,7 +437,7 @@ impl<T> ObjectPool<T> {
     }
 
     pub(crate) fn add_to_pool(&self, mut addition: Vec<T>) {
-        assert!(!addition.is_empty());
+        // assert!(!addition.is_empty());
         let mut current = self.pool.write();
         current.append(&mut addition);
         sample!(

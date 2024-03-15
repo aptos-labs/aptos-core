@@ -45,6 +45,7 @@ impl TransactionGenerator for AccountGenerator {
         &mut self,
         account: &LocalAccount,
         num_to_create: usize,
+        _history: &Vec<String>,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
         let mut new_accounts = Vec::with_capacity(num_to_create);

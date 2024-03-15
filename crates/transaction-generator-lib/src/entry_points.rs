@@ -90,7 +90,7 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             _ => None,
         };
 
-        Arc::new(move |account, package, publisher, txn_factory, rng, _txn_counter| {
+        Arc::new(move |account, package, publisher, txn_factory, rng, _txn_counter, _prev_orders| {
             let payload = entry_point.create_payload(
                 package.get_module_id(entry_point.module_name()),
                 Some(rng),

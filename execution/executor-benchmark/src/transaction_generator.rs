@@ -332,7 +332,7 @@ impl TransactionGenerator {
                         })
                         .borrow_mut();
                     transaction_generator
-                        .generate_transactions(sender, 1)
+                        .generate_transactions(sender, 1, &Vec::new())
                         .iter()
                         .map(|txn| Transaction::UserTransaction(txn.clone()))
                         .collect()

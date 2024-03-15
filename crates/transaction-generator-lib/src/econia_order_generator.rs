@@ -32,6 +32,9 @@ fn quote_coin_type(_market_id: u64) -> &'static str {
     "QC"
 }
 
+const ASK: bool = true;
+const BID: bool = false;
+
 /// Placeas a bid limit order.
 pub fn place_bid_limit_order(
     module_id: ModuleId,
@@ -148,6 +151,87 @@ pub fn place_ask_market_order(
     ))
 }
 
+/// Placeas a market order.
+pub fn place_market_order(
+    module_id: ModuleId,
+    publisher: AccountAddress,
+    size: u64,
+    market_id: u64,
+    direction: bool,
+    self_matching_behavior: u8,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        module_id,
+        ident_str!("place_market_order").to_owned(),
+        vec![TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(base_coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        })), TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(quote_coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        }))],
+        vec![
+            bcs::to_bytes(&market_id).unwrap(),
+            bcs::to_bytes(&direction).unwrap(),
+            bcs::to_bytes(&size).unwrap(),
+            bcs::to_bytes(&self_matching_behavior).unwrap(),
+        ],
+    ))
+}
+
+
+
+pub fn place_limit_order(
+    module_id: ModuleId,
+    publisher: AccountAddress,
+    size: u64,
+    price: u64,
+    market_id: u64,
+    direction: bool,
+    restriction: u8,
+    self_matching_behavior: u8,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        module_id,
+        ident_str!("place_limit_order").to_owned(),
+        vec![TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(base_coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        })), TypeTag::Struct(Box::new(StructTag {
+            address: publisher,
+            module: Identifier::new(<&str as Into<Box<str>>>::into("assets")).unwrap(),
+            name: Identifier::new(<&str as Into<Box<str>>>::into(quote_coin_type(market_id))).unwrap(),
+            type_params: vec![],
+        }))],
+        vec![
+            bcs::to_bytes(&market_id).unwrap(),
+            bcs::to_bytes(&direction).unwrap(),
+            bcs::to_bytes(&size).unwrap(),
+            bcs::to_bytes(&price).unwrap(),
+            bcs::to_bytes(&restriction).unwrap(),
+            bcs::to_bytes(&self_matching_behavior).unwrap(),
+        ],
+    ))
+}
+
+pub fn place_cancel_order(
+    module_id: ModuleId,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        module_id,
+        ident_str!("place_cancel_order").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+
 pub fn register_market(
     module_id: ModuleId,
     num_markets: u64,
@@ -250,7 +334,7 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
         let num_prev_transactions = self.num_prev_transactions.clone();
-        Arc::new(move |account, package, publisher, txn_factory, rng, txn_counter| {
+        Arc::new(move |account, package, publisher, txn_factory, rng, txn_counter, _prev_orders| {
             let mut requests = vec![];
             let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
             let bid_size = rng.gen_range(4, 14);
@@ -277,6 +361,94 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
     }
 }
 
+
+
+
+pub struct EconiaRealOrderTransactionGenerator {
+}
+
+impl EconiaRealOrderTransactionGenerator {
+    pub fn new() -> Self {
+        Self {
+        }
+    }
+}
+
+#[async_trait]
+impl UserModuleTransactionGenerator for EconiaRealOrderTransactionGenerator {
+    fn initialize_package(
+        &mut self,
+        _package: &Package,
+        _publisher: &mut LocalAccount,
+        _txn_factory: &TransactionFactory,
+        _rng: &mut StdRng,
+    ) -> Vec<SignedTransaction> {
+        vec![]
+    }
+
+    async fn create_generator_fn(
+        &mut self,
+        _root_account: &dyn RootAccountHandle,
+        _txn_factory: &TransactionFactory,
+        _txn_executor: &dyn ReliableTransactionSubmitter,
+        _rng: &mut StdRng,
+    ) -> Arc<TransactionGeneratorWorker> {
+        Arc::new(move |account, package, publisher, txn_factory, rng, _txn_counter, history| {
+            println!("account: {}, history: {:?}", account.address(), history);
+            let size = rng.gen_range(4, 10000);
+            if rng.gen_range(1, 10000) < 265 {  // Market order with 2.65% probability
+                let market_id = if rng.gen_range(1, 1000) < 885 {   // Market 1 with 88.5% probability
+                    1
+                } else {
+                    2
+                };
+                let direction = if rng.gen_range(1, 1000) < 515 {   // ASK with 51.5% probability
+                    ASK
+                } else {
+                    BID
+                };
+                let self_matching_behavior = if rng.gen_range(1, 1000) < 184 { // 18.4% probability
+                    0
+                } else {    // 81.6% probability
+                    3
+                };
+                vec![account.sign_with_transaction_builder(txn_factory.payload(place_market_order(package.get_module_id("txn_generator_utils"), publisher.address(), size, market_id, direction, self_matching_behavior)))]
+            } else { // Limit order with 97.35% probability
+                let market_id = if rng.gen_range(1, 1000) < 740 {   // Market 1 with 74% probability
+                    1
+                } else {
+                    2
+                };
+                let rand = rng.gen_range(1, 10000);
+                let restriction = if rand < 88 {   // 0.88% probability
+                    0
+                } else if rand < 176 {   // 0.88% probability
+                    2
+                } else {   // 98.2% probability
+                    3
+                };
+
+                let rand = rng.gen_range(1, 1000);
+                let self_matching_behavior = if rand < 8 { // 0.8% probability
+                    3
+                } else if rand < 295 { // 2.87% probability
+                    2
+                } else {    // 96.33% probability
+                    0
+                };
+                let (direction, price) = if rng.gen_range(1, 1000) < 546 {   // ASK with 54.6% probability
+                    (ASK, rng.gen_range(10001, 20000))
+                } else {
+                    (BID, rng.gen_range(1, 10000))
+                };
+                vec![account.sign_with_transaction_builder(txn_factory.payload(place_limit_order(package.get_module_id("txn_generator_utils"), publisher.address(), size, price, market_id, direction, restriction, self_matching_behavior)))]
+            }
+        })
+    }
+}
+
+
+
 pub async fn register_econia_markets(
     init_txn_factory: TransactionFactory,
     packages: &mut Vec<(Package, LocalAccount)>,
@@ -298,14 +470,17 @@ pub async fn register_econia_markets(
 
 pub struct EconiaRegisterMarketUserTransactionGenerator {
     num_markets: Arc<u64>,
+    bucket_users_into_markets: bool,
 }
 
 impl EconiaRegisterMarketUserTransactionGenerator {
     pub fn new(
-        num_markets: u64
+        num_markets: u64,
+        bucket_users_into_markets: bool,
     ) -> Self {
         Self {
             num_markets: Arc::new(num_markets),
+            bucket_users_into_markets,
         }
     }
 }
@@ -330,11 +505,22 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketUserTransactionGener
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
-        Arc::new(move |account, package, publisher, txn_factory, _rng, _txn_counter| {
-            let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
-            let builder = txn_factory.payload(register_market_accounts(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
-            vec![account.sign_with_transaction_builder(builder)]
-        })
+        if self.bucket_users_into_markets {
+            Arc::new(move |account, package, publisher, txn_factory, _rng, _txn_counter, _prev_orders| {
+                let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
+                let builder = txn_factory.payload(register_market_accounts(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
+                vec![account.sign_with_transaction_builder(builder)]
+            })    
+        } else {
+            Arc::new(move |account, package, publisher, txn_factory, _rng, _txn_counter, _prev_orders| {
+                let mut requests = Vec::new();
+                for market_id in 1..(*num_markets + 1) {
+                    let builder = txn_factory.payload(register_market_accounts(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
+                    requests.push(account.sign_with_transaction_builder(builder))
+                }
+                requests
+            })
+        }
     }
 }
 
@@ -342,14 +528,17 @@ impl UserModuleTransactionGenerator for EconiaRegisterMarketUserTransactionGener
 
 pub struct EconiaDepositCoinsTransactionGenerator {
     num_markets: Arc<u64>,
+    bucket_users_into_markets: bool,
 }
 
 impl EconiaDepositCoinsTransactionGenerator {
     pub fn new(
-        num_markets: u64
+        num_markets: u64,
+        bucket_users_into_markets: bool,
     ) -> Self {
         Self {
             num_markets: Arc::new(num_markets),
+            bucket_users_into_markets,
         }
     }
 }
@@ -374,10 +563,21 @@ impl UserModuleTransactionGenerator for EconiaDepositCoinsTransactionGenerator {
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         let num_markets = self.num_markets.clone();
-        Arc::new(move |account, package, publisher, txn_factory, _rng, _txn_counter| {
-            let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
-            let builder = txn_factory.payload(deposit_coins(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
-            vec![account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)]
-        })
+        if self.bucket_users_into_markets {
+            Arc::new(move |account, package, publisher, txn_factory, _rng, _txn_counter, _prev_orders| {
+                let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
+                let builder = txn_factory.payload(deposit_coins(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
+                vec![account.sign_multi_agent_with_transaction_builder(vec![publisher], builder)]
+            })
+        } else {
+            Arc::new(move |account, package, publisher, txn_factory, _rng, _txn_counter, _prev_orders| {
+                let mut requests = Vec::new();
+                for market_id in 1..(*num_markets + 1) {
+                    let builder = txn_factory.payload(deposit_coins(package.get_module_id("txn_generator_utils"), market_id, publisher.address()));
+                    requests.push(account.sign_multi_agent_with_transaction_builder(vec![publisher], builder))
+                }
+                requests
+            })
+        }
     }
 }
