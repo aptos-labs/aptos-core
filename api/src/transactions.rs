@@ -13,9 +13,9 @@ use crate::{
     page::Page,
     response::{
         api_disabled, api_forbidden, transaction_not_found_by_hash,
-        transaction_not_found_by_version, version_pruned, BadRequestError, BasicError,
-        BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult, BasicResultWith404,
-        ForbiddenError, InsufficientStorageError, InternalError,
+        transaction_not_found_by_version, version_pruned, AptosResponseContent, BadRequestError,
+        BasicError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResult,
+        BasicResultWith404, ForbiddenError, InsufficientStorageError, InternalError,
     },
     ApiTags,
 };
@@ -241,34 +241,13 @@ impl TransactionsApi {
         fail_point_poem("endpoint_wait_transaction_by_hash")?;
         self.context
             .check_api_output_enabled("Get transactions by hash", &accept_type)?;
-        let wait_by_hash_timeout_ms = self.context.node_config.api.wait_by_hash_timeout_ms;
-        let wait_by_hash_poll_interval_ms =
-            self.context.node_config.api.wait_by_hash_poll_interval_ms;
-
-        let start_time = std::time::Instant::now();
-        WAIT_TRANSACTION_GAUGE.inc();
-        loop {
-            let result = match self
-                .get_transaction_by_hash_inner(&accept_type, txn_hash.0)
-                .await
-            {
-                Ok(txn) => Ok(txn),
-                Err(err) => {
-                    if let BasicErrorWith404::NotFound(..) = &err {
-                        if (start_time.elapsed().as_millis() as u64) < wait_by_hash_timeout_ms {
-                            tokio::time::sleep(std::time::Duration::from_millis(
-                                wait_by_hash_poll_interval_ms,
-                            ))
-                            .await;
-                            continue;
-                        }
-                    }
-                    Err(err)
-                },
-            };
-            WAIT_TRANSACTION_GAUGE.dec();
-            return result;
-        }
+        self.wait_transaction_by_hash_inner(
+            &accept_type,
+            txn_hash.0,
+            self.context.node_config.api.wait_by_hash_timeout_ms,
+            self.context.node_config.api.wait_by_hash_poll_interval_ms,
+        )
+        .await
     }
 
     /// Get transaction by version
@@ -748,6 +727,52 @@ impl TransactionsApi {
             AcceptType::Bcs => {
                 BasicResponse::try_from_bcs((data, &latest_ledger_info, BasicResponseStatus::Ok))
             },
+        }
+    }
+
+    async fn wait_transaction_by_hash_inner(
+        &self,
+        accept_type: &AcceptType,
+        hash: HashValue,
+        wait_by_hash_timeout_ms: u64,
+        wait_by_hash_poll_interval_ms: u64,
+    ) -> BasicResultWith404<Transaction> {
+        let start_time = std::time::Instant::now();
+        WAIT_TRANSACTION_GAUGE.inc();
+        loop {
+            let context = self.context.clone();
+            let accept_type = accept_type.clone();
+
+            let ledger_info = api_spawn_blocking(move || context.get_latest_ledger_info()).await?;
+
+            let txn_data = self
+                .get_by_hash(hash.into(), &ledger_info)
+                .await
+                .context(format!("Failed to get transaction by hash {}", hash))
+                .map_err(|err| {
+                    BasicErrorWith404::internal_with_code(
+                        err,
+                        AptosErrorCode::InternalError,
+                        &ledger_info,
+                    )
+                })?
+                .context(format!("Failed to find transaction with hash: {}", hash))
+                .map_err(|_| transaction_not_found_by_hash(hash, &ledger_info))?;
+
+            if let TransactionData::Pending(_) = txn_data {
+                if (start_time.elapsed().as_millis() as u64) < wait_by_hash_timeout_ms {
+                    tokio::time::sleep(Duration::from_millis(wait_by_hash_poll_interval_ms)).await;
+                    continue;
+                }
+            }
+
+            WAIT_TRANSACTION_GAUGE.dec();
+            let api = self.clone();
+            let result = api_spawn_blocking(move || {
+                api.get_transaction_inner(&accept_type, txn_data, &ledger_info)
+            })
+            .await;
+            return result;
         }
     }
 
