@@ -65,6 +65,7 @@ pub trait AptosValidatorInterface: Sync {
                 HashMap<(AccountAddress, String), PackageMetadata>,
             ),
         >,
+        sampling: u32,
     ) -> Result<
         Vec<(
             u64,

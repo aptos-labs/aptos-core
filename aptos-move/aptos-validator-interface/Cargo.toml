@@ -26,4 +26,5 @@ async-trait = { workspace = true }
 bcs = { workspace = true }
 lru = { workspace = true }
 move-core-types = { workspace = true }
+rand = { workspace = true }
 tokio = { workspace = true }
