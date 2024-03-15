@@ -91,7 +91,7 @@ impl UserPayloadClient for QuorumStoreClient {
         max_inline_items: u64,
         max_inline_bytes: u64,
         exclude: PayloadFilter,
-        wait_callback: BoxFuture<'static, ()>,
+        _wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
         pending_uncommitted_blocks: usize,
         recent_max_fill_fraction: f32,
@@ -106,7 +106,7 @@ impl UserPayloadClient for QuorumStoreClient {
         fail_point!("consensus::pull_payload", |_| {
             Err(anyhow::anyhow!("Injected error in pull_payload").into())
         });
-        let mut callback_wrapper = Some(wait_callback);
+        //let mut _callback_wrapper = Some(wait_callback);
         // keep polling QuorumStore until there's payloads available or there's still pending payloads
         let start_time = Instant::now();
 
@@ -123,13 +123,13 @@ impl UserPayloadClient for QuorumStoreClient {
                     exclude.clone(),
                 )
                 .await?;
-            if payload.is_empty() && !return_empty && !done {
+            /*if payload.is_empty() && !return_empty && !done {
                 if let Some(callback) = callback_wrapper.take() {
                     callback.await;
                 }
                 sleep(Duration::from_millis(NO_TXN_DELAY)).await;
                 continue;
-            }
+            }*/
             break payload;
         };
         info!(
