@@ -13,6 +13,7 @@ pub mod inliner;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
+pub mod recursive_struct_checker;
 
 use crate::{
     env_pipeline::{rewrite_target::RewritingScope, spec_checker, EnvProcessorPipeline},
@@ -51,18 +52,6 @@ use move_stackless_bytecode::function_target_pipeline::{
 use move_symbol_pool::Symbol;
 pub use options::*;
 use std::{collections::BTreeSet, io::Write, path::Path};
-
-mod bytecode_generator;
-pub mod env_pipeline;
-mod experiments;
-mod file_format_generator;
-pub mod flow_insensitive_checkers;
-pub mod function_checker;
-pub mod inliner;
-pub mod logging;
-pub mod options;
-pub mod pipeline;
-pub mod recursive_struct_checker;
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
