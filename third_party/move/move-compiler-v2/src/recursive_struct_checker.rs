@@ -131,7 +131,7 @@ impl<'a> RecursiveStructChecker<'a> {
         let root_struct_loc = self.mod_env.get_struct(path[0].2).get_loc();
         self.mod_env
             .env
-            .error_with_notes(&root_struct_loc, "cyclic data3", notes);
+            .error_with_notes(&root_struct_loc, "cyclic data", notes);
     }
 
     fn get_struct_name(&self, struct_id: StructId) -> Rc<String> {
