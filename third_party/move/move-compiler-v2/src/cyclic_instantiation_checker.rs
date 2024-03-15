@@ -184,12 +184,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
             .map(|i| {
                 let (caller_loc, caller) = &callers_chain[i];
                 // callee of `caller`
-                let callee = if i != callers_chain.len() - 1 {
-                    &callers_chain[i + 1].1
-                } else {
-                    // callee of the last caller in the chain is the parameter `callee`
-                    &callee
-                };
+                let callee = &callers_chain[i + 1].1;
                 format!(
                     "`{}` calls `{}` {}",
                     self.display_call(caller),
