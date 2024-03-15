@@ -4,7 +4,10 @@
 use aptos_consensus_types::{
     pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
 };
-use aptos_types::ledger_info::LedgerInfoWithSignatures;
+use aptos_crypto::HashValue;
+use aptos_types::{
+    block_info::BlockInfo, ledger_info::LedgerInfoWithSignatures, transaction::SignedTransaction,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{Display, Formatter},
@@ -21,6 +24,7 @@ pub struct OrderedBlock {
 pub enum ObserverMessage {
     OrderedBlock(OrderedBlock),
     CommitDecision(CommitDecision),
+    Payload((BlockInfo, (Vec<SignedTransaction>, Option<usize>))),
 }
 
 impl Display for ObserverMessage {
@@ -32,6 +36,9 @@ impl Display for ObserverMessage {
             ObserverMessage::CommitDecision(commit) => {
                 write!(f, "CommitDecision: {}", commit.ledger_info().commit_info())
             },
+            ObserverMessage::Payload((block, (payload, limit))) => {
+                write!(f, "Payload: {} {} {:?}", block.id(), payload.len(), limit)
+            },
         }
     }
 }
@@ -41,6 +48,7 @@ impl ObserverMessage {
         match self {
             ObserverMessage::OrderedBlock(blocks) => blocks.ordered_proof.commit_info().epoch(),
             ObserverMessage::CommitDecision(commit) => commit.ledger_info().commit_info().epoch(),
+            ObserverMessage::Payload((block, _)) => block.epoch(),
         }
     }
 }

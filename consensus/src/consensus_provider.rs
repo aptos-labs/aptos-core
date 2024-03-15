@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::{network::ObserverMessage, observer::Observer},
+    consensus_observer::{network::ObserverMessage, observer::Observer, publisher::Publisher},
     counters,
     epoch_manager::EpochManager,
     network::NetworkTask,
@@ -82,7 +82,7 @@ pub fn start_consensus(
         consensus_network_client.clone(),
         bounded_executor.clone(),
         rand_storage.clone(),
-        observer_network,
+        observer_network.clone(),
     ));
 
     let epoch_mgr = EpochManager::new(
@@ -100,6 +100,7 @@ pub fn start_consensus(
         aptos_time_service::TimeService::real(),
         vtxn_pool,
         rand_storage,
+        observer_network,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);
@@ -155,7 +156,7 @@ pub fn start_consensus_observer(
         dummy_client,
         bounded_executor.clone(),
         rand_storage.clone(),
-        Some(observer_network_client),
+        Some(observer_network_client.clone()),
     ));
 
     let events: Vec<_> = observer_network_service_events
@@ -165,7 +166,13 @@ pub fn start_consensus_observer(
     let network_events = Box::new(select_all(events));
 
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-    let observer = Observer::new(root, execution_client, tx, reconfig_events);
+    let observer = Observer::new(
+        root,
+        execution_client,
+        tx,
+        reconfig_events,
+        Publisher::new(observer_network_client),
+    );
     runtime.spawn(observer.start(network_events, rx));
     runtime
 }

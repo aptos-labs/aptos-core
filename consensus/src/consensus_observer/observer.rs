@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    consensus_observer::network::{ObserverMessage, OrderedBlock},
+    consensus_observer::{
+        network::{ObserverMessage, OrderedBlock},
+        publisher::Publisher,
+    },
     dag::DagCommitSigner,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
     network_interface::{CommitMessage, ConsensusMsg},
@@ -14,7 +17,7 @@ use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_consensus_types::{
     common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
 };
-use aptos_crypto::{bls12381, Genesis};
+use aptos_crypto::{bls12381, Genesis, HashValue};
 use aptos_event_notifications::{DbBackedOnChainConfig, ReconfigNotificationListener};
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info};
@@ -29,6 +32,7 @@ use aptos_types::{
         Features, OnChainConfigPayload, OnChainConsensusConfig, OnChainExecutionConfig,
         ValidatorSet,
     },
+    transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
 };
 use futures::{
@@ -37,7 +41,18 @@ use futures::{
 };
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::{collections::BTreeMap, ops::DerefMut, sync::Arc};
+use std::{
+    collections::{hash_map::Entry, BTreeMap, HashMap},
+    mem,
+    ops::DerefMut,
+    sync::Arc,
+};
+use tokio::sync::oneshot as tokio_oneshot;
+
+pub enum ObserverDataStatus {
+    Requested(tokio_oneshot::Sender<(Vec<SignedTransaction>, Option<usize>)>),
+    Available((Vec<SignedTransaction>, Option<usize>)),
+}
 
 /// Consensus observer, get update from upstreams and propagate to execution pipeline.
 pub struct Observer {
@@ -54,6 +69,10 @@ pub struct Observer {
     sync_notifier: tokio::sync::mpsc::UnboundedSender<(u64, Round)>,
     // Reconfig event listener to reload on-chain configs.
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
+    // Maps between block id and its payload, the same as payload manager returns.
+    payload_store: Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
+    // Publisher to forward payload message.
+    publisher: Publisher,
 }
 
 impl Observer {
@@ -62,6 +81,7 @@ impl Observer {
         execution_client: Arc<dyn TExecutionClient>,
         sync_notifier: tokio::sync::mpsc::UnboundedSender<(u64, Round)>,
         reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
+        publisher: Publisher,
     ) -> Self {
         Self {
             epoch: root.commit_info().epoch(),
@@ -71,6 +91,8 @@ impl Observer {
             sync_handle: None,
             sync_notifier,
             reconfig_events,
+            payload_store: Arc::new(Mutex::new(HashMap::new())),
+            publisher,
         }
     }
 
@@ -88,9 +110,19 @@ impl Observer {
     fn commit_callback(&self) -> StateComputerCommitCallBackType {
         let root = self.root.clone();
         let pending_blocks = self.pending_blocks.clone();
-        Box::new(move |_, ledger_info: LedgerInfoWithSignatures| {
-            let mut pending_blocks = pending_blocks.lock();
-            *pending_blocks = pending_blocks.split_off(&(ledger_info.commit_info().round() + 1));
+        let payload_store = self.payload_store.clone();
+        Box::new(move |blocks, ledger_info: LedgerInfoWithSignatures| {
+            {
+                let mut payload_store = payload_store.lock();
+                for block in blocks.iter() {
+                    payload_store.remove(&block.id());
+                }
+            }
+            {
+                let mut pending_blocks = pending_blocks.lock();
+                *pending_blocks =
+                    pending_blocks.split_off(&(ledger_info.commit_info().round() + 1));
+            }
             *root.lock() = ledger_info;
         })
     }
@@ -113,10 +145,6 @@ impl Observer {
             blocks,
             ordered_proof,
         } = ordered_block.clone();
-        info!(
-            "[Observer] received ordered block {}.",
-            ordered_proof.commit_info()
-        );
         let last_block_id = self.last_block().id();
         // if the block is a child of the last block we have, we can insert it.
         if last_block_id == blocks.first().unwrap().parent_id() {
@@ -143,56 +171,62 @@ impl Observer {
     }
 
     fn process_commit_decision(&mut self, decision: CommitDecision) {
-        info!(
-            "[Observer] received commit decision {}.",
-            decision.ledger_info().commit_info()
-        );
         let mut pending_blocks = self.pending_blocks.lock();
         let decision_epoch = decision.ledger_info().commit_info().epoch();
         let decision_round = decision.round();
-        if let Some((_, maybe_decision)) = pending_blocks.get_mut(&decision_round) {
+        if let Some((ordered_blocks, maybe_decision)) = pending_blocks.get_mut(&decision_round) {
+            let payload_exist = {
+                let payload = self.payload_store.lock();
+                ordered_blocks.blocks.iter().all(|block| {
+                    matches!(
+                        payload.get(&block.id()),
+                        Some(ObserverDataStatus::Available(_))
+                    )
+                })
+            };
+            if payload_exist {
+                info!(
+                    "[Observer] Add decision to pending {}",
+                    decision.ledger_info().commit_info()
+                );
+                *maybe_decision = Some(decision.clone());
+                if self.sync_handle.is_none() {
+                    info!(
+                        "[Observer] Forward decision to pending {}.",
+                        decision.ledger_info().commit_info()
+                    );
+                    self.forward_decision(decision);
+                }
+                return;
+            }
+        }
+        // need to drop the lock otherwise it deadlocks last_block
+        drop(pending_blocks);
+        // we don't advance to next epoch via commit, so it has to sync from here to enter new epoch
+        if decision_epoch > self.last_block().epoch() || decision_round > self.last_block().round()
+        {
             info!(
-                "[Observer] Add decision to pending {}",
+                "[Observer] Start sync to {}.",
                 decision.ledger_info().commit_info()
             );
-            *maybe_decision = Some(decision.clone());
-            if self.sync_handle.is_none() {
-                info!(
-                    "[Observer] Forward decision to pending {}.",
-                    decision.ledger_info().commit_info()
-                );
-                self.forward_decision(decision);
-            }
-        } else {
-            // need to drop the lock otherwise it deadlocks last_block
-            drop(pending_blocks);
-            // we don't advance to next epoch via commit, so it has to sync from here to enter new epoch
-            if decision_epoch > self.last_block().epoch()
-                || decision_round > self.last_block().round()
-            {
-                info!(
-                    "[Observer] Start sync to {}.",
-                    decision.ledger_info().commit_info()
-                );
-                // enter sync mode if we are missing blocks
-                *self.root.lock() = decision.ledger_info().clone();
-                self.pending_blocks.lock().clear();
-                let execution_client = self.execution_client.clone();
-                let notify_tx = self.sync_notifier.clone();
-                let (abort_handle, abort_registration) = AbortHandle::new_pair();
-                tokio::spawn(Abortable::new(
-                    async move {
-                        execution_client
-                            .clone()
-                            .sync_to(decision.ledger_info().clone())
-                            .await
-                            .unwrap(); // todo: handle error
-                        notify_tx.send((decision_epoch, decision_round)).unwrap();
-                    },
-                    abort_registration,
-                ));
-                self.sync_handle = Some(DropGuard::new(abort_handle));
-            }
+            // enter sync mode if we are missing blocks
+            *self.root.lock() = decision.ledger_info().clone();
+            self.pending_blocks.lock().clear();
+            let execution_client = self.execution_client.clone();
+            let notify_tx = self.sync_notifier.clone();
+            let (abort_handle, abort_registration) = AbortHandle::new_pair();
+            tokio::spawn(Abortable::new(
+                async move {
+                    execution_client
+                        .clone()
+                        .sync_to(decision.ledger_info().clone())
+                        .await
+                        .unwrap(); // todo: handle error
+                    notify_tx.send((decision_epoch, decision_round)).unwrap();
+                },
+                abort_registration,
+            ));
+            self.sync_handle = Some(DropGuard::new(abort_handle));
         }
     }
 
@@ -269,11 +303,16 @@ impl Observer {
         let dummy_signer = Arc::new(DagCommitSigner::new(signer.clone()));
         let (_, rand_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingRandGenRequest>(QueueStyle::FIFO, 1, None);
+        let payload_manager = if consensus_config.quorum_store_enabled() {
+            PayloadManager::Observer(self.payload_store.clone(), self.publisher.clone())
+        } else {
+            PayloadManager::DirectMempool
+        };
         self.execution_client
             .start_epoch(
                 epoch_state.clone(),
                 dummy_signer,
-                Arc::new(PayloadManager::DirectMempool),
+                Arc::new(payload_manager),
                 &consensus_config,
                 &execution_config,
                 &features,
@@ -296,15 +335,40 @@ impl Observer {
             tokio::select! {
                 Some(event) = network_events.next() => {
                     match event {
-                        Event::Message(_peer, msg) => {
+                        Event::Message(peer, msg) => {
                             // todo: verify messages
                            match msg {
                                ObserverMessage::OrderedBlock(ordered_block) => {
-                                   self.process_ordered_block(ordered_block).await;
+                                    info!(
+                                        "[Observer] received ordered block {} from {}.",
+                                        ordered_block.ordered_proof.commit_info(),
+                                        peer,
+                                    );
+                                    self.process_ordered_block(ordered_block).await;
                                }
                                ObserverMessage::CommitDecision(msg) => {
-                                   self.process_commit_decision(msg);
+                                    info!(
+                                        "[Observer] received commit decision {} from {}.",
+                                        msg.ledger_info().commit_info(),
+                                        peer,
+                                    );
+                                    self.process_commit_decision(msg);
                                }
+                                ObserverMessage::Payload((block, payload)) => {
+                                    info!("[Observer] received payload {} from {}", block, peer);
+                                    match self.payload_store.lock().entry(block.id()) {
+                                        Entry::Occupied(mut entry) => {
+                                            let mut status = ObserverDataStatus::Available(payload.clone());
+                                            mem::swap(entry.get_mut(), &mut status);
+                                            if let ObserverDataStatus::Requested(tx) = status {
+                                                tx.send(payload).unwrap();
+                                            }
+                                        }
+                                        Entry::Vacant(entry) => {
+                                            entry.insert(ObserverDataStatus::Available(payload));
+                                        }
+                                    }
+                                }
                            }
                         }
                         _ => {},

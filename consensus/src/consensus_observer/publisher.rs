@@ -7,6 +7,7 @@ use aptos_logger::info;
 use aptos_network::application::interface::{NetworkClient, NetworkClientInterface};
 
 /// Publish updates to downstream observers.
+#[derive(Clone)]
 pub struct Publisher {
     network_client: NetworkClient<ObserverMessage>,
 }
@@ -37,7 +38,9 @@ impl Publisher {
 
     pub fn publish(&self, msg: ObserverMessage) {
         let downstream_peers = self.get_downstream_peers();
-        info!("[Publisher] Sending {}", msg);
+        for peer in &downstream_peers {
+            info!("[Publisher] Sending {} to {}", msg, peer);
+        }
         let _ = self.network_client.send_to_peers(msg, &downstream_peers);
     }
 }

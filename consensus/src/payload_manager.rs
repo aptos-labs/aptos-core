@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    consensus_observer::{
+        network::ObserverMessage, observer::ObserverDataStatus, publisher::Publisher,
+    },
     counters,
     quorum_store::{batch_store::BatchReader, quorum_store_coordinator::CoordinatorCommand},
 };
@@ -12,11 +15,16 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::{ExecutorError::DataNotFound, *};
+use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::transaction::SignedTransaction;
 use futures::channel::mpsc::Sender;
-use std::sync::Arc;
-use tokio::sync::oneshot;
+use std::{
+    collections::{btree_map::Entry, HashMap},
+    sync::Arc,
+    time::Duration,
+};
+use tokio::{sync::oneshot, time::timeout};
 
 pub trait TPayloadManager: Send + Sync {
     fn prefetch_payload_data(&self, payload: &Payload, timestamp: u64);
@@ -26,7 +34,15 @@ pub trait TPayloadManager: Send + Sync {
 /// If QuorumStore is enabled, has to ask BatchReader for the transaction behind the proofs of availability in the payload.
 pub enum PayloadManager {
     DirectMempool,
-    InQuorumStore(Arc<dyn BatchReader>, Sender<CoordinatorCommand>),
+    InQuorumStore(
+        Arc<dyn BatchReader>,
+        Sender<CoordinatorCommand>,
+        Option<Publisher>,
+    ),
+    Observer(
+        Arc<Mutex<HashMap<HashValue, ObserverDataStatus>>>,
+        Publisher,
+    ),
 }
 
 impl TPayloadManager for PayloadManager {
@@ -64,8 +80,8 @@ impl PayloadManager {
     ///Pass commit information to BatchReader and QuorumStore wrapper for their internal cleanups.
     pub fn notify_commit(&self, block_timestamp: u64, payloads: Vec<Payload>) {
         match self {
-            PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, coordinator_tx) => {
+            PayloadManager::DirectMempool | PayloadManager::Observer(_, _) => {},
+            PayloadManager::InQuorumStore(batch_reader, coordinator_tx, _) => {
                 batch_reader.update_certified_timestamp(block_timestamp);
 
                 let batches: Vec<_> = payloads
@@ -131,8 +147,8 @@ impl PayloadManager {
             };
 
         match self {
-            PayloadManager::DirectMempool => {},
-            PayloadManager::InQuorumStore(batch_reader, _) => match payload {
+            PayloadManager::DirectMempool | PayloadManager::Observer(_, _) => {},
+            PayloadManager::InQuorumStore(batch_reader, _, _) => match payload {
                 Payload::InQuorumStore(proof_with_status) => {
                     request_txns_and_update_status(proof_with_status, batch_reader.clone());
                 },
@@ -162,6 +178,34 @@ impl PayloadManager {
             Some(p) => p,
             None => return Ok((Vec::new(), None)),
         };
+
+        if let PayloadManager::Observer(txns_pool, publisher) = self {
+            let maybe_data = if let Some(ObserverDataStatus::Available(payload)) =
+                txns_pool.lock().get(&block.id())
+            {
+                Some(payload.clone())
+            } else {
+                None
+            };
+            let data = match maybe_data {
+                Some(data) => data,
+                None => {
+                    let (tx, rx) = oneshot::channel();
+                    txns_pool
+                        .lock()
+                        .insert(block.id(), ObserverDataStatus::Requested(tx));
+                    timeout(Duration::from_millis(300), rx)
+                        .await
+                        .map_err(|_| ExecutorError::CouldNotGetData)?
+                        .map_err(|_| ExecutorError::CouldNotGetData)?
+                },
+            };
+            publisher.publish(ObserverMessage::Payload((
+                block.gen_block_info(HashValue::zero(), 0, None),
+                data.clone(),
+            )));
+            return Ok(data);
+        }
 
         async fn process_payload(
             proof_with_data: &ProofWithData,
@@ -237,21 +281,19 @@ impl PayloadManager {
             }
         }
 
-        match (self, payload) {
-            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => {
-                Ok((txns.clone(), None))
-            },
+        let result = match (self, payload) {
+            (PayloadManager::DirectMempool, Payload::DirectMempool(txns)) => (txns.clone(), None),
             (
-                PayloadManager::InQuorumStore(batch_reader, _),
+                PayloadManager::InQuorumStore(batch_reader, _, _),
                 Payload::InQuorumStore(proof_with_data),
-            ) => Ok((
+            ) => (
                 process_payload(proof_with_data, batch_reader.clone(), block).await?,
                 None,
-            )),
+            ),
             (
-                PayloadManager::InQuorumStore(batch_reader, _),
+                PayloadManager::InQuorumStore(batch_reader, _, _),
                 Payload::InQuorumStoreWithLimit(proof_with_data),
-            ) => Ok((
+            ) => (
                 process_payload(
                     &proof_with_data.proof_with_data,
                     batch_reader.clone(),
@@ -259,15 +301,15 @@ impl PayloadManager {
                 )
                 .await?,
                 proof_with_data.max_txns_to_execute,
-            )),
+            ),
             (
-                PayloadManager::InQuorumStore(batch_reader, _),
+                PayloadManager::InQuorumStore(batch_reader, _, _),
                 Payload::QuorumStoreInlineHybrid(
                     inline_batches,
                     proof_with_data,
                     max_txns_to_execute,
                 ),
-            ) => Ok((
+            ) => (
                 {
                     let mut all_txns =
                         process_payload(proof_with_data, batch_reader.clone(), block).await?;
@@ -281,7 +323,7 @@ impl PayloadManager {
                     all_txns
                 },
                 *max_txns_to_execute,
-            )),
+            ),
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",
                 payload,
@@ -289,6 +331,13 @@ impl PayloadManager {
                 block.block_data().round(),
                 block.id()
             ),
+        };
+        if let PayloadManager::InQuorumStore(_, _, Some(publisher)) = self {
+            publisher.publish(ObserverMessage::Payload((
+                block.gen_block_info(HashValue::zero(), 0, None),
+                result.clone(),
+            )));
         }
+        Ok(result)
     }
 }
