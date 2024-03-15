@@ -104,7 +104,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::SPEC_CHECK.to_string(),
             description: "Turns on or off specification checks".to_string(),
-            default: Inherited(Experiment::CHECKS.to_string()),
+            default: Given(false),
         },
         Experiment {
             name: Experiment::SPEC_REWRITE.to_string(),
@@ -140,7 +140,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string(),
             description: "Turns on optimizations waiting for comparison testing".to_string(),
-            default: Given(false),
+            default: Given(true),
         },
         Experiment {
             name: Experiment::CFG_SIMPLIFICATION.to_string(),
