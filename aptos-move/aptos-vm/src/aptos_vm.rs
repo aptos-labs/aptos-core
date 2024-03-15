@@ -1692,7 +1692,7 @@ impl AptosVM {
         txn: &SignedTransaction,
         log_context: &AdapterLogSchema,
     ) -> (VMStatus, VMOutput) {
-        let balance = TransactionMetadata::new(txn).max_gas_amount();
+        let balance = txn.max_gas_amount().into();
         // TODO: would we end up having a diverging behavior by creating the gas meter at an earlier time?
         let mut gas_meter = unwrap_or_discard!(self.make_standard_gas_meter(balance, log_context));
 
@@ -1719,8 +1719,7 @@ impl AptosVM {
         G: AptosGasMeter,
         F: FnOnce(u64, VMGasParameters, StorageGasParameters, Gas) -> Result<G, VMStatus>,
     {
-        // TODO(Gas): avoid creating txn metadata twice.
-        let balance = TransactionMetadata::new(txn).max_gas_amount();
+        let balance = txn.max_gas_amount().into();
         let mut gas_meter = make_gas_meter(
             self.gas_feature_version,
             get_or_vm_startup_failure(&self.gas_params, log_context)?

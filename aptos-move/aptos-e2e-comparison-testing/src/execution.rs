@@ -17,7 +17,7 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_validator_interface::AptosValidatorInterface;
-use aptos_vm::{data_cache::AsMoveResolver, transaction_metadata::TransactionMetadata};
+use aptos_vm::data_cache::AsMoveResolver;
 use clap::ValueEnum;
 use itertools::Itertools;
 use move_core_types::{account_address::AccountAddress, language_storage::ModuleId};
@@ -362,7 +362,7 @@ impl Execution {
                     load_packages_to_executor(&mut executor, package_info, compiled_package_cache);
                 }
                 let mut senders = vec![sender];
-                senders.extend(TransactionMetadata::new(signed_trans).secondary_signers);
+                senders.extend(signed_trans.authenticator().secondary_signer_addresses());
                 let enable_v7 = |features: &mut Features| {
                     if v2_flag {
                         features.enable(FeatureFlag::VM_BINARY_FORMAT_V7);
