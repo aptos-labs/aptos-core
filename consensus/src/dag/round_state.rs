@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
-    observability::tracing::{observe_round, RoundStage},
+    observability::{
+        counters,
+        tracing::{observe_round, RoundStage},
+    },
     types::NodeCertificate,
 };
 use anyhow::ensure;
@@ -207,6 +210,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
             let wait_time = wait_time.saturating_sub(duration_since_start);
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(wait_time).await;
+                counters::TIMEOUT_WAIT_VOTING_POWER_COUNT.inc();
                 let _ = sender.send(new_round);
             });
             inner.state = State::Scheduled(handle);
