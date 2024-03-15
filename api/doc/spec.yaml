@@ -10072,7 +10072,21 @@ components:
           $ref: '#/components/schemas/MultisigTransactionPayload'
     MultisigTransactionPayload:
       type: object
-      anyOf:
+      oneOf:
+      - $ref: '#/components/schemas/MultisigTransactionPayload_EntryFunctionPayload'
+      discriminator:
+        propertyName: type
+        mapping:
+          entry_function_payload: '#/components/schemas/MultisigTransactionPayload_EntryFunctionPayload'
+    MultisigTransactionPayload_EntryFunctionPayload:
+      allOf:
+      - type: object
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            example: entry_function_payload
       - $ref: '#/components/schemas/EntryFunctionPayload'
     PendingTransaction:
       type: object
