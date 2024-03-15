@@ -806,10 +806,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.def_ana_struct(&name, def);
         }
 
-        for (_, struct_entry) in self.parent.struct_table.iter() {
-            self.parent.check_recursive_struct(struct_entry);
-        }
-
         // Analyze all constants.
         for (name, def) in module_def.constants.key_cloned_iter() {
             self.def_ana_constant(&name, def, compiled_module);
