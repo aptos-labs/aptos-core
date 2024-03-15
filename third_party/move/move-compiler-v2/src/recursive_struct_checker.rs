@@ -123,7 +123,8 @@ impl<'a> RecursiveStructChecker<'a> {
     }
 
     /// Report cyclic dependency of structs
-    /// `path`: `path[i]` contains field of type `path[i + 1]`, and the last element contains field of type `struct_id`
+    /// `path`: `path[i]` contains field of type `path[i + 1]`,
+    /// and the last element contains field of type `struct_id`
     /// precondition: `path` not empty, and `path[0] == struct_id`
     fn report_cycle(&self, path: &[(Loc, Symbol, StructId)], struct_id: StructId) {
         let notes = self.gen_error_msg_for_fields_cycle(path, struct_id);
