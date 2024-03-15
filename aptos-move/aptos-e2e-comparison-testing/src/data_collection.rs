@@ -2,20 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    add_aptos_packages_to_state_store, check_aptos_packages_availability, compile_aptos_packages,
     data_state_view::DataStateView, dump_and_compile_from_package_metadata, is_aptos_package,
-    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex,
+    CompilationCache, DataManager, IndexWriter, PackageInfo, TxnIndex, APTOS_COMMONS, SAMPLING_RATE
 };
 use anyhow::{format_err, Result};
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_framework::natives::code::PackageMetadata;
+use aptos_transaction_simulation::{InMemoryStateStore, SimulationStateStore};
+
 use aptos_rest_client::Client;
 use aptos_types::{
-    state_store::{state_key::StateKey, state_value::StateValue, TStateView},
-    transaction::{
+    on_chain_config::{Features, FeatureFlag}, state_store::{state_key::StateKey, state_value::StateValue, TStateView}, transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, Transaction,
         TransactionOutput, Version,
-    },
-    write_set::TOTAL_SUPPLY_STATE_KEY,
+    }, write_set::TOTAL_SUPPLY_STATE_KEY
 };
 use aptos_validator_interface::{AptosValidatorInterface, FilterCondition, RestDebuggerInterface};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};
@@ -162,9 +163,19 @@ impl DataCollection {
         }
     }
 
-    pub async fn dump_data(&self, begin: Version, limit: u64) -> Result<()> {
+    pub async fn dump_data(&self, begin: Version, limit: u64, rate: u32) -> Result<()> {
         println!("begin dumping data");
-        let compilation_cache = Arc::new(Mutex::new(CompilationCache::default()));
+        let aptos_commons_path = self.current_dir.join(APTOS_COMMONS);
+        if self.filter_condition.check_source_code && !check_aptos_packages_availability(aptos_commons_path.clone()) {
+            return Err(anyhow::Error::msg("aptos packages are missing"));
+        }
+        let mut compiled_cache = CompilationCache::default();
+        let _ = compile_aptos_packages(
+            &aptos_commons_path,
+            &mut compiled_cache.compiled_package_cache_v1,
+            false,
+        );
+        let compilation_cache: Arc<Mutex<CompilationCache>> = Arc::new(Mutex::new(compiled_cache));
         let data_manager = Arc::new(Mutex::new(DataManager::new_with_dir_creation(
             &self.current_dir,
         )));
@@ -172,6 +183,7 @@ impl DataCollection {
 
         let mut cur_version = begin;
         let mut module_registry_map = HashMap::new();
+        let mut filtered_vec = vec![];
         while cur_version < begin + limit {
             let batch = if cur_version + self.batch_size <= begin + limit {
                 self.batch_size
@@ -185,6 +197,8 @@ impl DataCollection {
                     batch,
                     self.filter_condition,
                     &mut module_registry_map,
+                    &mut filtered_vec,
+                    rate
                 )
                 .await;
             // if error happens when collecting txns, log the version range
@@ -203,11 +217,25 @@ impl DataCollection {
                     let compilation_cache = compilation_cache.clone();
                     let current_dir = self.current_dir.clone();
                     let dump_write_set = self.dump_write_set;
-                    let data_manager = data_manager.clone();
+                    let data_manager= data_manager.clone();
                     let index = index_writer.clone();
 
-                    let state_view =
-                        DataStateView::new_with_data_reads(self.debugger.clone(), version);
+                    let mut data_state = InMemoryStateStore::default();
+                    let mut features_to_enable = vec![FeatureFlag::VM_BINARY_FORMAT_V7, FeatureFlag::NATIVE_MEMORY_OPERATIONS];
+
+                    let cache_v1 = compilation_cache
+                        .lock()
+                        .unwrap()
+                        .compiled_package_cache_v1
+                        .clone();
+                    add_aptos_packages_to_state_store(&mut data_state, &cache_v1);
+                    let state_view = DataStateView::new_with_data_reads_and_code(
+                        self.debugger.clone(),
+                        version,
+                        data_state,
+                        features_to_enable,
+                        vec![]
+                    );
 
                     let txn_execution_thread = tokio::task::spawn_blocking(move || {
                         let epoch_result_res =
