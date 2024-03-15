@@ -1,11 +1,10 @@
 
 Diagnostics:
 error: cyclic type instantiation
-  ┌─ tests/recursive-instantiation-checker/recursive_two_args_swapping_type_con.move:7:5
+  ┌─ tests/recursive-instantiation-checker/v1-tests/recursive_two_args_swapping_type_con.move:7:9
   │
-7 │ ╭     fun f<T1, T2>(a: T1, x: T2) {
-8 │ │         f<S<T2>, T1>(S<T2> { x }, a)
-9 │ │     }
-  │ ╰─────^
+7 │     fun f<T1, T2>(a: T1, x: T2) {
+  │         ^
   │
-  = f<T1, T2> calls f<M::S<T2>, T1> at tests/recursive-instantiation-checker/recursive_two_args_swapping_type_con.move:7
+  = `f<T1, T2>` calls `f<M::S<T2>, T1>` at tests/recursive-instantiation-checker/v1-tests/recursive_two_args_swapping_type_con.move:7,
+    A cycle of recursive calls causes the instantiation to recurse infinitely.

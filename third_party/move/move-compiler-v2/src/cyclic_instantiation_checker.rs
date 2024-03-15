@@ -180,7 +180,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
         callee: QualifiedInstId<FunId>,
         callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
     ) {
-        let labels = (0..callers_chain.len())
+        let mut labels = (0..callers_chain.len() - 1)
             .map(|i| {
                 let (caller_loc, caller) = &callers_chain[i];
                 // callee of `caller`
@@ -191,17 +191,27 @@ impl<'a> CyclicInstantiationChecker<'a> {
                     &callee
                 };
                 format!(
-                    "{} calls {} {}",
+                    "`{}` calls `{}` {}",
                     self.display_call(caller),
                     self.display_call(callee),
                     caller_loc.display_line_only(self.mod_env.env)
                 )
             })
             .collect_vec();
-        let root_loc = &callers_chain[0].0;
+        let (caller_loc, caller) = &callers_chain.last().expect("parent");
+        labels.push(format!(
+            "`{}` calls `{}` {},\nA cycle of recursive calls causes the instantiation to recurse infinitely.",
+            self.display_call(caller),
+            self.display_call(&callee),
+            caller_loc.display_line_only(self.mod_env.env)
+        ));
+        let root_loc = self
+            .mod_env
+            .get_function(callers_chain[0].1.id)
+            .get_id_loc();
         self.mod_env
             .env
-            .error_with_notes(root_loc, "cyclic type instantiation", labels)
+            .error_with_notes(&root_loc, "cyclic type instantiation", labels)
     }
 
     /// Returns the display name of a function call with type parameters but without arguments

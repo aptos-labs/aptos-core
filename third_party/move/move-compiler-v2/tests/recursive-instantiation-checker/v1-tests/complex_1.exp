@@ -1,37 +1,32 @@
 
 Diagnostics:
 error: cyclic type instantiation
-   ┌─ tests/recursive-instantiation-checker/complex_1.move:13:5
+   ┌─ tests/recursive-instantiation-checker/v1-tests/complex_1.move:13:9
    │
-13 │ ╭     fun c<T1, T2>() {
-14 │ │         c<u64, T1>();
-15 │ │         d<T2>();
-16 │ │         e<T2>()
-17 │ │     }
-   │ ╰─────^
+13 │     fun c<T1, T2>() {
+   │         ^
    │
-   = c<T1, T2> calls d<#1> at tests/recursive-instantiation-checker/complex_1.move:13
-   = d<#1> calls b<u64, T2> at tests/recursive-instantiation-checker/complex_1.move:15
-   = b<u64, T2> calls c<M::S<T2>, bool> at tests/recursive-instantiation-checker/complex_1.move:20
+   = `c<T1, T2>` calls `d<#1>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:13
+   = `d<#1>` calls `b<u64, T2>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:15
+   = `b<u64, T2>` calls `c<M::S<T2>, bool>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:20,
+     A cycle of recursive calls causes the instantiation to recurse infinitely.
 
 error: cyclic type instantiation
-   ┌─ tests/recursive-instantiation-checker/complex_1.move:26:5
+   ┌─ tests/recursive-instantiation-checker/v1-tests/complex_1.move:26:9
    │
-26 │ ╭     fun f<T>() {
-27 │ │         g<T>()
-28 │ │     }
-   │ ╰─────^
+26 │     fun f<T>() {
+   │         ^
    │
-   = f<T> calls g<T> at tests/recursive-instantiation-checker/complex_1.move:26
-   = g<T> calls f<M::S<T>> at tests/recursive-instantiation-checker/complex_1.move:27
+   = `f<T>` calls `g<T>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:26
+   = `g<T>` calls `f<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:27,
+     A cycle of recursive calls causes the instantiation to recurse infinitely.
 
 error: cyclic type instantiation
-   ┌─ tests/recursive-instantiation-checker/complex_1.move:30:5
+   ┌─ tests/recursive-instantiation-checker/v1-tests/complex_1.move:30:9
    │
-30 │ ╭     fun g<T>() {
-31 │ │         f<S<T>>()
-32 │ │     }
-   │ ╰─────^
+30 │     fun g<T>() {
+   │         ^
    │
-   = g<T> calls f<M::S<T>> at tests/recursive-instantiation-checker/complex_1.move:30
-   = f<M::S<T>> calls g<M::S<T>> at tests/recursive-instantiation-checker/complex_1.move:31
+   = `g<T>` calls `f<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:30
+   = `f<M::S<T>>` calls `g<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:31,
+     A cycle of recursive calls causes the instantiation to recurse infinitely.

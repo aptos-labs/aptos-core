@@ -1,11 +1,10 @@
 
 Diagnostics:
 error: cyclic type instantiation
-  ┌─ tests/recursive-instantiation-checker/nested_types_1.move:4:5
+  ┌─ tests/recursive-instantiation-checker/v1-tests/nested_types_1.move:4:9
   │
-4 │ ╭     fun foo<T>() {
-5 │ │         foo<S<S<T>>>()
-6 │ │     }
-  │ ╰─────^
+4 │     fun foo<T>() {
+  │         ^^^
   │
-  = foo<T> calls foo<M::S<M::S<T>>> at tests/recursive-instantiation-checker/nested_types_1.move:4
+  = `foo<T>` calls `foo<M::S<M::S<T>>>` at tests/recursive-instantiation-checker/v1-tests/nested_types_1.move:4,
+    A cycle of recursive calls causes the instantiation to recurse infinitely.

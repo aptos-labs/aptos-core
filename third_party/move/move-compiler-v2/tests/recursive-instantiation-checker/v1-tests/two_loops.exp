@@ -1,21 +1,19 @@
 
 Diagnostics:
 error: cyclic type instantiation
-  ┌─ tests/recursive-instantiation-checker/two_loops.move:7:5
+  ┌─ tests/recursive-instantiation-checker/v1-tests/two_loops.move:7:9
   │
-7 │ ╭     fun f<T>() {
-8 │ │         f<S<T>>()
-9 │ │     }
-  │ ╰─────^
+7 │     fun f<T>() {
+  │         ^
   │
-  = f<T> calls f<M::S<T>> at tests/recursive-instantiation-checker/two_loops.move:7
+  = `f<T>` calls `f<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/two_loops.move:7,
+    A cycle of recursive calls causes the instantiation to recurse infinitely.
 
 error: cyclic type instantiation
-   ┌─ tests/recursive-instantiation-checker/two_loops.move:11:5
+   ┌─ tests/recursive-instantiation-checker/v1-tests/two_loops.move:11:9
    │
-11 │ ╭     fun g<T>() {
-12 │ │         g<S<T>>()
-13 │ │     }
-   │ ╰─────^
+11 │     fun g<T>() {
+   │         ^
    │
-   = g<T> calls g<M::S<T>> at tests/recursive-instantiation-checker/two_loops.move:11
+   = `g<T>` calls `g<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/two_loops.move:11,
+     A cycle of recursive calls causes the instantiation to recurse infinitely.
