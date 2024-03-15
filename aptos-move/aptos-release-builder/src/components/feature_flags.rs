@@ -380,6 +380,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DisallowInitModuleToPublishModules => {
                 AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
             },
+            FeatureFlag::TransactionContextHashFunctionUpdate => {
+                AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE
+            },
             FeatureFlag::EnableCallTreeAndInstructionVMCache => {
                 AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE
             },
@@ -561,6 +564,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::_ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
             AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
                 FeatureFlag::DisallowInitModuleToPublishModules
+            },
+            AptosFeatureFlag::TRANSACTION_CONTEXT_HASH_FUNCTION_UPDATE => {
+                FeatureFlag::TransactionContextHashFunctionUpdate
             },
             AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE => {
                 FeatureFlag::EnableCallTreeAndInstructionVMCache
