@@ -110,49 +110,31 @@ impl TestConfig {
 
         // The bytecode transformation pipeline
         let mut pipeline = FunctionTargetPipeline::default();
+
+        // Get path to allow path-specific test configuration
         let path = path.to_string_lossy();
-        if path.contains("/inlining/")
-            || path.contains("/folding/")
-            || path.contains("/simplifier/")
-        {
+
+        // turn on simplifier unless doing no-simplifier tests.
+        if path.contains("/simplifier-elimination/") {
+            env_pipeline.add("simplifier", |env: &mut GlobalEnv| {
+                ast_simplifier::run_simplifier(
+                    env, true, // Code elimination
+                )
+            });
+        } else if !path.contains("/no-simplifier/") {
             env_pipeline.add("simplifier", |env: &mut GlobalEnv| {
                 ast_simplifier::run_simplifier(
                     env, false, // No code elimination
                 )
             });
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
-            pipeline.add_processor(Box::new(AbilityProcessor {}));
-            Self {
-                stop_before_generating_bytecode: false,
-                dump_ast: AstDumpLevel::EndStage,
-                env_pipeline,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: false,
-                dump_for_only_some_stages: None,
-            }
-        } else if path.contains("/simplifier-elimination/") {
-            env_pipeline.add("simplifier", |env: &mut GlobalEnv| {
-                ast_simplifier::run_simplifier(
-                    env, true, // Enable code elimination
-                )
-            });
-            pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
-            pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-            pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
-            pipeline.add_processor(Box::new(AbilityProcessor {}));
-            Self {
-                stop_before_generating_bytecode: false,
-                dump_ast: AstDumpLevel::EndStage,
-                env_pipeline,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: false,
-                dump_for_only_some_stages: None,
-            }
-        } else if path.contains("/no-simplifier/") {
+        }
+
+        if path.contains("/inlining/")
+            || path.contains("/folding/")
+            || path.contains("/simplifier/")
+            || path.contains("/simplifier-elimination/")
+            || path.contains("/no-simplifier/")
+        {
             pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
             pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
             pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
