@@ -8,7 +8,7 @@ proposals:
       description: "Increase max txn gas temporarily for framework upgrade"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGasWithOverrideOld: # Use `DefaultGasWithOverrideOld` in 1.11 and change back to `DefaultGasWithOverride` in 1.12+.
+      - DefaultGasWithOverrideOld: # This is translated to `gas_schedule::set_gas_schedule(...)`.
           - name: "txn.max_execution_gas"
             value: 3676000000
   - name: step_2_upgrade_framework
@@ -21,7 +21,7 @@ proposals:
           bytecode_version: 6
           git_hash: ~
       - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move # Keep this in 1.11
-      - DefaultGas
+      - DefaultGas  # [probably 1.11] This is translated to `gas_schedule::set_for_next_epoch(...)`.
   - name: step_3_storage_fee_for_state_bytes_refundable
     metadata:
       title: "AIP-65: Storage Fee for State Bytes refundable"
@@ -29,7 +29,7 @@ proposals:
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/328"
     execution_mode: MultiStep
     update_sequence:
-      - FeatureFlag:
+      - FeatureFlag: # This and the following `FeatureFlag` entries are translated to `features::change_feature_flags_for_next_epoch(...)`.
           enabled:
             - refundable_bytes
   - name: step_4_enable_fairness_shuffler
@@ -171,14 +171,14 @@ proposals:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
   - name: step_14_migrate_jwk_consensus_config
     metadata:
-      title: "[1.11] Migrate JWK consensus config"
+      title: "[probably 1.11] Migrate JWK consensus config"
       description: "Move JWK consensus on-off control and the supported OIDC provider list to its own resource."
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/jwk_consensus_config_migration.move
   - name: step_15_enable_randomness # Keep this the last step, so any other governance gets the existing "immediate reconfig" experience (if they need a reconfig).
     metadata:
-      title: "[1.11] Enable randomness"
+      title: "[probably 1.11] Enable randomness"
       description: "Move JWK consensus on-off control and the supported OIDC provider list to its own resource."
     execution_mode: MultiStep
     update_sequence:
