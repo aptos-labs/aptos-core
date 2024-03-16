@@ -65,7 +65,7 @@ impl<'a> RecursiveStructChecker<'a> {
         checked: &mut BTreeSet<StructId>,
     ) {
         // check for cyclic dependencies
-        for (i, (_ancestor_loc, _ancecsotr_name, ancestor)) in path.iter().enumerate() {
+        for (i, (_ancestor_loc, _ancestor_name, ancestor)) in path.iter().enumerate() {
             if *ancestor == struct_id {
                 self.report_cycle(&path[i..], struct_id);
                 checked.insert(struct_id);
