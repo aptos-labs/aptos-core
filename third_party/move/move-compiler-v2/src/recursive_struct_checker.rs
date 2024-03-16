@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Implements an AST pass that checks any struct `S` cannot contain descendant of type `S`.
+//! Preconditon: Cyclic module dependency has been checked.
 
 use move_model::{
     model::{FieldEnv, GlobalEnv, Loc, ModuleEnv, StructEnv, StructId},
