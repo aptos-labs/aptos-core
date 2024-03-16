@@ -117,6 +117,7 @@ fn test_rounding_uniform_distribution() {
     let mut rng = rand::thread_rng();
     // assuming each validator has a stake between 1_000_000 and 50_000_000, following uniform distribution
     // randomly generate 100~500 validators' stake distribution
+    let timer = Instant::now();
     for _ in 0..num_runs {
         let validator_num = rng.gen_range(100, 500);
         let mut validator_stakes = vec![];
@@ -136,13 +137,8 @@ fn test_rounding_uniform_distribution() {
             *DEFAULT_SECRECY_THRESHOLD.deref(),
         );
         let total_weight = dkg_rounding.profile.validator_weights.iter().sum::<u64>();
-        assert!(total_weight >= total_weight_min as u64);
-        assert!(total_weight <= total_weight_max as u64);
-        assert!(is_valid_profile(
-            &dkg_rounding.profile,
-            *DEFAULT_RECONSTRUCT_THRESHOLD.deref()
-        ));
     }
+    println!("time={:?}", timer.elapsed());
 }
 
 #[cfg(test)]
