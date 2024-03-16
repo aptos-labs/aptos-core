@@ -173,6 +173,8 @@ impl DagDriver {
     fn check_new_round(&self) {
         let (highest_strong_link_round, strong_links) = self.get_highest_strong_links_round();
 
+        debug!(round = highest_strong_link_round, "check new round");
+
         let minimum_delay = self
             .health_backoff
             .backoff_duration(highest_strong_link_round + 1);
