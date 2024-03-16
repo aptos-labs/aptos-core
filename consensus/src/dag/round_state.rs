@@ -11,6 +11,7 @@ use crate::dag::{
 use anyhow::ensure;
 use aptos_consensus_types::common::Round;
 use aptos_infallible::{duration_since_epoch, Mutex};
+use aptos_logger::debug;
 use aptos_types::epoch_state::EpochState;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
@@ -40,9 +41,21 @@ impl RoundState {
         minimum_delay: Duration,
     ) {
         let current_round = *self.current_round.lock();
+
+        debug!(
+            round = current_round,
+            highest = highest_strong_links_round,
+            "check for new round"
+        );
+
         match current_round.cmp(&highest_strong_links_round) {
             // we're behind, move forward immediately
             Ordering::Less => {
+                debug!(
+                    round = current_round,
+                    highest = highest_strong_links_round,
+                    "current round too low"
+                );
                 // the receiver can be dropped if we move to a new epoch
                 let _ = self.event_sender.send(highest_strong_links_round + 1);
             },
@@ -189,17 +202,30 @@ impl ResponsiveCheck for AdaptiveResponsive {
             (self.minimal_wait_time, false)
         };
 
+        debug!(
+            voting_power = voting_power,
+            wait_power = self.wait_voting_power,
+            round = highest_strong_links_round,
+            is_health_backoff = is_health_backoff,
+            "check for new round"
+        );
+
         // voting power >= 90% and pass wait time if health backoff
         let duration_since_start = duration_since_epoch().saturating_sub(inner.start_time);
         if voting_power >= self.wait_voting_power
             && (duration_since_start >= wait_time || !is_health_backoff)
         {
             if voting_power >= self.wait_voting_power {
+                debug!(round = highest_strong_links_round, "voting power met");
                 observe_round(
                     inner.start_time.as_micros() as u64,
                     RoundStage::VotingPowerMet,
                 );
             }
+            debug!(
+                round = highest_strong_links_round,
+                "sending new round notification"
+            );
             let _ = self.event_sender.send(new_round);
             if let State::Scheduled(handle) = std::mem::replace(&mut inner.state, State::Sent) {
                 handle.abort();
@@ -208,6 +234,10 @@ impl ResponsiveCheck for AdaptiveResponsive {
             // wait until minimal time reaches before sending
             let sender = self.event_sender.clone();
             let wait_time = wait_time.saturating_sub(duration_since_start);
+            debug!(
+                round = highest_strong_links_round,
+                "waiting timeout for round"
+            );
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(wait_time).await;
                 counters::TIMEOUT_WAIT_VOTING_POWER_COUNT.inc();
