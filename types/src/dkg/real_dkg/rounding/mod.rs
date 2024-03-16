@@ -153,8 +153,8 @@ impl DKGRoundingProfile {
             (profile, valid)
         }).collect();
 
-        let (p, _) = profiles[0].clone();
-        p
+        let (p, _) = profiles.into_iter().find(|(p,v)|*v).unwrap();
+        p.clone()
     }
 
     pub fn default(
