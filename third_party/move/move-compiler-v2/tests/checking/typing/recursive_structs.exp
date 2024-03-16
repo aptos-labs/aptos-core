@@ -14,7 +14,7 @@ error: cyclic data
 7 │     struct Bar { f: Cup<Bar> }
   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^
   │                  │
-  │                  invalid field f of Bar containing Bar itself
+  │                  invalid field `f` of `Bar` containing `Bar` itself
 
 error: cyclic data
   ┌─ tests/checking/typing/recursive_structs.move:9:5
@@ -31,7 +31,7 @@ error: cyclic data
 17 │     struct Foo { f: M0::Cup<Foo> }
    │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    │                  │
-   │                  invalid field f of Foo containing Foo itself
+   │                  invalid field `f` of `Foo` containing `Foo` itself
 
 error: cyclic data
    ┌─ tests/checking/typing/recursive_structs.move:19:5
