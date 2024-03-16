@@ -307,6 +307,9 @@ impl NodeSetup {
 
         let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
 
+        let mut local_config = local_consensus_config.clone();
+        local_config.enable_broadcast_vote(false);
+
         let mut round_manager = RoundManager::new(
             epoch_state,
             Arc::clone(&block_store),
@@ -318,10 +321,9 @@ impl NodeSetup {
             storage.clone(),
             onchain_consensus_config.clone(),
             round_manager_tx,
-            local_consensus_config.clone(),
+            local_config,
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
-            false,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

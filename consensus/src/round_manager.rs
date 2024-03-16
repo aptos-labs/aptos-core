@@ -216,7 +216,6 @@ pub struct RoundManager {
     local_config: ConsensusConfig,
     randomness_config: OnChainRandomnessConfig,
     jwk_consensus_config: OnChainJWKConsensusConfig,
-    broadcast_vote: bool,
 }
 
 impl RoundManager {
@@ -234,7 +233,6 @@ impl RoundManager {
         local_config: ConsensusConfig,
         randomness_config: OnChainRandomnessConfig,
         jwk_consensus_config: OnChainJWKConsensusConfig,
-        broadcast_vote: bool,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -261,7 +259,6 @@ impl RoundManager {
             local_config,
             randomness_config,
             jwk_consensus_config,
-            broadcast_vote,
         }
     }
 
@@ -840,7 +837,7 @@ impl RoundManager {
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        if self.broadcast_vote {
+        if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
             self.network.broadcast_vote(vote_msg).await;
         } else {
@@ -945,7 +942,7 @@ impl RoundManager {
             is_timeout = vote.is_timeout(),
         );
 
-        if !self.broadcast_vote && !vote.is_timeout() {
+        if !self.local_config.broadcast_vote && !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.
             let next_round = round + 1;
             ensure!(
