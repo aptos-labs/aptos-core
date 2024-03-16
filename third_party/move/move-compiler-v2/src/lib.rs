@@ -13,6 +13,7 @@ pub mod inliner;
 pub mod logging;
 pub mod options;
 pub mod pipeline;
+pub mod recursive_struct_checker;
 
 use crate::{
     env_pipeline::{rewrite_target::RewritingScope, spec_checker, EnvProcessorPipeline},
@@ -51,6 +52,7 @@ use move_stackless_bytecode::function_target_pipeline::{
 use move_symbol_pool::Symbol;
 pub use options::*;
 use std::{collections::BTreeSet, io::Write, path::Path};
+
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
     options: Options,
@@ -255,6 +257,9 @@ pub fn check_and_rewrite_pipeline<'a>(
     env_pipeline.add("specification checker", |env| {
         let env: &GlobalEnv = env;
         spec_checker::run_spec_checker(env)
+    });
+    env_pipeline.add("check recursive struct definition", |env| {
+        recursive_struct_checker::check_recursive_struct(env)
     });
     env_pipeline
 }
