@@ -91,7 +91,7 @@ impl<'a> RecursiveStructChecker<'a> {
                     }
                     // check the type parameters of the fields cannot contain the struct we are checking
                     if insts.iter().any(|ty| {
-                        self.ty_contains_struct(path, &ty, loc.clone(), struct_id, checked)
+                        self.ty_contains_struct(path, ty, loc.clone(), struct_id, checked)
                     }) {
                         self.report_invalid_field(&struct_env, &field_env);
                     }
@@ -112,7 +112,7 @@ impl<'a> RecursiveStructChecker<'a> {
     fn report_invalid_field(&self, struct_env: &StructEnv, field_env: &FieldEnv) {
         let struct_name = self.get_struct_name(struct_env.get_id());
         let note = format!(
-            "invalid field {} of {} containing {} itself",
+            "invalid field `{}` of `{}` containing `{}` itself",
             self.mod_env.symbol_pool().string(field_env.get_name()),
             struct_name,
             struct_name,
