@@ -30,7 +30,11 @@ pub fn generate_jwk_consensus_config_update_proposal(
                         emitln!(writer, "jwk_consensus_config::new_oidc_provider(utf8(b\"{}\"), utf8(b\"{}\")),", p.name, p.config_url);
                     }
                     emitln!(writer, "]);");
-                    emitln!(writer, "jwk_consensus_config::set_for_next_epoch({}, config);", signer_arg);
+                    emitln!(
+                        writer,
+                        "jwk_consensus_config::set_for_next_epoch({}, config);",
+                        signer_arg
+                    );
                 },
             }
             emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
