@@ -8,15 +8,18 @@ use aptos_dkg::pvss::WeightedConfig;
 use fixed::types::U64F64;
 use rand::Rng;
 use std::ops::Deref;
+use std::time::Instant;
 
 #[test]
 fn compute_mainnet_rounding() {
     let validator_stakes = MAINNET_STAKES.to_vec();
+    let timer = Instant::now();
     let dkg_rounding = DKGRounding::new(
         &validator_stakes,
         *DEFAULT_SECRECY_THRESHOLD.deref(),
         *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
     );
+    println!("time={:?}", timer.elapsed());
     // println!("mainnet rounding profile: {:?}", dkg_rounding.profile);
     // Result:
     // mainnet rounding profile: total_weight: 437, secrecy_threshold_in_stake_ratio: 0.5, reconstruct_threshold_in_stake_ratio: 0.5859020899996102, reconstruct_threshold_in_weights: 237, validator_weights: [10, 1, 9, 9, 1, 1, 9, 9, 1, 7, 8, 5, 2, 1, 9, 7, 1, 2, 1, 9, 2, 1, 1, 9, 1, 8, 10, 1, 1, 9, 1, 1, 1, 7, 9, 1, 1, 9, 1, 9, 1, 3, 1, 8, 1, 1, 7, 10, 3, 2, 1, 9, 1, 9, 1, 3, 8, 1, 10, 1, 1, 1, 9, 3, 8, 8, 3, 10, 1, 1, 7, 9, 2, 5, 2, 9, 9, 1, 4, 1, 1, 1, 1, 1, 2, 10, 1, 1, 9, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 2, 1, 9, 8, 1, 1, 9, 2, 1]
@@ -40,11 +43,13 @@ fn compute_mainnet_rounding() {
 #[test]
 fn test_rounding_single_validator() {
     let validator_stakes = vec![1_000_000];
+    let timer = Instant::now();
     let dkg_rounding = DKGRounding::new(
         &validator_stakes,
         *DEFAULT_SECRECY_THRESHOLD.deref(),
         *DEFAULT_RECONSTRUCT_THRESHOLD.deref(),
     );
+    println!("time={:?}", timer.elapsed());
     let wconfig = WeightedConfig::new(1, vec![1]).unwrap();
     assert_eq!(dkg_rounding.wconfig, wconfig);
 }
@@ -53,6 +58,7 @@ fn test_rounding_single_validator() {
 fn test_rounding_equal_stakes() {
     let num_runs = 100;
     let mut rng = rand::thread_rng();
+    let timer = Instant::now();
     for _ in 0..num_runs {
         let validator_num = rng.gen_range(100, 500);
         let validator_stakes = vec![1_000_000; validator_num];
@@ -70,6 +76,7 @@ fn test_rounding_equal_stakes() {
         .unwrap();
         assert_eq!(dkg_rounding.wconfig, wconfig);
     }
+    println!("time={:?}", timer.elapsed());
 }
 
 #[test]
