@@ -7,6 +7,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
+    consensus_observer::{network::ObserverMessage, publisher::Publisher},
     counters,
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},
@@ -169,6 +170,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     payload_manager: Arc<PayloadManager>,
     proof_cache: ProofCache,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+    observer_network: Option<NetworkClient<ObserverMessage>>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -187,6 +189,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+        observer_network: Option<NetworkClient<ObserverMessage>>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -233,6 +236,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .time_to_live(Duration::from_secs(10))
                 .build(),
             rand_storage,
+            observer_network,
         }
     }
 
@@ -691,7 +695,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ))
         };
 
-        let (payload_manager, quorum_store_msg_tx) = quorum_store_builder.init_payload_manager();
+        let (payload_manager, quorum_store_msg_tx) = quorum_store_builder
+            .init_payload_manager(self.observer_network.clone().map(Publisher::new));
         self.quorum_store_msg_tx = quorum_store_msg_tx;
         self.payload_manager = payload_manager.clone();
 

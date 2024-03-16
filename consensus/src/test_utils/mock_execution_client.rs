@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    consensus_observer::publisher::Publisher,
     error::StateSyncError,
     network::{IncomingCommitRequest, IncomingRandGenRequest},
     payload_manager::PayloadManager,

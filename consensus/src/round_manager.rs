@@ -7,6 +7,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
     },
+    consensus_observer::network::ObserverMessage,
     counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
     error::{error_kind, VerifyError},
     liveness::{
