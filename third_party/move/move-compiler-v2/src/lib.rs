@@ -258,10 +258,9 @@ pub fn check_and_rewrite_pipeline<'a>(
         let env: &GlobalEnv = env;
         spec_checker::run_spec_checker(env)
     });
-    env_pipeline.add(
-        "check recursive struct definition",
-        |env| recursive_struct_checker::check_recursive_struct(env),
-    );
+    env_pipeline.add("check recursive struct definition", |env| {
+        recursive_struct_checker::check_recursive_struct(env)
+    });
     env_pipeline
 }
 

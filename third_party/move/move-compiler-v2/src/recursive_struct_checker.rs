@@ -79,7 +79,7 @@ impl<'a> RecursiveStructChecker<'a> {
             match field_env.get_type() {
                 Type::Struct(field_mod_id, field_struct_id, insts) => {
                     // check the field struct if it's not been checked, so that we only need to look at
-					// the type parameters later
+                    // the type parameters later
                     if field_mod_id == self.mod_env.get_id() && !checked.contains(&field_struct_id)
                     {
                         self.check_struct_as_required_by(
