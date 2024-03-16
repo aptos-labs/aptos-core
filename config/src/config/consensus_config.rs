@@ -69,6 +69,7 @@ pub struct ConsensusConfig {
     pub max_blocks_per_sending_request_quorum_store_override: u64,
     pub max_blocks_per_receiving_request: u64,
     pub max_blocks_per_receiving_request_quorum_store_override: u64,
+    pub broadcast_vote: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -283,6 +284,7 @@ impl Default for ConsensusConfig {
             max_blocks_per_sending_request_quorum_store_override: 10,
             max_blocks_per_receiving_request: 10,
             max_blocks_per_receiving_request_quorum_store_override: 100,
+            broadcast_vote: true,
         }
     }
 }
@@ -290,6 +292,10 @@ impl Default for ConsensusConfig {
 impl ConsensusConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         self.safety_rules.set_data_dir(data_dir);
+    }
+
+    pub fn enable_broadcast_vote(&mut self, enable: bool) {
+        self.broadcast_vote = enable;
     }
 
     pub fn max_blocks_per_sending_request(&self, quorum_store_enabled: bool) -> u64 {
