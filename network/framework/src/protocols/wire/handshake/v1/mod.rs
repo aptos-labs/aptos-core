@@ -154,9 +154,9 @@ impl ProtocolId {
     fn encoding(self) -> Encoding {
         match self {
             ProtocolId::ConsensusDirectSendJson | ProtocolId::ConsensusRpcJson => Encoding::Json,
-            ProtocolId::ConsensusDirectSendCompressed
-            | ProtocolId::ConsensusRpcCompressed
-            | ProtocolId::ConsensusObserverCompressed => Encoding::CompressedBcs(RECURSION_LIMIT),
+            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                Encoding::CompressedBcs(RECURSION_LIMIT)
+            },
             ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
                 Encoding::CompressedBcs(RECURSION_LIMIT)
             },
@@ -171,9 +171,9 @@ impl ProtocolId {
     /// Returns the compression client label based on the current protocol id
     fn get_compression_client(self) -> CompressionClient {
         match self {
-            ProtocolId::ConsensusDirectSendCompressed
-            | ProtocolId::ConsensusRpcCompressed
-            | ProtocolId::ConsensusObserverCompressed => CompressionClient::Consensus,
+            ProtocolId::ConsensusDirectSendCompressed | ProtocolId::ConsensusRpcCompressed => {
+                CompressionClient::Consensus
+            },
             ProtocolId::MempoolDirectSend => CompressionClient::Mempool,
             ProtocolId::DKGDirectSendCompressed | ProtocolId::DKGRpcCompressed => {
                 CompressionClient::DKG
