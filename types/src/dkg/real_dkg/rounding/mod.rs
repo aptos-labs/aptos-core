@@ -8,6 +8,8 @@ use std::{
     fmt,
     fmt::{Debug, Formatter},
 };
+use rayon::iter::IntoParallelIterator;
+use rayon::iter::ParallelIterator;
 
 pub fn total_weight_lower_bound(validator_stakes: &Vec<u64>) -> usize {
     // Each validator has at least 1 weight.
@@ -130,47 +132,28 @@ impl DKGRoundingProfile {
         assert!(secrecy_threshold_in_stake_ratio < reconstruct_threshold_in_stake_ratio);
         assert!(reconstruct_threshold_in_stake_ratio * U64F64::from_num(3) <= U64F64::from_num(2));
 
-        let mut weight_low = total_weight_min as u64;
-        let mut weight_high = total_weight_max as u64;
-        let mut best_profile = compute_profile_fixed_point(
-            validator_stakes,
-            weight_low,
-            secrecy_threshold_in_stake_ratio,
-        );
-
-        if is_valid_profile(&best_profile, reconstruct_threshold_in_stake_ratio) {
-            return best_profile;
-        }
-
-        // binary search for the minimum weight that satisfies the conditions
-        while weight_low <= weight_high {
-            let weight_mid = weight_low + (weight_high - weight_low) / 2;
+        let best_profile = (total_weight_min..=total_weight_max).into_par_iter().filter_map(|weight|{
             let profile = compute_profile_fixed_point(
                 validator_stakes,
-                weight_mid,
+                weight as u64,
                 secrecy_threshold_in_stake_ratio,
             );
-
             // Check if the current weight satisfies the conditions
             if is_valid_profile(&profile, reconstruct_threshold_in_stake_ratio) {
-                best_profile = profile;
-                weight_high = weight_mid - 1;
+                Some(profile)
             } else {
-                weight_low = weight_mid + 1;
+                None
             }
-        }
+        }).min_by_key(|p|p.validator_weights.iter().sum::<u64>());
 
-        // todo: remove once aptos-dkg supports 0 weights
-        if !is_valid_profile(&best_profile, reconstruct_threshold_in_stake_ratio) {
+        best_profile.unwrap_or_else(||{
             println!("[Randomness] Rounding error: failed to find a valid profile, using default");
-            return Self::default(
+            Self::default(
                 validator_stakes.len(),
                 secrecy_threshold_in_stake_ratio,
                 reconstruct_threshold_in_stake_ratio,
-            );
-        }
-
-        best_profile
+            )
+        })
     }
 
     pub fn default(
@@ -234,7 +217,6 @@ fn compute_profile_fixed_point(
         reconstruct_threshold_in_weights_fixed.to_num::<u64>();
     let stake_gap_fixed = stake_per_weight_fixed * delta_total_fixed / stake_sum_fixed;
     let reconstruct_threshold_in_stake_ratio = secrecy_threshold_in_stake_ratio + stake_gap_fixed;
-
     DKGRoundingProfile {
         validator_weights,
         secrecy_threshold_in_stake_ratio,
