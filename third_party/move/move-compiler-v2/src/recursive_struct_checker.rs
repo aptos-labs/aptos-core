@@ -101,7 +101,7 @@ impl<'a> RecursiveStructChecker<'a> {
                     }
                 },
                 Type::Primitive(_) | Type::TypeParameter(_) => {},
-                _ => panic!("invalid field type"),
+                _ => unreachable!("invalid field type"),
             }
             path.pop();
         }
