@@ -209,7 +209,7 @@ impl DagDriver {
 
             let highest_strong_links_round =
                 dag_reader.highest_strong_links_round(&self.epoch_state.verifier);
-            if new_round.saturating_sub(highest_strong_links_round) == 0 {
+            if new_round.abs_diff(highest_strong_links_round) > 5 {
                 debug!(
                     new_round = new_round,
                     highest_strong_link_round = highest_strong_links_round,

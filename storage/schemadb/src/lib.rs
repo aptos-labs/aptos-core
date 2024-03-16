@@ -247,8 +247,9 @@ impl DB {
             .with_label_values(&[&self.name])
             .start_timer();
         let rows_locked = batch.rows.lock();
-        let sampling_rate_pct = 1;
-        let sampled_kv_bytes = should_sample(sampling_rate_pct);
+        // let sampling_rate_pct = 1;
+        // let sampled_kv_bytes = should_sample(sampling_rate_pct);
+        let sampled_kv_bytes = false;
 
         let mut db_batch = rocksdb::WriteBatch::default();
         for (cf_name, rows) in rows_locked.iter() {

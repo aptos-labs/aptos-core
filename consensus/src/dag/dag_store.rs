@@ -595,11 +595,13 @@ impl DagStore {
             self.storage.save_certified_node(&node)?;
         }
 
-        debug!("Added node {}", node.id());
         self.payload_manager
             .prefetch_payload_data(node.payload(), node.metadata().timestamp());
 
-        self.dag.write().add_validated_node(node)
+        let id = node.id();
+        self.dag.write().add_validated_node(node)?;
+        debug!("Added node {}", id);
+        Ok(())
     }
 
     pub fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {
