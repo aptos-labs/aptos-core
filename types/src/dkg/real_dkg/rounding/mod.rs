@@ -142,35 +142,19 @@ impl DKGRoundingProfile {
             return best_profile;
         }
 
-        // binary search for the minimum weight that satisfies the conditions
-        while weight_low <= weight_high {
-            let weight_mid = weight_low + (weight_high - weight_low) / 2;
+        let profiles: Vec<(DKGRoundingProfile, bool)> = (weight_low..=weight_high).map(|weight_mid|{
             let profile = compute_profile_fixed_point(
                 validator_stakes,
                 weight_mid,
                 secrecy_threshold_in_stake_ratio,
             );
 
-            // Check if the current weight satisfies the conditions
-            if is_valid_profile(&profile, reconstruct_threshold_in_stake_ratio) {
-                best_profile = profile;
-                weight_high = weight_mid - 1;
-            } else {
-                weight_low = weight_mid + 1;
-            }
-        }
+            let valid = is_valid_profile(&profile, reconstruct_threshold_in_stake_ratio);
+            (profile, valid)
+        }).collect();
 
-        // todo: remove once aptos-dkg supports 0 weights
-        if !is_valid_profile(&best_profile, reconstruct_threshold_in_stake_ratio) {
-            println!("[Randomness] Rounding error: failed to find a valid profile, using default");
-            return Self::default(
-                validator_stakes.len(),
-                secrecy_threshold_in_stake_ratio,
-                reconstruct_threshold_in_stake_ratio,
-            );
-        }
-
-        best_profile
+        let (p, _) = profiles[0].clone();
+        p
     }
 
     pub fn default(
