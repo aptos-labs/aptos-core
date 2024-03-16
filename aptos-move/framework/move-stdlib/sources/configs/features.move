@@ -435,15 +435,6 @@ module std::features {
         is_enabled(MULTISIG_V2_ENHANCEMENT)
     }
 
-    /// The fast path feature for on-chain randomness.
-    ///
-    /// Lifetime: transient
-    const FAST_RANDOMNESS: u64 = 56;
-    public fun get_fast_randomness_feature(): u64 { FAST_RANDOMNESS }
-    public fun fast_randomness_enabled(): bool acquires Features {
-        is_enabled(FAST_RANDOMNESS)
-    }
-
 
     // ============================================================================================
     // Feature Flag Implementation

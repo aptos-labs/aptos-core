@@ -937,7 +937,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         )
         .map_err(NoRandomnessReason::SecretShareDecryptionFailed)?;
 
-        let fast_randomness_is_enabled = features.is_enabled(FeatureFlag::FAST_RANDOMNESS)
+        let fast_randomness_is_enabled = onchain_randomness_config.fast_randomness_enabled()
             && sk.fast.is_some()
             && pk.fast.is_some()
             && transcript.fast.is_some()
@@ -1075,15 +1075,18 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (rand_config, fast_rand_config) = match rand_configs {
             Ok((rand_config, fast_rand_config)) => (Some(rand_config), fast_rand_config),
             Err(reason) => {
-                if features.is_reconfigure_with_dkg_enabled() {
+                if onchain_randomness_config.randomness_enabled() {
                     error!(
-                        "[Randomness] start_new_epoch fail to generate rand_config: epoch={}, reason={:?}",
-                        epoch_state.epoch, reason
+                        "Failed to get randomness config for new epoch: {:?}",
+                        reason
                     );
                 }
                 (None, None)
             },
         };
+        if fast_rand_config.is_none() && onchain_randomness_config.fast_randomness_enabled() {
+            error!("Failed to get fast randomness config for new epoch");
+        }
 
         info!(
             "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, fast_rand_config={:?}",

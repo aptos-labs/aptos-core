@@ -1,15 +1,7 @@
 // Copyright © Aptos Foundation
 
 use crate::{
-    dkg::{
-        
-        real_dkg::rounding::{{
-            DKGRounding, FAST_PATH_SECRECY_THRESHOLD},
-        DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
-        },
-        DKGSessionMetadata, DKGTrait,
-    ,
-    },
+    dkg::{real_dkg::rounding::DKGRounding, DKGSessionMetadata, DKGTrait},
     on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{ValidatorConsensusInfo, ValidatorVerifier},
 };
@@ -70,11 +62,16 @@ pub fn build_dkg_pvss_config(
     cur_epoch: u64,
     secrecy_threshold: U64F64,
     reconstruct_threshold: U64F64,
+    maybe_fast_path_secrecy_threshold: Option<U64F64>,
     next_validators: &[ValidatorConsensusInfo],
 ) -> DKGPvssConfig {
     let validator_stakes: Vec<u64> = next_validators.iter().map(|vi| vi.voting_power).collect();
-    let dkg_rounding =
-        DKGRounding::new(&validator_stakes, secrecy_threshold, reconstruct_threshold, Some(FAST_PATH_SECRECY_THRESHOLD));
+    let dkg_rounding = DKGRounding::new(
+        &validator_stakes,
+        secrecy_threshold,
+        reconstruct_threshold,
+        maybe_fast_path_secrecy_threshold,
+    );
 
     println!(
         "[Randomness] rounding: epoch {} starts, profile = {:?}",
@@ -152,15 +149,17 @@ impl DKGTrait for RealDKG {
             .unwrap_or_else(OnChainRandomnessConfig::default_enabled);
         let secrecy_threshold = randomness_config
             .secrecy_threshold()
-            .unwrap_or_else(|| *DEFAULT_SECRECY_THRESHOLD);
+            .unwrap_or_else(|| *rounding::DEFAULT_SECRECY_THRESHOLD);
         let reconstruct_threshold = randomness_config
             .reconstruct_threshold()
-            .unwrap_or_else(|| *DEFAULT_RECONSTRUCT_THRESHOLD);
+            .unwrap_or_else(|| *rounding::DEFAULT_RECONSTRUCT_THRESHOLD);
+        let maybe_fast_path_secrecy_threshold = randomness_config.fast_path_secrecy_threshold();
 
         let pvss_config = build_dkg_pvss_config(
             dkg_session_metadata.dealer_epoch,
             secrecy_threshold,
             reconstruct_threshold,
+            maybe_fast_path_secrecy_threshold,
             &dkg_session_metadata.target_validator_consensus_infos_cloned(),
         );
         let verifier = ValidatorVerifier::new(dkg_session_metadata.dealer_consensus_infos_cloned());

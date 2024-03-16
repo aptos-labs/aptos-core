@@ -31,7 +31,6 @@ async fn validator_restart_during_dkg() {
 
             // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-            features.enable(FeatureFlag::FAST_RANDOMNESS);
             conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build()

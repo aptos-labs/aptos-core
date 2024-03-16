@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 
+use self::real_dkg::RealDKG;
 use crate::{
-    dkg::real_dkg::RealDKG,
     on_chain_config::{OnChainConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     validator_verifier::{ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct},
 };

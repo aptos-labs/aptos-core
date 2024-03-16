@@ -67,7 +67,6 @@ pub enum FeatureFlag {
     MAX_OBJECT_NESTING_CHECK = 53,
     KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
     MULTISIG_V2_ENHANCEMENT = 55,
-    FAST_RANDOMNESS = 56,
 }
 
 impl FeatureFlag {
@@ -121,7 +120,6 @@ impl FeatureFlag {
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
-            // FeatureFlag::FAST_RANDOMNESS,
         ]
     }
 }

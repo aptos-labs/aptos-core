@@ -222,6 +222,7 @@ pub struct RoundManager {
 }
 
 impl RoundManager {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         epoch_state: Arc<EpochState>,
         block_store: Arc<BlockStore>,
