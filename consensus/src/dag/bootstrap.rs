@@ -533,16 +533,11 @@ impl DagBootstrapper {
             ledger_info,
         )));
 
-        let initial_ledger_info = ledger_info_provider
-            .get_latest_ledger_info()
-            .ledger_info()
-            .clone();
-        let commit_round = initial_ledger_info.round();
+        let highest_committed_anchor_round =
+            ledger_info_provider.get_highest_committed_anchor_round();
         let initial_round = std::cmp::max(
             1,
-            initial_ledger_info
-                .round()
-                .saturating_sub(dag_window_size_config),
+            highest_committed_anchor_round.saturating_sub(dag_window_size_config),
         );
 
         let dag = monitor!("dag_store_new", {
@@ -582,7 +577,7 @@ impl DagBootstrapper {
             "dag_order_rule_new",
             Arc::new(Mutex::new(OrderRule::new(
                 self.epoch_state.clone(),
-                commit_round + 1,
+                highest_committed_anchor_round + 1,
                 dag.clone(),
                 anchor_election.clone(),
                 ordered_notifier.clone(),
