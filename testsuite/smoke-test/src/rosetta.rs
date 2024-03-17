@@ -47,6 +47,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{task::JoinHandle, time::Instant};
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
 
 const EPOCH_DURATION_S: u64 = 5;
 const DEFAULT_TRANSFER_AMOUNT: u64 = 20;
@@ -79,6 +80,7 @@ async fn setup_test(
     let (swarm, cli, faucet) = SwarmBuilder::new_local(1)
         .with_init_genesis_config(Arc::new(|genesis_config| {
             genesis_config.epoch_duration_secs = EPOCH_DURATION_S;
+            genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
         }))
         .with_init_config(config_fn)
         .with_aptos()
