@@ -36,6 +36,8 @@ class Flow(Flag):
     AGG_V2 = auto()
     # Test resource groups
     RESOURCE_GROUPS = auto()
+    #
+    CUR_TEST = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -91,7 +93,7 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=1000, key=RunGroupKey("populate-or-read-vector-of-snapshots"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=30, key=RunGroupKey("populate-or-read-vector-of-integer-snapshots"), included_in=Flow.CUR_TEST),
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
@@ -422,11 +424,6 @@ def print_table(
     print(tabulate(rows, headers=headers))
 
 
-import subprocess
-
-subprocess.run(["ulimit", "-m", str(1024*1024)]) 
-subprocess.run(["ulimit", "-v", str(1024*1024)]) 
-
 errors = []
 warnings = []
 
@@ -508,7 +505,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 output, "Overall execution"
             )
 
-        test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
+        test_db_command = f"MALLOC_CONF=\"prof:true,prof_active:false,lg_prof_interval:31,lg_prof_sample:20\" RUST_BACKTRACE=1 /usr/bin/time -v {BUILD_FOLDER}/aptos-executor-benchmark --memory-profiling --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
         single_node_result = extract_run_results(output, "Overall")

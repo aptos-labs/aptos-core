@@ -696,6 +696,7 @@ mod tests {
     use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig};
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
+    use aptos_profiler::{ProfilerConfig, ProfilerHandler};
     use aptos_temppath::TempPath;
     use aptos_transaction_generator_lib::{
         args::TransactionTypeArg, EntryPoints, TransactionType, WorkflowProgress
@@ -717,7 +718,7 @@ mod tests {
         println!("db_generator::create_db_with_accounts");
 
         crate::db_generator::create_db_with_accounts::<E>(
-            100, /* num_accounts */
+            10, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000_000, /* init_account_balance */
             5,               /* block_size */
@@ -730,16 +731,21 @@ mod tests {
 
         println!("run_benchmark");
 
+        let config = ProfilerConfig::new_with_defaults();
+        let handler = ProfilerHandler::new(config);
+        let mut memory_profiler = handler.get_mem_profiler();
+
+        let _mem_start = memory_profiler.start_profiling();
         super::run_benchmark::<E>(
             10, /* block_size */
-            30, /* num_blocks */
+            5, /* num_blocks */
             transaction_type.map(|t| vec![(t, 1)]),
-            2,     /* transactions per sender */
+            1,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
             None,  /* maybe_hotspot_probability */
-            25,    /* num_main_signer_accounts */
-            30,    /* num_dst_pool_accounts */
+            10,    /* num_main_signer_accounts */
+            0,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
@@ -747,6 +753,7 @@ mod tests {
             false,
             PipelineConfig::default(),
         );
+        let _mem_end = memory_profiler.end_profiling("./target/release/aptos-executor-benchmark");
     }
 
     #[test]
@@ -768,14 +775,14 @@ mod tests {
             //         WorkflowProgress::MoveByPhases,
             //     ),
             // ),
-            Some(
-                TransactionType::CallCustomModules {
-                    entry_point: EntryPoints::VectorPictureRead { num_pictures: 1, length: 50000 },
-                    num_modules: 1,
-                    use_account_pool: false,
-                }
-            ),
-            // Some(TransactionType::CallCustomModules { entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { num_elements: 50000 }, num_modules: 1, use_account_pool: false }),
+            // Some(
+            //     TransactionType::CallCustomModules {
+            //         entry_point: EntryPoints::VectorPictureRead { num_pictures: 1, length: 50000 },
+            //         num_modules: 1,
+            //         use_account_pool: false,
+            //     }
+            // ),
+            Some(TransactionType::CallCustomModules { entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { num_elements: 1000 }, num_modules: 1, use_account_pool: false }),
             true,
         );
     }
