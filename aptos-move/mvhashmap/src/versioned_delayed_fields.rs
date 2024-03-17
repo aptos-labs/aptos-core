@@ -58,7 +58,7 @@ enum VersionEntry<K: Clone> {
 // that update a given aggregator, alongside the corresponding entries.
 #[derive(Debug)]
 struct VersionedValue<K: Clone> {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<VersionEntry<K>>>,
+    versioned_map: Option<BTreeMap<TxnIndex, CachePadded<VersionEntry<K>>>>,
 
     // The value of the given aggregator prior to the block execution. None implies that
     // the aggregator did not exist prior to the block.
@@ -88,7 +88,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     // is known & provided to the constructor.
     fn new(base_value: Option<DelayedFieldValue>) -> Self {
         Self {
-            versioned_map: BTreeMap::new(),
+            versioned_map: None,
             base_value,
             // Enable the optimization to not wait on dependencies during reading by default.
             read_estimate_deltas: true,
@@ -99,7 +99,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         use EstimatedEntry::*;
         use VersionEntry::*;
 
-        match self.versioned_map.entry(txn_idx) {
+        match self.versioned_map.as_mut().expect("Versioned entry must exist when marking as estimate").entry(txn_idx) {
             Entry::Occupied(mut o) => {
                 let bypass = match &**o.get() {
                     Value(_, maybe_apply) => maybe_apply.clone().map_or(NoBypass, Bypass),
@@ -114,7 +114,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     }
 
     fn remove(&mut self, txn_idx: TxnIndex) {
-        let deleted_entry = self.versioned_map.remove(&txn_idx);
+        let deleted_entry = self.versioned_map.as_mut().expect("Entry must exist to be removed").remove(&txn_idx);
         // Entries should only be deleted if the transaction that produced them is
         // aborted and re-executed, but abort must have marked the entry as an Estimate.
         assert_matches!(
@@ -141,7 +141,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
             "Inserting Estimate is not allowed - must call mark_estimate"
         );
 
-        match self.versioned_map.entry(txn_idx) {
+        match self.versioned_map.get_or_insert_with(BTreeMap::new).entry(txn_idx) {
             Entry::Occupied(mut o) => {
                 if !match (&**o.get(), &entry) {
                     // These are the cases where the transaction behavior with respect to the
@@ -183,7 +183,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     fn insert_final_value(&mut self, txn_idx: TxnIndex, value: DelayedFieldValue) {
         use VersionEntry::*;
 
-        match self.versioned_map.entry(txn_idx) {
+        match self.versioned_map.get_or_insert_with(BTreeMap::new).entry(txn_idx) {
             Entry::Occupied(mut o) => {
                 match &**o.get() {
                     Value(v, _) => assert_eq!(v, &value),
@@ -205,8 +205,10 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         use VersionEntry::*;
 
         self.versioned_map
-            .range(0..next_idx_to_commit)
-            .next_back()
+            .as_ref()
+            .and_then(|versioned_map|
+                versioned_map.range(0..next_idx_to_commit).next_back()
+            )
             .map_or_else(
                 || {
                     self.base_value
@@ -298,7 +300,11 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         use MVDelayedFieldsError::*;
         use VersionEntry::*;
 
-        let mut iter = self.versioned_map.range(0..txn_idx);
+
+        let mut iter = match &self.versioned_map {
+            None => return self.base_value.clone().ok_or(PanicOr::Or(NotFound)).map(VersionedRead::Value),
+            Some(versioned_map) => versioned_map.range(0..txn_idx)
+        };
 
         iter.next_back().map_or_else(
             // No entries in versioned map, use base value.
@@ -522,11 +528,13 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
             let mut versioned_value = self
                 .values
                 .get_mut(&id)
-                .expect("Value in commit needs to be in the HashMap");
+                .expect("Value in commit needs to be in the Map");
             let entry_to_commit = versioned_value
                 .versioned_map
+                .as_ref()
+                .expect("Value in commit needs to have initialized Map")
                 .get(&idx_to_commit)
-                .expect("Value in commit at that transaction version needs to be in the HashMap");
+                .expect("Value in commit at that transaction version needs to be in the Map");
 
             let new_entry = match &**entry_to_commit {
                 VersionEntry::Value(_, None) => None,
@@ -923,7 +931,7 @@ mod test {
 
         // Marking an Estimate (first we confirm) as estimate is not allowed.
         assert_matches!(
-            &**v.versioned_map
+            &**assert_some!(v.versioned_map.as_ref())
                 .get(&3)
                 .expect("Expecting an Estimate entry"),
             VersionEntry::Estimate(EstimatedEntry::NoBypass)
@@ -962,7 +970,7 @@ mod test {
         assert_read_aggregator_value!(v.read(5), 45);
 
         v.mark_estimate(3);
-        let val_bypass = v.versioned_map.get(&3);
+        let val_bypass = assert_some!(v.versioned_map.as_ref()).get(&3);
         assert_some!(val_bypass);
         assert_matches!(
             &**val_bypass.unwrap(),
@@ -974,7 +982,7 @@ mod test {
         assert_read_aggregator_value!(v.read(5), 70);
 
         v.mark_estimate(4);
-        let delta_bypass = v.versioned_map.get(&4);
+        let delta_bypass = assert_some!(v.versioned_map.as_ref()).get(&4);
         assert_some!(delta_bypass);
         assert_matches!(
             &**delta_bypass.unwrap(),
@@ -986,7 +994,7 @@ mod test {
         assert_read_aggregator_value!(v.read(5), 70);
 
         v.mark_estimate(2);
-        let val_no_bypass = v.versioned_map.get(&2);
+        let val_no_bypass = assert_some!(v.versioned_map.as_ref()).get(&2);
         assert_some!(val_no_bypass);
         assert_matches!(
             &**val_no_bypass.unwrap(),
@@ -1028,7 +1036,7 @@ mod test {
             assert_read_snapshot_value!(v.read(7), 13);
 
             v.mark_estimate(6);
-            let val_no_bypass = v.versioned_map.get(&6);
+            let val_no_bypass = assert_some!(v.versioned_map.as_ref()).get(&6);
             assert_some!(val_no_bypass);
             assert_matches!(
                 &**val_no_bypass.unwrap(),
@@ -1052,7 +1060,7 @@ mod test {
             assert_read_snapshot_value!(v.read(9), 13);
 
             v.mark_estimate(8);
-            let snapshot_bypass = v.versioned_map.get(&8);
+            let snapshot_bypass = assert_some!(v.versioned_map.as_ref()).get(&8);
             assert_some!(snapshot_bypass);
             assert_matches!(
                 &**snapshot_bypass.unwrap(),
@@ -1088,7 +1096,7 @@ mod test {
             assert_read_derived_value!(v.read(7), vec![70, 80, 90]);
 
             v.mark_estimate(6);
-            let val_no_bypass = v.versioned_map.get(&6);
+            let val_no_bypass = assert_some!(v.versioned_map.as_ref()).get(&6);
             assert_some!(val_no_bypass);
             assert_matches!(
                 &**val_no_bypass.unwrap(),
@@ -1112,7 +1120,7 @@ mod test {
             assert_read_derived_value!(v.read(10), vec![70, 80, 90]);
 
             v.mark_estimate(8);
-            let snapshot_bypass = v.versioned_map.get(&8);
+            let snapshot_bypass = assert_some!(v.versioned_map.as_ref()).get(&8);
             assert_some!(snapshot_bypass);
             assert_matches!(
                 &**snapshot_bypass.unwrap(),
