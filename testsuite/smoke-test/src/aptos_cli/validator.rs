@@ -27,8 +27,8 @@ use aptos_types::{
     network_address::DnsName,
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, ExecutionConfigV1, LeaderReputationType,
-        OnChainConsensusConfig, OnChainExecutionConfig, ProposerAndVoterConfig,
-        ProposerElectionType, TransactionShufflerType, ValidatorSet,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
+        ProposerAndVoterConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
     },
     PeerId,
 };
@@ -39,7 +39,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
 
 #[tokio::test]
 async fn test_analyze_validators() {
@@ -556,7 +555,8 @@ async fn test_large_total_stake() {
             genesis_config.epoch_duration_secs = 4;
             genesis_config.recurring_lockup_duration_secs = 4;
             genesis_config.voting_duration_secs = 3;
-            genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::default_disabled());
+            genesis_config.randomness_config_override =
+                Some(OnChainRandomnessConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
