@@ -33,7 +33,7 @@ At a high level, the builder works as follows. By default, the builder builds al
 1. One of `aptos-node-builder`, `indexer-builder`, or `tools-builder` targets are invoked depending on what image is being built.
 2. The target image is built by copying the output of either the `aptos-node-builder` or `tools-builder` target into the target image.
 
-The `aptos-node-builder` is separate from the the other builder targets because it allows to build different `aptos-node` binary variants with different features and profiles.
+The `aptos-node-builder` is separate from the other builder targets because it allows to build different `aptos-node` binary variants with different features and profiles.
 
 Using a builder step allows us to cache the build artifacts and reuse them across different images. Our binaries have a lot of common dependencies, so this is a significant time saver. Furthermore, most `RUN` instructions use a cache mount that allows us to cache the output of the command leading to significant build time improvements.
 

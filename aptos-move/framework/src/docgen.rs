@@ -37,7 +37,7 @@ pub struct DocgenOptions {
     /// Package-relative path to an optional markdown template which is a used to create a
     /// landing page. Placeholders in this file are substituted as follows: `> {{move-toc}}` is
     /// replaced by a table of contents of all modules; `> {{move-index}}` is replaced by an index,
-    /// and `> {{move-include NAME_OF_MODULE_OR_SCRIP}}` is replaced by the the full
+    /// and `> {{move-include NAME_OF_MODULE_OR_SCRIP}}` is replaced by the full
     /// documentation of the named entity. (The given entity will not longer be placed in
     /// its own file, so this can be used to create a single manually populated page for
     /// the package.)

@@ -294,7 +294,7 @@ pub fn get_app_name() -> Result<String, AptosLedgerError> {
     }
 }
 
-/// Returns the the batch/HashMap of the accounts for the account index in index_range
+/// Returns the batch/HashMap of the accounts for the account index in index_range
 /// Note: We only allow a range of 10 for performance purpose
 ///
 /// # Arguments
