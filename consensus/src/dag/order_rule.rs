@@ -36,6 +36,8 @@ pub struct OrderRule {
     anchor_election: Arc<dyn AnchorElection>,
     notifier: Arc<dyn OrderedNotifier>,
     dag_window_size_config: Round,
+    current_instance: usize,
+    max_instances: usize,
 }
 
 impl OrderRule {
@@ -56,9 +58,10 @@ impl OrderRule {
                 .all(|w| (w[0].epoch(), w[0].round()) < (w[1].epoch(), w[1].round())));
             for event in commit_events {
                 if event.epoch() == epoch_state.epoch {
+                    let anchor_round = event.round() / epoch_state.verifier.len() as u64;
                     let maybe_anchor = dag
                         .read()
-                        .get_node_by_round_author(event.round(), event.author())
+                        .get_node_by_round_author(anchor_round, event.author())
                         .cloned();
                     if let Some(anchor) = maybe_anchor {
                         dag.write()
@@ -77,12 +80,14 @@ impl OrderRule {
         }
 
         let mut order_rule = Self {
+            max_instances: anchor_election.get_max_instances(),
             epoch_state,
             lowest_unordered_anchor_round,
             dag,
             anchor_election,
             notifier,
             dag_window_size_config,
+            current_instance: 0,
         };
 
         // re-check if anything can be ordered to recover pending anchors
@@ -118,17 +123,29 @@ impl OrderRule {
 
     /// From the start round until the target_round, try to find if there's any anchor has enough votes to trigger ordering
     fn find_first_anchor_with_enough_votes(
-        &self,
+        &mut self,
         mut start_round: Round,
         target_round: Round,
     ) -> Option<Arc<CertifiedNode>> {
         let dag_reader = self.dag.read();
         while start_round < target_round {
-            let anchor_author = self.anchor_election.get_anchor(start_round);
+            let anchor_author = self
+                .anchor_election
+                .get_anchor_at_round_instance(start_round, self.current_instance);
             // I "think" it's impossible to get ordered/committed node here but to double check
-            if let Some(anchor_node) =
-                dag_reader.get_node_by_round_author(start_round, &anchor_author)
-            {
+            if let Some(anchor_node_status) = dag_reader.get_node_ref(start_round, &anchor_author) {
+                // It is possible that the anchor is already ordered
+                if matches!(anchor_node_status, NodeStatus::Ordered(_)) {
+                    if self.current_instance == self.max_instances - 1 {
+                        self.lowest_unordered_anchor_round = start_round + 1;
+                        self.current_instance = 0;
+                        start_round = start_round + 1;
+                    } else {
+                        self.current_instance += 1;
+                    }
+                    continue;
+                }
+                let anchor_node = anchor_node_status.as_node();
                 // f+1 or 2f+1?
                 if dag_reader
                     .check_votes_for_node(anchor_node.metadata(), &self.epoch_state.verifier)
@@ -155,7 +172,10 @@ impl OrderRule {
         let anchor_round = current_anchor.round();
         let is_anchor = |metadata: &NodeMetadata| -> bool {
             Self::check_parity(metadata.round(), anchor_round)
-                && *metadata.author() == self.anchor_election.get_anchor(metadata.round())
+                && *metadata.author()
+                    == self
+                        .anchor_election
+                        .get_anchor_at_round_instance(metadata.round(), self.current_instance)
         };
         while let Some(prev_anchor) = dag_reader
             .reachable(
@@ -233,7 +253,26 @@ impl OrderRule {
             ordered_nodes.len()
         );
 
-        self.lowest_unordered_anchor_round = anchor.round() + 1;
+        if self.lowest_unordered_anchor_round != anchor.round() {
+            // If an anchor was missing in the lowest unordered anchor round, then we should move to
+            // either the current anchor round or the next round.
+            if self.current_instance == self.max_instances - 1 {
+                self.lowest_unordered_anchor_round = anchor.round() + 1;
+                self.current_instance = 0;
+            } else {
+                self.lowest_unordered_anchor_round = anchor.round();
+                self.current_instance += 1;
+            }
+        } else {
+            // Only update the lowest unordered anchor round after ordering all instances in that
+            // round
+            if self.current_instance == self.max_instances - 1 {
+                self.lowest_unordered_anchor_round = anchor.round() + 1;
+                self.current_instance = 0;
+            } else {
+                self.current_instance += 1;
+            }
+        }
         self.notifier
             .send_ordered_nodes(ordered_nodes, failed_authors_and_rounds);
     }
