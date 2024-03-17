@@ -57,7 +57,7 @@ impl RoundState {
                     "current round too low"
                 );
                 // the receiver can be dropped if we move to a new epoch
-                let _ = self.event_sender.send(highest_strong_links_round + 1);
+                let _ = self.event_sender.send(current_round + 1);
             },
             Ordering::Equal => self.responsive_check.check_for_new_round(
                 highest_strong_links_round,
