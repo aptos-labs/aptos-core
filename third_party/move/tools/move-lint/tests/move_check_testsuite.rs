@@ -26,7 +26,6 @@ pub fn run_test(path: &Path, exp_path: &Path, out_path: &Path) -> anyhow::Result
 
 // Runs all tests under the test/testsuite directory.
 pub fn run_test_inner(path: &Path, exp_path: &Path, out_path: &Path) -> anyhow::Result<()> {
-    eprintln!("Running test: {}", path.display());
     let (diags, files) = move_lint::move_lint(path.to_path_buf());
     let has_diags = !diags.is_empty();
     let mut writer = Buffer::no_color();

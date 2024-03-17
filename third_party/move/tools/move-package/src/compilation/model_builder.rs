@@ -134,7 +134,8 @@ impl ModelBuilder {
         )
     }
 
-        pub fn build_model_v2(&self) -> Result<GlobalEnv> {
+    //This is the same as build_model, but with compile_via_model set to true because we attached bytecode to the model for the purpose of linting, particularly for the unused_borrow_global_mut linter.
+    pub fn build_model_v2(&self) -> Result<GlobalEnv> {
         // Make sure no renamings have been performed
         if let Some(pkg_name) = self.resolution_graph.contains_renaming() {
             anyhow::bail!(

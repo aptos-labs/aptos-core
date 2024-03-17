@@ -35,7 +35,7 @@ impl UnnecessaryTypeConversionVisitor {
         diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         let message = &format!(
-            "Unnecessary type conversion detected. '{}' is already of type '{}'. Avoid casting it to its own type.",
+            "Unnecessary type conversion detected. `{}` is already of type `{}`. Avoid casting it to its own type.",
             var_name,
             ty
         );

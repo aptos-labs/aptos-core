@@ -15,8 +15,6 @@ pub mod utils;
 
 /// Focused on the compiling move code into GlobalEnv
 pub mod build;
-use std::path::PathBuf;
-
 use self::{
     manager::VisitorManager,
     rules::{
@@ -42,11 +40,18 @@ use self::{
         unnecessary_while_true::UnnecessaryWhileTrueVisitor,
         unused_borrow_global_mut::UnusedBorrowGlobalMutVisitor, use_mul_div::UseMulDivLint,
     },
-    utils::read_config,
+    utils::read_config_or_default,
 };
+use crate::lint::utils::LintConfig;
+use codespan::{FileId, Files};
+use codespan_reporting::diagnostic::Diagnostic;
+use std::path::PathBuf;
 
-pub fn main(path: PathBuf) {
-    let lint_config = read_config(&path).expect("Failed to read config file.");
+pub fn main(path: PathBuf) -> (Vec<Diagnostic<FileId>>, Files<String>) {
+    let lint_config = read_config_or_default(&path).unwrap_or_else(|e| {
+        eprintln!("Failed to read config file: `{}`", e);
+        LintConfig::default()
+    });
     let env = build::build_ast(Some(path))
         .expect("Failed to initialize environment. Expected a valid path with necessary data.");
     let mut manager = VisitorManager::new(vec![
@@ -81,5 +86,8 @@ pub fn main(path: PathBuf) {
         OverflowMultiplicationDetectorVisitor::visitor(),
     ]);
 
+    let diags = manager.diagnostics();
+    let files = env.0.model.get_source_files();
     manager.run(env, &lint_config);
+    (diags, files)
 }

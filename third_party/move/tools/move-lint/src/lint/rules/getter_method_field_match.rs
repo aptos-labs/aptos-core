@@ -149,7 +149,7 @@ impl GetterMethodFieldMatchLint {
         diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         let message = format!(
-            "Getter method '{}' returns a field '{}' which does not match its name.",
+            "Getter method `{}` returns a field `{}` which does not match its name.",
             method_name,
             field_env.get_name().display(module_env.symbol_pool())
         );
@@ -176,7 +176,7 @@ impl GetterMethodFieldMatchLint {
         diags: &mut Vec<Diagnostic<FileId>>,
     ) {
         let message = format!(
-            "Getter method '{}' does not return required field.",
+            "Getter method `{}` does not return required field.",
             method_name
         );
         add_diagnostic_and_emit(

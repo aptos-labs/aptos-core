@@ -177,7 +177,7 @@ fn render_diagnostic(
         secondary_labels,
         notes,
     } = diag;
-    let mut diag = csr::diagnostic::Diagnostic::new(csr::diagnostic::Severity::Warning);
+    let mut diag = csr::diagnostic::Diagnostic::new(info.severity().into_codespan_severity());
     let (code, message) = info.render();
     diag = diag.with_code(code);
     diag = diag.with_message(message);

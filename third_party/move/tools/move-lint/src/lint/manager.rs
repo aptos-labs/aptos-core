@@ -16,6 +16,10 @@ impl VisitorManager {
         }
     }
 
+    /// Runs all registered linters on the given environment.
+    /// This method will visit each module and function within the environment with each registered linter
+    /// The env tuple contains 2 CompiledModel, one for the bytecode attched and one for the bytecode not attatched.
+    /// The reason for this is that some linters require bytecode inspection and some don't.
     pub fn run(&mut self, env: (CompiledModel, CompiledModel), lint_config: &LintConfig) {
         for module_env in env
             .0
@@ -65,7 +69,7 @@ impl VisitorManager {
         }
     }
 
-    pub fn diagnostics(&self) -> &Vec<Diagnostic<FileId>> {
-        &self.diagnostics
+    pub fn diagnostics(&self) -> Vec<Diagnostic<FileId>> {
+        self.diagnostics.clone()
     }
 }

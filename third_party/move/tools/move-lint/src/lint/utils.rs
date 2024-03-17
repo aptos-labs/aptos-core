@@ -1,5 +1,5 @@
-use codespan::FileId;
-use codespan::Span;
+use anyhow::Ok;
+use codespan::{FileId, Span};
 use codespan_reporting::{
     diagnostic::{Diagnostic, Label},
     term::{
@@ -10,10 +10,10 @@ use codespan_reporting::{
 };
 use move_model::model::{GlobalEnv, Parameter};
 use serde::{Deserialize, Serialize};
-use std::io::{Read, Write};
-use std::{fs::OpenOptions, path::Path};
+use std::{fs::OpenOptions, io::Read, path::Path};
 use toml;
 
+// LintConfig is a struct that holds the default configuration for the linter.
 #[derive(Deserialize, Serialize, Debug)]
 pub struct LintConfig {
     pub statement_count: usize,
@@ -89,25 +89,23 @@ pub fn add_diagnostic_and_emit_by_span(
 pub fn get_var_info_from_func_param(index: usize, params: &[Parameter]) -> Option<&Parameter> {
     params.get(index)
 }
-pub fn read_config(path: &Path) -> Result<LintConfig, Box<dyn std::error::Error>> {
-    eprintln!("Reading config from path: {:?}", path);
+
+pub fn read_config_or_default(path: &Path) -> Result<LintConfig, anyhow::Error> {
     let binding = path.join("lint.toml");
     let exist_path = Path::new(&binding);
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(exist_path)?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)?;
-    if content.is_empty() {
-        let default_config = LintConfig::default();
-        let default_content = toml::to_string(&default_config)?;
-        file.write_all(default_content.as_bytes())?;
-        file.flush()?;
-        content = default_content.to_string();
-    }
-    let config: LintConfig = toml::from_str(&content)?;
+    if exist_path.exists() {
+        let mut file = OpenOptions::new().read(true).open(exist_path)?;
 
-    Ok(config)
+        let mut content = String::new();
+        file.read_to_string(&mut content)?;
+
+        if content.is_empty() {
+            Ok(LintConfig::default())
+        } else {
+            let config: LintConfig = toml::from_str(&content)?;
+            Ok(config)
+        }
+    } else {
+        Ok(LintConfig::default())
+    }
 }

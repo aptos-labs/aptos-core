@@ -37,7 +37,7 @@ impl UnmodifiedMutableArgumentLint {
         for param in func_env.get_parameters().iter() {
             if param.1.is_mutable_reference() && !self.is_argument_modified(param, func_env) {
                 let message = format!(
-                    "Mutable parameter '{}' is never modified in function '{}'.",
+                    "Mutable parameter `{}` is never modified in function `{}`.",
                     param.0.display(func_env.symbol_pool()),
                     func_env.get_name().display(func_env.symbol_pool())
                 );

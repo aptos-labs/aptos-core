@@ -11,6 +11,11 @@ module NamedAddr::Detector {
         if (!x) {};
         if (true == x) {};
         if (condition() == true) {};
+
+        if ((condition() && x == true) && (!x == false)){};
+        let y = (x == true);
+        if (true == condition()) {};
+        if (condition() == true) {};
     }
 
     fun condition(): bool {
