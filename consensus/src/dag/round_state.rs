@@ -13,6 +13,7 @@ use aptos_consensus_types::common::Round;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::debug;
 use aptos_types::epoch_state::EpochState;
+use log::debug;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 
@@ -81,6 +82,7 @@ impl RoundState {
             new_round
         );
         *current_round = new_round;
+        debug!(round = new_round, "round state: reset");
         self.responsive_check.reset();
         Ok(())
     }
@@ -181,6 +183,10 @@ impl ResponsiveCheck for AdaptiveResponsive {
     ) {
         let mut inner = self.inner.lock();
         if matches!(inner.state, State::Sent) {
+            debug!(
+                round = highest_strong_links_round,
+                "adaptive responsive: already sent"
+            );
             return;
         }
         let new_round = highest_strong_links_round + 1;
@@ -207,7 +213,7 @@ impl ResponsiveCheck for AdaptiveResponsive {
             wait_power = self.wait_voting_power,
             round = highest_strong_links_round,
             is_health_backoff = is_health_backoff,
-            "check for new round"
+            "adaptive responsive: check for new round"
         );
 
         // voting power >= 90% and pass wait time if health backoff
