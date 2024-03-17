@@ -35,8 +35,11 @@ use aptos_rosetta::{
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
 use aptos_types::{
-    account_address::AccountAddress, account_config::CORE_CODE_ADDRESS, chain_id::ChainId,
-    on_chain_config::GasScheduleV2, transaction::SignedTransaction,
+    account_address::AccountAddress,
+    account_config::CORE_CODE_ADDRESS,
+    chain_id::ChainId,
+    on_chain_config::{GasScheduleV2, OnChainRandomnessConfig},
+    transaction::SignedTransaction,
 };
 use serde_json::json;
 use std::{
@@ -47,7 +50,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::{task::JoinHandle, time::Instant};
-use aptos_types::on_chain_config::OnChainRandomnessConfig;
 
 const EPOCH_DURATION_S: u64 = 5;
 const DEFAULT_TRANSFER_AMOUNT: u64 = 20;
