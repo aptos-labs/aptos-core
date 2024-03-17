@@ -218,7 +218,6 @@ fn create_node_for_fuzzing() -> RoundManager {
         ConsensusConfig::default(),
         OnChainRandomnessConfig::default_enabled(),
         OnChainJWKConsensusConfig::default_enabled(),
-        true,
         None,
     )
 }

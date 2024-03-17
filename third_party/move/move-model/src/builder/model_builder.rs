@@ -405,10 +405,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Looks up the StructEntry for a qualified id.
     pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
-        let struct_name = self
-            .reverse_struct_table
-            .get(&(id.module_id, id.id))
-            .expect("invalid Type::Struct");
+        let struct_name = self.get_struct_name(id);
         self.struct_table
             .get(struct_name)
             .expect("invalid Type::Struct")
@@ -470,6 +467,13 @@ impl<'env> ModelBuilder<'env> {
                 }
             }
         }
+    }
+
+    /// Gets the name of the struct
+    fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
+        self.reverse_struct_table
+            .get(&(qid.module_id, qid.id))
+            .expect("invalid Type::Struct")
     }
 
     // Generate warnings about unused schemas.
