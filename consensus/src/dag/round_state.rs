@@ -13,7 +13,6 @@ use aptos_consensus_types::common::Round;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::debug;
 use aptos_types::epoch_state::EpochState;
-use log::debug;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
 
@@ -41,10 +40,10 @@ impl RoundState {
         strong_links: Vec<NodeCertificate>,
         minimum_delay: Duration,
     ) {
-        let current_round = *self.current_round.lock();
+        let current_round = self.current_round.lock();
 
         debug!(
-            round = current_round,
+            round = *current_round,
             highest = highest_strong_links_round,
             "check for new round"
         );
@@ -53,12 +52,12 @@ impl RoundState {
             // we're behind, move forward immediately
             Ordering::Less => {
                 debug!(
-                    round = current_round,
+                    round = *current_round,
                     highest = highest_strong_links_round,
                     "current round too low"
                 );
                 // the receiver can be dropped if we move to a new epoch
-                let _ = self.event_sender.send(current_round + 1);
+                let _ = self.event_sender.send(*current_round + 1);
             },
             Ordering::Equal => self.responsive_check.check_for_new_round(
                 highest_strong_links_round,
@@ -67,10 +66,6 @@ impl RoundState {
             ),
             Ordering::Greater => (),
         }
-    }
-
-    pub fn current_round(&self) -> Round {
-        *self.current_round.lock()
     }
 
     pub fn set_current_round(&self, new_round: Round) -> anyhow::Result<()> {
