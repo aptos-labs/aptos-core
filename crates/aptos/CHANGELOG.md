@@ -3,6 +3,7 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+- Use `self_update` crate rev `8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b`.
 
 ## [3.0.2] - 2024/03/12
 - Increased `max_connections` for postgres container created as part of local testnet to address occasional startup failures due to overloaded DB.
