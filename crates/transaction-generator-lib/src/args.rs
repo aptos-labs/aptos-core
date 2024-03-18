@@ -584,7 +584,7 @@ impl TransactionTypeArg {
                     flow_type: crate::EconiaFlowType::Real,
                     num_markets: 2,
                     reuse_accounts_for_orders: true,
-                    publish_packages: true,
+                    publish_packages: false,
                 },
                 progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
                 num_modules: module_working_set_size,
