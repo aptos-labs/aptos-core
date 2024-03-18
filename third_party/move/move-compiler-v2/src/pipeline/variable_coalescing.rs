@@ -8,7 +8,7 @@
 //! - livevar annotation is available by performing liveness analysis.
 //! - copy inference is already performed.
 //! - it is preferable, but not required, to have run dead store elimination (so that
-//!   dead stores do not hold up variable slots).
+//!   dead stores do not consume and retain variable slots).
 //! side effect: this transformation removes all pre-existing annotations.
 //!
 //! This transformation is closely related to the register allocation problem in
