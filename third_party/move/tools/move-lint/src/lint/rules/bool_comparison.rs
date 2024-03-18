@@ -2,7 +2,7 @@
 //! equality (==) or inequality (!=) operators and provides suggestions to simplify the comparisons.
 //! Examples: if (x == true) can be simplified to if (x), if (x == false) can be simplified to if (!x)
 use crate::lint::{
-    utils::{add_diagnostic_and_emit, get_var_info_from_func_param, LintConfig},
+    utils::{add_diagnostic_and_emit, get_var_name_or_func_name_from_exp, LintConfig},
     visitor::ExpressionAnalysisVisitor,
 };
 use codespan::FileId;
@@ -28,35 +28,6 @@ impl BoolComparisonVisitor {
         Box::new(Self::new())
     }
 
-    // Get the variable name or function name from a given expression. This will be used to
-    // print out the message for this lint.
-    fn get_var_name_or_func_name_from_exp(
-        &mut self,
-        exp: &ExpData,
-        func_env: &FunctionEnv,
-        env: &GlobalEnv,
-    ) -> Option<String> {
-        match exp {
-            ExpData::Temporary(_, index) => {
-                let parameters = func_env.get_parameters();
-                let param = get_var_info_from_func_param(*index, &parameters)
-                    .expect("variable information not found");
-                Some(env.symbol_pool().string(param.0).to_string())
-            },
-            ExpData::LocalVar(_, sym) => Some(env.symbol_pool().string(*sym).to_string()),
-            ExpData::Call(_, Operation::MoveFunction(module_id, func_id), _) => {
-                let module = env.get_module(*module_id);
-                let func_env = module.get_function(*func_id);
-                let func_name = func_env
-                    .get_name()
-                    .display(func_env.symbol_pool())
-                    .to_string();
-                Some(func_name)
-            },
-            _ => None,
-        }
-    }
-
     // This function examines the provided expression to identify if it contains a comparison
     // between a boolean value and a variable (either a temporary or a local variable). If such
     // a comparison is found, it generates a diagnostic message suggesting a more direct
@@ -77,8 +48,7 @@ impl BoolComparisonVisitor {
                     ExpData::Temporary(_, _) | ExpData::LocalVar(_, _),
                 ) = (first_arg.as_ref(), second_arg.as_ref())
                 {
-                    let var_name = self
-                        .get_var_name_or_func_name_from_exp(second_arg, func_env, env)
+                    let var_name = get_var_name_or_func_name_from_exp(second_arg, func_env, env)
                         .expect("Expected to get a variable name");
 
                     let diagnostic_msg = match (oper, a) {
@@ -87,7 +57,7 @@ impl BoolComparisonVisitor {
                             var_name, a
                         )),
                         (Operation::Eq, false) | (Operation::Neq, true) => Some(format!(
-                            "Use `!{}` directly instead of comparing it to `{}`.",
+                            "Use `!{}` directly instead of qcomparing it to `{}`.",
                             var_name, a
                         )),
                         _ => None,
@@ -111,9 +81,9 @@ impl BoolComparisonVisitor {
                         if !*b {
                             // Check if the comparison is with false
                             if let Some(neg_var) = neg_args.get(0) {
-                                let var_name = self
-                                    .get_var_name_or_func_name_from_exp(neg_var, func_env, env)
-                                    .expect("Expected to get a variable name");
+                                let var_name =
+                                    get_var_name_or_func_name_from_exp(neg_var, func_env, env)
+                                        .expect("Expected to get a variable name");
 
                                 let diagnostic_msg = format!(
                                     "Use `{}` directly instead of `!{} == false`.",
@@ -152,14 +122,13 @@ impl BoolComparisonVisitor {
                 if is_comparison_with_true(first_arg.as_ref())
                     || is_comparison_with_true(second_arg.as_ref())
                 {
-                    let (literal_arg, other_arg) = if is_comparison_with_true(first_arg.as_ref()) {
+                    let (_, other_arg) = if is_comparison_with_true(first_arg.as_ref()) {
                         (first_arg, second_arg)
                     } else {
                         (second_arg, first_arg)
                     };
                     if is_function_or_variable(other_arg.as_ref()) {
-                        let var_name = self
-                            .get_var_name_or_func_name_from_exp(other_arg, func_env, env)
+                        let var_name = get_var_name_or_func_name_from_exp(other_arg, func_env, env)
                             .expect("Expected to get a variable or function name");
                         let var_type = if matches!(
                             other_arg.as_ref(),
@@ -170,7 +139,7 @@ impl BoolComparisonVisitor {
                             "variable"
                         };
                         let use_directly = var_type == "variable" || oper == &Operation::Eq;
-                        let diagnostic_msg: String; // Define as mutable String
+                        let diagnostic_msg: String;
 
                         if var_type == "variable" {
                             diagnostic_msg = if use_directly {

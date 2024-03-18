@@ -28,6 +28,7 @@ use self::{
         infinite_loop_detector::InfiniteLoopDetectorVisitor,
         meaningless_math_operations::MeaninglessMathOperationsVisitor,
         multiplication_before_division::MultiplicationBeforeDivisionVisitor,
+        needless_bool::NeedlessBoolVisitor,
         out_of_bounds_array_indexing::OutOfBoundsArrayIndexingVisitor,
         overflow_multiplication_detector::OverflowMultiplicationDetectorVisitor,
         redundant_deref_ref::RedundantDerefRefVisitor,
@@ -84,6 +85,7 @@ pub fn main(path: PathBuf) -> (Vec<Diagnostic<FileId>>, Files<String>) {
         UnnecessaryWhileTrueVisitor::visitor(),
         InfiniteLoopDetectorVisitor::visitor(),
         OverflowMultiplicationDetectorVisitor::visitor(),
+        NeedlessBoolVisitor::visitor(),
     ]);
 
     let diags = manager.diagnostics();

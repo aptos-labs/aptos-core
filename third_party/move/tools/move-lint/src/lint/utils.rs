@@ -8,7 +8,10 @@ use codespan_reporting::{
         Config,
     },
 };
-use move_model::model::{GlobalEnv, Parameter};
+use move_model::{
+    ast::{ExpData, Operation},
+    model::{FunctionEnv, GlobalEnv, Parameter},
+};
 use serde::{Deserialize, Serialize};
 use std::{fs::OpenOptions, io::Read, path::Path};
 use toml;
@@ -26,6 +29,47 @@ impl Default for LintConfig {
             statement_count: 10,
             usage_frequency: 2,
         }
+    }
+}
+
+// Get the variable name or function name from a given expression. This will be used to
+// print out the message for this lint.
+pub fn get_var_name_or_func_name_from_exp(
+    exp: &ExpData,
+    func_env: &FunctionEnv,
+    env: &GlobalEnv,
+) -> Option<String> {
+    match exp {
+        ExpData::Temporary(_, index) => {
+            let parameters = func_env.get_parameters();
+            let param = get_var_info_from_func_param(*index, &parameters)
+                .expect("variable information not found");
+            Some(env.symbol_pool().string(param.0).to_string())
+        },
+        ExpData::LocalVar(_, sym) => Some(env.symbol_pool().string(*sym).to_string()),
+        ExpData::Call(_, Operation::MoveFunction(module_id, func_id), _) => {
+            let module = env.get_module(*module_id);
+            let func_env = module.get_function(*func_id);
+            let func_name = func_env
+                .get_name()
+                .display(func_env.symbol_pool())
+                .to_string();
+            Some(func_name)
+        },
+        ExpData::Call(_, Operation::Not, vec_exp) => {
+            if vec_exp.len() == 1 {
+                let var_name =
+                    get_var_name_or_func_name_from_exp(vec_exp.get(0).unwrap(), func_env, env);
+                if let Some(name) = var_name {
+                    return Some(format!("!{}", name));
+                } else {
+                    Some("".to_string())
+                }
+            } else {
+                Some("".to_string())
+            }
+        },
+        _ => Some("".to_string()),
     }
 }
 
