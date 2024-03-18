@@ -427,6 +427,7 @@ module veiled_coin::veiled_coin {
 
     /// Casts a `u32` to-be-veiled amount to a `u64` normal public amount. No precision is lost here.
     public fun cast_u32_to_u64_amount(amount: u32): u64 {
+        assert!((amount as u64) <= 100000000, (amount as u64));
         (amount as u64) << NUM_MOST_SIGNIFICANT_BITS_REMOVED
     }
 

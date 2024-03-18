@@ -291,7 +291,7 @@ impl Interpreter {
 
                     self.call_stack.push(current_frame).map_err(|frame| {
                         let err = PartialVMError::new(StatusCode::CALL_STACK_OVERFLOW);
-                        let err = set_err_info!(frame, err);
+                        let err: VMError = set_err_info!(frame, err);
                         self.maybe_core_dump(err, &frame)
                     })?;
                     current_frame = frame;
