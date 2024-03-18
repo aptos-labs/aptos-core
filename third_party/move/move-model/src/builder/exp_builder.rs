@@ -1432,16 +1432,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .specialize(&self.env().get_node_type(rhs.node_id()));
                 let mut rhs = rhs.into_exp();
                 // Insert freeze for rhs of the assignment
-                if lhs_ty.is_tuple() && rhs_ty.is_tuple() {
+                if lhs_ty.is_tuple()
+                    && rhs_ty.is_tuple()
+                    && matches!(rhs.as_ref(), ExpData::Call(_, Operation::Tuple, _))
+                {
                     if let Pattern::Tuple(_, lhs_tys) = &lhs {
                         if let Type::Tuple(rhs_tys) = &rhs_ty {
                             let lhs_tys = lhs_tys
                                 .iter()
                                 .map(|pat| self.get_node_type(pat.node_id()))
                                 .collect_vec();
-                            if let ExpData::Call(_, Operation::Tuple, _) = rhs.as_ref() {
-                                self.freeze_tuple_exp(&lhs_tys, rhs_tys, &mut rhs, &loc);
-                            }
+                            self.freeze_tuple_exp(&lhs_tys, rhs_tys, &mut rhs, &loc);
                         }
                     }
                 } else {

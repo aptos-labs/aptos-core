@@ -889,14 +889,14 @@ impl<'env> Generator<'env> {
         if let Type::Tuple(ret_tys) = ret_type {
             if ret_tys.len() == targets.len() {
                 let mut new_targets = vec![];
-                let mut target_map = BTreeMap::new();
+                let mut temp_map_for_targets_requiring_freeze = BTreeMap::new();
                 for (target, ret_ty) in targets.iter().zip(ret_tys) {
                     if self.temp_type(*target).is_immutable_reference()
                         && ret_ty.is_mutable_reference()
                     {
-                        let new_temp = self.new_temp(ret_ty);
-                        new_targets.push(new_temp);
-                        target_map.insert(target, new_temp);
+                        let new_target = self.new_temp(ret_ty);
+                        new_targets.push(new_target);
+                        temp_map_for_targets_requiring_freeze.insert(target, new_target);
                     } else {
                         new_targets.push(*target);
                     }
@@ -910,7 +910,7 @@ impl<'env> Generator<'env> {
                         None,
                     )
                 });
-                for (target, new_target) in target_map {
+                for (target, new_target) in temp_map_for_targets_requiring_freeze {
                     self.emit_with(id, |attr| {
                         Bytecode::Call(
                             attr,
