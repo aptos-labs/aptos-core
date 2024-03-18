@@ -39,7 +39,7 @@ enum EstimatedEntry<K: Clone> {
 // aggregator (as the ID will not be contained in a resource anymore). The write on the
 // previously holding resource and Block-STM read validation ensures correctness.
 #[derive(Debug)]
-enum VersionEntry<K: Clone> {
+pub(crate) enum VersionEntry<K: Clone> {
     // If the value is determined by a delta applied to a value read during the execution
     // of the same transaction, the delta may also be kept in the entry. This is useful
     // if speculative execution aborts and the entry is marked as estimate, as the delta
@@ -59,7 +59,7 @@ enum VersionEntry<K: Clone> {
 // A VersionedValue internally contains a BTreeMap from indices of transactions
 // that update a given aggregator, alongside the corresponding entries.
 #[derive(Debug)]
-struct VersionedValue<K: Clone> {
+pub(crate) struct VersionedValue<K: Clone> {
     versioned_map: BTreeMap<TxnIndex, Box<CachePadded<VersionEntry<K>>>>,
 
     // The value of the given aggregator prior to the block execution. None implies that
@@ -415,9 +415,9 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
         let mut with_versions = 0;
         let mut total_versions = 0;
         for entry in self.values.iter() {
-            if let Some(map) = &entry.versioned_map {
+            if !entry.versioned_map.is_empty() {
                 with_versions += 1;
-                total_versions += map.len();
+                total_versions += entry.versioned_map.len();
             }
         }
 
