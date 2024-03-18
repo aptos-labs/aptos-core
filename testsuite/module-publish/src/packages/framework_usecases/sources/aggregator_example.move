@@ -21,6 +21,8 @@ module 0xABCD::aggregator_example {
 
     const ENOT_AUTHORIZED: u64 = 5;
 
+    const ENOT_INITIALIZED: u64 = 6;
+
     struct Counter has key {
         count: u64,
     }
@@ -101,6 +103,14 @@ module 0xABCD::aggregator_example {
             move_to<StringVector>(user, StringVector { vec });
         }
     }
+
+    public entry fun read_string(user: &signer) acquires StringVector {
+        let user_address = signer::address_of(user);
+
+        assert!(exists<StringVector>(user_address), error::invalid_argument(ENOT_INITIALIZED));
+        let _vec = borrow_global<StringVector>(user_address);
+    }
+
     public entry fun populate_or_read_u64_snapshot(user: &signer, length: u64) acquires SnapshotVector {
         let user_address = signer::address_of(user);
 
@@ -116,5 +126,12 @@ module 0xABCD::aggregator_example {
             };
             move_to<SnapshotVector>(user, SnapshotVector { vec });
         }
+    }
+
+    public entry fun read_u64_snapshot(user: &signer) acquires SnapshotVector {
+        let user_address = signer::address_of(user);
+
+        assert!(exists<SnapshotVector>(user_address), error::invalid_argument(ENOT_INITIALIZED));
+        let _vec = borrow_global<SnapshotVector>(user_address);
     }
 }

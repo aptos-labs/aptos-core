@@ -277,7 +277,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = Duration::from_secs(600); // args.duration_secs as u64);
+    let duration = Duration::from_secs(900); // args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -1954,14 +1954,6 @@ fn realistic_env_max_load_test(
                             num_modules: 1,
                             use_account_pool: false,
                         },
-                        // TransactionType::CallCustomModules {
-                        //     entry_point: EntryPoints::PopulateOrReadVectorOfStringSnapshots {
-                        //         num_elements: 30,
-                        //         string_length: 2,
-                        //     },
-                        //     num_modules: 1,
-                        //     use_account_pool: false,
-                        // },
                         TransactionType::CallCustomModules {
                             entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots {
                                 num_elements: 50000,
@@ -1970,6 +1962,28 @@ fn realistic_env_max_load_test(
                             use_account_pool: false,
                         },
                         TransactionTypeArg::AccountGeneration.materialize_default(),
+
+                        TransactionType::CallCustomModules {
+                            entry_point: EntryPoints::ReadVectorOfStringSnapshots,
+                            num_modules: 1,
+                            use_account_pool: false,
+                        },
+                        TransactionType::CallCustomModules {
+                            entry_point: EntryPoints::ReadVectorOfIntegerSnapshots,
+                            num_modules: 1,
+                            use_account_pool: false,
+                        },
+                        TransactionTypeArg::AccountGeneration.materialize_default(),
+
+
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::PopulateOrReadVectorOfStringSnapshots {
+                        //         num_elements: 30,
+                        //         string_length: 2,
+                        //     },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
 
                         // TransactionType::CallCustomModules {
                         //     entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots {

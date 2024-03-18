@@ -187,10 +187,13 @@ pub enum EntryPoints {
         num_elements: u64,
         string_length: usize,
     },
+    ReadVectorOfStringSnapshots,
     /// Populate or read resource which is vector of snapshots
     PopulateOrReadVectorOfIntegerSnapshots {
         num_elements: u64,
     },
+    ReadVectorOfIntegerSnapshots,
+
     /// Modifying a single random tag in a resource group (which contains 8 tags),
     /// from a global resource (at module publishers' address)
     ResourceGroupsGlobalWriteTag {
@@ -282,7 +285,9 @@ impl EntryPoints {
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
             | EntryPoints::PopulateOrReadVectorOfStringSnapshots { .. }
+            | EntryPoints::ReadVectorOfStringSnapshots
             | EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { .. }
+            | EntryPoints::ReadVectorOfIntegerSnapshots
             | EntryPoints::CreateObjects { .. }
             | EntryPoints::CreateObjectsConflict { .. }
             | EntryPoints::TokenV1InitializeCollection
@@ -333,7 +338,9 @@ impl EntryPoints {
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. }
             | EntryPoints::PopulateOrReadVectorOfStringSnapshots { .. }
-            | EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { .. } => "aggregator_example",
+            | EntryPoints::ReadVectorOfStringSnapshots
+            | EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { .. }
+            | EntryPoints::ReadVectorOfIntegerSnapshots => "aggregator_example",
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 "objects"
             },
@@ -482,12 +489,25 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::ReadVectorOfStringSnapshots => {
+                get_payload(
+                    module_id,
+                    ident_str!("read_string").to_owned(),
+                    vec![],
+                )
+            },
             EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { num_elements } => {
-                let rng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
                     ident_str!("populate_or_read_u64_snapshot").to_owned(),
                     vec![bcs::to_bytes(&num_elements).unwrap()],
+                )
+            },
+            EntryPoints::ReadVectorOfIntegerSnapshots => {
+                get_payload(
+                    module_id,
+                    ident_str!("read_u64_snapshot").to_owned(),
+                    vec![],
                 )
             },
             EntryPoints::CreateObjects {
@@ -724,7 +744,9 @@ impl EntryPoints {
             | EntryPoints::IncGlobalAggV2
             | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => AutomaticArgs::None,
             EntryPoints::PopulateOrReadVectorOfStringSnapshots { .. }
-            | EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { .. } => AutomaticArgs::Signer,
+            | EntryPoints::ReadVectorOfStringSnapshots
+            | EntryPoints::PopulateOrReadVectorOfIntegerSnapshots { .. }
+            | EntryPoints::ReadVectorOfIntegerSnapshots => AutomaticArgs::Signer,
             EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
                 AutomaticArgs::Signer
             },
