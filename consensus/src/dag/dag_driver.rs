@@ -27,11 +27,15 @@ use crate::{
 };
 use anyhow::{bail, ensure};
 use aptos_collections::BoundedVecDeque;
-use aptos_config::config::DagPayloadConfig;
+use aptos_config::{
+    config::DagPayloadConfig,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
@@ -52,7 +56,7 @@ pub(crate) struct DagDriver {
     payload_client: Arc<dyn PayloadClient>,
     reliable_broadcast: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     time_service: TimeService,
-    rb_handles: Mutex<BoundedVecDeque<(DropGuard, u64)>>,
+    rb_handles: Mutex<BoundedVecDeque<(DropGuard, u64, Round)>>,
     storage: Arc<dyn DAGStorage>,
     order_rule: Arc<Mutex<OrderRule>>,
     fetch_requester: Arc<dyn TFetchRequester>,
@@ -62,6 +66,7 @@ pub(crate) struct DagDriver {
     payload_config: DagPayloadConfig,
     health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
+    peers_by_latency: PeersByLatency,
 }
 
 impl DagDriver {
@@ -82,6 +87,7 @@ impl DagDriver {
         payload_config: DagPayloadConfig,
         health_backoff: HealthBackoff,
         quorum_store_enabled: bool,
+        peers_by_latency: PeersByLatency,
     ) -> Self {
         let pending_node = storage
             .get_pending_node()
@@ -106,6 +112,7 @@ impl DagDriver {
             payload_config,
             health_backoff,
             quorum_store_enabled,
+            peers_by_latency,
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -163,6 +170,8 @@ impl DagDriver {
     fn check_new_round(&self) {
         let (highest_strong_link_round, strong_links) = self.get_highest_strong_links_round();
 
+        debug!(round = highest_strong_link_round, "check new round");
+
         let minimum_delay = self
             .health_backoff
             .backoff_duration(highest_strong_link_round + 1);
@@ -197,7 +206,7 @@ impl DagDriver {
 
             let highest_strong_links_round =
                 dag_reader.highest_strong_links_round(&self.epoch_state.verifier);
-            if new_round.saturating_sub(highest_strong_links_round) == 0 {
+            if new_round.abs_diff(highest_strong_links_round) > 5 {
                 debug!(
                     new_round = new_round,
                     highest_strong_link_round = highest_strong_links_round,
@@ -315,11 +324,14 @@ impl DagDriver {
         let round = node.round();
         let node_clone = node.clone();
         let timestamp = node.timestamp();
+        let ordered_peers = self.peers_by_latency.get_peers();
+        let ordered_peers_clone = ordered_peers.clone();
         let node_broadcast = async move {
             debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
 
             defer!( observe_round(timestamp, RoundStage::NodeBroadcastedAll); );
-            rb.broadcast(node, signature_builder).await
+            rb.multicast(node, signature_builder, ordered_peers_clone)
+                .await
         };
         let certified_broadcast = async move {
             let Ok(certificate) = rx.await else {
@@ -340,7 +352,8 @@ impl DagDriver {
                 certified_node,
                 latest_ledger_info.get_latest_ledger_info(),
             );
-            rb2.broadcast(certified_node_msg, cert_ack_set).await
+            rb2.multicast(certified_node_msg, cert_ack_set, ordered_peers)
+                .await
         };
         let core_task = join(node_broadcast, certified_broadcast);
         let author = self.author;
@@ -352,13 +365,21 @@ impl DagDriver {
         tokio::spawn(Abortable::new(task, abort_registration));
         // TODO: a bounded vec queue can hold more than window rounds, but we want to limit
         // by number of rounds.
-        if let Some((_handle, prev_round_timestamp)) = self
-            .rb_handles
-            .lock()
-            .push_back((DropGuard::new(abort_handle), timestamp))
+        let mut rb_handles = self.rb_handles.lock();
+        if let Some((_handle, prev_round_timestamp, _)) =
+            rb_handles.push_back((DropGuard::new(abort_handle), timestamp, round))
         {
             // TODO: this observation is inaccurate.
             observe_round(prev_round_timestamp, RoundStage::Finished);
+        }
+
+        while let Some(front) = rb_handles.front() {
+            if round.abs_diff(front.2) > self.window_size_config {
+                observe_round(front.1, RoundStage::Finished);
+                rb_handles.pop_front();
+            } else {
+                break;
+            }
         }
     }
 
@@ -391,5 +412,41 @@ impl RpcHandler for DagDriver {
             .map(|_| self.order_rule.process_new_node(&node_metadata))?;
 
         Ok(CertifiedAck::new(epoch))
+    }
+}
+
+pub struct PeersByLatency {
+    peers: Vec<Author>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
+}
+
+impl PeersByLatency {
+    pub fn new(peers: Vec<Author>, peers_and_metadata: Arc<PeersAndMetadata>) -> Self {
+        Self {
+            peers,
+            peers_and_metadata,
+        }
+    }
+
+    fn get_peers(&self) -> Vec<Author> {
+        let mut peers = self.peers.clone();
+        peers.sort_unstable_by(|a, b| {
+            let a = Self::get_latency(&self.peers_and_metadata, *a).unwrap_or(0.0);
+            let b = Self::get_latency(&self.peers_and_metadata, *b).unwrap_or(0.0);
+            b.partial_cmp(&a).unwrap()
+        });
+        peers
+    }
+
+    fn get_latency(peers_and_metadata: &PeersAndMetadata, peer: Author) -> Option<f64> {
+        peers_and_metadata
+            .get_metadata_for_peer(PeerNetworkId::new(NetworkId::Validator, peer))
+            .map(|metadata| {
+                metadata
+                    .get_peer_monitoring_metadata()
+                    .average_ping_latency_secs
+            })
+            .ok()
+            .flatten()
     }
 }

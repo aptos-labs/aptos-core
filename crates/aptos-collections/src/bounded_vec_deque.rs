@@ -48,6 +48,14 @@ impl<T> BoundedVecDeque<T> {
         oldest
     }
 
+    pub fn front(&self) -> Option<&T> {
+        self.inner.front()
+    }
+
+    pub fn pop_front(&mut self) -> Option<T> {
+        self.inner.pop_front()
+    }
+
     pub fn iter(&self) -> Iter<'_, T> {
         self.inner.iter()
     }

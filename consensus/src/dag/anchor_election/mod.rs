@@ -8,6 +8,10 @@ pub trait AnchorElection: Send + Sync {
     fn get_anchor(&self, round: Round) -> Author;
 
     fn update_reputation(&self, commit_event: CommitEvent);
+
+    fn get_anchor_at_round_instance(&self, round: Round, instance: usize) -> Author;
+
+    fn get_max_instances(&self) -> usize;
 }
 
 pub trait CommitHistory: Send + Sync {
@@ -17,5 +21,7 @@ pub trait CommitHistory: Send + Sync {
 mod leader_reputation_adapter;
 mod round_robin;
 
-pub use leader_reputation_adapter::{LeaderReputationAdapter, MetadataBackendAdapter};
+pub use leader_reputation_adapter::{
+    CachedLeaderReputation, LeaderReputationAdapter, MetadataBackendAdapter,
+};
 pub use round_robin::RoundRobinAnchorElection;

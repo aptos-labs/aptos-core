@@ -21,10 +21,10 @@ pub struct DagPayloadConfig {
 impl Default for DagPayloadConfig {
     fn default() -> Self {
         Self {
-            max_sending_txns_per_round: 10000,
-            max_sending_size_per_round_bytes: 10 * 1024 * 1024,
-            max_receiving_txns_per_round: 11000,
-            max_receiving_size_per_round_bytes: 20 * 1024 * 1024,
+            max_sending_txns_per_round: 100_000,
+            max_sending_size_per_round_bytes: 300 * 1024 * 1024,
+            max_receiving_txns_per_round: 101_000,
+            max_receiving_size_per_round_bytes: 310 * 1024 * 1024,
 
             payload_pull_max_poll_time_ms: 50,
         }
@@ -94,7 +94,7 @@ impl Default for DagFetcherConfig {
             retry_interval_ms: 1000,
             rpc_timeout_ms: 5000,
             min_concurrent_responders: 2,
-            max_concurrent_responders: 10,
+            max_concurrent_responders: 4,
             max_concurrent_fetches: 50,
             request_channel_size: 100,
             response_channel_size: 100,
@@ -115,10 +115,10 @@ pub struct ReliableBroadcastConfig {
 impl Default for ReliableBroadcastConfig {
     fn default() -> Self {
         Self {
-            // A backoff policy that starts at 100ms and doubles each iteration up to 10secs.
+            // A backoff policy that starts at 200ms and doubles each iteration up to 10secs.
             backoff_policy_base_ms: 2,
-            backoff_policy_factor: 50,
-            backoff_policy_max_delay_ms: 10000,
+            backoff_policy_factor: 100,
+            backoff_policy_max_delay_ms: 2000,
 
             rpc_timeout_ms: 5000,
         }
@@ -129,12 +129,14 @@ impl Default for ReliableBroadcastConfig {
 #[serde(default, deny_unknown_fields)]
 pub struct DagRoundStateConfig {
     pub adaptive_responsive_minimum_wait_time_ms: u64,
+    pub wait_voting_power_pct: usize,
 }
 
 impl Default for DagRoundStateConfig {
     fn default() -> Self {
         Self {
-            adaptive_responsive_minimum_wait_time_ms: 500,
+            adaptive_responsive_minimum_wait_time_ms: 60000,
+            wait_voting_power_pct: 100,
         }
     }
 }
@@ -167,6 +169,7 @@ pub struct DagConsensusConfig {
     pub health_config: DagHealthConfig,
     #[serde(default = "QuorumStoreConfig::default_for_dag")]
     pub quorum_store: QuorumStoreConfig,
+    pub incoming_rpc_channel_per_key_size: usize,
 }
 
 impl Default for DagConsensusConfig {
@@ -178,6 +181,7 @@ impl Default for DagConsensusConfig {
             round_state_config: DagRoundStateConfig::default(),
             health_config: DagHealthConfig::default(),
             quorum_store: QuorumStoreConfig::default_for_dag(),
+            incoming_rpc_channel_per_key_size: 50,
         }
     }
 }

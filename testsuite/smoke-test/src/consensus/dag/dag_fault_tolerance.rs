@@ -12,7 +12,9 @@ use aptos_forge::{
     LocalSwarm,
 };
 use aptos_types::on_chain_config::{
-    ConsensusAlgorithmConfig, DagConsensusConfigV1, OnChainConsensusConfig, ValidatorTxnConfig,
+    AnchorElectionMode, ConsensusAlgorithmConfig, DagConsensusConfigV1, LeaderReputationType,
+    LeaderReputationType::ProposerAndVoterV2, OnChainConsensusConfig, ProposerAndVoterConfig,
+    ValidatorTxnConfig,
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::sync::{atomic::AtomicBool, Arc};
@@ -35,11 +37,28 @@ pub async fn create_dag_swarm(num_nodes: usize) -> LocalSwarm {
                 min_concurrent_responders: 2,
                 max_concurrent_responders: 7,
                 max_concurrent_fetches: 4,
+                request_channel_size: 10,
+                response_channel_size: 10,
             }
         }))
         .with_init_genesis_config(Arc::new(move |genesis_config| {
             let onchain_consensus_config = OnChainConsensusConfig::V3 {
-                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1 {
+                    anchor_election_mode: AnchorElectionMode::LeaderReputation(ProposerAndVoterV2(
+                        ProposerAndVoterConfig {
+                            active_weight: 1000,
+                            inactive_weight: 10,
+                            failed_weight: 1,
+                            failure_threshold_percent: 10,
+                            proposer_window_num_validators_multiplier: 10,
+                            voter_window_num_validators_multiplier: 1,
+                            weight_by_voting_power: true,
+                            use_history_from_previous_epoch_max_count: 5,
+                            proposers_per_round: 3,
+                        },
+                    )),
+                    ..Default::default()
+                }),
                 vtxn: ValidatorTxnConfig::default_for_genesis(),
             };
 
@@ -192,7 +211,7 @@ async fn test_fault_tolerance_of_network_receive() {
 }
 
 #[tokio::test]
-async fn test_changing_working_consensus() {
+async fn test_changing_working_consensus_short() {
     // with 7 nodes, consensus needs 5 to operate.
     // we rotate in each cycle, which 2 nodes are down.
     // we should consisnently be seeing progress.
@@ -202,7 +221,7 @@ async fn test_changing_working_consensus() {
         6,
         10.0,
         2,
-        1.0,
+        0.0,
         num_validators as u64,
         Box::new(move |cycle, part| {
             if part == 0 {

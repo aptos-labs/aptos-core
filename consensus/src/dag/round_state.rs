@@ -2,12 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::dag::{
-    observability::tracing::{observe_round, RoundStage},
+    observability::{
+        counters,
+        tracing::{observe_round, RoundStage},
+    },
     types::NodeCertificate,
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::Round;
 use aptos_infallible::{duration_since_epoch, Mutex};
+use aptos_logger::debug;
 use aptos_types::epoch_state::EpochState;
 use std::{cmp::Ordering, sync::Arc, time::Duration};
 use tokio::task::JoinHandle;
@@ -36,12 +40,24 @@ impl RoundState {
         strong_links: Vec<NodeCertificate>,
         minimum_delay: Duration,
     ) {
-        let current_round = *self.current_round.lock();
+        let current_round = self.current_round.lock();
+
+        debug!(
+            round = *current_round,
+            highest = highest_strong_links_round,
+            "check for new round"
+        );
+
         match current_round.cmp(&highest_strong_links_round) {
             // we're behind, move forward immediately
             Ordering::Less => {
+                debug!(
+                    round = *current_round,
+                    highest = highest_strong_links_round,
+                    "current round too low"
+                );
                 // the receiver can be dropped if we move to a new epoch
-                let _ = self.event_sender.send(highest_strong_links_round + 1);
+                let _ = self.event_sender.send(*current_round + 1);
             },
             Ordering::Equal => self.responsive_check.check_for_new_round(
                 highest_strong_links_round,
@@ -50,10 +66,6 @@ impl RoundState {
             ),
             Ordering::Greater => (),
         }
-    }
-
-    pub fn current_round(&self) -> Round {
-        *self.current_round.lock()
     }
 
     pub fn set_current_round(&self, new_round: Round) -> anyhow::Result<()> {
@@ -65,6 +77,7 @@ impl RoundState {
             new_round
         );
         *current_round = new_round;
+        debug!(round = new_round, "round state: reset");
         self.responsive_check.reset();
         Ok(())
     }
@@ -125,6 +138,7 @@ struct AdaptiveResponsiveInner {
 pub struct AdaptiveResponsive {
     inner: Mutex<AdaptiveResponsiveInner>,
     epoch_state: Arc<EpochState>,
+    wait_voting_power: u128,
     minimal_wait_time: Duration,
     event_sender: tokio::sync::mpsc::UnboundedSender<Round>,
 }
@@ -134,13 +148,21 @@ impl AdaptiveResponsive {
         event_sender: tokio::sync::mpsc::UnboundedSender<Round>,
         epoch_state: Arc<EpochState>,
         minimal_wait_time: Duration,
+        wait_voting_power_pct: usize,
     ) -> Self {
+        let wait_voting_power = epoch_state
+            .verifier
+            .total_voting_power()
+            .saturating_mul(wait_voting_power_pct as u128)
+            .saturating_add(50)
+            .saturating_div(100);
         Self {
             inner: Mutex::new(AdaptiveResponsiveInner {
                 start_time: duration_since_epoch(),
                 state: State::Initial,
             }),
             epoch_state,
+            wait_voting_power,
             minimal_wait_time,
             event_sender,
         }
@@ -156,13 +178,19 @@ impl ResponsiveCheck for AdaptiveResponsive {
     ) {
         let mut inner = self.inner.lock();
         if matches!(inner.state, State::Sent) {
+            debug!(
+                round = highest_strong_links_round,
+                "adaptive responsive: already sent"
+            );
             return;
         }
         let new_round = highest_strong_links_round + 1;
-        observe_round(
-            inner.start_time.as_micros() as u64,
-            RoundStage::StrongLinkReceived,
-        );
+        if matches!(inner.state, State::Initial) {
+            observe_round(
+                inner.start_time.as_micros() as u64,
+                RoundStage::StrongLinkReceived,
+            );
+        }
         let voting_power = self
             .epoch_state
             .verifier
@@ -175,11 +203,30 @@ impl ResponsiveCheck for AdaptiveResponsive {
             (self.minimal_wait_time, false)
         };
 
-        // voting power == 3f+1 and pass wait time if health backoff
+        debug!(
+            voting_power = voting_power,
+            wait_power = self.wait_voting_power,
+            round = highest_strong_links_round,
+            is_health_backoff = is_health_backoff,
+            "adaptive responsive: check for new round"
+        );
+
+        // voting power >= 90% and pass wait time if health backoff
         let duration_since_start = duration_since_epoch().saturating_sub(inner.start_time);
-        if voting_power == self.epoch_state.verifier.total_voting_power()
+        if voting_power >= self.wait_voting_power
             && (duration_since_start >= wait_time || !is_health_backoff)
         {
+            if voting_power >= self.wait_voting_power {
+                debug!(round = highest_strong_links_round, "voting power met");
+                observe_round(
+                    inner.start_time.as_micros() as u64,
+                    RoundStage::VotingPowerMet,
+                );
+            }
+            debug!(
+                round = highest_strong_links_round,
+                "sending new round notification"
+            );
             let _ = self.event_sender.send(new_round);
             if let State::Scheduled(handle) = std::mem::replace(&mut inner.state, State::Sent) {
                 handle.abort();
@@ -188,8 +235,13 @@ impl ResponsiveCheck for AdaptiveResponsive {
             // wait until minimal time reaches before sending
             let sender = self.event_sender.clone();
             let wait_time = wait_time.saturating_sub(duration_since_start);
+            debug!(
+                round = highest_strong_links_round,
+                "waiting timeout for round"
+            );
             let handle = tokio::spawn(async move {
                 tokio::time::sleep(wait_time).await;
+                counters::TIMEOUT_WAIT_VOTING_POWER_COUNT.inc();
                 let _ = sender.send(new_round);
             });
             inner.state = State::Scheduled(handle);

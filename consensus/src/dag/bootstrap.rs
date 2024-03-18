@@ -2,7 +2,9 @@
 
 use super::{
     adapter::{OrderedNotifierAdapter, TLedgerInfoProvider},
-    anchor_election::{AnchorElection, CommitHistory, RoundRobinAnchorElection},
+    anchor_election::{
+        AnchorElection, CachedLeaderReputation, CommitHistory, RoundRobinAnchorElection,
+    },
     dag_driver::DagDriver,
     dag_fetcher::{DagFetcher, DagFetcherService, FetchRequestHandler},
     dag_handler::NetworkHandler,
@@ -20,6 +22,7 @@ use crate::{
     dag::{
         adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
         anchor_election::{LeaderReputationAdapter, MetadataBackendAdapter},
+        dag_driver::PeersByLatency,
         dag_state_sync::{SyncModeMessageHandler, SyncOutcome},
         observability::logging::{LogEvent, LogSchema},
         round_state::{AdaptiveResponsive, RoundState},
@@ -39,15 +42,16 @@ use aptos_channels::{
     aptos_channel::{self, Receiver},
     message_queues::QueueStyle,
 };
-use aptos_config::config::DagConsensusConfig;
+use aptos_config::{config::DagConsensusConfig, network_id::NetworkId};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{debug, info};
+use aptos_network::application::storage::PeersAndMetadata;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        AnchorElectionMode, DagConsensusConfigV1, FeatureFlag, Features,
+        AnchorElectionMode, DagConsensusConfigV1, FeatureFlag, Features, LeaderReputationType,
         LeaderReputationType::{ProposerAndVoter, ProposerAndVoterV2},
         ProposerAndVoterConfig, ValidatorTxnConfig,
     },
@@ -275,9 +279,10 @@ impl SyncMode {
                     Ok(sync_result) => {
                         if sync_result.is_ok() {
                             info!("sync succeeded. running full bootstrap.");
+                            let dag_store = sync_result.unwrap();
                             // If the sync task finishes successfully, we can transition to Active mode by
                             // rebootstrapping all components starting from the DAG store.
-                            let (new_state, new_handler, new_fetch_service) = monitor!("dag_sync_full_bootstrap", bootstrapper.full_bootstrap());
+                            let (new_state, new_handler, new_fetch_service) = monitor!("dag_sync_full_bootstrap", bootstrapper.full_bootstrap(Some(dag_store)));
                             Some(Mode::Active(ActiveMode {
                                 handler: new_handler,
                                 fetch_service: new_fetch_service,
@@ -336,6 +341,7 @@ pub struct DagBootstrapper {
     vtxn_config: ValidatorTxnConfig,
     executor: BoundedExecutor,
     features: Features,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl DagBootstrapper {
@@ -359,6 +365,7 @@ impl DagBootstrapper {
         vtxn_config: ValidatorTxnConfig,
         executor: BoundedExecutor,
         features: Features,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         info!("OnChainConfig: {:?}", onchain_config);
         Self {
@@ -380,13 +387,14 @@ impl DagBootstrapper {
             vtxn_config,
             executor,
             features,
+            peers_and_metadata,
         }
     }
 
     fn build_leader_reputation_components(
         &self,
         config: &ProposerAndVoterConfig,
-    ) -> Arc<LeaderReputationAdapter> {
+    ) -> Arc<CachedLeaderReputation> {
         let num_validators = self.epoch_state.verifier.len();
         let epoch_to_validators_vec = self.storage.get_epoch_to_proposers();
         let epoch_to_validator_map = epoch_to_validators_vec
@@ -428,14 +436,20 @@ impl DagBootstrapper {
             .map(|p| self.epoch_state.verifier.get_voting_power(&p).unwrap())
             .collect();
 
-        Arc::new(LeaderReputationAdapter::new(
+        let cached_leader_reputation = CachedLeaderReputation::new(
             self.epoch_state.epoch,
-            epoch_to_validators_vec,
-            voting_power,
-            metadata_adapter,
-            heuristic,
-            100,
-        ))
+            LeaderReputationAdapter::new(
+                self.epoch_state.epoch,
+                epoch_to_validators_vec,
+                voting_power,
+                metadata_adapter,
+                heuristic,
+                100,
+                config.proposers_per_round,
+            ),
+        );
+
+        Arc::new(cached_leader_reputation)
     }
 
     fn build_anchor_election(
@@ -494,6 +508,7 @@ impl DagBootstrapper {
         commit_history: Arc<dyn CommitHistory>,
         commit_events: Option<Vec<CommitEvent>>,
         dag_window_size_config: u64,
+        existing_dag_store: Option<DagStore>,
     ) -> BootstrapBaseState {
         let ledger_info_from_storage = self
             .storage
@@ -502,30 +517,38 @@ impl DagBootstrapper {
         let (parent_block_info, ledger_info) =
             compute_initial_block_and_ledger_info(ledger_info_from_storage);
 
-        let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
+        let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(
+            self.epoch_state.clone(),
+            ledger_info,
+        )));
 
-        let initial_ledger_info = ledger_info_provider
-            .get_latest_ledger_info()
-            .ledger_info()
-            .clone();
-        let commit_round = initial_ledger_info.round();
+        let highest_committed_anchor_round =
+            ledger_info_provider.get_highest_committed_anchor_round();
         let initial_round = std::cmp::max(
             1,
-            initial_ledger_info
-                .round()
-                .saturating_sub(dag_window_size_config),
+            highest_committed_anchor_round.saturating_sub(dag_window_size_config),
         );
 
-        let dag = monitor!(
-            "dag_store_new",
-            Arc::new(DagStore::new(
-                self.epoch_state.clone(),
-                self.storage.clone(),
-                self.payload_manager.clone(),
-                initial_round,
-                dag_window_size_config,
-            ))
-        );
+        let dag = monitor!("dag_store_new", {
+            if let Some(store) = existing_dag_store {
+                Arc::new(DagStore::new_from_existing(
+                    self.epoch_state.clone(),
+                    self.storage.clone(),
+                    self.payload_manager.clone(),
+                    initial_round,
+                    dag_window_size_config,
+                    store,
+                ))
+            } else {
+                Arc::new(DagStore::new(
+                    self.epoch_state.clone(),
+                    self.storage.clone(),
+                    self.payload_manager.clone(),
+                    initial_round,
+                    dag_window_size_config,
+                ))
+            }
+        });
 
         let ordered_notifier = monitor!(
             "dag_ordered_notifier_new",
@@ -542,7 +565,7 @@ impl DagBootstrapper {
             "dag_order_rule_new",
             Arc::new(Mutex::new(OrderRule::new(
                 self.epoch_state.clone(),
-                commit_round + 1,
+                highest_committed_anchor_round + 1,
                 dag.clone(),
                 anchor_election.clone(),
                 ordered_notifier.clone(),
@@ -615,6 +638,7 @@ impl DagBootstrapper {
                 new_round_tx,
                 self.epoch_state.clone(),
                 Duration::from_millis(round_state_config.adaptive_responsive_minimum_wait_time_ms),
+                round_state_config.wait_voting_power_pct,
             )),
         );
 
@@ -634,6 +658,10 @@ impl DagBootstrapper {
         );
         let health_backoff =
             HealthBackoff::new(self.epoch_state.clone(), chain_health, pipeline_health);
+        let peers_by_latency = PeersByLatency::new(
+            self.epoch_state.verifier.get_ordered_account_addresses(),
+            self.peers_and_metadata.clone(),
+        );
         let dag_driver = DagDriver::new(
             self.self_peer,
             self.epoch_state.clone(),
@@ -650,6 +678,7 @@ impl DagBootstrapper {
             self.config.node_payload_config.clone(),
             health_backoff.clone(),
             self.quorum_store_enabled,
+            peers_by_latency,
         );
         let rb_handler = NodeBroadcastHandler::new(
             dag_store.clone(),
@@ -680,7 +709,10 @@ impl DagBootstrapper {
         (dag_handler, dag_fetcher)
     }
 
-    fn full_bootstrap(&self) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
+    fn full_bootstrap(
+        &self,
+        existing_dag_store: Option<DagStore>,
+    ) -> (BootstrapBaseState, NetworkHandler, DagFetcherService) {
         let (anchor_election, commit_history, commit_events) =
             monitor!("dag_build_anchor_election", self.build_anchor_election());
 
@@ -691,6 +723,7 @@ impl DagBootstrapper {
                 commit_history,
                 commit_events,
                 self.onchain_config.dag_ordering_causal_history_window as u64,
+                existing_dag_store
             )
         );
 
@@ -711,7 +744,7 @@ impl DagBootstrapper {
             epoch = self.epoch_state.epoch,
         );
 
-        let (base_state, handler, fetch_service) = self.full_bootstrap();
+        let (base_state, handler, fetch_service) = self.full_bootstrap(None);
 
         let mut mode = Mode::Active(ActiveMode {
             handler,
@@ -757,10 +790,25 @@ pub(super) fn bootstrap_dag_for_test(
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
     let mut features = Features::default();
     features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
+    let mut onchain_config = DagConsensusConfigV1::default();
+    onchain_config.anchor_election_mode = AnchorElectionMode::LeaderReputation(
+        LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
+            active_weight: 1000,
+            inactive_weight: 10,
+            failed_weight: 1,
+            failure_threshold_percent: 10,
+            proposer_window_num_validators_multiplier: 10,
+            voter_window_num_validators_multiplier: 1,
+            weight_by_voting_power: true,
+            use_history_from_previous_epoch_max_count: 5,
+            proposers_per_round: 4,
+        }),
+    );
+    let peers_and_metadata = PeersAndMetadata::new(&[NetworkId::Validator]);
     let bootstraper = DagBootstrapper::new(
         self_peer,
         DagConsensusConfig::default(),
-        DagConsensusConfigV1::default(),
+        onchain_config,
         signer.into(),
         epoch_state.clone(),
         storage.clone(),
@@ -776,9 +824,10 @@ pub(super) fn bootstrap_dag_for_test(
         ValidatorTxnConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
         features,
+        peers_and_metadata,
     );
 
-    let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();
+    let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap(None);
 
     let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 64, None);
 

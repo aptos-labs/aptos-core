@@ -2,6 +2,7 @@
 
 use super::helpers::TEST_DAG_WINDOW;
 use crate::{
+    consensusdb::ConsensusDB,
     dag::{
         adapter::OrderedNotifier,
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
@@ -14,13 +15,16 @@ use crate::{
             helpers::{generate_dag_nodes, MockPayloadManager},
         },
         types::{CertifiedNodeMessage, RemoteFetchRequest},
-        CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, TDAGNetworkSender,
+        CertifiedNode, DAGMessage, DAGRpcResult, RpcHandler, RpcWithFallback, StorageAdapter,
+        TDAGNetworkSender,
     },
     pipeline::execution_client::DummyExecutionClient,
 };
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::HashValue;
 use aptos_reliable_broadcast::RBNetworkSender;
+use aptos_storage_interface::mock::MockDbReaderWriter;
+use aptos_temppath::TempPath;
 use aptos_time_service::TimeService;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
@@ -31,7 +35,8 @@ use aptos_types::{
 };
 use async_trait::async_trait;
 use claims::assert_none;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
+use tokio::time::Instant;
 
 struct MockDAGNetworkSender {}
 
@@ -230,4 +235,76 @@ async fn test_dag_state_sync() {
     );
     assert_eq!(new_dag.read().highest_round(), NUM_ROUNDS as Round);
     assert_none!(new_dag.read().highest_ordered_anchor_round(),);
+}
+
+#[tokio::test]
+async fn test_dag_big_db() {
+    const NUM_ROUNDS: u64 = 30;
+
+    let (signers, validator_verifier) = random_validator_verifier(150, None, false);
+    let validators = validator_verifier.get_ordered_account_addresses();
+    let epoch_state = Arc::new(EpochState {
+        epoch: 1,
+        verifier: validator_verifier,
+    });
+    let mut db_root_path = TempPath::new();
+    db_root_path.persist();
+    let consensus_db = Arc::new(ConsensusDB::new(db_root_path.as_ref()));
+    let aptos_db = Arc::new(MockDbReaderWriter {});
+    let storage = Arc::new(StorageAdapter::new(
+        1,
+        HashMap::from([(1, validators.clone())]),
+        consensus_db,
+        aptos_db,
+    ));
+
+    let virtual_dag = (0..NUM_ROUNDS)
+        .map(|_| {
+            signers
+                .iter()
+                .map(|_| Some(vec![true; signers.len() * 2 / 3 + 1]))
+                .collect()
+        })
+        .collect::<Vec<_>>();
+    let nodes = generate_dag_nodes(&virtual_dag, &validators);
+
+    let start = Instant::now();
+
+    let dag = Arc::new(DagStore::new(
+        epoch_state.clone(),
+        storage.clone(),
+        Arc::new(MockPayloadManager {}),
+        1,
+        30,
+    ));
+    for round_nodes in &nodes {
+        for node in round_nodes.iter().flatten() {
+            dag.add_node(node.clone()).unwrap();
+        }
+    }
+    println!("add elapsed {}", start.elapsed().as_secs_f64());
+
+    println!("db_path {:?}", db_root_path);
+
+    for _ in 0..10 {
+        let start = Instant::now();
+        let dag = Arc::new(DagStore::new(
+            epoch_state.clone(),
+            storage.clone(),
+            Arc::new(MockPayloadManager {}),
+            1,
+            30,
+        ));
+        println!("elapsed {}", start.elapsed().as_secs_f64());
+    }
+
+    storage
+        .save_pending_node(&nodes[0][0].as_deref().unwrap())
+        .unwrap();
+    let start = Instant::now();
+    for _ in 0..100 {
+        storage.get_pending_node().unwrap();
+    }
+    println!("elapsed {}", start.elapsed().as_secs_f64());
+    let _ = tokio::time::sleep(Duration::from_secs(5));
 }

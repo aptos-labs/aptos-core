@@ -24,7 +24,7 @@ pub fn spawn_named_runtime_with_start_hook<F>(
 where
     F: Fn() + Send + Sync + 'static,
 {
-    const MAX_BLOCKING_THREADS: usize = 64;
+    const MAX_BLOCKING_THREADS: usize = 128;
 
     // Verify the given name has an appropriate length
     if thread_name.len() > MAX_THREAD_NAME_LENGTH {

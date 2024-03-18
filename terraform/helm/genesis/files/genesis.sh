@@ -129,12 +129,14 @@ kubectl get pvc -o name | grep /fn- | grep -v "e${ERA}-" | xargs -r kubectl dele
 # delete all genesis secrets except for those from this era
 kubectl get secret -o name | grep "genesis-e" | grep -v "e${ERA}-" | xargs -r kubectl delete
 
+gzip ${WORKSPACE}/genesis.blob
+
 # create genesis secrets for validators to startup
 for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
   username="${USERNAME_PREFIX}-${i}"
   user_dir="${WORKSPACE}/${username}"
   kubectl create secret generic "${username}-genesis-e${ERA}" \
-    --from-file=genesis.blob=${WORKSPACE}/genesis.blob \
+    --from-file=genesis.blob.gz=${WORKSPACE}/genesis.blob.gz \
     --from-file=waypoint.txt=${WORKSPACE}/waypoint.txt \
     --from-file=validator-identity.yaml=${user_dir}/validator-identity.yaml \
     --from-file=validator-full-node-identity.yaml=${user_dir}/validator-full-node-identity.yaml

@@ -27,6 +27,7 @@ use rayon::iter::{
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    mem,
     ops::Deref,
     sync::Arc,
 };
@@ -469,7 +470,10 @@ impl DagStore {
         start_round: Round,
         window_size: u64,
     ) -> Self {
-        let mut all_nodes = storage.get_certified_nodes().unwrap_or_default();
+        let mut all_nodes = monitor!(
+            "dag_store_new_storage",
+            storage.get_certified_nodes().unwrap_or_default()
+        );
         all_nodes.sort_unstable_by_key(|(_, node)| node.round());
         let mut to_prune = vec![];
         // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
@@ -481,28 +485,30 @@ impl DagStore {
             window_size,
         );
 
-        let groups: Vec<(Round, Vec<_>)> = all_nodes
-            .into_iter()
-            .group_by(|(_, node)| node.round())
-            .into_iter()
-            .map(|(key, group)| (key, group.collect()))
-            .collect();
-
-        for (_round, round_group) in groups {
-            let digests: Vec<_> = round_group
-                .into_par_iter()
-                .with_min_len(5)
-                .filter_map(|(digest, certified_node)| {
-                    if let Err(e) = dag.add_node_inmem(certified_node) {
-                        debug!("Delete node after bootstrap due to {}", e);
-                        Some(digest)
-                    } else {
-                        None
-                    }
-                })
+        monitor!("dag_store_new_par_iter", {
+            let groups: Vec<(Round, Vec<_>)> = all_nodes
+                .into_iter()
+                .group_by(|(_, node)| node.round())
+                .into_iter()
+                .map(|(key, group)| (key, group.collect()))
                 .collect();
-            to_prune.extend_from_slice(&digests)
-        }
+
+            for (_round, round_group) in groups {
+                let digests: Vec<_> = round_group
+                    .into_par_iter()
+                    .with_min_len(5)
+                    .filter_map(|(digest, certified_node)| {
+                        if let Err(e) = dag.add_node_inmem(certified_node) {
+                            debug!("Delete node after bootstrap due to {}", e);
+                            Some(digest)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                to_prune.extend_from_slice(&digests)
+            }
+        });
 
         let handle = tokio::task::spawn_blocking(move || {
             monitor!("dag_store_new_gc", {
@@ -520,6 +526,28 @@ impl DagStore {
                 start_round
             );
         }
+
+        dag
+    }
+
+    pub fn new_from_existing(
+        epoch_state: Arc<EpochState>,
+        storage: Arc<dyn DAGStorage>,
+        payload_manager: Arc<dyn TPayloadManager>,
+        start_round: Round,
+        window_size: u64,
+        existing_dag: Self,
+    ) -> Self {
+        let dag = Self::new_empty(
+            epoch_state,
+            storage.clone(),
+            payload_manager,
+            start_round,
+            window_size,
+        );
+
+        let mut w = existing_dag.dag.write();
+        dag.dag.write().nodes_by_round = mem::replace(&mut w.nodes_by_round, BTreeMap::new());
 
         dag
     }
@@ -567,11 +595,13 @@ impl DagStore {
             self.storage.save_certified_node(&node)?;
         }
 
-        debug!("Added node {}", node.id());
         self.payload_manager
             .prefetch_payload_data(node.payload(), node.metadata().timestamp());
 
-        self.dag.write().add_validated_node(node)
+        let id = node.id();
+        self.dag.write().add_validated_node(node)?;
+        debug!("Added node {}", id);
+        Ok(())
     }
 
     pub fn add_node(&self, node: CertifiedNode) -> anyhow::Result<()> {

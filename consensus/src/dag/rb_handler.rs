@@ -258,12 +258,6 @@ impl RpcHandler for NodeBroadcastHandler {
             assert_some!(self.votes_fine_grained_lock.remove(&key));
         });
 
-        let node = self.validate(node)?;
-        observe_node(node.timestamp(), NodeStage::NodeReceived);
-        debug!(LogSchema::new(LogEvent::ReceiveNode)
-            .remote_peer(*node.author())
-            .round(node.round()));
-
         if let Some(ack) = self
             .votes_by_round_peer
             .lock()
@@ -275,6 +269,16 @@ impl RpcHandler for NodeBroadcastHandler {
             return Ok(ack.clone());
         }
 
+        let node = self.validate(node)?;
+
+        self.dag.write().update_votes(&node, false);
+        self.order_rule.process_new_node(node.metadata());
+
+        observe_node(node.timestamp(), NodeStage::NodeReceived);
+        debug!(LogSchema::new(LogEvent::ReceiveNode)
+            .remote_peer(*node.author())
+            .round(node.round()));
+
         let signature = node.sign_vote(&self.signer)?;
         let vote = Vote::new(node.metadata().clone(), signature);
         self.storage.save_vote(&node.id(), &vote)?;
@@ -283,9 +287,6 @@ impl RpcHandler for NodeBroadcastHandler {
             .get_mut(&node.round())
             .expect("must exist")
             .insert(*node.author(), vote.clone());
-
-        self.dag.write().update_votes(&node, false);
-        self.order_rule.process_new_node(node.metadata());
 
         debug!(LogSchema::new(LogEvent::Vote)
             .remote_peer(*node.author())

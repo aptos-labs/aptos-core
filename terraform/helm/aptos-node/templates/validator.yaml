@@ -84,6 +84,19 @@ spec:
         prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
+      initContainers:
+      - name: uncompress-config
+        image: busybox
+        command: ['/bin/sh', "-c"]
+        args:
+        - |
+          cp /compressed-configs/* /configs/.
+          gzip -dc /compressed-configs/genesis.blob.gz > /configs/genesis.blob
+        volumeMounts:
+        - name: compressed-genesis-config
+          mountPath: /compressed-configs
+        - name: genesis-config
+          mountPath: /configs
       containers:
       - name: validator
         {{- if and $validator_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -179,6 +192,8 @@ spec:
         configMap:
           name: {{ include "aptos-validator.fullname" $ }}-{{$i}}
       - name: genesis-config
+        emptyDir: {}
+      - name: compressed-genesis-config
         # Current implementation of `forge::backend::k8s::stateful_set::{set_identity, get_identity}`
         # depends on the position of this volume item within the parent list.
         secret:

@@ -73,7 +73,10 @@ use aptos_global_constants::CONSENSUS_KEY;
 use aptos_infallible::{duration_since_epoch, Mutex};
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
-use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_network::{
+    application::{interface::NetworkClient, storage::PeersAndMetadata},
+    protocols::network::Event,
+};
 use aptos_safety_rules::SafetyRulesManager;
 use aptos_secure_storage::{KVStorage, Storage};
 use aptos_types::{
@@ -166,6 +169,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_config: DagConsensusConfig,
     payload_manager: Arc<PayloadManager>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+    peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -184,6 +188,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         aptos_time_service: aptos_time_service::TimeService,
         vtxn_pool: VTxnPoolState,
         rand_storage: Arc<dyn RandStorage<AugmentedData>>,
+        peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         let author = node_config.validator_network.as_ref().unwrap().peer_id();
         let config = node_config.consensus.clone();
@@ -225,6 +230,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             dag_config,
             payload_manager: Arc::new(PayloadManager::DirectMempool),
             rand_storage,
+            peers_and_metadata,
         }
     }
 
@@ -355,6 +361,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     onchain_config.leader_reputation_exclude_round(),
                     leader_reputation_type.use_root_hash_for_seed(),
                     self.config.window_for_chain_health,
+                    1,
                 ));
                 // LeaderReputation is not cheap, so we can cache the amount of rounds round_manager needs.
                 Arc::new(CachedProposerElection::new(
@@ -1195,9 +1202,14 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             onchain_consensus_config.effective_validator_txn_config(),
             self.bounded_executor.clone(),
             features.clone(),
+            self.peers_and_metadata.clone(),
         );
 
-        let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(QueueStyle::FIFO, 10, None);
+        let (dag_rpc_tx, dag_rpc_rx) = aptos_channel::new(
+            QueueStyle::FIFO,
+            self.dag_config.incoming_rpc_channel_per_key_size,
+            Some(&crate::dag::observability::counters::DAG_RPC_CHANNEL),
+        );
         self.dag_rpc_tx = Some(dag_rpc_tx);
         let (dag_shutdown_tx, dag_shutdown_rx) = oneshot::channel();
         self.dag_shutdown_tx = Some(dag_shutdown_tx);
