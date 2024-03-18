@@ -1,0 +1,12 @@
+[package]
+name = "script"
+version = "0.0.0"
+
+[addresses]
+bond_coin = "0x9ac6e327c67207e641be69940ab4abfe7a2920c969185ae2b8515e4fa45dce01"
+veiled_coin = "0x9ac6e327c67207e641be69940ab4abfe7a2920c969185ae2b8515e4fa45dce01"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
+BondCoin = { local = "../bond_coin" }
+VeiledCoin = { local = "../veiled_coin"}

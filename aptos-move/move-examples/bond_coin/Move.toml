@@ -1,0 +1,9 @@
+[package]
+name = "BondCoin"
+version = "0.0.0"
+
+[addresses]
+bond_coin = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }

@@ -406,7 +406,7 @@ module aptos_framework::coin {
 
     /// Extracts `amount` from the passed-in `coin`, where the original token is modified in place.
     public fun extract<CoinType>(coin: &mut Coin<CoinType>, amount: u64): Coin<CoinType> {
-        assert!(coin.value >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
+        assert!(coin.value >= amount, amount);
         spec {
             update supply<CoinType> = supply<CoinType> - amount;
         };

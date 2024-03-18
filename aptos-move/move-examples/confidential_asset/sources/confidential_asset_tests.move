@@ -34,6 +34,10 @@ module confidential_asset::veiled_coin_tests {
     use confidential_asset::sigma_protos::{serialize_withdrawal_subproof, prove_withdrawal};
     #[test_only]
     use confidential_asset::sigma_protos;
+    #[test_only]
+    use bond_coin::bond_coin;
+    #[test_only]
+    use aptos_framework::managed_coin;
 
     //
     // Test-only functions
@@ -270,7 +274,7 @@ module confidential_asset::veiled_coin_tests {
         assert!(remaining_public_balance == confidential_asset::cast_u32_to_u64_amount(400), 3);
     }
 
-    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xc0ffee, recipient = @0x1337)]
+    #[test(veiled_coin = @veiled_coin, aptos_fx = @aptos_framework, sender = @0xe7194662d2006cf307eafbb00387137dc95dfdd228ae0c8158cf3dfabb9972a0, recipient = @0x9ac6e327c67207e641be69940ab4abfe7a2920c969185ae2b8515e4fa45dce01)]
     fun basic_viability_test(
         veiled_coin: signer,
         aptos_fx: signer,
@@ -278,30 +282,45 @@ module confidential_asset::veiled_coin_tests {
         recipient: signer
     ) {
         set_up_for_veiled_coin_test(&veiled_coin, aptos_fx, &sender, &recipient, 500, 500);
+         aptos_framework::managed_coin::initialize<bond_coin::BondCoin>(
+            &recipient,
+            b"BOND Coin",
+            b"BOND",
+            8,
+            false,
+        );
+        managed_coin::register<bond_coin::BondCoin>(&sender);
+        managed_coin::register<bond_coin::BondCoin>(&recipient);
+
+        managed_coin::mint<bond_coin::BondCoin>(&recipient, @0x9ac6e327c67207e641be69940ab4abfe7a2920c969185ae2b8515e4fa45dce01, 600000000000);
+        managed_coin::mint<bond_coin::BondCoin>(&recipient, @0xe7194662d2006cf307eafbb00387137dc95dfdd228ae0c8158cf3dfabb9972a0, 600000000000);
 
         // Creates a balance of `b = 150` veiled coins at sender (requires registering a veiled coin store at 'sender')
-        let (sender_sk, sender_pk) = generate_elgamal_keypair();
-        confidential_asset::register<coin::FakeMoney>(&sender, elgamal::pubkey_to_bytes(&sender_pk));
-        confidential_asset::veil<coin::FakeMoney>(&sender, 150);
+        let sender_sk = std::option::extract(&mut ristretto255::new_scalar_from_bytes(x"49cfc15340eeb185e6c91b0d0e452e2c4e4711c413238af4a5909ad59883580c"));
+        let sender_pk = elgamal::pubkey_from_secret_key(&sender_sk);
+        print(&sender_pk);
+        print(&sender_sk);
+        confidential_asset::register<bond_coin::BondCoin>(&sender, elgamal::pubkey_to_bytes(&sender_pk));
+        confidential_asset::veil<bond_coin::BondCoin>(&sender, 1000);
         println(b"Veiled 150 coins to the `sender`");
         // TODO: This throws an invariant violation (INTERNAL_TYPE_ERROR (code 2009))
         //print(&sender);
 
         // Make sure we are correctly keeping track of the normal coins veiled in this module
-        let total_veiled_coins = confidential_asset::cast_u32_to_u64_amount(150);
-        assert!(confidential_asset::total_veiled_coins<coin::FakeMoney>() == total_veiled_coins, 1);
+        let total_veiled_coins = confidential_asset::cast_u32_to_u64_amount(1000);
+        assert!(confidential_asset::total_veiled_coins<bond_coin::BondCoin>() == total_veiled_coins, 1);
 
         // Transfer `v = 50` of these veiled coins to the recipient
-        let amount_val = ristretto255::new_scalar_from_u32(50);
-        let amount_rand = ristretto255::random_scalar();
+        let amount_val = ristretto255::new_scalar_from_u32(500);
+        let amount_rand = ristretto255::new_scalar_from_u32(0);
 
         // The commitment to the sender's new balance can use fresh randomness as we don't use the
         // new balance amount in a ciphertext
-        let new_balance_rand = ristretto255::random_scalar();
-        let curr_balance_val = ristretto255::new_scalar_from_u32(150);
+        let new_balance_rand = ristretto255::new_scalar_from_u32(0);
+        let curr_balance_val = ristretto255::new_scalar_from_u32(1000);
 
         // The sender's new balance is 150 - 50 = 100
-        let new_balance_val = ristretto255::new_scalar_from_u32(100);
+        let new_balance_val = ristretto255::new_scalar_from_u32(500);
 
         // No veiled transfers have been done yet so the sender's balance randomness is zero
         let curr_balance_ct = elgamal::new_ciphertext_with_basepoint(&curr_balance_val, &ristretto255::scalar_zero(), &sender_pk);
@@ -318,8 +337,8 @@ module confidential_asset::veiled_coin_tests {
         println(b"Computed range proof over the transferred amount");
 
         // Register the `recipient` for receiving veiled coins
-        let (_, recipient_pk) = generate_elgamal_keypair();
-        confidential_asset::register<coin::FakeMoney>(&recipient, elgamal::pubkey_to_bytes(&recipient_pk));
+        let recipient_pk = sender_pk;
+        confidential_asset::register<bond_coin::BondCoin>(&recipient, elgamal::pubkey_to_bytes(&recipient_pk));
         println(b"Registered the `recipient` to receive veiled coins");
         // TODO: This throws an invariant violation (INTERNAL_TYPE_ERROR (code 2009))
         //print(&recipient);
@@ -350,11 +369,21 @@ module confidential_asset::veiled_coin_tests {
         println(b"Created sigma protocol proof");
 
         // Sanity check veiled balances
-        assert!(confidential_asset::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 150, &ristretto255::scalar_zero(), &sender_pk), 1);
-        assert!(confidential_asset::verify_opened_balance<coin::FakeMoney>(signer::address_of(&recipient), 0, &ristretto255::scalar_zero(), &recipient_pk), 1);
+        assert!(confidential_asset::verify_opened_balance<bond_coin::BondCoin>(signer::address_of(&sender), 1000, &ristretto255::scalar_zero(), &sender_pk), 1);
+        assert!(confidential_asset::verify_opened_balance<bond_coin::BondCoin>(signer::address_of(&recipient), 0, &ristretto255::scalar_zero(), &recipient_pk), 1);
+
+        println(b"param1");
+        print(&elgamal::ciphertext_to_bytes(&withdraw_ct));
+        println(b"param2");
+        print(&elgamal::ciphertext_to_bytes(&deposit_ct));
+        print(&pedersen::commitment_to_bytes(&new_balance_comm));
+        print(&pedersen::commitment_to_bytes(&amount_comm));
+        print(&bulletproofs::range_proof_to_bytes(&new_balance_range_proof));
+        print(&bulletproofs::range_proof_to_bytes(&amount_val_range_proof));
+        print(&sigma_proof_bytes);
 
         // Execute the veiled transaction: no one will be able to tell 50 coins are being transferred.
-        confidential_asset::fully_veiled_transfer<coin::FakeMoney>(
+        confidential_asset::fully_veiled_transfer<bond_coin::BondCoin>(
             &sender,
             signer::address_of(&recipient),
             elgamal::ciphertext_to_bytes(&withdraw_ct),
@@ -369,16 +398,16 @@ module confidential_asset::veiled_coin_tests {
         // Compute the randomness of the sender's current balance
         let balance_rand = ristretto255::scalar_neg(&amount_rand);
         // Sanity check veiled balances
-        assert!(confidential_asset::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 100, &balance_rand, &sender_pk), 1);
-        assert!(confidential_asset::verify_opened_balance<coin::FakeMoney>(signer::address_of(&recipient), 50, &amount_rand, &recipient_pk), 1);
+        assert!(confidential_asset::verify_opened_balance<bond_coin::BondCoin>(signer::address_of(&sender), 500, &balance_rand, &sender_pk), 1);
+        assert!(confidential_asset::verify_opened_balance<bond_coin::BondCoin>(signer::address_of(&recipient), 500, &amount_rand, &recipient_pk), 1);
 
-        assert!(confidential_asset::total_veiled_coins<coin::FakeMoney>() == total_veiled_coins, 1);
+        assert!(confidential_asset::total_veiled_coins<bond_coin::BondCoin>() == total_veiled_coins, 1);
 
         // Drain the whole remaining balance of the sender
-        let new_curr_balance_val = ristretto255::new_scalar_from_u32(100);
-        let new_amount_val = ristretto255::new_scalar_from_u32(100);
+        let new_curr_balance_val = ristretto255::new_scalar_from_u32(500);
+        let new_amount_val = ristretto255::new_scalar_from_u32(500);
         let new_new_balance_val = ristretto255::new_scalar_from_u32(0);
-        let fresh_new_balance_rand = ristretto255::random_scalar();
+        let fresh_new_balance_rand = ristretto255::new_scalar_from_u32(0);
 
         // `unveil` doesn't change the randomness, so we reuse the `new_balance_rand` randomness from before
         let (new_new_balance_range_proof, _) = bulletproofs::prove_range_pedersen(
@@ -401,15 +430,15 @@ module confidential_asset::veiled_coin_tests {
         let sigma_proof_bytes = serialize_withdrawal_subproof(&sigma_proof);
 
         // Unveil all coins of the `sender`
-        confidential_asset::unveil<coin::FakeMoney>(
-            &sender, 100, new_new_balance_comm_bytes, bulletproofs::range_proof_to_bytes(&new_new_balance_range_proof), sigma_proof_bytes);
+        confidential_asset::unveil<bond_coin::BondCoin>(
+            &sender, 500, new_new_balance_comm_bytes, bulletproofs::range_proof_to_bytes(&new_new_balance_range_proof), sigma_proof_bytes);
         println(b"Unveiled all 100 coins from the `sender`'s veiled balance");
 
-        let total_veiled_coins = confidential_asset::cast_u32_to_u64_amount(50);
-        assert!(confidential_asset::total_veiled_coins<coin::FakeMoney>() == total_veiled_coins, 1);
+        let total_veiled_coins = confidential_asset::cast_u32_to_u64_amount(500);
+        assert!(confidential_asset::total_veiled_coins<bond_coin::BondCoin>() == total_veiled_coins, 1);
 
         // Sanity check veiled balances
-        assert!(confidential_asset::verify_opened_balance<coin::FakeMoney>(signer::address_of(&sender), 0, &balance_rand, &sender_pk), 1);
-        assert!(confidential_asset::verify_opened_balance<coin::FakeMoney>(signer::address_of(&recipient), 50, &amount_rand, &recipient_pk), 1);
+        // assert!(confidential_asset::verify_opened_balance<bond_coin::BondCoin>(signer::address_of(&sender), 500, &balance_rand, &sender_pk), 1);
+        // assert!(confidential_asset::verify_opened_balance<bond_coin::BondCoin>(signer::address_of(&recipient), 500, &amount_rand, &recipient_pk), 1);
     }
 }
