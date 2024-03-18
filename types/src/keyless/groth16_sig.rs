@@ -206,13 +206,18 @@ impl Groth16Proof {
         public_inputs_hash: Fr,
         pvk: &PreparedVerifyingKey<Bn254>,
     ) -> anyhow::Result<()> {
+        // let start = std::time::Instant::now();
         let proof: Proof<Bn254> = Proof {
             a: self.a.deserialize_into_affine()?,
-            b: self.b.as_affine()?,
+            b: self.b.deserialize_into_affine()?,
             c: self.c.deserialize_into_affine()?,
         };
-        let result = Groth16::<Bn254>::verify_proof(pvk, &proof, &[public_inputs_hash])?;
-        if !result {
+        // println!("Deserialization time: {:?}", start.elapsed());
+
+        // let start = std::time::Instant::now();
+        let verified = Groth16::<Bn254>::verify_proof(pvk, &proof, &[public_inputs_hash])?;
+        // println!("Proof verification time: {:?}", start.elapsed());
+        if !verified {
             bail!("groth16 proof verification failed")
         }
         Ok(())

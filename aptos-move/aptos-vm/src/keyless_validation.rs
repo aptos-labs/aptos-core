@@ -195,10 +195,12 @@ pub(crate) fn validate_authenticators(
 
                     match &zksig.proof {
                         ZKP::Groth16(groth16proof) => {
+                            // let start = std::time::Instant::now();
                             let public_inputs_hash =
                                 get_public_inputs_hash(sig, pk, &rsa_jwk, config).map_err(
                                     |_| invalid_signature!("Could not compute public inputs hash"),
                                 )?;
+                            // println!("Public inputs hash time: {:?}", start.elapsed());
 
                             let groth16_and_stmt =
                                 Groth16ProofAndStatement::new(*groth16proof, public_inputs_hash);

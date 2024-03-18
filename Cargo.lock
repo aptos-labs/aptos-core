@@ -963,6 +963,7 @@ dependencies = [
  "ark-bn254",
  "ark-ec",
  "ark-ff",
+ "ark-groth16",
  "ark-serialize",
  "ark-std",
  "base64 0.13.1",
