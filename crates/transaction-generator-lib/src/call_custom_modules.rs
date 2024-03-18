@@ -36,7 +36,7 @@ pub trait UserModuleTransactionGenerator: Sync + Send {
     fn initialize_package(
         &mut self,
         package: &Package,
-        publisher: &mut LocalAccount,
+        publisher: &LocalAccount,
         txn_factory: &TransactionFactory,
         rng: &mut StdRng,
     ) -> Vec<SignedTransaction>;
@@ -133,7 +133,7 @@ impl CustomModulesDelegationGeneratorCreator {
         package_name: &str,
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Self {
-        let mut packages = Self::publish_package(
+        let packages = Self::publish_package(
             init_txn_factory.clone(),
             root_account,
             txn_executor,
@@ -146,7 +146,7 @@ impl CustomModulesDelegationGeneratorCreator {
             init_txn_factory,
             root_account,
             txn_executor,
-            &mut packages,
+            &packages,
             workload,
         )
         .await;
@@ -161,13 +161,13 @@ impl CustomModulesDelegationGeneratorCreator {
         init_txn_factory: TransactionFactory,
         root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
-        packages: &mut Vec<(Package, LocalAccount)>,
+        packages: &Vec<(Package, LocalAccount)>,
         workload: &mut dyn UserModuleTransactionGenerator,
     ) -> Arc<TransactionGeneratorWorker> {
         let mut rng = StdRng::from_entropy();
         let mut requests_initialize = Vec::with_capacity(packages.len());
 
-        for (package, publisher) in packages.iter_mut() {
+        for (package, publisher) in packages.iter() {
             requests_initialize.append(&mut workload.initialize_package(
                 package,
                 publisher,

@@ -267,7 +267,7 @@ impl WorkflowTxnGeneratorCreator {
                 let mint_entry_point = EntryPoints::TokenV2AmbassadorMint { numbered: false };
                 let burn_entry_point = EntryPoints::TokenV2AmbassadorBurn;
 
-                let mut packages = CustomModulesDelegationGeneratorCreator::publish_package(
+                let packages = Arc::new(CustomModulesDelegationGeneratorCreator::publish_package(
                     init_txn_factory.clone(),
                     root_account,
                     txn_executor,
@@ -275,13 +275,13 @@ impl WorkflowTxnGeneratorCreator {
                     mint_entry_point.package_name(),
                     Some(20_00000000),
                 )
-                .await;
+                .await);
 
                 let mint_worker = CustomModulesDelegationGeneratorCreator::create_worker(
                     init_txn_factory.clone(),
                     root_account,
                     txn_executor,
-                    &mut packages,
+                    &packages,
                     &mut EntryPointTransactionGenerator {
                         entry_point: mint_entry_point,
                     },
@@ -291,14 +291,12 @@ impl WorkflowTxnGeneratorCreator {
                     init_txn_factory.clone(),
                     root_account,
                     txn_executor,
-                    &mut packages,
+                    &packages,
                     &mut EntryPointTransactionGenerator {
                         entry_point: burn_entry_point,
                     },
                 )
                 .await;
-
-                let packages = Arc::new(packages);
 
                 let creators: Vec<Box<dyn TransactionGeneratorCreator>> = vec![
                     Box::new(AccountGeneratorCreator::new(

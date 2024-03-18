@@ -239,6 +239,9 @@ pub async fn create_txn_generator_creator(
     Arc<ObjectPool<AccountAddress>>,
     Arc<ObjectPool<LocalAccount>>,
 ) {
+    let reuse_published_modules = true;
+    let mut published_packages = HashMap::new();
+
     let addresses_pool = Arc::new(ObjectPool::new_initial(
         source_accounts
             .iter()
@@ -328,24 +331,58 @@ pub async fn create_txn_generator_creator(
                     entry_point,
                     num_modules,
                     use_account_pool,
-                } => wrap_accounts_pool(
-                    Box::new(
-                        CustomModulesDelegationGeneratorCreator::new(
-                            txn_factory.clone(),
-                            init_txn_factory.clone(),
-                            &root_account,
-                            txn_executor,
-                            *num_modules,
-                            entry_point.package_name(),
-                            &mut EntryPointTransactionGenerator {
-                                entry_point: *entry_point,
-                            },
+                } => {
+                    let workload = &mut EntryPointTransactionGenerator {
+                        entry_point: *entry_point,
+                    };
+                    let package_name = entry_point.package_name();
+                    if reuse_published_modules {
+                        use std::collections::hash_map::Entry::*;
+                        let package: &_ = match published_packages.entry(package_name.to_string()) {
+                            Occupied(entry) => entry.into_mut(),
+                            Vacant(entry) => entry.insert(
+                                Arc::new(CustomModulesDelegationGeneratorCreator::publish_package(
+                                    init_txn_factory.clone(),
+                                    &root_account,
+                                    txn_executor,
+                                    *num_modules,
+                                    package_name,
+                                    None
+                                )
+                                .await),
+                            ),
+                        };
+                        let workload = CustomModulesDelegationGeneratorCreator::create_worker(init_txn_factory.clone(), &root_account, txn_executor, package, workload).await;
+                        wrap_accounts_pool(
+                            Box::new(
+                                CustomModulesDelegationGeneratorCreator::new_raw(
+                                    txn_factory.clone(),
+                                    package.clone(),
+                                    workload,
+                                )
+                            ),
+                            *use_account_pool,
+                            &accounts_pool,
                         )
-                        .await,
-                    ),
-                    *use_account_pool,
-                    &accounts_pool,
-                ),
+                    } else {
+                        wrap_accounts_pool(
+                            Box::new(
+                                CustomModulesDelegationGeneratorCreator::new(
+                                    txn_factory.clone(),
+                                    init_txn_factory.clone(),
+                                    &root_account,
+                                    txn_executor,
+                                    *num_modules,
+                                    package_name,
+                                    workload,
+                                )
+                                .await,
+                            ),
+                            *use_account_pool,
+                            &accounts_pool,
+                        )
+                    }
+                },
                 TransactionType::BatchTransfer { batch_size } => {
                     Box::new(BatchTransferTransactionGeneratorCreator::new(
                         txn_factory.clone(),
