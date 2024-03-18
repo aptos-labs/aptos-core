@@ -31,30 +31,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - refundable_bytes
-  - name: step_4_increase_parallelism_for_machine_upgrade
-    metadata:
-      title: "AIP-74: Increase block gas limit to account for concurrency increase"
-      description: "AIP-74: Increase block gas limit to account for concurrency increase"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/375"
-    execution_mode: MultiStep
-    update_sequence:
-      - Execution:
-          V4:
-            transaction_shuffler_type:
-              sender_aware_v2: 32
-            block_gas_limit_type:
-              complex_limit_v1:
-                effective_block_gas_limit: 30000
-                execution_gas_effective_multiplier: 1
-                io_gas_effective_multiplier: 1
-                conflict_penalty_window: 9
-                use_granular_resource_group_conflicts: false
-                use_module_publishing_block_conflict: true
-                block_output_limit: 5242880
-                include_user_txn_size_in_block_output: true
-                add_block_limit_outcome_onchain: false
-            transaction_deduper_type: txn_hash_and_authenticator_v1
-  - name: step_5_passkey_authenticator
+  - name: step_4_passkey_authenticator
     metadata:
       title: "AIP-66: Passkey Accounts"
       description: "AIP-66: The first WebAuthn Authenticator for Aptos, enabling users to utilize passkeys and other WebAuthn credentials for transaction authentication."
@@ -64,7 +41,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - web_authn_signature
-  - name: step_6_object_code_deployment
+  - name: step_5_object_code_deployment
     metadata:
       title: "AIP-54: Object Code Deployment"
       description: "AIP-54: Introduces a method to deploy code to objects, allowing more modular and resource efficient development."
@@ -74,7 +51,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - object_code_deployment
-  - name: step_7_enable_aggregator_v2_api
+  - name: step_6_enable_aggregator_v2_api
     metadata:
       title: "AIP-47: Enable Aggregator v2 API"
       description: "AIP-47: This AIP revamps and expands upon the current concept of Aggregators. Enabling their usage for control flow, and storing their values elsewhere. This step only enables new APIs."
@@ -84,7 +61,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - aggregator_v2_api
-  - name: step_8_enable_aggregator_v2_parallelism
+  - name: step_7_enable_aggregator_v2_parallelism
     metadata:
       title: "AIP-47: Enable Aggregator v2 parallelism"
       description: "AIP-47: This step enables the backend that makes execution of Aggregators V2 parallel."
@@ -95,7 +72,7 @@ proposals:
           enabled:
             - aggregator_v2_delayed_fields
             - resource_groups_split_in_vm_change_set            
-  - name: step_9_enable_max_object_nesting_check
+  - name: step_8_enable_max_object_nesting_check
     metadata:
       title: "Max Object Nesting Check"
       description: "Enable the max object nesting check, preventing running out of gas due to ownership cycles."
@@ -104,7 +81,7 @@ proposals:
       - FeatureFlag:
           enabled:
             - max_object_nesting_check
-  - name: step_10_enable_validator_txn
+  - name: step_9_enable_validator_txn
     metadata:
       title: "AIP-64: Validator Transaction Type"
       description: "AIP-64: This AIP introduces a new transaction type for validators to perform on-chain operations."
@@ -136,7 +113,7 @@ proposals:
               V1:
                 per_block_limit_txn_count: 2
                 per_block_limit_total_bytes: 2097152
-  - name: step_11_enable_jwk_consensus
+  - name: step_10_enable_jwk_consensus
     metadata:
       title: "AIP-67: Native Consensus for JSON Web Key (JWK)"
       description: "AIP-67: This AIP proposes a solution for validators to agree on OpenID Connect providers' JSON Web Keys."
@@ -147,14 +124,14 @@ proposals:
       - FeatureFlag:
           enabled:
             - jwk_consensus
-  - name: step_12_start_watching_google_jwks
+  - name: step_11_start_watching_google_jwks
     metadata:
       title: "Start JWK consensus for Google"
       description: "JWK Consensus (AIP-67) for Google enables Google-based keyless accounts (AIP-61)."
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
-  - name: step_13_enable_concurrent_digital_assets
+  - name: step_12_enable_concurrent_digital_assets
     metadata:
       title: "AIP-43: Enable Concurrent Digital Assets (Token V2)"
       description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
