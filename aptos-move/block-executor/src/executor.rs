@@ -24,7 +24,7 @@ use aptos_aggregator::{
     delta_change_set::serialize,
     types::{code_invariant_error, expect_ok, PanicOr},
 };
-// use aptos_drop_helper::DEFAULT_DROPPER;
+use aptos_drop_helper::DEFAULT_DROPPER;
 use aptos_logger::{debug, error, info};
 use aptos_mvhashmap::{
     types::{Incarnation, MVDelayedFieldsError, TxnIndex, ValueWithLayout},
@@ -913,9 +913,9 @@ where
 
         counters::update_state_counters(versioned_cache.stats(), true);
 
-        drop((last_input_output, scheduler, versioned_cache));
+        // drop((last_input_output, scheduler, versioned_cache));
         // Explicit async drops.
-        // DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
+        DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
         // TODO add block end info to output.
         // block_limit_processor.is_block_limit_reached();

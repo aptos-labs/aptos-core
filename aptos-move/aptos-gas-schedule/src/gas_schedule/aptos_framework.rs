@@ -276,13 +276,13 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [aggregator_destroy_base: InternalGas, "aggregator.destroy.base", 1838],
         [aggregator_factory_new_aggregator_base: InternalGas, "aggregator_factory.new_aggregator.base", 1838],
 
-        [aggregator_v2_create_aggregator_base: InternalGas, {12.. => "aggregator_v2.create_aggregator.base"}, 1838],
+        [aggregator_v2_create_aggregator_base: InternalGas, {12.. => "aggregator_v2.create_aggregator.base"}, 20000],
         [aggregator_v2_try_add_base: InternalGas, {12.. => "aggregator_v2.try_add.base"}, 1102],
         [aggregator_v2_try_sub_base: InternalGas, {12.. => "aggregator_v2.try_sub.base"}, 1102],
         [aggregator_v2_read_base: InternalGas, {12.. => "aggregator_v2.read.base"}, 2205],
         [aggregator_v2_snapshot_base: InternalGas, {12.. => "aggregator_v2.snapshot.base"}, 1102],
 
-        [aggregator_v2_create_snapshot_base: InternalGas, {11.. => "aggregator_v2.create_snapshot.base"}, 1102],
+        [aggregator_v2_create_snapshot_base: InternalGas, {11.. => "aggregator_v2.create_snapshot.base"}, 10000],
         [aggregator_v2_create_snapshot_per_byte: InternalGasPerByte, { 12.. =>"aggregator_v2.create_snapshot.per_byte" }, 3],
         [aggregator_v2_copy_snapshot_base: InternalGas, {11.. => "aggregator_v2.copy_snapshot.base"}, 1102],
         [aggregator_v2_read_snapshot_base: InternalGas, {11.. => "aggregator_v2.read_snapshot.base"}, 2205],
