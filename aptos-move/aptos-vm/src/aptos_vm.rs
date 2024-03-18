@@ -50,6 +50,7 @@ use aptos_types::{
     block_metadata_ext::{BlockMetadataExt, BlockMetadataWithRandomness},
     chain_id::ChainId,
     fee_statement::FeeStatement,
+    invalid_signature,
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
@@ -76,6 +77,8 @@ use aptos_vm_types::{
     resolver::{ExecutorView, ResourceGroupView},
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
+use ark_bn254::Bn254;
+use ark_groth16::PreparedVerifyingKey;
 use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
@@ -202,6 +205,8 @@ pub struct AptosVM {
     pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     timed_features: TimedFeatures,
     randomness_enabled: bool,
+    /// For a new chain, or even mainnet, the VK might not necessarily be set.
+    pvk: Option<PreparedVerifyingKey<Bn254>>,
 }
 
 impl AptosVM {
@@ -259,6 +264,12 @@ impl AptosVM {
         )
         .expect("should be able to create Move VM; check if there are duplicated natives");
 
+        // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
+        // via governance (although, currently, we do check for that in `keyless_account.move`).
+        let pvk = keyless_validation::get_groth16_vk_onchain(resolver)
+            .ok()
+            .and_then(|vk| vk.try_into().ok());
+
         Self {
             is_simulation: false,
             move_vm,
@@ -267,6 +278,7 @@ impl AptosVM {
             storage_gas_params,
             timed_features,
             randomness_enabled,
+            pvk,
         }
     }
 
@@ -1568,13 +1580,21 @@ impl AptosVM {
             ));
         }
 
-        let authenticators = aptos_types::keyless::get_authenticators(transaction)
+        let keyless_authenticators = aptos_types::keyless::get_authenticators(transaction)
             .map_err(|_| VMStatus::error(StatusCode::INVALID_SIGNATURE, None))?;
 
         // If there are keyless TXN authenticators, validate them all.
-        if !authenticators.is_empty() {
+        if !keyless_authenticators.is_empty() {
+            // This should only happen if we incorrectly enable the feature without setting the VK.
+            // Or, if we spawn a network without initializing the VK in genesis. Either way, it must
+            // be handled here.
+            if self.pvk.is_none() {
+                return Err(invalid_signature!("Groth16 VK has not been set on-chain"));
+            }
+
             keyless_validation::validate_authenticators(
-                &authenticators,
+                self.pvk.as_ref().unwrap(),
+                &keyless_authenticators,
                 self.features(),
                 self.gas_feature_version,
                 resolver,

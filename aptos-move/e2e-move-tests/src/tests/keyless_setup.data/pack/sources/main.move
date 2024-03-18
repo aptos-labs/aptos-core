@@ -19,6 +19,11 @@ script {
         ];
         jwks::set_patches(&fx, patches);
 
+        // sets the pending VK and Configuration changes
+        keyless_account::on_new_epoch_for_testing(&fx);
+
         keyless_account::update_max_exp_horizon(&fx, max_exp_horizon_secs);
+        // sets the pending Configuration change to the max expiration horizon from above
+        keyless_account::on_new_epoch_for_testing(&fx);
     }
 }

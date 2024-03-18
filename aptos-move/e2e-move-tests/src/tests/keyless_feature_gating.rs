@@ -47,7 +47,7 @@ fn test_feature_gating(
 ) {
     let (sig, pk) = get_sig_and_pk();
 
-    let transaction = get_keyless_txn(h, sig, pk, *recipient.address());
+    let transaction = create_and_spend_keyless_account(h, sig, pk, *recipient.address());
     let output = h.run_raw(transaction);
 
     if !should_succeed {
@@ -81,6 +81,8 @@ fn test_feature_gating_with_zk_on() {
     // ZK & ZKless
     let (mut h, recipient) = init_feature_gating(
         vec![
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BN254_STRUCTURES,
             FeatureFlag::KEYLESS_ACCOUNTS,
             FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
         ],
@@ -93,9 +95,14 @@ fn test_feature_gating_with_zk_on() {
 
     //
     // ZK & !ZKless
-    let (mut h, recipient) = init_feature_gating(vec![FeatureFlag::KEYLESS_ACCOUNTS], vec![
-        FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
-    ]);
+    let (mut h, recipient) = init_feature_gating(
+        vec![
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::KEYLESS_ACCOUNTS,
+        ],
+        vec![FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS],
+    );
     // Groth16-based sig => success
     test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, true);
     // OIDC-based sig => discard
@@ -106,10 +113,14 @@ fn test_feature_gating_with_zk_on() {
 fn test_feature_gating_with_zk_off() {
     //
     // !ZK & ZKless
-    let (mut h, recipient) =
-        init_feature_gating(vec![FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS], vec![
-            FeatureFlag::KEYLESS_ACCOUNTS,
-        ]);
+    let (mut h, recipient) = init_feature_gating(
+        vec![
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
+        ],
+        vec![FeatureFlag::KEYLESS_ACCOUNTS],
+    );
     // Groth16-based sig => discard
     test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, false);
     // OIDC-based sig => success
@@ -117,27 +128,27 @@ fn test_feature_gating_with_zk_off() {
 
     //
     // !ZK & !ZKless
-    let (mut h, recipient) = init_feature_gating(vec![], vec![
-        FeatureFlag::KEYLESS_ACCOUNTS,
-        FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
-    ]);
+    let (mut h, recipient) = init_feature_gating(
+        vec![
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BN254_STRUCTURES,
+        ],
+        vec![
+            FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
+        ],
+    );
     // Groth16-based sig => discard
     test_feature_gating(&mut h, &recipient, get_sample_groth16_sig_and_pk, false);
     // OIDC-based sig => discard
     test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, false);
 }
 
-/// Creates and funds a new account at `pk` and sends coins to `recipient`.
-fn get_keyless_txn(
-    h: &mut MoveHarness,
-    mut sig: KeylessSignature,
-    pk: KeylessPublicKey,
-    recipient: AccountAddress,
-) -> SignedTransaction {
+fn create_keyless_account(h: &mut MoveHarness, pk: KeylessPublicKey) -> Account {
     let apk = AnyPublicKey::keyless(pk.clone());
     let addr = AuthenticationKey::any_key(apk.clone()).account_address();
     let account = h.store_and_fund_account(
-        &Account::new_from_addr(addr, AccountPublicKey::Keyless(pk.clone())),
+        &Account::new_from_addr(addr, AccountPublicKey::Keyless(pk)),
         100000000,
         0,
     );
@@ -145,6 +156,15 @@ fn get_keyless_txn(
     println!("Actual address: {}", addr.to_hex());
     println!("Account address: {}", account.address().to_hex());
 
+    account
+}
+
+fn spend_keyless_account(
+    h: &mut MoveHarness,
+    mut sig: KeylessSignature,
+    account: &Account,
+    recipient: AccountAddress,
+) -> SignedTransaction {
     let payload = aptos_stdlib::aptos_coin_transfer(recipient, 1);
     //println!("Payload: {:?}", payload);
     let raw_txn = TransactionBuilder::new(account.clone())
@@ -162,7 +182,6 @@ fn get_keyless_txn(
     };
     let esk = get_sample_esk();
 
-    // Compute the training wheels signature if not present
     match &mut sig.cert {
         EphemeralCertificate::ZeroKnowledgeSig(proof) => {
             // Training wheels should be disabled.
@@ -173,12 +192,25 @@ fn get_keyless_txn(
     }
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
-    let transaction = SignedTransaction::new_keyless(raw_txn, pk, sig);
+    let transaction =
+        SignedTransaction::new_keyless(raw_txn, account.pubkey.as_keyless().unwrap(), sig);
     println!(
         "Submitted TXN hash: {}",
         Transaction::UserTransaction(transaction.clone()).hash()
     );
     transaction
+}
+
+/// Creates and funds a new account at `pk` and sends coins to `recipient`.
+fn create_and_spend_keyless_account(
+    h: &mut MoveHarness,
+    sig: KeylessSignature,
+    pk: KeylessPublicKey,
+    recipient: AccountAddress,
+) -> SignedTransaction {
+    let account = create_keyless_account(h, pk.clone());
+
+    spend_keyless_account(h, sig, &account, recipient)
 }
 
 fn run_setup_script(h: &mut MoveHarness) {
