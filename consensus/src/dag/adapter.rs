@@ -29,7 +29,7 @@ use aptos_consensus_types::{
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
 use aptos_infallible::{Mutex, RwLock};
-use aptos_logger::{error, info};
+use aptos_logger::{debug, error, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_config::NewBlockEvent,
@@ -214,6 +214,10 @@ impl OrderedNotifier for OrderedNotifierAdapter {
 
         let idx = self.idx_gen.lock().next(round);
         assert!(idx < (self.epoch_state.verifier.len() as u64));
+        if idx > 0 && payload.is_empty() {
+            debug!("payload is empty. not producing block ({}, {})", round, idx);
+            return;
+        }
         let block_round = (round * self.epoch_state.verifier.len() as Round) + idx;
 
         let block = PipelinedBlock::new(
