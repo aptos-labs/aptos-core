@@ -1092,7 +1092,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         .ok_or_else(|| {
                             anyhow::anyhow!("Failed to deserialize resource during id replacement")
                         })?;
-                serialize_and_allow_delayed_values(&patched_value, layout)
+                serialize_and_allow_delayed_values(&patched_value, layout)?
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Failed to serialize value {} after id replacement",
