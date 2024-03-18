@@ -85,7 +85,7 @@ fun <SELF>_0::main() {
      # events: e:$t5
   8: $t0 := move($t5)
      # live vars: $t0, $t1
-     # events: e:$t1
+     # events: e:$t1, e:$t6, b:$t6
   9: $t6 := move($t1)
      # live vars: $t0
  10: goto 14
@@ -139,7 +139,7 @@ fun <SELF>_0::main() {
      var $t3: u64
      var $t4: u64
      var $t5: u64
-     var $t6: u64
+     var $t6: u64 [unused]
      var $t7: u64 [unused]
      var $t8: bool [unused]
      var $t9: u64 [unused]
@@ -154,15 +154,15 @@ fun <SELF>_0::main() {
   6: $t4 := move($t4)
   7: $t5 := 5
   8: $t3 := move($t5)
-  9: $t6 := move($t4)
+  9: $t4 := move($t4)
  10: goto 14
  11: label L1
- 12: $t4 := 0
- 13: $t3 := move($t4)
+ 12: $t5 := 0
+ 13: $t3 := move($t5)
  14: label L2
  15: $t3 := copy($t3)
- 16: $t4 := 5
- 17: $t2 := ==($t3, $t4)
+ 16: $t5 := 5
+ 17: $t2 := ==($t3, $t5)
  18: if ($t2) goto 19 else goto 21
  19: label L3
  20: goto 24
@@ -181,7 +181,7 @@ fun <SELF>_0::main() {
      var $t1: u64 [unused]
      var $t2: bool
      var $t3: u64
-     var $t4: u64
+     var $t4: u64 [unused]
      var $t5: u64
      var $t6: u64 [unused]
      var $t7: u64 [unused]
@@ -196,11 +196,11 @@ fun <SELF>_0::main() {
   4: $t3 := move($t5)
   5: goto 9
   6: label L1
-  7: $t4 := 0
-  8: $t3 := move($t4)
+  7: $t5 := 0
+  8: $t3 := move($t5)
   9: label L2
- 10: $t4 := 5
- 11: $t2 := ==($t3, $t4)
+ 10: $t5 := 5
+ 11: $t2 := ==($t3, $t5)
  12: if ($t2) goto 13 else goto 15
  13: label L3
  14: goto 18

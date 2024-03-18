@@ -56,7 +56,7 @@ fun m::test($t0: u64): u64 {
      var $t5: u64
      var $t6: u64
      # live vars: $t0
-     # events: b:$t0
+     # events: b:$t0, e:$t2, b:$t2
   0: $t2 := copy($t0)
      # live vars: $t0
      # events: e:$t0, b:$t3

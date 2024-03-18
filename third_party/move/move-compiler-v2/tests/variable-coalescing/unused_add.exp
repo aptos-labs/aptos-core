@@ -51,7 +51,7 @@ public fun m::test() {
      # events: e:$t0, e:$t2, b:$t5
   4: $t5 := +($t0, $t2)
      # live vars: $t5
-     # events: e:$t5
+     # events: e:$t4, e:$t5, b:$t4
   5: $t4 := move($t5)
      # live vars:
   6: return ()
@@ -65,14 +65,14 @@ public fun m::test() {
      var $t1: u64
      var $t2: u64 [unused]
      var $t3: u64
-     var $t4: u64
+     var $t4: u64 [unused]
      var $t5: u64 [unused]
   0: $t1 := 1
   1: $t1 := move($t1)
   2: $t3 := 2
   3: $t3 := move($t3)
   4: $t1 := +($t1, $t3)
-  5: $t4 := move($t1)
+  5: $t1 := move($t1)
   6: return ()
 }
 
