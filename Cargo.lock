@@ -963,6 +963,7 @@ dependencies = [
  "ark-bn254",
  "ark-ec",
  "ark-ff",
+ "ark-groth16",
  "ark-serialize",
  "ark-std",
  "base64 0.13.1",
@@ -4079,6 +4080,9 @@ dependencies = [
  "aptos-utils",
  "aptos-vm-logging",
  "aptos-vm-types",
+ "ark-bn254",
+ "ark-groth16",
+ "base64-url",
  "bcs 0.1.4",
  "bytes",
  "claims",
@@ -4097,6 +4101,7 @@ dependencies = [
  "once_cell",
  "ouroboros 0.15.6",
  "proptest",
+ "quick_cache",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
@@ -5010,6 +5015,15 @@ name = "base64"
 version = "0.21.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c79fed4cdb43e993fcdadc7e58a09fd0e3e649c4436fa11da71c9f1f3ee7feb9"
+
+[[package]]
+name = "base64-url"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb9fb9fb058cc3063b5fc88d9a21eefa2735871498a04e1650da76ed511c8569"
+dependencies = [
+ "base64 0.21.6",
+]
 
 [[package]]
 name = "base64ct"
@@ -7000,6 +7014,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-types",
+ "ark-groth16",
  "bcs 0.1.4",
  "claims",
  "hex",
@@ -13048,6 +13063,18 @@ checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
 dependencies = [
  "memchr",
  "serde",
+]
+
+[[package]]
+name = "quick_cache"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58c20af3800cee5134b79a3bd4a3d4b583c16ccfa5f53338f46400851a5b3819"
+dependencies = [
+ "ahash 0.8.8",
+ "equivalent",
+ "hashbrown 0.14.3",
+ "parking_lot 0.12.1",
 ]
 
 [[package]]

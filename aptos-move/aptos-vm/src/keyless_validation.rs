@@ -2,14 +2,16 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use std::sync::RwLockReadGuard;
+use once_cell::sync::Lazy;
 use crate::move_vm_ext::AptosMoveResolver;
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
     keyless::{
-        get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16VerificationKey,
-        KeylessPublicKey, KeylessSignature, ZKP,
+        get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
+        Groth16VerificationKey, KeylessPublicKey, KeylessSignature, ZKP,
     },
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
@@ -18,6 +20,47 @@ use aptos_types::{
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
 use serde::Deserialize;
+use aptos_infallible::RwLock;
+use ark_groth16::PreparedVerifyingKey;
+use ark_bn254::Bn254;
+
+/// We perform an expensive deserialization of the VK only when we detect a change in the on-chain VK.
+/// Initially, the last seen VK is initialized to an invalid value so that it is immediately replaced
+/// by the on-chain value.
+pub(crate) static LAST_SEEN_VK: Lazy<RwLock<PreparedVerifyingKey<Bn254>>> =
+    Lazy::new(|| RwLock::new(PreparedVerifyingKey::default()));
+
+// TODO(thispr): This will not work because during parallel execution on different validators,
+//  On validator 1: TXN 1 may update the VK and TXN 2 may see it
+//  On validator 2: TXN 2 may execute first, and then TXN 1 may update the VK
+//  This will diverge the execution results.
+fn maybe_update_last_seen_pvk(
+    vk: &Groth16VerificationKey,
+) -> Result<(), VMStatus> {
+    let mut last_seen_vk = LAST_SEEN_VK.write();
+
+    // TODO(Performance): Can hash `vk` and compare it to hash of last seen vk.
+    //   let vk_hash = vk.hash();
+    if *vk != *last_seen_vk {
+        // let start = std::time::Instant::now();
+        // Note: This is where we (rarely) perform the expensive ~2ms VK deserialization.
+        *last_seen_vk = vk
+            .try_into()
+            .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
+        // println!("Groth16 VK deserialization time: {:?}", start.elapsed());
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "testing")]
+pub fn clear_last_seen_pvk() {
+    *LAST_SEEN_VK.write() = PreparedVerifyingKey::default();
+}
+
+pub fn get_last_seen_pvk() -> RwLockReadGuard<'static, PreparedVerifyingKey<Bn254>> {
+    LAST_SEEN_VK.read()
+}
 
 macro_rules! value_deserialization_error {
     ($message:expr) => {{
@@ -118,6 +161,8 @@ fn get_jwk_for_authenticator(
 }
 
 /// Ensures that **all** keyless authenticators in the transaction are valid.
+///
+/// WARNING: This function is not re-entrant because it acquires a RwLock (both for writing and reading).
 pub(crate) fn validate_authenticators(
     authenticators: &Vec<(KeylessPublicKey, KeylessSignature)>,
     features: &Features,
@@ -156,9 +201,6 @@ pub(crate) fn validate_authenticators(
     }
 
     let patched_jwks = get_jwks_onchain(resolver)?;
-    let pvk = &get_groth16_vk_onchain(resolver)?
-        .try_into()
-        .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
 
     let training_wheels_pk = match &config.training_wheels_pubkey {
         None => None,
@@ -185,29 +227,47 @@ pub(crate) fn validate_authenticators(
                         config.is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())?;
                     }
 
-                    match zksig.proof {
-                        ZKP::Groth16(_) => {
+                    match &zksig.proof {
+                        ZKP::Groth16(groth16proof) => {
+                            // let start = std::time::Instant::now();
                             let public_inputs_hash =
                                 get_public_inputs_hash(sig, pk, &rsa_jwk, config).map_err(
                                     |_| invalid_signature!("Could not compute public inputs hash"),
                                 )?;
+                            // println!("Public inputs hash time: {:?}", start.elapsed());
+
+                            let groth16_and_stmt =
+                                Groth16ProofAndStatement::new(*groth16proof, public_inputs_hash);
 
                             // The training wheels signature is only checked if a training wheels PK is set on chain
                             if training_wheels_pk.is_some() {
-                                zksig
-                                    .verify_training_wheels_sig(
-                                        training_wheels_pk.as_ref().unwrap(),
-                                        &public_inputs_hash,
-                                    )
-                                    .map_err(|_| {
-                                        invalid_signature!(
-                                            "Could not verify training wheels signature"
-                                        )
-                                    })?;
+                                match &zksig.training_wheels_signature {
+                                    Some(training_wheels_sig) => {
+                                        training_wheels_sig
+                                            .verify(
+                                                &groth16_and_stmt,
+                                                training_wheels_pk.as_ref().unwrap(),
+                                            )
+                                            .map_err(|_| {
+                                                invalid_signature!(
+                                                    "Could not verify training wheels signature"
+                                                )
+                                            })?;
+                                    },
+                                    None => {
+                                        return Err(invalid_signature!(
+                                            "Training wheels signature expected but it is missing"
+                                        ))
+                                    },
+                                }
                             }
 
-                            zksig
-                                .verify_groth16_proof(public_inputs_hash, pvk)
+                            let vk = get_groth16_vk_onchain(resolver)?;
+                            maybe_update_last_seen_pvk(&vk)?;
+                            let pvk = get_last_seen_pvk();
+                            let result = zksig.verify_groth16_proof(public_inputs_hash, &pvk);
+
+                            result
                                 .map_err(|_| invalid_signature!("Proof verification failed"))?;
                         },
                     }

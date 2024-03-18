@@ -36,6 +36,9 @@ aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
+ark-groth16 = { workspace = true }
+ark-bn254 = { workspace = true }
+base64-url = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
@@ -53,6 +56,7 @@ move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
 ouroboros = { workspace = true }
+quick_cache = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }

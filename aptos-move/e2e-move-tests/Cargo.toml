@@ -24,6 +24,7 @@ aptos-language-e2e-tests = { workspace = true }
 aptos-package-builder = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ["testing"] }
+ark-groth16 = { workspace = true }
 bcs = { workspace = true }
 claims = { workspace = true }
 hex = { workspace = true }
