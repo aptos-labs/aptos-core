@@ -28,7 +28,7 @@ module 0x8675309::M {
           let f: &u64;
           {
             let s2: &M::S;
-            M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S }: M::R = Borrow(Immutable)(pack M::R(pack M::S(0), pack M::S(1)));
+            M::R{ s1: M::S{ f: f: &u64 }, s2: s2: &M::S }: &M::R = Borrow(Immutable)(pack M::R(pack M::S(0), pack M::S(1)));
             f;
             s2;
             f: &u64 = Borrow(Immutable)(0);
@@ -44,7 +44,7 @@ module 0x8675309::M {
           let f: &mut u64;
           {
             let s2: &mut M::S;
-            M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S }: M::R = Borrow(Mutable)(pack M::R(pack M::S(0), pack M::S(1)));
+            M::R{ s1: M::S{ f: f: &mut u64 }, s2: s2: &mut M::S }: &mut M::R = Borrow(Mutable)(pack M::R(pack M::S(0), pack M::S(1)));
             f;
             s2;
             f: &mut u64 = Borrow(Mutable)(0);
@@ -59,14 +59,14 @@ module 0x8675309::M {
 
 
 Diagnostics:
-bug: Unpacking a reference to a struct must return the references of fields
-   ┌─ tests/simplifier-elimination/assign_unpack_references.move:17:9
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:17:33
    │
 17 │         R { s1: S { f }, s2 } = &R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
-   │         ^^^^^^^^^^^^^^^^^^^^^
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used
 
-bug: Unpacking a reference to a struct must return the references of fields
-   ┌─ tests/simplifier-elimination/assign_unpack_references.move:27:9
+error: value of type `M::R` does not have the `drop` ability
+   ┌─ tests/simplifier-elimination/assign_unpack_references.move:27:33
    │
 27 │         R { s1: S { f }, s2 } = &mut R { s1: S{f: 0}, s2: S{f: 1} }; f; s2;
-   │         ^^^^^^^^^^^^^^^^^^^^^
+   │                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ still borrowed but will be implicitly dropped later since it is no longer used

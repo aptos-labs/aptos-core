@@ -1264,14 +1264,15 @@ impl<'env> Generator<'env> {
                     } else {
                         ReferenceKind::Mutable
                     };
-                    return self.gen_borrow_field_for_unpack_ref(id, str, arg, temps, ref_kind);
+                    self.gen_borrow_field_for_unpack_ref(id, str, arg, temps, ref_kind);
+                } else {
+                    self.emit_call(
+                        *id,
+                        temps,
+                        BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned()),
+                        vec![arg],
+                    );
                 }
-                self.emit_call(
-                    *id,
-                    temps,
-                    BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned()),
-                    vec![arg],
-                );
                 for (cont_id, cont_pat, cont_temp) in cont_assigns {
                     self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
                 }
