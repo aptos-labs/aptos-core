@@ -19,6 +19,7 @@ aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-types = { workspace = true }
+aptos-logger = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }

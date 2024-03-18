@@ -18,6 +18,7 @@ use std::{
     ops::Deref,
     sync::atomic::{AtomicU64, Ordering},
 };
+use aptos_logger::info;
 
 pub enum CommitError {
     CodeInvariantError(String),
@@ -405,6 +406,22 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
 
     pub(crate) fn total_base_value_size(&self) -> u64 {
         self.total_base_value_size.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn print_memory_details(&self) {
+        info!("#### Memory details for VersionedDelayedFields ####");
+        info!("Types: DashMap: {:?}, VersionedValue: {:?}, VersionEntry: {:?}, DelayedFieldValue: {:?}", std::mem::size_of::<DashMap<K, VersionedValue<K>>>(), std::mem::size_of::<VersionedValue<K>>(), std::mem::size_of::<CachePadded<VersionEntry<K>>>(), std::mem::size_of::<DelayedFieldValue>());
+
+        let mut with_versions = 0;
+        let mut total_versions = 0;
+        for entry in self.values.iter() {
+            if let Some(map) = &entry.versioned_map {
+                with_versions += 1;
+                total_versions += map.len();
+            }
+        }
+
+        info!("DashMap keys: {:?}, with versions {:?}, total versions {:?}", self.values.len(), with_versions, total_versions);
     }
 
     /// Must be called when an delayed field from storage is resolved, with ID replacing the

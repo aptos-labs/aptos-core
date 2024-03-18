@@ -61,6 +61,8 @@ impl<
     }
 
     pub fn stats(&self) -> BlockStateStats {
+        self.data.print_memory_details();
+        self.delayed_fields.print_memory_details();
         BlockStateStats {
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),

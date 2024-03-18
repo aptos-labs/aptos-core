@@ -21,6 +21,7 @@ use std::{
         Arc,
     },
 };
+use aptos_logger::info;
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
 /// and some content.
@@ -227,6 +228,54 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
 
     pub(crate) fn total_base_value_size(&self) -> u64 {
         self.total_base_value_size.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn print_memory_details(&self) {
+        info!("#### Memory details for VersionedData ####");
+        info!("Types: DashMap: {:?}, VersionedValue: {:?}, VersionEntry: {:?}, DelayedFieldValue: {:?}", std::mem::size_of::<DashMap<K, VersionedValue<V>>>(), std::mem::size_of::<VersionedValue<K>>(), std::mem::size_of::<CachePadded<Entry<V>>>(), std::mem::size_of::<ValueWithLayout<V>>());
+
+        let mut with_base = 0;
+        let mut with_versions = 0;
+        let mut total_versions = 0;
+        let mut total_exchanged_versions = 0;
+        let mut total_exchanged_versions_with_layout = 0;
+        let mut total_size = 0;
+        for entry in self.values.iter() {
+            if !entry.versioned_map.is_empty() {
+                let mut has_base = false;
+                let mut has_version = false;
+                for (k, v) in &entry.versioned_map {
+                    if k == &ShiftedTxnIndex::zero_idx() {
+                        has_base = true;
+                    } else {
+                        has_version = true;
+                        total_versions += 1;
+                    };
+                    match &v.cell {
+                        EntryCell::Write(_, vl) => {
+                            total_size += vl.bytes_len().unwrap_or(0);
+                            if let ValueWithLayout::Exchanged(_, layout) = vl {
+                                total_exchanged_versions += 1;
+                                if layout.is_some() {
+                                    total_exchanged_versions_with_layout += 1;
+                                }
+                            }
+                        },
+                        EntryCell::Delta(_, _) => {
+
+                        },
+                    }
+                }
+                if has_base {
+                    with_base += 1;
+                }
+                if has_version {
+                    with_versions += 1;
+                }
+            }
+        }
+
+        info!("DashMap keys: {:?}, with base {:?}, with versions {:?}, total versions {:?}, total exchanged ver. {:?}, total exchanged with layout ver. {:?}, total byte size {:?}", self.values.len(), with_base, with_versions, total_versions, total_exchanged_versions, total_exchanged_versions_with_layout, total_size);
     }
 
     pub fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {

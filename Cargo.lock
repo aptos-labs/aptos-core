@@ -2885,6 +2885,7 @@ dependencies = [
  "aptos-aggregator",
  "aptos-crypto",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-types",
  "aptos-vm-types",
  "bcs 0.1.4",
