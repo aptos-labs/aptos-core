@@ -5,8 +5,8 @@
 use crate::compiler::{as_module, compile_units};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
-    vm_status::StatusCode,
+    account_address::AccountAddress, gas_algebra::GasQuantity, identifier::Identifier,
+    language_storage::ModuleId, vm_status::StatusCode,
 };
 use move_vm_runtime::{module_traversal::*, move_vm::MoveVM, native_functions::NativeFunction};
 use move_vm_test_utils::InMemoryStorage;
@@ -26,6 +26,7 @@ fn make_load_c() -> NativeFunction {
 fn make_dispatch_native() -> NativeFunction {
     Arc::new(move |_, _, _| -> PartialVMResult<NativeResult> {
         Ok(NativeResult::CallFunction {
+            cost: GasQuantity::zero(),
             module_name: ModuleId::new(TEST_ADDR, Identifier::new("A").unwrap()),
             func_name: Identifier::new("foo").unwrap(),
             ty_args: vec![],
@@ -37,6 +38,7 @@ fn make_dispatch_native() -> NativeFunction {
 fn make_dispatch_c_native() -> NativeFunction {
     Arc::new(move |_, _, _| -> PartialVMResult<NativeResult> {
         Ok(NativeResult::CallFunction {
+            cost: GasQuantity::zero(),
             module_name: ModuleId::new(TEST_ADDR, Identifier::new("C").unwrap()),
             func_name: Identifier::new("foo").unwrap(),
             ty_args: vec![],
@@ -48,6 +50,7 @@ fn make_dispatch_c_native() -> NativeFunction {
 fn make_dispatch_d_native() -> NativeFunction {
     Arc::new(move |_, _, _| -> PartialVMResult<NativeResult> {
         Ok(NativeResult::CallFunction {
+            cost: GasQuantity::zero(),
             module_name: ModuleId::new(TEST_ADDR, Identifier::new("D").unwrap()),
             func_name: Identifier::new("foo3").unwrap(),
             ty_args: vec![],
@@ -188,7 +191,6 @@ fn runtime_reentrancy_check() {
         &mut TraversalContext::new(&traversal_storage),
     )
     .unwrap();
-
 
     // Call stack look like following:
     // A::foo3 -> B::foo3 -> B::dispatch_d -> D::foo3, D doesn't exists, thus FUNCTION_RESOLUTION_FAILURE.

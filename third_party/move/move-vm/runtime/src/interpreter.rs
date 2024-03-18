@@ -584,11 +584,13 @@ impl Interpreter {
                 Err(err)
             },
             NativeResult::CallFunction {
+                cost,
                 module_name,
                 func_name,
                 ty_args,
                 args,
             } => {
+                gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
                 let func = resolver.function_from_name(&module_name, &func_name)?;
 
                 if func.is_friend_or_private() {

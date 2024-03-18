@@ -52,6 +52,7 @@ pub enum NativeResult {
     ///
     /// Failing to follow this convention will result in errors in paranoid mode.
     CallFunction {
+        cost: InternalGas,
         module_name: ModuleId,
         func_name: Identifier,
         ty_args: Vec<Type>,
