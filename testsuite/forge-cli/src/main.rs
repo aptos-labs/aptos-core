@@ -1599,7 +1599,7 @@ fn network_partition() -> ForgeConfig {
 
 fn compat() -> ForgeConfig {
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(4).unwrap())
+        .with_initial_validator_count(NonZeroUsize::new(40).unwrap())
         .add_network_test(SimpleValidatorUpgrade)
         .with_success_criteria(SuccessCriteria::new(5000).add_wait_for_catchup_s(240))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
