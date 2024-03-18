@@ -14591,7 +14591,7 @@ dependencies = [
 [[package]]
 name = "self_update"
 version = "0.39.0"
-source = "git+https://github.com/banool/self_update.git?rev=65916eade8b37e90ea5778c62592f20614b56627#65916eade8b37e90ea5778c62592f20614b56627"
+source = "git+https://github.com/banool/self_update.git?rev=8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b#8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b"
 dependencies = [
  "hyper",
  "indicatif 0.17.7",
