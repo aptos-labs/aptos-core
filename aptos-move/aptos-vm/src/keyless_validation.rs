@@ -8,8 +8,8 @@ use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
     keyless::{
-        get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16VerificationKey,
-        KeylessPublicKey, KeylessSignature, ZKP,
+        get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
+        Groth16VerificationKey, KeylessPublicKey, KeylessSignature, ZKP,
     },
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
@@ -17,6 +17,8 @@ use aptos_types::{
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
+use once_cell::sync::Lazy;
+use quick_cache::sync::Cache;
 use serde::Deserialize;
 
 macro_rules! value_deserialization_error {
@@ -27,6 +29,10 @@ macro_rules! value_deserialization_error {
         )
     }};
 }
+
+/// TODO(keyless): Comments say Cache should be wrapped in an Arc if used from multiple threads, but do I even need one if it's in a sync::Lazy?
+pub(crate) static ZKP_CACHE: Lazy<Cache<Groth16ProofAndStatement, bool>> =
+    Lazy::new(|| Cache::new(1_000_000));
 
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
     resolver: &impl AptosMoveResolver,
@@ -118,6 +124,8 @@ fn get_jwk_for_authenticator(
 }
 
 /// Ensures that **all** keyless authenticators in the transaction are valid.
+///
+/// WARNING: This function is NOT re-entrant.
 pub(crate) fn validate_authenticators(
     authenticators: &Vec<(KeylessPublicKey, KeylessSignature)>,
     features: &Features,
@@ -185,30 +193,51 @@ pub(crate) fn validate_authenticators(
                         config.is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())?;
                     }
 
-                    match zksig.proof {
-                        ZKP::Groth16(_) => {
+                    match &zksig.proof {
+                        ZKP::Groth16(groth16proof) => {
                             let public_inputs_hash =
                                 get_public_inputs_hash(sig, pk, &rsa_jwk, config).map_err(
                                     |_| invalid_signature!("Could not compute public inputs hash"),
                                 )?;
 
+                            let groth16_and_stmt =
+                                Groth16ProofAndStatement::new(*groth16proof, public_inputs_hash);
+
                             // The training wheels signature is only checked if a training wheels PK is set on chain
                             if training_wheels_pk.is_some() {
-                                zksig
-                                    .verify_training_wheels_sig(
-                                        training_wheels_pk.as_ref().unwrap(),
-                                        &public_inputs_hash,
-                                    )
-                                    .map_err(|_| {
-                                        invalid_signature!(
-                                            "Could not verify training wheels signature"
-                                        )
-                                    })?;
+                                match &zksig.training_wheels_signature {
+                                    Some(training_wheels_sig) => {
+                                        training_wheels_sig
+                                            .verify(
+                                                &groth16_and_stmt,
+                                                training_wheels_pk.as_ref().unwrap(),
+                                            )
+                                            .map_err(|_| {
+                                                invalid_signature!(
+                                                    "Could not verify training wheels signature"
+                                                )
+                                            })?;
+                                    },
+                                    None => {
+                                        return Err(invalid_signature!(
+                                            "Training wheels signature expected but it is missing"
+                                        ))
+                                    },
+                                }
                             }
 
-                            zksig
-                                .verify_groth16_proof(public_inputs_hash, pvk)
-                                .map_err(|_| invalid_signature!("Proof verification failed"))?;
+                            // If the ZKP has not successfully verified over this statment in the past,
+                            // manually verify it & cache it. Otherwise, skip.
+                            if matches!(ZKP_CACHE.get(&groth16_and_stmt), None | Some(false)) {
+                                let result = zksig.verify_groth16_proof(public_inputs_hash, pvk);
+
+                                if result.is_ok() {
+                                    ZKP_CACHE.insert(groth16_and_stmt, true);
+                                }
+
+                                result
+                                    .map_err(|_| invalid_signature!("Proof verification failed"))?;
+                            }
                         },
                     }
                 },

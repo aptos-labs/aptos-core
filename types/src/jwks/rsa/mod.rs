@@ -58,7 +58,7 @@ impl RSA_JWK {
         }
     }
 
-    pub fn verify_signature(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
+    pub fn verify_signature_without_exp_check(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
         let mut validation = Validation::new(Algorithm::RS256);
         validation.validate_exp = false;
         let key = &DecodingKey::from_rsa_components(&self.n, &self.e)?;

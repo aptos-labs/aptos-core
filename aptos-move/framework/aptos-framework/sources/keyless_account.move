@@ -117,7 +117,6 @@ module aptos_framework::keyless_account {
     }
 
     // Sets the keyless configuration, only callable via governance proposal.
-    // WARNING: If a malicious key is set, this would lead to stolen funds.
     public fun update_configuration(fx: &signer, config: Configuration) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
@@ -138,7 +137,7 @@ module aptos_framework::keyless_account {
     }
 
     // Convenience method to [un]set the training wheels PK, only callable via governance proposal.
-    // WARNING: If a malicious key is set, this would lead to stolen funds.
+    // WARNING: If a malicious key is set, this *could* lead to stolen funds.
     public fun update_training_wheels(fx: &signer, pk: Option<vector<u8>>) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
         if (option::is_some(&pk)) {
@@ -168,7 +167,7 @@ module aptos_framework::keyless_account {
     }
 
     // Convenience method to append to the set of override `aud`'s, only callable via governance proposal.
-    // WARNING: If a malicious override `aud` is set, this would lead to stolen funds.
+    // WARNING: If a malicious override `aud` is set, this *could* lead to stolen funds.
     public fun add_override_aud(fx: &signer, aud: String) acquires Configuration {
         system_addresses::assert_aptos_framework(fx);
 
