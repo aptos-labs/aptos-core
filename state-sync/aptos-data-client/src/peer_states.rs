@@ -7,7 +7,10 @@ use crate::{
     logging::{LogEntry, LogEvent, LogSchema},
     metrics,
 };
-use aptos_config::{config::AptosDataClientConfig, network_id::PeerNetworkId};
+use aptos_config::{
+    config::AptosDataClientConfig,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_logger::prelude::*;
 use aptos_storage_service_types::{
     requests::StorageServiceRequest, responses::StorageServerSummary,
@@ -130,12 +133,17 @@ impl PeerState {
     }
 
     /// Returns the storage summary iff the peer is not below the ignore threshold
-    pub(crate) fn get_storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
-        if self.score <= IGNORE_PEER_THRESHOLD {
+    pub fn get_storage_summary_if_not_ignored(&self) -> Option<&StorageServerSummary> {
+        if self.is_ignored() {
             None
         } else {
             self.storage_summary.as_ref()
         }
+    }
+
+    /// Returns true iff the peer is currently ignored
+    fn is_ignored(&self) -> bool {
+        self.score <= IGNORE_PEER_THRESHOLD
     }
 
     /// Updates the score of the peer according to a successful operation
@@ -247,6 +255,12 @@ impl PeerStates {
         sample!(
             SampleRate::Duration(Duration::from_secs(LOGS_FREQUENCY_SECS)),
             update_peer_request_logs(self.peer_to_state.clone());
+        );
+
+        // Periodically update the metrics for ignored peers
+        sample!(
+            SampleRate::Duration(Duration::from_secs(METRICS_FREQUENCY_SECS)),
+            update_peer_ignored_metrics(self.peer_to_state.clone());
         );
     }
 
@@ -433,6 +447,37 @@ fn median_or_max<T: Ord + Copy>(mut values: Vec<T>, max_value: T) -> T {
 pub fn get_bucket_id_for_peer(peer: PeerNetworkId) -> u8 {
     let peer_id_bytes = peer.peer_id().into_bytes();
     peer_id_bytes[0] % NUM_PEER_BUCKETS_FOR_METRICS
+}
+
+/// Updates the metrics for the number of ignored peers
+fn update_peer_ignored_metrics(peer_to_state: Arc<DashMap<PeerNetworkId, PeerState>>) {
+    // Collect the ignored peer counts by network
+    let mut ignored_peer_counts_by_network: BTreeMap<NetworkId, u64> = BTreeMap::new();
+    for peer_state_entry in peer_to_state.iter() {
+        // Get the peer and state
+        let peer = *peer_state_entry.key();
+        let network_id = peer.network_id();
+        let peer_state = peer_state_entry.value();
+
+        // Get (or initialize) the network count entry
+        let network_count_entry = ignored_peer_counts_by_network
+            .entry(network_id)
+            .or_default();
+
+        // If the peer is ignored, increment the count
+        if peer_state.is_ignored() {
+            *network_count_entry += 1;
+        }
+    }
+
+    // Update the ignored peer metrics
+    for (network_id, ignored_peer_count) in ignored_peer_counts_by_network.iter() {
+        metrics::set_gauge(
+            &metrics::IGNORED_PEERS,
+            &network_id.to_string(),
+            *ignored_peer_count,
+        );
+    }
 }
 
 /// Updates the logs for the peer requests and responses by bucket
