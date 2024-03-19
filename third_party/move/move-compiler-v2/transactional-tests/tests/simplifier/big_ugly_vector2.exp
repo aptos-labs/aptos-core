@@ -1,0 +1,32 @@
+processed 3 tasks
+
+task 0 'print-bytecode'. lines 1-323:
+Error: compilation errors:
+ error: exceeded maximal local count: 255
+  ┌─ TEMPFILE:4:9
+  │
+4 │     fun make_big_vector(a: u64): vector<u64> {
+  │         ^^^^^^^^^^^^^^^
+
+
+
+task 1 'publish'. lines 325-647:
+Error: compilation errors:
+ error: exceeded maximal local count: 255
+    ┌─ TEMPFILE:328:9
+    │
+328 │     fun make_big_vector(a: u64): vector<u64> {
+    │         ^^^^^^^^^^^^^^^
+
+
+
+task 2 'run'. lines 649-649:
+Error: Function execution failed with VMError: {
+    message: Linker Error: Cannot find ModuleId { address: 000000000000000000000000000000000000000000000000000000000000cafe, name: Identifier("vectors") } in data cache,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
