@@ -25,7 +25,7 @@ module 0xcafe::vectors {
             223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233,
             234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244,
             245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255,
-            256];
+            0];
         let y = x;
         y
     }
@@ -41,7 +41,7 @@ module 0xcafe::vectors {
         let len = vector::length(&v);
         let sum = sum(&v);
         assert!(len == 257, len);
-        assert!(sum == (256 * 257)/2, sum);
+        assert!(sum == (256 * 255)/2, sum);
     }
 }
 

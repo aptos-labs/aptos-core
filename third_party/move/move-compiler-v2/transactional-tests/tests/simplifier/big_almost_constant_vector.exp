@@ -6,20 +6,17 @@ comparison between v1 and v2 failed:
 +  error: exceeded maximal local count: 255
 +   ┌─ TEMPFILE:4:9
 +   │
-+ 4 │     fun make_big_vector(a: u64): vector<u64> {
++ 4 │     fun make_big_vector(a: u8): vector<u8> {
 +   │         ^^^^^^^^^^^^^^^
 = 
 = 
 = 
-= task 1 'run'. lines 48-48:
-= Error: Function execution failed with VMError: {
--     major_status: ABORTED,
--     sub_status: Some(32896),
--     location: 0xcafe::vectors,
++ task 1 'run'. lines 48-48:
++ Error: Function execution failed with VMError: {
 +     major_status: LINKER_ERROR,
 +     sub_status: None,
 +     location: undefined,
-=     indices: redacted,
-=     offsets: redacted,
-= }
-= 
++     indices: redacted,
++     offsets: redacted,
++ }
++ 
