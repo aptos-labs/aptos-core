@@ -4385,6 +4385,7 @@ dependencies = [
  "derive_more",
  "fail 0.5.1",
  "futures",
+ "hex",
  "jsonwebtoken 8.3.0",
  "move-binary-format",
  "move-bytecode-utils",
@@ -10870,6 +10871,7 @@ dependencies = [
  "move-symbol-pool",
  "num 0.4.1",
  "once_cell",
+ "petgraph 0.6.4",
  "serde",
 ]
 
@@ -11170,6 +11172,7 @@ dependencies = [
  "move-binary-format",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-core-types",
  "move-docgen",
  "move-errmapgen",
@@ -11318,6 +11321,7 @@ dependencies = [
  "codespan-reporting",
  "move-command-line-common",
  "move-compiler",
+ "move-compiler-v2",
  "move-model",
  "move-prover-test-utils",
  "move-stackless-bytecode",
@@ -14587,7 +14591,7 @@ dependencies = [
 [[package]]
 name = "self_update"
 version = "0.39.0"
-source = "git+https://github.com/banool/self_update.git?rev=65916eade8b37e90ea5778c62592f20614b56627#65916eade8b37e90ea5778c62592f20614b56627"
+source = "git+https://github.com/banool/self_update.git?rev=8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b#8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b"
 dependencies = [
  "hyper",
  "indicatif 0.17.7",

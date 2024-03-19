@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    ast::{Condition, Exp, ExpData, MemoryLabel, Operation, Pattern, Spec, TempIndex, Value},
+    ast::{
+        Condition, Exp, ExpData, MemoryLabel, Operation, Pattern, Spec, SpecBlockTarget, TempIndex,
+        Value,
+    },
     model::{GlobalEnv, ModuleId, NodeId, SpecVarId},
     symbol::Symbol,
     ty::Type,
@@ -248,7 +251,14 @@ pub trait ExpRewriterFunctions {
     fn rewrite_sequence(&mut self, id: NodeId, seq: &[Exp]) -> Option<Exp> {
         None
     }
-    fn rewrite_spec(&mut self, id: NodeId, spec: &Spec) -> Option<Spec> {
+    fn rewrite_spec(&mut self, target: &SpecBlockTarget, spec: &Spec) -> Option<Spec> {
+        None
+    }
+    fn rewrite_condition(
+        &mut self,
+        target: &SpecBlockTarget,
+        cond: &Condition,
+    ) -> Option<Condition> {
         None
     }
     // Might only be useful with V1-compiled code
@@ -512,7 +522,8 @@ pub trait ExpRewriterFunctions {
             },
             SpecBlock(id, spec) => {
                 let (id_changed, new_id) = self.internal_rewrite_id(*id);
-                let (spec_changed, new_spec) = self.internal_rewrite_spec(new_id, spec.clone());
+                let (spec_changed, new_spec) =
+                    self.rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
                 if id_changed || spec_changed {
                     SpecBlock(new_id, new_spec).into_exp()
                 } else {
@@ -656,24 +667,77 @@ pub trait ExpRewriterFunctions {
         }
     }
 
-    fn internal_rewrite_spec(&mut self, id: NodeId, spec: Spec) -> (bool, Spec) {
-        let (conditions_changed, new_conditions) =
-            self.internal_rewrite_spec_conditions(spec.conditions);
-        let (on_impl_changed, new_on_impl) = self.internal_rewrite_spec_on_impl(spec.on_impl);
-        let (update_map_changed, new_update_map) = self.rewrite_spec_update_map(spec.update_map);
-        let newspec = Spec {
-            conditions: new_conditions,
-            on_impl: new_on_impl,
-            update_map: new_update_map,
-            ..spec
+    fn rewrite_spec_descent(&mut self, target: &SpecBlockTarget, spec: &Spec) -> (bool, Spec) {
+        let mut changed = false;
+        let mut conditions = vec![];
+
+        // First go over all top-level conditions in this block.
+        for cond in &spec.conditions {
+            let (this_changed, new_cond) = self.internal_rewrite_condition(target, cond);
+            conditions.push(new_cond);
+            changed |= this_changed;
+        }
+        let mut update_map = BTreeMap::new();
+        for (node_id, cond) in &spec.update_map {
+            let (this_changed, new_cond) = self.internal_rewrite_condition(target, cond);
+            update_map.insert(*node_id, new_cond);
+            changed |= this_changed
+        }
+
+        // Next go over any sub-blocks for implementation
+        let mut on_impl = BTreeMap::new();
+        for (code_offs, impl_spec) in &spec.on_impl {
+            // We expect the target to be a function if implementation specs are present
+            let SpecBlockTarget::Function(mid, fid) = target else {
+                panic!("expected function target")
+            };
+            let (this_changed, new_spec) = self.rewrite_spec_descent(
+                &SpecBlockTarget::FunctionCode(*mid, *fid, *code_offs as usize),
+                impl_spec,
+            );
+            on_impl.insert(*code_offs, new_spec);
+            changed |= this_changed
+        }
+
+        let new_spec = Spec {
+            loc: spec.loc.clone(),
+            conditions,
+            properties: spec.properties.clone(),
+            on_impl,
+            update_map,
         };
-        if let Some(newer_spec) = self.rewrite_spec(id, &newspec) {
-            (true, newer_spec)
+
+        if let Some(new_spec) = self.rewrite_spec(target, &new_spec) {
+            (true, new_spec)
         } else {
-            (
-                conditions_changed || on_impl_changed || update_map_changed,
-                newspec,
-            )
+            (changed, new_spec)
+        }
+    }
+
+    fn internal_rewrite_condition(
+        &mut self,
+        target: &SpecBlockTarget,
+        cond: &Condition,
+    ) -> (bool, Condition) {
+        let (mut changed, exp) = self.internal_rewrite_exp(&cond.exp);
+        let additional_exps =
+            if let Some(additional_exps) = self.internal_rewrite_vec(&cond.additional_exps) {
+                changed = true;
+                additional_exps
+            } else {
+                cond.additional_exps.clone()
+            };
+        let cond = Condition {
+            loc: cond.loc.clone(),
+            kind: cond.kind.clone(),
+            properties: cond.properties.clone(),
+            exp,
+            additional_exps,
+        };
+        if let Some(new_cond) = self.rewrite_condition(target, &cond) {
+            (true, new_cond)
+        } else {
+            (changed, cond)
         }
     }
 

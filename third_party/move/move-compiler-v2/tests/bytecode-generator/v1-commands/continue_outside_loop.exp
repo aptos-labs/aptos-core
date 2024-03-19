@@ -3,9 +3,6 @@ module <SELF>_0 {
     private fun main() {
         continue
     }
-    spec fun $main() {
-        continue
-    }
 } // end <SELF>_0
 
 

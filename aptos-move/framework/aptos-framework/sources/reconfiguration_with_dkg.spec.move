@@ -12,8 +12,10 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires chain_status::is_operating();
         include stake::ResourceRequirement;
         include stake::GetReconfigStartTimeRequirement;
-        include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
+        include features::spec_periodical_reward_rate_decrease_enabled(
+        ) ==> staking_config::StakingRewardsConfigEnabledRequirement;
         aborts_if false;
+        pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved).
     }
 
     spec finish(account: &signer) {
@@ -59,5 +61,4 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires dkg::has_incomplete_session();
         aborts_if false;
     }
-
 }

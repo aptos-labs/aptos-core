@@ -7,7 +7,4 @@ module 0x42::m {
         ;
         Tuple()
     }
-    spec fun $foo(vec: vector<bool>) {
-        Tuple()
-    }
 } // end 0x42::m

@@ -23,5 +23,4 @@ module <SELF>_0 {
           Tuple()
         }
     }
-    spec fun $main();
 } // end <SELF>_0

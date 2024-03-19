@@ -12,5 +12,4 @@ module 0xc0ffee::m {
         };
         0
     }
-    spec fun $test(): u64;
 } // end 0xc0ffee::m

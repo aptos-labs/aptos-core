@@ -127,16 +127,6 @@ module 0x8675::M {
           }
         }
     }
-    spec fun $id<T>(r: #0): #0 {
-        r
-    }
-    spec fun $id_mut<T>(r: #0): #0 {
-        r
-    }
-    spec fun $iterloop(x: u64,y: &u64): u64;
-    spec fun $t0();
-    spec fun $test1(r: u64): u64;
-    spec fun $test1a(x: u64,r: &u64): u64;
 } // end 0x8675::M
 
 

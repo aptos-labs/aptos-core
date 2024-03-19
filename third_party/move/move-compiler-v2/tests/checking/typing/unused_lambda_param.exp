@@ -27,39 +27,15 @@ warning: Function `0xc0ffee::m::unused_lambda_suppressed2` is unused: it has no 
 // -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     private fun unused_lambda() {
-        {
-          let (p: u64): (u64) = Tuple(0);
-          {
-            let (x: u64): (u64) = Tuple(p);
-            1
-          }
-        };
+        1;
         Tuple()
     }
     private fun unused_lambda_suppressed1() {
-        {
-          let (p: u64): (u64) = Tuple(0);
-          {
-            let (_x: u64): (u64) = Tuple(p);
-            1
-          }
-        };
+        1;
         Tuple()
     }
     private fun unused_lambda_suppressed2() {
-        {
-          let (p: u64): (u64) = Tuple(0);
-          {
-            let (_): (u64) = Tuple(p);
-            1
-          }
-        };
+        1;
         Tuple()
     }
-    spec fun $test(p: u64,f: |u64|u64): u64 {
-        (f)(p)
-    }
-    spec fun $unused_lambda();
-    spec fun $unused_lambda_suppressed1();
-    spec fun $unused_lambda_suppressed2();
 } // end 0xc0ffee::m

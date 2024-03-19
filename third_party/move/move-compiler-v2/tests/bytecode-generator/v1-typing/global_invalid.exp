@@ -12,7 +12,6 @@ module 0x42::m {
           Tuple()
         }
     }
-    spec fun $invalid<T>(addr: address);
 } // end 0x42::m
 
 
