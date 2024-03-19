@@ -463,7 +463,7 @@ fn initialize_features(session: &mut SessionExt, features_override: Option<Vec<F
     exec_function(
         session,
         "features",
-        "change_feature_flags",
+        "change_feature_flags_internal",
         vec![],
         serialized_values,
     );

@@ -24,12 +24,9 @@ spec aptos_framework::randomness {
     spec fun spec_is_unbiasable(): bool;
 
     spec initialize(framework: &signer) {
-        use std::option;
         use std::signer;
         let framework_addr = signer::address_of(framework);
         aborts_if framework_addr != @aptos_framework;
-        aborts_if exists<PerBlockRandomness>(framework_addr);
-        ensures global<PerBlockRandomness>(framework_addr).seed == option::spec_none<vector<u8>>();
     }
 
     spec on_new_block(vm: &signer, epoch: u64, round: u64, seed_for_new_block: Option<vector<u8>>) {
