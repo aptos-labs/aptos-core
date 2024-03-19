@@ -250,7 +250,11 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .collect();
 
         let mut script_bytes = vec![];
-        script.serialize_for_version(Some(file_format_common::VERSION_MAX), &mut script_bytes)?;
+        script.serialize_for_version(
+            Some(file_format_common::VERSION_MAX),
+            &mut script_bytes,
+            "execute_script",
+        )?;
 
         let args = txn_args
             .iter()
