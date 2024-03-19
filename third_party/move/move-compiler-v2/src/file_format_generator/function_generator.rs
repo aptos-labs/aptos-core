@@ -679,6 +679,11 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Generate code for the load instruction.
     fn gen_load(&mut self, ctx: &BytecodeContext, dest: &TempIndex, cons: &Constant) {
+        if let Some(pos) = self.stack.iter().position(|e| e == dest) {
+            // If `dest` is already on the stack, we need to flush it out (dead store)
+            // before we can reload the constant into `dest`.
+            self.abstract_flush_stack_before(ctx, pos);
+        }
         use Constant::*;
         match cons {
             Bool(b) => {
