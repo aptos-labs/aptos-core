@@ -301,27 +301,20 @@ impl<S: TShare> RandStore<S> {
             "Share from future round"
         );
         let rand_metadata = fast_share.metadata().clone();
-        ensure!(
-            self.fast_rand_config.is_some() && self.fast_rand_map.is_some(),
-            "Fast path not enabled"
-        );
 
-        let fast_rand_item = self
-            .fast_rand_map
-            .as_mut()
-            .unwrap()
-            .entry(rand_metadata.round())
-            .or_insert_with(|| RandItem::new(self.author));
-        fast_rand_item.add_share(
-            fast_share.rand_share().clone(),
-            self.fast_rand_config.as_ref().unwrap(),
-        )?;
-        fast_rand_item.try_aggregate(
-            self.fast_rand_config.as_ref().unwrap(),
-            self.decision_tx.clone(),
-            true,
-        );
-        Ok(fast_rand_item.has_decision())
+        match (self.fast_rand_config.as_ref(), self.fast_rand_map.as_mut()) {
+            (Some(fast_rand_config), Some(fast_rand_map)) => {
+                let fast_rand_item = fast_rand_map
+                    .entry(rand_metadata.round())
+                    .or_insert_with(|| RandItem::new(self.author));
+                fast_rand_item.add_share(fast_share.share, fast_rand_config)?;
+                fast_rand_item.try_aggregate(fast_rand_config, self.decision_tx.clone(), true);
+                Ok(fast_rand_item.has_decision())
+            },
+            _ => {
+                anyhow::bail!("Fast path not enabled");
+            },
+        }
     }
 
     /// This should only be called after the block is added, returns None if already decided

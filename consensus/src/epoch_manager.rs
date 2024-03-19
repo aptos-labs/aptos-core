@@ -963,12 +963,11 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 StdRng::from_rng(thread_rng()).map_err(NoRandomnessReason::RngCreationError)?;
             let augmented_key_pair = WVUF::augment_key_pair(&vuf_pp, sk.main, pk.main, &mut rng);
             let fast_augmented_key_pair = if fast_randomness_is_enabled {
-                Some(WVUF::augment_key_pair(
-                    &vuf_pp,
-                    sk.fast.unwrap(),
-                    pk.fast.unwrap(),
-                    &mut rng,
-                ))
+                if let (Some(sk), Some(pk)) = (sk.fast, pk.fast) {
+                    Some(WVUF::augment_key_pair(&vuf_pp, sk, pk, &mut rng))
+                } else {
+                    None
+                }
             } else {
                 None
             };
@@ -995,20 +994,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             dkg_pub_params.pvss_config.wconfig.clone(),
         );
 
-        let fast_rand_config = if fast_randomness_is_enabled && fast_augmented_key_pair.is_some() {
-            let (ask, apk) = fast_augmented_key_pair.unwrap();
-
+        let fast_rand_config = if let (Some((ask, apk)), Some(trx), Some(wconfig)) = (
+            fast_augmented_key_pair,
+            transcript.fast.as_ref(),
+            dkg_pub_params.pvss_config.fast_wconfig.as_ref(),
+        ) {
             let pk_shares = (0..new_epoch_state.verifier.len())
-                .map(|id| {
-                    transcript.fast.as_ref().unwrap().get_public_key_share(
-                        dkg_pub_params.pvss_config.fast_wconfig.as_ref().unwrap(),
-                        &Player { id },
-                    )
-                })
+                .map(|id| trx.get_public_key_share(wconfig, &Player { id }))
                 .collect::<Vec<_>>();
 
             let fast_keys = RandKeys::new(ask, apk, pk_shares, new_epoch_state.verifier.len());
-            let fast_wconfig = dkg_pub_params.pvss_config.fast_wconfig.unwrap().clone();
+            let fast_wconfig = wconfig.clone();
 
             Some(RandConfig::new(
                 self.author,
@@ -1083,9 +1079,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 (None, None)
             },
         };
-        if fast_rand_config.is_none() && onchain_randomness_config.fast_randomness_enabled() {
-            error!("Failed to get fast randomness config for new epoch");
-        }
 
         info!(
             "[Randomness] start_new_epoch: epoch={}, rand_config={:?}, fast_rand_config={:?}",

@@ -233,13 +233,6 @@ impl DKGTrait for RealDKG {
         params: &Self::PublicParams,
         trx: &Self::Transcript,
     ) -> anyhow::Result<()> {
-        // Verify fast path is present if and only if fast_wconfig is present.
-        assert_eq!(
-            trx.fast.is_some(),
-            params.pvss_config.fast_wconfig.is_some()
-        );
-        let has_fast_path = trx.fast.is_some();
-
         // Verify dealer indices are valid.
         let dealers = trx
             .main
@@ -252,20 +245,6 @@ impl DKGTrait for RealDKG {
             dealers.iter().all(|id| *id < num_validators),
             "real_dkg::verify_transcript failed with invalid dealer index."
         );
-        if has_fast_path {
-            let _fast_dealers = trx
-                .fast
-                .as_ref()
-                .unwrap()
-                .get_dealers()
-                .iter()
-                .map(|player| player.id)
-                .collect::<Vec<usize>>();
-            ensure!(
-                matches!(dealers.clone(), _fast_dealers),
-                "real_dkg::verify_transcript failed with inconsistent dealer index."
-            );
-        }
 
         let all_eks = params.pvss_config.eks.clone();
 
@@ -294,14 +273,28 @@ impl DKGTrait for RealDKG {
             &aux,
         )?;
 
-        if has_fast_path {
-            trx.fast.as_ref().unwrap().verify(
-                params.pvss_config.fast_wconfig.as_ref().unwrap(),
-                &params.pvss_config.pp,
-                &spks,
-                &all_eks,
-                &aux,
-            )?;
+        // Verify fast path is present if and only if fast_wconfig is present.
+        ensure!(
+            trx.fast.is_some() == params.pvss_config.fast_wconfig.is_some(),
+            "real_dkg::verify_transcript failed with mismatched fast path flag in trx and params."
+        );
+
+        if let Some(fast_trx) = trx.fast.as_ref() {
+            let _fast_dealers = fast_trx
+                .get_dealers()
+                .iter()
+                .map(|player| player.id)
+                .collect::<Vec<usize>>();
+            ensure!(
+                matches!(dealers, _fast_dealers),
+                "real_dkg::verify_transcript failed with inconsistent dealer index."
+            );
+        }
+
+        if let (Some(fast_trx), Some(fast_wconfig)) =
+            (trx.fast.as_ref(), params.pvss_config.fast_wconfig.as_ref())
+        {
+            fast_trx.verify(fast_wconfig, &params.pvss_config.pp, &spks, &all_eks, &aux)?;
         }
 
         Ok(())
@@ -315,14 +308,12 @@ impl DKGTrait for RealDKG {
         accumulator
             .main
             .aggregate_with(&params.pvss_config.wconfig, &element.main);
-        if accumulator.fast.is_some()
-            && element.fast.is_some()
-            && params.pvss_config.fast_wconfig.is_some()
-        {
-            accumulator.fast.as_mut().unwrap().aggregate_with(
-                params.pvss_config.fast_wconfig.as_ref().unwrap(),
-                &element.fast.unwrap(),
-            );
+        if let (Some(acc), Some(ele), Some(config)) = (
+            accumulator.fast.as_mut(),
+            element.fast.as_ref(),
+            params.pvss_config.fast_wconfig.as_ref(),
+        ) {
+            acc.aggregate_with(config, ele);
         }
     }
 
@@ -343,18 +334,21 @@ impl DKGTrait for RealDKG {
             trx.fast.is_some(),
             pub_params.pvss_config.fast_wconfig.is_some()
         );
-        let (fast_sk, fast_pk) = if trx.fast.is_some() {
-            let fast_trx = trx.fast.as_ref().unwrap();
-            let (fast_sk, fast_pk) = fast_trx.decrypt_own_share(
-                pub_params.pvss_config.fast_wconfig.as_ref().unwrap(),
-                &Player {
-                    id: player_idx as usize,
-                },
-                dk,
-            );
-            (Some(fast_sk), Some(fast_pk))
-        } else {
-            (None, None)
+        let (fast_sk, fast_pk) = match (
+            trx.fast.as_ref(),
+            pub_params.pvss_config.fast_wconfig.as_ref(),
+        ) {
+            (Some(fast_trx), Some(fast_wconfig)) => {
+                let (fast_sk, fast_pk) = fast_trx.decrypt_own_share(
+                    fast_wconfig,
+                    &Player {
+                        id: player_idx as usize,
+                    },
+                    dk,
+                );
+                (Some(fast_sk), Some(fast_pk))
+            },
+            _ => (None, None),
         };
         Ok((
             DealtSecretKeyShares {
@@ -368,6 +362,7 @@ impl DKGTrait for RealDKG {
         ))
     }
 
+    // Test-only function
     fn reconstruct_secret_from_shares(
         pub_params: &Self::PublicParams,
         input_player_share_pairs: Vec<(u64, Self::DealtSecretShare)>,
