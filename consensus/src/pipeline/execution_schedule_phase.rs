@@ -21,11 +21,11 @@ use std::{
 };
 
 /// [ This class is used when consensus.decoupled = true ]
-/// ExecutionSchedulePhase is a singleton that receives ordered blocks from
+/// ExecutionSchedulePhase is a singleton that receives blocks from
 /// the buffer manager and send them to the ExecutionPipeline.
 
 pub struct ExecutionRequest {
-    pub ordered_blocks: Vec<PipelinedBlock>,
+    pub blocks: Vec<PipelinedBlock>,
     // Hold a CountedRequest to guarantee the executor doesn't get reset with pending tasks
     // stuck in the ExecutinoPipeline.
     pub lifetime_guard: CountedRequest<()>,
@@ -39,7 +39,7 @@ impl Debug for ExecutionRequest {
 
 impl Display for ExecutionRequest {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "ExecutionScheduleRequest({:?})", self.ordered_blocks)
+        write!(f, "ExecutionScheduleRequest({:?})", self.blocks)
     }
 }
 
@@ -62,23 +62,23 @@ impl StatelessPipeline for ExecutionSchedulePhase {
 
     async fn process(&self, req: ExecutionRequest) -> ExecutionWaitRequest {
         let ExecutionRequest {
-            ordered_blocks,
+            blocks,
             lifetime_guard,
         } = req;
 
-        if ordered_blocks.is_empty() {
+        if blocks.is_empty() {
             return ExecutionWaitRequest {
                 block_id: HashValue::zero(),
                 fut: Box::pin(async { Err(aptos_executor_types::ExecutorError::EmptyBlocks) }),
             };
         }
 
-        let block_id = ordered_blocks.last().unwrap().id();
+        let block_id = blocks.last().unwrap().id();
 
         // Call schedule_compute() for each block here (not in the fut being returned) to
         // make sure they are scheduled in order.
         let mut futs = vec![];
-        for b in &ordered_blocks {
+        for b in &blocks {
             let fut = self
                 .execution_proxy
                 .schedule_compute(b.block(), b.parent_id(), b.randomness().cloned())
@@ -91,7 +91,7 @@ impl StatelessPipeline for ExecutionSchedulePhase {
         //      ExecutionWait phase is never kicked off.
         let fut = tokio::task::spawn(async move {
             let mut results = vec![];
-            for (block, fut) in itertools::zip_eq(ordered_blocks, futs) {
+            for (block, fut) in itertools::zip_eq(blocks, futs) {
                 debug!("try to receive compute result for block {}", block.id());
                 let PipelineExecutionResult { input_txns, result } = fut.await?;
                 results.push(block.set_execution_result(input_txns, result));

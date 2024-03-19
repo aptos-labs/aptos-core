@@ -235,6 +235,32 @@ impl BufferManager {
         });
     }
 
+
+    async fn process_proposed_blocks(&mut self, proposed_blocks: ProposedBlocks) {
+        let ProposedBlocks {
+            proposed_blocks,
+            callback,
+        } = proposed_blocks;
+
+        let request = self.create_new_request(ExecutionRequest {
+            blocks: proposed_blocks,
+            lifetime_guard: self.create_new_request(()),
+        });
+        self.execution_schedule_phase_tx
+            .send(request)
+            .await
+            .expect("Failed to send execution schedule request");
+
+        let item = BufferItem::new_ordered(proposed_blocks, LedgerInfoWithSignatures::new(
+            LedgerInfo::new(
+                BlockInfo::empty(),
+                HashValue::zero(),
+            ),
+            vec![],
+        ), callback);
+        self.buffer.push_back(item);
+    }
+
     /// process incoming ordered blocks
     /// push them into the buffer and update the roots if they are none.
     async fn process_ordered_blocks(&mut self, ordered_blocks: OrderedBlocks) {
