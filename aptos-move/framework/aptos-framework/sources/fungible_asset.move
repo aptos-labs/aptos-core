@@ -466,21 +466,6 @@ module aptos_framework::fungible_asset {
         event::emit(Frozen { store: store_addr, frozen });
     }
 
-    /// Used by coin.move for the migration from coin to fungible asset only
-    public(friend) fun get_mint_ref_internal(metadata: Object<Metadata>): MintRef {
-        MintRef { metadata }
-    }
-
-    /// Used by coin.move for the migration from coin to fungible asset only
-    public(friend) fun get_transfer_ref_internal(metadata: Object<Metadata>): TransferRef {
-        TransferRef { metadata }
-    }
-
-    /// Used by coin.move for the migration from coin to fungible asset only
-    public(friend) fun get_burn_ref_internal(metadata: Object<Metadata>): BurnRef {
-        BurnRef { metadata }
-    }
-
     /// Burns a fungible asset
     public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
         assert!(

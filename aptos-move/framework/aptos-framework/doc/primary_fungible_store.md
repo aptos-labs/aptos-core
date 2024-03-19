@@ -772,4 +772,27 @@ Transfer <code>amount</code> of FA from the primary store of <code>from</code> t
 </code></pre>
 
 
+
+
+<a id="0x1_primary_fungible_store_spec_primary_store_exists"></a>
+
+
+<pre><code><b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_exists">spec_primary_store_exists</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;): bool {
+   <a href="fungible_asset.md#0x1_fungible_asset_store_exists">fungible_asset::store_exists</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_address">spec_primary_store_address</a>(<a href="account.md#0x1_account">account</a>, metadata))
+}
+</code></pre>
+
+
+
+
+<a id="0x1_primary_fungible_store_spec_primary_store_address"></a>
+
+
+<pre><code><b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_spec_primary_store_address">spec_primary_store_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> {
+   <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(metadata);
+   <a href="object.md#0x1_object_spec_create_user_derived_object_address">object::spec_create_user_derived_object_address</a>(owner, metadata_addr)
+}
+</code></pre>
+
+
 [move-book]: https://aptos.dev/move/book/SUMMARY
