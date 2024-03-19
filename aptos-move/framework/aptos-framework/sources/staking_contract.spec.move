@@ -333,8 +333,11 @@ spec aptos_framework::staking_contract {
 
     /// Staking_contract exists the stacker/operator pair.
     spec distribute(staker: address, operator: address) {
+        // TODO: These function passed locally however failed in github CI
+        pragma verify_duration_estimate = 120;
         // TODO: Call `distribute_internal` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
+
         include ContractExistsAbortsIf;
     }
 
@@ -346,6 +349,8 @@ spec aptos_framework::staking_contract {
     staking_contract: &mut StakingContract,
     distribute_events: &mut EventHandle<DistributeEvent>,
     ) {
+        // TODO: These function passed locally however failed in github CI
+        pragma verify_duration_estimate = 120;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let pool_address = staking_contract.pool_address;

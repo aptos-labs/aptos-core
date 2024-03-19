@@ -53,9 +53,6 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `mint_to`](#0x1_fungible_asset_mint_to)
 -  [Function `set_frozen_flag`](#0x1_fungible_asset_set_frozen_flag)
 -  [Function `set_frozen_flag_internal`](#0x1_fungible_asset_set_frozen_flag_internal)
--  [Function `get_mint_ref_internal`](#0x1_fungible_asset_get_mint_ref_internal)
--  [Function `get_transfer_ref_internal`](#0x1_fungible_asset_get_transfer_ref_internal)
--  [Function `get_burn_ref_internal`](#0x1_fungible_asset_get_burn_ref_internal)
 -  [Function `burn`](#0x1_fungible_asset_burn)
 -  [Function `burn_internal`](#0x1_fungible_asset_burn_internal)
 -  [Function `burn_from`](#0x1_fungible_asset_burn_from)
@@ -1788,81 +1785,6 @@ Enable/disable a store's ability to do direct transfers of the fungible asset.
 
 </details>
 
-<a id="0x1_fungible_asset_get_mint_ref_internal"></a>
-
-## Function `get_mint_ref_internal`
-
-Used by coin.move for the migration from coin to fungible asset only
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_get_mint_ref_internal">get_mint_ref_internal</a>(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): <a href="fungible_asset.md#0x1_fungible_asset_MintRef">fungible_asset::MintRef</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_get_mint_ref_internal">get_mint_ref_internal</a>(metadata: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;): <a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> {
-    <a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a> { metadata }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_fungible_asset_get_transfer_ref_internal"></a>
-
-## Function `get_transfer_ref_internal`
-
-Used by coin.move for the migration from coin to fungible asset only
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_get_transfer_ref_internal">get_transfer_ref_internal</a>(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">fungible_asset::TransferRef</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_get_transfer_ref_internal">get_transfer_ref_internal</a>(metadata: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;): <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> {
-    <a href="fungible_asset.md#0x1_fungible_asset_TransferRef">TransferRef</a> { metadata }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_fungible_asset_get_burn_ref_internal"></a>
-
-## Function `get_burn_ref_internal`
-
-Used by coin.move for the migration from coin to fungible asset only
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_get_burn_ref_internal">get_burn_ref_internal</a>(metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_get_burn_ref_internal">get_burn_ref_internal</a>(metadata: Object&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> {
-    <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> { metadata }
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_fungible_asset_burn"></a>
 
 ## Function `burn`
@@ -2221,12 +2143,12 @@ Extract <code>amount</code> of the fungible asset from <code>store</code>.
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="fungible_asset.md#0x1_fungible_asset_EFUNGIBLE_STORE_EXISTENCE">EFUNGIBLE_STORE_EXISTENCE</a>));
     <b>let</b> store = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr);
-    <b>assert</b>!(store.balance &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>));
-    store.balance = store.balance - amount;
-
     <b>let</b> metadata = store.metadata;
-    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a> { store: store_addr, amount });
-
+    <b>if</b> (amount != 0) {
+        <b>assert</b>!(store.balance &gt;= amount, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EINSUFFICIENT_BALANCE">EINSUFFICIENT_BALANCE</a>));
+        store.balance = store.balance - amount;
+        <a href="event.md#0x1_event_emit">event::emit</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a>&gt;(<a href="fungible_asset.md#0x1_fungible_asset_Withdraw">Withdraw</a> { store: store_addr, amount });
+    };
     <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> { metadata, amount }
 }
 </code></pre>

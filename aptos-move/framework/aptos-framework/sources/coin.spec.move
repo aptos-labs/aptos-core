@@ -152,11 +152,40 @@ spec aptos_framework::coin {
     }
 
     spec is_account_registered<CoinType>(account_addr: address): bool {
-        aborts_if false;
+        use aptos_framework::fungible_asset;
+        use aptos_framework::object;
+        pragma aborts_if_is_partial;
+        let map = global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
+        aborts_if exists<CoinConversionMap>(@aptos_framework) && table::spec_contains(
+            map,
+            type_info::type_of<CoinType>()
+        ) && (!exists<object::ObjectCore>(table::spec_get(map, type_info::type_of<CoinType>()))
+            || !object::spec_exists_at<fungible_asset::Metadata>(table::spec_get(map, type_info::type_of<CoinType>())));
     }
 
     spec fun get_coin_supply_opt<CoinType>(): Option<OptionalAggregator> {
         global<CoinInfo<CoinType>>(type_info::type_of<CoinType>().account_address).supply
+    }
+
+    spec fun spec_paired_metadata<CoinType>(): Option<Object<Metadata>> {
+        if (exists<CoinConversionMap>(@aptos_framework)) {
+            let map = global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
+            if (table::spec_contains(map, type_info::type_of<CoinType>())) {
+                let metadata = object::address_to_object(table::spec_get(map, type_info::type_of<CoinType>()));
+                option::spec_some(metadata)
+            } else {
+                option::spec_none()
+            }
+        } else {
+            option::spec_none()
+        }
+    }
+
+    spec fun spec_is_account_registered<CoinType>(account_addr: address): bool {
+        let paired_metadata_opt = spec_paired_metadata<CoinType>();
+        exists<CoinStore<CoinType>>(account_addr) || (option::spec_is_some(
+            paired_metadata_opt
+        ) && primary_fungible_store::spec_primary_store_exists(account_addr, option::spec_borrow(paired_metadata_opt)))
     }
 
     spec schema CoinSubAbortsIf<CoinType> {

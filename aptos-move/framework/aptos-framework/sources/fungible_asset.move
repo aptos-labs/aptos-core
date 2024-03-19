@@ -466,21 +466,6 @@ module aptos_framework::fungible_asset {
         event::emit(Frozen { store: store_addr, frozen });
     }
 
-    /// Used by coin.move for the migration from coin to fungible asset only
-    public(friend) fun get_mint_ref_internal(metadata: Object<Metadata>): MintRef {
-        MintRef { metadata }
-    }
-
-    /// Used by coin.move for the migration from coin to fungible asset only
-    public(friend) fun get_transfer_ref_internal(metadata: Object<Metadata>): TransferRef {
-        TransferRef { metadata }
-    }
-
-    /// Used by coin.move for the migration from coin to fungible asset only
-    public(friend) fun get_burn_ref_internal(metadata: Object<Metadata>): BurnRef {
-        BurnRef { metadata }
-    }
-
     /// Burns a fungible asset
     public fun burn(ref: &BurnRef, fa: FungibleAsset) acquires Supply, ConcurrentSupply {
         assert!(
@@ -604,12 +589,12 @@ module aptos_framework::fungible_asset {
     ): FungibleAsset acquires FungibleStore {
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
         let store = borrow_global_mut<FungibleStore>(store_addr);
-        assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
-        store.balance = store.balance - amount;
-
         let metadata = store.metadata;
-        event::emit(Withdraw { store: store_addr, amount });
-
+        if (amount != 0) {
+            assert!(store.balance >= amount, error::invalid_argument(EINSUFFICIENT_BALANCE));
+            store.balance = store.balance - amount;
+            event::emit<Withdraw>(Withdraw { store: store_addr, amount });
+        };
         FungibleAsset { metadata, amount }
     }
 

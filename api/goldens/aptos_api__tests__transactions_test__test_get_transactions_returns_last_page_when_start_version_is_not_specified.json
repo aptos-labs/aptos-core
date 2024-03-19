@@ -343,7 +343,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -697,7 +697,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -1051,7 +1051,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -1405,7 +1405,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -1759,7 +1759,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -2113,7 +2113,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -2467,7 +2467,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
@@ -2821,7 +2821,7 @@
         "type": "0x1::transaction_fee::FeeStatement",
         "data": {
           "execution_gas_units": "4",
-          "io_gas_units": "1",
+          "io_gas_units": "2",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
           "total_charge_gas_units": "5"
