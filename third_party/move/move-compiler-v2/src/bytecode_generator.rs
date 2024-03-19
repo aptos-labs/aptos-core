@@ -701,6 +701,14 @@ impl<'env> Generator<'env> {
             Operation::Borrow(kind) => {
                 let target = self.require_unary_target(id, targets);
                 let arg = self.require_unary_arg(id, args);
+                // When the target of this borrow is of type immutable ref, while kind is mutable ref
+                // we need to change the type of target to mutable ref,
+                // code example:
+                // 1) `let x: &T = &mut y;`
+                // 2) `let x: u64 = 3; *(&mut x: &u64) = 5;`
+                if let Type::Reference(ReferenceKind::Immutable, ty) = self.temp_type(target) {
+                    self.temps[target] = Type::Reference(*kind, ty.clone());
+                }
                 self.gen_borrow(target, id, *kind, &arg)
             },
             Operation::Abort => {

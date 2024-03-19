@@ -1497,14 +1497,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 if self.subs.specialize(&target_ty).is_reference() {
                     self.error(&loc, "cannot borrow from a reference")
                 }
-                // When the target of this borrow is an immutable reference, we still need to set
-                // the type of id to mutable ref, otherwise, the type info the bytecode will be incorrect.
-                // for instance `let x: &T = &mut y;`, borrow of y should still return mutable ref
-                let id = if expected_type.is_immutable_reference() && *mutable {
-                    self.new_node_id_with_type_loc(&ty, &loc)
-                } else {
-                    self.new_node_id_with_type_loc(&result_ty, &loc)
-                };
+                let id = self.new_node_id_with_type_loc(&result_ty, &loc);
                 let mut target_exp =
                     ExpData::Call(id, Operation::Borrow(ref_kind), vec![target_exp.into_exp()])
                         .into();

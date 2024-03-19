@@ -21,4 +21,10 @@ module 0x8675309::M {
         (t_ref: &T).s = g; // this is not OK
     }
 
+    struct G has key, drop {  }
+
+    fun t1() {
+        let x: u64 = 3;
+        *(&mut x: &u64) = 5;
+    }
 }
