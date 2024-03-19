@@ -1,7 +1,7 @@
 processed 2 tasks
 
 task 0 'publish'. lines 1-281:
-Error: value (256) cannot exceed (255)
+Error: value (256) cannot exceed (255) for signature_size
 
 task 1 'run'. lines 283-283:
 Error: Function execution failed with VMError: {
