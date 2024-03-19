@@ -460,7 +460,10 @@ where
             self.event_id = self.event_id.wrapping_add(1);
             futures::select! {
                 _ = ticker.select_next_some() => {
-                    info!("tick check_connectivity");
+                    info!(
+                        NetworkSchema::new(&self.network_context),
+                        "tick check_connectivity",
+                    );
                     self.check_connectivity(&mut pending_dials, &handle).await;
                 },
                 req = self.requests_rx.select_next_some() => {
@@ -610,7 +613,10 @@ where
         handle: &Handle,
     ) {
         let to_connect = self.choose_peers_to_dial().await;
-        info!("dial_eligible_peers found {:?} to connect to", to_connect.len());
+        info!(
+            NetworkSchema::new(&self.network_context),
+            "dial_eligible_peers found {:?} to connect to", to_connect.len(),
+        );
         for (peer_id, peer) in to_connect {
             self.queue_dial_peer(peer_id, peer, pending_dials, handle);
         }
@@ -660,7 +666,10 @@ where
         }
         // aptos_logger::sample!(
         //     aptos_logger::sample::SampleRate::Frequency(10),
-            info!("peers: {} discovered, {} eligible, {} ineligible, {} already connected, {} already in dial queue, {} wrong role", num_discovered, eligible_peers.len(), ineligible, already_connected, already_in_dial_queue, wrong_role);
+            info!(
+            NetworkSchema::new(&self.network_context),
+            "peers: {} discovered, {} eligible, {} ineligible, {} already connected, {} already in dial queue, {} wrong role", num_discovered, eligible_peers.len(), ineligible, already_connected, already_in_dial_queue, wrong_role,
+        );
         // );
 
         // Initialize the dial state for any new peers
@@ -839,7 +848,10 @@ where
         // the next dial attempt for this peer.
         let dial_delay = dial_state.next_backoff_delay(self.max_delay);
         let f_delay = self.time_service.sleep(dial_delay);
-        info!("queue_dial_peer going to dial {} @ {} after delay {:?}", peer_id.short_str_lossless(), addr, dial_delay);
+        info!(
+            NetworkSchema::new(&self.network_context),
+            "queue_dial_peer going to dial {} @ {} after delay {:?}", peer_id.short_str_lossless(), addr, dial_delay,
+        );
 
         let (cancel_tx, cancel_rx) = oneshot::channel();
 
