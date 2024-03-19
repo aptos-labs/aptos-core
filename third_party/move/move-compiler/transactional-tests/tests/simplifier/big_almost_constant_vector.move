@@ -2,8 +2,8 @@
 module 0xcafe::vectors {
     use std::vector;
 
-    fun make_big_vector(a: u64): vector<u64> {
-        let x = vector[a,
+    fun make_big_vector(a: u8): vector<u8> {
+        let x = vector<u8>[a,
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
             18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
             32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
@@ -30,9 +30,9 @@ module 0xcafe::vectors {
         y
     }
 
-    fun sum(a: &vector<u64>): u64 {
+    fun sum(a: &vector<u8>): u64 {
         let sum = 0;
-        vector::for_each_ref(a, |elt| { sum = sum + *elt});
+        vector::for_each_ref(a, |elt| { sum = sum + (*elt as u64); });
         sum
     }
 

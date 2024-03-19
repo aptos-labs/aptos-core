@@ -4,15 +4,6 @@ task 0 'publish'. lines 1-46:
 
 
 
-task 1 'run'. lines 48-48:
-Error: Function execution failed with VMError: {
-    major_status: ABORTED,
-    sub_status: Some(32896),
-    location: 0xcafe::vectors,
-    indices: [],
-    offsets: [(FunctionDefinitionIndex(2), 22)],
-}
-
 >>> V1 Compiler {
 == BEGIN Bytecode ==
 // Move bytecode v6
@@ -346,7 +337,7 @@ B2:
 	15: Abort
 B3:
 	16: CopyLoc[1](loc1: u64)
-	17: LdU64(32640)
+	17: LdU64(32896)
 	18: Eq
 	19: BrFalse(21)
 B4:
