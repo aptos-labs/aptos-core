@@ -1,13 +1,694 @@
 processed 2 tasks
 
-task 0 'publish'. lines 1-281:
-Error: value (256) cannot exceed (255) for signature_size
+task 0 'publish'. lines 1-99:
 
-task 1 'run'. lines 283-283:
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
+
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module cafe.vectors {
+
+
+make_big_vector(Arg0: u64): vector<u64> /* def_idx: 0 */ {
+L0:	loc1: u64
+L1:	loc2: u64
+L2:	loc3: u64
+L3:	loc4: u64
+L4:	loc5: u64
+L5:	loc6: u64
+L6:	loc7: u64
+L7:	loc8: u64
+L8:	loc9: u64
+L9:	loc10: u64
+L10:	loc11: u64
+L11:	loc12: u64
+L12:	loc13: u64
+L13:	loc14: u64
+L14:	loc15: u64
+L15:	loc16: u64
+L16:	loc17: u64
+L17:	loc18: u64
+L18:	loc19: u64
+L19:	loc20: u64
+L20:	loc21: u64
+L21:	loc22: u64
+L22:	loc23: u64
+L23:	loc24: u64
+L24:	loc25: u64
+L25:	loc26: u64
+L26:	loc27: u64
+L27:	loc28: u64
+L28:	loc29: u64
+L29:	loc30: u64
+L30:	loc31: u64
+L31:	loc32: u64
+L32:	loc33: u64
+L33:	loc34: u64
+L34:	loc35: u64
+L35:	loc36: u64
+L36:	loc37: u64
+L37:	loc38: u64
+L38:	loc39: u64
+L39:	loc40: u64
+L40:	loc41: u64
+L41:	loc42: u64
+L42:	loc43: u64
+L43:	loc44: u64
+L44:	loc45: u64
+L45:	loc46: u64
+L46:	loc47: u64
+L47:	loc48: u64
+L48:	loc49: u64
+L49:	loc50: u64
+L50:	loc51: u64
+L51:	loc52: u64
+L52:	loc53: u64
+L53:	loc54: u64
+L54:	loc55: u64
+L55:	loc56: u64
+L56:	loc57: u64
+L57:	loc58: u64
+L58:	loc59: u64
+L59:	loc60: u64
+L60:	loc61: u64
+L61:	loc62: u64
+L62:	loc63: u64
+L63:	loc64: u64
+L64:	loc65: u64
+L65:	loc66: u64
+L66:	loc67: u64
+L67:	loc68: u64
+L68:	loc69: u64
+L69:	loc70: u64
+L70:	loc71: u64
+L71:	loc72: u64
+L72:	loc73: u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: StLoc[72](loc71: u64)
+	2: MoveLoc[0](Arg0: u64)
+	3: LdU64(1)
+	4: Add
+	5: StLoc[0](Arg0: u64)
+	6: CopyLoc[0](Arg0: u64)
+	7: StLoc[71](loc70: u64)
+	8: MoveLoc[0](Arg0: u64)
+	9: LdU64(1)
+	10: Add
+	11: StLoc[0](Arg0: u64)
+	12: CopyLoc[0](Arg0: u64)
+	13: StLoc[70](loc69: u64)
+	14: MoveLoc[0](Arg0: u64)
+	15: LdU64(1)
+	16: Add
+	17: StLoc[0](Arg0: u64)
+	18: CopyLoc[0](Arg0: u64)
+	19: StLoc[69](loc68: u64)
+	20: MoveLoc[0](Arg0: u64)
+	21: LdU64(1)
+	22: Add
+	23: StLoc[0](Arg0: u64)
+	24: CopyLoc[0](Arg0: u64)
+	25: StLoc[68](loc67: u64)
+	26: MoveLoc[0](Arg0: u64)
+	27: LdU64(1)
+	28: Add
+	29: StLoc[0](Arg0: u64)
+	30: CopyLoc[0](Arg0: u64)
+	31: StLoc[66](loc65: u64)
+	32: MoveLoc[0](Arg0: u64)
+	33: LdU64(1)
+	34: Add
+	35: StLoc[0](Arg0: u64)
+	36: CopyLoc[0](Arg0: u64)
+	37: StLoc[65](loc64: u64)
+	38: MoveLoc[0](Arg0: u64)
+	39: LdU64(1)
+	40: Add
+	41: StLoc[0](Arg0: u64)
+	42: CopyLoc[0](Arg0: u64)
+	43: StLoc[64](loc63: u64)
+	44: MoveLoc[0](Arg0: u64)
+	45: LdU64(1)
+	46: Add
+	47: StLoc[0](Arg0: u64)
+	48: CopyLoc[0](Arg0: u64)
+	49: StLoc[63](loc62: u64)
+	50: MoveLoc[0](Arg0: u64)
+	51: LdU64(1)
+	52: Add
+	53: StLoc[0](Arg0: u64)
+	54: CopyLoc[0](Arg0: u64)
+	55: StLoc[62](loc61: u64)
+	56: MoveLoc[0](Arg0: u64)
+	57: LdU64(1)
+	58: Add
+	59: StLoc[0](Arg0: u64)
+	60: CopyLoc[0](Arg0: u64)
+	61: StLoc[61](loc60: u64)
+	62: MoveLoc[0](Arg0: u64)
+	63: LdU64(1)
+	64: Add
+	65: StLoc[0](Arg0: u64)
+	66: CopyLoc[0](Arg0: u64)
+	67: StLoc[60](loc59: u64)
+	68: MoveLoc[0](Arg0: u64)
+	69: LdU64(1)
+	70: Add
+	71: StLoc[0](Arg0: u64)
+	72: CopyLoc[0](Arg0: u64)
+	73: StLoc[59](loc58: u64)
+	74: MoveLoc[0](Arg0: u64)
+	75: LdU64(1)
+	76: Add
+	77: StLoc[0](Arg0: u64)
+	78: CopyLoc[0](Arg0: u64)
+	79: StLoc[58](loc57: u64)
+	80: MoveLoc[0](Arg0: u64)
+	81: LdU64(1)
+	82: Add
+	83: StLoc[0](Arg0: u64)
+	84: CopyLoc[0](Arg0: u64)
+	85: StLoc[57](loc56: u64)
+	86: MoveLoc[0](Arg0: u64)
+	87: LdU64(1)
+	88: Add
+	89: StLoc[0](Arg0: u64)
+	90: CopyLoc[0](Arg0: u64)
+	91: StLoc[55](loc54: u64)
+	92: MoveLoc[0](Arg0: u64)
+	93: LdU64(1)
+	94: Add
+	95: StLoc[0](Arg0: u64)
+	96: CopyLoc[0](Arg0: u64)
+	97: StLoc[54](loc53: u64)
+	98: MoveLoc[0](Arg0: u64)
+	99: LdU64(1)
+	100: Add
+	101: StLoc[0](Arg0: u64)
+	102: CopyLoc[0](Arg0: u64)
+	103: StLoc[53](loc52: u64)
+	104: MoveLoc[0](Arg0: u64)
+	105: LdU64(1)
+	106: Add
+	107: StLoc[0](Arg0: u64)
+	108: CopyLoc[0](Arg0: u64)
+	109: StLoc[52](loc51: u64)
+	110: MoveLoc[0](Arg0: u64)
+	111: LdU64(1)
+	112: Add
+	113: StLoc[0](Arg0: u64)
+	114: CopyLoc[0](Arg0: u64)
+	115: StLoc[51](loc50: u64)
+	116: MoveLoc[0](Arg0: u64)
+	117: LdU64(1)
+	118: Add
+	119: StLoc[0](Arg0: u64)
+	120: CopyLoc[0](Arg0: u64)
+	121: StLoc[50](loc49: u64)
+	122: MoveLoc[0](Arg0: u64)
+	123: LdU64(1)
+	124: Add
+	125: StLoc[0](Arg0: u64)
+	126: CopyLoc[0](Arg0: u64)
+	127: StLoc[49](loc48: u64)
+	128: MoveLoc[0](Arg0: u64)
+	129: LdU64(1)
+	130: Add
+	131: StLoc[0](Arg0: u64)
+	132: CopyLoc[0](Arg0: u64)
+	133: StLoc[48](loc47: u64)
+	134: MoveLoc[0](Arg0: u64)
+	135: LdU64(1)
+	136: Add
+	137: StLoc[0](Arg0: u64)
+	138: CopyLoc[0](Arg0: u64)
+	139: StLoc[47](loc46: u64)
+	140: MoveLoc[0](Arg0: u64)
+	141: LdU64(1)
+	142: Add
+	143: StLoc[0](Arg0: u64)
+	144: CopyLoc[0](Arg0: u64)
+	145: StLoc[46](loc45: u64)
+	146: MoveLoc[0](Arg0: u64)
+	147: LdU64(1)
+	148: Add
+	149: StLoc[0](Arg0: u64)
+	150: CopyLoc[0](Arg0: u64)
+	151: StLoc[44](loc43: u64)
+	152: MoveLoc[0](Arg0: u64)
+	153: LdU64(1)
+	154: Add
+	155: StLoc[0](Arg0: u64)
+	156: CopyLoc[0](Arg0: u64)
+	157: StLoc[43](loc42: u64)
+	158: MoveLoc[0](Arg0: u64)
+	159: LdU64(1)
+	160: Add
+	161: StLoc[0](Arg0: u64)
+	162: CopyLoc[0](Arg0: u64)
+	163: StLoc[42](loc41: u64)
+	164: MoveLoc[0](Arg0: u64)
+	165: LdU64(1)
+	166: Add
+	167: StLoc[0](Arg0: u64)
+	168: CopyLoc[0](Arg0: u64)
+	169: StLoc[41](loc40: u64)
+	170: MoveLoc[0](Arg0: u64)
+	171: LdU64(1)
+	172: Add
+	173: StLoc[0](Arg0: u64)
+	174: CopyLoc[0](Arg0: u64)
+	175: StLoc[40](loc39: u64)
+	176: MoveLoc[0](Arg0: u64)
+	177: LdU64(1)
+	178: Add
+	179: StLoc[0](Arg0: u64)
+	180: CopyLoc[0](Arg0: u64)
+	181: StLoc[39](loc38: u64)
+	182: MoveLoc[0](Arg0: u64)
+	183: LdU64(1)
+	184: Add
+	185: StLoc[0](Arg0: u64)
+	186: CopyLoc[0](Arg0: u64)
+	187: StLoc[38](loc37: u64)
+	188: MoveLoc[0](Arg0: u64)
+	189: LdU64(1)
+	190: Add
+	191: StLoc[0](Arg0: u64)
+	192: CopyLoc[0](Arg0: u64)
+	193: StLoc[37](loc36: u64)
+	194: MoveLoc[0](Arg0: u64)
+	195: LdU64(1)
+	196: Add
+	197: StLoc[0](Arg0: u64)
+	198: CopyLoc[0](Arg0: u64)
+	199: StLoc[36](loc35: u64)
+	200: MoveLoc[0](Arg0: u64)
+	201: LdU64(1)
+	202: Add
+	203: StLoc[0](Arg0: u64)
+	204: CopyLoc[0](Arg0: u64)
+	205: StLoc[35](loc34: u64)
+	206: MoveLoc[0](Arg0: u64)
+	207: LdU64(1)
+	208: Add
+	209: StLoc[0](Arg0: u64)
+	210: CopyLoc[0](Arg0: u64)
+	211: StLoc[33](loc32: u64)
+	212: MoveLoc[0](Arg0: u64)
+	213: LdU64(1)
+	214: Add
+	215: StLoc[0](Arg0: u64)
+	216: CopyLoc[0](Arg0: u64)
+	217: StLoc[32](loc31: u64)
+	218: MoveLoc[0](Arg0: u64)
+	219: LdU64(1)
+	220: Add
+	221: StLoc[0](Arg0: u64)
+	222: CopyLoc[0](Arg0: u64)
+	223: StLoc[31](loc30: u64)
+	224: MoveLoc[0](Arg0: u64)
+	225: LdU64(1)
+	226: Add
+	227: StLoc[0](Arg0: u64)
+	228: CopyLoc[0](Arg0: u64)
+	229: StLoc[30](loc29: u64)
+	230: MoveLoc[0](Arg0: u64)
+	231: LdU64(1)
+	232: Add
+	233: StLoc[0](Arg0: u64)
+	234: CopyLoc[0](Arg0: u64)
+	235: StLoc[29](loc28: u64)
+	236: MoveLoc[0](Arg0: u64)
+	237: LdU64(1)
+	238: Add
+	239: StLoc[0](Arg0: u64)
+	240: CopyLoc[0](Arg0: u64)
+	241: StLoc[28](loc27: u64)
+	242: MoveLoc[0](Arg0: u64)
+	243: LdU64(1)
+	244: Add
+	245: StLoc[0](Arg0: u64)
+	246: CopyLoc[0](Arg0: u64)
+	247: StLoc[27](loc26: u64)
+	248: MoveLoc[0](Arg0: u64)
+	249: LdU64(1)
+	250: Add
+	251: StLoc[0](Arg0: u64)
+	252: CopyLoc[0](Arg0: u64)
+	253: StLoc[26](loc25: u64)
+	254: MoveLoc[0](Arg0: u64)
+	255: LdU64(1)
+	256: Add
+	257: StLoc[0](Arg0: u64)
+	258: CopyLoc[0](Arg0: u64)
+	259: StLoc[25](loc24: u64)
+	260: MoveLoc[0](Arg0: u64)
+	261: LdU64(1)
+	262: Add
+	263: StLoc[0](Arg0: u64)
+	264: CopyLoc[0](Arg0: u64)
+	265: StLoc[24](loc23: u64)
+	266: MoveLoc[0](Arg0: u64)
+	267: LdU64(1)
+	268: Add
+	269: StLoc[0](Arg0: u64)
+	270: CopyLoc[0](Arg0: u64)
+	271: StLoc[22](loc21: u64)
+	272: MoveLoc[0](Arg0: u64)
+	273: LdU64(1)
+	274: Add
+	275: StLoc[0](Arg0: u64)
+	276: CopyLoc[0](Arg0: u64)
+	277: StLoc[21](loc20: u64)
+	278: MoveLoc[0](Arg0: u64)
+	279: LdU64(1)
+	280: Add
+	281: StLoc[0](Arg0: u64)
+	282: CopyLoc[0](Arg0: u64)
+	283: StLoc[20](loc19: u64)
+	284: MoveLoc[0](Arg0: u64)
+	285: LdU64(1)
+	286: Add
+	287: StLoc[0](Arg0: u64)
+	288: CopyLoc[0](Arg0: u64)
+	289: StLoc[19](loc18: u64)
+	290: MoveLoc[0](Arg0: u64)
+	291: LdU64(1)
+	292: Add
+	293: StLoc[0](Arg0: u64)
+	294: CopyLoc[0](Arg0: u64)
+	295: StLoc[18](loc17: u64)
+	296: MoveLoc[0](Arg0: u64)
+	297: LdU64(1)
+	298: Add
+	299: StLoc[0](Arg0: u64)
+	300: CopyLoc[0](Arg0: u64)
+	301: StLoc[17](loc16: u64)
+	302: MoveLoc[0](Arg0: u64)
+	303: LdU64(1)
+	304: Add
+	305: StLoc[0](Arg0: u64)
+	306: CopyLoc[0](Arg0: u64)
+	307: StLoc[16](loc15: u64)
+	308: MoveLoc[0](Arg0: u64)
+	309: LdU64(1)
+	310: Add
+	311: StLoc[0](Arg0: u64)
+	312: CopyLoc[0](Arg0: u64)
+	313: StLoc[15](loc14: u64)
+	314: MoveLoc[0](Arg0: u64)
+	315: LdU64(1)
+	316: Add
+	317: StLoc[0](Arg0: u64)
+	318: CopyLoc[0](Arg0: u64)
+	319: StLoc[14](loc13: u64)
+	320: MoveLoc[0](Arg0: u64)
+	321: LdU64(1)
+	322: Add
+	323: StLoc[0](Arg0: u64)
+	324: CopyLoc[0](Arg0: u64)
+	325: StLoc[13](loc12: u64)
+	326: MoveLoc[0](Arg0: u64)
+	327: LdU64(1)
+	328: Add
+	329: StLoc[0](Arg0: u64)
+	330: CopyLoc[0](Arg0: u64)
+	331: StLoc[11](loc10: u64)
+	332: MoveLoc[0](Arg0: u64)
+	333: LdU64(1)
+	334: Add
+	335: StLoc[0](Arg0: u64)
+	336: CopyLoc[0](Arg0: u64)
+	337: StLoc[10](loc9: u64)
+	338: MoveLoc[0](Arg0: u64)
+	339: LdU64(1)
+	340: Add
+	341: StLoc[0](Arg0: u64)
+	342: CopyLoc[0](Arg0: u64)
+	343: StLoc[9](loc8: u64)
+	344: MoveLoc[0](Arg0: u64)
+	345: LdU64(1)
+	346: Add
+	347: StLoc[0](Arg0: u64)
+	348: CopyLoc[0](Arg0: u64)
+	349: StLoc[8](loc7: u64)
+	350: MoveLoc[0](Arg0: u64)
+	351: LdU64(1)
+	352: Add
+	353: StLoc[0](Arg0: u64)
+	354: CopyLoc[0](Arg0: u64)
+	355: StLoc[7](loc6: u64)
+	356: MoveLoc[0](Arg0: u64)
+	357: LdU64(1)
+	358: Add
+	359: StLoc[0](Arg0: u64)
+	360: CopyLoc[0](Arg0: u64)
+	361: StLoc[6](loc5: u64)
+	362: MoveLoc[0](Arg0: u64)
+	363: LdU64(1)
+	364: Add
+	365: StLoc[0](Arg0: u64)
+	366: CopyLoc[0](Arg0: u64)
+	367: StLoc[5](loc4: u64)
+	368: MoveLoc[0](Arg0: u64)
+	369: LdU64(1)
+	370: Add
+	371: StLoc[0](Arg0: u64)
+	372: CopyLoc[0](Arg0: u64)
+	373: StLoc[4](loc3: u64)
+	374: MoveLoc[0](Arg0: u64)
+	375: LdU64(1)
+	376: Add
+	377: StLoc[0](Arg0: u64)
+	378: CopyLoc[0](Arg0: u64)
+	379: StLoc[3](loc2: u64)
+	380: MoveLoc[0](Arg0: u64)
+	381: LdU64(1)
+	382: Add
+	383: StLoc[0](Arg0: u64)
+	384: CopyLoc[0](Arg0: u64)
+	385: StLoc[2](loc1: u64)
+	386: MoveLoc[0](Arg0: u64)
+	387: LdU64(1)
+	388: Add
+	389: StLoc[0](Arg0: u64)
+	390: CopyLoc[0](Arg0: u64)
+	391: StLoc[74](loc73: u64)
+	392: MoveLoc[0](Arg0: u64)
+	393: LdU64(1)
+	394: Add
+	395: StLoc[0](Arg0: u64)
+	396: CopyLoc[0](Arg0: u64)
+	397: StLoc[73](loc72: u64)
+	398: MoveLoc[0](Arg0: u64)
+	399: LdU64(1)
+	400: Add
+	401: StLoc[0](Arg0: u64)
+	402: CopyLoc[0](Arg0: u64)
+	403: StLoc[67](loc66: u64)
+	404: MoveLoc[0](Arg0: u64)
+	405: LdU64(1)
+	406: Add
+	407: StLoc[0](Arg0: u64)
+	408: CopyLoc[0](Arg0: u64)
+	409: StLoc[56](loc55: u64)
+	410: MoveLoc[0](Arg0: u64)
+	411: LdU64(1)
+	412: Add
+	413: StLoc[0](Arg0: u64)
+	414: CopyLoc[0](Arg0: u64)
+	415: StLoc[45](loc44: u64)
+	416: MoveLoc[0](Arg0: u64)
+	417: LdU64(1)
+	418: Add
+	419: StLoc[0](Arg0: u64)
+	420: CopyLoc[0](Arg0: u64)
+	421: StLoc[34](loc33: u64)
+	422: MoveLoc[0](Arg0: u64)
+	423: LdU64(1)
+	424: Add
+	425: StLoc[0](Arg0: u64)
+	426: CopyLoc[0](Arg0: u64)
+	427: StLoc[23](loc22: u64)
+	428: MoveLoc[0](Arg0: u64)
+	429: LdU64(1)
+	430: Add
+	431: StLoc[0](Arg0: u64)
+	432: CopyLoc[0](Arg0: u64)
+	433: StLoc[12](loc11: u64)
+	434: MoveLoc[0](Arg0: u64)
+	435: LdU64(1)
+	436: Add
+	437: StLoc[0](Arg0: u64)
+	438: CopyLoc[0](Arg0: u64)
+	439: StLoc[1](loc0: u64)
+	440: MoveLoc[0](Arg0: u64)
+	441: LdU64(1)
+	442: Add
+	443: StLoc[0](Arg0: u64)
+	444: MoveLoc[72](loc71: u64)
+	445: MoveLoc[71](loc70: u64)
+	446: MoveLoc[70](loc69: u64)
+	447: MoveLoc[69](loc68: u64)
+	448: MoveLoc[68](loc67: u64)
+	449: MoveLoc[66](loc65: u64)
+	450: MoveLoc[65](loc64: u64)
+	451: MoveLoc[64](loc63: u64)
+	452: MoveLoc[63](loc62: u64)
+	453: MoveLoc[62](loc61: u64)
+	454: MoveLoc[61](loc60: u64)
+	455: MoveLoc[60](loc59: u64)
+	456: MoveLoc[59](loc58: u64)
+	457: MoveLoc[58](loc57: u64)
+	458: MoveLoc[57](loc56: u64)
+	459: MoveLoc[55](loc54: u64)
+	460: MoveLoc[54](loc53: u64)
+	461: MoveLoc[53](loc52: u64)
+	462: MoveLoc[52](loc51: u64)
+	463: MoveLoc[51](loc50: u64)
+	464: MoveLoc[50](loc49: u64)
+	465: MoveLoc[49](loc48: u64)
+	466: MoveLoc[48](loc47: u64)
+	467: MoveLoc[47](loc46: u64)
+	468: MoveLoc[46](loc45: u64)
+	469: MoveLoc[44](loc43: u64)
+	470: MoveLoc[43](loc42: u64)
+	471: MoveLoc[42](loc41: u64)
+	472: MoveLoc[41](loc40: u64)
+	473: MoveLoc[40](loc39: u64)
+	474: MoveLoc[39](loc38: u64)
+	475: MoveLoc[38](loc37: u64)
+	476: MoveLoc[37](loc36: u64)
+	477: MoveLoc[36](loc35: u64)
+	478: MoveLoc[35](loc34: u64)
+	479: MoveLoc[33](loc32: u64)
+	480: MoveLoc[32](loc31: u64)
+	481: MoveLoc[31](loc30: u64)
+	482: MoveLoc[30](loc29: u64)
+	483: MoveLoc[29](loc28: u64)
+	484: MoveLoc[28](loc27: u64)
+	485: MoveLoc[27](loc26: u64)
+	486: MoveLoc[26](loc25: u64)
+	487: MoveLoc[25](loc24: u64)
+	488: MoveLoc[24](loc23: u64)
+	489: MoveLoc[22](loc21: u64)
+	490: MoveLoc[21](loc20: u64)
+	491: MoveLoc[20](loc19: u64)
+	492: MoveLoc[19](loc18: u64)
+	493: MoveLoc[18](loc17: u64)
+	494: MoveLoc[17](loc16: u64)
+	495: MoveLoc[16](loc15: u64)
+	496: MoveLoc[15](loc14: u64)
+	497: MoveLoc[14](loc13: u64)
+	498: MoveLoc[13](loc12: u64)
+	499: MoveLoc[11](loc10: u64)
+	500: MoveLoc[10](loc9: u64)
+	501: MoveLoc[9](loc8: u64)
+	502: MoveLoc[8](loc7: u64)
+	503: MoveLoc[7](loc6: u64)
+	504: MoveLoc[6](loc5: u64)
+	505: MoveLoc[5](loc4: u64)
+	506: MoveLoc[4](loc3: u64)
+	507: MoveLoc[3](loc2: u64)
+	508: MoveLoc[2](loc1: u64)
+	509: MoveLoc[74](loc73: u64)
+	510: MoveLoc[73](loc72: u64)
+	511: MoveLoc[67](loc66: u64)
+	512: MoveLoc[56](loc55: u64)
+	513: MoveLoc[45](loc44: u64)
+	514: MoveLoc[34](loc33: u64)
+	515: MoveLoc[23](loc22: u64)
+	516: MoveLoc[12](loc11: u64)
+	517: MoveLoc[1](loc0: u64)
+	518: MoveLoc[0](Arg0: u64)
+	519: VecPack(0, 75)
+	520: Ret
+}
+sum(Arg0: &vector<u64>): u64 /* def_idx: 1 */ {
+L0:	loc1: u64
+L1:	loc2: u64
+L2:	loc3: &vector<u64>
+B0:
+	0: LdU64(0)
+	1: StLoc[3](loc2: u64)
+	2: MoveLoc[0](Arg0: &vector<u64>)
+	3: StLoc[4](loc3: &vector<u64>)
+	4: LdU64(0)
+	5: StLoc[2](loc1: u64)
+B1:
+	6: CopyLoc[2](loc1: u64)
+	7: CopyLoc[4](loc3: &vector<u64>)
+	8: VecLen(0)
+	9: Lt
+	10: BrFalse(26)
+B2:
+	11: Branch(12)
+B3:
+	12: CopyLoc[4](loc3: &vector<u64>)
+	13: CopyLoc[2](loc1: u64)
+	14: VecImmBorrow(0)
+	15: StLoc[1](loc0: &u64)
+	16: MoveLoc[3](loc2: u64)
+	17: MoveLoc[1](loc0: &u64)
+	18: ReadRef
+	19: Add
+	20: StLoc[3](loc2: u64)
+	21: MoveLoc[2](loc1: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[2](loc1: u64)
+	25: Branch(6)
+B4:
+	26: MoveLoc[4](loc3: &vector<u64>)
+	27: Pop
+	28: MoveLoc[3](loc2: u64)
+	29: Ret
+}
+public test_big_vector() /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: vector<u64>
+B0:
+	0: LdU64(0)
+	1: Call make_big_vector(u64): vector<u64>
+	2: StLoc[2](loc2: vector<u64>)
+	3: ImmBorrowLoc[2](loc2: vector<u64>)
+	4: VecLen(0)
+	5: StLoc[0](loc0: u64)
+	6: ImmBorrowLoc[2](loc2: vector<u64>)
+	7: Call sum(&vector<u64>): u64
+	8: StLoc[1](loc1: u64)
+	9: CopyLoc[0](loc0: u64)
+	10: LdU64(75)
+	11: Eq
+	12: BrFalse(14)
+B1:
+	13: Branch(16)
+B2:
+	14: MoveLoc[0](loc0: u64)
+	15: Abort
+B3:
+	16: CopyLoc[1](loc1: u64)
+	17: CopyLoc[0](loc0: u64)
+	18: MoveLoc[0](loc0: u64)
+	19: LdU64(1)
+	20: Sub
+	21: Mul
+	22: LdU64(2)
+	23: Div
+	24: Eq
+	25: BrFalse(27)
+B4:
+	26: Branch(29)
+B5:
+	27: MoveLoc[1](loc1: u64)
+	28: Abort
+B6:
+	29: Ret
+}
+}
+== END Bytecode ==
 }
