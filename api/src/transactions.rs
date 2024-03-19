@@ -237,13 +237,16 @@ impl TransactionsApi {
         if self
             .context
             .wait_for_hash_active_connections
-            .load(std::sync::atomic::Ordering::Relaxed)
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
             >= self
                 .context
                 .node_config
                 .api
                 .wait_by_hash_max_active_connections
         {
+            self.context
+                .wait_for_hash_active_connections
+                .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
             metrics::WAIT_TRANSACTION_POLL_TIME
                 .with_label_values(&["short"])
                 .observe(0.0);
@@ -253,9 +256,6 @@ impl TransactionsApi {
         }
 
         let start_time = std::time::Instant::now();
-        self.context
-            .wait_for_hash_active_connections
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         WAIT_TRANSACTION_GAUGE.inc();
 
         let result = self

@@ -135,7 +135,7 @@ impl Default for ApiConfig {
             simulation_filter: Filter::default(),
             view_filter: ViewFilter::default(),
             periodic_function_stats_sec: Some(60),
-            wait_by_hash_timeout_ms: 2_000,
+            wait_by_hash_timeout_ms: 1_000,
             wait_by_hash_poll_interval_ms: 20,
             wait_by_hash_max_active_connections: 100,
         }
