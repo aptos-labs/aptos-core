@@ -105,9 +105,9 @@ module aptos_framework::aptos_account {
         if (!account::exists_at(to)) {
             create_account(to);
             spec {
-                assert coin::is_account_registered<AptosCoin>(to);
+                assert coin::spec_is_account_registered<AptosCoin>(to);
                 assume aptos_std::type_info::type_of<CoinType>() == aptos_std::type_info::type_of<AptosCoin>() ==>
-                    coin::is_account_registered<CoinType>(to);
+                    coin::spec_is_account_registered<CoinType>(to);
             };
         };
         if (!coin::is_account_registered<CoinType>(to)) {

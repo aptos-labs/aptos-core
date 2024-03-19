@@ -91,7 +91,7 @@ spec aptos_framework::resource_account {
         include RotateAccountAuthenticationKeyAndStoreCapabilityAbortsIfWithoutAccountLimit;
 
         //coin property
-        aborts_if coin::is_account_registered<AptosCoin>(resource_addr) && coin_store_resource.frozen;
+        aborts_if coin::spec_is_account_registered<AptosCoin>(resource_addr) && coin_store_resource.frozen;
         /// [high-level-req-3]
         ensures exists<aptos_framework::coin::CoinStore<AptosCoin>>(resource_addr);
     }
