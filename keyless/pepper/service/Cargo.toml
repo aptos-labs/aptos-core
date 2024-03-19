@@ -14,7 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+aptos-inspection-service = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
+aptos-metrics-core = { workspace = true }
 aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }
 ark-ec = { workspace = true }

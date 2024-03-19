@@ -19,6 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod about;
 pub mod jwk;
+pub mod metrics;
 pub mod vuf_keys;
 
 pub type Issuer = String;

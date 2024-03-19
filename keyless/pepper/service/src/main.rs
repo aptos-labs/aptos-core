@@ -17,6 +17,10 @@ use hyper::{
 };
 use log::{info, LevelFilter};
 use std::{convert::Infallible, net::SocketAddr, ops::Deref, time::Duration};
+use std::time::Instant;
+use aptos_inspection_service::utils::get_encoded_metrics;
+use aptos_keyless_pepper_service::metrics::{REQUEST_HANDLING_SECONDS, start_metric_server};
+use aptos_metrics_core::TextEncoder;
 
 async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Body>, Infallible> {
     let origin = req
@@ -49,8 +53,12 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
             let pepper_request = serde_json::from_slice::<PepperRequest>(&body_bytes);
             info!("pepper_request={:?}", pepper_request);
+            let timer = Instant::now();
             let pepper_response = pepper_request.map(process);
+            let processing_time = timer.elapsed();
             info!("pepper_response={:?}", pepper_response);
+            let result_str = pepper_response.is_ok().to_string();
+            REQUEST_HANDLING_SECONDS.with_label_values(&["v0", result_str.as_str()]).observe(processing_time.as_secs_f64());
             let (status_code, body_json) = match pepper_response {
                 Ok(Ok(pepper_response)) => (
                     StatusCode::OK,
@@ -107,6 +115,8 @@ async fn main() {
     env_logger::Builder::new()
         .filter(None, LevelFilter::Info)
         .init();
+
+    start_metric_server();
 
     // TODO: JWKs should be from on-chain states?
     jwk::start_jwk_refresh_loop(

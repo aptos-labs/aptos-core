@@ -2558,7 +2558,9 @@ name = "aptos-keyless-pepper-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-inspection-service",
  "aptos-keyless-pepper-common",
+ "aptos-metrics-core",
  "aptos-types",
  "ark-bls12-381",
  "ark-ec",
