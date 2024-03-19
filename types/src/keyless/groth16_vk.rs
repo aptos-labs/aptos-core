@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// Reflection of aptos_framework::keyless_account::Groth16VerificationKey
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Groth16VerificationKey {
     pub alpha_g1: Vec<u8>,
     pub beta_g2: Vec<u8>,
@@ -46,10 +46,10 @@ impl MoveStructType for Groth16VerificationKey {
     const STRUCT_NAME: &'static IdentStr = ident_str!("Groth16VerificationKey");
 }
 
-impl TryFrom<Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
+impl TryFrom<&Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
     type Error = CryptoMaterialError;
 
-    fn try_from(vk: Groth16VerificationKey) -> Result<Self, Self::Error> {
+    fn try_from(vk: &Groth16VerificationKey) -> Result<Self, Self::Error> {
         if vk.gamma_abc_g1.len() != 2 {
             return Err(CryptoMaterialError::DeserializationError);
         }
@@ -73,8 +73,8 @@ impl TryFrom<Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
     }
 }
 
-impl From<PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
-    fn from(pvk: PreparedVerifyingKey<Bn254>) -> Self {
+impl From<&PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
+    fn from(pvk: &PreparedVerifyingKey<Bn254>) -> Self {
         let PreparedVerifyingKey {
             vk:
                 VerifyingKey {
@@ -101,6 +101,13 @@ impl From<PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
             delta_g2: serialize!(delta_g2),
             gamma_abc_g1: gamma_abc_g1_bytes,
         }
+    }
+}
+
+impl PartialEq<PreparedVerifyingKey<Bn254>> for Groth16VerificationKey {
+    fn eq(&self, other: &PreparedVerifyingKey<Bn254>) -> bool {
+        let other_vk: Groth16VerificationKey = other.into();
+        self == &other_vk
     }
 }
 

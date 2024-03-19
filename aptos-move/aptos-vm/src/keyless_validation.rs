@@ -15,11 +15,14 @@ use aptos_types::{
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
     vm_status::{StatusCode, VMStatus},
 };
+use ark_bn254::Bn254;
+use ark_groth16::PreparedVerifyingKey;
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
 use once_cell::sync::Lazy;
 use quick_cache::sync::Cache;
 use serde::Deserialize;
+use std::sync::{Mutex, MutexGuard};
 
 macro_rules! value_deserialization_error {
     ($message:expr) => {{
@@ -33,6 +36,41 @@ macro_rules! value_deserialization_error {
 /// TODO(keyless): Comments say Cache should be wrapped in an Arc if used from multiple threads, but do I even need one if it's in a sync::Lazy?
 pub(crate) static ZKP_CACHE: Lazy<Cache<Groth16ProofAndStatement, bool>> =
     Lazy::new(|| Cache::new(1_000_000));
+
+/// Whenever the on-chain VK is different from the last seen VK, (1) the ZKP cache is cleared and
+/// (2) the last seen VK is updated.
+/// Initially, the last seen VK is initialized to an invalid value so that it is imeediately replaced
+/// by the on-chain value.
+pub(crate) static LAST_SEEN_VK: Lazy<Mutex<PreparedVerifyingKey<Bn254>>> =
+    Lazy::new(|| Mutex::new(PreparedVerifyingKey::default()));
+
+fn compare_and_swap_last_seen_vk(
+    vk: &Groth16VerificationKey,
+) -> anyhow::Result<MutexGuard<PreparedVerifyingKey<Bn254>>, VMStatus> {
+    let mut last_seen_vk = LAST_SEEN_VK.lock().unwrap();
+
+    if *vk != *last_seen_vk {
+        ZKP_CACHE.clear();
+        // let start = std::time::Instant::now();
+        *last_seen_vk = vk
+            .try_into()
+            .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
+        // println!("Groth16 VK deserialization time: {:?}", start.elapsed());
+    }
+
+    Ok(last_seen_vk)
+}
+
+#[cfg(any(test, feature = "testing"))]
+pub fn zkp_cache_num_hits() -> usize {
+    ZKP_CACHE.hits() as usize
+}
+
+/// Returns the # of cached ZKPs.
+#[cfg(any(test, feature = "testing"))]
+pub fn zkp_cache_size() -> usize {
+    ZKP_CACHE.len()
+}
 
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
     resolver: &impl AptosMoveResolver,
@@ -163,10 +201,14 @@ pub(crate) fn validate_authenticators(
             .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
     }
 
+    // If the VK has changed, the cache will be invalidated.
+    let vk = get_groth16_vk_onchain(resolver)?;
+    // TODO(keyless): I believe we need a lock here because the VK might be changed by another TXN
+    //  during parallel execution? But this effectively serializes the verification of all keyless
+    //  TXNs, which is a BIG performance penalty, so we need to avoid this somehow.
+    let pvk = compare_and_swap_last_seen_vk(&vk)?;
+
     let patched_jwks = get_jwks_onchain(resolver)?;
-    let pvk = &get_groth16_vk_onchain(resolver)?
-        .try_into()
-        .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
 
     let training_wheels_pk = match &config.training_wheels_pubkey {
         None => None,
@@ -231,7 +273,7 @@ pub(crate) fn validate_authenticators(
                             // If the ZKP has not successfully verified over this statment in the past,
                             // manually verify it & cache it. Otherwise, skip.
                             if matches!(ZKP_CACHE.get(&groth16_and_stmt), None | Some(false)) {
-                                let result = zksig.verify_groth16_proof(public_inputs_hash, pvk);
+                                let result = zksig.verify_groth16_proof(public_inputs_hash, &pvk);
 
                                 if result.is_ok() {
                                     ZKP_CACHE.insert(groth16_and_stmt, true);

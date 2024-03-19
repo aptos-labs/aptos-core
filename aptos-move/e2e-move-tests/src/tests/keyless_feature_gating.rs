@@ -47,7 +47,7 @@ fn test_feature_gating(
 ) {
     let (sig, pk) = get_sig_and_pk();
 
-    let transaction = get_keyless_txn(h, sig, pk, *recipient.address());
+    let transaction = create_and_spend_keyless_account(h, sig, pk, *recipient.address());
     let output = h.run_raw(transaction);
 
     if !should_succeed {
@@ -127,17 +127,11 @@ fn test_feature_gating_with_zk_off() {
     test_feature_gating(&mut h, &recipient, get_sample_openid_sig_and_pk, false);
 }
 
-/// Creates and funds a new account at `pk` and sends coins to `recipient`.
-fn get_keyless_txn(
-    h: &mut MoveHarness,
-    mut sig: KeylessSignature,
-    pk: KeylessPublicKey,
-    recipient: AccountAddress,
-) -> SignedTransaction {
+fn create_keyless_account(h: &mut MoveHarness, pk: KeylessPublicKey) -> Account {
     let apk = AnyPublicKey::keyless(pk.clone());
     let addr = AuthenticationKey::any_key(apk.clone()).account_address();
     let account = h.store_and_fund_account(
-        &Account::new_from_addr(addr, AccountPublicKey::Keyless(pk.clone())),
+        &Account::new_from_addr(addr, AccountPublicKey::Keyless(pk)),
         100000000,
         0,
     );
@@ -145,6 +139,15 @@ fn get_keyless_txn(
     println!("Actual address: {}", addr.to_hex());
     println!("Account address: {}", account.address().to_hex());
 
+    account
+}
+
+fn spend_keyless_account(
+    h: &mut MoveHarness,
+    mut sig: KeylessSignature,
+    account: &Account,
+    recipient: AccountAddress,
+) -> SignedTransaction {
     let payload = aptos_stdlib::aptos_coin_transfer(recipient, 1);
     //println!("Payload: {:?}", payload);
     let raw_txn = TransactionBuilder::new(account.clone())
@@ -162,7 +165,6 @@ fn get_keyless_txn(
     };
     let esk = get_sample_esk();
 
-    // Compute the training wheels signature if not present
     match &mut sig.cert {
         EphemeralCertificate::ZeroKnowledgeSig(proof) => {
             // Training wheels should be disabled.
@@ -173,12 +175,25 @@ fn get_keyless_txn(
     }
     sig.ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
 
-    let transaction = SignedTransaction::new_keyless(raw_txn, pk, sig);
+    let transaction =
+        SignedTransaction::new_keyless(raw_txn, account.pubkey.as_keyless().unwrap(), sig);
     println!(
         "Submitted TXN hash: {}",
         Transaction::UserTransaction(transaction.clone()).hash()
     );
     transaction
+}
+
+/// Creates and funds a new account at `pk` and sends coins to `recipient`.
+fn create_and_spend_keyless_account(
+    h: &mut MoveHarness,
+    sig: KeylessSignature,
+    pk: KeylessPublicKey,
+    recipient: AccountAddress,
+) -> SignedTransaction {
+    let account = create_keyless_account(h, pk.clone());
+
+    spend_keyless_account(h, sig, &account, recipient)
 }
 
 fn run_setup_script(h: &mut MoveHarness) {
@@ -217,4 +232,62 @@ fn run_setup_script(h: &mut MoveHarness) {
     // because it does not (yet) work with resource groups.
 
     assert_success!(h.run(txn));
+}
+
+#[test]
+fn test_zkp_cache_hits() {
+    let (mut h, recipient) = init_feature_gating(vec![FeatureFlag::KEYLESS_ACCOUNTS], vec![]);
+
+    assert_eq!(aptos_vm::keyless_validation::zkp_cache_size(), 0);
+    assert_eq!(aptos_vm::keyless_validation::zkp_cache_num_hits(), 0);
+
+    // create a keyless account
+    let (sig, pk) = get_sample_groth16_sig_and_pk();
+    let account = create_keyless_account(&mut h, pk);
+
+    // submit TXN with \pi
+    submit_keyless_txn(&mut h, &recipient, &sig, &account);
+    assert_eq!(aptos_vm::keyless_validation::zkp_cache_size(), 1);
+    assert_eq!(aptos_vm::keyless_validation::zkp_cache_num_hits(), 0);
+
+    // resubmit TXN with same \pi
+    submit_keyless_txn(&mut h, &recipient, &sig, &account);
+    assert_eq!(aptos_vm::keyless_validation::zkp_cache_size(), 1);
+    assert_eq!(aptos_vm::keyless_validation::zkp_cache_num_hits(), 1);
+
+    // reresubmit TXN with same \pi
+    submit_keyless_txn(&mut h, &recipient, &sig, &account);
+    assert_eq!(aptos_vm::keyless_validation::zkp_cache_size(), 1);
+    assert_eq!(aptos_vm::keyless_validation::zkp_cache_num_hits(), 2);
+
+    // change \pi to \pi'
+    // submit TXN with \pi'
+    // once, no hit
+    // twice, hits
+}
+
+fn submit_keyless_txn(
+    mut h: &mut MoveHarness,
+    recipient: &Account,
+    sig: &KeylessSignature,
+    account: &Account,
+) {
+    let transaction = spend_keyless_account(&mut h, sig.clone(), account, *recipient.address());
+    let output = h.run_raw(transaction);
+
+    assert_success!(
+        output.status().clone(),
+        "Expected TransactionStatus::Keep(ExecutionStatus::Success) for 1st TXN, but got: {:?}",
+        output.status()
+    );
+}
+
+fn test_cache_is_cleared_after_vk_change() {
+    // submit TXN with \pi
+    // once, no hit
+    // twice, hits
+
+    // change VK via governance
+    // resubmit TXN with same \pi
+    // should not hit
 }
