@@ -21,6 +21,8 @@ pub struct ConsensusConfig {
     pub max_network_channel_size: usize,
     pub max_sending_block_txns: u64,
     pub max_sending_block_bytes: u64,
+    pub max_sending_inline_txns: u64,
+    pub max_sending_inline_bytes: u64,
     pub max_receiving_block_txns: u64,
     pub max_receiving_block_bytes: u64,
     pub max_pruned_blocks_in_mem: usize,
@@ -67,6 +69,7 @@ pub struct ConsensusConfig {
     pub max_blocks_per_sending_request_quorum_store_override: u64,
     pub max_blocks_per_receiving_request: u64,
     pub max_blocks_per_receiving_request_quorum_store_override: u64,
+    pub broadcast_vote: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -144,6 +147,8 @@ impl Default for ConsensusConfig {
             max_sending_block_txns: MAX_SENDING_BLOCK_TXNS,
             max_sending_block_bytes: 3 * 1024 * 1024, // 3MB
             max_receiving_block_txns: 10000.max(2 * MAX_SENDING_BLOCK_TXNS),
+            max_sending_inline_txns: 100,
+            max_sending_inline_bytes: 200 * 1024,       // 200 KB
             max_receiving_block_bytes: 6 * 1024 * 1024, // 6MB
             max_pruned_blocks_in_mem: 100,
             mempool_executed_txn_timeout_ms: 1000,
@@ -279,6 +284,7 @@ impl Default for ConsensusConfig {
             max_blocks_per_sending_request_quorum_store_override: 10,
             max_blocks_per_receiving_request: 10,
             max_blocks_per_receiving_request_quorum_store_override: 100,
+            broadcast_vote: true,
         }
     }
 }
@@ -286,6 +292,10 @@ impl Default for ConsensusConfig {
 impl ConsensusConfig {
     pub fn set_data_dir(&mut self, data_dir: PathBuf) {
         self.safety_rules.set_data_dir(data_dir);
+    }
+
+    pub fn enable_broadcast_vote(&mut self, enable: bool) {
+        self.broadcast_vote = enable;
     }
 
     pub fn max_blocks_per_sending_request(&self, quorum_store_enabled: bool) -> u64 {

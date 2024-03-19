@@ -22,7 +22,4 @@ module 0x8675309::M {
         };
         break
     }
-    spec fun $bar();
-    spec fun $baz(x: u64): u64;
-    spec fun $foo();
 } // end 0x8675309::M

@@ -3,16 +3,14 @@
 [variant baseline]
 fun explicate_drop::test0(): u8 {
      var $t0: u8
-     var $t1: u8
-     var $t2: u8
-     var $t3: &u8
-     var $t4: &u8
-  0: $t2 := 42
-  1: $t1 := infer($t2)
-  2: $t4 := borrow_local($t1)
-  3: $t3 := infer($t4)
-  4: $t0 := read_ref($t3)
-  5: return $t0
+     var $t1: &u8
+     var $t2: &u8
+     var $t3: u8
+  0: $t3 := 42
+  1: $t2 := borrow_local($t3)
+  2: $t1 := infer($t2)
+  3: $t0 := read_ref($t1)
+  4: return $t0
 }
 
 ============ after LiveVarAnalysisProcessor: ================
@@ -20,22 +18,19 @@ fun explicate_drop::test0(): u8 {
 [variant baseline]
 fun explicate_drop::test0(): u8 {
      var $t0: u8
-     var $t1: u8
-     var $t2: u8
-     var $t3: &u8
-     var $t4: &u8
+     var $t1: &u8
+     var $t2: &u8
+     var $t3: u8
      # live vars:
-  0: $t2 := 42
-     # live vars: $t2
-  1: $t1 := infer($t2)
-     # live vars: $t1
-  2: $t4 := borrow_local($t1)
-     # live vars: $t4
-  3: $t3 := infer($t4)
+  0: $t3 := 42
      # live vars: $t3
-  4: $t0 := read_ref($t3)
+  1: $t2 := borrow_local($t3)
+     # live vars: $t2
+  2: $t1 := infer($t2)
+     # live vars: $t1
+  3: $t0 := read_ref($t1)
      # live vars: $t0
-  5: return $t0
+  4: return $t0
 }
 
 ============ after ReferenceSafetyProcessor: ================
@@ -43,46 +38,39 @@ fun explicate_drop::test0(): u8 {
 [variant baseline]
 fun explicate_drop::test0(): u8 {
      var $t0: u8
-     var $t1: u8
-     var $t2: u8
-     var $t3: &u8
-     var $t4: &u8
+     var $t1: &u8
+     var $t2: &u8
+     var $t3: u8
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  0: $t2 := 42
-     # live vars: $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
-  1: $t1 := infer($t2)
-     # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
-  2: $t4 := borrow_local($t1)
-     # live vars: $t4
-     # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
-     # locals: {$t1=@200,$t4=@201}
-     # globals: {}
-     #
-  3: $t3 := infer($t4)
+  0: $t3 := 42
      # live vars: $t3
-     # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
-     # locals: {$t1=@200,$t3=@201}
+     # graph: {}
+     # locals: {}
      # globals: {}
      #
-  4: $t0 := read_ref($t3)
+  1: $t2 := borrow_local($t3)
+     # live vars: $t2
+     # graph: {@100=local($t3)[borrow(false) -> @101],@101=derived[]}
+     # locals: {$t2=@101,$t3=@100}
+     # globals: {}
+     #
+  2: $t1 := infer($t2)
+     # live vars: $t1
+     # graph: {@100=local($t3)[borrow(false) -> @101],@101=derived[]}
+     # locals: {$t1=@101,$t3=@100}
+     # globals: {}
+     #
+  3: $t0 := read_ref($t1)
      # live vars: $t0
-     # graph: {@200=local($t1)[]}
-     # locals: {$t1=@200}
+     # graph: {@100=local($t3)[]}
+     # locals: {$t3=@100}
      # globals: {}
      #
-  5: return $t0
+  4: return $t0
 }
 
 ============ after AbortAnalysisProcessor: ================
@@ -90,52 +78,44 @@ fun explicate_drop::test0(): u8 {
 [variant baseline]
 fun explicate_drop::test0(): u8 {
      var $t0: u8
-     var $t1: u8
-     var $t2: u8
-     var $t3: &u8
-     var $t4: &u8
+     var $t1: &u8
+     var $t2: &u8
+     var $t3: u8
      # abort state: {returns}
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
-  0: $t2 := 42
-     # abort state: {returns}
-     # live vars: $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
-  1: $t1 := infer($t2)
-     # abort state: {returns}
-     # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
-  2: $t4 := borrow_local($t1)
-     # abort state: {returns}
-     # live vars: $t4
-     # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
-     # locals: {$t1=@200,$t4=@201}
-     # globals: {}
-     #
-  3: $t3 := infer($t4)
+  0: $t3 := 42
      # abort state: {returns}
      # live vars: $t3
-     # graph: {@200=local($t1)[borrow(false) -> @201],@201=derived[]}
-     # locals: {$t1=@200,$t3=@201}
+     # graph: {}
+     # locals: {}
      # globals: {}
      #
-  4: $t0 := read_ref($t3)
+  1: $t2 := borrow_local($t3)
+     # abort state: {returns}
+     # live vars: $t2
+     # graph: {@100=local($t3)[borrow(false) -> @101],@101=derived[]}
+     # locals: {$t2=@101,$t3=@100}
+     # globals: {}
+     #
+  2: $t1 := infer($t2)
+     # abort state: {returns}
+     # live vars: $t1
+     # graph: {@100=local($t3)[borrow(false) -> @101],@101=derived[]}
+     # locals: {$t1=@101,$t3=@100}
+     # globals: {}
+     #
+  3: $t0 := read_ref($t1)
      # abort state: {returns}
      # live vars: $t0
-     # graph: {@200=local($t1)[]}
-     # locals: {$t1=@200}
+     # graph: {@100=local($t3)[]}
+     # locals: {$t3=@100}
      # globals: {}
      #
-  5: return $t0
+  4: return $t0
 }
 
 ============ after AbilityProcessor: ================
@@ -143,14 +123,12 @@ fun explicate_drop::test0(): u8 {
 [variant baseline]
 fun explicate_drop::test0(): u8 {
      var $t0: u8
-     var $t1: u8
-     var $t2: u8
-     var $t3: &u8
-     var $t4: &u8
-  0: $t2 := 42
-  1: $t1 := move($t2)
-  2: $t4 := borrow_local($t1)
-  3: $t3 := move($t4)
-  4: $t0 := read_ref($t3)
-  5: return $t0
+     var $t1: &u8
+     var $t2: &u8
+     var $t3: u8
+  0: $t3 := 42
+  1: $t2 := borrow_local($t3)
+  2: $t1 := move($t2)
+  3: $t0 := read_ref($t1)
+  4: return $t0
 }

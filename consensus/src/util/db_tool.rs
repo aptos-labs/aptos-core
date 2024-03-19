@@ -92,6 +92,14 @@ pub fn extract_txns_from_block<'a>(
                 Payload::InQuorumStoreWithLimit(proof_with_data) => {
                     extract_txns_from_proof_stores(&proof_with_data.proof_with_data.proofs)
                 },
+                Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                    let mut all_txns =
+                        extract_txns_from_proof_stores(&proof_with_data.proofs).unwrap();
+                    for (_, txns) in inline_batches {
+                        all_txns.extend(txns);
+                    }
+                    Ok(all_txns)
+                },
             }
         },
         None => Ok(vec![]),

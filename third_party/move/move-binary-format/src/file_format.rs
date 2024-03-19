@@ -441,6 +441,13 @@ pub enum Visibility {
 
 impl Visibility {
     pub const DEPRECATED_SCRIPT: u8 = 0x2;
+
+    pub fn is_public(&self) -> bool {
+        match self {
+            Self::Public => true,
+            Self::Private | Self::Friend => false,
+        }
+    }
 }
 
 impl std::convert::TryFrom<u8> for Visibility {

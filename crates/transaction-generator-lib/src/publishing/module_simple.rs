@@ -93,6 +93,7 @@ pub enum MultiSigConfig {
     None,
     Random(usize),
     Publisher,
+    FeePayerPublisher,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -119,6 +120,8 @@ pub enum AutomaticArgs {
 pub enum EntryPoints {
     /// Empty (NoOp) function
     Nop,
+    /// Empty (NoOp) function, signed by publisher as fee-payer
+    NopFeePayer,
     /// Empty (NoOp) function, signed by 2 accounts
     Nop2Signers,
     /// Empty (NoOp) function, signed by 5 accounts
@@ -245,6 +248,7 @@ impl EntryPoints {
     pub fn package_name(&self) -> &'static str {
         match self {
             EntryPoints::Nop
+            | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
             | EntryPoints::Step
@@ -293,6 +297,7 @@ impl EntryPoints {
     pub fn module_name(&self) -> &'static str {
         match self {
             EntryPoints::Nop
+            | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
             | EntryPoints::Step
@@ -348,7 +353,9 @@ impl EntryPoints {
     ) -> TransactionPayload {
         match self {
             // 0 args
-            EntryPoints::Nop => get_payload_void(module_id, ident_str!("nop").to_owned()),
+            EntryPoints::Nop | EntryPoints::NopFeePayer => {
+                get_payload_void(module_id, ident_str!("nop").to_owned())
+            },
             EntryPoints::Nop2Signers => {
                 get_payload_void(module_id, ident_str!("nop_2_signers").to_owned())
             },
@@ -639,6 +646,7 @@ impl EntryPoints {
 
     pub fn multi_sig_additional_num(&self) -> MultiSigConfig {
         match self {
+            EntryPoints::NopFeePayer => MultiSigConfig::FeePayerPublisher,
             EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
@@ -653,6 +661,7 @@ impl EntryPoints {
     pub fn automatic_args(&self) -> AutomaticArgs {
         match self {
             EntryPoints::Nop
+            | EntryPoints::NopFeePayer
             | EntryPoints::Step
             | EntryPoints::GetCounter
             | EntryPoints::ResetData

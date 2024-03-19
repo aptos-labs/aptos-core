@@ -19,6 +19,8 @@ pub trait PayloadClient: Send + Sync {
         max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
+        max_inline_items: u64,
+        max_inline_bytes: u64,
         validator_txn_filter: TransactionFilter,
         user_txn_filter: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,

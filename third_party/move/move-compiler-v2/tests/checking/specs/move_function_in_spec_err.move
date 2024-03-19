@@ -1,13 +1,18 @@
-module 0x42::move_function_in_spec {
+module 0x42::move_function_in_spec_err {
     struct TypeInfo has key, copy, drop, store {
         account_address: address,
     }
-    public native fun type_of<T>(): TypeInfo;
+
+    public fun type_of<T>(): TypeInfo {
+        abort 1
+    }
+
     public fun change(target: address, new_addr: address): bool acquires TypeInfo {
         let ty = borrow_global_mut<TypeInfo>(target);
         ty.account_address = new_addr;
         true
     }
+
     public fun no_change(target: address, new_addr: address): bool acquires TypeInfo {
         let ty = borrow_global<TypeInfo>(target);
         ty.account_address == new_addr

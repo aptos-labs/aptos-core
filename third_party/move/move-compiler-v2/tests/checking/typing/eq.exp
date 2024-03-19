@@ -10,14 +10,14 @@ module 0x8675309::M {
         u: u64,
     }
     private fun t0(r: &M::R,r_mut: &mut M::R,s: M::S,s_ref: &M::S,s_mut: &mut M::S) {
-        Eq<u64>(0, 1);
-        Eq<u8>(0, 1);
-        Eq<u8>(0, 1);
-        Eq<u128>(0, 1);
-        Eq<u128>(0, 1);
+        false;
+        false;
+        false;
+        false;
+        false;
         Eq<u64>(Borrow(Immutable)(0), Borrow(Immutable)(1));
-        Eq<bool>(true, false);
-        Eq<u64>(0, 1);
+        false;
+        false;
         Eq<M::S>(Borrow(Immutable)(s), s_ref);
         Eq<M::S>(Freeze(Borrow(Mutable)(s)), s_ref);
         Eq<M::S>(Freeze(Borrow(Mutable)(s)), Freeze(s_mut));
@@ -33,5 +33,4 @@ module 0x8675309::M {
         Eq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(1));
         Tuple()
     }
-    spec fun $t0(r: &M::R,r_mut: &mut M::R,s: M::S,s_ref: &M::S,s_mut: &mut M::S);
 } // end 0x8675309::M

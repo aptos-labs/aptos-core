@@ -66,7 +66,7 @@ pub enum FeatureFlag {
     OBJECT_CODE_DEPLOYMENT = 52,
     MAX_OBJECT_NESTING_CHECK = 53,
     KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
-    TRANSACTION_CONTEXT_EXTENSION = 55,
+    MULTISIG_V2_ENHANCEMENT = 55,
 }
 
 impl FeatureFlag {
@@ -119,7 +119,7 @@ impl FeatureFlag {
             FeatureFlag::OBJECT_CODE_DEPLOYMENT,
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
-            FeatureFlag::TRANSACTION_CONTEXT_EXTENSION,
+            FeatureFlag::MULTISIG_V2_ENHANCEMENT,
         ]
     }
 }
@@ -232,7 +232,7 @@ impl Features {
 
     /// Whether the keyless accounts feature is enabled, specifically the ZK path with ZKP-based signatures.
     /// The ZK-less path is controlled via a different `FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS` flag.
-    pub fn is_keyless_enabled(&self) -> bool {
+    pub fn is_zk_keyless_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS)
     }
 
@@ -242,16 +242,12 @@ impl Features {
     /// safety precaution in case of emergency (e.g., if the ZK-based signatures must be temporarily
     /// turned off due to a zeroday exploit, the ZK-less path will still allow users to transact,
     /// but without privacy).
-    pub fn is_keyless_zkless_enabled(&self) -> bool {
+    pub fn is_zkless_keyless_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
 
     pub fn is_keyless_with_passkeys_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
-    }
-
-    pub fn is_reconfigure_with_dkg_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG)
     }
 
     pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {

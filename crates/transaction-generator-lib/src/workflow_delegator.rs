@@ -5,8 +5,8 @@ use crate::{
     account_generator::AccountGeneratorCreator, accounts_pool_wrapper::AccountsPoolWrapperCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
     entry_points::EntryPointTransactionGenerator, EntryPoints, ObjectPool,
-    ReliableTransactionSubmitter, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind,
-    WorkflowProgress,
+    ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator,
+    TransactionGeneratorCreator, WorkflowKind, WorkflowProgress,
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -229,7 +229,7 @@ impl WorkflowTxnGeneratorCreator {
         workflow_kind: WorkflowKind,
         txn_factory: TransactionFactory,
         init_txn_factory: TransactionFactory,
-        root_account: &mut LocalAccount,
+        root_account: &dyn RootAccountHandle,
         txn_executor: &dyn ReliableTransactionSubmitter,
         num_modules: usize,
         _initial_account_pool: Option<Arc<ObjectPool<LocalAccount>>>,

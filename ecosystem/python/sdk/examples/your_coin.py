@@ -130,6 +130,20 @@ async def main(moon_coin_path: str):
     balance = await rest_client.get_balance(alice.address(), bob.address())
     print(f"Bob's updated MoonCoin balance: {balance}")
 
+    try:
+        maybe_balance = await rest_client.get_balance(alice.address(), alice.address())
+    except Exception:
+        maybe_balance = None
+    print(f"Bob will transfer to Alice, her balance: {maybe_balance}")
+    txn_hash = await rest_client.transfer_coins(
+        bob, alice.address(), f"{alice.address()}::moon_coin::MoonCoin", 5
+    )
+    await rest_client.wait_for_transaction(txn_hash)
+    balance = await rest_client.get_balance(alice.address(), alice.address())
+    print(f"Alice's updated MoonCoin balance: {balance}")
+    balance = await rest_client.get_balance(alice.address(), bob.address())
+    print(f"Bob's updated MoonCoin balance: {balance}")
+
 
 if __name__ == "__main__":
     assert (

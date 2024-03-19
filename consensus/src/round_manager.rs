@@ -49,7 +49,10 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
-    on_chain_config::{Features, OnChainConsensusConfig, ValidatorTxnConfig},
+    on_chain_config::{
+        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        ValidatorTxnConfig,
+    },
     validator_verifier::ValidatorVerifier,
     PeerId,
 };
@@ -211,8 +214,8 @@ pub struct RoundManager {
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     local_config: ConsensusConfig,
-    features: Features,
-    broadcast_vote: bool,
+    randomness_config: OnChainRandomnessConfig,
+    jwk_consensus_config: OnChainJWKConsensusConfig,
 }
 
 impl RoundManager {
@@ -228,8 +231,8 @@ impl RoundManager {
         onchain_config: OnChainConsensusConfig,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         local_config: ConsensusConfig,
-        features: Features,
-        broadcast_vote: bool,
+        randomness_config: OnChainRandomnessConfig,
+        jwk_consensus_config: OnChainJWKConsensusConfig,
     ) -> Self {
         // when decoupled execution is false,
         // the counter is still static.
@@ -254,8 +257,8 @@ impl RoundManager {
             vtxn_config,
             buffered_proposal_tx,
             local_config,
-            features,
-            broadcast_vote,
+            randomness_config,
+            jwk_consensus_config,
         }
     }
 
@@ -676,7 +679,7 @@ impl RoundManager {
         if let Some(vtxns) = proposal.validator_txns() {
             for vtxn in vtxns {
                 ensure!(
-                    is_vtxn_expected(&self.features, vtxn),
+                    is_vtxn_expected(&self.randomness_config, &self.jwk_consensus_config, vtxn),
                     "unexpected validator txn: {:?}",
                     vtxn.topic()
                 );
@@ -834,7 +837,7 @@ impl RoundManager {
         self.round_state.record_vote(vote.clone());
         let vote_msg = VoteMsg::new(vote.clone(), self.block_store.sync_info());
 
-        if self.broadcast_vote {
+        if self.local_config.broadcast_vote {
             info!(self.new_log(LogEvent::Vote), "{}", vote);
             self.network.broadcast_vote(vote_msg).await;
         } else {
@@ -939,7 +942,7 @@ impl RoundManager {
             is_timeout = vote.is_timeout(),
         );
 
-        if !self.broadcast_vote && !vote.is_timeout() {
+        if !self.local_config.broadcast_vote && !vote.is_timeout() {
             // Unlike timeout votes regular votes are sent to the leaders of the next round only.
             let next_round = round + 1;
             ensure!(

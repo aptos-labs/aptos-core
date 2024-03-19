@@ -268,7 +268,8 @@ impl GlobalNumberOperationState {
 
         // Obtain positions that are marked as Bitwise by analyzing the pragma
         let para_sym = &struct_env.module_env.env.symbol_pool().make(BV_PARAM_PROP);
-        let bv_struct_opt = struct_env.get_spec().properties.get(para_sym);
+        let struct_spec = struct_env.get_spec();
+        let bv_struct_opt = struct_spec.properties.get(para_sym);
         let field_idx_vec = Self::extract_bv_vars(bv_struct_opt);
 
         let mid = struct_env.module_env.get_id();

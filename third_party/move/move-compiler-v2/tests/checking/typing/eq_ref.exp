@@ -12,7 +12,4 @@ module 0x42::m {
         Eq<u64>(Borrow(Immutable)(x), Borrow(Immutable)(y));
         Tuple()
     }
-    spec fun $mut_ref_to_mut_ref(x: u64,y: u64);
-    spec fun $mut_ref_to_ref(x: u64,y: u64);
-    spec fun $ref_to_ref(x: u64,y: u64);
 } // end 0x42::m

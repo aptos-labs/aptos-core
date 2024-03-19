@@ -37,6 +37,7 @@ const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
 const ERROR_PREFIX: &str = "E";
 const EVENT_STRUCT_ATTRIBUTE: &str = "event";
+const RANDOMNESS_ATTRIBUTE: &str = "randomness";
 const RESOURCE_GROUP: &str = "resource_group";
 const RESOURCE_GROUP_MEMBER: &str = "resource_group_member";
 const RESOURCE_GROUP_NAME: &str = "group";
@@ -45,12 +46,13 @@ const VIEW_FUN_ATTRIBUTE: &str = "view";
 
 // top-level attribute names, only.
 pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
-    const ALL_ATTRIBUTE_NAMES: [&str; 5] = [
+    const ALL_ATTRIBUTE_NAMES: [&str; 6] = [
         LEGACY_ENTRY_FUN_ATTRIBUTE,
         RESOURCE_GROUP,
         RESOURCE_GROUP_MEMBER,
         VIEW_FUN_ATTRIBUTE,
         EVENT_STRUCT_ATTRIBUTE,
+        RANDOMNESS_ATTRIBUTE,
     ];
 
     fn extended_attribute_names() -> BTreeSet<String> {
@@ -114,6 +116,7 @@ impl<'a> ExtendedChecker<'a> {
                 self.check_and_record_resource_group_members(module);
                 self.check_and_record_view_functions(module);
                 self.check_entry_functions(module);
+                self.check_and_record_unbiasabale_entry_functions(module);
                 self.check_and_record_events(module);
                 self.check_init_module(module);
                 self.build_error_map(module)
@@ -166,10 +169,12 @@ impl<'a> ExtendedChecker<'a> {
             if !fun.is_entry() {
                 continue;
             }
+
             if self.has_attribute(fun, LEGACY_ENTRY_FUN_ATTRIBUTE) {
-                // Skip checking for legacy entries
+                // Skip checking for legacy entries.
                 continue;
             }
+
             self.check_transaction_args(&fun.get_id_loc(), &fun.get_parameter_types());
             if fun.get_return_count() > 0 {
                 self.env
@@ -445,6 +450,36 @@ impl<'a> ExtendedChecker<'a> {
             }
         } else {
             None
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------------
+// Unbiasable entry functions
+
+impl<'a> ExtendedChecker<'a> {
+    fn check_and_record_unbiasabale_entry_functions(&mut self, module: &ModuleEnv) {
+        for ref fun in module.get_functions() {
+            if !self.has_attribute(fun, RANDOMNESS_ATTRIBUTE) {
+                continue;
+            }
+
+            if !fun.is_entry() || fun.visibility().is_public() {
+                self.env.error(
+                    &fun.get_id_loc(),
+                    "only private or public(friend) entry functions can have #[randomness] attribute",
+                )
+            }
+
+            // Record functions which use randomness.
+            let module_id = self.get_runtime_module_id(module);
+            self.output
+                .entry(module_id)
+                .or_default()
+                .fun_attributes
+                .entry(fun.get_simple_name_string().to_string())
+                .or_default()
+                .push(KnownAttribute::randomness());
         }
     }
 }
