@@ -23,7 +23,9 @@ use self::{
         combinable_bool_conditions::CombinableBoolVisitor,
         complex_inline_function::ComplexInlineFunctionVisitor,
         constant_naming::ConstantNamingVisitor, deep_nesting::DeepNestingVisitor,
-        empty_loop::EmptyLoopVisitor, explicit_self_assignments::ExplicitSelfAssignmentsVisitor,
+        empty_loop::EmptyLoopVisitor, exceed_fields::ExceedFieldsVisitor,
+        exceed_params::ExceedParamsVisitor,
+        explicit_self_assignments::ExplicitSelfAssignmentsVisitor,
         getter_method_field_match::GetterMethodFieldMatchLint, ifs_same_cond::IfsSameCondVisitor,
         infinite_loop_detector::InfiniteLoopDetectorVisitor,
         meaningless_math_operations::MeaninglessMathOperationsVisitor,
@@ -49,10 +51,7 @@ use codespan_reporting::diagnostic::Diagnostic;
 use std::path::PathBuf;
 
 pub fn main(path: PathBuf) -> (Vec<Diagnostic<FileId>>, Files<String>) {
-    let lint_config = read_config_or_default(&path).unwrap_or_else(|e| {
-        eprintln!("Failed to read config file: `{}`", e);
-        LintConfig::default()
-    });
+    let lint_config = read_config_or_default(&path).unwrap_or_else(|e| LintConfig::default());
     let env = build::build_ast(Some(path))
         .expect("Failed to initialize environment. Expected a valid path with necessary data.");
     let mut manager = VisitorManager::new(vec![
@@ -86,6 +85,8 @@ pub fn main(path: PathBuf) -> (Vec<Diagnostic<FileId>>, Files<String>) {
         InfiniteLoopDetectorVisitor::visitor(),
         OverflowMultiplicationDetectorVisitor::visitor(),
         NeedlessBoolVisitor::visitor(),
+        ExceedParamsVisitor::visitor(),
+        ExceedFieldsVisitor::visitor(),
     ]);
 
     let diags = manager.diagnostics();

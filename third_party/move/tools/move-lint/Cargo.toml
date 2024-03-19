@@ -24,6 +24,7 @@ move-model = { workspace = true }
 move-abigen = { workspace = true }
 move-compiler-v2 = { workspace = true }
 move-stackless-bytecode = { workspace = true }
+move-bytecode-verifier = { path = "../../move-bytecode-verifier" }
 codespan-reporting = { workspace = true }
 move-command-line-common = { workspace = true }
 named-lock = "0.2.0"

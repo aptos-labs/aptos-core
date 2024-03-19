@@ -10116,6 +10116,7 @@ dependencies = [
  "codespan-reporting",
  "datatest-stable",
  "move-abigen",
+ "move-bytecode-verifier",
  "move-command-line-common",
  "move-compiler",
  "move-compiler-v2",
