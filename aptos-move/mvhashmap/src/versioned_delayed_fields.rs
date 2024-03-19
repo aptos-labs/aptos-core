@@ -15,7 +15,7 @@ use std::{
     hash::Hash,
     iter::DoubleEndedIterator,
     ops::Deref,
-    sync::atomic::Ordering,
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 pub enum CommitError {
@@ -381,7 +381,9 @@ pub struct VersionedDelayedFields<K: Clone> {
 
     /// No deltas are allowed below next_idx_to_commit version, as all deltas (and snapshots)
     /// must be materialized and converted to Values during commit.
-    next_idx_to_commit: AtomicTxnIndex,
+    next_idx_to_commit: CachePadded<AtomicTxnIndex>,
+
+    total_base_value_size: CachePadded<AtomicU64>,
 }
 
 impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
@@ -391,8 +393,17 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
-            next_idx_to_commit: AtomicTxnIndex::new(0),
+            next_idx_to_commit: CachePadded::new(AtomicTxnIndex::new(0)),
+            total_base_value_size: CachePadded::new(AtomicU64::new(0)),
         }
+    }
+
+    pub(crate) fn num_keys(&self) -> usize {
+        self.values.len()
+    }
+
+    pub(crate) fn total_base_value_size(&self) -> u64 {
+        self.total_base_value_size.load(Ordering::Relaxed)
     }
 
     /// Must be called when an delayed field from storage is resolved, with ID replacing the
@@ -402,9 +413,13 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// Setting base value multiple times, even concurrently, is okay for the same ID,
     /// because the corresponding value prior to the block is fixed.
     pub fn set_base_value(&self, id: K, base_value: DelayedFieldValue) {
-        self.values
-            .entry(id)
-            .or_insert(VersionedValue::new(Some(base_value)));
+        self.values.entry(id).or_insert_with(|| {
+            self.total_base_value_size.fetch_add(
+                base_value.get_approximate_memory_size() as u64,
+                Ordering::Relaxed,
+            );
+            VersionedValue::new(Some(base_value))
+        });
     }
 
     /// Must be called when an delayed field creation with a given ID and initial value is
