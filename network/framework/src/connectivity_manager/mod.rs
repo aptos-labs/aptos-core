@@ -372,7 +372,11 @@ where
     ) -> Self {
         let connectivity_check_interval = Duration::from_millis(config.connectivity_check_interval_ms);
         let max_delay = Duration::from_millis(config.max_connection_delay_ms);
-        let outbound_connection_limit = Some(config.max_outbound_connections);
+        let outbound_connection_limit = if network_context.network_id().is_validator_network() {
+            None
+        } else {
+            Some(config.max_outbound_connections)
+        };
         let enable_latency_aware_dialing = config.enable_latency_aware_dialing;
 
         // Verify that the trusted peers set exists and that it is empty
