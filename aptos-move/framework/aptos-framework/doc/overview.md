@@ -7,9 +7,9 @@
 This is the reference documentation of the Aptos framework.
 
 
-<a id="@Index_1"></a>
+<a id="@Module_Index_1"></a>
 
-## Index
+## Module Index
 
 
 -  [`0x1::account`](account.md#0x1_account)
@@ -59,6 +59,116 @@ This is the reference documentation of the Aptos framework.
 -  [`0x1::version`](version.md#0x1_version)
 -  [`0x1::vesting`](vesting.md#0x1_vesting)
 -  [`0x1::voting`](voting.md#0x1_voting)
+
+
+
+<a id="@Specification_Index_2"></a>
+
+## Specification Index
+
+
+-  [`0x1::account`](account.md#specification)
+-  [`0x1::aggregator`](aggregator.md#specification)
+-  [`0x1::aggregator_factory`](aggregator_factory.md#specification)
+-  [`0x1::aggregator_v2`](aggregator_v2.md#specification)
+-  [`0x1::aptos_account`](aptos_account.md#specification)
+-  [`0x1::aptos_coin`](aptos_coin.md#specification)
+-  [`0x1::aptos_governance`](aptos_governance.md#specification)
+-  [`0x1::block`](block.md#specification)
+-  [`0x1::chain_id`](chain_id.md#specification)
+-  [`0x1::chain_status`](chain_status.md#specification)
+-  [`0x1::code`](code.md#specification)
+-  [`0x1::coin`](coin.md#specification)
+-  [`0x1::consensus_config`](consensus_config.md#specification)
+-  [`0x1::create_signer`](create_signer.md#specification)
+-  [`0x1::delegation_pool`](delegation_pool.md#specification)
+-  [`0x1::event`](event.md#specification)
+-  [`0x1::execution_config`](execution_config.md#specification)
+-  [`0x1::fungible_asset`](fungible_asset.md#specification)
+-  [`0x1::gas_schedule`](gas_schedule.md#specification)
+-  [`0x1::genesis`](genesis.md#specification)
+-  [`0x1::governance_proposal`](governance_proposal.md#specification)
+-  [`0x1::guid`](guid.md#specification)
+-  [`0x1::jwks`](jwks.md#specification)
+-  [`0x1::keyless_account`](keyless_account.md#specification)
+-  [`0x1::managed_coin`](managed_coin.md#specification)
+-  [`0x1::multisig_account`](multisig_account.md#specification)
+-  [`0x1::object`](object.md#specification)
+-  [`0x1::object_code_deployment`](object_code_deployment.md#specification)
+-  [`0x1::optional_aggregator`](optional_aggregator.md#specification)
+-  [`0x1::primary_fungible_store`](primary_fungible_store.md#specification)
+-  [`0x1::reconfiguration`](reconfiguration.md#specification)
+-  [`0x1::resource_account`](resource_account.md#specification)
+-  [`0x1::stake`](stake.md#specification)
+-  [`0x1::staking_config`](staking_config.md#specification)
+-  [`0x1::staking_contract`](staking_contract.md#specification)
+-  [`0x1::staking_proxy`](staking_proxy.md#specification)
+-  [`0x1::state_storage`](state_storage.md#specification)
+-  [`0x1::storage_gas`](storage_gas.md#specification)
+-  [`0x1::system_addresses`](system_addresses.md#specification)
+-  [`0x1::timestamp`](timestamp.md#specification)
+-  [`0x1::transaction_context`](transaction_context.md#specification)
+-  [`0x1::transaction_fee`](transaction_fee.md#specification)
+-  [`0x1::transaction_validation`](transaction_validation.md#specification)
+-  [`0x1::util`](util.md#specification)
+-  [`0x1::version`](version.md#specification)
+-  [`0x1::vesting`](vesting.md#specification)
+-  [`0x1::voting`](voting.md#specification)
+
+
+
+<a id="@High-level_Security_Requirement_Index_3"></a>
+
+## High-level Security Requirement Index
+
+
+-  [`0x1::account`](account.md#high-level-requirements)
+-  [`0x1::aggregator`](aggregator.md#high-level-requirements)
+-  [`0x1::aggregator_factory`](aggregator_factory.md#high-level-requirements)
+-  [`0x1::aggregator_v2`](aggregator_v2.md#high-level-requirements)
+-  [`0x1::aptos_account`](aptos_account.md#high-level-requirements)
+-  [`0x1::aptos_coin`](aptos_coin.md#high-level-requirements)
+-  [`0x1::aptos_governance`](aptos_governance.md#high-level-requirements)
+-  [`0x1::block`](block.md#high-level-requirements)
+-  [`0x1::chain_id`](chain_id.md#high-level-requirements)
+-  [`0x1::chain_status`](chain_status.md#high-level-requirements)
+-  [`0x1::code`](code.md#high-level-requirements)
+-  [`0x1::coin`](coin.md#high-level-requirements)
+-  [`0x1::consensus_config`](consensus_config.md#high-level-requirements)
+-  [`0x1::create_signer`](create_signer.md#high-level-requirements)
+-  [`0x1::delegation_pool`](delegation_pool.md#high-level-requirements)
+-  [`0x1::event`](event.md#high-level-requirements)
+-  [`0x1::execution_config`](execution_config.md#high-level-requirements)
+-  [`0x1::fungible_asset`](fungible_asset.md#high-level-requirements)
+-  [`0x1::gas_schedule`](gas_schedule.md#high-level-requirements)
+-  [`0x1::genesis`](genesis.md#high-level-requirements)
+-  [`0x1::governance_proposal`](governance_proposal.md#high-level-requirements)
+-  [`0x1::guid`](guid.md#high-level-requirements)
+-  [`0x1::jwks`](jwks.md#high-level-requirements)
+-  [`0x1::keyless_account`](keyless_account.md#high-level-requirements)
+-  [`0x1::managed_coin`](managed_coin.md#high-level-requirements)
+-  [`0x1::multisig_account`](multisig_account.md#high-level-requirements)
+-  [`0x1::object`](object.md#high-level-requirements)
+-  [`0x1::object_code_deployment`](object_code_deployment.md#high-level-requirements)
+-  [`0x1::optional_aggregator`](optional_aggregator.md#high-level-requirements)
+-  [`0x1::primary_fungible_store`](primary_fungible_store.md#high-level-requirements)
+-  [`0x1::reconfiguration`](reconfiguration.md#high-level-requirements)
+-  [`0x1::resource_account`](resource_account.md#high-level-requirements)
+-  [`0x1::stake`](stake.md#high-level-requirements)
+-  [`0x1::staking_config`](staking_config.md#high-level-requirements)
+-  [`0x1::staking_contract`](staking_contract.md#high-level-requirements)
+-  [`0x1::staking_proxy`](staking_proxy.md#high-level-requirements)
+-  [`0x1::state_storage`](state_storage.md#high-level-requirements)
+-  [`0x1::storage_gas`](storage_gas.md#high-level-requirements)
+-  [`0x1::system_addresses`](system_addresses.md#high-level-requirements)
+-  [`0x1::timestamp`](timestamp.md#high-level-requirements)
+-  [`0x1::transaction_context`](transaction_context.md#high-level-requirements)
+-  [`0x1::transaction_fee`](transaction_fee.md#high-level-requirements)
+-  [`0x1::transaction_validation`](transaction_validation.md#high-level-requirements)
+-  [`0x1::util`](util.md#high-level-requirements)
+-  [`0x1::version`](version.md#high-level-requirements)
+-  [`0x1::vesting`](vesting.md#high-level-requirements)
+-  [`0x1::voting`](voting.md#high-level-requirements)
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -7,9 +7,9 @@
 This is the reference documentation of the Aptos standard library.
 
 
-<a id="@Index_1"></a>
+<a id="@Module_Index_1"></a>
 
-## Index
+## Module Index
 
 
 -  [`0x1::any`](any.md#0x1_any)
@@ -45,6 +45,47 @@ This is the reference documentation of the Aptos standard library.
 -  [`0x1::table`](table.md#0x1_table)
 -  [`0x1::table_with_length`](table_with_length.md#0x1_table_with_length)
 -  [`0x1::type_info`](type_info.md#0x1_type_info)
+
+
+
+<a id="@Specification_Index_2"></a>
+
+## Specification Index
+
+
+-  [`0x1::any`](any.md#specification)
+-  [`0x1::aptos_hash`](hash.md#specification)
+-  [`0x1::big_vector`](big_vector.md#specification)
+-  [`0x1::bls12381`](bls12381.md#specification)
+-  [`0x1::bls12381_algebra`](bls12381_algebra.md#specification)
+-  [`0x1::bn254_algebra`](bn254_algebra.md#specification)
+-  [`0x1::capability`](capability.md#specification)
+-  [`0x1::comparator`](comparator.md#specification)
+-  [`0x1::copyable_any`](copyable_any.md#specification)
+-  [`0x1::crypto_algebra`](crypto_algebra.md#specification)
+-  [`0x1::debug`](debug.md#specification)
+-  [`0x1::ed25519`](ed25519.md#specification)
+-  [`0x1::fixed_point64`](fixed_point64.md#specification)
+-  [`0x1::from_bcs`](from_bcs.md#specification)
+-  [`0x1::math128`](math128.md#specification)
+-  [`0x1::math64`](math64.md#specification)
+-  [`0x1::math_fixed`](math_fixed.md#specification)
+-  [`0x1::math_fixed64`](math_fixed64.md#specification)
+-  [`0x1::multi_ed25519`](multi_ed25519.md#specification)
+-  [`0x1::pool_u64`](pool_u64.md#specification)
+-  [`0x1::pool_u64_unbound`](pool_u64_unbound.md#specification)
+-  [`0x1::ristretto255`](ristretto255.md#specification)
+-  [`0x1::ristretto255_bulletproofs`](ristretto255_bulletproofs.md#specification)
+-  [`0x1::ristretto255_elgamal`](ristretto255_elgamal.md#specification)
+-  [`0x1::ristretto255_pedersen`](ristretto255_pedersen.md#specification)
+-  [`0x1::secp256k1`](secp256k1.md#specification)
+-  [`0x1::simple_map`](simple_map.md#specification)
+-  [`0x1::smart_table`](smart_table.md#specification)
+-  [`0x1::smart_vector`](smart_vector.md#specification)
+-  [`0x1::string_utils`](string_utils.md#specification)
+-  [`0x1::table`](table.md#specification)
+-  [`0x1::table_with_length`](table_with_length.md#specification)
+-  [`0x1::type_info`](type_info.md#specification)
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

@@ -2,6 +2,10 @@
 
 This is the reference documentation of the Aptos standard library.
 
-## Index
+## Module Index
 
 > {{move-index}}
+
+## Specification Index
+
+> {{spec-index}}

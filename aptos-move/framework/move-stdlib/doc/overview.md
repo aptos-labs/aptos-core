@@ -8,9 +8,9 @@ This is the reference documentation of the Move standard library.
 For on overview of the Move language, see the [Move Book][move-book].
 
 
-<a id="@Index_1"></a>
+<a id="@Module_Index_1"></a>
 
-## Index
+## Module Index
 
 
 -  [`0x1::acl`](acl.md#0x1_acl)
@@ -24,6 +24,25 @@ For on overview of the Move language, see the [Move Book][move-book].
 -  [`0x1::signer`](signer.md#0x1_signer)
 -  [`0x1::string`](string.md#0x1_string)
 -  [`0x1::vector`](vector.md#0x1_vector)
+
+
+
+<a id="@Specification_Index_2"></a>
+
+## Specification Index
+
+
+-  [`0x1::acl`](acl.md#specification)
+-  [`0x1::bcs`](bcs.md#specification)
+-  [`0x1::bit_vector`](bit_vector.md#specification)
+-  [`0x1::error`](error.md#specification)
+-  [`0x1::features`](features.md#specification)
+-  [`0x1::fixed_point32`](fixed_point32.md#specification)
+-  [`0x1::hash`](hash.md#specification)
+-  [`0x1::option`](option.md#specification)
+-  [`0x1::signer`](signer.md#specification)
+-  [`0x1::string`](string.md#specification)
+-  [`0x1::vector`](vector.md#specification)
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

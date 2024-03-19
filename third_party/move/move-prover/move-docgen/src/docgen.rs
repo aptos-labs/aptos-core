@@ -169,6 +169,8 @@ enum TemplateElement {
     IncludeModule(String),
     IncludeToc,
     Index,
+    SpecIndex,
+    ReqIndex,
 }
 
 /// A map from spec block targets to associated spec blocks.
@@ -300,6 +302,8 @@ impl<'env> Docgen<'env> {
                 ( (?P<include>move-include\s+(?P<include_name>\w+))
                 | (?P<toc>move-toc)
                 | (?P<index>move-index)
+                | (?P<spec_index>spec-index)
+                | (?P<req_index>req-index)
                 )\s*}}.*$",
             )
             .unwrap()
@@ -322,6 +326,10 @@ impl<'env> Docgen<'env> {
                 res.push(TemplateElement::IncludeToc);
             } else if cap.name("index").is_some() {
                 res.push(TemplateElement::Index);
+            } else if cap.name("spec_index").is_some() {
+                res.push(TemplateElement::SpecIndex);
+            } else if cap.name("req_index").is_some() {
+                res.push(TemplateElement::ReqIndex);
             } else {
                 unreachable!("regex misbehavior");
             }
@@ -374,6 +382,12 @@ impl<'env> Docgen<'env> {
                 },
                 TemplateElement::Index => {
                     self.gen_index();
+                },
+                TemplateElement::SpecIndex => {
+                    self.gen_spec_index();
+                },
+                TemplateElement::ReqIndex => {
+                    self.gen_req_index();
                 },
             }
         }
@@ -1101,6 +1115,64 @@ impl<'env> Docgen<'env> {
                 "[`{}`]({})",
                 module_env.get_name().display_full(module_env.env),
                 self.ref_for_module(&module_env)
+            ))
+        }
+        self.end_items();
+    }
+
+    /// Generate an index of all modules and scripts in the context. This includes generated
+    /// ones and those which are only dependencies.
+    fn gen_spec_index(&self) {
+        // Sort all modules and script by simple name. (Perhaps we should include addresses?)
+        let sorted_infos = self.infos.iter().sorted_by(|(id1, _), (id2, _)| {
+            let name = |id: ModuleId| {
+                self.env
+                    .symbol_pool()
+                    .string(self.env.get_module(id).get_name().name())
+            };
+            Ord::cmp(name(**id1).as_str(), name(**id2).as_str())
+        });
+        self.begin_items();
+        for (id, _) in sorted_infos {
+            let module_env = self.env.get_module(*id);
+            if !module_env.is_target() {
+                // Do not include modules which are not target (outside of the package)
+                // into the index.
+                continue;
+            }
+            self.item_text(&format!(
+                "[`{}`]({})",
+                module_env.get_name().display_full(module_env.env),
+                self.ref_for_spec(&module_env)
+            ))
+        }
+        self.end_items();
+    }
+
+    /// Generate an index of all modules and scripts in the context. This includes generated
+    /// ones and those which are only dependencies.
+    fn gen_req_index(&self) {
+        // Sort all modules and script by simple name. (Perhaps we should include addresses?)
+        let sorted_infos = self.infos.iter().sorted_by(|(id1, _), (id2, _)| {
+            let name = |id: ModuleId| {
+                self.env
+                    .symbol_pool()
+                    .string(self.env.get_module(id).get_name().name())
+            };
+            Ord::cmp(name(**id1).as_str(), name(**id2).as_str())
+        });
+        self.begin_items();
+        for (id, _) in sorted_infos {
+            let module_env = self.env.get_module(*id);
+            if !module_env.is_target() {
+                // Do not include modules which are not target (outside of the package)
+                // into the index.
+                continue;
+            }
+            self.item_text(&format!(
+                "[`{}`]({})",
+                module_env.get_name().display_full(module_env.env),
+                self.ref_for_req(&module_env)
             ))
         }
         self.end_items();
@@ -1930,6 +2002,24 @@ impl<'env> Docgen<'env> {
     fn ref_for_module(&self, module_env: &ModuleEnv<'_>) -> String {
         if let Some(info) = self.infos.get(&module_env.get_id()) {
             format!("{}#{}", info.target_file, info.label)
+        } else {
+            "".to_string()
+        }
+    }
+
+    /// Return the reference for the spec of a module.
+    fn ref_for_spec(&self, module_env: &ModuleEnv<'_>) -> String {
+        if let Some(info) = self.infos.get(&module_env.get_id()) {
+            format!("{}#specification", info.target_file)
+        } else {
+            "".to_string()
+        }
+    }
+
+    /// Return the reference for the high-level requirement of a module.
+    fn ref_for_req(&self, module_env: &ModuleEnv<'_>) -> String {
+        if let Some(info) = self.infos.get(&module_env.get_id()) {
+            format!("{}#high-level-requirements", info.target_file)
         } else {
             "".to_string()
         }
