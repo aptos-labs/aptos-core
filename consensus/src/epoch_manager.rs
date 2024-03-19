@@ -430,10 +430,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .map_err(DbError::from)
             .context("[EpochManager] Failed to get epoch proof")?;
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
-        self.network_sender.send_to(peer_id, msg).context(format!(
-            "[EpochManager] Failed to send epoch proof to {}",
-            peer_id
-        ))
+        if let Err(err) = self.network_sender.send_to(peer_id, msg) {
+            warn!(
+                "[EpochManager] Failed to send epoch proof to {}, with error: {:?}",
+                peer_id, err,
+            );
+        }
+        Ok(())
     }
 
     fn process_different_epoch(

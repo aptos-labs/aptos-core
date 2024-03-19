@@ -24,6 +24,7 @@ use aptos_consensus_types::{
     common::Author, executed_block::ExecutedBlock, pipeline::commit_decision::CommitDecision,
 };
 use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutorError;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -437,6 +438,10 @@ impl BufferManager {
 
         let executed_blocks = match inner {
             Ok(result) => result,
+            Err(ExecutorError::CouldNotGetData) => {
+                warn!("Execution error - CouldNotGetData");
+                return;
+            },
             Err(e) => {
                 error!("Execution error {:?}", e);
                 return;
