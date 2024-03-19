@@ -134,14 +134,16 @@ impl TAugmentedData for AugmentedData {
             .add_certified_delta(&rand_config.author(), delta.clone())
             .expect("Add self delta should succeed");
 
-        let fast_delta = fast_rand_config
-            .as_ref()
-            .map(|config| config.get_my_delta().clone());
-        let _ = fast_rand_config.as_ref().map(|config| {
-            config
-                .add_certified_delta(&rand_config.author(), fast_delta.clone().unwrap())
-                .expect("Add self delta for fast path should succeed")
-        });
+        let fast_delta = if let Some(fast_config) = fast_rand_config.as_ref() {
+            let fast_delta = fast_config.get_my_delta().clone();
+            fast_config
+                .add_certified_delta(&rand_config.author(), fast_delta.clone())
+                .expect("Add self delta for fast path should succeed");
+            Some(fast_delta)
+        } else {
+            None
+        };
+
         let data = AugmentedData {
             delta: delta.clone(),
             fast_delta,
@@ -159,9 +161,10 @@ impl TAugmentedData for AugmentedData {
         rand_config
             .add_certified_delta(author, delta.clone())
             .expect("Add delta should succeed");
-        if let Some(config) = fast_rand_config {
+
+        if let (Some(config), Some(fast_delta)) = (fast_rand_config, fast_delta) {
             config
-                .add_certified_delta(author, fast_delta.clone().unwrap())
+                .add_certified_delta(author, fast_delta.clone())
                 .expect("Add delta for fast path should succeed");
         }
     }
@@ -175,15 +178,16 @@ impl TAugmentedData for AugmentedData {
         rand_config
             .derive_apk(author, self.delta.clone())
             .map(|_| ())?;
-        fast_rand_config
-            .as_ref()
-            .map(|config| {
-                config
-                    .derive_apk(author, self.fast_delta.clone().unwrap())
-                    .map(|_| ())
-            })
-            .transpose()?;
-        Ok(())
+
+        ensure!(
+            self.fast_delta.is_some() == fast_rand_config.is_some(),
+            "Fast path delta should be present iff fast_rand_config is present."
+        );
+        if let (Some(config), Some(fast_delta)) = (fast_rand_config, self.fast_delta.as_ref()) {
+            config.derive_apk(author, fast_delta.clone()).map(|_| ())
+        } else {
+            Ok(())
+        }
     }
 }
 

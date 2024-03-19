@@ -253,22 +253,14 @@ impl<S: TShare> RandStore<S> {
         rand_item.add_metadata(&self.rand_config, rand_metadata.clone());
         rand_item.try_aggregate(&self.rand_config, self.decision_tx.clone(), false);
         // fast path
-        if self.fast_rand_map.is_some() && self.fast_rand_config.is_some() {
-            let fast_rand_item = self
-                .fast_rand_map
-                .as_mut()
-                .unwrap()
+        if let (Some(fast_rand_map), Some(fast_rand_config)) =
+            (self.fast_rand_map.as_mut(), self.fast_rand_config.as_ref())
+        {
+            let fast_rand_item = fast_rand_map
                 .entry(rand_metadata.round())
                 .or_insert_with(|| RandItem::new(self.author));
-            fast_rand_item.add_metadata(
-                self.fast_rand_config.as_ref().unwrap(),
-                rand_metadata.clone(),
-            );
-            fast_rand_item.try_aggregate(
-                self.fast_rand_config.as_ref().unwrap(),
-                self.decision_tx.clone(),
-                true,
-            );
+            fast_rand_item.add_metadata(fast_rand_config, rand_metadata.clone());
+            fast_rand_item.try_aggregate(fast_rand_config, self.decision_tx.clone(), true);
         }
     }
 
