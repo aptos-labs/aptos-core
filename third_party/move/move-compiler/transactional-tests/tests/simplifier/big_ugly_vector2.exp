@@ -2483,11 +2483,9 @@ Error: value (298) cannot exceed (255) for signature_size
 
 task 2 'run'. lines 649-649:
 Error: Function execution failed with VMError: {
-    message: Linker Error: Cannot find ModuleId { address: 000000000000000000000000000000000000000000000000000000000000cafe, name: Identifier("vectors") } in data cache,
     major_status: LINKER_ERROR,
     sub_status: None,
     location: undefined,
     indices: [],
     offsets: [],
-    exec_state: None,
 }
