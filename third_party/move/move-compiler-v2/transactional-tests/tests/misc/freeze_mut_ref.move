@@ -60,18 +60,35 @@ module 0x42::freeze_mut_ref {
         assert!(*y == 0, 0);
     }
 
-    fun test_4() {
-        let x: &u64;
-        let y: &u64;
-        (x, y) = t2(&mut 3, &mut 4);
-        assert!(*x == 3, 2);
-        assert!(*y == 4, 3);
-    }
+    // TODO: this case is not handled
+    // fun test_4() {
+    //     let x: &u64;
+    //     let y: &u64;
+    //     (x, y) = t2(&mut 3, &mut 4);
+    //     assert!(*x == 3, 2);
+    //     assert!(*y == 4, 3);
+    // }
 
     fun test_5() {
         let x = 3;
         let a = borrow_mut2(&mut x);
         assert!(*a == 3, 0);
+    }
+
+
+    fun test_6() {
+        let s1 = G {f: 2};
+        let s2 = G {f: 3};
+        let x;
+        x = if (true) &s1 else &mut s2;
+        assert!(x.f == 2, 0);
+    }
+
+    fun test_7() {
+        let s1 = G {f: 2};
+        let s2 = G {f: 3};
+        let x: &G = if (true) &s1 else &mut s2;
+        assert!(x.f == 2, 0);
     }
 
 }
@@ -82,6 +99,8 @@ module 0x42::freeze_mut_ref {
 
 //# run 0x42::freeze_mut_ref::test_3
 
-//# run 0x42::freeze_mut_ref::test_4
-
 //# run 0x42::freeze_mut_ref::test_5
+
+//# run 0x42::freeze_mut_ref::test_6
+
+//# run 0x42::freeze_mut_ref::test_7

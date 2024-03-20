@@ -31,10 +31,10 @@ module 0x8675309::M {
                       let t_ref: &mut M::T = Borrow(Mutable)(t);
                       {
                         let g: M::S = pack M::S(2);
-                        select M::T.s(t_ref) = g;
+                        select M::T.s<&mut M::T>(t_ref) = g;
                         {
                           let g: M::S = pack M::S(3);
-                          select M::T.s(t_ref) = g;
+                          select M::T.s<&M::T>(t_ref) = g;
                           Tuple()
                         }
                       }

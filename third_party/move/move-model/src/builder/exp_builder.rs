@@ -1254,22 +1254,47 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.translate_pack(&loc, maccess, generics, fields, expected_type, context)
             },
             EA::Exp_::IfElse(cond, then, else_) => {
-                let (rty, then, else_) = if self.subs.is_free_var(expected_type) {
-                    // Check both branches independently and join their types
-                    let (ty1, then) = self.translate_exp_free(then);
-                    let (ty2, else_) = self.translate_exp_free(else_);
-                    let jt = self.join_type(&loc, &ty1, &ty2, context);
-                    (
-                        self.check_type(&loc, &jt, expected_type, context),
-                        then,
-                        else_,
-                    )
-                } else {
-                    // Check branches against expected type
-                    let then = self.translate_exp_in_context(then, expected_type, context);
-                    let else_ = self.translate_exp_in_context(else_, expected_type, context);
-                    (expected_type.clone(), then, else_)
+                let try_freeze_if_else = |et: &mut ExpTranslator,
+                                          expected_ty: &Type,
+                                          then: ExpData,
+                                          ty1: Type,
+                                          else_: ExpData,
+                                          ty2: Type| {
+                    let mut then_exp = then.into_exp();
+                    let mut else_exp = else_.into_exp();
+                    if expected_ty.is_immutable_reference() {
+                        if ty1.is_mutable_reference() {
+                            et.try_freeze(expected_ty, &ty1, &mut then_exp);
+                        }
+                        if ty2.is_mutable_reference() {
+                            et.try_freeze(expected_ty, &ty2, &mut else_exp);
+                        }
+                    }
+                    (then_exp, else_exp)
                 };
+                let (rty, then, else_): (Type, ExpData, ExpData) =
+                    if self.subs.is_free_var(expected_type) {
+                        // Check both branches independently and join their types
+                        let (ty1, then) = self.translate_exp_free(then);
+                        let (ty2, else_) = self.translate_exp_free(else_);
+                        let jt = self.join_type(&loc, &ty1, &ty2, context);
+                        let (then_exp, else_exp) =
+                            try_freeze_if_else(self, &jt, then, ty1, else_, ty2);
+                        (
+                            self.check_type(&loc, &jt, expected_type, context),
+                            then_exp.into(),
+                            else_exp.into(),
+                        )
+                    } else {
+                        // Check branches against expected type
+                        let then = self.translate_exp_in_context(then, expected_type, context);
+                        let else_ = self.translate_exp_in_context(else_, expected_type, context);
+                        let ty1 = self.get_node_type(then.node_id());
+                        let ty2 = self.get_node_type(else_.node_id());
+                        let (then_exp, else_exp) =
+                            try_freeze_if_else(self, expected_type, then, ty1, else_, ty2);
+                        (expected_type.clone(), then_exp.into(), else_exp.into())
+                    };
                 let cond = self.translate_exp(cond, &Type::new_prim(PrimitiveType::Bool));
                 let id = self.new_node_id_with_type_loc(&rty, &loc);
                 ExpData::IfElse(id, cond.into_exp(), then.into_exp(), else_.into_exp())

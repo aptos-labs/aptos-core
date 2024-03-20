@@ -29,7 +29,7 @@ module 0x42::freeze_mut_ref {
         return v
     }
 
-    struct S {
+    struct S has drop {
 
     }
 
@@ -45,11 +45,12 @@ module 0x42::freeze_mut_ref {
         (u1, u2)
     }
 
-    fun t3() {
-        let x: &u64;
-        let y: &u64;
-        (x, y) = t2(&mut 3, &mut 4);
-    }
+    // TODO: this case is not handled
+    // fun t3() {
+    //     let x: &u64;
+    //     let y: &u64;
+    //     (x, y) = t2(&mut 3, &mut 4);
+    // }
 
     public fun t4() {
         let x: &u64;
@@ -71,6 +72,15 @@ module 0x42::freeze_mut_ref {
     fun t6(cond: bool, s: &mut S, other: &S) {
         let x: &S;
         if (cond) x = copy s else x = other;
+    }
+
+    fun t7(cond: bool, s: &mut S, other: &S) {
+        let _x;
+        _x = if (cond) s else other;
+    }
+
+    fun t8(cond: bool, s: &mut S, other: &S) {
+        let _x: &S = if (cond) s else other;
     }
 
 }

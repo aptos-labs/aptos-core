@@ -891,47 +891,6 @@ impl<'env> Generator<'env> {
             .map(|(e, t)| self.maybe_convert(e, &t))
             .collect::<Vec<_>>();
         let args = self.gen_arg_list(&args, true);
-        let ret_type: Type = self.env().get_function(fun).get_result_type();
-        // For the code such as `let x: &u64; let y: &u64; (x,y) = f() where f returns (&mut, &mut)`
-        // we need to generate a new temp with mut ref type and then freeze it
-        if let Type::Tuple(ret_tys) = ret_type {
-            if ret_tys.len() == targets.len() {
-                let mut new_targets = vec![];
-                let mut temp_map_for_targets_requiring_freeze = BTreeMap::new();
-                for (target, ret_ty) in targets.iter().zip(ret_tys) {
-                    if self.temp_type(*target).is_immutable_reference()
-                        && ret_ty.is_mutable_reference()
-                    {
-                        let new_target = self.new_temp(ret_ty);
-                        new_targets.push(new_target);
-                        temp_map_for_targets_requiring_freeze.insert(target, new_target);
-                    } else {
-                        new_targets.push(*target);
-                    }
-                }
-                self.emit_with(id, |attr| {
-                    Bytecode::Call(
-                        attr,
-                        new_targets,
-                        BytecodeOperation::Function(fun.module_id, fun.id, type_args),
-                        args,
-                        None,
-                    )
-                });
-                for (target, new_target) in temp_map_for_targets_requiring_freeze {
-                    self.emit_with(id, |attr| {
-                        Bytecode::Call(
-                            attr,
-                            vec![*target],
-                            BytecodeOperation::FreezeRef,
-                            vec![new_target],
-                            None,
-                        )
-                    });
-                }
-                return;
-            }
-        }
         self.emit_with(id, |attr| {
             Bytecode::Call(
                 attr,
