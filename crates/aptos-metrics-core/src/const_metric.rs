@@ -63,7 +63,7 @@ impl ConstMetric {
 
         let mut metric = Metric::default();
         metric.set_gauge(guage);
-        metric.set_label(labels);
+        metric.set_label(labels.into());
 
         Ok(ConstMetric {
             desc,
