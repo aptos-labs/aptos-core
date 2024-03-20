@@ -5,7 +5,8 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::debug;
 use move_compiler_v2::{
-    annotate_units, ast_simplifier, check_and_rewrite_pipeline, cyclic_instantiation_checker, disassemble_compiled_units,
+    annotate_units, ast_simplifier, check_and_rewrite_pipeline, cyclic_instantiation_checker,
+    disassemble_compiled_units,
     env_pipeline::{
         lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
         spec_rewriter, EnvProcessorPipeline,

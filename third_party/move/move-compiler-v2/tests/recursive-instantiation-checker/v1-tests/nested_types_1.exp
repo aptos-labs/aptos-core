@@ -1,9 +1,0 @@
-
-Diagnostics:
-error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
-  ┌─ tests/recursive-instantiation-checker/v1-tests/nested_types_1.move:4:9
-  │
-4 │     fun foo<T>() {
-  │         ^^^
-  │
-  = `foo<T>` calls `foo<M::S<M::S<T>>>` at tests/recursive-instantiation-checker/v1-tests/nested_types_1.move:4
