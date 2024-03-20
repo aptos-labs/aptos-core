@@ -75,6 +75,7 @@ async fn flag_init_provider_vtxn() {
         .await
         .expect("Epoch 7 taking too long to arrive!");
 
+    tokio::time::sleep(Duration::from_secs(15)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     assert_eq!(2, patched_jwks.jwks.entries[0].jwks.len());
 }
