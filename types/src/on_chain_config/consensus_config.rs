@@ -7,6 +7,7 @@ use anyhow::{format_err, Result};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::on_chain_config::ConsensusAlgorithmConfig::Jolteon;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub enum ConsensusAlgorithmConfig {
@@ -101,10 +102,7 @@ pub enum ValidatorTxnConfig {
 
 impl ValidatorTxnConfig {
     pub fn default_for_genesis() -> Self {
-        Self::V1 {
-            per_block_limit_txn_count: VTXN_CONFIG_PER_BLOCK_LIMIT_TXN_COUNT_DEFAULT,
-            per_block_limit_total_bytes: VTXN_CONFIG_PER_BLOCK_LIMIT_TOTAL_BYTES_DEFAULT,
-        }
+        Self::V0
     }
 
     pub fn default_if_missing() -> Self {
@@ -236,6 +234,37 @@ impl OnChainConsensusConfig {
             },
             OnChainConsensusConfig::V3 { vtxn, .. } => vtxn.clone(),
         }
+    }
+
+    pub fn enable_validator_txns(&mut self) {
+        let new_self = match std::mem::take(self) {
+            OnChainConsensusConfig::V1(config) => OnChainConsensusConfig::V3 {
+                alg: Jolteon {
+                    main: config,
+                    quorum_store_enabled: false,
+                },
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            OnChainConsensusConfig::V2(config) => OnChainConsensusConfig::V3 {
+                alg: Jolteon {
+                    main: config,
+                    quorum_store_enabled: true,
+                },
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            OnChainConsensusConfig::V3 {
+                vtxn: ValidatorTxnConfig::V0,
+                alg,
+            } => OnChainConsensusConfig::V3 {
+                alg,
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            item @ OnChainConsensusConfig::V3 {
+                vtxn: ValidatorTxnConfig::V1 { .. },
+                ..
+            } => item,
+        };
+        *self = new_self;
     }
 }
 

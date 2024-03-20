@@ -456,7 +456,7 @@ pub fn default_features() -> Vec<FeatureFlag> {
         // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
         FeatureFlag::KEYLESS_ACCOUNTS,
         FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
-        FeatureFlag::JWK_CONSENSUS,
+        // FeatureFlag::JWK_CONSENSUS,
         FeatureFlag::REFUNDABLE_BYTES,
         FeatureFlag::OBJECT_CODE_DEPLOYMENT,
         FeatureFlag::MAX_OBJECT_NESTING_CHECK,

@@ -4,6 +4,7 @@ mod dummy_provider;
 mod jwk_consensus_basic;
 mod jwk_consensus_per_issuer;
 mod jwk_consensus_provider_change_mind;
+mod enable;
 
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::{common::types::TransactionSummary, test::CliTestFramework};
@@ -17,6 +18,7 @@ use aptos_types::jwks::{
 };
 use move_core_types::account_address::AccountAddress;
 use std::time::Duration;
+use crate::utils::get_current_consensus_config;
 
 pub async fn put_provider_on_chain(
     cli: CliTestFramework,
@@ -118,4 +120,76 @@ script {
         }],
     };
     assert_eq!(expected_providers_jwks, patched_jwks.jwks);
+}
+
+async fn enable_feature_flag(cli: &CliTestFramework, root_idx: usize) -> TransactionSummary {
+    let script = r#"
+script {
+    use aptos_framework::aptos_governance;
+    use std::features;
+    fun main(core_resources: &signer) {
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        features::change_feature_flags(&framework, vector[features::get_jwk_consensus_feature()], vector[]);
+        aptos_governance::reconfigure(&framework);
+    }
+}
+"#;
+    cli.run_script(root_idx, script)
+        .await
+        .unwrap()
+}
+
+async fn initialize_jwk_module(cli: &CliTestFramework, root_idx: usize) -> TransactionSummary {
+    let script = r#"
+script {
+    use aptos_framework::aptos_governance;
+    use aptos_framework::jwks;
+    fun main(core_resources: &signer) {
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        jwks::initialize(&framework);
+    }
+}
+"#;
+    cli.run_script(root_idx, script)
+        .await
+        .unwrap()
+}
+
+async fn add_provider_google(cli: &CliTestFramework, root_idx: usize) -> TransactionSummary {
+    let script = r#"
+script {
+    use aptos_framework::aptos_governance;
+    use aptos_framework::jwks;
+    fun main(core_resources: &signer) {
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        jwks::upsert_oidc_provider(
+            &framework_signer,
+            b"https://accounts.google.com",
+            b"https://accounts.google.com/.well-known/openid-configuration"
+        );
+    }
+}
+"#;
+    cli.run_script(root_idx, script)
+        .await
+        .unwrap()
+}
+
+async fn enable_vtxn(rest_cli: &Client, cli: &CliTestFramework, root_idx: usize) -> TransactionSummary {
+    let mut config = get_current_consensus_config(rest_cli).await;
+    config.enable_validator_txns();
+    let config_bytes = bcs::to_bytes(&config).unwrap();
+    let script = format!(r#"
+script {{
+    use aptos_framework::aptos_governance;
+    use aptos_framework::consensus_config;
+    fun main(core_resources: &signer) {{
+        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        consensus_config::set(&framework, vector{:?});
+    }}
+}}
+"#, config_bytes);
+    cli.run_script(root_idx, script.as_str())
+        .await
+        .unwrap()
 }
