@@ -179,6 +179,7 @@ impl Format {
             index += 1;
         }
         self.add_comments(u32::MAX, "end_of_move_file".to_string());
+        self.process_last_empty_line();
         self.ret.into_inner()
     }
 
@@ -505,13 +506,13 @@ impl Format {
     fn format_each_token_in_nested_elements(
         &self,
         kind: &NestKind,
-        elements: &Vec<TokenTree>,
+        elements: &[TokenTree],
         delimiter: Option<Delimiter>,
         has_colon: bool,
         b_new_line_mode: bool,
     ) {
         let nested_token = TokenTree::Nested {
-            elements: elements.clone(),
+            elements: elements.to_owned(),
             kind: *kind,
             note: None,
         };
@@ -699,6 +700,7 @@ impl Format {
                 self.new_line(None);
             }
 
+            // process `else if`
             if *tok == Tok::Else && next_token.is_some() && 
                 (next_token.unwrap().simple_str().unwrap_or_default() == "if" || 
                 self.syntax_extractor
@@ -857,7 +859,18 @@ impl Format {
             }
 
             if (self.translate_line(c.start_offset) - self.cur_line.get()) > 1 {
-                self.new_line(None);
+                tracing::debug!("the pos of this comment > current line");
+                // 20240318: process case as follows
+                // 
+                /*
+                #[test(econia = @econia, integrator = @user)]
+
+                // comment 
+                fun func() {}
+                */
+                if self.format_context.borrow().cur_tok != Tok::NumSign {
+                    self.new_line(None);
+                }
             }
 
             if (self.translate_line(c.start_offset) - self.cur_line.get()) == 1 {
@@ -1232,6 +1245,22 @@ impl Format {
             .collect::<Vec<_>>()
             .join("\n");
         *self.ret.borrow_mut() = result;
+    }
+
+    fn process_last_empty_line(&mut self) {
+        let ret_copy = self.ret.clone().into_inner();
+        let mut lines = ret_copy.lines().collect::<Vec<&str>>();
+        let last_line = lines.last().unwrap_or(&"");
+
+        if last_line.is_empty() {
+            while lines.len() > 1 && lines[lines.len() - 2].is_empty() {
+                lines.pop();
+            }
+        } else {
+            lines.push("");
+        }
+
+        *self.ret.borrow_mut() = lines.join("\n");
     }
 }
 

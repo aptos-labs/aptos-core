@@ -182,9 +182,9 @@ module aptos_framework::coin {
     /// Creates a new aggregatable coin with value overflowing on `limit`. Note that this function can
     /// only be called by Aptos Framework (0x1) account for now because of `create_aggregator`.
     public(friend) fun initialize_aggregatable_coin<CoinType>(aptos_framework: &signer)
-        : AggregatableCoin<CoinType>{
+        : AggregatableCoin<CoinType> {
         let aggregator = aggregator_factory::create_aggregator(aptos_framework, MAX_U64);
-        AggregatableCoin<CoinType>{value: aggregator,}
+        AggregatableCoin<CoinType> {value: aggregator,}
     }
 
     /// Returns true if the value of aggregatable coin is zero.
@@ -197,7 +197,7 @@ module aptos_framework::coin {
     /// Drains the aggregatable coin, setting it to zero and returning a standard coin.
     public(friend) fun drain_aggregatable_coin<CoinType>(
         coin: &mut AggregatableCoin<CoinType>
-    ): Coin<CoinType>{
+    ): Coin<CoinType> {
         spec {
             // TODO: The data invariant is not properly assumed from CollectedFeesPerBlock.
             assume aggregator::spec_get_limit(coin.value) == MAX_U64;
@@ -214,7 +214,7 @@ module aptos_framework::coin {
         spec {
             update supply<CoinType> = supply<CoinType> + amount;
         };
-        Coin<CoinType>{value: (amount as u64),}
+        Coin<CoinType> {value: (amount as u64),}
     }
 
     /// Merges `coin` into aggregatable coin (`dst_coin`).
@@ -396,7 +396,7 @@ module aptos_framework::coin {
             DepositEvent {amount: coin.value},
         );
         event::emit(
-            Deposit<CoinType>{
+            Deposit<CoinType> {
                 account: account_addr,
                 amount: coin.value
             }
@@ -440,7 +440,7 @@ module aptos_framework::coin {
     public fun extract<CoinType>(
         coin: &mut Coin<CoinType>,
         amount: u64
-    ): Coin<CoinType>{
+    ): Coin<CoinType> {
         assert!(
             coin.value >= amount,
             error::invalid_argument(EINSUFFICIENT_BALANCE)
@@ -456,7 +456,7 @@ module aptos_framework::coin {
     }
 
     /// Extracts the entire amount from the passed-in `coin`, where the original token is modified in place.
-    public fun extract_all<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType>{
+    public fun extract_all<CoinType>(coin: &mut Coin<CoinType>): Coin<CoinType> {
         let total_value = coin.value;
         spec {
             update supply<CoinType> = supply<CoinType> - coin.value;
@@ -599,7 +599,7 @@ module aptos_framework::coin {
             error::invalid_argument(ECOIN_SYMBOL_TOO_LONG)
         );
 
-        let coin_info = CoinInfo<CoinType>{
+        let coin_info = CoinInfo<CoinType> {
             name,
             symbol,
             decimals,
@@ -645,7 +645,7 @@ module aptos_framework::coin {
         _cap: &MintCapability<CoinType>,
     ): Coin<CoinType>
         acquires CoinInfo {
-        if (amount == 0) {return Coin<CoinType>{value: 0}};
+        if (amount == 0) {return Coin<CoinType> {value: 0}};
 
         let maybe_supply = &mut borrow_global_mut<CoinInfo<CoinType>>(
             coin_address<CoinType>()
@@ -672,7 +672,7 @@ module aptos_framework::coin {
         spec {
             update supply<CoinType> = supply<CoinType> + amount;
         };
-        Coin<CoinType>{value: amount}
+        Coin<CoinType> {value: amount}
     }
 
     public fun register<CoinType>(account: &signer) {
@@ -681,7 +681,7 @@ module aptos_framework::coin {
         if (is_account_registered<CoinType>(account_addr)) { return };
 
         account::register_coin<CoinType>(account_addr);
-        let coin_store = CoinStore<CoinType>{
+        let coin_store = CoinStore<CoinType> {
             coin: Coin {value: 0},
             frozen: false,
             deposit_events: account::new_event_handle<DepositEvent>(account),
@@ -726,18 +726,18 @@ module aptos_framework::coin {
             WithdrawEvent { amount },
         );
         event::emit(
-            Withdraw<CoinType>{account: account_addr, amount}
+            Withdraw<CoinType> {account: account_addr, amount}
         );
 
         extract(&mut coin_store.coin, amount)
     }
 
     /// Create a new `Coin<CoinType>` with a value of `0`.
-    public fun zero<CoinType>(): Coin<CoinType>{
+    public fun zero<CoinType>(): Coin<CoinType> {
         spec {
             update supply<CoinType> = supply<CoinType> + 0;
         };
-        Coin<CoinType>{value: 0}
+        Coin<CoinType> {value: 0}
     }
 
     /// Destroy a freeze capability. Freeze capability is dangerous and therefore should be destroyed if not used.

@@ -137,4 +137,5 @@ test_indexer_grpc/*
 
 # test output files for movefmt
 third_party/move/tools/move-formatter/tests/formatter/*/*.out
+third_party/move/tools/move-formatter/tests/*/*/*.out
 third_party/move/tools/move-formatter/tests/*/*.out

@@ -2928,7 +2928,6 @@ module econia::incentives {
     }
 
     #[test(econia = @econia, integrator = @user)]
-
     /// Verify registration of assorted coin stores, fee assessment, and
     /// withdrawal scenarios.
     fun test_register_assess_withdraw(econia: &signer, integrator: &signer)
@@ -3317,7 +3316,6 @@ module econia::incentives {
 
     #[test(econia = @econia)]
     #[expected_failure(abort_code = E_CUSTODIAN_REGISTRATION_FEE_LESS_THAN_MIN)]
-
     /// Verify failure for custodian registration fee too low.
     fun test_set_incentive_params_range_check_inputs_custodian_fee(econia: &signer) {
         // Attempt invalid invocation.
@@ -3378,7 +3376,6 @@ module econia::incentives {
 
     #[test(econia = @econia)]
     #[expected_failure(abort_code = E_UNDERWRITER_REGISTRATION_FEE_LESS_THAN_MIN)]
-
     /// Verify failure for underwriter registration fee too low.
     fun test_set_incentive_params_range_check_inputs_underwriter(econia: &signer) {
         // Attempt invalid invocation.

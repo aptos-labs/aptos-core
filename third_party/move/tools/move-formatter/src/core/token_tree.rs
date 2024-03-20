@@ -129,6 +129,14 @@ pub enum Note {
     ApplyName,
     /// This is a address that contained modules.
     ModuleAddress,
+    /// default
+    Unkownwn,
+}
+
+impl Default for Note {
+    fn default() -> Self {
+        Note::Unkownwn
+    }
 }
 
 impl Default for TokenTree {

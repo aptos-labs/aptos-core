@@ -12,7 +12,7 @@ spec std::string {
         ensures [abstract] result == spec_internal_is_char_boundary(v, i);
     }
 
-    spec internal_sub_string(v: &vector<u8>, i: u64, j: u64): vector<u8>{
+    spec internal_sub_string(v: &vector<u8>, i: u64, j: u64): vector<u8> {
         pragma opaque;
         aborts_if [abstract] false;
         ensures [abstract] result == spec_internal_sub_string(v, i, j);

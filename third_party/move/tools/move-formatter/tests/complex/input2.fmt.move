@@ -6,7 +6,7 @@ module TestFunFormat {
 
     spec singletonlllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll<T: store>(
         element: T, bucket_size: u64
-    ): BigVector<T>{
+    ): BigVector<T> {
         ensures length(result) == 1;
         ensures result.bucket_size == bucket_size;
     }

@@ -216,7 +216,7 @@ impl std::fmt::Display for FileRange {
 pub fn path_concat(p1: &Path, p2: &Path) -> PathBuf {
     let p2: Vec<_> = p2.components().collect();
     let is_abs = matches!(
-        p2.get(0).unwrap(),
+        p2.first().unwrap(),
         Component::RootDir | Component::Prefix(_)
     );
     let mut p1: Vec<_> = p1.components().collect();

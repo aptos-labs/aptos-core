@@ -260,11 +260,12 @@ fn test_success_dir() {
 
 #[test]
 fn test_dir() {
-    std::env::set_var("MOVEFMT_LOG", "movefmt=DEBUG");
+    std::env::set_var("MOVEFMT_LOG", "movefmt=WARN");
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_env("MOVEFMT_LOG"))
         .init();
-    eprintln!("formated {} files", scan_dir("./tests/complex/branch"));
+    eprintln!("formated {} files", scan_dir("./tests/complex"));
+    eprintln!("formated {} files", scan_dir("./tests/aptos_framework_case"));
 }
 
 #[test]
