@@ -421,7 +421,7 @@ module econia::txn_generator_utils {
         market::place_market_order_user<BaseCoinType, QuoteCoinType>(user, market_id, @econia, direction, size, self_match_behavior);
     }
 
-    public entry fun cancel_order(user: &signer) acquires Orders {
+    public entry fun place_cancel_order(user: &signer) acquires Orders {
         if (exists<Orders>(signer::address_of(user))) {
             let orders = borrow_global_mut<Orders>(signer::address_of(user));
             if (!vector::is_empty(&orders.orders)) {
