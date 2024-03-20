@@ -99,6 +99,7 @@ move-compiler/tests/move_check/inlining/bug_11112.exp   move-compiler-v2/tests/c
 move-compiler/tests/move_check/inlining/bug_9717.exp   move-compiler-v2/tests/checking/inlining/bug_9717.exp
 move-compiler/tests/move_check/inlining/bug_9717_looponly.exp   move-compiler-v2/tests/checking/inlining/bug_9717_looponly.exp
 move-compiler/tests/move_check/inlining/cool_inlining_test.exp   move-compiler-v2/tests/checking/inlining/cool_inlining_test.exp
+move-compiler/tests/move_check/inlining/deep_exp.exp   move-compiler-v2/tests/checking/inlining/deep_exp.exp
 move-compiler/tests/move_check/inlining/double_nesting.exp   move-compiler-v2/tests/checking/inlining/double_nesting.exp
 move-compiler/tests/move_check/inlining/inline_accessing_constant.exp   move-compiler-v2/tests/checking/inlining/inline_accessing_constant.exp
 move-compiler/tests/move_check/inlining/lambda.exp   move-compiler-v2/tests/checking/inlining/lambda.exp
@@ -180,6 +181,8 @@ move-compiler/tests/move_check/translated_ir_tests/move/signer/move_to_non_signe
 move-compiler/tests/move_check/translated_ir_tests/move/signer/move_to_reference_to_args_flipped.exp   move-compiler-v2/tests/checking/typing/v1-signer/move_to_reference_to_args_flipped.exp
 move-compiler/tests/move_check/translated_ir_tests/move/signer/move_to_reference_to_resource.exp   move-compiler-v2/tests/checking/typing/v1-signer/move_to_reference_to_resource.exp
 move-compiler/tests/move_check/translated_ir_tests/move/signer/move_to_reference_to_wrong_resource.exp   move-compiler-v2/tests/checking/typing/v1-signer/move_to_reference_to_wrong_resource.exp
+move-compiler/tests/move_check/simplifier/moved_var_not_simplified.exp   move-compiler-v2/tests/simplifier/moved_var_not_simplified.exp
+move-compiler/tests/move_check/simplifier/moved_var_not_simplified2.exp   move-compiler-v2/tests/simplifier/moved_var_not_simplified2.exp
 move-compiler/tests/move_check/typing/annotated_types.exp   move-compiler-v2/tests/checking/typing/annotated_types.exp
 move-compiler/tests/move_check/typing/assign_duplicate_assigning.exp   move-compiler-v2/tests/checking/typing/assign_duplicate_assigning.exp
 move-compiler/tests/move_check/typing/assign_nested.exp   move-compiler-v2/tests/checking/typing/assign_nested.exp
@@ -337,7 +340,7 @@ move-compiler/tests/move_check/typing/move_from_type_argument.exp   move-compile
 move-compiler/tests/move_check/typing/mutable_eq_and_neq.exp   move-compiler-v2/tests/checking/typing/mutable_eq_and_neq.exp
 move-compiler/tests/move_check/typing/mutate.exp   move-compiler-v2/tests/checking/typing/mutate.exp
 move-compiler/tests/move_check/typing/mutate_field_internal.exp   move-compiler-v2/tests/checking/typing/mutate_field_internal.exp
-move-compiler/tests/move_check/typing/mutate_immutable.exp   move-compiler-v2/tests/checking/typing/mutate_immutable.exp
+move-compiler/tests/move_check/typing/mutate_immutable.exp   move-compiler-v2/tests/bytecode-generator/v1-typing/mutate_immutable.exp
 move-compiler/tests/move_check/typing/mutate_invalid.exp   move-compiler-v2/tests/checking/typing/mutate_invalid.exp
 move-compiler/tests/move_check/typing/mutate_non_ref.exp   move-compiler-v2/tests/checking/typing/mutate_non_ref.exp
 move-compiler/tests/move_check/typing/mutate_resource.exp   move-compiler-v2/tests/checking/typing/mutate_resource.exp
@@ -353,6 +356,8 @@ move-compiler/tests/move_check/typing/pack_missing_field.exp   move-compiler-v2/
 move-compiler/tests/move_check/typing/pack_multiple.exp   move-compiler-v2/tests/checking/typing/pack_multiple.exp
 move-compiler/tests/move_check/typing/pack_reference.exp   move-compiler-v2/tests/checking/typing/pack_reference.exp
 move-compiler/tests/move_check/typing/recursive_local.exp   move-compiler-v2/tests/checking/typing/recursive_local.exp
+move-compiler/tests/move_check/typing/recursive_structs.exp   move-compiler-v2/tests/checking/typing/recursive_structs.exp
+move-compiler/tests/move_check/typing/recursive_structs_malformed.exp   move-compiler-v2/tests/checking/typing/recursive_structs_malformed.exp
 move-compiler/tests/move_check/typing/return_any_type.exp   move-compiler-v2/tests/checking/typing/return_any_type.exp
 move-compiler/tests/move_check/typing/return_type_explicit_exp.exp   move-compiler-v2/tests/checking/typing/return_type_explicit_exp.exp
 move-compiler/tests/move_check/typing/return_type_explicit_exp_invalid.exp   move-compiler-v2/tests/checking/typing/return_type_explicit_exp_invalid.exp
