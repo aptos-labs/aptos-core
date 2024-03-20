@@ -166,10 +166,14 @@ pub struct ReuseAccountsPoolWrapperGenerator {
 
 impl ReuseAccountsPoolWrapperGenerator {
     pub fn new(
-        rng: StdRng,
+        &mut rng: StdRng,
         generator: Box<dyn TransactionGenerator>,
         source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
     ) -> Self {
+        let mut source_accounts = source_accounts_pool
+            .take_from_pool(source_accounts_pool.len(), true, &mut rng);
+
+
         Self {
             rng,
             generator,
