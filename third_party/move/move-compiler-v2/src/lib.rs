@@ -1,10 +1,10 @@
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-pub mod cyclic_instantiation_checker;
 
 pub mod ast_simplifier;
 mod bytecode_generator;
+pub mod cyclic_instantiation_checker;
 pub mod env_pipeline;
 mod experiments;
 mod file_format_generator;
@@ -23,7 +23,6 @@ use crate::{
         copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
-        recursive_instantiation_checker::RecursiveInstantiationChecker,
         reference_safety_processor::ReferenceSafetyProcessor,
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
@@ -77,23 +76,6 @@ where
     // Run context check.
     let mut env = run_checker_and_rewriters(options.clone(), RewritingScope::CompilationTarget)?;
     check_errors(&env, error_writer, "checking errors")?;
-
-    trace!(
-        "After flow-insensitive checks, GlobalEnv=\n{}",
-        env.dump_env()
-    );
-
-    // Run inlining.
-    inliner::run_inlining(&mut env);
-    check_errors(&env, error_writer, "inlining")?;
-
-    debug!("After inlining, GlobalEnv=\n{}", env.dump_env());
-
-    function_checker::check_access_and_use(&mut env, false);
-    check_errors(&env, error_writer, "post-inlining access checks")?;
-
-    cyclic_instantiation_checker::check_cyclic_instantiations(&env);
-    check_errors(&env, error_writer, "post-cyclic instantiations checking")?;
 
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
@@ -279,6 +261,9 @@ pub fn check_and_rewrite_pipeline<'a>(
     });
     env_pipeline.add("check recursive struct definition", |env| {
         recursive_struct_checker::check_recursive_struct(env)
+    });
+    env_pipeline.add("check cyclic type instantiation", |env| {
+        cyclic_instantiation_checker::check_cyclic_instantiations(env)
     });
     env_pipeline
 }

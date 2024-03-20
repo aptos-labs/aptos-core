@@ -160,16 +160,12 @@ impl<'a> CyclicInstantiationChecker<'a> {
 
     /// Returns true if we are sure the function with given id is not recursive
     fn def_not_recursive(&self, id: QualifiedId<FunId>) -> bool {
-        if let Some(descendants) = self
+        !self
             .mod_env
             .env
             .get_function(id)
             .get_transitive_closure_of_called_functions()
-        {
-            !descendants.contains(&id)
-        } else {
-            false
-        }
+            .contains(&id)
     }
 
     /// Reports a cyclic type instantiation error, in which the root caller eventually calls `callee`
