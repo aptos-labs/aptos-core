@@ -23,7 +23,7 @@ fun m::test() {
  10: return ()
 }
 
-============ after LiveVarAnalysisProcessor: ================
+============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
 fun m::test() {
@@ -36,30 +36,40 @@ fun m::test() {
      var $t6: u64
      var $t7: u64
      # live vars:
+     # events: b:$t1
   0: $t1 := 1
      # live vars: $t1
-  1: $t0 := infer($t1)
+     # events: e:$t1, b:$t0
+  1: $t0 := move($t1)
      # live vars: $t0
+     # events: b:$t3
   2: $t3 := 1
      # live vars: $t0, $t3
+     # events: e:$t0, e:$t3, b:$t2
   3: $t2 := +($t0, $t3)
      # live vars: $t2
-  4: $t0 := infer($t2)
+     # events: e:$t2
+  4: $t0 := move($t2)
      # live vars:
+     # events: b:$t5
   5: $t5 := 2
      # live vars: $t5
-  6: $t4 := infer($t5)
+     # events: e:$t5, b:$t4
+  6: $t4 := move($t5)
      # live vars: $t4
+     # events: b:$t7
   7: $t7 := 1
      # live vars: $t4, $t7
+     # events: e:$t4, e:$t7, b:$t6
   8: $t6 := +($t4, $t7)
      # live vars: $t6
-  9: $t4 := infer($t6)
+     # events: e:$t6
+  9: $t4 := move($t6)
      # live vars:
  10: return ()
 }
 
-============ after VariableCoalescing: ================
+============ after VariableCoalescingTransformer: ================
 
 [variant baseline]
 fun m::test() {
@@ -72,14 +82,55 @@ fun m::test() {
      var $t6: u64 [unused]
      var $t7: u64 [unused]
   0: $t1 := 1
-  1: $t1 := infer($t1)
+  1: $t1 := move($t1)
   2: $t3 := 1
   3: $t1 := +($t1, $t3)
-  4: $t1 := infer($t1)
+  4: $t1 := move($t1)
   5: $t1 := 2
-  6: $t1 := infer($t1)
+  6: $t1 := move($t1)
   7: $t3 := 1
   8: $t1 := +($t1, $t3)
-  9: $t1 := infer($t1)
+  9: $t1 := move($t1)
  10: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+  0: $t1 := 1
+  1: $t3 := 1
+  2: $t1 := +($t1, $t3)
+  3: $t1 := 2
+  4: $t3 := 1
+  5: $t1 := +($t1, $t3)
+  6: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test() /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: LdU64(1)
+	2: Add
+	3: LdU64(2)
+	4: LdU64(1)
+	5: Add
+	6: Pop
+	7: Pop
+	8: Ret
+}
 }

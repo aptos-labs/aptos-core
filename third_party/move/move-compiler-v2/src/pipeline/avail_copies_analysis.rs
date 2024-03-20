@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! NOTE: Until the bug #12068 is fixed, we should not use this module.
+//!
 //! Implements the "definitely available copies" analysis, also called "available copies" analysis (in short).
 //! This analysis is a prerequisite for the copy propagation transformation.
 //!
