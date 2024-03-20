@@ -106,6 +106,10 @@ static UNIT_PATH_REMAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
         "visibility-checker/v1-typing".to_string(),
         "typing".to_string(),
     );
+    map.insert(
+        "cyclic-instantiation-checker/v1-tests".to_string(),
+        "instantiation_loops".to_string(),
+    );
     map
 });
 

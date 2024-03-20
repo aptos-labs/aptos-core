@@ -5,7 +5,8 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::debug;
 use move_compiler_v2::{
-    annotate_units, ast_simplifier, check_and_rewrite_pipeline, disassemble_compiled_units,
+    annotate_units, ast_simplifier, check_and_rewrite_pipeline, cyclic_instantiation_checker,
+    disassemble_compiled_units,
     env_pipeline::{
         lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
         spec_rewriter, EnvProcessorPipeline,
@@ -108,6 +109,9 @@ impl TestConfig {
         // as part of regular compilation, but only as part of a prover run.
         env_pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
 
+        env_pipeline.add("recursive instantiation check", |env| {
+            cyclic_instantiation_checker::check_cyclic_instantiations(env)
+        });
         // The bytecode transformation pipeline
         let mut pipeline = FunctionTargetPipeline::default();
 
@@ -212,6 +216,16 @@ impl TestConfig {
                 env_pipeline,
                 pipeline,
                 generate_file_format: true,
+                dump_annotated_targets: false,
+                dump_for_only_some_stages: None,
+            }
+        } else if path.contains("/cyclic-instantiation-checker") {
+            Self {
+                stop_before_generating_bytecode: true,
+                dump_ast: AstDumpLevel::None,
+                env_pipeline,
+                pipeline,
+                generate_file_format: false,
                 dump_annotated_targets: false,
                 dump_for_only_some_stages: None,
             }

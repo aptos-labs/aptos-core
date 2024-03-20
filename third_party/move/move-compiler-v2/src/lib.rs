@@ -4,6 +4,7 @@
 
 pub mod ast_simplifier;
 mod bytecode_generator;
+pub mod cyclic_instantiation_checker;
 pub mod env_pipeline;
 mod experiments;
 mod file_format_generator;
@@ -260,6 +261,9 @@ pub fn check_and_rewrite_pipeline<'a>(
     });
     env_pipeline.add("check recursive struct definition", |env| {
         recursive_struct_checker::check_recursive_struct(env)
+    });
+    env_pipeline.add("check cyclic type instantiation", |env| {
+        cyclic_instantiation_checker::check_cyclic_instantiations(env)
     });
     env_pipeline
 }
