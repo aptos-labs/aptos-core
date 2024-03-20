@@ -910,6 +910,9 @@ where
             }
         });
         drop(timer);
+
+        counters::update_state_counters(versioned_cache.stats(), true);
+
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 
@@ -1271,6 +1274,8 @@ where
             .finish_sequential_update_counters_and_log_info(ret.len() as u32, num_txns as u32);
 
         ret.resize_with(num_txns, E::Output::skip_output);
+
+        counters::update_state_counters(unsync_map.stats(), false);
 
         // TODO add block end info to output.
         // block_limit_processor.is_block_limit_reached();

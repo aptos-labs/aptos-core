@@ -1275,6 +1275,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let result = et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
             et.finalize_types();
             let translated = et.post_process_body(result.into_exp());
+            et.check_mutable_borrow_field(&translated);
             assert!(self.fun_defs.insert(full_name.symbol, translated).is_none());
             if let Some(specifiers) = access_specifiers {
                 assert!(self

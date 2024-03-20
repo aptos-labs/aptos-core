@@ -753,13 +753,15 @@ pub enum StatusCode {
     // Should never be committed on chain
     SPECULATIVE_EXECUTION_ABORT_ERROR = 2024,
     ACCESS_CONTROL_INVARIANT_VIOLATION = 2025,
+    // We tried to create resource with more than currently allowed number of DelayedFields
+    TOO_MANY_DELAYED_FIELDS = 2026,
 
     // Reserved error code for future use
-    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2026,
-    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2027,
-    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2028,
-    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2029,
-    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2030,
+    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2027,
+    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2028,
+    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2029,
+    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2030,
+    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2031,
 
     // Errors that can arise from binary decoding (deserialization)
     // Deserialization Errors: 3000-3999
