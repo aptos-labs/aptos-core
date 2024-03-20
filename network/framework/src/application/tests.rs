@@ -427,6 +427,81 @@ fn test_peers_and_metadata_caching() {
     );
 }
 
+fn check_peers_and_metadata_generational_some(generation: u32, expected_len: usize, peers_and_metadata: Arc<PeersAndMetadata>) -> u32 {
+    match peers_and_metadata.get_all_peers_generational(generation, false, &[]) {
+        Some((pam, newgen)) => {
+            assert_eq!(generation+1, newgen);
+            assert_eq!(pam.len(), expected_len);
+        }
+        None => {
+            panic!("expected generation 0 -> 1");
+        }
+    }
+    match peers_and_metadata.get_all_peers_and_metadata_generational(generation, false, &[]) {
+        Some((pam, newgen)) => {
+            assert_eq!(generation+1, newgen);
+            assert_eq!(pam.len(), expected_len);
+            newgen
+        }
+        None => {
+            panic!("expected generation 0 -> 1");
+        }
+    }
+}
+fn check_peers_and_metadata_generational_none(generation: u32, peers_and_metadata: Arc<PeersAndMetadata>) {
+    if peers_and_metadata.get_all_peers_generational(generation, false, &[]).is_some() {
+        panic!("expected None")
+    }
+    if peers_and_metadata.get_all_peers_and_metadata_generational(generation, false, &[]).is_some() {
+        panic!("expected None")
+    }
+}
+
+#[test]
+fn test_peers_and_metadata_generational_interface() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    let mut generation : u32 = 0;
+    generation = check_peers_and_metadata_generational_some(generation, 0, peers_and_metadata.clone());
+    check_peers_and_metadata_generational_none(generation, peers_and_metadata.clone());
+
+    let (peer_network_id_1, _connection_1) = create_peer_and_connection(
+        NetworkId::Validator,
+        vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
+        peers_and_metadata.clone(),
+    );
+
+    generation = check_peers_and_metadata_generational_some(generation, 1, peers_and_metadata.clone());
+    check_peers_and_metadata_generational_none(generation, peers_and_metadata.clone());
+
+    let (peer_network_id_2, _connection_2) = create_peer_and_connection(
+        NetworkId::Vfn,
+        vec![ProtocolId::MempoolDirectSend, ProtocolId::ConsensusRpcBcs],
+        peers_and_metadata.clone(),
+    );
+
+    generation = check_peers_and_metadata_generational_some(generation, 2, peers_and_metadata.clone());
+    check_peers_and_metadata_generational_none(generation, peers_and_metadata.clone());
+
+    // this should be a no-op
+    peers_and_metadata.update_connection_state(peer_network_id_1, ConnectionState::Connected).unwrap();
+    check_peers_and_metadata_generational_none(generation, peers_and_metadata.clone());
+
+    // this should cause a generation update
+    let peer_monitoring_1a = PeerMonitoringMetadata{
+        average_ping_latency_secs: None,
+        latest_network_info_response: None,
+        latest_node_info_response: None,
+        internal_client_state: None,
+    };
+    peers_and_metadata.update_peer_monitoring_metadata(peer_network_id_2, peer_monitoring_1a).unwrap();
+    generation = check_peers_and_metadata_generational_some(generation, 2, peers_and_metadata.clone());
+
+    let _ = generation; // consume the last generation update
+}
+
 #[test]
 fn test_network_client_available_peers() {
     // Create the peers and metadata container
