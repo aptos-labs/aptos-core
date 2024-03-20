@@ -21,7 +21,7 @@ use tokio::time::sleep;
 use crate::jwks::{add_provider_google, enable_feature_flag, enable_vtxn, initialize_jwk_module};
 
 #[tokio::test]
-async fn enable_order_jigv() {
+async fn enable_order_jgvi() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
@@ -45,14 +45,14 @@ async fn enable_order_jigv() {
     let txn_result = enable_feature_flag(&cli, root_idx).await;
     println!("flag_result={:?}", txn_result);
 
-    let txn_result = initialize_jwk_module(&cli, root_idx).await;
-    println!("init_result={:?}", txn_result);
-
     let txn_result = add_provider_google(&cli, root_idx).await;
     println!("provider_result={:?}", txn_result);
 
     let txn_result = enable_vtxn(&client, &cli, root_idx).await;
     println!("vtxn_result={:?}", txn_result);
+
+    let txn_result = initialize_jwk_module(&cli, root_idx).await;
+    println!("init_result={:?}", txn_result);
 
     tokio::time::sleep(Duration::from_secs(20)).await;
     let patched_jwks = get_patched_jwks(&client).await;
