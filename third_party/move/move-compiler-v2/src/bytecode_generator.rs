@@ -1367,7 +1367,7 @@ impl<'env> Generator<'env> {
             .map(|p| p.0)
             .collect::<Vec<_>>();
         let mut rhs_vars = rhs
-            .used_temporaries(self.env())
+            .used_temporaries_with_types(self.env())
             .into_iter()
             .map(|t| param_symbols[t.0])
             .collect::<BTreeSet<_>>();

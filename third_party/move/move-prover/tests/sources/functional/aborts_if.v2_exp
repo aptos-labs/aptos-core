@@ -117,6 +117,7 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
+    =         x = <redacted>
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:137: abort_at_2_or_3_total_incorrect
     =         ABORTED
@@ -132,6 +133,7 @@ error: function does not abort under this condition
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
+    =         x = <redacted>
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:146: abort_at_2_or_3_spec_incorrect
     =     at tests/sources/functional/aborts_if.move:147: abort_at_2_or_3_spec_incorrect
@@ -154,6 +156,7 @@ error: abort not covered by any of the `aborts_if` clauses
     =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect
+    =         x = <redacted>
     =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if.move:155: abort_at_2_or_3_strict_incorrect
     =         ABORTED

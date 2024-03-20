@@ -171,7 +171,11 @@ impl<'a> FunctionGenerator<'a> {
     /// Generates code for a function.
     fn gen_code(&mut self, ctx: &FunctionContext<'_>) -> FF::CodeUnit {
         // Initialize the abstract virtual machine
-        self.pinned = Self::pinned_temps(ctx);
+        // TODO: right now we pin temps which are parameter of the drop instruction.
+        //   This is needed since we cannot determine whether the local has been already moved on
+        //   the stack and is not longer available in the associated local. This needs to be reworked
+        //   to avoid this.
+        self.pinned = ctx.fun.get_pinned_temps(/*include_drop*/ true);
         self.temps = (0..ctx.fun.get_parameter_count())
             .map(|temp| (temp, TempInfo::new(self.temp_to_local(ctx, None, temp))))
             .collect();
@@ -230,36 +234,6 @@ impl<'a> FunctionGenerator<'a> {
             locals,
             code: std::mem::take(&mut self.code),
         }
-    }
-
-    /// Compute the set of temporaries which are referenced in borrow instructions, or which
-    /// are used in specification blocks.
-    /// TODO: right now we also pin locals which are parameter of the destroy instruction.
-    ///   This is needed since we cannot determine whether the local has been already moved on
-    ///   the stack and is not longer available in the associated local. This needs to be reworked
-    ///   to avoid this.
-    fn pinned_temps(ctx: &FunctionContext) -> BTreeSet<TempIndex> {
-        let mut result = BTreeSet::new();
-        for bc in ctx.fun.get_bytecode() {
-            match bc {
-                Bytecode::Call(_, _, Operation::BorrowLoc | Operation::Drop, args, _) => {
-                    result.insert(args[0]);
-                },
-                Bytecode::SpecBlock(_, spec) => {
-                    // All Temporaries used in the spec need to be pinned. Notice that
-                    // any bound variables inside the spec are LocalVar, so we can just
-                    // unconditionally collect all Temporary instances.
-                    let mut collect = |exp: &ExpData| {
-                        if let ExpData::Temporary(_, temp) = exp {
-                            result.insert(*temp);
-                        }
-                    };
-                    spec.visit_post_order(&mut collect)
-                },
-                _ => {},
-            }
-        }
-        result
     }
 
     /// Generate file-format bytecode from a stackless bytecode and an optional next bytecode

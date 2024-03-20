@@ -372,6 +372,32 @@ impl Spec {
             Some(())
         });
     }
+
+    /// Returns the temporaries used in this spec block. Result is ordered by occurrence.
+    pub fn used_temporaries_with_types(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
+        let mut temps = vec![];
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Temporary(id, idx) = e {
+                if !temps.iter().any(|(i, _)| i == idx) {
+                    temps.push((*idx, env.get_node_type(*id)));
+                }
+            }
+        };
+        self.visit_post_order(&mut visitor);
+        temps
+    }
+
+    /// Returns the temporaries used in this spec block. Result is ordered by occurrence.
+    pub fn used_temporaries(&self) -> BTreeSet<TempIndex> {
+        let mut temps = BTreeSet::new();
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Temporary(_, idx) = e {
+                temps.insert(*idx);
+            }
+        };
+        self.visit_post_order(&mut visitor);
+        temps
+    }
 }
 
 /// Information about a specification block in the source. This is used for documentation
@@ -876,14 +902,27 @@ impl ExpData {
         result
     }
 
-    /// Returns the temporaries used in this expression. Result is ordered by occurrence.
-    pub fn used_temporaries(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
+    /// Returns the temporaries used in this expression, with types. Result is ordered by occurrence.
+    pub fn used_temporaries_with_types(&self, env: &GlobalEnv) -> Vec<(TempIndex, Type)> {
         let mut temps = vec![];
         let mut visitor = |e: &ExpData| {
             if let ExpData::Temporary(id, idx) = e {
                 if !temps.iter().any(|(i, _)| i == idx) {
                     temps.push((*idx, env.get_node_type(*id)));
                 }
+            }
+            true // keep going
+        };
+        self.visit_post_order(&mut visitor);
+        temps
+    }
+
+    /// Returns the temporaries used in this spec block.
+    pub fn used_temporaries(&self) -> BTreeSet<TempIndex> {
+        let mut temps = BTreeSet::new();
+        let mut visitor = |e: &ExpData| {
+            if let ExpData::Temporary(_, idx) = e {
+                temps.insert(*idx);
             }
             true // keep going
         };

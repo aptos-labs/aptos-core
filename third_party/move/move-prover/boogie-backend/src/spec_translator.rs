@@ -1535,7 +1535,7 @@ impl<'env> SpecTranslator<'env> {
             .map(|(s, ty)| (s, self.inst(ty.skip_reference())))
             .collect_vec();
         let used_temps = range_and_body
-            .used_temporaries(self.env)
+            .used_temporaries_with_types(self.env)
             .into_iter()
             .collect_vec();
         let used_memory = range_and_body

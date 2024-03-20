@@ -169,6 +169,7 @@ impl Options {
             .arg(
                 Arg::new("compiler-v2")
                     .long("compiler-v2")
+                    .env("MOVE_COMPILER_V2")
                     .action(SetTrue)
                     .help("whether to use Move compiler v2 to compile to bytecode")
             )

@@ -198,7 +198,9 @@ impl FunctionTargetProcessor for LiveVarAnalysisProcessor {
 impl LiveVarAnalysisProcessor {
     /// Create a new instance of live variable analysis.
     /// `track_all_usages` determines whether both primary and secondary usages of a variable are
-    /// tracked (when true), or only the primary usages (when false).
+    /// tracked (when true), or only the primary usages (when false). Also, if set, all usages
+    /// of temporaries in specifications are tracked, which are considered as secondary because
+    /// they are not part of the execution semantics.
     /// Unless all usages are needed, it is recommended to set `track_all_usages` to false.
     pub fn new(track_all_usages: bool) -> Self {
         Self { track_all_usages }
@@ -371,9 +373,14 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
             Branch(id, _, _, src) => {
                 state.insert_or_update(*src, self.livevar_info(id, offset), self.track_all_usages);
             },
-            Prop(id, _, exp) => {
-                for (idx, _) in exp.used_temporaries(self.func_target.global_env()) {
-                    state.livevars.insert(idx, self.livevar_info(id, offset));
+            Prop(id, _, exp) if self.track_all_usages => {
+                for idx in exp.used_temporaries() {
+                    state.insert_or_update(idx, self.livevar_info(id, offset), true);
+                }
+            },
+            SpecBlock(id, spec) if self.track_all_usages => {
+                for idx in spec.used_temporaries() {
+                    state.insert_or_update(idx, self.livevar_info(id, offset), true);
                 }
             },
             _ => {},
