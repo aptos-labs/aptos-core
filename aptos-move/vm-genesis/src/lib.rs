@@ -255,7 +255,6 @@ pub fn encode_genesis_change_set(
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session);
     }
-    initialize_keyless_accounts(&mut session, chain_id);
     set_genesis_end(&mut session);
 
     // Reconfiguration should happen after all on-chain invocations.
@@ -545,32 +544,6 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
         serialize_values(&vec![
             MoveValue::Signer(CORE_CODE_ADDRESS),
             config.as_move_value(),
-        ]),
-    );
-    if !chain_id.is_mainnet() {
-        let vk = Groth16VerificationKey::from(DEVNET_VERIFICATION_KEY.clone());
-        exec_function(
-            session,
-            KEYLESS_ACCOUNT_MODULE_NAME,
-            "update_groth16_verification_key",
-            vec![],
-            serialize_values(&vec![
-                MoveValue::Signer(CORE_CODE_ADDRESS),
-                vk.as_move_value(),
-            ]),
-        );
-    }
-    exec_function(
-        session,
-        JWKS_MODULE_NAME,
-        "upsert_oidc_provider",
-        vec![],
-        serialize_values(&vec![
-            MoveValue::Signer(CORE_CODE_ADDRESS),
-            "https://accounts.google.com".to_string().as_move_value(),
-            "https://accounts.google.com/.well-known/openid-configuration"
-                .to_string()
-                .as_move_value(),
         ]),
     );
 }
