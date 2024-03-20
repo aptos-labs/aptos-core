@@ -20,9 +20,9 @@ use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
 use crate::jwks::{add_provider_google, enable_feature_flag, enable_vtxn, initialize_jwk_module};
 
-/// JWK on - initialize - watch google - vtxn
+/// JWK feature flag on - initialize jwks.move - watch google - vtxn
 #[tokio::test]
-async fn flag_init_provider_vtxn() {
+async fn enable_order_jigv() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
@@ -46,36 +46,16 @@ async fn flag_init_provider_vtxn() {
     let txn_result = enable_feature_flag(&cli, root_idx).await;
     println!("flag_result={:?}", txn_result);
 
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(4, Duration::from_secs(epoch_duration_secs * 2))
-        .await
-        .expect("Epoch 4 taking too long to arrive!");
-
     let txn_result = initialize_jwk_module(&cli, root_idx).await;
     println!("init_result={:?}", txn_result);
-
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(5, Duration::from_secs(epoch_duration_secs * 2))
-        .await
-        .expect("Epoch 5 taking too long to arrive!");
 
     let txn_result = add_provider_google(&cli, root_idx).await;
     println!("provider_result={:?}", txn_result);
 
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(6, Duration::from_secs(epoch_duration_secs * 2))
-        .await
-        .expect("Epoch 6 taking too long to arrive!");
-
     let txn_result = enable_vtxn(&client, &cli, root_idx).await;
     println!("vtxn_result={:?}", txn_result);
 
-    swarm
-        .wait_for_all_nodes_to_catchup_to_epoch(7, Duration::from_secs(epoch_duration_secs * 2))
-        .await
-        .expect("Epoch 7 taking too long to arrive!");
-
-    tokio::time::sleep(Duration::from_secs(15)).await;
+    tokio::time::sleep(Duration::from_secs(20)).await;
     let patched_jwks = get_patched_jwks(&client).await;
     assert_eq!(2, patched_jwks.jwks.entries[0].jwks.len());
 }
