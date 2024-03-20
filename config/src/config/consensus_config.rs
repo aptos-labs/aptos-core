@@ -272,7 +272,7 @@ impl Default for ConsensusConfig {
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 76,
-                    max_sending_block_txns_override: 1000,
+                    max_sending_block_txns_override: 500,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
                     backoff_proposal_delay_ms: 300,
                     max_txns_from_block_to_execute: None,
@@ -281,19 +281,26 @@ impl Default for ConsensusConfig {
                     backoff_if_below_participating_voting_power_percentage: 74,
                     max_sending_block_txns_override: 500,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backoff_proposal_delay_ms: 300,
-                    max_txns_from_block_to_execute: None,
+                    backoff_proposal_delay_ms: 500,
+                    max_txns_from_block_to_execute: Some(100),
                 },
                 ChainHealthBackoffValues {
                     backoff_if_below_participating_voting_power_percentage: 72,
-                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
-                    // meaning that most aggressively we limit to ~500 TPS
-                    // For transactions that are more expensive than that, we should
-                    // instead rely on max gas per block to limit latency
-                    max_sending_block_txns_override: 250,
+                    max_sending_block_txns_override: 500,
                     max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
-                    backoff_proposal_delay_ms: 300,
-                    max_txns_from_block_to_execute: None,
+                    backoff_proposal_delay_ms: 500,
+                    max_txns_from_block_to_execute: Some(25),
+                },
+                ChainHealthBackoffValues {
+                    backoff_if_below_participating_voting_power_percentage: 70,
+                    max_sending_block_txns_override: 500,
+                    max_sending_block_bytes_override: MIN_BLOCK_BYTES_OVERRIDE,
+                    backoff_proposal_delay_ms: 500,
+                    // in practice, latencies and delay make it such that ~2 blocks/s is max,
+                    // meaning that most aggressively we limit to ~10 TPS
+                    // For transactions that are more expensive than that, we should
+                    // instead rely on max gas per block to limit latency.
+                    max_txns_from_block_to_execute: Some(5),
                 },
             ],
 
@@ -681,6 +688,7 @@ mod test {
                     max_sending_block_txns_override: 100,
                     max_sending_block_bytes_override: 0,
                     backoff_proposal_delay_ms: 0,
+                    max_txns_from_block_to_execute: None,
                 }],
                 quorum_store: QuorumStoreConfig {
                     receiver_max_batch_txns: 251,
@@ -707,6 +715,7 @@ mod test {
                     max_sending_block_txns_override: 0,
                     max_sending_block_bytes_override: 100,
                     backoff_proposal_delay_ms: 0,
+                    max_txns_from_block_to_execute: None,
                 }],
                 quorum_store: QuorumStoreConfig {
                     receiver_max_batch_bytes: 2_000_000,

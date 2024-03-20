@@ -422,7 +422,7 @@ impl ProposalGenerator {
         if let Some(value) = chain_health_backoff {
             values_max_block_txns.push(value.max_sending_block_txns_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
-            if Some(val) = value.max_txns_from_block_to_execute {
+            if let Some(val) = value.max_txns_from_block_to_execute {
                 values_max_txns_from_block_to_execute.push(val);
             }
             values_proposal_delay.push(Duration::from_millis(value.backoff_proposal_delay_ms));
@@ -449,7 +449,8 @@ impl ProposalGenerator {
         let max_block_txns = values_max_block_txns.into_iter().min().unwrap();
         let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
         let proposal_delay = values_proposal_delay.into_iter().max().unwrap();
-        let max_txns_from_block_to_execute = values_max_txns_from_block_to_execute.into_iter().min();
+        let max_txns_from_block_to_execute =
+            values_max_txns_from_block_to_execute.into_iter().min();
         if pipeline_backpressure.is_some() || chain_health_backoff.is_some() {
             warn!(
                 "Generating proposal: reducing limits to {} txns (filtered to {:?}) and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms. Round: {}",
