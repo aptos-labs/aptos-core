@@ -2,12 +2,12 @@
 
 use crate::{Issuer, KeyID};
 use anyhow::{anyhow, Result};
+use aptos_logger::warn;
 use dashmap::DashMap;
 use jsonwebtoken::{
     jwk::{Jwk, JwkSet},
     DecodingKey,
 };
-use log::{info, warn};
 use once_cell::sync::Lazy;
 use std::{sync::Arc, time::Duration};
 
@@ -52,15 +52,15 @@ pub fn start_jwk_refresh_loop(issuer: &str, jwk_url: &str, refresh_interval: Dur
         loop {
             match fetch_jwks(jwk_url.as_str()).await {
                 Ok(key_set) => {
-                    let num_keys = key_set.len();
-                    DECODING_KEY_CACHE.insert(issuer.clone(), key_set);
-                    info!(
-                        "Updated key set of issuer {}. Num of keys: {}.",
-                        issuer, num_keys
-                    );
+                    DECODING_KEY_CACHE.insert(issuer.clone(), key_set.clone());
                 },
                 Err(msg) => {
-                    warn!("{}", msg);
+                    warn!(
+                        issuer = issuer,
+                        jwk_url = jwk_url,
+                        "error fetching JWK: {}",
+                        msg
+                    );
                 },
             }
             tokio::time::sleep(refresh_interval).await;

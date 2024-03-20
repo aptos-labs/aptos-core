@@ -1,21 +1,23 @@
 // Copyright © Aptos Foundation
 
-use std::convert::Infallible;
-use std::net::SocketAddr;
-use hyper::{Body, Method, Server, StatusCode};
-use hyper::header::CONTENT_TYPE;
-use hyper::service::{make_service_fn, service_fn};
-use once_cell::sync::Lazy;
 use aptos_inspection_service::utils::get_encoded_metrics;
-use aptos_metrics_core::{HistogramVec, register_histogram_vec, register_int_counter_vec, TextEncoder};
+use aptos_metrics_core::{exponential_buckets, register_histogram_vec, HistogramVec, TextEncoder};
+use hyper::{
+    header::CONTENT_TYPE,
+    service::{make_service_fn, service_fn},
+    Body, Method, Server, StatusCode,
+};
+use once_cell::sync::Lazy;
+use std::{convert::Infallible, net::SocketAddr};
 
 pub static REQUEST_HANDLING_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "keyless_pepper_request_handling_seconds",
-        "How long it takes to process a pepper request",
-        &["pepper_scheme", "result"],
+        "Seconds taken to process pepper requests by scheme and result.",
+        &["pepper_scheme", "is_ok"],
+        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap()
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn start_metric_server() {
@@ -30,7 +32,6 @@ pub fn start_metric_server() {
         if let Err(e) = server.await {
             eprintln!("server error: {}", e);
         }
-
     });
 }
 
