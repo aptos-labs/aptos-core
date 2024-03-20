@@ -1083,13 +1083,22 @@ impl ExpData {
     where
         F: FnMut(VisitorPosition, &ExpData) -> bool,
     {
-        let _ = self.visit_positions_impl(&mut |x, e| {
+        self.visit_positions_all_visits_return_true(visitor);
+    }
+
+    /// Same as `visit_positions`, but returns false iff any visit of a subexpression returns false
+    pub fn visit_positions_all_visits_return_true<F>(&self, visitor: &mut F) -> bool
+    where
+        F: FnMut(VisitorPosition, &ExpData) -> bool,
+    {
+        self.visit_positions_impl(&mut |x, e| {
             if visitor(x, e) {
                 Some(())
             } else {
                 None
             }
-        });
+        })
+        .is_some()
     }
 
     /// Visitor implementation uses `Option<()>` to implement short-cutting without verbosity.
