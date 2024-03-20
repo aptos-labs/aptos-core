@@ -55,6 +55,7 @@ use std::{
     time::Instant,
 };
 use tokio::io::BufReader;
+use rand::{Rng, seq::SliceRandom};
 
 const BATCH_SIZE: usize = if cfg!(test) { 2 } else { 10000 };
 
@@ -362,7 +363,21 @@ impl TransactionRestoreBatchController {
                 let epoch_history = epoch_history.clone();
                 future::ok(async move {
                     tokio::task::spawn(async move {
-                        LoadedChunk::load(chunk, &storage, epoch_history.as_ref()).await
+                        let mut chunk = LoadedChunk::load(chunk, &storage, epoch_history.as_ref()).await.unwrap();
+                        let mut rng = rand::thread_rng();
+                        let num_txns = chunk.txns.len();
+                        for i in 0..(num_txns-1) {
+                            if rng.gen_range(0,2) == 0 {
+                                // 50% chance to shuffle
+                                let distance: usize = rng.gen_range(0, min(100, num_txns-1-i));
+                                chunk.txns.swap(i, i + distance);
+                                chunk.txn_infos.swap(i, i + distance);
+                                chunk.event_vecs.swap(i, i + distance);
+                                chunk.write_sets.swap(i, i + distance);
+                            }
+                        }
+                        println!("LoadedChunk first_version = {} last_version = {} num_txns = {}", chunk.manifest.first_version, chunk.manifest.last_version, chunk.txns.len());
+                        Ok(chunk)
                     })
                     .err_into::<anyhow::Error>()
                     .await
