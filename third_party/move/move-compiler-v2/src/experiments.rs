@@ -23,13 +23,20 @@
 pub struct Experiment();
 
 impl Experiment {
+    /// This flag enables running various AST-based aggressive optimizations, such as
+    /// code eliminations, which are turned off by default.
+    /// Retention: temporary. To be removed when various optimization pipeline combos
+    /// can be controlled via user-accessible configs.
+    pub const AST_AGGRESSIVE_OPTIMIZE: &'static str = "ast-aggressive-optimize";
     /// A flag which allows to turn off safety checks, or suppress any error messages
     /// they produce.
     /// Retention: permanent.
     pub const NO_SAFETY: &'static str = "no-safety";
-    /// A flag to turn on optimizations. Currently off by default.
-    /// Retention: temporary (to be removed when optimization is the default)
-    pub const OPTIMIZE: &'static str = "optimize";
+    /// The compiler runs a default pipeline of stackless bytecode optimizations.
+    /// This flag allows to turn off these optimizations.
+    /// Retention: temporary. To be removed when various optimization pipeline combos
+    /// can be controlled via user-accessible configs.
+    pub const NO_SBC_OPTIMIZE: &'static str = "no-sbc-optimize";
     /// A flag which allows to turn on the critical edge splitting pass.
     /// Retention: temporary. This should be removed after the pass can be tested.
     pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
