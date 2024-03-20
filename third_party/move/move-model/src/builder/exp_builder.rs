@@ -1839,7 +1839,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &expected_type,
                         context,
                     );
-                    let id = self.new_node_id_with_type_loc(&ty, loc);
+                    let node_ty = if let Some(kind) = ref_expected {
+                        Type::Reference(kind, Box::new(ty.clone()))
+                    } else {
+                        ty.clone()
+                    };
+                    let id = self.new_node_id_with_type_loc(&node_ty, loc);
                     let mut std = struct_id;
                     if let Type::Struct(_, _, types) = ty {
                         std.inst = types;
