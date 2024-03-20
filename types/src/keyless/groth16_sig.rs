@@ -50,7 +50,7 @@ pub struct ZeroKnowledgeSig {
 /// This struct is used to wrap together the Groth16 ZKP and the statement it proves so that the
 /// prover service can sign them together. It is only used during signature verification & never
 /// sent over the network.
-#[derive(Debug, CryptoHasher, BCSCryptoHash, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, CryptoHasher, BCSCryptoHash, Hash, PartialEq, Eq)]
 pub struct Groth16ProofAndStatement {
     pub proof: Groth16Proof,
     // TODO(keyless): implement Serialize/Deserialize for Fr and use Fr here directly

@@ -260,6 +260,7 @@ fn test_zkp_cache_hits() {
     assert_eq!(aptos_vm::keyless_validation::zkp_cache_size(), 1);
     assert_eq!(aptos_vm::keyless_validation::zkp_cache_num_hits(), 2);
 
+    // TODO: need additional sample ZKP in our testcases for this
     // change \pi to \pi'
     // submit TXN with \pi'
     // once, no hit
@@ -283,11 +284,13 @@ fn submit_keyless_txn(
 }
 
 fn test_cache_is_cleared_after_vk_change() {
+    // TODO: need additional VK with sample ZKP in our testcases for this
     // submit TXN with \pi
-    // once, no hit
-    // twice, hits
+    // first submission, no hit
+    // second submission, cache hit
 
     // change VK via governance
+    // assert cache is empty
     // resubmit TXN with same \pi
-    // should not hit
+    // should not hit cache & proof should fail verification
 }

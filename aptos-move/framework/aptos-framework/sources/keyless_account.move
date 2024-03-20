@@ -1,6 +1,7 @@
 /// This module is responsible for configuring keyless blockchain accounts which were introduced in
 /// [AIP-61](https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-61.md).
 module aptos_framework::keyless_account {
+    use std::bn254_algebra;
     use std::option;
     use std::option::Option;
     use std::signer;
@@ -67,6 +68,8 @@ module aptos_framework::keyless_account {
                                             delta_g2: vector<u8>,
                                             gamma_abc_g1: vector<vector<u8>>
     ): Groth16VerificationKey {
+        assert!(option::is_some(bn))
+
         Groth16VerificationKey {
             alpha_g1,
             beta_g2,

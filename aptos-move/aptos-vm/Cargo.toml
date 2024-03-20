@@ -36,8 +36,6 @@ aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
-ark-bn254 = { workspace = true }
-ark-groth16 = { workspace = true }
 base64-url = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
