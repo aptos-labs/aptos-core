@@ -219,7 +219,7 @@ impl TestConfig {
                 dump_annotated_targets: false,
                 dump_for_only_some_stages: None,
             }
-        } else if path.contains("/recursive-instantiation-checker") {
+        } else if path.contains("/cyclic-instantiation-checker") {
             Self {
                 stop_before_generating_bytecode: true,
                 dump_ast: AstDumpLevel::None,
