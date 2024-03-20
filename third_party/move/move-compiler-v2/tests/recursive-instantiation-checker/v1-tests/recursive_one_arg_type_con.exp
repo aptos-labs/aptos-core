@@ -1,10 +1,9 @@
 
 Diagnostics:
-error: cyclic type instantiation
+error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
   ┌─ tests/recursive-instantiation-checker/v1-tests/recursive_one_arg_type_con.move:6:9
   │
 6 │     fun f<T>(x: T) {
   │         ^
   │
-  = `f<T>` calls `f<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/recursive_one_arg_type_con.move:6,
-    A cycle of recursive calls causes the instantiation to recurse infinitely.
+  = `f<T>` calls `f<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/recursive_one_arg_type_con.move:6

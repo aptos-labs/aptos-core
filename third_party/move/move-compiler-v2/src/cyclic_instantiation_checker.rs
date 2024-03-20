@@ -195,7 +195,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
             .collect_vec();
         let (caller_loc, caller) = &callers_chain.last().expect("parent");
         labels.push(format!(
-            "`{}` calls `{}` {},\nA cycle of recursive calls causes the instantiation to recurse infinitely.",
+            "`{}` calls `{}` {}",
             self.display_call(caller),
             self.display_call(&callee),
             caller_loc.display_line_only(self.mod_env.env)
@@ -206,7 +206,11 @@ impl<'a> CyclicInstantiationChecker<'a> {
             .get_id_loc();
         self.mod_env
             .env
-            .error_with_notes(&root_loc, "cyclic type instantiation", labels)
+            .error_with_notes(
+                &root_loc,
+                "cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound",
+                labels
+            )
     }
 
     /// Returns the display name of a function call with type parameters but without arguments

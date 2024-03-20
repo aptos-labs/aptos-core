@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cyclic type instantiation
+error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/recursive-instantiation-checker/v1-tests/complex_1.move:13:9
    │
 13 │     fun c<T1, T2>() {
@@ -8,25 +8,22 @@ error: cyclic type instantiation
    │
    = `c<T1, T2>` calls `d<#1>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:13
    = `d<#1>` calls `b<u64, T2>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:15
-   = `b<u64, T2>` calls `c<M::S<T2>, bool>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:20,
-     A cycle of recursive calls causes the instantiation to recurse infinitely.
+   = `b<u64, T2>` calls `c<M::S<T2>, bool>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:20
 
-error: cyclic type instantiation
+error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/recursive-instantiation-checker/v1-tests/complex_1.move:26:9
    │
 26 │     fun f<T>() {
    │         ^
    │
    = `f<T>` calls `g<T>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:26
-   = `g<T>` calls `f<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:27,
-     A cycle of recursive calls causes the instantiation to recurse infinitely.
+   = `g<T>` calls `f<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:27
 
-error: cyclic type instantiation
+error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound
    ┌─ tests/recursive-instantiation-checker/v1-tests/complex_1.move:30:9
    │
 30 │     fun g<T>() {
    │         ^
    │
    = `g<T>` calls `f<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:30
-   = `f<M::S<T>>` calls `g<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:31,
-     A cycle of recursive calls causes the instantiation to recurse infinitely.
+   = `f<M::S<T>>` calls `g<M::S<T>>` at tests/recursive-instantiation-checker/v1-tests/complex_1.move:31
