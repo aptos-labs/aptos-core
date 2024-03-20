@@ -6,8 +6,8 @@ error: cyclic type instantiation: a cycle of recursive calls causes a type to gr
 13 │     fun c<T1, T2>() {
    │         ^
    │
-   = `c<T1, T2>` calls `d<#1>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:13
-   = `d<#1>` calls `b<u64, T2>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:15
+   = `c<T1, T2>` calls `d<T2>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:13
+   = `d<T2>` calls `b<u64, T2>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:15
    = `b<u64, T2>` calls `c<M::S<T2>, bool>` at tests/cyclic-instantiation-checker/v1-tests/complex_1.move:20
 
 error: cyclic type instantiation: a cycle of recursive calls causes a type to grow without bound

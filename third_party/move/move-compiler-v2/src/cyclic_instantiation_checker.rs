@@ -170,12 +170,14 @@ impl<'a> CyclicInstantiationChecker<'a> {
 
     /// Reports a cyclic type instantiation error, in which the root caller eventually calls `callee`
     /// with a cyclic type instantiation. `callee` is the callee of the last caller in `callers_chain`.
+    /// Precondition: `callers_chain` is not empty
     fn report_error(
         &self,
         _nid: NodeId,
         callee: QualifiedInstId<FunId>,
         callers_chain: &mut Vec<(Loc, QualifiedInstId<FunId>)>,
     ) {
+        let root = callers_chain[0].1.id;
         let mut labels = (0..callers_chain.len() - 1)
             .map(|i| {
                 let (caller_loc, caller) = &callers_chain[i];
@@ -183,8 +185,8 @@ impl<'a> CyclicInstantiationChecker<'a> {
                 let callee = &callers_chain[i + 1].1;
                 format!(
                     "`{}` calls `{}` {}",
-                    self.display_call(caller),
-                    self.display_call(callee),
+                    self.display_call(caller, root),
+                    self.display_call(callee, root),
                     caller_loc.display_line_only(self.mod_env.env)
                 )
             })
@@ -192,8 +194,8 @@ impl<'a> CyclicInstantiationChecker<'a> {
         let (caller_loc, caller) = &callers_chain.last().expect("parent");
         labels.push(format!(
             "`{}` calls `{}` {}",
-            self.display_call(caller),
-            self.display_call(&callee),
+            self.display_call(caller, root),
+            self.display_call(&callee, root),
             caller_loc.display_line_only(self.mod_env.env)
         ));
         let root_loc = self
@@ -210,10 +212,11 @@ impl<'a> CyclicInstantiationChecker<'a> {
     }
 
     /// Returns the display name of a function call with type parameters but without arguments
-    fn display_call(&self, call: &QualifiedInstId<FunId>) -> String {
+    fn display_call(&self, call: &QualifiedInstId<FunId>, root_call: FunId) -> String {
         let fun_env = self.mod_env.get_function(call.id);
         let fun_name = fun_env.get_name_str();
-        let type_disply_ctx = fun_env.get_type_display_ctx();
+        let root_env = self.mod_env.get_function(root_call);
+        let type_disply_ctx = root_env.get_type_display_ctx();
         format!(
             "{}<{}>",
             fun_name,
