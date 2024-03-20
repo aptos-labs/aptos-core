@@ -209,14 +209,16 @@ impl VMStatus {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
-                    | StatusCode::STORAGE_LIMIT_REACHED,
+                    | StatusCode::STORAGE_LIMIT_REACHED
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
                 ..
             }
             | VMStatus::Error {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
-                    | StatusCode::STORAGE_LIMIT_REACHED,
+                    | StatusCode::STORAGE_LIMIT_REACHED
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
                 ..
             } => Ok(KeptVMStatus::MiscellaneousError),
 
@@ -753,15 +755,13 @@ pub enum StatusCode {
     // Should never be committed on chain
     SPECULATIVE_EXECUTION_ABORT_ERROR = 2024,
     ACCESS_CONTROL_INVARIANT_VIOLATION = 2025,
-    // We tried to create resource with more than currently allowed number of DelayedFields
-    TOO_MANY_DELAYED_FIELDS = 2026,
 
     // Reserved error code for future use
-    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2027,
-    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2028,
-    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2029,
-    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2030,
-    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2031,
+    RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2026,
+    RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2027,
+    RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2028,
+    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2039,
+    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2040,
 
     // Errors that can arise from binary decoding (deserialization)
     // Deserialization Errors: 3000-3999
@@ -826,11 +826,14 @@ pub enum StatusCode {
     ACCESS_DENIED = 4034,
     // The stack of access control specifier has overflowed.
     ACCESS_STACK_LIMIT_EXCEEDED = 4035,
+    // We tried to create resource with more than currently allowed number of DelayedFields
+    TOO_MANY_DELAYED_FIELDS = 4036,
+
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4036,
-    RESERVED_RUNTIME_ERROR_2 = 4037,
-    RESERVED_RUNTIME_ERROR_3 = 4038,
-    RESERVED_RUNTIME_ERROR_4 = 4039,
+    RESERVED_RUNTIME_ERROR_1 = 4037,
+    RESERVED_RUNTIME_ERROR_2 = 4038,
+    RESERVED_RUNTIME_ERROR_3 = 4039,
+    RESERVED_RUNTIME_ERROR_4 = 4040,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in
