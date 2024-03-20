@@ -573,7 +573,9 @@ async fn test_get_pending_transaction_by_hash() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_wait_transaction_by_hash() {
-    let mut context = new_test_context(current_function_name!());
+    let mut node_config = NodeConfig::default();
+    node_config.api.wait_by_hash_timeout_ms = 2_000;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
     let account = context.gen_account();
     let txn = context.create_user_account(&account).await;
     context.commit_block(&vec![txn.clone()]).await;
@@ -581,34 +583,47 @@ async fn test_wait_transaction_by_hash() {
     let txns = context.get("/transactions?start=2&limit=1").await;
     assert_eq!(1, txns.as_array().unwrap().len());
 
+    let start_time = std::time::Instant::now();
     let resp = context
         .get(&format!(
             "/transactions/wait_by_hash/{}",
             txns[0]["hash"].as_str().unwrap()
         ))
         .await;
+    // return immediately
+    assert!(start_time.elapsed().as_millis() < 2_000);
     assert_json(resp, txns[0].clone());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_wait_transaction_by_hash_not_found() {
+    let mut node_config = NodeConfig::default();
+    node_config.api.wait_by_hash_timeout_ms = 2_000;
     let mut context = new_test_context(current_function_name!());
 
+    let start_time = std::time::Instant::now();
     let resp = context
         .expect_status_code(404)
         .get("/transactions/wait_by_hash/0xdadfeddcca7cb6396c735e9094c76c6e4e9cb3e3ef814730693aed59bd87b31d")
         .await;
+    // return immediately
+    assert!(start_time.elapsed().as_millis() < 2_000);
     context.check_golden_output(resp);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_wait_transaction_by_invalid_hash() {
-    let mut context = new_test_context(current_function_name!());
+    let mut node_config = NodeConfig::default();
+    node_config.api.wait_by_hash_timeout_ms = 2_000;
+    let mut context = new_test_context_with_config(current_function_name!(), node_config);
 
+    let start_time = std::time::Instant::now();
     let resp = context
         .expect_status_code(400)
         .get("/transactions/wait_by_hash/0x1")
         .await;
+    // return immediately
+    assert!(start_time.elapsed().as_millis() < 2_000);
     context.check_golden_output(resp);
 }
 
@@ -631,6 +646,7 @@ async fn test_wait_pending_transaction_by_hash() {
     let mut txn = context
         .get(&format!("/transactions/wait_by_hash/{}", txn_hash))
         .await;
+    // return after waiting for pending to become committed
     assert!(start_time.elapsed().as_millis() > 2_000);
 
     // The pending txn response from the POST request doesn't the type field,
