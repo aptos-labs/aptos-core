@@ -3109,7 +3109,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-node"
-version = "1.7.0"
+version = "0.0.0-main"
 dependencies = [
  "anyhow",
  "aptos-admin-service",
@@ -3450,6 +3450,7 @@ dependencies = [
  "aptos-framework",
  "aptos-gas-schedule-updator",
  "aptos-genesis",
+ "aptos-infallible",
  "aptos-keygen",
  "aptos-rest-client",
  "aptos-temppath",

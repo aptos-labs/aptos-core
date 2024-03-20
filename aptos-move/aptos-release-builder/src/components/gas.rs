@@ -1,16 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::*;
+use crate::{components::get_signer_arg, utils::*};
 use anyhow::Result;
 use aptos_types::on_chain_config::GasScheduleV2;
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
 
 pub fn generate_gas_upgrade_proposal(
+    post_randomness_framework: bool,
     gas_schedule: &GasScheduleV2,
     is_testnet: bool,
     next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
+    let signer_arg = get_signer_arg(is_testnet, &next_execution_hash);
     let mut result = vec![];
 
     let writer = CodeWriter::new(Loc::default());
@@ -51,20 +53,23 @@ pub fn generate_gas_upgrade_proposal(
             emit!(writer, "let gas_schedule_blob: vector<u8> = ");
             generate_blob(writer, &gas_schedule_blob);
             emitln!(writer, ";\n");
-            // The else statement has & before the framework_signer.
-            // The testnet single-step generation had something like let framework_signer = &core_signer;
-            // so that their framework_signer is of type &signer, but for mainnet single-step and multi-step,
-            // the framework_signer is of type signer.
-            if is_testnet && next_execution_hash.is_empty() {
+            if !post_randomness_framework {
                 emitln!(
                     writer,
-                    "gas_schedule::set_gas_schedule(framework_signer, gas_schedule_blob);"
+                    "gas_schedule::set_gas_schedule({}, gas_schedule_blob)",
+                    signer_arg
                 );
             } else {
+                // The else statement has & before the framework_signer.
+                // The testnet single-step generation had something like let framework_signer = &core_signer;
+                // so that their framework_signer is of type &signer, but for mainnet single-step and multi-step,
+                // the framework_signer is of type signer.
                 emitln!(
                     writer,
-                    "gas_schedule::set_gas_schedule(&framework_signer, gas_schedule_blob);"
+                    "gas_schedule::set_for_next_epoch({}, gas_schedule_blob);",
+                    signer_arg
                 );
+                emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
             }
         },
     );

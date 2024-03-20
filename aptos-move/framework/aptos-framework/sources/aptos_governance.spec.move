@@ -847,4 +847,8 @@ spec aptos_framework::aptos_governance {
     spec schema VotingInitializationAbortIfs {
         aborts_if features::spec_partial_governance_voting_enabled() && !exists<VotingRecordsV2>(@aptos_framework);
     }
+
+    spec force_end_epoch_test_only {
+        pragma verify = false;
+    }
 }

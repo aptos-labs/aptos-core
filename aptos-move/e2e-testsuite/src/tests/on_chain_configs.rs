@@ -18,15 +18,21 @@ fn initial_aptos_version() {
     let version = aptos_types::on_chain_config::APTOS_MAX_KNOWN_VERSION;
 
     assert_eq!(Version::fetch_config(&resolver).unwrap(), version);
-
-    let txn = executor
-        .new_account_at(CORE_CODE_ADDRESS)
+    let account = executor.new_account_at(CORE_CODE_ADDRESS);
+    let txn_0 = account
         .transaction()
-        .payload(aptos_stdlib::version_set_version(version.major + 1))
+        .payload(aptos_stdlib::version_set_for_next_epoch(version.major + 1))
         .sequence_number(0)
         .sign();
+    let txn_1 = account
+        .transaction()
+        .payload(aptos_stdlib::aptos_governance_force_end_epoch())
+        .sequence_number(1)
+        .sign();
     executor.new_block();
-    executor.execute_and_apply(txn);
+    executor.execute_and_apply(txn_0);
+    executor.new_block();
+    executor.execute_and_apply(txn_1);
 
     let resolver = executor.get_state_view().as_move_resolver();
     assert_eq!(Version::fetch_config(&resolver).unwrap(), Version {
@@ -44,7 +50,7 @@ fn drop_txn_after_reconfiguration() {
     let txn = executor
         .new_account_at(CORE_CODE_ADDRESS)
         .transaction()
-        .payload(aptos_stdlib::version_set_version(version.major + 1))
+        .payload(aptos_stdlib::aptos_governance_force_end_epoch())
         .sequence_number(0)
         .sign();
     executor.new_block();

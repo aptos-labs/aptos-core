@@ -1,5 +1,6 @@
 module 0x1::chain_id_test {
     use aptos_std::type_info;
+    use aptos_framework::aptos_governance;
     use aptos_framework::chain_id;
     use std::features;
 
@@ -18,7 +19,8 @@ module 0x1::chain_id_test {
             }
         );
 
-        features::change_feature_flags(sender, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
+        features::change_feature_flags_for_next_epoch(sender, vector[features::get_aptos_stdlib_chain_id_feature()], vector[]);
+        aptos_governance::force_end_epoch(sender);
     }
 
     /// Fetches the chain ID (via aptos_framework::chain_id::get()) and stores it in the ChainIdStore resource.

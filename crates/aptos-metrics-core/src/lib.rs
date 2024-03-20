@@ -12,7 +12,7 @@ pub use prometheus::{
 };
 
 mod avg_counter;
-pub use avg_counter::register_avg_counter;
+pub use avg_counter::{register_avg_counter, register_avg_counter_vec};
 pub mod const_metric;
 pub mod op_counters;
 

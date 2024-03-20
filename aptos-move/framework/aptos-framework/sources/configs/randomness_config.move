@@ -34,7 +34,9 @@ module aptos_framework::randomness_config {
     /// Initialize the configuration. Used in genesis or governance.
     public fun initialize(framework: &signer, config: RandomnessConfig) {
         system_addresses::assert_aptos_framework(framework);
-        move_to(framework, config)
+        if (!exists<RandomnessConfig>(@aptos_framework)) {
+            move_to(framework, config)
+        }
     }
 
     /// This can be called by on-chain governance to update on-chain consensus configs for the next epoch.

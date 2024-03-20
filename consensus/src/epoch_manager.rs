@@ -81,10 +81,11 @@ use aptos_types::{
     dkg::{real_dkg::maybe_dk_from_bls_sk, DKGState, DKGTrait, DefaultDKG},
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
+    jwks::SupportedOIDCProviders,
     on_chain_config::{
-        LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
-        OnChainExecutionConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
-        ProposerElectionType, RandomnessConfigMoveStruct, ValidatorSet,
+        Features, LeaderReputationType, OnChainConfigPayload, OnChainConfigProvider,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        OnChainRandomnessConfig, ProposerElectionType, RandomnessConfigMoveStruct, ValidatorSet,
     },
     randomness::{RandKeys, WvufPP, WVUF},
     validator_signer::ValidatorSigner,
@@ -436,10 +437,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .map_err(DbError::from)
             .context("[EpochManager] Failed to get epoch proof")?;
         let msg = ConsensusMsg::EpochChangeProof(Box::new(proof));
-        self.network_sender.send_to(peer_id, msg).context(format!(
-            "[EpochManager] Failed to send epoch proof to {}",
-            peer_id
-        ))
+        if let Err(err) = self.network_sender.send_to(peer_id, msg) {
+            warn!(
+                "[EpochManager] Failed to send epoch proof to {}, with error: {:?}",
+                peer_id, err,
+            );
+        }
+        Ok(())
     }
 
     fn process_different_epoch(
@@ -1012,8 +1016,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let onchain_randomness_config = onchain_randomness_config
             .and_then(OnChainRandomnessConfig::try_from)
             .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
-        let jwk_consensus_config = onchain_jwk_consensus_config
-            .unwrap_or_else(|_| OnChainJWKConsensusConfig::default_if_missing());
+        let jwk_consensus_config = onchain_jwk_consensus_config.unwrap_or_else(|_| {
+            // `jwk_consensus_config` not yet initialized, falling back to the old configs.
+            Self::equivalent_jwk_consensus_config_from_deprecated_resources(&payload)
+        });
         let rand_config = self.try_get_rand_config_for_new_epoch(
             &epoch_state,
             &onchain_randomness_config,
@@ -1571,6 +1577,15 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .gauge("time_since_epoch_ms")
                 .set(duration_since_epoch().as_millis() as i64);
         }
+    }
+
+    /// Before `JWKConsensusConfig` is initialized, convert from `Features` and `SupportedOIDCProviders` instead.
+    fn equivalent_jwk_consensus_config_from_deprecated_resources(
+        payload: &OnChainConfigPayload<P>,
+    ) -> OnChainJWKConsensusConfig {
+        let features = payload.get::<Features>().ok();
+        let oidc_providers = payload.get::<SupportedOIDCProviders>().ok();
+        OnChainJWKConsensusConfig::from((features, oidc_providers))
     }
 }
 

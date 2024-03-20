@@ -620,7 +620,7 @@ module aptos_token_objects::collection {
     #[test(fx = @aptos_framework, creator = @0x123)]
     fun test_create_mint_burn_for_unlimited(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let feature = features::get_concurrent_token_v2_feature();
-        features::change_feature_flags(fx, vector[], vector[feature]);
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
 
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
@@ -639,7 +639,7 @@ module aptos_token_objects::collection {
     #[test(fx = @aptos_framework, creator = @0x123)]
     fun test_create_mint_burn_for_fixed(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let feature = features::get_concurrent_token_v2_feature();
-        features::change_feature_flags(fx, vector[], vector[feature]);
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
 
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
@@ -658,7 +658,7 @@ module aptos_token_objects::collection {
     #[test(fx = @aptos_framework, creator = @0x123)]
     fun test_create_mint_burn_for_concurrent(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let feature = features::get_concurrent_token_v2_feature();
-        features::change_feature_flags(fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(fx, vector[feature], vector[]);
 
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");

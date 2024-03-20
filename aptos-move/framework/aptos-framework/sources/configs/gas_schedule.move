@@ -4,6 +4,7 @@ module aptos_framework::gas_schedule {
     use std::error;
     use std::string::String;
     use std::vector;
+    use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
@@ -51,6 +52,7 @@ module aptos_framework::gas_schedule {
     public fun set_gas_schedule(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasSchedule, GasScheduleV2 {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
+        chain_status::assert_genesis();
 
         if (exists<GasScheduleV2>(@aptos_framework)) {
             let gas_schedule = borrow_global_mut<GasScheduleV2>(@aptos_framework);
