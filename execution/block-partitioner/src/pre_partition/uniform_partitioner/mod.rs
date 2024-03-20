@@ -13,7 +13,7 @@ use crate::{
 use rand::thread_rng;
 
 /// A naive partitioner that evenly divide txns into shards.
-/// Example: processing txns 0..11 results in [[0,1,2,3],[4,5,6,7],[8,9,10]].
+/// Example: processing txns 0..11 results in `[[0,1,2,3],[4,5,6,7],[8,9,10]]`.
 pub struct UniformPartitioner {}
 
 impl UniformPartitioner {

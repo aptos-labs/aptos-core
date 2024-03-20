@@ -16,7 +16,7 @@ use std::{
 
 /// A `PrePartitioner` used in `PartitionerV2` that tries to group conflicting txns together (but a group size limit applied),
 /// then assign the groups to the shards using Longest-processing-time-first (LPT) scheduling.
-/// https://en.wikipedia.org/wiki/Longest-processing-time-first_scheduling
+/// <https://en.wikipedia.org/wiki/Longest-processing-time-first_scheduling>
 ///
 /// Note that the number of groups varies depending on the block:
 /// - if the conflict level is high and group size limit is loose, we may have only 1 group;
