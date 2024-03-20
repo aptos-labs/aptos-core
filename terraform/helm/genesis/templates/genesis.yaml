@@ -31,6 +31,9 @@ data:
     {{- with .Values.chain.on_chain_execution_config}}
     on_chain_execution_config: {{ . | toJson }}
     {{- end}}
+    {{- with .Values.chain.jwk_consensus_config_override }}
+    jwk_consensus_config_override: {{ . | toJson }}
+    {{- end}}
 
 ---
 
