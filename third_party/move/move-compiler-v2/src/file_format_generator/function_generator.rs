@@ -39,7 +39,7 @@ pub struct FunctionGenerator<'a> {
     locals: Vec<Type>,
     /// A map from branching labels to information about them.
     label_info: BTreeMap<Label, LabelInfo>,
-    /// A mao from code offset to spec blocks associated with them
+    /// A map from code offset to spec blocks associated with them
     spec_blocks: BTreeMap<CodeOffset, Spec>,
     /// The generated code
     code: Vec<FF::Bytecode>,
@@ -232,7 +232,8 @@ impl<'a> FunctionGenerator<'a> {
         }
     }
 
-    /// Compute the set of temporaries which are referenced in borrow instructions.
+    /// Compute the set of temporaries which are referenced in borrow instructions, or which
+    /// are used in specification blocks.
     /// TODO: right now we also pin locals which are parameter of the destroy instruction.
     ///   This is needed since we cannot determine whether the local has been already moved on
     ///   the stack and is not longer available in the associated local. This needs to be reworked
@@ -247,7 +248,7 @@ impl<'a> FunctionGenerator<'a> {
                 Bytecode::SpecBlock(_, spec) => {
                     // All Temporaries used in the spec need to be pinned. Notice that
                     // any bound variables inside the spec are LocalVar, so we can just
-                    // unconditionally collect them.
+                    // unconditionally collect all Temporary instances.
                     let mut collect = |exp: &ExpData| {
                         if let ExpData::Temporary(_, temp) = exp {
                             result.insert(*temp);

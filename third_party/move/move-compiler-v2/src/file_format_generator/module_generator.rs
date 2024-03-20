@@ -8,7 +8,6 @@ use crate::file_format_generator::{
     MAX_STRUCT_DEF_INST_COUNT,
 };
 use codespan_reporting::diagnostic::Severity;
-use itertools::Itertools;
 use move_binary_format::{
     file_format as FF,
     file_format::{FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
@@ -184,9 +183,7 @@ impl ModuleGenerator {
                 .expect(SOURCE_MAP_OK);
         }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
-        let fields = struct_env
-            .get_fields()
-            .sorted_by(|a, b| a.get_offset().cmp(&b.get_offset()));
+        let fields = struct_env.get_fields();
         let field_information = FF::StructFieldInformation::Declared(
             fields
                 .map(|f| {
