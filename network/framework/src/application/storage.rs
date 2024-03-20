@@ -62,9 +62,9 @@ impl PeersAndMetadata {
 
         // Initialize each network mapping and trusted peer set
         {
-            let mut wat = peers_and_metadata.peers_and_metadata.write();
+            let mut writer = peers_and_metadata.peers_and_metadata.write();
             peers_and_metadata.network_ids.iter().for_each(|network_id| {
-                wat.insert(*network_id, HashMap::new());
+                writer.insert(*network_id, HashMap::new());
 
                 peers_and_metadata
                     .trusted_peers
