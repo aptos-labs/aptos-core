@@ -1,0 +1,25 @@
+
+Diagnostics:
+error: cannot mutably borrow from an immutable ref
+   ┌─ tests/checking/typing/mut_ref_from_immut.move:11:17
+   │
+11 │         let _ = &mut s_ref.g;
+   │                 ^^^^^^^^^^^^
+
+error: cannot mutably borrow from an immutable ref
+   ┌─ tests/checking/typing/mut_ref_from_immut.move:16:9
+   │
+16 │         &mut s.g;
+   │         ^^^^^^^^
+
+error: cannot mutably borrow from an immutable ref
+   ┌─ tests/checking/typing/mut_ref_from_immut.move:23:17
+   │
+23 │         let x = &mut s_ref.g;
+   │                 ^^^^^^^^^^^^
+
+error: cannot mutably borrow from an immutable ref
+   ┌─ tests/checking/typing/mut_ref_from_immut.move:50:17
+   │
+50 │         let x = &mut b_ref.g;
+   │                 ^^^^^^^^^^^^
