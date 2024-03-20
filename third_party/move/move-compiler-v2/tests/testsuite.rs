@@ -109,8 +109,6 @@ impl TestConfig {
         env_pipeline.add("recursive instantiation check", |env| {
             cyclic_instantiation_checker::check_cyclic_instantiations(env)
         });
-        // The bytecode transformation pipeline
-        let mut pipeline = FunctionTargetPipeline::default();
 
         // Get path to allow path-specific test configuration
         let path = path.to_string_lossy();
@@ -221,16 +219,6 @@ impl TestConfig {
                 pipeline,
                 generate_file_format: false,
                 dump_annotated_targets: false,
-            }
-        } else if path.contains("/cyclic-instantiation-checker") {
-            Self {
-                stop_before_generating_bytecode: true,
-                dump_ast: AstDumpLevel::None,
-                env_pipeline,
-                pipeline,
-                generate_file_format: false,
-                dump_annotated_targets: false,
-                dump_for_only_some_stages: None,
             }
         } else if path.contains("/visibility-checker/") {
             Self {
