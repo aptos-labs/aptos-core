@@ -687,7 +687,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
-        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include fewer artifacts via `--included-artifacts`. \
@@ -927,7 +927,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
 
-        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
@@ -1023,7 +1023,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
 
-        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
@@ -1131,7 +1131,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
-        if !override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
