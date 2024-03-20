@@ -163,7 +163,7 @@ script {
     fun main(core_resources: &signer) {
         let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
         jwks::upsert_oidc_provider(
-            &framework_signer,
+            &framework,
             b"https://accounts.google.com",
             b"https://accounts.google.com/.well-known/openid-configuration"
         );
