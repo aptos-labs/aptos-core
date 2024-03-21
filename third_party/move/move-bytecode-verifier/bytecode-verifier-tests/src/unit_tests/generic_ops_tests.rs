@@ -2,7 +2,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::file_format::*;
+use move_binary_format::{
+    file_format::*,
+    file_format_common::{COMPILER_VERSION_MAJOR_MAX, COMPILER_VERSION_MINOR_MAX},
+};
 use move_bytecode_verifier::InstructionConsistency;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
@@ -14,6 +17,8 @@ use move_core_types::{
 fn make_module() -> CompiledModule {
     CompiledModule {
         version: move_binary_format::file_format_common::VERSION_MAX,
+        compiler_version_major: COMPILER_VERSION_MAJOR_MAX,
+        compiler_version_minor: COMPILER_VERSION_MINOR_MAX,
         module_handles: vec![
             // only self module
             ModuleHandle {

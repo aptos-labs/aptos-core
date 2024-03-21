@@ -33,6 +33,7 @@ use crate::{
     access::{ModuleAccess, ScriptAccess},
     errors::{PartialVMError, PartialVMResult},
     file_format_common,
+    file_format_common::{COMPILER_VERSION_MAJOR_MAX, COMPILER_VERSION_MINOR_MAX},
     internals::ModuleIndex,
     IndexKind, SignatureTokenKind,
 };
@@ -1985,6 +1986,10 @@ impl Bytecode {
 pub struct CompiledScript {
     /// Version number found during deserialization
     pub version: u32,
+    /// Major Version number of the Compiler that produces this code
+    pub compiler_version_major: u32,
+    /// Minor Version number of the Compiler that produces this code
+    pub compiler_version_minor: u32,
     /// Handles to all modules referenced.
     pub module_handles: Vec<ModuleHandle>,
     /// Handles to external/imported types.
@@ -2036,6 +2041,10 @@ impl CompiledScript {
 pub struct CompiledModule {
     /// Version number found during deserialization
     pub version: u32,
+    /// Major Version number of the Compiler that produces this code
+    pub compiler_version_major: u32,
+    /// Minor Version number of the Compiler that produces this code
+    pub compiler_version_minor: u32,
     /// Handle to self.
     pub self_module_handle_idx: ModuleHandleIndex,
     /// Handles to external dependency modules and self.
@@ -2110,6 +2119,8 @@ impl Arbitrary for CompiledScript {
                     // TODO actual constant generation
                     CompiledScript {
                         version: file_format_common::VERSION_MAX,
+                        compiler_version_major: file_format_common::COMPILER_VERSION_MAJOR_MAX,
+                        compiler_version_minor: file_format_common::COMPILER_VERSION_MINOR_MAX,
                         module_handles,
                         struct_handles,
                         function_handles,
@@ -2166,6 +2177,8 @@ impl Arbitrary for CompiledModule {
                     // TODO actual constant generation
                     CompiledModule {
                         version: file_format_common::VERSION_MAX,
+                        compiler_version_major: file_format_common::COMPILER_VERSION_MAJOR_MAX,
+                        compiler_version_minor: file_format_common::COMPILER_VERSION_MINOR_MAX,
                         module_handles,
                         struct_handles,
                         function_handles,
@@ -2250,6 +2263,8 @@ impl CompiledModule {
 pub fn empty_module() -> CompiledModule {
     CompiledModule {
         version: file_format_common::VERSION_MAX,
+        compiler_version_major: COMPILER_VERSION_MAJOR_MAX,
+        compiler_version_minor: COMPILER_VERSION_MINOR_MAX,
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex(0),
@@ -2332,6 +2347,8 @@ pub fn basic_test_module() -> CompiledModule {
 pub fn empty_script() -> CompiledScript {
     CompiledScript {
         version: file_format_common::VERSION_MAX,
+        compiler_version_major: COMPILER_VERSION_MAJOR_MAX,
+        compiler_version_minor: COMPILER_VERSION_MINOR_MAX,
         module_handles: vec![],
         struct_handles: vec![],
         function_handles: vec![],

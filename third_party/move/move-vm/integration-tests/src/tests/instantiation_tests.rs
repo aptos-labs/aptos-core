@@ -1,12 +1,15 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::file_format::{
-    AbilitySet, AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
-    FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
-    ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, SignatureToken::*,
-    StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex, StructTypeParameter,
-    TypeSignature,
+use move_binary_format::{
+    file_format::{
+        AbilitySet, AddressIdentifierIndex, Bytecode::*, CodeUnit, CompiledModule, FieldDefinition,
+        FunctionDefinition, FunctionHandle, FunctionHandleIndex, IdentifierIndex, ModuleHandle,
+        ModuleHandleIndex, Signature, SignatureIndex, SignatureToken, SignatureToken::*,
+        StructDefinition, StructFieldInformation, StructHandle, StructHandleIndex,
+        StructTypeParameter, TypeSignature,
+    },
+    file_format_common::{COMPILER_VERSION_MAJOR_DEFAULT, COMPILER_VERSION_MINOR_DEFAULT},
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -35,6 +38,8 @@ fn instantiation_err() {
 
     let cm = CompiledModule {
         version: 6,
+        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
+        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
