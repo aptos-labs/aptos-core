@@ -112,7 +112,7 @@ script {{
         consensus_config::set_for_next_epoch(&framework_signer, consensus_config_bytes);
         let target_randomness_status = {};
         let randomness_config = if (target_randomness_status == 0) {{
-            randomness_config::new_v0()
+            randomness_config::new_off()
         }} else if (target_randomness_status == 1) {{
             randomness_config::new_v1(
                 fixed_point64::create_from_rational(1, 2),
