@@ -165,7 +165,10 @@ async fn assert_state(validator_power_status_vec: &Vec<bool>, swarm: &mut LocalS
     for (idx, &power_status) in validator_power_status_vec.iter().enumerate() {
         if power_status {
             let health_check_result = swarm.validators_mut().nth(idx).unwrap().health_check().await;
-            assert!(health_check_result.is_ok());
+            if health_check_result.is_err() {
+                println!("node {} is supposed to be on!", idx);
+                assert!(false);
+            }
         }
     }
 }
