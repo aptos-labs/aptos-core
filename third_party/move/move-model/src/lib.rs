@@ -275,7 +275,12 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            visited_modules.contains(&mident.value).then(|| {
+            // Always need to include the vector module because it can be implicitly used.
+            // TODO(#12492): we can remove this once this bug is fixed
+            let is_vector = mident.value.address.into_addr_bytes().into_inner()
+                == AccountAddress::ONE
+                && mident.value.module.0.value.as_str() == "vector";
+            (is_vector || visited_modules.contains(&mident.value)).then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
@@ -386,6 +391,13 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         let module_def = expansion_script_to_module(script_def);
         module_translator.translate(loc, module_def, None);
     }
+
+    // Populate GlobalEnv with model-level information
+    builder.populate_env();
+
+    // After all specs have been processed, warn about any unused schemas.
+    builder.warn_unused_schemas();
+
     // Perform any remaining friend-declaration checks and update friend module id information.
     check_and_update_friend_info(builder);
 }
@@ -511,7 +523,7 @@ pub fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
 }
 
 #[allow(deprecated)]
-fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
+pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> CompiledModule {
     let mut script = compiled_script;
 
     // Add the "<SELF>" identifier if it isn't present.
@@ -521,14 +533,14 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
     let self_ident_idx = match script
         .identifiers
         .iter()
-        .position(|ident| ident.as_ident_str() == self_module_name())
+        .position(|ident| ident.as_ident_str().as_str() == name)
     {
         Some(idx) => IdentifierIndex::new(idx as u16),
         None => {
             let idx = IdentifierIndex::new(script.identifiers.len() as u16);
             script
                 .identifiers
-                .push(Identifier::new(self_module_name().to_string()).unwrap());
+                .push(Identifier::new(name.to_string()).unwrap());
             idx
         },
     };
@@ -689,7 +701,7 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
                     .unwrap();
 
                 let expanded_module = expansion_script_to_module(expanded_script);
-                let module = script_into_module(script.script);
+                let module = script_into_module(script.script, self_module_name().as_str());
                 modules.push((
                     ident,
                     expanded_module,

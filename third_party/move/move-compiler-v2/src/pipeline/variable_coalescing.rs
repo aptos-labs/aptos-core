@@ -123,9 +123,10 @@ impl VariableCoalescing {
             .get_annotations()
             .get::<LiveVarAnnotation>()
             .expect("live var annotation is a prerequisite");
-        // Note: we currently exclude all the variables that are borrowed from participating in this
-        // transformation, which is safe. However, we could be more precise in this regard.
-        let borrowed_locals = target.get_borrowed_locals();
+        // Note: we currently exclude all the variables that are borrowed or appear in spec blocks
+        // from participating in this transformation, which is safe. However, we could be more
+        // precise in this regard.
+        let pinned_locals = target.get_pinned_temps(false);
         // Initially, all locals have trivial live intervals.
         // They are made more precise using live variable analysis.
         let mut live_intervals = std::iter::repeat_with(|| None)
@@ -136,9 +137,9 @@ impl VariableCoalescing {
                 .after
                 .keys()
                 .chain(live_var_info.before.keys())
-                .filter(|local| !borrowed_locals.contains(local))
+                .filter(|local| !pinned_locals.contains(local))
                 .for_each(|local| {
-                    // non-borrowed local that is live before and/or after the code offset.
+                    // non-pinned local that is live before and/or after the code offset.
                     let interval =
                         live_intervals[*local].get_or_insert_with(|| LiveInterval::new(*offset));
                     interval.include(*offset);
