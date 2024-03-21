@@ -15,7 +15,7 @@ pub static JWK_FETCH_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         "keyless_pepper_service_jwk_fetch_seconds",
         "Seconds taken to process pepper requests by scheme and result.",
         &["issuer", "succeeded"],
-        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap()
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 24).unwrap()
     )
     .unwrap()
 });
@@ -25,7 +25,7 @@ pub static REQUEST_HANDLING_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
         "keyless_pepper_request_handling_seconds",
         "Seconds taken to process pepper requests by scheme and result.",
         &["pepper_scheme", "is_ok"],
-        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap()
+        exponential_buckets(/*start=*/ 1e-6, /*factor=*/ 2.0, /*count=*/ 24).unwrap()
     )
     .unwrap()
 });
@@ -47,7 +47,7 @@ pub fn start_metric_server() {
 
 async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Body>, Infallible> {
     let response = match (req.method(), req.uri().path()) {
-        (&Method::GET, "/") => {
+        (&Method::GET, "/metrics") => {
             let buffer = get_encoded_metrics(TextEncoder::new());
             hyper::Response::builder()
                 .status(StatusCode::OK)
