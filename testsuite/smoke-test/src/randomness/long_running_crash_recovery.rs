@@ -46,7 +46,9 @@ async fn long_running_crash_recovery() {
     loop {
         print_current_state(num_iterations, &rest_cli, &validator_power_status_vec).await;
         make_change(&mut validator_power_status_vec, &rest_cli, &aptos_cli, root_idx, &mut swarm).await;
-        tokio::time::sleep(Duration::from_secs(rng.gen_range(5, 30))).await;
+        let sleep_sec = rng.gen_range(5, 30);
+        println!("Acted. Sleeping for {} secs.", sleep_sec);
+        tokio::time::sleep(Duration::from_secs(sleep_sec)).await;
         assert_state(&validator_power_status_vec, &mut swarm).await;
         num_iterations += 1;
     }
@@ -87,7 +89,7 @@ async fn stop_random_node(validator_power_status_vec: &mut Vec<bool>, swarm: &mu
 }
 
 async fn set_random_vtxn_and_randomness_config(rest_cli: &Client, aptos_cli: &CliTestFramework, root_idx: usize) {
-    let target_vtxn_status = thread_rng().gen_range(0, 2);
+    let target_vtxn_status = thread_rng().gen_range(1, 2);
     let target_randomness_status = thread_rng().gen_range(0, 3);
     println!("Action: set target_vtxn_status={}, target_randomness_status={}", target_vtxn_status, target_randomness_status);
     println!();

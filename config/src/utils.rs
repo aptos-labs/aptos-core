@@ -65,11 +65,7 @@ impl Drop for PortCounterFiles {
 }
 
 pub fn get_available_port() -> u16 {
-    if NEXTEST_RUN_ID.is_some() {
-        get_unique_port()
-    } else {
-        get_random_port()
-    }
+    get_unique_port()
 }
 
 /// Return an ephemeral, available port. On unix systems, the port returned will be in the
