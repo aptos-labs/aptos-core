@@ -480,14 +480,12 @@ where
         let (cost, res) =
             self.delegate_charge(|base| base.charge_dependency(is_new, addr, name, size));
 
-        if !cost.is_zero() {
-            self.dependencies.push(Dependency {
-                is_new,
-                id: ModuleId::new(*addr, name.to_owned()),
-                size,
-                cost,
-            });
-        }
+        self.dependencies.push(Dependency {
+            is_new,
+            id: ModuleId::new(*addr, name.to_owned()),
+            size,
+            cost,
+        });
 
         res
     }
