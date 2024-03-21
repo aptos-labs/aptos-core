@@ -19,10 +19,7 @@ use aptos_config::{
     },
     network_id::NetworkContext,
 };
-use aptos_crypto::x25519::PublicKey;
-use aptos_event_notifications::{
-    DbBackedOnChainConfig, EventSubscriptionService, ReconfigNotificationListener,
-};
+use aptos_event_notifications::{DbBackedOnChainConfig, EventSubscriptionService};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::tcp::TCPBufferCfg;
 use aptos_network::{
@@ -170,12 +167,11 @@ impl NetworkBuilder {
         role: RoleType,
         config: &NetworkConfig,
         time_service: TimeService,
-        mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
+        reconfig_subscription_service: Option<&mut EventSubscriptionService>,
         peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> NetworkBuilder {
         let peer_id = config.peer_id();
         let identity_key = config.identity_key();
-        let pubkey = identity_key.public_key();
 
         let authentication_mode = if config.mutual_authentication {
             AuthenticationMode::Mutual(identity_key)
@@ -378,7 +374,7 @@ impl NetworkBuilder {
                         pubkey,
                         reconfig_events,
                     )
-                }
+                },
                 DiscoveryMethod::File(file_discovery) => DiscoveryChangeListener::file(
                     self.network_context,
                     conn_mgr_reqs_tx.clone(),
@@ -395,7 +391,7 @@ impl NetworkBuilder {
                 ),
                 DiscoveryMethod::None => {
                     continue;
-                }
+                },
             };
             self.discovery_listeners
                 .as_mut()
