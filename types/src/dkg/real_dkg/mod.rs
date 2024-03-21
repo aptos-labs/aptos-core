@@ -280,13 +280,13 @@ impl DKGTrait for RealDKG {
         );
 
         if let Some(fast_trx) = trx.fast.as_ref() {
-            let _fast_dealers = fast_trx
+            let fast_dealers = fast_trx
                 .get_dealers()
                 .iter()
                 .map(|player| player.id)
                 .collect::<Vec<usize>>();
             ensure!(
-                matches!(dealers, _fast_dealers),
+                dealers == fast_dealers,
                 "real_dkg::verify_transcript failed with inconsistent dealer index."
             );
         }

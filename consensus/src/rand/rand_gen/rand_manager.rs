@@ -15,7 +15,7 @@ use crate::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
         storage::interface::RandStorage,
-        types::{FastShare, RandConfig, RequestShare, TAugmentedData, TShare},
+        types::{FastShare, PathType, RandConfig, RequestShare, TAugmentedData, TShare},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
@@ -147,13 +147,13 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         let mut rand_store = self.rand_store.lock();
         rand_store.update_highest_known_round(metadata.round());
         rand_store
-            .add_share(self_share.clone())
+            .add_share(self_share.clone(), PathType::Slow)
             .expect("Add self share should succeed");
 
         if let Some(fast_config) = &self.fast_config {
             let self_fast_share = FastShare::new(S::generate(fast_config, metadata.clone()));
             rand_store
-                .add_fast_share(self_fast_share.clone())
+                .add_share(self_fast_share.rand_share(), PathType::Fast)
                 .expect("Add self share for fast path should succeed");
         }
 
@@ -384,7 +384,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                     let share = maybe_share.unwrap_or_else(|| {
                                         // reproduce previous share if not found
                                         let share = S::generate(&self.config, request.rand_metadata().clone());
-                                        self.rand_store.lock().add_share(share.clone()).expect("Add self share should succeed");
+                                        self.rand_store.lock().add_share(share.clone(), PathType::Slow).expect("Add self share should succeed");
                                         share
                                     });
                                     self.process_response(protocol, response_sender, RandMessage::Share(share));
@@ -401,7 +401,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round())
                                 .remote_peer(*share.author()));
 
-                            if let Err(e) = self.rand_store.lock().add_share(share) {
+                            if let Err(e) = self.rand_store.lock().add_share(share, PathType::Slow) {
                                 warn!("[RandManager] Failed to add share: {}", e);
                             }
                         }
@@ -412,7 +412,7 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
                                 .round(share.metadata().round())
                                 .remote_peer(*share.share.author()));
 
-                            if let Err(e) = self.rand_store.lock().add_fast_share(share) {
+                            if let Err(e) = self.rand_store.lock().add_share(share.rand_share(), PathType::Fast) {
                                 warn!("[RandManager] Failed to add share for fast path: {}", e);
                             }
                         }

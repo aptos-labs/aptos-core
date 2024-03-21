@@ -22,7 +22,14 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::{fmt::Debug, sync::Arc};
 
-const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
+pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
+pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
+
+#[derive(PartialEq)]
+pub enum PathType {
+    Fast,
+    Slow,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
@@ -384,8 +391,8 @@ impl<S: TShare> FastShare<S> {
         self.share.author()
     }
 
-    pub fn rand_share(&self) -> &RandShare<S> {
-        &self.share
+    pub fn rand_share(&self) -> RandShare<S> {
+        self.share.clone()
     }
 
     pub fn share(&self) -> &S {
