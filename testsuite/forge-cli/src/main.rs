@@ -2449,14 +2449,17 @@ fn pfn_performance(
 
     // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(10).unwrap())
-        .with_initial_fullnode_count(10)
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(20)
         .add_network_test(PFNPerformance::new(1, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
         }))
         .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
-            config.mempool.default_failovers = 6;
+            config.mempool.default_failovers = 20;
+            for network in &mut config.full_node_networks {
+                network.max_outbound_connections = 20;
+            }
         }))
         .with_success_criteria(
             SuccessCriteria::new(min_expected_tps)
