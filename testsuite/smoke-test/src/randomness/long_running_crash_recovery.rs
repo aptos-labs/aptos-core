@@ -83,7 +83,7 @@ async fn stop_random_node(validator_power_status_vec: &mut Vec<bool>, swarm: &mu
     println!("Action: stop node {}", i);
     println!();
     swarm.validators_mut().nth(i).unwrap().stop();
-    validator_power_status_vec[i] = true;
+    validator_power_status_vec[i] = false;
 }
 
 async fn set_random_vtxn_and_randomness_config(rest_cli: &Client, aptos_cli: &CliTestFramework, root_idx: usize) {
