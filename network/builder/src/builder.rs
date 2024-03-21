@@ -229,25 +229,7 @@ impl NetworkBuilder {
         );
 
         network_builder.discovery_listeners = Some(Vec::new());
-        for discovery_method in config.discovery_methods() {
-            let reconfig_listener = if *discovery_method == DiscoveryMethod::Onchain {
-                Some(
-                    reconfig_subscription_service
-                        .as_mut()
-                        .expect("An event subscription service is required for on-chain discovery!")
-                        .subscribe_to_reconfigurations()
-                        .expect("On-chain discovery is unable to subscribe to reconfigurations!"),
-                )
-            } else {
-                None
-            };
-
-            network_builder.add_discovery_change_listener(
-                discovery_method,
-                pubkey,
-                reconfig_listener,
-            );
-        }
+        network_builder.setup_discovery(config, reconfig_subscription_service);
 
         // Ensure there are no duplicate source types
         let set: HashSet<_> = network_builder
@@ -372,48 +354,54 @@ impl NetworkBuilder {
         self
     }
 
-    fn add_discovery_change_listener(
+    fn setup_discovery(
         &mut self,
-        discovery_method: &DiscoveryMethod,
-        pubkey: PublicKey,
-        reconfig_events: Option<ReconfigNotificationListener<DbBackedOnChainConfig>>,
+        config: &NetworkConfig,
+        mut reconfig_subscription_service: Option<&mut EventSubscriptionService>,
     ) {
         let conn_mgr_reqs_tx = self
             .conn_mgr_reqs_tx()
             .expect("ConnectivityManager must exist");
-
-        let listener = match discovery_method {
-            DiscoveryMethod::Onchain => {
-                let reconfig_events =
-                    reconfig_events.expect("Reconfiguration listener is expected!");
-                DiscoveryChangeListener::validator_set(
+        for discovery_method in config.discovery_methods() {
+            let listener = match discovery_method {
+                DiscoveryMethod::Onchain => {
+                    let reconfig_events = reconfig_subscription_service
+                        .as_mut()
+                        .expect("An event subscription service is required for on-chain discovery!")
+                        .subscribe_to_reconfigurations()
+                        .expect("On-chain discovery is unable to subscribe to reconfigurations!");
+                    let identity_key = config.identity_key();
+                    let pubkey = identity_key.public_key();
+                    DiscoveryChangeListener::validator_set(
+                        self.network_context,
+                        conn_mgr_reqs_tx.clone(),
+                        pubkey,
+                        reconfig_events,
+                    )
+                }
+                DiscoveryMethod::File(file_discovery) => DiscoveryChangeListener::file(
                     self.network_context,
-                    conn_mgr_reqs_tx,
-                    pubkey,
-                    reconfig_events,
-                )
-            },
-            DiscoveryMethod::File(file_discovery) => DiscoveryChangeListener::file(
-                self.network_context,
-                conn_mgr_reqs_tx,
-                file_discovery.path.as_path(),
-                Duration::from_secs(file_discovery.interval_secs),
-                self.time_service.clone(),
-            ),
-            DiscoveryMethod::Rest(rest_discovery) => DiscoveryChangeListener::rest(
-                self.network_context,
-                conn_mgr_reqs_tx,
-                rest_discovery.url.clone(),
-                Duration::from_secs(rest_discovery.interval_secs),
-                self.time_service.clone(),
-            ),
-            DiscoveryMethod::None => return,
-        };
-
-        self.discovery_listeners
-            .as_mut()
-            .expect("Can only add listeners before starting")
-            .push(listener);
+                    conn_mgr_reqs_tx.clone(),
+                    file_discovery.path.as_path(),
+                    Duration::from_secs(file_discovery.interval_secs),
+                    self.time_service.clone(),
+                ),
+                DiscoveryMethod::Rest(rest_discovery) => DiscoveryChangeListener::rest(
+                    self.network_context,
+                    conn_mgr_reqs_tx.clone(),
+                    rest_discovery.url.clone(),
+                    Duration::from_secs(rest_discovery.interval_secs),
+                    self.time_service.clone(),
+                ),
+                DiscoveryMethod::None => {
+                    continue;
+                }
+            };
+            self.discovery_listeners
+                .as_mut()
+                .expect("Can only add listeners before starting")
+                .push(listener);
+        }
     }
 
     /// Add a HealthChecker to the network.
