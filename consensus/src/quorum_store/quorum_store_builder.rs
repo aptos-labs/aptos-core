@@ -311,7 +311,6 @@ impl InnerBuilder {
             let batch_coordinator = BatchCoordinator::new(
                 self.author,
                 self.network_sender.clone(),
-                self.proof_manager_cmd_tx.clone(),
                 self.batch_store.clone().unwrap(),
                 self.config.receiver_max_batch_txns as u64,
                 self.config.receiver_max_batch_bytes as u64,
@@ -351,8 +350,6 @@ impl InnerBuilder {
                 .back_pressure
                 .backlog_per_validator_batch_limit_count
                 * self.num_validators,
-            self.batch_store.clone().unwrap(),
-            self.config.allow_batches_without_pos_in_proposal,
         );
         spawn_named!(
             "proof_manager",
