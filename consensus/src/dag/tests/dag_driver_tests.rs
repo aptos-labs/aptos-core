@@ -181,7 +181,6 @@ fn setup(
             NoPipelineBackpressure::new(),
         ),
         false,
-        true,
     )
 }
 

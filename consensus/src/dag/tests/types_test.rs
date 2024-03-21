@@ -23,7 +23,7 @@ fn test_node_verify() {
 
     let invalid_node = Node::new_for_test(
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
-        Payload::empty(false, true),
+        Payload::empty(false),
         vec![],
         Extensions::empty(),
     );
@@ -72,7 +72,7 @@ fn test_certified_node_verify() {
 
     let invalid_node = Node::new_for_test(
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
-        Payload::empty(false, true),
+        Payload::empty(false),
         vec![],
         Extensions::empty(),
     );

@@ -43,7 +43,7 @@ prop_compose! {
         parent_qc in Just(parent_qc)
     ) -> Block {
         Block::new_proposal(
-            Payload::empty(false, true),
+            Payload::empty(false),
             round,
             aptos_infallible::duration_since_epoch().as_micros() as u64,
             parent_qc,

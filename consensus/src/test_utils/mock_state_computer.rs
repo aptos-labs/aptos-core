@@ -91,10 +91,7 @@ impl StateComputer for MockStateComputer {
     ) -> ExecutorResult<PipelineExecutionResult> {
         self.block_cache.lock().insert(
             block.id(),
-            block
-                .payload()
-                .unwrap_or(&Payload::empty(false, true))
-                .clone(),
+            block.payload().unwrap_or(&Payload::empty(false)).clone(),
         );
         let result = PipelineExecutionResult::new_dummy();
         Ok(result)

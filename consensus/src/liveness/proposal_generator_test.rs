@@ -38,14 +38,11 @@ async fn test_proposal_generation_empty_tree() {
         Duration::ZERO,
         1,
         10,
-        1,
-        10,
         10,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
     );
     let mut proposer_election =
         UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(vec![signer.author()], 1)));
@@ -82,14 +79,11 @@ async fn test_proposal_generation_parent() {
         Duration::ZERO,
         1,
         1000,
-        1,
-        500,
         10,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -158,14 +152,11 @@ async fn test_old_proposal_generation() {
         Duration::ZERO,
         1,
         1000,
-        1,
-        500,
         10,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![inserter.signer().author()],
@@ -199,14 +190,11 @@ async fn test_correct_failed_authors() {
         Duration::ZERO,
         1,
         1000,
-        1,
-        500,
         10,
         PipelineBackpressureConfig::new_no_backoff(),
         ChainHealthBackoffConfig::new_no_backoff(),
         false,
         ValidatorTxnConfig::default_disabled(),
-        true,
     );
     let mut proposer_election = UnequivocalProposerElection::new(Arc::new(RotatingProposer::new(
         vec![author, peer1, peer2],
