@@ -44,7 +44,7 @@ async fn long_running_crash_recovery() {
     let mut validator_power_status_vec = vec![true; 4];
     let mut num_iterations = 0;
     loop {
-        print_current_state(num_iterations, &rest_cli, &validator_power_status_vec);
+        print_current_state(num_iterations, &rest_cli, &validator_power_status_vec).await;
         make_change(&mut validator_power_status_vec, &rest_cli, &aptos_cli, root_idx, &mut swarm).await;
         tokio::time::sleep(Duration::from_secs(rng.gen_range(5, 30))).await;
         assert_state(&validator_power_status_vec, &mut swarm).await;
