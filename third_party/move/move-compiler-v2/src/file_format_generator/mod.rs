@@ -27,6 +27,8 @@ pub fn generate_file_format(
         if module_env.is_script_module() {
             let FF::CompiledModule {
                 version,
+                compiler_version_major,
+                compiler_version_minor,
                 module_handles,
                 struct_handles,
                 function_handles,
@@ -52,6 +54,8 @@ pub fn generate_file_format(
                 let name = Symbol::from(identifiers[name.into_index()].as_str());
                 let script = FF::CompiledScript {
                     version,
+                    compiler_version_major,
+                    compiler_version_minor,
                     module_handles,
                     struct_handles,
                     function_handles,

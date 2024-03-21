@@ -1,7 +1,12 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{compatibility::Compatibility, file_format::*, normalized};
+use crate::{
+    compatibility::Compatibility,
+    file_format::*,
+    file_format_common::{COMPILER_VERSION_MAJOR_DEFAULT, COMPILER_VERSION_MINOR_DEFAULT},
+    normalized,
+};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use std::convert::TryFrom;
 
@@ -13,6 +18,8 @@ fn mk_module(vis: u8) -> normalized::Module {
     };
     let m = CompiledModule {
         version: crate::file_format_common::VERSION_4,
+        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
+        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         module_handles: vec![
             // only self module
             ModuleHandle {

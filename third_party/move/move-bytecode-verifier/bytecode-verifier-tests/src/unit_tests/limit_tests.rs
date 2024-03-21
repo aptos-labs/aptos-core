@@ -1,7 +1,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::file_format::*;
+use move_binary_format::{
+    file_format::*,
+    file_format_common::{COMPILER_VERSION_MAJOR_DEFAULT, COMPILER_VERSION_MINOR_DEFAULT},
+};
 use move_bytecode_verifier::{
     limits::LimitsVerifier, verify_module_with_config_for_test, VerifierConfig,
 };
@@ -197,6 +200,8 @@ fn big_vec_unpacks() {
     };
     let module = CompiledModule {
         version: 5,
+        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
+        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),

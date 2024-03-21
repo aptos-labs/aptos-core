@@ -478,6 +478,10 @@ pub const VERSION_6: u32 = 6;
 /// + access specifiers (read/write set)
 pub const VERSION_7: u32 = 7;
 
+/// Version 8: changes compare to version 7
+/// place holder for next version
+pub const VERSION_8: u32 = 8;
+
 /// Mark which version is the default version
 pub const VERSION_DEFAULT: u32 = VERSION_6;
 
@@ -490,11 +494,32 @@ pub const VERSION_MAX: u32 = VERSION_7;
 ///
 /// This is currently set to VERSION_7, the next major version, and should be updated once
 /// this version is ready for production.
-pub const VERSION_NEXT: u32 = VERSION_7;
+pub const VERSION_NEXT: u32 = VERSION_8;
 
 // Mark which oldest version is supported.
 // TODO(#145): finish v4 compatibility; as of now, only metadata is implemented
 pub const VERSION_MIN: u32 = VERSION_5;
+
+/// The major version of Compiler V1
+pub const COMPILER_VERSION_MAJOR_1: u32 = 1;
+
+/// The major version of Compiler V2
+pub const COMPILER_VERSION_MAJOR_2: u32 = 2;
+
+/// The minor version of Compiler
+pub const COMPILER_VERSION_MINOR_0: u32 = 0;
+
+/// Mark which version is the default compiler major version
+pub const COMPILER_VERSION_MAJOR_DEFAULT: u32 = COMPILER_VERSION_MAJOR_1;
+
+/// Mark which version is the default compiler minor version
+pub const COMPILER_VERSION_MINOR_DEFAULT: u32 = COMPILER_VERSION_MINOR_0;
+
+/// Mark which version is the latest compiler major version
+pub const COMPILER_VERSION_MAJOR_MAX: u32 = COMPILER_VERSION_MAJOR_2;
+
+/// Mark which version is the latest compiler minor version
+pub const COMPILER_VERSION_MINOR_MAX: u32 = COMPILER_VERSION_MINOR_0;
 
 pub(crate) mod versioned_data {
     use crate::{errors::*, file_format_common::*};
