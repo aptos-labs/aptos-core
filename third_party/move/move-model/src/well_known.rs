@@ -10,7 +10,7 @@
 /// Function identifying the name of an attribute which declares an
 /// item to be part of test.
 pub fn is_test_only_attribute_name(s: &str) -> bool {
-    s == "test" || s == "test_only "
+    s == "test" || s == "test_only"
 }
 
 /// Function identifying the name of an attribute which declares an

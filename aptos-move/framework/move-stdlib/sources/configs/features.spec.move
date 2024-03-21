@@ -33,6 +33,10 @@ spec std::features {
     spec change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) {
         aborts_if signer::address_of(framework) != @std;
         // TODO(tengzhang): add functional spec
+        // TODO(#12526): undo declaring opaque once fixed
+        pragma opaque;
+        modifies global<Features>(@std);
+        modifies global<PendingFeatures>(@std);
     }
 
     spec fun spec_contains(features: vector<u8>, feature: u64): bool {

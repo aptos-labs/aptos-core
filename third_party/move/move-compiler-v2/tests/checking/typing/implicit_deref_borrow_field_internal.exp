@@ -10,10 +10,10 @@ module 0x2::X {
 module 0x2::M {
     use 0x2::X; // resolved as: 0x2::X
     private fun t0() {
-        select X::S.f(X::s());
+        select X::S.f<X::S>(X::s());
         {
           let s: &X::S = Borrow(Immutable)(X::s());
-          select X::S.f(s);
+          select X::S.f<&X::S>(s);
           Abort(0)
         }
     }

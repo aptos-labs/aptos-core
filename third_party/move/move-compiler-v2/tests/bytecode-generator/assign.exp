@@ -8,7 +8,7 @@ module 0x42::assign {
         g: assign::T,
     }
     private fun assign_field(s: &mut assign::S,f: u64) {
-        select assign::S.f(s) = f;
+        select assign::S.f<&mut assign::S>(s) = f;
         Tuple()
     }
     private fun assign_int(x: &mut u64) {

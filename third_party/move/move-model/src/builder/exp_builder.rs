@@ -2561,6 +2561,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.fresh_type_var_constr(loc.clone(), WideningOrder::RightToLeft, constraint);
                 let exp = self.translate_dotted(e.as_ref(), &ty, &ErrorMessageContext::General);
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
+                self.set_node_instantiation(id, vec![ty.clone()]);
                 let oper = if let Type::Struct(mid, sid, _inst) = self.subs.specialize(&ty) {
                     // Struct known at this point
                     Operation::Select(mid, sid, FieldId::new(field_name))

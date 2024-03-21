@@ -5,7 +5,7 @@
 //!
 //! Currently we can only derive for structs.
 //! For tuple structs, the derived join pair-wise joins each field;
-//! for structs with named fields, the derived join pair-wise joins each field without #[no_join] attribute.
+//! for structs with named fields, the derived join pair-wise joins each field without `#[no_join]` attribute.
 
 use proc_macro::TokenStream;
 use quote::{quote, ToTokens};

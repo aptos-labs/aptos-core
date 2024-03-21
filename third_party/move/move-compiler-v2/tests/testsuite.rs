@@ -5,8 +5,7 @@
 use codespan_reporting::{diagnostic::Severity, term::termcolor::Buffer};
 use log::debug;
 use move_compiler_v2::{
-    annotate_units, ast_simplifier, check_and_rewrite_pipeline, cyclic_instantiation_checker,
-    disassemble_compiled_units,
+    annotate_units, ast_simplifier, check_and_rewrite_pipeline, disassemble_compiled_units,
     env_pipeline::{
         lambda_lifter, lambda_lifter::LambdaLiftingOptions, rewrite_target::RewritingScope,
         spec_rewriter, EnvProcessorPipeline,
@@ -105,10 +104,6 @@ impl TestConfig {
         // Add the specification rewriter for testing here as well, even though it is not run
         // as part of regular compilation, but only as part of a prover run.
         env_pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
-
-        env_pipeline.add("recursive instantiation check", |env| {
-            cyclic_instantiation_checker::check_cyclic_instantiations(env)
-        });
 
         // Get path to allow path-specific test configuration
         let path = path.to_string_lossy();

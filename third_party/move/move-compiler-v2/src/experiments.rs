@@ -8,7 +8,7 @@
 ///
 /// Moreover, one can activate an experiment in a test source by using a
 /// comment as such in a unit test:
-/// ```
+/// ```text
 ///   // experiment: <name>
 /// ```
 /// This can be repeated an arbitrary number of times. The test will then be run for
