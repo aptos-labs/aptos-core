@@ -23,7 +23,7 @@ pub struct LocalFileStoreOperator {
 impl LocalFileStoreOperator {
     pub fn new(path: PathBuf, enable_compression: bool) -> Self {
         let storage_format = if enable_compression {
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         } else {
             StorageFormat::JsonBase64UncompressedProto
         };

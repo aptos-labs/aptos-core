@@ -34,7 +34,7 @@ impl Processor {
         enable_cache_compression: bool,
     ) -> Result<Self> {
         let cache_storage_format = if enable_cache_compression {
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         } else {
             StorageFormat::Base64UncompressedProto
         };
