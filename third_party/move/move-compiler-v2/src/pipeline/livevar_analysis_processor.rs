@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Implements a live-variable analysis processor, annotating lifetime information about locals.
-//! See also https://en.wikipedia.org/wiki/Live-variable_analysis
+//! See also <https://en.wikipedia.org/wiki/Live-variable_analysis>
 //!
 //! Prerequisite annotations: none
 //! Side effect: the `LiveVarAnnotation` will be added to the function target annotations.

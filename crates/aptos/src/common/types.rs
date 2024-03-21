@@ -679,8 +679,8 @@ pub struct HardwareWalletOptions {
 
     /// Index of your account in hardware wallet
     ///
-    /// This is the simpler version of derivation path e.g format - [0]
-    /// we will translate this index into [m/44'/637'/0'/0'/0]
+    /// This is the simpler version of derivation path e.g `format - [0]`
+    /// we will translate this index into `[m/44'/637'/0'/0'/0]`
     #[clap(long)]
     pub derivation_index: Option<String>,
 }
@@ -1068,7 +1068,7 @@ pub struct MovePackageDir {
 
     /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
-    /// See https://github.com/aptos-labs/aptos-core/issues/10335
+    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
 }

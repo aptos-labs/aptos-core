@@ -24,7 +24,7 @@ pub fn is_power_of_two(n: usize) -> bool {
 
 /// Hashes the specified `msg` and domain separation tag `dst` into a `Scalar` by computing a 512-bit
 /// number as SHA3-512(SHA3-512(dst) || msg) and reducing it modulo the order of the field.
-/// (Same design as in `curve25519-dalek` explained here https://crypto.stackexchange.com/questions/88002/how-to-map-output-of-hash-algorithm-to-a-finite-field)
+/// (Same design as in `curve25519-dalek` explained here <https://crypto.stackexchange.com/questions/88002/how-to-map-output-of-hash-algorithm-to-a-finite-field>)
 ///
 /// NOTE: Domain separation from other SHA3-512 calls in our system is left up to the caller.
 pub fn hash_to_scalar(msg: &[u8], dst: &[u8]) -> Scalar {
