@@ -64,20 +64,27 @@ impl From<ResponseError> for ErrorType {
 
 #[derive(Clone, Debug)]
 pub struct PeerState {
+    /// The data client configuration
+    data_client_config: Arc<AptosDataClientConfig>,
+
     /// The number of responses received from this peer (by data request label)
     received_responses_by_type: Arc<DashMap<String, u64>>,
+
     /// The number of requests sent to this peer (by data request label)
     sent_requests_by_type: Arc<DashMap<String, u64>>,
+
     /// The latest observed advertised data for this peer, or `None` if we
     /// haven't polled them yet.
     storage_summary: Option<StorageServerSummary>,
+
     /// For now, a simplified port of the original state-sync v1 scoring system.
     score: f64,
 }
 
-impl Default for PeerState {
-    fn default() -> Self {
+impl PeerState {
+    pub fn new(data_client_config: Arc<AptosDataClientConfig>) -> Self {
         Self {
+            data_client_config,
             received_responses_by_type: Arc::new(DashMap::new()),
             sent_requests_by_type: Arc::new(DashMap::new()),
             storage_summary: None,
@@ -143,6 +150,12 @@ impl PeerState {
 
     /// Returns true iff the peer is currently ignored
     fn is_ignored(&self) -> bool {
+        // Only ignore peers if the config allows it
+        if !self.data_client_config.ignore_low_score_peers {
+            return false;
+        }
+
+        // Otherwise, ignore peers with a low score
         self.score <= IGNORE_PEER_THRESHOLD
     }
 
@@ -312,7 +325,7 @@ impl PeerStates {
     pub fn update_summary(&self, peer: PeerNetworkId, storage_summary: StorageServerSummary) {
         self.peer_to_state
             .entry(peer)
-            .or_default()
+            .or_insert(PeerState::new(self.data_client_config.clone()))
             .update_storage_summary(storage_summary);
     }
 

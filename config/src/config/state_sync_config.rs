@@ -396,6 +396,8 @@ pub struct AptosDataClientConfig {
     pub data_poller_config: AptosDataPollerConfig,
     /// The aptos data multi-fetch config for the data client
     pub data_multi_fetch_config: AptosDataMultiFetchConfig,
+    /// Whether or not to ignore peers with low peer scores
+    pub ignore_low_score_peers: bool,
     /// The aptos latency filtering config for the data client
     pub latency_filtering_config: AptosLatencyFilteringConfig,
     /// The interval (milliseconds) at which to refresh the latency monitor
@@ -431,6 +433,7 @@ impl Default for AptosDataClientConfig {
         Self {
             data_poller_config: AptosDataPollerConfig::default(),
             data_multi_fetch_config: AptosDataMultiFetchConfig::default(),
+            ignore_low_score_peers: true,
             latency_filtering_config: AptosLatencyFilteringConfig::default(),
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
