@@ -150,6 +150,18 @@ impl HashValue {
         self.hash.to_vec()
     }
 
+    /// Dumps into a u64 vector.
+    pub fn to_u64_vec(&self) -> Vec<u64> {
+        self.to_vec()
+            .chunks_exact(8)
+            .map(|chunk| {
+                let mut array = [0u8; 8];
+                array.copy_from_slice(chunk);
+                u64::from_le_bytes(array)
+            })
+            .collect()
+    }
+
     /// Creates a zero-initialized instance.
     pub const fn zero() -> Self {
         HashValue {

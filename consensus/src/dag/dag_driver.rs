@@ -1,49 +1,53 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::{dag_store::DagStore, health::HealthBackoff, types::NodeCertificate};
-use crate::{
-    dag::{
-        shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet},
-        adapter::TLedgerInfoProvider,
-        dag_fetcher::TFetchRequester,
-        errors::DagDriverError,
-        observability::{
-            counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
-            logging::{LogEvent, LogSchema},
-            tracing::{observe_node, observe_round, NodeStage, RoundStage},
-        },
-        order_rule::OrderRule,
-        round_state::RoundState,
-        storage::DAGStorage,
-        types::{
-            CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
-            Extensions, Node, SignatureBuilder,
-        },
-        DAGRpcResult, RpcHandler,
-    },
-    payload_client::PayloadClient,
-};
+use std::{collections::HashSet, sync::Arc, time::Duration};
+
 use anyhow::{bail, ensure};
+use async_trait::async_trait;
+use futures::{
+    executor::block_on,
+    future::{Abortable, AbortHandle, join},
+};
+use futures_channel::oneshot;
+use tokio::sync::mpsc::Sender;
+use tokio_retry::strategy::ExponentialBackoff;
+
 use aptos_collections::BoundedVecDeque;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
-use aptos_crypto::hash::CryptoHash;
+// use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::Mutex;
 use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
 use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::{block_info::Round, epoch_state::EpochState};
 use aptos_validator_transaction_pool as vtxn_pool;
-use async_trait::async_trait;
-use futures::{
-    executor::block_on,
-    future::{join, AbortHandle, Abortable},
+
+use crate::{
+    dag::{
+        adapter::TLedgerInfoProvider,
+        dag_fetcher::TFetchRequester,
+        DAGRpcResult,
+        errors::DagDriverError,
+        observability::{
+            counters::{self, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
+            logging::{LogEvent, LogSchema},
+            tracing::{NodeStage, observe_node, observe_round, RoundStage},
+        },
+        order_rule::OrderRule,
+        round_state::RoundState,
+        RpcHandler,
+        shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet},
+        storage::DAGStorage, types::{
+            CertificateAckState, CertifiedAck, CertifiedNode, CertifiedNodeMessage, DAGMessage,
+            Extensions, Node, SignatureBuilder,
+        },
+    },
+    payload_client::PayloadClient,
 };
-use futures_channel::oneshot;
-use std::{collections::HashSet, sync::Arc, time::Duration};
-use tokio_retry::strategy::ExponentialBackoff;
-use tokio::sync::mpsc::Sender;
+
+use super::{dag_store::DagStore, health::HealthBackoff, types::NodeCertificate};
 
 pub(crate) struct DagDriver {
     dag_id: u8,
@@ -163,6 +167,39 @@ impl DagDriver {
         Ok(())
     }
 
+    pub fn get_payload_filter(&self) -> PayloadFilter {
+        let strong_links = self.get_strong_links();
+        let dag_reader = self.dag.read();
+        let highest_commit_round = self
+            .ledger_info_provider
+            .get_highest_committed_anchor_round(self.dag_id);
+        if strong_links.is_empty() {
+            PayloadFilter::Empty
+        } else {
+            PayloadFilter::from(
+                &dag_reader
+                    .reachable(
+                        strong_links.iter().map(|node| node.metadata()),
+                        Some(highest_commit_round.saturating_sub(self.window_size_config)),
+                        |_| true,
+                    )
+                    .map(|node_status| node_status.as_node().payload())
+                    .collect(),
+            )
+        }
+    }
+
+    fn get_strong_links(&self) -> Vec<NodeCertificate> {
+        self
+            .dag
+            .read()
+            .get_strong_links_for_round(self.round_state.current_round() - 1, &self.epoch_state.verifier)
+            .unwrap_or_else(|| {
+                assert_eq!(self.round_state.current_round(), 1, "Only expect empty strong links for round 1");
+                vec![]
+            })
+    }
+
     fn check_new_round(&self) {
         let (highest_strong_link_round, strong_links) = self.get_highest_strong_links_round();
 
@@ -219,38 +256,38 @@ impl DagDriver {
                     vec![]
                 });
 
-            if strong_links.is_empty() {
+            // if strong_links.is_empty() {
                 (
                     strong_links,
                     vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
                     PayloadFilter::Empty,
                 )
-            } else {
-                let highest_commit_round = self
-                    .ledger_info_provider
-                    .get_highest_committed_anchor_round();
+            // } else {
+            //     let highest_commit_round = self
+            //         .ledger_info_provider
+            //         .get_highest_committed_anchor_round();
 
-                let nodes = dag_reader
-                    .reachable(
-                        strong_links.iter().map(|node| node.metadata()),
-                        Some(highest_commit_round.saturating_sub(self.window_size_config)),
-                        |_| true,
-                    )
-                    .map(|node_status| node_status.as_node())
-                    .collect::<Vec<_>>();
+            // let nodes = dag_reader
+            //     .reachable(
+            //         strong_links.iter().map(|node| node.metadata()),
+            //         Some(highest_commit_round.saturating_sub(self.window_size_config)),
+            //         |_| true,
+            //     )
+            //     .map(|node_status| node_status.as_node())
+            //     .collect::<Vec<_>>();
+            //
+            // let payload_filter =
+            //     PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
+            // let validator_txn_hashes = nodes
+            //     .iter()
+            //     .flat_map(|node| node.validator_txns())
+            //     .map(|txn| txn.hash());
+            // let validator_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
+            //     HashSet::from_iter(validator_txn_hashes),
+            // );
 
-                let payload_filter =
-                    PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
-                let validator_txn_hashes = nodes
-                    .iter()
-                    .flat_map(|node| node.validator_txns())
-                    .map(|txn| txn.hash());
-                let validator_payload_filter = vtxn_pool::TransactionFilter::PendingTxnHashSet(
-                    HashSet::from_iter(validator_txn_hashes),
-                );
-
-                (strong_links, validator_payload_filter, payload_filter)
-            }
+            // (strong_links, validator_payload_filter, payload_filter)
+            // }
         };
 
         let (max_txns, max_size_bytes) = self

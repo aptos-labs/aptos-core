@@ -86,6 +86,16 @@ impl InMemDag {
             .max(&self.start_round)
     }
 
+
+    pub fn highest_round_nodes(&self) -> Vec<NodeCertificate> {
+        let highest_round = self.highest_round();
+        self
+            .get_round_iter(highest_round)
+            .map_or(Vec::new(), |node_status_iter| node_status_iter
+                .map(|node_status| node_status.as_node().clone().certificate())
+                .collect())
+    }
+
     /// The highest strong links round is either the highest round or the highest round - 1
     /// because we ensure all parents (strong links) exist for any nodes in the store
     pub fn highest_strong_links_round(&self, validator_verifier: &ValidatorVerifier) -> Round {
@@ -408,7 +418,7 @@ impl InMemDag {
         to_prune
     }
 
-    fn commit_callback(
+    pub(crate) fn commit_callback(
         &mut self,
         commit_round: Round,
     ) -> Option<BTreeMap<u64, Vec<Option<NodeStatus>>>> {

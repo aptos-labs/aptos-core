@@ -42,6 +42,7 @@ impl fmt::Display for SyncOutcome {
 }
 
 pub(super) struct StateSyncTrigger {
+    dag_id: u8,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     dag_store: Arc<DagStore>,
@@ -51,6 +52,7 @@ pub(super) struct StateSyncTrigger {
 
 impl StateSyncTrigger {
     pub(super) fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
         dag_store: Arc<DagStore>,
@@ -58,6 +60,7 @@ impl StateSyncTrigger {
         dag_window_size_config: Round,
     ) -> Self {
         Self {
+            dag_id,
             epoch_state,
             ledger_info_provider,
             dag_store,
@@ -110,7 +113,7 @@ impl StateSyncTrigger {
         // Note: ledger info round <= highest ordered round
         if self
             .ledger_info_provider
-            .get_highest_committed_anchor_round()
+            .get_highest_committed_anchor_round(self.dag_id)
             < ledger_info.commit_info().round()
             && self
                 .dag_store
@@ -131,7 +134,7 @@ impl StateSyncTrigger {
         if li.commit_info().round()
             <= self
                 .ledger_info_provider
-                .get_highest_committed_anchor_round()
+                .get_highest_committed_anchor_round(self.dag_id)
         {
             return false;
         }
@@ -148,7 +151,7 @@ impl StateSyncTrigger {
                 < li.commit_info().round()
             || self
                 .ledger_info_provider
-                .get_highest_committed_anchor_round()
+                .get_highest_committed_anchor_round(self.dag_id)
                 + 2 * self.dag_window_size_config
                 < li.commit_info().round()
     }

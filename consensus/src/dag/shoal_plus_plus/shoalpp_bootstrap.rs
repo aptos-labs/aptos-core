@@ -3,6 +3,7 @@
 
 
 use std::{sync::Arc, time::Duration};
+use arc_swap::ArcSwapOption;
 use futures_channel::mpsc::UnboundedSender;
 use futures_channel::oneshot;
 use tokio::sync::mpsc::{channel, Receiver};
@@ -12,14 +13,17 @@ use aptos_channels::aptos_channel;
 use aptos_channels::message_queues::QueueStyle;
 use aptos_config::config::DagConsensusConfig;
 use aptos_consensus_types::common::Author;
+use aptos_infallible::RwLock;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::epoch_state::EpochState;
 use aptos_types::on_chain_config::{DagConsensusConfigV1, Features, ValidatorTxnConfig};
 use aptos_types::validator_signer::ValidatorSigner;
 use crate::dag::{DagBootstrapper, DAGMessage, DAGRpcResult, ProofNotifier, TDAGNetworkSender};
+use crate::dag::adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider};
 use crate::dag::shoal_plus_plus::shoalpp_broadcast_sync::{BoltBroadcastSync, BroadcastSync};
 use crate::dag::shoal_plus_plus::shoalpp_handler::BoltHandler;
 use crate::dag::shoal_plus_plus::shoalpp_order_notifier::{ShoalppOrderNotifier};
+use crate::dag::shoal_plus_plus::shoalpp_payload_client::ShoalppPayloadClient;
 use crate::dag::shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet};
 use crate::dag::storage::DAGStorage;
 use crate::network::IncomingShoalppRequest;
@@ -27,6 +31,7 @@ use crate::payload_client::PayloadClient;
 use crate::payload_manager::PayloadManager;
 use crate::pipeline::buffer_manager::OrderedBlocks;
 use crate::pipeline::execution_client::TExecutionClient;
+
 
 
 pub struct ShoalppBootstrapper {
@@ -59,6 +64,22 @@ impl ShoalppBootstrapper {
         executor: BoundedExecutor,
         features: Features,
     ) -> Self {
+
+        let ledger_info_from_storage = storage
+            .get_latest_ledger_info()
+            .expect("latest ledger info must exist");
+        let (block_info, ledger_info) =
+            compute_initial_block_and_ledger_info(ledger_info_from_storage);
+
+        let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info, epoch_state.epoch)));
+
+        let mut dag_store_vec = Vec::new();
+        for _i in 0..3 {
+            // TDOO: consider changing  ArcSwapOption -> Mutex
+            dag_store_vec.push(Arc::new(ArcSwapOption::from(None)));
+        }
+
+        let shoalpp_payload_client = Arc::new(ShoalppPayloadClient::new(dag_store_vec.clone(), payload_client, ledger_info_provider.clone(), onchain_config.dag_ordering_causal_history_window as u64));
         let validators = epoch_state.verifier.get_ordered_account_addresses();
         let rb_config = config.rb_config.clone();
         // A backoff policy that starts at _base_*_factor_ ms and multiplies by _base_ each iteration.
@@ -95,7 +116,7 @@ impl ShoalppBootstrapper {
                 proof_notifier.clone(),
                 time_service.clone(),
                 payload_manager.clone(),
-                payload_client.clone(),
+                shoalpp_payload_client.clone(),
                 order_nodes_tx,
                 execution_client.clone(),
                 quorum_store_enabled,
@@ -104,15 +125,19 @@ impl ShoalppBootstrapper {
                 features.clone(),
                 rb.clone(),
                 broadcast_sender,
+                ledger_info_provider.clone(),
+                dag_store_vec[dag_id as usize].clone(),
             );
             dags.push(dag_bootstrapper);
         }
+
+        let shoalpp_order_notifier = ShoalppOrderNotifier::new(dag_store_vec, ordered_nodes_tx, receiver_ordered_nodes_vec, ledger_info_provider, epoch_state.clone(), block_info);
         Self {
             epoch_state,
             dags,
             receivers: receiver_vec,
             rb,
-            shoalpp_order_notifier: ShoalppOrderNotifier::new(ordered_nodes_tx, receiver_ordered_nodes_vec),
+            shoalpp_order_notifier,
         }
     }
 

@@ -18,7 +18,7 @@ use super::{
 };
 use crate::{
     dag::{
-        adapter::{compute_initial_block_and_ledger_info, LedgerInfoProvider},
+        adapter::{LedgerInfoProvider},
         anchor_election::{LeaderReputationAdapter, MetadataBackendAdapter},
         dag_state_sync::{SyncModeMessageHandler, SyncOutcome},
         observability::logging::{LogEvent, LogSchema},
@@ -32,7 +32,7 @@ use crate::{
     network::IncomingDAGRequest,
     payload_client::PayloadClient,
     payload_manager::PayloadManager,
-    pipeline::{buffer_manager::OrderedBlocks, execution_client::TExecutionClient},
+    pipeline::{execution_client::TExecutionClient},
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{
@@ -59,6 +59,7 @@ use futures_channel::{
     oneshot,
 };
 use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
+use arc_swap::ArcSwapOption;
 use tokio::{
     runtime::Handle,
     select,
@@ -66,15 +67,18 @@ use tokio::{
 };
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::mpsc::Sender;
+#[allow(unused_imports)]
 use tokio_retry::Action;
 use tokio_retry::strategy::ExponentialBackoff;
+use crate::dag::adapter::ShoalppOrderBlocksInfo;
 use crate::dag::shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet};
 
 #[derive(Clone)]
 struct BootstrapBaseState {
+    dag_id: u8,
     dag_store: Arc<DagStore>,
     order_rule: Arc<Mutex<OrderRule>>,
-    ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
+    // ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
     ordered_notifier: Arc<OrderedNotifierAdapter>,
     commit_history: Arc<dyn CommitHistory>,
 }
@@ -134,12 +138,9 @@ impl ActiveMode {
         info!(
             LogSchema::new(LogEvent::ActiveMode)
                 .round(self.base_state.dag_store.deref().read().highest_round()),
-            highest_committed_round = self
-                .base_state
+            highest_committed_round = bootstrapper
                 .ledger_info_provider
-                .get_latest_ledger_info()
-                .commit_info()
-                .round(),
+                .get_highest_committed_anchor_round(bootstrapper.dag_id),
             highest_ordered_round = self
                 .base_state
                 .dag_store
@@ -215,10 +216,9 @@ impl SyncMode {
                 .dag_ordering_causal_history_window as Round,
         );
 
-        let highest_committed_anchor_round = self
-            .base_state
+        let highest_committed_anchor_round = bootstrapper
             .ledger_info_provider
-            .get_highest_committed_anchor_round();
+            .get_highest_committed_anchor_round(self.base_state.dag_id);
 
         info!(
             LogSchema::new(LogEvent::SyncMode)
@@ -334,7 +334,8 @@ pub struct DagBootstrapper {
     time_service: aptos_time_service::TimeService,
     payload_manager: Arc<PayloadManager>,
     payload_client: Arc<dyn PayloadClient>,
-    ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+    // ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+    ordered_nodes_tx: UnboundedSender<ShoalppOrderBlocksInfo>,
     execution_client: Arc<dyn TExecutionClient>,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
@@ -342,6 +343,8 @@ pub struct DagBootstrapper {
     features: Features,
     rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
+    ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+    dag_store: Arc<ArcSwapOption<DagStore>>,
 }
 
 impl DagBootstrapper {
@@ -360,7 +363,8 @@ impl DagBootstrapper {
         time_service: aptos_time_service::TimeService,
         payload_manager: Arc<PayloadManager>,
         payload_client: Arc<dyn PayloadClient>,
-        ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+        // ordered_nodes_tx: UnboundedSender<OrderedBlocks>,
+        ordered_nodes_tx: UnboundedSender<ShoalppOrderBlocksInfo>,
         execution_client: Arc<dyn TExecutionClient>,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
@@ -368,6 +372,8 @@ impl DagBootstrapper {
         features: Features,
         rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
         broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
+        ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+        dag_store: Arc<ArcSwapOption<DagStore>>,
     ) -> Self {
         Self {
             dag_id,
@@ -390,7 +396,9 @@ impl DagBootstrapper {
             executor,
             features,
             rb,
-            broadcast_sender
+            broadcast_sender,
+            ledger_info_provider,
+            dag_store,
         }
     }
 
@@ -490,24 +498,23 @@ impl DagBootstrapper {
         commit_events: Option<Vec<CommitEvent>>,
         dag_window_size_config: u64,
     ) -> BootstrapBaseState {
-        let ledger_info_from_storage = self
-            .storage
-            .get_latest_ledger_info()
-            .expect("latest ledger info must exist");
-        let (parent_block_info, ledger_info) =
-            compute_initial_block_and_ledger_info(ledger_info_from_storage);
+        // let ledger_info_from_storage = self
+        //     .storage
+        //     .get_latest_ledger_info()
+        //     .expect("latest ledger info must exist");
+        // let (parent_block_info, ledger_info) =
+        //     compute_initial_block_and_ledger_info(ledger_info_from_storage);
 
-        let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
+        // let ledger_info_provider = Arc::new(RwLock::new(LedgerInfoProvider::new(ledger_info)));
 
-        let initial_ledger_info = ledger_info_provider
-            .get_latest_ledger_info()
-            .ledger_info()
-            .clone();
-        let commit_round = initial_ledger_info.round();
+        // let initial_ledger_info = ledger_info_provider
+        //     .get_latest_ledger_info()
+        //     .ledger_info()
+        //     .clone();
+        let commit_round = self.ledger_info_provider.get_highest_committed_anchor_round(self.dag_id);
         let initial_round = std::cmp::max(
             1,
-            initial_ledger_info
-                .round()
+            commit_round
                 .saturating_sub(dag_window_size_config),
         );
 
@@ -519,12 +526,15 @@ impl DagBootstrapper {
             dag_window_size_config,
         ));
 
+        self.dag_store.swap(Some(dag.clone()));
+
         let ordered_notifier = Arc::new(OrderedNotifierAdapter::new(
+            self.dag_id,
             self.ordered_nodes_tx.clone(),
             dag.clone(),
             self.epoch_state.clone(),
-            parent_block_info,
-            ledger_info_provider.clone(),
+            // parent_block_info,
+            self.ledger_info_provider.clone(),
         ));
 
         let order_rule = Arc::new(Mutex::new(OrderRule::new(
@@ -538,9 +548,10 @@ impl DagBootstrapper {
         )));
 
         BootstrapBaseState {
+            dag_id: self.dag_id,
             dag_store: dag,
             order_rule,
-            ledger_info_provider,
+            // ledger_info_provider,
             ordered_notifier,
             commit_history,
         }
@@ -555,16 +566,18 @@ impl DagBootstrapper {
         let round_state_config = self.config.round_state_config.clone();
 
         let BootstrapBaseState {
+            dag_id,
             dag_store,
-            ledger_info_provider,
+            // ledger_info_provider,
             order_rule,
             ordered_notifier,
             commit_history,
         } = base_state;
 
         let state_sync_trigger = StateSyncTrigger::new(
+            *dag_id,
             self.epoch_state.clone(),
-            ledger_info_provider.clone(),
+            self.ledger_info_provider.clone(),
             dag_store.clone(),
             self.proof_notifier.clone(),
             self.onchain_config.dag_ordering_causal_history_window as Round,
@@ -616,7 +629,7 @@ impl DagBootstrapper {
             self.storage.clone(),
             order_rule.clone(),
             fetch_requester.clone(),
-            ledger_info_provider.clone(),
+            self.ledger_info_provider.clone(),
             round_state,
             self.onchain_config.dag_ordering_causal_history_window as Round,
             self.config.node_payload_config.clone(),
@@ -715,11 +728,13 @@ pub(super) fn bootstrap_dag_for_test(
     execution_client: Arc<dyn TExecutionClient>,
     rb: Arc<ReliableBroadcast<DAGMessage, ExponentialBackoff, DAGRpcResult>>,
     broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
+    ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
+    dag_store: Arc<ArcSwapOption<DagStore>>,
 ) -> (
     JoinHandle<SyncOutcome>,
     JoinHandle<()>,
     aptos_channel::Sender<Author, IncomingDAGRequest>,
-    tokio::sync::mpsc::UnboundedReceiver<OrderedBlocks>,
+    tokio::sync::mpsc::UnboundedReceiver<ShoalppOrderBlocksInfo>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = tokio::sync::mpsc::unbounded_channel();
     let mut features = Features::default();
@@ -746,6 +761,8 @@ pub(super) fn bootstrap_dag_for_test(
         features,
         rb,
         broadcast_sender,
+        ledger_info_provider,
+        dag_store,
     );
 
     let (_base_state, handler, fetch_service) = bootstraper.full_bootstrap();

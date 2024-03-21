@@ -8,6 +8,7 @@ use std::time::Duration;
 
 pub struct BlockStage;
 
+#[allow(dead_code)]
 impl BlockStage {
     pub const COMMITTED: &'static str = "committed";
     pub const COMMIT_CERTIFIED: &'static str = "commit_certified";

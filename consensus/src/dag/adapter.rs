@@ -3,38 +3,37 @@
 
 use super::{
     dag_store::DagStore,
-    observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
+    // observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
 };
 use crate::{
-    block_storage::tracing::{observe_block, BlockStage},
+    // block_storage::tracing::{BlockStage},
     consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
-    counters::update_counters_for_committed_blocks,
+    // counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
-    pipeline::buffer_manager::OrderedBlocks,
+    // pipeline::buffer_manager::OrderedBlocks,
 };
 use anyhow::{anyhow, bail};
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
     block::Block,
-    common::{Author, Payload, Round},
-    pipelined_block::PipelinedBlock,
+    common::{Author, Round},
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
-use aptos_executor_types::StateComputeResult;
+// use aptos_executor_types::StateComputeResult;
 use aptos_infallible::RwLock;
 use aptos_logger::{error, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_config::NewBlockEvent,
-    aggregate_signature::AggregateSignature,
+    // aggregate_signature::AggregateSignature,
     block_info::BlockInfo,
     epoch_change::EpochChangeProof,
     epoch_state::EpochState,
-    ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
+    ledger_info::{LedgerInfoWithSignatures},
 };
 use async_trait::async_trait;
 use std::{
@@ -90,9 +89,9 @@ pub(crate) fn compute_initial_block_and_ledger_info(
 }
 
 pub(super) struct OrderedNotifierAdapter {
-    executor_channel: tokio::sync::mpsc::UnboundedSender<OrderedBlocks>,
+    dag_id: u8,
+    executor_channel: tokio::sync::mpsc::UnboundedSender<ShoalppOrderBlocksInfo>,
     dag: Arc<DagStore>,
-    parent_block_info: Arc<RwLock<BlockInfo>>,
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     block_ordered_ts: Arc<RwLock<BTreeMap<Round, Instant>>>,
@@ -100,16 +99,16 @@ pub(super) struct OrderedNotifierAdapter {
 
 impl OrderedNotifierAdapter {
     pub(super) fn new(
-        executor_channel: tokio::sync::mpsc::UnboundedSender<OrderedBlocks>,
+        dag_id: u8,
+        executor_channel: tokio::sync::mpsc::UnboundedSender<ShoalppOrderBlocksInfo>,
         dag: Arc<DagStore>,
         epoch_state: Arc<EpochState>,
-        parent_block_info: BlockInfo,
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     ) -> Self {
         Self {
+            dag_id,
             executor_channel,
             dag,
-            parent_block_info: Arc::new(RwLock::new(parent_block_info)),
             epoch_state,
             ledger_info_provider,
             block_ordered_ts: Arc::new(RwLock::new(BTreeMap::new())),
@@ -128,99 +127,35 @@ impl OrderedNotifierAdapter {
     }
 }
 
+pub struct ShoalppOrderBlocksInfo {
+    pub dag_id: u8,
+    pub ordered_nodes: Vec<Arc<CertifiedNode>>,
+    pub failed_author: Vec<(Round, Author)>,
+}
+
+impl ShoalppOrderBlocksInfo {
+    pub fn new(dag_id: u8,
+               ordered_nodes: Vec<Arc<CertifiedNode>>,
+               failed_author: Vec<(Round, Author)>,
+    ) -> Self {
+        Self {
+            dag_id,
+            ordered_nodes,
+            failed_author,
+        }
+    }
+}
+
 impl OrderedNotifier for OrderedNotifierAdapter {
     fn send_ordered_nodes(
         &self,
         ordered_nodes: Vec<Arc<CertifiedNode>>,
         failed_author: Vec<(Round, Author)>,
     ) {
-        let anchor = ordered_nodes.last().unwrap();
-        let epoch = anchor.epoch();
-        let round = anchor.round();
-        let timestamp = anchor.metadata().timestamp();
-        let author = *anchor.author();
-        let mut validator_txns = vec![];
-        let mut payload = Payload::empty(!anchor.payload().is_direct());
-        let mut node_digests = vec![];
-        for node in &ordered_nodes {
-            validator_txns.extend(node.validator_txns().clone());
-            payload.extend(node.payload().clone());
-            node_digests.push(node.digest());
-        }
-        let parent_block_id = self.parent_block_info.read().id();
-        // construct the bitvec that indicates which nodes present in the previous round in CommitEvent
-        let mut parents_bitvec = BitVec::with_num_bits(self.epoch_state.verifier.len() as u16);
-        for parent in anchor.parents().iter() {
-            if let Some(idx) = self
-                .epoch_state
-                .verifier
-                .address_to_validator_index()
-                .get(parent.metadata().author())
-            {
-                parents_bitvec.set(*idx as u16);
-            }
-        }
-        let parent_timestamp = self.parent_block_info.read().timestamp_usecs();
-        let block_timestamp = timestamp.max(parent_timestamp.checked_add(1).expect("must add"));
-
-        NUM_NODES_PER_BLOCK.observe(ordered_nodes.len() as f64);
-        let rounds_between = {
-            let lowest_round_node = ordered_nodes.first().map_or(0, |node| node.round());
-            round.saturating_sub(lowest_round_node)
-        };
-        NUM_ROUNDS_PER_BLOCK.observe((rounds_between + 1) as f64);
-
-        let block = PipelinedBlock::new(
-            Block::new_for_dag(
-                epoch,
-                round,
-                block_timestamp,
-                validator_txns,
-                payload,
-                author,
-                failed_author,
-                parent_block_id,
-                parents_bitvec,
-                node_digests,
-            ),
-            vec![],
-            StateComputeResult::new_dummy(),
-        );
-        let block_info = block.block_info();
-        let ledger_info_provider = self.ledger_info_provider.clone();
-        let dag = self.dag.clone();
-        *self.parent_block_info.write() = block_info.clone();
-
-        self.block_ordered_ts
-            .write()
-            .insert(block_info.round(), Instant::now());
-        let block_created_ts = self.block_ordered_ts.clone();
-
-        observe_block(block.block().timestamp_usecs(), BlockStage::ORDERED);
-
-        let blocks_to_send = OrderedBlocks {
-            ordered_blocks: vec![block],
-            ordered_proof: LedgerInfoWithSignatures::new(
-                LedgerInfo::new(block_info, anchor.digest()),
-                AggregateSignature::empty(),
-            ),
-            callback: Box::new(
-                move |committed_blocks: &[Arc<PipelinedBlock>],
-                      commit_decision: LedgerInfoWithSignatures| {
-                    block_created_ts
-                        .write()
-                        .retain(|&round, _| round > commit_decision.commit_info().round());
-                    dag.commit_callback(commit_decision.commit_info().round());
-                    ledger_info_provider
-                        .write()
-                        .notify_commit_proof(commit_decision);
-                    update_counters_for_committed_blocks(committed_blocks);
-                },
-            ),
-        };
+        let block_info = ShoalppOrderBlocksInfo::new(self.dag_id, ordered_nodes, failed_author);
         if self
             .executor_channel
-            .send(blocks_to_send)
+            .send(block_info)
             .is_err()
         {
             error!("[DAG] execution pipeline closed");
@@ -375,15 +310,21 @@ impl DAGStorage for StorageAdapter {
 pub(crate) trait TLedgerInfoProvider: Send + Sync {
     fn get_latest_ledger_info(&self) -> LedgerInfoWithSignatures;
 
-    fn get_highest_committed_anchor_round(&self) -> Round;
+    fn get_highest_committed_anchor_round(&self, dag_id: u8) -> Round;
 }
 
-pub(super) struct LedgerInfoProvider {
+pub struct LedgerInfoProvider {
     latest_ledger_info: LedgerInfoWithSignatures,
 }
 
 impl LedgerInfoProvider {
-    pub(super) fn new(latest_ledger_info: LedgerInfoWithSignatures) -> Self {
+    pub(super) fn new(mut latest_ledger_info: LedgerInfoWithSignatures, new_epoch: u64) -> Self {
+        let epoch = latest_ledger_info.ledger_info().epoch();
+        if new_epoch > epoch {
+            // TODO: verify it does what I think it does.
+            let committed_rounds = HashValue::new([0; HashValue::LENGTH]);
+            latest_ledger_info.set_consensus_data_hash(committed_rounds);
+        }
         Self { latest_ledger_info }
     }
 
@@ -397,7 +338,11 @@ impl TLedgerInfoProvider for RwLock<LedgerInfoProvider> {
         self.read().latest_ledger_info.clone()
     }
 
-    fn get_highest_committed_anchor_round(&self) -> Round {
-        self.read().latest_ledger_info.ledger_info().round()
+    fn get_highest_committed_anchor_round(&self, dag_id: u8) -> Round {
+        let committed_anchor_rounds = self
+            .read()
+            .latest_ledger_info
+            .get_highest_committed_rounds_for_bolt();
+        committed_anchor_rounds[dag_id as usize]
     }
 }
