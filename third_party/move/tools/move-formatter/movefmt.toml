@@ -1,0 +1,6 @@
+max_width = 90
+indent_size = 4
+hard_tabs = false
+tab_spaces = 4
+emit_mode = "NewFiles"
+verbose = "Normal"
