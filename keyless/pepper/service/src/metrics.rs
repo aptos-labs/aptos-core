@@ -10,6 +10,16 @@ use hyper::{
 use once_cell::sync::Lazy;
 use std::{convert::Infallible, net::SocketAddr};
 
+pub static JWK_FETCH_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "keyless_pepper_service_jwk_fetch_seconds",
+        "Seconds taken to process pepper requests by scheme and result.",
+        &["issuer", "succeeded"],
+        exponential_buckets(/*start=*/ 1e-9, /*factor=*/ 2.0, /*count=*/ 32).unwrap()
+    )
+    .unwrap()
+});
+
 pub static REQUEST_HANDLING_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "keyless_pepper_request_handling_seconds",
