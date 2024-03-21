@@ -1,9 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::{
-    proof_manager::ProofManager, tests::batch_store_test::batch_store_for_test,
-};
+use crate::quorum_store::proof_manager::ProofManager;
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
@@ -15,8 +13,7 @@ use futures::channel::oneshot;
 use std::collections::HashSet;
 
 fn create_proof_manager() -> ProofManager {
-    let batch_store = batch_store_for_test(5 * 1024 * 1024);
-    ProofManager::new(PeerId::random(), 10, 10, batch_store, true)
+    ProofManager::new(PeerId::random(), 10, 10)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
