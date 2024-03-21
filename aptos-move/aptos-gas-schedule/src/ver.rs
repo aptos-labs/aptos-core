@@ -30,7 +30,7 @@
 /// - V8
 ///   - Added BLS12-381 operations.
 /// - V7
-///   - Native support for exists<T>
+///   - Native support for `exists<T>`
 ///   - New formulae for storage fees based on fixed APT costs
 ///   - Lower gas price (other than the newly introduced storage fees) by upping the scaling factor
 /// - V6

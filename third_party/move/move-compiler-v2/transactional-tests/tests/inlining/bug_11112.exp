@@ -80,67 +80,65 @@ module cafe.vectors {
 
 test_for_each_mut() /* def_idx: 0 */ {
 L0:	loc0: vector<u64>
-L1:	loc1: u64
-L2:	loc2: &mut vector<u64>
+L1:	loc1: &mut vector<u64>
+L2:	loc2: u64
 L3:	loc3: u64
 L4:	loc4: u64
 L5:	loc5: &mut vector<u64>
 L6:	loc6: &mut u64
-L7:	loc7: u64
-L8:	loc8: u64
-L9:	loc9: vector<u64>
+L7:	loc7: vector<u64>
 B0:
 	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
 	1: StLoc[0](loc0: vector<u64>)
 	2: LdU64(2)
-	3: StLoc[1](loc1: u64)
-	4: MutBorrowLoc[0](loc0: vector<u64>)
-	5: StLoc[2](loc2: &mut vector<u64>)
-	6: LdU64(0)
+	3: MutBorrowLoc[0](loc0: vector<u64>)
+	4: StLoc[1](loc1: &mut vector<u64>)
+	5: LdU64(0)
+	6: StLoc[2](loc2: u64)
 	7: StLoc[3](loc3: u64)
 B1:
-	8: CopyLoc[2](loc2: &mut vector<u64>)
+	8: CopyLoc[1](loc1: &mut vector<u64>)
 	9: FreezeRef
 	10: VecLen(1)
 	11: StLoc[4](loc4: u64)
-	12: CopyLoc[3](loc3: u64)
+	12: CopyLoc[2](loc2: u64)
 	13: MoveLoc[4](loc4: u64)
 	14: Lt
 	15: BrFalse(38)
 B2:
-	16: CopyLoc[2](loc2: &mut vector<u64>)
+	16: CopyLoc[1](loc1: &mut vector<u64>)
 	17: StLoc[5](loc5: &mut vector<u64>)
 	18: MoveLoc[5](loc5: &mut vector<u64>)
-	19: CopyLoc[3](loc3: u64)
+	19: CopyLoc[2](loc2: u64)
 	20: VecMutBorrow(1)
 	21: StLoc[6](loc6: &mut u64)
-	22: CopyLoc[1](loc1: u64)
+	22: CopyLoc[3](loc3: u64)
 	23: MoveLoc[6](loc6: &mut u64)
 	24: WriteRef
 	25: LdU64(1)
-	26: StLoc[7](loc7: u64)
-	27: MoveLoc[1](loc1: u64)
-	28: MoveLoc[7](loc7: u64)
+	26: StLoc[4](loc4: u64)
+	27: MoveLoc[3](loc3: u64)
+	28: CopyLoc[4](loc4: u64)
 	29: Add
-	30: StLoc[1](loc1: u64)
+	30: StLoc[3](loc3: u64)
 	31: LdU64(1)
-	32: StLoc[8](loc8: u64)
-	33: MoveLoc[3](loc3: u64)
-	34: MoveLoc[8](loc8: u64)
+	32: StLoc[4](loc4: u64)
+	33: MoveLoc[2](loc2: u64)
+	34: CopyLoc[4](loc4: u64)
 	35: Add
-	36: StLoc[3](loc3: u64)
+	36: StLoc[2](loc2: u64)
 	37: Branch(41)
 B3:
-	38: MoveLoc[2](loc2: &mut vector<u64>)
+	38: MoveLoc[1](loc1: &mut vector<u64>)
 	39: Pop
 	40: Branch(42)
 B4:
 	41: Branch(8)
 B5:
 	42: LdConst[1](Vector(U64): [3, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0])
-	43: StLoc[9](loc9: vector<u64>)
+	43: StLoc[7](loc7: vector<u64>)
 	44: MoveLoc[0](loc0: vector<u64>)
-	45: MoveLoc[9](loc9: vector<u64>)
+	45: MoveLoc[7](loc7: vector<u64>)
 	46: Eq
 	47: BrFalse(49)
 B6:

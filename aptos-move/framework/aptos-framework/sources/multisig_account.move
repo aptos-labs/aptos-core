@@ -1317,7 +1317,7 @@ module aptos_framework::multisig_account {
     #[test_only]
     fun setup() {
         let framework_signer = &create_signer(@0x1);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             framework_signer, vector[features::get_multisig_accounts_feature(), features::get_multisig_v2_enhancement_feature()], vector[]);
         timestamp::set_time_has_started_for_testing(framework_signer);
         chain_id::initialize_for_test(framework_signer, 1);
@@ -1326,7 +1326,7 @@ module aptos_framework::multisig_account {
     #[test_only]
     fun setup_disabled() {
         let framework_signer = &create_signer(@0x1);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             framework_signer, vector[], vector[features::get_multisig_accounts_feature()]);
         timestamp::set_time_has_started_for_testing(framework_signer);
         chain_id::initialize_for_test(framework_signer, 1);

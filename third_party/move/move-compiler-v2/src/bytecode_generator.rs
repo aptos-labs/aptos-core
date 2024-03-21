@@ -5,7 +5,8 @@
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, TempIndex, Value},
+    ast::{Exp, ExpData, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
@@ -451,13 +452,18 @@ impl<'env> Generator<'env> {
                     self.error(*id, "missing enclosing loop statement")
                 }
             },
-            ExpData::SpecBlock(_, spec) => {
-                let (mut code, mut update_map) = self.context.generate_spec(&self.func_env, spec);
-                self.code.append(&mut code);
-                self.func_env
-                    .get_mut_spec()
-                    .update_map
-                    .append(&mut update_map)
+            ExpData::SpecBlock(id, spec) => {
+                // Map locals in spec to assigned temporaries.
+                let mut replacer = |id, target| {
+                    if let RewriteTarget::LocalVar(sym) = target {
+                        Some(ExpData::Temporary(id, self.find_local(id, sym)).into_exp())
+                    } else {
+                        None
+                    }
+                };
+                let (_, spec) = ExpRewriter::new(self.env(), &mut replacer)
+                    .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
+                self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             ExpData::Invoke(id, _, _) | ExpData::Lambda(id, _, _) => {
                 self.internal_error(*id, format!("not yet implemented: {:?}", exp))
@@ -1264,14 +1270,15 @@ impl<'env> Generator<'env> {
                     } else {
                         ReferenceKind::Mutable
                     };
-                    return self.gen_borrow_field_for_unpack_ref(id, str, arg, temps, ref_kind);
+                    self.gen_borrow_field_for_unpack_ref(id, str, arg, temps, ref_kind);
+                } else {
+                    self.emit_call(
+                        *id,
+                        temps,
+                        BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned()),
+                        vec![arg],
+                    );
                 }
-                self.emit_call(
-                    *id,
-                    temps,
-                    BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned()),
-                    vec![arg],
-                );
                 for (cont_id, cont_pat, cont_temp) in cont_assigns {
                     self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
                 }
@@ -1360,7 +1367,7 @@ impl<'env> Generator<'env> {
             .map(|p| p.0)
             .collect::<Vec<_>>();
         let mut rhs_vars = rhs
-            .used_temporaries(self.env())
+            .used_temporaries_with_types(self.env())
             .into_iter()
             .map(|t| param_symbols[t.0])
             .collect::<BTreeSet<_>>();

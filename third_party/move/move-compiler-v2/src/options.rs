@@ -59,6 +59,9 @@ pub struct Options {
     /// Note that the current value of this constant is "Wunused"
     #[clap(long = cli::WARN_UNUSED_FLAG, default_value="false")]
     pub warn_unused: bool,
+    /// Whether to compile everything, including dependencies.
+    #[clap(long)]
+    pub whole_program: bool,
 }
 
 impl Default for Options {

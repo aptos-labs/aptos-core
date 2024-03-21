@@ -9,7 +9,6 @@ spec aptos_framework::dkg {
         use std::signer;
         let aptos_framework_addr = signer::address_of(aptos_framework);
         aborts_if aptos_framework_addr != @aptos_framework;
-        aborts_if exists<DKGState>(@aptos_framework);
     }
 
     spec start(

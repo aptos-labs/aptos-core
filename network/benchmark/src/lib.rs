@@ -487,8 +487,8 @@ impl NetbenchSharedState {
         self.sent_pos = (self.sent_pos + 1) % self.sent.capacity();
     }
 
-    /// return the record for the request_counter, or {0, oldest send_micros}
-    /// Option<SendRecord> might seem like it would make sense, but we use the send_micros field to return the oldest known message time when we don't find a request_counter match.
+    /// return the record for the request_counter, or `{0, oldest send_micros}`
+    /// `Option<SendRecord>` might seem like it would make sense, but we use the send_micros field to return the oldest known message time when we don't find a request_counter match.
     pub fn find(&self, request_counter: u64) -> SendRecord {
         if self.sent.is_empty() {
             return SendRecord {

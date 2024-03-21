@@ -8,7 +8,7 @@ use datatest_stable::Requirements;
 use itertools::Itertools;
 use log::{info, warn};
 use move_command_line_common::{env::read_env_var, testing::EXP_EXT};
-use move_prover::{cli::Options, run_move_prover};
+use move_prover::{cli::Options, run_move_prover, run_move_prover_v2};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use once_cell::sync::OnceCell;
 use std::{
@@ -39,6 +39,8 @@ struct Feature {
     enable_in_ci: bool,
     /// Whether this feature has as a separate baseline file.
     separate_baseline: bool,
+    /// Whether the run the v2 compiler tool chain
+    v2: bool,
     /// A static function pointer to the runner to be used for datatest. Since datatest
     /// does not support function values and closures, we need to have a different runner for
     /// each feature
@@ -71,7 +73,20 @@ fn get_features() -> &'static [Feature] {
                 enable_in_ci: true,
                 only_if_requested: false,
                 separate_baseline: false,
+                v2: false,
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("default")),
+                enabling_condition: |_, _| true,
+            },
+            // Tests the default configuration with the v2 compiler chain
+            Feature {
+                name: "v2",
+                flags: &[],
+                inclusion_mode: InclusionMode::Implicit,
+                enable_in_ci: true,
+                only_if_requested: false,
+                separate_baseline: true, // different traces in .exp file
+                v2: true,
+                runner: |p| test_runner_for_feature(p, get_feature_by_name("v2")),
                 enabling_condition: |_, _| true,
             },
             // Tests with cvc5 as a backend for boogie.
@@ -82,6 +97,7 @@ fn get_features() -> &'static [Feature] {
                 enable_in_ci: false, // Do not enable in CI until we have more data about stability
                 only_if_requested: true, // Only run if requested
                 separate_baseline: false,
+                v2: false,
                 runner: |p| test_runner_for_feature(p, get_feature_by_name("cvc5")),
                 enabling_condition: |group, _| group == "unit",
             },
@@ -150,7 +166,12 @@ fn test_runner_for_feature(path: &Path, feature: &Feature) -> datatest_stable::R
     options.backend.stable_test_output = true;
 
     let mut error_writer = Buffer::no_color();
-    let mut diags = match run_move_prover(&mut error_writer, options) {
+    let result = if feature.v2 {
+        run_move_prover_v2(&mut error_writer, options)
+    } else {
+        run_move_prover(&mut error_writer, options)
+    };
+    let mut diags = match result {
         Ok(()) => "".to_string(),
         Err(err) => format!("Move prover returns: {}\n", err),
     };

@@ -2,12 +2,12 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module defines error types used by [`AptosDB`](crate::AptosDB).
+//! This module defines error types used by `AptosDB`.
 use aptos_types::state_store::errors::StateviewError;
 use std::sync::mpsc::RecvError;
 use thiserror::Error;
 
-/// This enum defines errors commonly used among [`AptosDB`](crate::AptosDB) APIs.
+/// This enum defines errors commonly used among `AptosDB` APIs.
 #[derive(Debug, Error)]
 pub enum AptosDbError {
     /// A requested item is not found.

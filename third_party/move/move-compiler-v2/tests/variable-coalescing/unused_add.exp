@@ -1,0 +1,109 @@
+
+Diagnostics:
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+  ┌─ tests/variable-coalescing/unused_add.move:5:13
+  │
+5 │         let z = x + y;
+  │             ^
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t1 := 1
+  1: $t0 := infer($t1)
+  2: $t3 := 2
+  3: $t2 := infer($t3)
+  4: $t5 := +($t0, $t2)
+  5: $t4 := infer($t5)
+  6: return ()
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars:
+     # events: b:$t1
+  0: $t1 := 1
+     # live vars: $t1
+     # events: e:$t1, b:$t0
+  1: $t0 := move($t1)
+     # live vars: $t0
+     # events: b:$t3
+  2: $t3 := 2
+     # live vars: $t0, $t3
+     # events: e:$t3, b:$t2
+  3: $t2 := move($t3)
+     # live vars: $t0, $t2
+     # events: e:$t0, e:$t2, b:$t5
+  4: $t5 := +($t0, $t2)
+     # live vars: $t5
+     # events: e:$t5
+  5: $t4 := move($t5)
+     # live vars:
+  6: return ()
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64 [unused]
+  0: $t1 := 1
+  1: $t1 := move($t1)
+  2: $t3 := 2
+  3: $t3 := move($t3)
+  4: $t1 := +($t1, $t3)
+  5: $t4 := move($t1)
+  6: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+  0: $t1 := 1
+  1: $t3 := 2
+  2: $t1 := +($t1, $t3)
+  3: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+public test() /* def_idx: 0 */ {
+B0:
+	0: LdU64(1)
+	1: LdU64(2)
+	2: Add
+	3: Pop
+	4: Ret
+}
+}

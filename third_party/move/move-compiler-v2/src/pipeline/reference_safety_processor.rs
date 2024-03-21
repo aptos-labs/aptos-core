@@ -3,6 +3,8 @@
 
 //! Implements memory safety analysis.
 //!
+//! Prerequisite: livevar annotation is available by performing liveness analysis.
+//!
 //! This is an intra functional, forward-directed data flow analysis over the domain
 //! of what we call a *borrow graph*. The borrow graph tracks the creation of references from
 //! root memory locations and derivation of other references, by recording an edge for each
@@ -12,7 +14,7 @@
 //! in `r1` and `&s.f` stored in `r2` (edges in the graph should be read as arrows pointing
 //! downwards):
 //!
-//! ```ignore
+//! ```text
 //!              s
 //!              | &
 //!          .g / \ .f
@@ -24,7 +26,7 @@
 //! we call an _implicit choice_, that is the choice between alternatives is down
 //! after a borrow step:
 //!
-//! ```ignore
+//! ```text
 //!              s
 //!           & / \ &
 //!          .g |  | .f
@@ -34,7 +36,7 @@
 //! In general, the graph is a DAG. Joining of nodes represents branching in the code. For
 //! example, the graph below depicts that `r` can either be `&s.f` or `&s.g`:
 //!
-//! ```ignore
+//! ```text
 //!              s
 //!           & / \ &
 //!          .g \ / .f
@@ -70,7 +72,7 @@
 //! after some non-empty common prefix, and do not have a common node where they join again. Here is
 //! an example of two paths with diverging edges:
 //!
-//! ```ignore
+//! ```text
 //!              s
 //!        &mut / \ &mut
 //!      call f |  | call g
@@ -81,7 +83,7 @@
 //! join again. Notice that this is a result of different execution paths from code
 //! like `let r = if (c) f(&mut s) else g(&mut s)`:
 //!
-//! ```ignore
+//! ```text
 //!              s
 //!        &mut / \ &mut
 //!      call f |  | call g
@@ -992,7 +994,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// To effectively check the path-oriented conditions of safety here, we need to deal with the fact
     /// that graphs have non-explicit choice nodes, for example:
     ///
-    /// ```ignore
+    /// ```text
     ///                 s
     ///            &mut /\ &mut
     ///             .f /  \ .g
@@ -1012,7 +1014,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     fn check_borrow_safety(&mut self, temps_vec: &[TempIndex]) {
         // First check direct duplicates
         for (i, temp) in temps_vec.iter().enumerate() {
-            if temps_vec[i + 1..].contains(temp) {
+            if self.ty(*temp).is_mutable_reference() && temps_vec[i + 1..].contains(temp) {
                 self.exclusive_access_direct_dup_error(*temp)
             }
         }
@@ -1318,9 +1320,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         let mut infos = vec![];
         for (temp, _) in cands {
             if let Some(info) = self.alive.after.get(&temp) {
-                for loc in &info.usages {
+                for loc in info.usage_locations().into_iter() {
                     infos.push((
-                        loc.clone(),
+                        loc,
                         format!(
                             "conflicting reference{} used here",
                             self.display_name_or_empty(" ", temp)

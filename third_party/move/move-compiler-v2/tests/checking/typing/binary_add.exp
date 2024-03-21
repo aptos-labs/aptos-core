@@ -13,8 +13,8 @@ module 0x8675309::M {
         1;
         1;
         Add<u64>(Copy(x), Move(x));
-        Add<u64>(select M::R.f(r), select M::R.f(r));
-        Add<u64>(Add<u64>(Add<u64>(1, select M::R.f(r)), select M::R.f(r)), 0);
+        Add<u64>(select M::R.f<M::R>(r), select M::R.f<M::R>(r));
+        Add<u64>(Add<u64>(Add<u64>(1, select M::R.f<M::R>(r)), select M::R.f<M::R>(r)), 0);
         {
           let M::R{ f: _ }: M::R = r;
           Tuple()

@@ -19,7 +19,7 @@ module 0x42::borrow {
     }
     private fun field(s: &borrow::S): u64 {
         {
-          let r: &u64 = Borrow(Immutable)(select borrow::S.f(s));
+          let r: &u64 = Borrow(Immutable)(select borrow::S.f<&borrow::S>(s));
           Deref(r)
         }
     }
@@ -37,7 +37,7 @@ module 0x42::borrow {
     }
     private fun mut_field(s: &mut borrow::S): u64 {
         {
-          let r: &mut u64 = Borrow(Mutable)(select borrow::S.f(s));
+          let r: &mut u64 = Borrow(Mutable)(select borrow::S.f<&mut borrow::S>(s));
           r = 22;
           Deref(r)
         }

@@ -200,6 +200,17 @@ impl AggV2TestHarness {
         result
     }
 
+    pub fn run_block(&mut self, txn_block: Vec<SignedTransaction>) -> Vec<TransactionOutput> {
+        let result = self.harness.run_block_get_output(txn_block.clone());
+
+        for (h, name) in self.comparison_harnesses.iter_mut() {
+            let new_result = h.run_block_get_output(txn_block.clone());
+            assert_outputs_equal(&result, "baseline", &new_result, name);
+        }
+
+        result
+    }
+
     pub fn initialize_issuer_accounts(&mut self, num_accounts: usize) {
         self.txn_accounts = (0..num_accounts)
             .map(|_i| self.new_account_with_key_pair())

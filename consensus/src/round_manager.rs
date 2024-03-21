@@ -1137,6 +1137,11 @@ impl RoundManager {
                         }
                     };
                     proposals.sort_by_key(get_round);
+                    // If the first proposal is not for the next round, we only process the last proposal.
+                    // to avoid going through block retrieval of many garbage collected rounds.
+                    if self.round_state.current_round() + 1 < get_round(&proposals[0]) {
+                        proposals = vec![proposals.pop().unwrap()];
+                    }
                     for proposal in proposals {
                         let result = match proposal {
                             VerifiedEvent::ProposalMsg(proposal_msg) => {

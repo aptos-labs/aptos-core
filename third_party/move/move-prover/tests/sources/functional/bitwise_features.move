@@ -1,4 +1,5 @@
 // exclude_for: cvc5
+/* TODO(#12501): this has legit verification failures in v2 which are missing in v1 */
 address 0x123 {
 
 module TestFeatures {
@@ -12,7 +13,7 @@ module TestFeatures {
     }
 
     spec Features {
-        pragma bv=b"0";
+        pragma bv = b"0";
     }
 
     /// Helper to check whether a feature flag is enabled.
@@ -23,7 +24,7 @@ module TestFeatures {
     }
 
     spec contains {
-        pragma bv=b"0";
+        pragma bv = b"0";
         pragma opaque;
         aborts_if false;
         ensures result == ((feature / 8) < len(features) && spec_contains(features, feature));
@@ -51,7 +52,7 @@ module TestFeatures {
 
         let byte_index = feature / 8;
         let bit_mask = 1 << ((feature % 8) as u8);
-        while({
+        while ({
             spec {
                 invariant n == len(features);
                 invariant n >= old_n;
@@ -73,7 +74,7 @@ module TestFeatures {
     }
 
     spec set {
-        pragma bv=b"0";
+        pragma bv = b"0";
         pragma timeout = 120;
         aborts_if false;
         ensures feature / 8 < len(features);
@@ -87,7 +88,7 @@ module TestFeatures {
     acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
         if (!exists<Features>(@std)) {
-            move_to<Features>(framework, Features{features: vector[]})
+            move_to<Features>(framework, Features { features: vector[] })
         };
         let features = &mut borrow_global_mut<Features>(@std).features;
         let i = 0;
@@ -112,7 +113,7 @@ module TestFeatures {
 
     spec fun spec_compute_feature_flag(features: vector<u8>, feature: u64): u8 {
         ((int2bv((((1 as u8) << ((feature % (8 as u64)) as u64)) as u8)) as u8)
-            & features[feature/8] as u8)
+            & features[feature / 8] as u8)
     }
 
     spec fun spec_contains(features: vector<u8>, feature: u64): bool {
@@ -176,6 +177,5 @@ module TestFeatures {
         let post features = global<Features>(@std).features;
         ensures forall i in 0..len(enable): (enable[i] / 8 < len(features) && spec_contains(features, enable[i]));
     }
-
 }
 }
