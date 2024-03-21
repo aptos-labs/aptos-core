@@ -196,7 +196,7 @@ assertion fails the unit test will fail.
 <details>
 <summary>Advanced concepts and exercises</summary>
 
-* There are a number of [test-related annotations](https://github.com/move-language/move/blob/main/language/changes/4-unit-testing#testing-annotations-their-meaning-and-usage) that are worth exploring.
+* There are a number of [test-related annotations](https://aptos.dev/move/book/unit-testing#testing-annotations-their-meaning-and-usage) that are worth exploring.
   You'll see some of these used in Step 5.
 
 #### Exercises
