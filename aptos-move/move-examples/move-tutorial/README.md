@@ -233,7 +233,7 @@ assertion fails the unit test will fail.
 In this section, we are going to design a module implementing a basic coin and balance interface, where coins can
 be minted and transferred between balances held under different addresses. 
 
-> NOTE: The coin and balance interfaces are for illustration of Move concepts only. Aptos uses a different, richer [coin type](https://github.com/aptos-labs/aptos-core/blob/main/aptos-move/framework/aptos-framework/doc/coin#0x1_coin) contained in the Aptos framework.
+> NOTE: The coin and balance interfaces are for illustration of Move concepts only. Aptos uses a different, richer [coin type](https://aptos.dev/reference/move?branch=mainnet&page=aptos-framework/doc/coin.md) contained in the Aptos framework.
 
 The signatures of the public Move function are the following:
 
