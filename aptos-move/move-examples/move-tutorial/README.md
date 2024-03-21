@@ -27,7 +27,7 @@ Now let's get started!
 
 ## Step 0: Preparation
 
-You should obtain a copy of the content of the directory in which this `README.md` resides. One way to achieve this is to clone [the Aptos core repository](https://github.com/aptos-labs/aptos-core) and navigate to the [`aptos-move/move-examples/move-tutorial.md`](..) directory. Subsequently, we assume you have a local copy of this directory and all paths are relative to this. To check that you have the right contents, run the `cd` and `ls` commands below to ensure the `move-tutorial` directory has the relevant subdirectories:
+You should obtain a copy of the content of the directory in which this `README.md` resides. One way to achieve this is to clone [the Aptos core repository](https://github.com/aptos-labs/aptos-core) and navigate to the [`aptos-move/move-examples/move-tutorial`](..) directory. Subsequently, we assume you have a local copy of this directory and all paths are relative to this. To check that you have the right contents, run the `cd` and `ls` commands below to ensure the `move-tutorial` directory has the relevant subdirectories:
 
 ```shell
 > cd move-tutorial
