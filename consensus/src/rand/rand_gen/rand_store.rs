@@ -15,7 +15,7 @@ use aptos_types::randomness::{RandMetadata, Randomness};
 use itertools::Either;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
+const FUTURE_ROUNDS_TO_ACCEPT: u64 = 20;
 
 pub struct ShareAggregator<S> {
     author: Author,
