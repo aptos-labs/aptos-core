@@ -266,6 +266,9 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [transaction_context_fee_payer_base: InternalGas, "transaction_context.fee_payer.base", 735],
         [transaction_context_max_gas_amount_base: InternalGas, "transaction_context.max_gas_amount.base", 735],
         [transaction_context_gas_unit_price_base: InternalGas, "transaction_context.gas_unit_price.base", 735],
+        [transaction_context_chain_id_base: InternalGas, "transaction_context.chain_id.base", 735],
+        [transaction_context_entry_function_payload_base: InternalGas, "transaction_context.entry_function_payload.base", 735],
+        [transaction_context_entry_function_payload_per_byte_in_str: InternalGasPerByte, "transaction_context.entry_function_payload.per_abstract_memory_unit", 18],
 
         [code_request_publish_base: InternalGas, "code.request_publish.base", 1838],
         [code_request_publish_per_byte: InternalGasPerByte, "code.request_publish.per_byte", 7],

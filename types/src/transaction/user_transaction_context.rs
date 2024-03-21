@@ -11,6 +11,7 @@ pub struct UserTransactionContext {
     max_gas_amount: u64,
     gas_unit_price: u64,
     chain_id: u8,
+    entry_function_payload: Option<EntryFunctionPayload>,
 }
 
 impl UserTransactionContext {
@@ -21,6 +22,7 @@ impl UserTransactionContext {
         max_gas_amount: u64,
         gas_unit_price: u64,
         chain_id: u8,
+        entry_function_payload: Option<EntryFunctionPayload>,
     ) -> Self {
         Self {
             sender,
@@ -29,6 +31,7 @@ impl UserTransactionContext {
             max_gas_amount,
             gas_unit_price,
             chain_id,
+            entry_function_payload,
         }
     }
 
@@ -54,5 +57,35 @@ impl UserTransactionContext {
 
     pub fn chain_id(&self) -> u8 {
         self.chain_id
+    }
+
+    pub fn entry_function_payload(&self) -> Option<EntryFunctionPayload> {
+        self.entry_function_payload.clone()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EntryFunctionPayload {
+    pub account_address: AccountAddress,
+    pub module_name: String,
+    pub function_name: String,
+    pub ty_arg_names: Vec<String>,
+    pub args: Vec<Vec<u8>>,
+}
+impl EntryFunctionPayload {
+    pub fn new(
+        account_address: AccountAddress,
+        module_name: String,
+        function_name: String,
+        ty_arg_names: Vec<String>,
+        args: Vec<Vec<u8>>,
+    ) -> Self {
+        Self {
+            account_address,
+            module_name,
+            function_name,
+            ty_arg_names,
+            args,
+        }
     }
 }

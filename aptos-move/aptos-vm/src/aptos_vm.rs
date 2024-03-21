@@ -760,11 +760,10 @@ impl AptosVM {
             let module_id = traversal_context
                 .referenced_module_ids
                 .alloc(entry_fn.module().clone());
-            session.check_dependencies_and_charge_gas(
-                gas_meter,
-                traversal_context,
-                [(module_id.address(), module_id.name())],
-            )?;
+            session.check_dependencies_and_charge_gas(gas_meter, traversal_context, [(
+                module_id.address(),
+                module_id.name(),
+            )])?;
         }
 
         let (function, is_friend_or_private) = session.load_function_and_is_friend_or_private_def(

@@ -1,5 +1,10 @@
 module admin::transaction_context_test {
+    use std::option;
     use std::signer;
+    use std::string::{Self, String};
+    use std::vector;
+    use aptos_std::from_bcs;
+    use aptos_std::type_info;
     use aptos_framework::transaction_context;
 
     /// Since tests in e2e-move-tests/ can only call entry functions which don't have return values, we must store
@@ -12,6 +17,11 @@ module admin::transaction_context_test {
         max_gas_amount: u64,
         gas_unit_price: u64,
         chain_id: u8,
+        account_address: address,
+        module_name: String,
+        function_name: String,
+        type_arg_names: vector<String>,
+        args: vector<vector<u8>>,
     }
 
     /// Called when the module is first deployed at address `signer`, which is supposed to be @admin (= 0x1).
@@ -26,6 +36,11 @@ module admin::transaction_context_test {
                 max_gas_amount: 0,
                 gas_unit_price: 0,
                 chain_id: 0,
+                account_address: @0x0,
+                module_name: string::utf8(x""),
+                function_name: string::utf8(x""),
+                args: vector[],
+                type_arg_names: vector[],
             }
         );
     }
@@ -63,5 +78,24 @@ module admin::transaction_context_test {
     public entry fun store_chain_id_from_native_txn_context(_s: &signer) acquires TransactionContextStore {
         let store = borrow_global_mut<TransactionContextStore>(@admin);
         store.chain_id =  transaction_context::chain_id();
+    }
+
+    entry fun store_entry_function_payload_from_native_txn_context<T1, T2, T3>(_s: &signer, arg0: u64, arg1: bool) acquires TransactionContextStore {
+        let store = borrow_global_mut<TransactionContextStore>(@admin);
+        let payload_opt = transaction_context::entry_function_payload();
+        if (option::is_some(&payload_opt)) {
+            let payload = option::borrow(&payload_opt);
+            store.account_address = transaction_context::account_address(payload);
+            store.module_name = transaction_context::module_name(payload);
+            store.function_name = transaction_context::function_name(payload);
+            store.type_arg_names = transaction_context::type_arg_names(payload);
+            store.args = transaction_context::args(payload);
+
+            // Check that the arguments are correct and can be parsed using `from_bcs`.
+            assert!(arg0 == from_bcs::to_u64(*vector::borrow(&store.args, 0)), 11);
+            assert!(arg1 == from_bcs::to_bool(*vector::borrow(&store.args, 1)), 12);
+            // Check that the type argument names are correct and matched to `type_info::type_name`.
+            assert!(store.type_arg_names == vector[type_info::type_name<T1>(), type_info::type_name<T2>(), type_info::type_name<T3>()], 13);
+        }
     }
 }

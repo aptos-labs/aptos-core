@@ -1,6 +1,8 @@
 module aptos_framework::transaction_context {
     use std::error;
     use std::features;
+    use std::option::Option;
+    use std::string::String;
 
     /// Transaction context is not available outside of the transaction prologue, execution, or epilogue phases.
     const ETRANSACTION_CONTEXT_NOT_AVAILABLE: u64 = 1;
@@ -106,6 +108,52 @@ module aptos_framework::transaction_context {
         chain_id_internal()
     }
 
+    struct EntryFunctionPayload has copy, drop {
+        account_address: address,
+        module_name: String,
+        function_name: String,
+        ty_args_names: vector<String>,
+        args: vector<vector<u8>>,
+    }
+
+    /// Return the chain ID specified for the current transaction.
+    /// This function aborts if called outside of the transaction prologue, execution, or epilogue phases.
+    native fun entry_function_payload_internal(): Option<EntryFunctionPayload>;
+    public fun entry_function_payload(): Option<EntryFunctionPayload> {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        entry_function_payload_internal()
+    }
+
+    /// Return the account address of the entry function payload.
+    public fun account_address(payload: &EntryFunctionPayload): address {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload.account_address
+    }
+
+    /// Return the module name of the entry function payload.
+    public fun module_name(payload: &EntryFunctionPayload): String {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload.module_name
+    }
+
+    /// Return the function name of the entry function payload.
+    public fun function_name(payload: &EntryFunctionPayload): String {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload.function_name
+    }
+
+    /// Return the type arguments names of the entry function payload.
+    public fun type_arg_names(payload: &EntryFunctionPayload): vector<String> {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload.ty_args_names
+    }
+
+    /// Return the arguments of the entry function payload.
+    public fun args(payload: &EntryFunctionPayload): vector<vector<u8>> {
+        assert!(features::transaction_context_extension_enabled(), error::invalid_state(ETRANSACTION_CONTEXT_EXTENSION_NOT_ENABLED));
+        payload.args
+    }
+
     #[test(fx = @std)]
     fun test_auid_uniquess(fx: signer) {
         use std::features;
@@ -172,5 +220,12 @@ module aptos_framework::transaction_context {
     fun test_call_chain_id() {
         // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
         let _chain_id = chain_id();
+    }
+
+    #[test]
+    #[expected_failure(abort_code=196609, location = Self)]
+    fun test_call_entry_function_payload() {
+        // expected to fail with the error code of `invalid_state(E_TRANSACTION_CONTEXT_NOT_AVAILABLE)`
+        let _entry_fun = entry_function_payload();
     }
 }

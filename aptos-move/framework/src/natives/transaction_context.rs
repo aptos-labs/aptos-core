@@ -12,9 +12,15 @@ use aptos_types::{
     },
 };
 use better_any::{Tid, TidAble};
-use move_core_types::{account_address::AccountAddress, gas_algebra::NumArgs};
+use move_core_types::{
+    account_address::AccountAddress,
+    gas_algebra::{NumArgs, NumBytes},
+};
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{
+    loaded_data::runtime_types::Type,
+    values::{Struct, Value},
+};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
@@ -225,11 +231,94 @@ fn native_chain_id_internal(
     mut _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    context.charge(TRANSACTION_CONTEXT_GAS_UNIT_PRICE_BASE)?;
+    context.charge(TRANSACTION_CONTEXT_CHAIN_ID_BASE)?;
 
     let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
     if let Some(transaction_context) = user_transaction_context_opt {
         Ok(smallvec![Value::u8(transaction_context.chain_id())])
+    } else {
+        Err(SafeNativeError::Abort {
+            abort_code: error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+        })
+    }
+}
+
+fn create_option_some_value(value: Value) -> Value {
+    Value::struct_(Struct::pack(vec![create_singleton_vector(value)]))
+}
+
+fn create_option_none() -> Value {
+    Value::struct_(Struct::pack(vec![create_empty_vector()]))
+}
+
+fn create_string_value(s: String) -> Value {
+    Value::struct_(Struct::pack(vec![Value::vector_u8(s.as_bytes().to_vec())]))
+}
+
+fn create_vector_value(vv: Vec<Value>) -> Value {
+    Value::vector_for_testing_only(vv)
+}
+
+fn create_singleton_vector(v: Value) -> Value {
+    create_vector_value(vec![v])
+}
+
+fn create_empty_vector() -> Value {
+    create_vector_value(vec![])
+}
+
+fn native_entry_function_payload_internal(
+    context: &mut SafeNativeContext,
+    mut _ty_args: Vec<Type>,
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_ENTRY_FUNCTION_PAYLOAD_BASE)?;
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+
+    if let Some(transaction_context) = user_transaction_context_opt {
+        if let Some(entry_function_payload) = transaction_context.entry_function_payload() {
+            let num_bytes = entry_function_payload.account_address.len()
+                + entry_function_payload.module_name.len()
+                + entry_function_payload.function_name.len()
+                + entry_function_payload
+                    .ty_arg_names
+                    .iter()
+                    .map(|s| s.len())
+                    .sum::<usize>()
+                + entry_function_payload
+                    .args
+                    .iter()
+                    .map(|v| v.len())
+                    .sum::<usize>();
+            context.charge(
+                TRANSACTION_CONTEXT_ENTRY_FUNCTION_PAYLOAD_PER_BYTE_IN_STR
+                    * NumBytes::new(num_bytes as u64),
+            )?;
+
+            let args = entry_function_payload
+                .args
+                .iter()
+                .map(|arg| Value::vector_u8(arg.clone()))
+                .collect::<Vec<_>>();
+
+            let ty_args = entry_function_payload
+                .ty_arg_names
+                .iter()
+                .map(|ty_arg| create_string_value(ty_arg.clone()))
+                .collect::<Vec<_>>();
+
+            let payload = Value::struct_(Struct::pack(vec![
+                Value::address(entry_function_payload.account_address),
+                create_string_value(entry_function_payload.module_name),
+                create_string_value(entry_function_payload.function_name),
+                create_vector_value(ty_args),
+                create_vector_value(args),
+            ]));
+            Ok(smallvec![create_option_some_value(payload)])
+        } else {
+            Ok(smallvec![create_option_none()])
+        }
     } else {
         Err(SafeNativeError::Abort {
             abort_code: error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
@@ -266,6 +355,10 @@ pub fn make_all(
         ("max_gas_amount_internal", native_max_gas_amount_internal),
         ("gas_unit_price_internal", native_gas_unit_price_internal),
         ("chain_id_internal", native_chain_id_internal),
+        (
+            "entry_function_payload_internal",
+            native_entry_function_payload_internal,
+        ),
     ];
 
     builder.make_named_natives(natives)
