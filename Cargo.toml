@@ -441,6 +441,7 @@ aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
+aes-gcm = "0.10.3"
 nalgebra = "0.32"
 float-cmp = "0.9.0"
 again = "0.1.2"

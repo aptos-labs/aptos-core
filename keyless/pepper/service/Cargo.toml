@@ -13,7 +13,9 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aes-gcm = { workspace = true }
 anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
 aptos-types = { workspace = true }
 ark-bls12-381 = { workspace = true }

@@ -1,8 +1,13 @@
 // Copyright © Aptos Foundation
 
-use aptos_crypto::ed25519::Ed25519PublicKey;
+use aptos_crypto::{
+    asymmetric_encryption::{
+        elgamal_curve25519_aes256_gcm::ElGamalCurve25519Aes256Gcm, AsymmetricEncryption,
+    },
+    ed25519::Ed25519PublicKey,
+};
 use aptos_keyless_pepper_common::{
-    jwt, vuf, vuf::VUF, PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey,
+    jwt, vuf, vuf::VUF, PepperInput, PepperRequestV1, PepperResponseV1, PepperV0VufPubKey,
 };
 use aptos_types::{
     keyless::{test_utils::get_sample_esk, Configuration, OpenIdSig},
@@ -68,8 +73,8 @@ async fn main() {
     println!("Starting an interaction with aptos-oidb-pepper-service.");
     let url = get_pepper_service_url();
     println!();
-    let vuf_pub_key_url = format!("{url}/v0/vuf-pub-key");
-    let fetch_url = format!("{url}/v0/fetch");
+    let vuf_pub_key_url = format!("{url}/v1/vuf-pub-key");
+    let fetch_url = format!("{url}/v1/fetch");
     println!();
     println!(
         "Action 1: fetch its verification key with a GET request to {}",
@@ -136,12 +141,13 @@ async fn main() {
         Err(_) => jwt_or_path,
     };
 
-    let pepper_request = PepperRequest {
+    let pepper_request = PepperRequestV1 {
         jwt: jwt.clone(),
         epk,
         exp_date_secs: epk_expiry_time_secs,
         uid_key: None,
         epk_blinder: blinder.to_vec(),
+        aud_override: None,
     };
     println!();
     println!(
@@ -156,13 +162,17 @@ async fn main() {
         .await
         .unwrap();
     assert_eq!(StatusCode::OK, raw_response.status());
-    let pepper_response = raw_response.json::<PepperResponse>().await.unwrap();
+    let pepper_response = raw_response.json::<PepperResponseV1>().await.unwrap();
     println!();
     println!(
         "pepper_service_response={}",
         serde_json::to_string_pretty(&pepper_response).unwrap()
     );
-    let PepperResponse { signature: pepper } = pepper_response;
+    let PepperResponseV1 {
+        signature_encrypted,
+    } = pepper_response;
+    let esk_scalar = esk.derive_scalar();
+    let pepper = ElGamalCurve25519Aes256Gcm::dec(&esk_scalar, &signature_encrypted).unwrap();
     println!();
     println!("pepper={:?}", pepper);
     let claims = jwt::parse(jwt.as_str()).unwrap();

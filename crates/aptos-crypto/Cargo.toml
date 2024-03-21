@@ -13,6 +13,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
+aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 ark-bn254 = { workspace = true }
@@ -48,6 +49,7 @@ serde-name = { workspace = true }
 serde_bytes = { workspace = true }
 sha2 = { workspace = true }
 sha2_0_10_6 = { workspace = true }
+sha3 = { workspace = true }
 signature = { workspace = true }
 static_assertions = { workspace = true }
 thiserror = { workspace = true }
@@ -67,7 +69,6 @@ criterion = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 serde_json = { workspace = true }
-sha3 = { workspace = true }
 trybuild = { workspace = true }
 
 [features]
