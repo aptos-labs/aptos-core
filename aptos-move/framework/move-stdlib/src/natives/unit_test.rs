@@ -36,7 +36,7 @@ fn native_create_signers_for_testing(
 
     let num_signers = safely_pop_arg!(args, u64);
 
-    let signers = Value::vector_for_testing_only(
+    let signers = Value::vector_value(
         (0..num_signers).map(|i| Value::signer(AccountAddress::new(to_le_bytes(i)))),
     );
 

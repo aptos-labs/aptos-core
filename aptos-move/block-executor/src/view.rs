@@ -2412,7 +2412,7 @@ mod test {
     }
 
     fn create_vector_value(inner: Vec<Value>) -> Value {
-        Value::vector_for_testing_only(inner)
+        Value::vector_value(inner)
     }
 
     fn create_state_value(value: &Value, layout: &MoveTypeLayout) -> StateValue {
@@ -2561,7 +2561,7 @@ mod test {
             "The counter should have been updated to 9"
         );
         let patched_value =
-            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+            Value::struct_(Struct::pack(vec![Value::vector_value(vec![
                 Value::struct_(Struct::pack(vec![
                     Value::u64(DelayedFieldID::new_with_width(6, 8).as_u64()),
                     Value::u64(50),
@@ -2627,7 +2627,7 @@ mod test {
             "The counter should have been updated to 12"
         );
         let patched_value =
-            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+            Value::struct_(Struct::pack(vec![Value::vector_value(vec![
                 create_snapshot_value(Value::u128(
                     DelayedFieldID::new_with_width(9, 16).as_u64() as u128
                 )),
@@ -2689,7 +2689,7 @@ mod test {
         );
 
         let patched_value =
-            Value::struct_(Struct::pack(vec![Value::vector_for_testing_only(vec![
+            Value::struct_(Struct::pack(vec![Value::vector_value(vec![
                 DelayedFieldID::new_with_width(12, 60)
                     .into_derived_string_struct()
                     .unwrap(),

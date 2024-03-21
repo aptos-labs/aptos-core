@@ -108,7 +108,7 @@ mod test {
         let x = Value::delayed_value(DelayedFieldID::from(1));
         let y = Value::delayed_value(DelayedFieldID::from(2));
         let z = Value::delayed_value(DelayedFieldID::from(3));
-        let d = Value::vector_for_testing_only(vec![x, y, z]);
+        let d = Value::vector_value(vec![x, y, z]);
 
         let e = Value::struct_(Struct::pack(vec![c, d]));
 
