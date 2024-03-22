@@ -3028,7 +3028,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Inserts the freeze operation when `exp` is a tuple expression
     fn freeze_tuple_exp(&self, lhs_tys: &Vec<Type>, rhs_tys: &Vec<Type>, exp: &mut Exp, loc: &Loc) {
         let mut new_exp = exp.clone().into();
-        if lhs_tys.len() != rhs_tys.len() {
+        if lhs_tys.len() != rhs_tys.len() || lhs_tys.eq(rhs_tys) {
             return;
         }
         let mut new_rhs = vec![];

@@ -390,19 +390,17 @@ impl<'env> Generator<'env> {
 
                 // For the case: `fun f(p: &mut S) { *(p :&S) =... },
                 // we need to check whether p (with explicit type annotation) is an immutable ref
-                if lhs_type.is_immutable_reference()
-                    || !self.temp_type(lhs_temp).is_mutable_reference()
-                {
-                    let err_type = if lhs_type.is_immutable_reference() {
-                        &lhs_type
-                    } else {
-                        self.temp_type(lhs_temp)
-                    };
+                let source_type = if lhs_type.is_immutable_reference() {
+                    &lhs_type
+                } else {
+                    self.temp_type(lhs_temp)
+                };
+                if !source_type.is_mutable_reference() {
                     self.error(
                         lhs.node_id(),
                         format!(
                             "expected `&mut` but found `{}`",
-                            err_type.display(&self.func_env.get_type_display_ctx()),
+                            source_type.display(&self.func_env.get_type_display_ctx()),
                         ),
                     );
                 }
@@ -1119,21 +1117,20 @@ impl<'env> Generator<'env> {
 
         // If we are in reference mode and a &mut is requested, the operand also needs to be
         // &mut.
+        let source_type = if oper_type.is_immutable_reference() {
+            &oper_type // To check the corner case `&mut x...; (x:&T). = ...`, we need this condition
+        } else {
+            self.temp_type(oper_temp)
+        };
         if self.reference_mode()
             && self.reference_mode_kind == ReferenceKind::Mutable
-            && (oper_type.is_immutable_reference() // To check the corner case `&mut x...; (x:&T). = ...`, we need this condition
-                || !self.temp_type(oper_temp).is_mutable_reference())
+            && !source_type.is_mutable_reference()
         {
-            let err_type = if oper_type.is_immutable_reference() {
-                &oper_type
-            } else {
-                self.temp_type(oper_temp)
-            };
             self.error(
                 oper.node_id(),
                 format!(
                     "expected `&mut` but found `{}`",
-                    err_type.display(&self.func_env.get_type_display_ctx())
+                    source_type.display(&self.func_env.get_type_display_ctx())
                 ),
             )
         }
