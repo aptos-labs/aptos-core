@@ -38,7 +38,9 @@ struct TestConfig {
     runner: fn(&Path) -> datatest_stable::Result<()>,
     /// Path substring for tests to include.
     include: Vec<&'static str>,
-    /// Path substring for tests to exclude.
+    /// Path substring for tests to exclude. The set of tests included is that
+    /// which match any of the include strings and do _not_ match ony of
+    /// the exclude strings.
     exclude: Vec<&'static str>,
     /// If set, a suffix for the baseline file used for these tests.
     /// If None, uses `exp`
@@ -74,7 +76,7 @@ enum StopAfter {
     BytecodeGen,
     /// Stop after bytecode pipeline runs to end (None) or to given processor.
     BytecodePipeline(Option<&'static str>),
-    /// Run to the end, including file format generation
+    /// Run to the end, including file format generation and bytecode verification
     FileFormat,
 }
 
@@ -456,7 +458,7 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     logging::setup_logging_for_testing();
     let path_str = path.display().to_string();
     let mut options = config.options.clone();
-    options.warn_unused = path_str.contains("unused");
+    options.warn_unused = path_str.contains("/unused/");
     options.sources = extract_test_directives(path, "// dep:")?;
     options.sources.push(path_str.clone());
     options.dependencies = vec![path_from_crate_root("../move-stdlib/sources")];

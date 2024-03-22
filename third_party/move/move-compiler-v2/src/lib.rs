@@ -371,6 +371,8 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
     }
 
     if options.experiment_on(Experiment::SPEC_CHECK) {
+        // Specification language checks are not done by the v1 compiler, so this
+        // will always run.
         env_pipeline.add("specification checker", |env| {
             let env: &GlobalEnv = env;
             spec_checker::run_spec_checker(env)
@@ -378,6 +380,7 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
     }
 
     if options.experiment_on(Experiment::SPEC_REWRITE) {
+        // Same as above for spec-check.
         env_pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
     }
 
