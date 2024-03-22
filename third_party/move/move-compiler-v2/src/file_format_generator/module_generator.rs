@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::file_format_generator::{
@@ -11,10 +10,10 @@ use crate::file_format_generator::{
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::{
     file_format as FF,
-    file_format::{FunctionHandle, ModuleHandle, TableIndex},
+    file_format::{FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
     file_format_common,
 };
-use move_bytecode_source_map::source_map::SourceMap;
+use move_bytecode_source_map::source_map::{SourceMap, SourceName};
 use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_ir_types::ast as IR_AST;
 use move_model::{
@@ -85,6 +84,10 @@ pub struct ModuleContext<'env> {
     /// A holder for function target data, containing stackless bytecode.
     pub targets: &'env FunctionTargetsHolder,
 }
+
+/// Source map operations deliver Result but are really not expected to fail.
+/// The below message is used if they do anyway.
+pub(crate) const SOURCE_MAP_OK: &str = "expected valid source map";
 
 impl ModuleGenerator {
     /// Runs generation of `CompiledModule`.
@@ -165,12 +168,30 @@ impl ModuleGenerator {
             return;
         }
         let loc = &struct_env.get_loc();
+        let def_idx = StructDefinitionIndex::new(ctx.checked_bound(
+            loc,
+            self.module.struct_defs.len(),
+            MAX_STRUCT_DEF_COUNT,
+            "struct",
+        ));
+        self.source_map
+            .add_top_level_struct_mapping(def_idx, ctx.env.to_ir_loc(loc))
+            .expect(SOURCE_MAP_OK);
+        for TypeParameter(name, _, loc) in struct_env.get_type_parameters() {
+            self.source_map
+                .add_struct_type_parameter_mapping(def_idx, ctx.source_name(name, loc))
+                .expect(SOURCE_MAP_OK);
+        }
         let struct_handle = self.struct_index(ctx, loc, struct_env);
+        let fields = struct_env.get_fields();
         let field_information = FF::StructFieldInformation::Declared(
-            struct_env
-                .get_fields()
+            fields
                 .map(|f| {
-                    let name = self.name_index(ctx, loc, f.get_name());
+                    let field_loc = f.get_loc();
+                    self.source_map
+                        .add_struct_field_mapping(def_idx, ctx.env.to_ir_loc(field_loc))
+                        .expect(SOURCE_MAP_OK);
+                    let name = self.name_index(ctx, field_loc, f.get_name());
                     let signature =
                         FF::TypeSignature(self.signature_token(ctx, loc, &f.get_type()));
                     FF::FieldDefinition { name, signature }
@@ -181,13 +202,7 @@ impl ModuleGenerator {
             struct_handle,
             field_information,
         };
-        ctx.checked_bound(
-            loc,
-            self.module.struct_defs.len(),
-            MAX_STRUCT_DEF_COUNT,
-            "struct",
-        );
-        self.module.struct_defs.push(def);
+        self.module.struct_defs.push(def)
     }
 
     /// Obtains or creates an index for a signature, a sequence of types.
@@ -846,5 +861,13 @@ impl<'env> ModuleContext<'env> {
             }
         }
         result
+    }
+
+    /// Converts to a name with location as expected by the SourceMap format.
+    pub(crate) fn source_name(&self, name: impl AsRef<Symbol>, loc: impl AsRef<Loc>) -> SourceName {
+        (
+            name.as_ref().display(self.env.symbol_pool()).to_string(),
+            self.env.to_ir_loc(loc.as_ref()),
+        )
     }
 }

@@ -5,7 +5,8 @@
 use codespan_reporting::diagnostic::Severity;
 use ethnum::U256;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, TempIndex, Value},
+    ast::{Exp, ExpData, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
+    exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
@@ -21,7 +22,7 @@ use move_stackless_bytecode::{
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
 use num::ToPrimitive;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 // ======================================================================================
 // Entry
@@ -254,7 +255,7 @@ impl<'env> Generator<'env> {
             self.label_counter += 1;
             Label::new(n as usize)
         } else {
-            self.internal_error(id, "too many labels");
+            self.internal_error(id, format!("too many labels: {}", self.label_counter));
             Label::new(0)
         }
     }
@@ -262,7 +263,13 @@ impl<'env> Generator<'env> {
     /// Require unary target.
     fn require_unary_target(&mut self, id: NodeId, target: Vec<TempIndex>) -> TempIndex {
         if target.len() != 1 {
-            self.internal_error(id, "inconsistent expression target arity");
+            self.internal_error(
+                id,
+                format!(
+                    "inconsistent expression target arity: {} and 1",
+                    target.len()
+                ),
+            );
             0
         } else {
             target[0]
@@ -273,7 +280,13 @@ impl<'env> Generator<'env> {
     /// interning.
     fn require_unary_arg(&self, id: NodeId, args: &[Exp]) -> Exp {
         if args.len() != 1 {
-            self.internal_error(id, "inconsistent expression argument arity");
+            self.internal_error(
+                id,
+                format!(
+                    "inconsistent expression argument arity: {} and 1",
+                    args.len()
+                ),
+            );
             ExpData::Invalid(self.env().new_node_id()).into_exp()
         } else {
             args[0].to_owned()
@@ -439,13 +452,18 @@ impl<'env> Generator<'env> {
                     self.error(*id, "missing enclosing loop statement")
                 }
             },
-            ExpData::SpecBlock(_, spec) => {
-                let (mut code, mut update_map) = self.context.generate_spec(&self.func_env, spec);
-                self.code.append(&mut code);
-                self.func_env
-                    .get_mut_spec()
-                    .update_map
-                    .append(&mut update_map)
+            ExpData::SpecBlock(id, spec) => {
+                // Map locals in spec to assigned temporaries.
+                let mut replacer = |id, target| {
+                    if let RewriteTarget::LocalVar(sym) = target {
+                        Some(ExpData::Temporary(id, self.find_local(id, sym)).into_exp())
+                    } else {
+                        None
+                    }
+                };
+                let (_, spec) = ExpRewriter::new(self.env(), &mut replacer)
+                    .rewrite_spec_descent(&SpecBlockTarget::Inline, spec);
+                self.emit_with(*id, |attr| Bytecode::SpecBlock(attr, spec));
             },
             ExpData::Invoke(id, _, _) | ExpData::Lambda(id, _, _) => {
                 self.internal_error(*id, format!("not yet implemented: {:?}", exp))
@@ -501,6 +519,18 @@ impl<'env> Generator<'env> {
             Value::Bool(x) => Constant::Bool(*x),
             Value::ByteArray(x) => Constant::ByteArray(x.clone()),
             Value::AddressArray(x) => Constant::AddressArray(x.clone()),
+            Value::Tuple(x) => {
+                if let Some(inner_ty) = ty.get_vector_element_type() {
+                    Constant::Vector(
+                        x.iter()
+                            .map(|v| self.to_constant(id, inner_ty.clone(), v))
+                            .collect(),
+                    )
+                } else {
+                    self.internal_error(id, format!("inconsistent tuple type: {:?}", ty));
+                    Constant::Bool(false)
+                }
+            },
             Value::Vector(x) => {
                 if let Some(inner_ty) = ty.get_vector_element_type() {
                     Constant::Vector(
@@ -546,7 +576,14 @@ impl<'env> Generator<'env> {
             Operation::Freeze => self.gen_op_call(targets, id, BytecodeOperation::FreezeRef, args),
             Operation::Tuple => {
                 if targets.len() != args.len() {
-                    self.internal_error(id, "inconsistent tuple arity")
+                    self.internal_error(
+                        id,
+                        format!(
+                            "inconsistent tuple arity: {} and {}",
+                            targets.len(),
+                            args.len()
+                        ),
+                    )
                 } else {
                     for (target, arg) in targets.into_iter().zip(args.iter()) {
                         self.gen(vec![target], arg)
@@ -687,6 +724,8 @@ impl<'env> Generator<'env> {
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
 
             Operation::NoOp => {}, // do nothing
+
+            Operation::Closure(..) => self.internal_error(id, "closure not yet implemented"),
 
             // Non-supported specification related operations
             Operation::Exists(Some(_))
@@ -1132,8 +1171,20 @@ impl<'env> Generator<'env> {
                 if args.len() != pats.len() {
                     // Type checker should have complained already
                     self.internal_error(id, "inconsistent tuple arity")
+                } else if args.len() != 1 && self.have_overlapping_vars(pats, exp) {
+                    // We want to simulate the semantics for "simultaneous" assignment with
+                    // overlapping variables, eg., `(x, y) = (y, x)`.
+                    // To do so, we save each tuple arg (from rhs) into a temporary.
+                    // Then, point-wise assign the temporaries.
+                    let temps = args
+                        .iter()
+                        .map(|exp| self.gen_escape_auto_ref_arg(exp, true))
+                        .collect::<Vec<_>>();
+                    for (pat, temp) in pats.iter().zip(temps.into_iter()) {
+                        self.gen_assign_from_temp(id, pat, temp, next_scope)
+                    }
                 } else {
-                    // Map this to point-wise assignment
+                    // No overlap, or a 1-tuple: just do point-wise assignment.
                     for (pat, exp) in pats.iter().zip(args.iter()) {
                         self.gen_assign(id, pat, exp, next_scope)
                     }
@@ -1150,6 +1201,48 @@ impl<'env> Generator<'env> {
         }
     }
 
+    /// Generate borrow_field when unpacking a reference to a struct
+    // e.g. `let s = &S; let (a, b, c) = &s`, a, b, and c are references
+    fn gen_borrow_field_for_unpack_ref(
+        &mut self,
+        id: &NodeId,
+        str: &QualifiedInstId<StructId>,
+        arg: TempIndex,
+        temps: Vec<TempIndex>,
+        ref_kind: ReferenceKind,
+    ) {
+        let struct_env = self.env().get_struct(str.to_qualified_id());
+        let mut temp_to_field_offsets = BTreeMap::new();
+        for (field, input_temp) in struct_env.get_fields().zip(temps.clone()) {
+            temp_to_field_offsets.insert(input_temp, field.get_offset());
+        }
+        for (temp, field_offset) in temp_to_field_offsets {
+            self.with_reference_mode(|s, entering| {
+                if entering {
+                    s.reference_mode_kind = ref_kind
+                }
+                if !s.temp_type(temp).is_reference() {
+                    s.env().diag(
+                        Severity::Bug,
+                        &s.env().get_node_loc(*id),
+                        "Unpacking a reference to a struct must return the references of fields",
+                    );
+                }
+                s.emit_call(
+                    *id,
+                    vec![temp],
+                    BytecodeOperation::BorrowField(
+                        str.module_id,
+                        str.id,
+                        str.inst.to_owned(),
+                        field_offset,
+                    ),
+                    vec![arg],
+                );
+            });
+        }
+    }
+
     fn gen_assign_from_temp(
         &mut self,
         id: NodeId,
@@ -1160,6 +1253,7 @@ impl<'env> Generator<'env> {
         match pat {
             Pattern::Wildcard(_) => {
                 // Nothing to do
+                // TODO(#12475) Should we copy to a temp here?
             },
             Pattern::Var(var_id, sym) => {
                 let local = self.find_local_for_pattern(*var_id, *sym, next_scope);
@@ -1169,12 +1263,22 @@ impl<'env> Generator<'env> {
             },
             Pattern::Struct(id, str, args) => {
                 let (temps, cont_assigns) = self.flatten_patterns(args, next_scope);
-                self.emit_call(
-                    *id,
-                    temps,
-                    BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned()),
-                    vec![arg],
-                );
+                let ty = self.temp_type(arg);
+                if ty.is_reference() {
+                    let ref_kind = if ty.is_immutable_reference() {
+                        ReferenceKind::Immutable
+                    } else {
+                        ReferenceKind::Mutable
+                    };
+                    self.gen_borrow_field_for_unpack_ref(id, str, arg, temps, ref_kind);
+                } else {
+                    self.emit_call(
+                        *id,
+                        temps,
+                        BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned()),
+                        vec![arg],
+                    );
+                }
                 for (cont_id, cont_pat, cont_temp) in cont_assigns {
                     self.gen_assign_from_temp(cont_id, &cont_pat, cont_temp, next_scope)
                 }
@@ -1246,6 +1350,29 @@ impl<'env> Generator<'env> {
         } else {
             self.find_local(id, sym)
         }
+    }
+
+    // Do the variables in `lhs` and `rhs` overlap?
+    fn have_overlapping_vars(&self, lhs: &[Pattern], rhs: &Exp) -> bool {
+        let lhs_vars = lhs
+            .iter()
+            .flat_map(|p| p.vars().into_iter().map(|t| t.1))
+            .collect::<BTreeSet<_>>();
+        // Compute the rhs expression's free locals and params used.
+        // We can likely just use free variables in the expression once #12317 is addressed.
+        let param_symbols = self
+            .func_env
+            .get_parameters()
+            .into_iter()
+            .map(|p| p.0)
+            .collect::<Vec<_>>();
+        let mut rhs_vars = rhs
+            .used_temporaries_with_types(self.env())
+            .into_iter()
+            .map(|t| param_symbols[t.0])
+            .collect::<BTreeSet<_>>();
+        rhs_vars.append(&mut rhs.free_vars());
+        lhs_vars.intersection(&rhs_vars).next().is_some()
     }
 }
 

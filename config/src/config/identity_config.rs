@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{config::SecureBackend, keys::ConfigKey};
+use anyhow::anyhow;
 use aptos_crypto::{
     bls12381,
     ed25519::Ed25519PrivateKey,
     x25519::{self, PRIVATE_KEY_SIZE},
     ValidCryptoMaterial,
 };
-use aptos_types::account_address::{
-    from_identity_public_key, AccountAddress, AccountAddress as PeerId,
+use aptos_types::{
+    account_address::{from_identity_public_key, AccountAddress, AccountAddress as PeerId},
+    dkg::{real_dkg::maybe_dk_from_bls_sk, DKGTrait, DefaultDKG},
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -42,6 +44,21 @@ impl IdentityBlob {
     pub fn to_file(&self, path: &Path) -> anyhow::Result<()> {
         let mut file = File::open(path)?;
         Ok(file.write_all(serde_yaml::to_string(self)?.as_bytes())?)
+    }
+
+    pub fn try_into_dkg_dealer_private_key(
+        self,
+    ) -> Option<<DefaultDKG as DKGTrait>::DealerPrivateKey> {
+        self.consensus_private_key
+    }
+
+    pub fn try_into_dkg_new_validator_decrypt_key(
+        self,
+    ) -> anyhow::Result<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> {
+        let consensus_sk = self.consensus_private_key.as_ref().ok_or_else(|| {
+            anyhow!("try_into_dkg_new_validator_decrypt_key failed with missing consensus key")
+        })?;
+        maybe_dk_from_bls_sk(consensus_sk)
     }
 }
 

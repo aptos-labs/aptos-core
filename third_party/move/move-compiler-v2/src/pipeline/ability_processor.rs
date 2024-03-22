@@ -165,8 +165,9 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
             !ty.is_primitive()
         };
         // Only temps which are used after or borrowed need a copy
-        let temp_needs_copy =
-            |temp| live_var.after.contains_key(temp) || lifetime.before.is_borrowed(*temp);
+        let temp_needs_copy = |temp, instr| {
+            live_var.is_temp_used_after(temp, instr) || lifetime.before.is_borrowed(*temp)
+        };
         // References always need to be dropped to satisfy bytecode verifier borrow analysis, other values
         // only if this execution path can return.
         let temp_needs_drop = |temp: &TempIndex| {
@@ -174,7 +175,7 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
         };
         match instr {
             Assign(_, _, src, AssignKind::Inferred) => {
-                if temp_needs_copy(src) {
+                if temp_needs_copy(src, instr) {
                     state.needs_copy.insert(*src);
                 } else {
                     state.moved.insert(*src);
@@ -196,7 +197,8 @@ impl<'a> TransferFunctions for CopyDropAnalysis<'a> {
                 // point, is again used in the argument list. Also, in difference to assign inference, we only need
                 // to copy the argument if its not primitive.
                 for (i, src) in srcs.iter().enumerate() {
-                    if (temp_needs_copy(src) || srcs[i + 1..].contains(src)) && type_needs_copy(src)
+                    if (temp_needs_copy(src, instr) || srcs[i + 1..].contains(src))
+                        && type_needs_copy(src)
                     {
                         state.needs_copy.insert(*src);
                     } else {
@@ -244,6 +246,22 @@ struct Transformer<'a> {
 
 impl<'a> Transformer<'a> {
     fn run(&mut self, code: Vec<Bytecode>) {
+        // Check and insert drop for parameters before the first instruction if it is a return
+        if !code.is_empty() && code.first().unwrap().is_return() {
+            let instr = code.first().unwrap();
+            for temp in self
+                .live_var
+                .0
+                .get(&0)
+                .unwrap()
+                .released_and_unused_temps(instr)
+            {
+                if temp < self.builder.fun_env.get_parameters().len() {
+                    self.copy_drop.get_mut(&0).unwrap().needs_drop.insert(temp);
+                }
+            }
+            self.check_and_add_implicit_drops(0, instr, true);
+        }
         for (offset, bc) in code.into_iter().enumerate() {
             self.transform_bytecode(offset as CodeOffset, bc)
         }
@@ -288,7 +306,7 @@ impl<'a> Transformer<'a> {
             _ => self.check_and_emit_bytecode(code_offset, bc.clone()),
         }
         // Insert/check any drops needed after this program point
-        self.check_and_add_implicit_drops(code_offset, &bc)
+        self.check_and_add_implicit_drops(code_offset, &bc, false)
     }
 
     fn check_and_emit_bytecode(&mut self, _code_offset: CodeOffset, bc: Bytecode) {
@@ -420,9 +438,14 @@ impl<'a> Transformer<'a> {
 
 impl<'a> Transformer<'a> {
     /// Add implicit drops at the given code offset.
-    fn check_and_add_implicit_drops(&mut self, code_offset: CodeOffset, bytecode: &Bytecode) {
-        // No drop after terminators
-        if !bytecode.is_always_branching() {
+    fn check_and_add_implicit_drops(
+        &mut self,
+        code_offset: CodeOffset,
+        bytecode: &Bytecode,
+        before: bool,
+    ) {
+        // No drop after terminators unless it is dropped before a return
+        if !bytecode.is_always_branching() || before {
             let copy_drop_at = self.copy_drop.get(&code_offset).expect("copy_drop");
             let id = bytecode.get_attr_id();
             for temp in copy_drop_at.check_drop.iter() {
@@ -682,9 +705,9 @@ impl<'a> Transformer<'a> {
         temp: TempIndex,
     ) -> Vec<(Loc, String)> {
         if let Some(info) = self.live_var.get_info_at(code_offset).after.get(&temp) {
-            info.usages
-                .iter()
-                .map(|loc| (loc.clone(), "used here".to_owned()))
+            info.usage_locations()
+                .into_iter()
+                .map(|loc| (loc, "used here".to_owned()))
                 .collect()
         } else {
             vec![]

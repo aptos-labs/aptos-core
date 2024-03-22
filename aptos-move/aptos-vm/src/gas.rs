@@ -44,7 +44,7 @@ pub(crate) fn get_gas_config_from_storage(
     }
 }
 
-pub(crate) fn get_gas_parameters(
+pub fn get_gas_parameters(
     features: &Features,
     config_storage: &impl ConfigStorage,
 ) -> (

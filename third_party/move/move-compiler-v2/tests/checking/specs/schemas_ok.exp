@@ -1,4 +1,56 @@
-// ---- Model Dump
+
+Diagnostics:
+note: unused schema M::IncreasesStrictly
+   ┌─ tests/checking/specs/schemas_ok.move:10:5
+   │
+10 │ ╭     spec schema IncreasesStrictly {
+11 │ │         include Increases;
+12 │ │         ensures result > x;
+13 │ │     }
+   │ ╰─────^
+
+note: unused schema M::IncreasesWithTwoResults
+   ┌─ tests/checking/specs/schemas_ok.move:15:5
+   │
+15 │ ╭     spec schema IncreasesWithTwoResults {
+16 │ │         result_1: num;
+17 │ │         result_2: num;
+18 │ │         include Increases{result: result_1};
+19 │ │         ensures result_2 > result_1;
+20 │ │     }
+   │ ╰─────^
+
+note: unused schema M::IsEqualConcrete
+   ┌─ tests/checking/specs/schemas_ok.move:28:5
+   │
+28 │ ╭     spec schema IsEqualConcrete {
+29 │ │         z: num;
+30 │ │         include IsEqual<num>{x: z};
+31 │ │         ensures z <= y;
+32 │ │     }
+   │ ╰─────^
+
+note: unused schema M::GenericIncludesGeneric
+   ┌─ tests/checking/specs/schemas_ok.move:53:5
+   │
+53 │ ╭     spec schema GenericIncludesGeneric<T> {
+54 │ │         include InvariantIsEqual<T>;
+55 │ │     }
+   │ ╰─────^
+
+note: unused schema M::SchemaExp
+   ┌─ tests/checking/specs/schemas_ok.move:67:5
+   │
+67 │ ╭     spec schema SchemaExp<T> {
+68 │ │         x: bool;
+69 │ │         include x ==> InvariantIsEqual<bool>;
+70 │ │         include !x ==> InvariantIsEqual<bool>;
+71 │ │         include InvariantIsEqual<bool> && InvariantIsEqual<bool>;
+72 │ │         include if (x) InvariantIsEqual<bool> else InvariantIsEqual<bool>;
+73 │ │     }
+   │ ╰─────^
+
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     struct S {
         x: #0,
@@ -22,13 +74,4 @@ module 0x42::M {
       requires Gt($t0, $t1);
     }
 
-    spec fun $add(x: u64): u64 {
-        Add(x, 1)
-    }
-    spec fun $id(x: u64): u64 {
-        x
-    }
-    spec fun $multiple(_x: u64,_y: u64) {
-        Tuple()
-    }
 } // end 0x42::M

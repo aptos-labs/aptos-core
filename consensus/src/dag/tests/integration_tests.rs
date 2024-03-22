@@ -66,12 +66,13 @@ impl DagBootstrapUnit {
         >,
         all_signers: Vec<ValidatorSigner>,
     ) -> (Self, UnboundedReceiver<OrderedBlocks>) {
-        let epoch_state = EpochState {
+        let epoch_state = Arc::new(EpochState {
             epoch,
             verifier: storage.get_validator_set().into(),
-        };
+        });
         let ledger_info = generate_ledger_info_with_sig(&all_signers, storage.get_ledger_info());
-        let dag_storage = dag_test::MockStorage::new_with_ledger_info(ledger_info);
+        let dag_storage =
+            dag_test::MockStorage::new_with_ledger_info(ledger_info, epoch_state.clone());
 
         let network = Arc::new(network);
 
@@ -84,7 +85,7 @@ impl DagBootstrapUnit {
             bootstrap_dag_for_test(
                 self_peer,
                 signer,
-                Arc::new(epoch_state),
+                epoch_state,
                 Arc::new(dag_storage),
                 network.clone(),
                 network.clone(),

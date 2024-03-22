@@ -617,34 +617,40 @@ module aptos_token_objects::collection {
 
     // Tests
 
-    #[test(creator = @0x123)]
-    fun test_create_mint_burn_for_unlimited(creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    #[test(fx = @aptos_framework, creator = @0x123)]
+    fun test_create_mint_burn_for_unlimited(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let feature = features::get_concurrent_token_v2_feature();
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
+
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         create_unlimited_collection(creator, string::utf8(b""), name, option::none(), string::utf8(b""));
         let collection_address = create_collection_address(&creator_address, &name);
         let collection = object::address_to_object<Collection>(collection_address);
         assert!(count(collection) == option::some(0), 0);
-        let cid = increment_supply(&collection, creator_address);
+        let cid = aggregator_v2::read_snapshot(&option::destroy_some(increment_concurrent_supply(&collection, creator_address)));
         assert!(count(collection) == option::some(1), 0);
         assert!(event::counter(&borrow_global<UnlimitedSupply>(collection_address).mint_events) == 1, 0);
-        decrement_supply(&collection, creator_address, cid, creator_address);
+        decrement_supply(&collection, creator_address, option::some(cid), creator_address);
         assert!(count(collection) == option::some(0), 0);
         assert!(event::counter(&borrow_global<UnlimitedSupply>(collection_address).burn_events) == 1, 0);
     }
 
-    #[test(creator = @0x123)]
-    fun test_create_mint_burn_for_fixed(creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    #[test(fx = @aptos_framework, creator = @0x123)]
+    fun test_create_mint_burn_for_fixed(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let feature = features::get_concurrent_token_v2_feature();
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
+
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         create_fixed_collection(creator, string::utf8(b""), 1, name, option::none(), string::utf8(b""));
         let collection_address = create_collection_address(&creator_address, &name);
         let collection = object::address_to_object<Collection>(collection_address);
         assert!(count(collection) == option::some(0), 0);
-        let cid = increment_supply(&collection, creator_address);
+        let cid = aggregator_v2::read_snapshot(&option::destroy_some(increment_concurrent_supply(&collection, creator_address)));
         assert!(count(collection) == option::some(1), 0);
         assert!(event::counter(&borrow_global<FixedSupply>(collection_address).mint_events) == 1, 0);
-        decrement_supply(&collection, creator_address, cid, creator_address);
+        decrement_supply(&collection, creator_address, option::some(cid), creator_address);
         assert!(count(collection) == option::some(0), 0);
         assert!(event::counter(&borrow_global<FixedSupply>(collection_address).burn_events) == 1, 0);
     }
@@ -652,10 +658,7 @@ module aptos_token_objects::collection {
     #[test(fx = @aptos_framework, creator = @0x123)]
     fun test_create_mint_burn_for_concurrent(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let feature = features::get_concurrent_token_v2_feature();
-        let agg_feature = features::get_aggregator_v2_api_feature();
-        let auid_feature = features::get_auids();
-        let module_event_feature = features::get_module_event_feature();
-        features::change_feature_flags(fx, vector[feature, auid_feature, module_event_feature, agg_feature], vector[]);
+        features::change_feature_flags_for_testing(fx, vector[feature], vector[]);
 
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");

@@ -129,8 +129,9 @@ pub fn test_execution_with_storage_impl_inner(
     let txn6 =
         account1.sign_with_transaction_builder(txn_factory.transfer(account3.address(), 70 * B));
 
-    let reconfig1 = core_resources_account
-        .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(100)));
+    let reconfig1 = core_resources_account.sign_with_transaction_builder(
+        txn_factory.payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+    );
 
     let block1: Vec<_> = into_signature_verified_block(vec![
         block1_meta,
@@ -156,8 +157,9 @@ pub fn test_execution_with_storage_impl_inner(
         vec![],
         2,
     ));
-    let reconfig2 = core_resources_account
-        .sign_with_transaction_builder(txn_factory.payload(aptos_stdlib::version_set_version(200)));
+    let reconfig2 = core_resources_account.sign_with_transaction_builder(
+        txn_factory.payload(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+    );
     let block2 = vec![block2_meta, UserTransaction(reconfig2)];
 
     let block3_id = gen_block_id(3);

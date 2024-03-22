@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::m {
     private fun foo() {
         {
@@ -10,5 +10,4 @@ module 0x42::m {
           i: u64 = Add<u64>(i, 1)
         }
     }
-    spec fun $foo();
 } // end 0x42::m

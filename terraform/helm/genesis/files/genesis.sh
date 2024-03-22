@@ -54,6 +54,16 @@ if [ "${FULLNODE_ENABLE_ONCHAIN_DISCOVERY}" = "true" ] && [ -z ${DOMAIN} ] \
   exit 1
 fi
 
+if [ -z ${CLUSTER_NAME} ]; then
+  echo "CLUSTER_NAME must be set"
+  exit 1
+fi
+
+if [ -z ${GENESIS_BLOB_UPLOAD_URL} ]; then
+  echo "GENESIS_BLOB_UPLOAD_URL must be set"
+  exit 1
+fi
+
 echo "NUM_VALIDATORS=${NUM_VALIDATORS}"
 echo "ERA=${ERA}"
 echo "WORKSPACE=${WORKSPACE}"
@@ -129,12 +139,16 @@ kubectl get pvc -o name | grep /fn- | grep -v "e${ERA}-" | xargs -r kubectl dele
 # delete all genesis secrets except for those from this era
 kubectl get secret -o name | grep "genesis-e" | grep -v "e${ERA}-" | xargs -r kubectl delete
 
+# Upload the genesis.blob to the cloud
+signed_url=$(curl -s -X GET "${GENESIS_BLOB_UPLOAD_URL}?cluster_name=${CLUSTER_NAME}&namespace=${NAMESPACE}&era=${ERA}&method=PUT")
+curl -X PUT -T ${WORKSPACE}/genesis.blob "$signed_url"
+
 # create genesis secrets for validators to startup
 for i in $(seq 0 $(($NUM_VALIDATORS - 1))); do
   username="${USERNAME_PREFIX}-${i}"
   user_dir="${WORKSPACE}/${username}"
+
   kubectl create secret generic "${username}-genesis-e${ERA}" \
-    --from-file=genesis.blob=${WORKSPACE}/genesis.blob \
     --from-file=waypoint.txt=${WORKSPACE}/waypoint.txt \
     --from-file=validator-identity.yaml=${user_dir}/validator-identity.yaml \
     --from-file=validator-full-node-identity.yaml=${user_dir}/validator-full-node-identity.yaml

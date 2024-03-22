@@ -12,7 +12,7 @@ error: cannot move local `x` which is still borrowed
 17 │         move x; // error in v2 (bug in v1)?
    │         ^^^^^^ moved here
 18 │         *r = 1;
-   │         ------ conflicting reference `r`used here
+   │         ------ conflicting reference `r` used here
 
 error: mutable reference in local `y_ref` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/call_transfer_borrows.move:29:9
@@ -24,4 +24,4 @@ error: mutable reference in local `y_ref` requires exclusive access but is borro
    │         ^^^^^^ requirement enforced here
 30 │         *x_ref;
 31 │         *r;
-   │         -- conflicting reference `r`used here
+   │         -- conflicting reference `r` used here

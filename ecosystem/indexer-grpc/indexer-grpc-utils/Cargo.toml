@@ -23,6 +23,7 @@ base64 = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 cloud-storage = { workspace = true }
+dashmap = { workspace = true }
 flate2 = { workspace = true }
 futures = { workspace = true }
 futures-core = { workspace = true }
@@ -38,6 +39,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 toml = { workspace = true }
 tonic = { workspace = true }
 tracing = { workspace = true }

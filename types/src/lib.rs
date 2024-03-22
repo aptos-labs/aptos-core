@@ -24,6 +24,7 @@ pub mod jwks;
 pub mod ledger_info;
 pub mod mempool_status;
 pub mod move_any;
+pub mod move_fixed_point;
 pub mod move_resource;
 pub mod move_utils;
 pub mod network_address;
@@ -63,7 +64,7 @@ pub mod aggregate_signature;
 pub mod block_executor;
 pub mod bytes;
 pub mod delayed_fields;
-pub mod oidb;
+pub mod keyless;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;

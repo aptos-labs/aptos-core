@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::reference_conversion {
     private fun deref(r: &u64): u64 {
         Deref(r)
@@ -9,14 +9,10 @@ module 0x42::reference_conversion {
           {
             let r: &mut u64 = Borrow(Mutable)(x);
             r = 43;
-            reference_conversion::deref(r)
+            reference_conversion::deref(Freeze(r))
           }
         }
     }
-    spec fun $deref(r: u64): u64 {
-        r
-    }
-    spec fun $use_it(): u64;
 } // end 0x42::reference_conversion
 
 ============ initial bytecode ================

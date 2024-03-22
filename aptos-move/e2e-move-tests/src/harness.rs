@@ -655,6 +655,7 @@ impl MoveHarness {
     }
 
     /// Reads the resource data `T`.
+    /// WARNING: Does not work with resource groups (because set_resource does not work?).
     pub fn read_resource<T: DeserializeOwned>(
         &self,
         addr: &AccountAddress,
@@ -714,6 +715,7 @@ impl MoveHarness {
     }
 
     /// Write the resource data `T`.
+    /// WARNING: Does not work with resource groups.
     pub fn set_resource<T: Serialize>(
         &mut self,
         addr: AccountAddress,
@@ -732,7 +734,7 @@ impl MoveHarness {
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor
-            .exec("features", "change_feature_flags", vec![], vec![
+            .exec("features", "change_feature_flags_internal", vec![], vec![
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
@@ -762,14 +764,19 @@ impl MoveHarness {
             entries,
         };
         let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
+        let core_signer_arg = MoveValue::Signer(AccountAddress::ONE)
+            .simple_serialize()
+            .unwrap();
         self.executor
-            .exec("gas_schedule", "set_gas_schedule", vec![], vec![
-                MoveValue::Signer(AccountAddress::ONE)
-                    .simple_serialize()
-                    .unwrap(),
+            .exec("gas_schedule", "set_for_next_epoch", vec![], vec![
+                core_signer_arg.clone(),
                 MoveValue::vector_u8(schedule_bytes)
                     .simple_serialize()
                     .unwrap(),
+            ]);
+        self.executor
+            .exec("aptos_governance", "force_end_epoch", vec![], vec![
+                core_signer_arg,
             ]);
     }
 

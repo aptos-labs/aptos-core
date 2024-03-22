@@ -441,6 +441,13 @@ pub enum Visibility {
 
 impl Visibility {
     pub const DEPRECATED_SCRIPT: u8 = 0x2;
+
+    pub fn is_public(&self) -> bool {
+        match self {
+            Self::Public => true,
+            Self::Private | Self::Friend => false,
+        }
+    }
 }
 
 impl std::convert::TryFrom<u8> for Visibility {
@@ -2228,6 +2235,14 @@ impl CompiledModule {
     /// Returns the code key of `self`
     pub fn self_id(&self) -> ModuleId {
         self.module_id_for_handle(self.self_handle())
+    }
+
+    pub fn self_addr(&self) -> &AccountAddress {
+        self.address_identifier_at(self.self_handle().address)
+    }
+
+    pub fn self_name(&self) -> &IdentStr {
+        self.identifier_at(self.self_handle().name)
     }
 }
 

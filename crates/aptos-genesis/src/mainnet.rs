@@ -10,7 +10,12 @@ use aptos_db::AptosDB;
 use aptos_framework::ReleaseBundle;
 use aptos_storage_interface::DbReaderWriter;
 use aptos_temppath::TempPath;
-use aptos_types::{chain_id::ChainId, transaction::Transaction, waypoint::Waypoint};
+use aptos_types::{
+    chain_id::ChainId,
+    on_chain_config::{Features, OnChainJWKConsensusConfig, OnChainRandomnessConfig},
+    transaction::Transaction,
+    waypoint::Waypoint,
+};
 use aptos_vm::AptosVM;
 use aptos_vm_genesis::{AccountBalance, EmployeePool, ValidatorWithCommissionRate};
 
@@ -54,6 +59,12 @@ pub struct MainnetGenesisInfo {
     employee_vesting_start: u64,
     /// Duration of each vesting period (in seconds).
     employee_vesting_period_duration: u64,
+    /// An optional feature vec to replace the default one.
+    initial_features_override: Option<Features>,
+    /// An optional randomness config to replace `OnChainRandomnessConfig::default_for_genesis()`.
+    randomness_config_override: Option<OnChainRandomnessConfig>,
+    /// An optional feature vec to replace `OnChainJWKConsensusConfig::default_for_genesis()`.
+    jwk_consensus_config_override: Option<OnChainJWKConsensusConfig>,
 }
 
 impl MainnetGenesisInfo {
@@ -93,6 +104,9 @@ impl MainnetGenesisInfo {
             voting_power_increase_limit: genesis_config.voting_power_increase_limit,
             employee_vesting_start,
             employee_vesting_period_duration,
+            initial_features_override: genesis_config.initial_features_override.clone(),
+            randomness_config_override: genesis_config.randomness_config_override.clone(),
+            jwk_consensus_config_override: genesis_config.jwk_consensus_config_override.clone(),
         })
     }
 
@@ -126,6 +140,9 @@ impl MainnetGenesisInfo {
                 voting_power_increase_limit: self.voting_power_increase_limit,
                 employee_vesting_start: self.employee_vesting_start,
                 employee_vesting_period_duration: self.employee_vesting_period_duration,
+                initial_features_override: self.initial_features_override.clone(),
+                randomness_config_override: self.randomness_config_override.clone(),
+                jwk_consensus_config_override: self.jwk_consensus_config_override.clone(),
             },
         )
     }

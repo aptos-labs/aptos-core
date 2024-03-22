@@ -4,7 +4,7 @@ error: mutable reference in local `return[0]` requires exclusive access but is b
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:16:9
    │
 15 │         let f = freeze(s1);
-   │                 ---------- previous call result
+   │                 ---------- previous freeze
 16 │         (s1, f)
    │         ^^^^^^^ requirement enforced here
 
@@ -41,7 +41,7 @@ error: cannot mutably borrow since immutable references exist
    │         │mutable borrow attempted here
    │         requirement enforced here
 
-error: same mutable reference in local `return[0]` is also used in other local `return[1]` in same argument list
+error: same mutable reference in local `return[0]` is also used in other local `return[1]` in argument list
    ┌─ tests/reference-safety/v1-tests/return_mutual_borrows_invalid.move:32:9
    │
 31 │     fun mut_mut_0(s1: &mut S): (&mut S, &mut S) {

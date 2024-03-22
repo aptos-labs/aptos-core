@@ -1,96 +1,25 @@
 
 Diagnostics:
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/bytecode-generator/globals.move:18:27
+error: type `R` does not have expected ability `key`
+  ┌─ tests/bytecode-generator/globals.move:6:20
+  │
+6 │         move_to(s, R{f: 1});
+  │                    ^^^^^^^
+
+error: type `R` does not have expected ability `key`
+   ┌─ tests/bytecode-generator/globals.move:10:9
    │
-18 │     fun write(a: address, x: u64): u64 {
-   │                           ^
+10 │         exists<R>(a)
+   │         ^^^^^^^^^^^^
 
-// ---- Model Dump
-module 0x42::globals {
-    struct R {
-        f: u64,
-    }
-    private fun check(a: address): bool {
-        exists<globals::R>(a)
-    }
-    private fun publish(s: &signer) {
-        MoveTo<globals::R>(s, pack globals::R(1));
-        Tuple()
-    }
-    private fun read(a: address): u64 {
-        {
-          let r: &globals::R = BorrowGlobal(Immutable)<globals::R>(a);
-          select globals::R.f(r)
-        }
-    }
-    private fun write(a: address,x: u64): u64 {
-        {
-          let r: &mut globals::R = BorrowGlobal(Mutable)<globals::R>(a);
-          select globals::R.f(r) = 2;
-          9
-        }
-    }
-    spec fun $check(a: address): bool {
-        exists<globals::R>(a)
-    }
-    spec fun $publish(s: &signer);
-    spec fun $read(a: address): u64 {
-        {
-          let r: globals::R = global<globals::R>(a);
-          select globals::R.f(r)
-        }
-    }
-    spec fun $write(a: address,x: u64): u64;
-} // end 0x42::globals
+error: type `R` does not have expected ability `key`
+   ┌─ tests/bytecode-generator/globals.move:14:17
+   │
+14 │         let r = borrow_global<R>(a);
+   │                 ^^^^^^^^^^^^^^^^^^^
 
-============ initial bytecode ================
-
-[variant baseline]
-fun globals::check($t0: address): bool {
-     var $t1: bool
-  0: $t1 := exists<globals::R>($t0)
-  1: return $t1
-}
-
-
-[variant baseline]
-fun globals::publish($t0: &signer) {
-     var $t1: globals::R
-     var $t2: u64
-  0: $t2 := 1
-  1: $t1 := pack globals::R($t2)
-  2: move_to<globals::R>($t0, $t1)
-  3: return ()
-}
-
-
-[variant baseline]
-fun globals::read($t0: address): u64 {
-     var $t1: u64
-     var $t2: &globals::R
-     var $t3: &globals::R
-     var $t4: &u64
-  0: $t3 := borrow_global<globals::R>($t0)
-  1: $t2 := infer($t3)
-  2: $t4 := borrow_field<globals::R>.f($t2)
-  3: $t1 := read_ref($t4)
-  4: return $t1
-}
-
-
-[variant baseline]
-fun globals::write($t0: address, $t1: u64): u64 {
-     var $t2: u64
-     var $t3: &mut globals::R
-     var $t4: &mut globals::R
-     var $t5: u64
-     var $t6: &mut u64
-  0: $t4 := borrow_global<globals::R>($t0)
-  1: $t3 := infer($t4)
-  2: $t5 := 2
-  3: $t6 := borrow_field<globals::R>.f($t3)
-  4: write_ref($t6, $t5)
-  5: $t2 := 9
-  6: return $t2
-}
+error: type `R` does not have expected ability `key`
+   ┌─ tests/bytecode-generator/globals.move:19:17
+   │
+19 │         let r = borrow_global_mut<R>(a);
+   │                 ^^^^^^^^^^^^^^^^^^^^^^^

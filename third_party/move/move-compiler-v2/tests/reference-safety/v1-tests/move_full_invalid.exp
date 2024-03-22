@@ -8,7 +8,7 @@ error: cannot move local `x` which is still borrowed
 13 │         move x;
    │         ^^^^^^ moved here
 14 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_full_invalid.move:18:9
@@ -18,7 +18,7 @@ error: cannot move local `x` which is still borrowed
 18 │         move x;
    │         ^^^^^^ moved here
 19 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_full_invalid.move:23:9
@@ -31,7 +31,7 @@ error: cannot move local `x` which is still borrowed
 23 │         move x;
    │         ^^^^^^ moved here
 24 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here
 
 error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/move_full_invalid.move:28:9
@@ -44,4 +44,4 @@ error: cannot move local `x` which is still borrowed
 28 │         move x;
    │         ^^^^^^ moved here
 29 │         *f;
-   │         -- conflicting reference `f`used here
+   │         -- conflicting reference `f` used here

@@ -31,7 +31,7 @@ error: cannot copy local `p` which is still mutably borrowed
   │             ^ copied here
   ·
 8 │         *a = 0;
-  │         ------ conflicting reference `a`used here
+  │         ------ conflicting reference `a` used here
 
 ============ after AvailableCopiesAnalysisProcessor: ================
 
@@ -90,12 +90,12 @@ fun m::test($t0: u64): u64 {
 
 [variant baseline]
 fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: &mut u64
+     var $t1: u64 [unused]
+     var $t2: &mut u64 [unused]
      var $t3: &mut u64
      var $t4: u64
-     var $t5: u64
-     var $t6: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
      var $t7: u64
   0: $t3 := borrow_local($t0)
   1: $t4 := copy($t0)
