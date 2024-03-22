@@ -395,19 +395,55 @@ impl UserModuleTransactionGenerator for EconiaRealOrderTransactionGenerator {
     ) -> Arc<TransactionGeneratorWorker> {
         Arc::new(move |account, package, publisher, txn_factory, rng, _txn_counter, history| {
             // println!("account: {}, history: {:?}", account.address(), history);
-            if account.address().into_bytes()[0] as u64 % 100 == 0 {
-                // 1% of the users are market makers
-                let num_prev_limit_orders = history.iter().map(|s| if s == "place_limit_order" {1} else {0}).sum::<u64>();
-                let num_prev_cancel_orders = history.iter().map(|s| if s == "place_cancel_order" {1} else {0}).sum::<u64>();
-                if num_prev_limit_orders > num_prev_cancel_orders {
-                    if rng.gen_range(1, 100) < 96 { // 95% probability
-                        return vec![account.sign_with_transaction_builder(txn_factory.payload(place_cancel_order(package.get_module_id("txn_generator_utils"))))];
-                    }
+            // if account.address().into_bytes()[0] as u64 % 100 == 0 {
+            //     // 1% of the users are market makers
+            //     let num_prev_limit_orders = history.iter().map(|s| if s == "place_limit_order" {1} else {0}).sum::<u64>();
+            //     let num_prev_cancel_orders = history.iter().map(|s| if s == "place_cancel_order" {1} else {0}).sum::<u64>();
+            //     if num_prev_limit_orders > num_prev_cancel_orders {
+            //         if rng.gen_range(1, 100) < 97 { // 96% probability
+            //             return vec![account.sign_with_transaction_builder(txn_factory.payload(place_cancel_order(package.get_module_id("txn_generator_utils"))))];
+            //         }
+            //     }
+            // } else {
+            //     // Limit order
+            //     let size = rng.gen_range(4, 20000);
+            //     let market_id = if rng.gen_range(1, 1000) < 740 {   // Market 1 with 74% probability
+            //         1
+            //     } else {
+            //         2
+            //     };
+            //     let rand = rng.gen_range(1, 10000);
+            //     let restriction = if rand < 88 {   // 0.88% probability
+            //         0
+            //     } else if rand < 176 {   // 0.88% probability
+            //         2
+            //     } else {   // 98.2% probability
+            //         3
+            //     };
+
+            //     let rand = rng.gen_range(1, 1000);
+            //     let self_matching_behavior = if rand < 8 { // 0.8% probability
+            //         3
+            //     } else if rand < 295 { // 2.87% pdrobability
+            //         2
+            //     } else {    // 96.33% probability
+            //         0
+            //     };
+            //     let (direction, price) = if rng.gen_range(1, 1000) < 546 {   // ASK with 54.6% probability
+            //         (ASK, rng.gen_range(13200, 13400))
+            //     } else {
+            //         (BID, rng.gen_range(13000, 13200))
+            //     };
+            //     vec![account.sign_with_transaction_builder(txn_factory.payload(place_limit_order(package.get_module_id("txn_generator_utils"), publisher.address(), size, price, market_id, direction, restriction, self_matching_behavior)))]
+            // }
+
+            let num_prev_limit_orders = history.iter().map(|s| if s == "place_limit_order" {1} else {0}).sum::<u64>();
+            let num_prev_cancel_orders = history.iter().map(|s| if s == "place_cancel_order" {1} else {0}).sum::<u64>();
+            if num_prev_limit_orders > num_prev_cancel_orders {
+                if rng.gen_range(1, 100) < 97 { // 96% probability
+                    return vec![account.sign_with_transaction_builder(txn_factory.payload(place_cancel_order(package.get_module_id("txn_generator_utils"))))];
                 }
-            } else {
-
             }
-
             let size = rng.gen_range(4, 10000);
             if rng.gen_range(1, 100) <= 5 {  // Market order with 5% probability
                 let market_id = if rng.gen_range(1, 1000) < 885 {   // Market 1 with 88.5% probability
@@ -450,9 +486,9 @@ impl UserModuleTransactionGenerator for EconiaRealOrderTransactionGenerator {
                     0
                 };
                 let (direction, price) = if rng.gen_range(1, 1000) < 546 {   // ASK with 54.6% probability
-                    (ASK, rng.gen_range(10001, 20000))
+                    (ASK, rng.gen_range(13200, 13400))
                 } else {
-                    (BID, rng.gen_range(1, 10000))
+                    (BID, rng.gen_range(13000, 13200))
                 };
                 vec![account.sign_with_transaction_builder(txn_factory.payload(place_limit_order(package.get_module_id("txn_generator_utils"), publisher.address(), size, price, market_id, direction, restriction, self_matching_behavior)))]
             }

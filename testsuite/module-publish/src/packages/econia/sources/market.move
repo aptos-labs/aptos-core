@@ -971,22 +971,6 @@ module econia::market {
 
     // View functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    #[view]
-    /// Return true if the order ID corresponds to an order that
-    /// resulted in a post to the order book (including an order that
-    /// filled across the spread as a taker before posting as a maker).
-    ///
-    /// # Testing
-    ///
-    /// * `test_get_market_order_id_price_did_not_post()`
-    /// * `test_get_market_order_id_side_did_not_post()`
-    /// * `test_place_limit_order_no_cross_ask_user()`
-    /// * `test_place_limit_order_no_cross_bid_custodian()`
-    public fun did_order_post(
-        order_id: u128
-    ): bool {
-        (order_id & (HI_64 as u128)) != (NIL as u128)
-    }
 
     #[view]
     /// Public constant getter for `ABORT`.
@@ -1175,83 +1159,6 @@ module econia::market {
         })
     }
 
-    #[view]
-    /// Return order counter encoded in market order ID.
-    ///
-    /// # Testing
-    ///
-    /// * `test_place_limit_order_no_cross_ask_user()`
-    /// * `test_place_limit_order_no_cross_bid_custodian()`
-    public fun get_market_order_id_counter(
-        market_order_id: u128
-    ): u64 {
-        (((market_order_id >> SHIFT_COUNTER) & (HI_64 as u128)) as u64)
-    }
-
-    #[view]
-    /// For an order that resulted in a post to the order book, return
-    /// the order price encoded in its market order ID, corresponding to
-    /// the price that the maker portion of the order posted to the book
-    /// at.
-    ///
-    /// # Aborts
-    ///
-    /// * `E_ORDER_DID_NOT_POST`: Order ID corresponds to an order that
-    ///   did not post to the book.
-    ///
-    /// # Testing
-    ///
-    /// * `test_get_market_order_id_price_did_not_post()`
-    /// * `test_place_limit_order_no_cross_ask_user()`
-    /// * `test_place_limit_order_no_cross_bid_custodian()`
-    public fun get_market_order_id_price(
-        market_order_id: u128
-    ): u64 {
-        // Assert order posted to the order book.
-        assert!(did_order_post(market_order_id), E_ORDER_DID_NOT_POST);
-        // Extract encoded price.
-        ((market_order_id & (HI_PRICE as u128)) as u64)
-    }
-    
-    #[view]
-    /// Return a `SwapperEventHandleCreationNumbers` for `market_id`, if
-    /// signing `swapper` has event handles for indicated market.
-    ///
-    /// Restricted to private view function to prevent runtime handle
-    /// contention.
-    ///
-    /// # Testing
-    ///
-    /// * `test_swap_between_coinstores_register_base_store()`
-    fun get_swapper_event_handle_creation_numbers(
-        swapper: address,
-        market_id: u64
-    ): Option<SwapperEventHandleCreationNumbers>
-    acquires SwapperEventHandles {
-        // Return none if swapper does not have event handles map.
-        if (!exists<SwapperEventHandles>(swapper)) return option::none();
-        // Return none if no handles exist for market.
-        let swapper_event_handles_map_ref =
-            &borrow_global<SwapperEventHandles>(swapper).map;
-        let has_handles = table::contains(
-            swapper_event_handles_map_ref, market_id);
-        if (!has_handles) return option::none();
-        let swapper_handles_ref = table::borrow(
-            swapper_event_handles_map_ref, market_id);
-        // Return option-packed creation numbers for market.
-        option::some(SwapperEventHandleCreationNumbers{
-            cancel_order_events_handle_creation_num:
-                guid::creation_num(event::guid(
-                    &swapper_handles_ref.cancel_order_events)),
-            fill_events_handle_creation_num:
-                guid::creation_num(event::guid(
-                    &swapper_handles_ref.fill_events)),
-            place_swap_order_events_handle_creation_num:
-                guid::creation_num(event::guid(
-                    &swapper_handles_ref.place_swap_order_events))
-        })
-    }
-
     // View functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     // Public functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -1294,6 +1201,29 @@ module econia::market {
             registry::get_custodian_id(custodian_capability_ref),
             side,
             market_order_id);
+    }
+
+    /// Public function wrapper for `change_order_size()` for changing
+    /// order size under authority of delegated custodian.
+    ///
+    /// # Invocation testing
+    ///
+    /// * `test_change_order_size_ask_custodian()`
+    public fun change_order_size_custodian(
+        user_address: address,
+        market_id: u64,
+        side: bool,
+        market_order_id: u128,
+        new_size: u64,
+        custodian_capability_ref: &CustodianCapability
+    ) acquires OrderBooks {
+        change_order_size(
+            user_address,
+            market_id,
+            registry::get_custodian_id(custodian_capability_ref),
+            side,
+            market_order_id,
+            new_size);
     }
 
     /// Public function wrapper for `place_limit_order()` for placing
@@ -1628,6 +1558,434 @@ module econia::market {
             registry::get_underwriter_id(underwriter_capability_ref))
     }
 
+    /// Swap against the order book between a user's coin stores.
+    ///
+    /// Initializes an `aptos_framework::coin::CoinStore` for each coin
+    /// type that does not yet have one.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `BaseType`: Same as for `match()`.
+    /// * `QuoteType`: Same as for `match()`.
+    ///
+    /// # Parameters
+    ///
+    /// * `user`: Account of swapping user.
+    /// * `market_id`: Same as for `match()`.
+    /// * `integrator`: Same as for `match()`.
+    /// * `direction`: Same as for `match()`.
+    /// * `min_base`: Same as for `match()`.
+    /// * `max_base`: Same as for `match()`. If passed as `MAX_POSSIBLE`
+    ///   will attempt to trade maximum possible amount for coin store.
+    /// * `min_quote`: Same as for `match()`.
+    /// * `max_quote`: Same as for `match()`. If passed as
+    ///   `MAX_POSSIBLE` will attempt to trade maximum possible amount
+    ///   for coin store.
+    /// * `limit_price`: Same as for `match()`.
+    ///
+    /// # Returns
+    ///
+    /// * `u64`: Base asset trade amount, same as for `match()`.
+    /// * `u64`: Quote coin trade amount, same as for `match()`.
+    /// * `u64`: Quote coin fees paid, same as for `match()`.
+    ///
+    /// # Emits
+    ///
+    /// * `PlaceSwapOrderEvent`: Information about the swap order.
+    /// * `user::FillEvent`(s): Information about fill(s) associated
+    ///   with the swap.
+    /// * `user::CancelOrderEvent`: Optionally, information about why
+    ///   the swap was cancelled without completely filling.
+    ///
+    /// # Testing
+    ///
+    /// * `test_swap_between_coinstores_max_possible_base_buy()`
+    /// * `test_swap_between_coinstores_max_possible_base_sell()`
+    /// * `test_swap_between_coinstores_max_possible_quote_buy()`
+    /// * `test_swap_between_coinstores_max_possible_quote_sell()`
+    /// * `test_swap_between_coinstores_max_quote_traded()`
+    /// * `test_swap_between_coinstores_not_enough_liquidity()`
+    /// * `test_swap_between_coinstores_register_base_store()`
+    /// * `test_swap_between_coinstores_register_quote_store()`
+    /// * `test_swap_between_coinstores_self_match_taker_cancel()`
+    public fun swap_between_coinstores<
+        BaseType,
+        QuoteType
+    >(
+        user: &signer,
+        market_id: u64,
+        integrator: address,
+        direction: bool,
+        min_base: u64,
+        max_base: u64,
+        min_quote: u64,
+        max_quote: u64,
+        limit_price: u64
+    ): (
+        u64,
+        u64,
+        u64
+    ) acquires
+        MarketEventHandles,
+        OrderBooks,
+        SwapperEventHandles
+    {
+        let user_address = address_of(user); // Get user address.
+        // Register base coin store if user does not have one.
+        if (!coin::is_account_registered<BaseType>(user_address))
+            coin::register<BaseType>(user);
+        // Register quote coin store if user does not have one.
+        if (!coin::is_account_registered<QuoteType>(user_address))
+            coin::register<QuoteType>(user);
+        let (base_value, quote_value) = // Get coin value amounts.
+            (coin::balance<BaseType>(user_address),
+             coin::balance<QuoteType>(user_address));
+        // If max base to trade flagged as max possible, update it:
+        if (max_base == MAX_POSSIBLE) max_base = if (direction == BUY)
+            // If a buy, max to trade is amount that can fit in
+            // coin store, else is the amount in the coin store.
+            (HI_64 - base_value) else base_value;
+        // If max quote to trade flagged as max possible, update it:
+        if (max_quote == MAX_POSSIBLE) max_quote = if (direction == BUY)
+            // If a buy, max to trade is amount in coin store, else is
+            // the amount that could fit in the coin store.
+            quote_value else (HI_64 - quote_value);
+        range_check_trade( // Range check trade amounts.
+            direction, min_base, max_base, min_quote, max_quote,
+            base_value, base_value, quote_value, quote_value);
+        // Get option-wrapped base coins and quote coins for matching:
+        let (optional_base_coins, quote_coins) = if (direction == BUY)
+            // If a buy, need no base but need max quote.
+            (option::some(coin::zero<BaseType>()),
+             coin::withdraw<QuoteType>(user, max_quote)) else
+            // If a sell, need max base but not quote.
+            (option::some(coin::withdraw<BaseType>(user, max_base)),
+             coin::zero<QuoteType>());
+        // Swap against the order book, deferring market events.
+        let fill_event_queue = vector[];
+        let (
+            optional_base_coins,
+            quote_coins,
+            base_traded,
+            quote_traded,
+            fees,
+            place_swap_order_event_option,
+            cancel_order_event_option
+        ) = swap(
+            &mut fill_event_queue,
+            user_address,
+            market_id,
+            NO_UNDERWRITER,
+            integrator,
+            direction,
+            min_base,
+            max_base,
+            min_quote,
+            max_quote,
+            limit_price,
+            optional_base_coins,
+            quote_coins
+        );
+        // Create swapper event handles for market as needed.
+        if (!exists<SwapperEventHandles>(user_address))
+            move_to(user, SwapperEventHandles{map: table::new()});
+        let swapper_event_handles_map_ref_mut =
+            &mut borrow_global_mut<SwapperEventHandles>(user_address).map;
+        let has_handles =
+            table::contains(swapper_event_handles_map_ref_mut, market_id);
+        if (!has_handles) {
+            let handles = SwapperEventHandlesForMarket{
+                cancel_order_events: account::new_event_handle(user),
+                fill_events: account::new_event_handle(user),
+                place_swap_order_events: account::new_event_handle(user)
+            };
+            table::add(
+                swapper_event_handles_map_ref_mut, market_id, handles);
+        };
+        let handles_ref_mut =
+            table::borrow_mut(swapper_event_handles_map_ref_mut, market_id);
+        // Emit place swap order event.
+        event::emit_event(&mut handles_ref_mut.place_swap_order_events,
+                          option::destroy_some(place_swap_order_event_option));
+        // Emit fill events first-in-first-out.
+        vector::for_each_ref(&fill_event_queue, |fill_event_ref| {
+            let fill_event: FillEvent = *fill_event_ref;
+            event::emit_event(&mut handles_ref_mut.fill_events, fill_event);
+        });
+        // Optionally emit cancel event.
+        if (option::is_some(&cancel_order_event_option))
+            event::emit_event(&mut handles_ref_mut.cancel_order_events,
+                              option::destroy_some(cancel_order_event_option));
+        // Deposit base coins back to user's coin store.
+        coin::deposit(user_address, option::destroy_some(optional_base_coins));
+        // Deposit quote coins back to user's coin store.
+        coin::deposit(user_address, quote_coins);
+        (base_traded, quote_traded, fees) // Return match results.
+    }
+
+    /// Swap standalone coins against the order book.
+    ///
+    /// If a buy, attempts to spend all quote coins. If a sell, attempts
+    /// to sell all base coins.
+    ///
+    /// Passes all base coins to matching engine if a buy or a sell, and
+    /// passes all quote coins to matching engine if a buy. If a sell,
+    /// does not pass any quote coins to matching engine, to avoid
+    /// intermediate quote match overflow that could occur prior to fee
+    /// assessment.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `BaseType`: Same as for `match()`.
+    /// * `QuoteType`: Same as for `match()`.
+    ///
+    /// # Parameters
+    ///
+    /// * `market_id`: Same as for `match()`.
+    /// * `integrator`: Same as for `match()`.
+    /// * `direction`: Same as for `match()`.
+    /// * `min_base`: Same as for `match()`.
+    /// * `max_base`: Same as for `match()`. Ignored if a sell. Else if
+    ///   passed as `MAX_POSSIBLE` will attempt to trade maximum
+    ///   possible amount for passed coin holdings.
+    /// * `min_quote`: Same as for `match()`.
+    /// * `max_quote`: Same as for `match()`. Ignored if a buy. Else if
+    ///   passed as `MAX_POSSIBLE` will attempt to trade maximum
+    ///   possible amount for passed coin holdings.
+    /// * `limit_price`: Same as for `match()`.
+    /// * `base_coins`: Same as `optional_base_coins` for `match()`, but
+    ///   unpacked.
+    /// * `quote_coins`: Same as for `match()`.
+    ///
+    /// # Returns
+    ///
+    /// * `Coin<BaseType>`: Updated base coin holdings, same as for
+    ///   `match()` but unpacked.
+    /// * `Coin<QuoteType>`: Updated quote coin holdings, same as for
+    ///   `match()`.
+    /// * `u64`: Base coin trade amount, same as for `match()`.
+    /// * `u64`: Quote coin trade amount, same as for `match()`.
+    /// * `u64`: Quote coin fees paid, same as for `match()`.
+    ///
+    /// # Terminology
+    ///
+    /// * The "inbound" asset is the asset received from a trade: base
+    ///   coins in the case of a buy, quote coins in the case of a sell.
+    /// * The "outbound" asset is the asset traded away: quote coins in
+    ///   the case of a buy, base coins in the case of a sell.
+    ///
+    /// # Testing
+    ///
+    /// * `test_swap_coins_buy_max_base_limiting()`
+    /// * `test_swap_coins_buy_no_max_base_limiting()`
+    /// * `test_swap_coins_buy_no_max_quote_limiting()`
+    /// * `test_swap_coins_sell_max_quote_limiting()`
+    /// * `test_swap_coins_sell_no_max_base_limiting()`
+    /// * `test_swap_coins_sell_no_max_quote_limiting()`
+    public fun swap_coins<
+        BaseType,
+        QuoteType
+    >(
+        market_id: u64,
+        integrator: address,
+        direction: bool,
+        min_base: u64,
+        max_base: u64,
+        min_quote: u64,
+        max_quote: u64,
+        limit_price: u64,
+        base_coins: Coin<BaseType>,
+        quote_coins: Coin<QuoteType>
+    ): (
+        Coin<BaseType>,
+        Coin<QuoteType>,
+        u64,
+        u64,
+        u64
+    ) acquires
+        MarketEventHandles,
+        OrderBooks
+    {
+        let (base_value, quote_value) = // Get coin value amounts.
+            (coin::value(&base_coins), coin::value(&quote_coins));
+        // Get option wrapped base coins.
+        let optional_base_coins = option::some(base_coins);
+        // Get quote coins to route through matching engine and update
+        // max match amounts based on side. If a swap buy:
+        let quote_coins_to_match = if (direction == BUY) {
+            // Max quote to trade is amount passed in.
+            max_quote = quote_value;
+            // If max base amount to trade is max possible flag, update
+            // to max amount that can be received.
+            if (max_base == MAX_POSSIBLE) max_base = (HI_64 - base_value);
+            // Pass all quote coins to matching engine.
+            coin::extract(&mut quote_coins, max_quote)
+        } else { // If a swap sell:
+            // Max base to trade is amount passed in.
+            max_base = base_value;
+            // If max quote amount to trade is max possible flag, update
+            // to max amount that can be received.
+            if (max_quote == MAX_POSSIBLE) max_quote = (HI_64 - quote_value);
+            // Do not pass any quote coins to matching engine.
+            coin::zero()
+        };
+        range_check_trade( // Range check trade amounts.
+            direction, min_base, max_base, min_quote, max_quote,
+            base_value, base_value, quote_value, quote_value);
+        // Swap against order book, discarding events.
+        let (
+            optional_base_coins,
+            quote_coins_matched,
+            base_traded,
+            quote_traded,
+            fees,
+            _,
+            _
+        ) = swap(
+            &mut vector[],
+            NO_TAKER_ADDRESS,
+            market_id,
+            NO_UNDERWRITER,
+            integrator,
+            direction,
+            min_base,
+            max_base,
+            min_quote,
+            max_quote,
+            limit_price,
+            optional_base_coins,
+            quote_coins_to_match
+        );
+        // Merge matched quote coins back into holdings.
+        coin::merge(&mut quote_coins, quote_coins_matched);
+        // Get base coins from option.
+        let base_coins = option::destroy_some(optional_base_coins);
+        // Return all coins.
+        (base_coins, quote_coins, base_traded, quote_traded, fees)
+    }
+
+    /// Swap against the order book for a generic market, under
+    /// authority of market underwriter.
+    ///
+    /// Passes all quote coins to matching engine if a buy. If a sell,
+    /// does not pass any quote coins to matching engine, to avoid
+    /// intermediate quote match overflow that could occur prior to fee
+    /// assessment.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `QuoteType`: Same as for `match()`.
+    ///
+    /// # Parameters
+    ///
+    /// * `market_id`: Same as for `match()`.
+    /// * `integrator`: Same as for `match()`.
+    /// * `direction`: Same as for `match()`.
+    /// * `min_base`: Same as for `match()`.
+    /// * `max_base`: Same as for `match()`.
+    /// * `min_quote`: Same as for `match()`.
+    /// * `max_quote`: Same as for `match()`. Ignored if a buy. Else if
+    ///   passed as `MAX_POSSIBLE` will attempt to trade maximum
+    ///   possible amount for passed coin holdings.
+    /// * `limit_price`: Same as for `match()`.
+    /// * `quote_coins`: Same as for `match()`.
+    /// * `underwriter_capability_ref`: Immutable reference to
+    ///   underwriter capability for given market.
+    ///
+    /// # Returns
+    ///
+    /// * `Coin<QuoteType>`: Updated quote coin holdings, same as for
+    ///   `match()`.
+    /// * `u64`: Base asset trade amount, same as for `match()`.
+    /// * `u64`: Quote coin trade amount, same as for `match()`.
+    /// * `u64`: Quote coin fees paid, same as for `match()`.
+    ///
+    /// # Testing
+    ///
+    /// * `test_swap_generic_buy_base_limiting()`
+    /// * `test_swap_generic_buy_quote_limiting()`
+    /// * `test_swap_generic_sell_max_quote_limiting()`
+    /// * `test_swap_generic_sell_no_max_base_limiting()`
+    /// * `test_swap_generic_sell_no_max_quote_limiting()`
+    public fun swap_generic<
+        QuoteType
+    >(
+        market_id: u64,
+        integrator: address,
+        direction: bool,
+        min_base: u64,
+        max_base: u64,
+        min_quote: u64,
+        max_quote: u64,
+        limit_price: u64,
+        quote_coins: Coin<QuoteType>,
+        underwriter_capability_ref: &UnderwriterCapability
+    ): (
+        Coin<QuoteType>,
+        u64,
+        u64,
+        u64
+    ) acquires
+        MarketEventHandles,
+        OrderBooks
+    {
+        let underwriter_id = // Get underwriter ID.
+            registry::get_underwriter_id(underwriter_capability_ref);
+        // Get quote coin value.
+        let quote_value = coin::value(&quote_coins);
+        // Get base asset value holdings and quote coins to route
+        // through matching engine, and update max match amounts based
+        // on side. If a swap buy:
+        let (base_value, quote_coins_to_match) = if (direction == BUY) {
+            // Max quote to trade is amount passed in.
+            max_quote = quote_value;
+            // Do not pass in base asset, and pass all quote coins to
+            // matching engine.
+            (0, coin::extract(&mut quote_coins, max_quote))
+        } else { // If a swap sell:
+            // If max quote amount to trade is max possible flag, update
+            // to max amount that can be received.
+            if (max_quote == MAX_POSSIBLE) max_quote = (HI_64 - quote_value);
+            // Effective base asset holdings are max trade amount, do
+            // not pass and quote coins to matching engine.
+            (max_base, coin::zero())
+        };
+        range_check_trade( // Range check trade amounts.
+            direction, min_base, max_base, min_quote, max_quote,
+            base_value, base_value, quote_value, quote_value);
+        // Swap against order book, discarding events.
+        let (
+            optional_base_coins,
+            quote_coins_matched,
+            base_traded,
+            quote_traded,
+            fees,
+            _,
+            _
+        ) = swap(
+            &mut vector[],
+            NO_TAKER_ADDRESS,
+            market_id,
+            underwriter_id,
+            integrator,
+            direction,
+            min_base,
+            max_base,
+            min_quote,
+            max_quote,
+            limit_price,
+            option::none(),
+            quote_coins_to_match
+        );
+        // Destroy empty base coin option.
+        option::destroy_none<Coin<GenericAsset>>(optional_base_coins);
+        // Merge matched quote coins back into holdings.
+        coin::merge(&mut quote_coins, quote_coins_matched);
+        // Return quote coins, amount of base traded, amount of quote
+        // traded, and quote fees paid.
+        (quote_coins, base_traded, quote_traded, fees)
+    }
+
     // Public functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     // Public entry functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -1668,6 +2026,28 @@ module econia::market {
             NO_CUSTODIAN,
             side,
             market_order_id);
+    }
+
+    /// Public entry function wrapper for `change_order_size()` for
+    /// changing order size under authority of signing user.
+    ///
+    /// # Invocation testing
+    ///
+    /// * `test_change_order_size_bid_user()`
+    public entry fun change_order_size_user(
+        user: &signer,
+        market_id: u64,
+        side: bool,
+        market_order_id: u128,
+        new_size: u64
+    ) acquires OrderBooks {
+        change_order_size(
+            address_of(user),
+            market_id,
+            NO_CUSTODIAN,
+            side,
+            market_order_id,
+            new_size);
     }
 
     /// Public entry function wrapper for
@@ -1767,7 +2147,34 @@ module econia::market {
             lot_size, tick_size, min_size, coin::withdraw(user, fee));
     }
 
-
+    /// Public entry function wrapper for `swap_between_coinstores()`.
+    ///
+    /// # Invocation testing
+    ///
+    /// * `test_swap_between_coinstores_register_base_store()`
+    /// * `test_swap_between_coinstores_register_quote_store()`
+    public entry fun swap_between_coinstores_entry<
+        BaseType,
+        QuoteType
+    >(
+        user: &signer,
+        market_id: u64,
+        integrator: address,
+        direction: bool,
+        min_base: u64,
+        max_base: u64,
+        min_quote: u64,
+        max_quote: u64,
+        limit_price: u64
+    ) acquires
+        MarketEventHandles,
+        OrderBooks,
+        SwapperEventHandles
+    {
+        swap_between_coinstores<BaseType, QuoteType>(
+            user, market_id, integrator, direction, min_base, max_base,
+            min_quote, max_quote, limit_price);
+    }
 
     // Public entry functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -1884,6 +2291,132 @@ module econia::market {
             market_order_id, CANCEL_REASON_MANUAL_CANCEL);
     }
 
+    /// Change maker order size on book and in user's market account.
+    ///
+    /// Priority for given price level is preserved for size decrease,
+    /// but lost for size increase.
+    ///
+    /// The market order ID is first checked to see if the AVL queue
+    /// access key encoded within can even be used for an AVL queue
+    /// borrow operation in the first place. Then during the call to
+    /// `user::change_order_size_internal()`, the market order ID is
+    /// again verified against the order access key derived from the AVL
+    /// queue borrow operation.
+    ///
+    /// # Parameters
+    ///
+    /// * `user`: Address of user holding maker order.
+    /// * `market_id`: Market ID of market.
+    /// * `custodian_id`: Market account custodian ID.
+    /// * `side`: `ASK` or `BID`, the maker order side.
+    /// * `market_order_id`: Market order ID of order on order book.
+    /// * `new_size`: The new order size to change to.
+    ///
+    /// # Aborts
+    ///
+    /// * `E_INVALID_MARKET_ORDER_ID`: Market order ID does not
+    ///   correspond to a valid order.
+    /// * `E_INVALID_MARKET_ID`: No market with given ID.
+    /// * `E_INVALID_USER`: Mismatch between `user` and user for order
+    ///   on book having given market order ID.
+    /// * `E_INVALID_CUSTODIAN`: Mismatch between `custodian_id` and
+    ///   custodian ID of order on order book having market order ID.
+    /// * `E_SIZE_CHANGE_BELOW_MIN_SIZE`: New order size is less than
+    ///   the minimum order size for market.
+    ///
+    /// # Expected value testing
+    ///
+    /// * `test_change_order_size_ask_custodian()`
+    /// * `test_change_order_size_bid_user()`
+    /// * `test_change_order_size_bid_user_new_tail()`
+    ///
+    /// # Failure testing
+    ///
+    /// * `test_change_order_size_below_min_size()`
+    /// * `test_change_order_size_insertion_error()`
+    /// * `test_change_order_size_invalid_custodian()`
+    /// * `test_change_order_size_invalid_market_id()`
+    /// * `test_change_order_size_invalid_market_order_id_bogus()`
+    /// * `test_change_order_size_invalid_market_order_id_null()`
+    /// * `test_change_order_size_invalid_user()`
+    fun change_order_size(
+        user: address,
+        market_id: u64,
+        custodian_id: u64,
+        side: bool,
+        market_order_id: u128,
+        new_size: u64
+    ) acquires OrderBooks {
+        // Get address of resource account where order books are stored.
+        let resource_address = resource_account::get_address();
+        let order_books_map_ref_mut = // Mutably borrow order books map.
+            &mut borrow_global_mut<OrderBooks>(resource_address).map;
+        // Assert order books map has order book with given market ID.
+        assert!(tablist::contains(order_books_map_ref_mut, market_id),
+                E_INVALID_MARKET_ID);
+        let order_book_ref_mut = // Mutably borrow market order book.
+            tablist::borrow_mut(order_books_map_ref_mut, market_id);
+        // Assert new size is at least minimum size for market.
+        assert!(new_size >= order_book_ref_mut.min_size,
+                E_SIZE_CHANGE_BELOW_MIN_SIZE);
+        // Mutably borrow corresponding orders AVL queue.
+        let orders_ref_mut = if (side == ASK) &mut order_book_ref_mut.asks
+            else &mut order_book_ref_mut.bids;
+        // Get AVL queue access key from market order ID.
+        let avlq_access_key = ((market_order_id & (HI_64 as u128)) as u64);
+        // Check if borrowing from the AVL queue is even possible.
+        let borrow_possible = avl_queue::contains_active_list_node_id(
+            orders_ref_mut, avlq_access_key);
+        // Assert that borrow from the AVL queue is possible.
+        assert!(borrow_possible, E_INVALID_MARKET_ORDER_ID);
+        // Check if order is at tail of queue for given price level.
+        let tail_of_price_level_queue =
+            avl_queue::is_local_tail(orders_ref_mut, avlq_access_key);
+        let order_ref_mut = // Mutably borrow order on order book.
+            avl_queue::borrow_mut(orders_ref_mut, avlq_access_key);
+        // Assert passed user address is user holding order.
+        assert!(user == order_ref_mut.user, E_INVALID_USER);
+        // Assert passed custodian ID matches that from order.
+        assert!(custodian_id == order_ref_mut.custodian_id,
+                E_INVALID_CUSTODIAN);
+        // Change order size user-side, thus verifying market order ID
+        // and new size.
+        user::change_order_size_internal(
+            user, market_id, custodian_id, side, order_ref_mut.size, new_size,
+            order_ref_mut.price, order_ref_mut.order_access_key,
+            market_order_id);
+        // Get order price.
+        let price = avl_queue::get_access_key_insertion_key(avlq_access_key);
+        // If size change is for a size decrease or if order is at tail
+        // of given price level:
+        if ((new_size < order_ref_mut.size) || tail_of_price_level_queue) {
+            // Mutate order on book to reflect new size, preserving spot
+            // in queue for the given price level.
+            order_ref_mut.size = new_size;
+        // If new size is more than old size (user-side function
+        // verifies that size is not equal) but order is not tail of
+        // queue for the given price level, priority should be lost:
+        } else {
+            // Remove order from AVL queue, pushing corresponding AVL
+            // queue list node onto unused list node stack.
+            let order = avl_queue::remove(orders_ref_mut, avlq_access_key);
+            order.size = new_size; // Mutate order size.
+            // Insert at back of queue for given price level.
+            let new_avlq_access_key =
+                avl_queue::insert(orders_ref_mut, price, order);
+            // Verify that new AVL queue access key is the same as
+            // before the size change: since list nodes are re-used, the
+            // AVL queue access key should be the same, even though the
+            // order is now the new tail of a doubly linked list for the
+            // given insertion key (back of queue for the given price
+            // level). Eviction is not checked because the AVL queue
+            // shape is the same before and after the remove/insert
+            // compound operation.
+            assert!(new_avlq_access_key == avlq_access_key,
+                    E_SIZE_CHANGE_INSERTION_ERROR);
+        };
+    }
+
     /// Get optional cancel reason for market order or swap.
     ///
     /// # Parameters
@@ -1930,7 +2463,260 @@ module econia::market {
         }
     }
 
-    
+    /// Index specified number of open orders for given side of order
+    /// book.
+    ///
+    /// # Testing
+    ///
+    /// * `test_get_open_orders()`
+    fun get_open_orders_for_side(
+        market_id: u64,
+        order_book_ref_mut: &mut OrderBook,
+        side: bool,
+        n_orders_max: u64
+    ): vector<OrderView> {
+        let orders = vector[]; // Initialize empty vector of orders.
+        // Get mutable reference to orders AVL queue for given side.
+        let avlq_ref_mut = if (side == ASK) &mut order_book_ref_mut.asks else
+            &mut order_book_ref_mut.bids;
+        // While there are still orders left to index:
+        while((vector::length(&orders) < n_orders_max) &&
+              (!avl_queue::is_empty(avlq_ref_mut))) {
+            // Remove and unpack order at head of queue.
+            let Order{size, price, user, custodian_id, order_access_key} =
+                avl_queue::pop_head(avlq_ref_mut);
+            // Get order ID from user-side order memory.
+            let order_id = option::destroy_some(
+                user::get_open_order_id_internal(user, market_id, custodian_id,
+                                                 side, order_access_key));
+            // Push back an order view to orders view vector.
+            vector::push_back(&mut orders, OrderView{
+                market_id, side, order_id, remaining_size: size, price, user,
+                custodian_id});
+        };
+        orders // Return vector of view-friendly orders.
+    }
+
+    /// Index specified number of open orders for given side of order
+    /// book, from given starting order ID.
+    ///
+    /// See `get_open_orders_paginated()`.
+    ///
+    /// # Testing
+    ///
+    /// * `test_get_open_orders_paginated()`
+    fun get_open_orders_for_side_paginated(
+        order_book_ref: &OrderBook,
+        market_id: u64,
+        side: bool,
+        n_orders_to_index_max: u64,
+        starting_order_id: u128
+    ): (
+        vector<OrderView>,
+        u128,
+    ) {
+        // Get immutable reference to orders AVL queue for given side.
+        let avlq_ref = if (side == ASK) &order_book_ref.asks else
+            &order_book_ref.bids;
+        let orders = vector[]; // Initialize empty vector of orders.
+        // Return early if no orders to index.
+        if (avl_queue::is_empty(avlq_ref) || n_orders_to_index_max == 0)
+            return (orders, (NIL as u128));
+        // Get order ID to index. If starting from best bid/ask:
+        let order_id = if (starting_order_id == (NIL as u128)) {
+            // Lookup order ID from user memory and reassign.
+            let order_ref = avl_queue::borrow_head(avlq_ref);
+            let optional_order_id = user::get_open_order_id_internal(
+                order_ref.user, market_id, order_ref.custodian_id, side,
+                order_ref.order_access_key);
+            option::destroy_some(optional_order_id)
+        } else {
+            starting_order_id
+        };
+        // Get AVL queue access key from order ID.
+        let avlq_access_key = get_order_id_avl_queue_access_key(order_id);
+        let n_indexed_orders = 0;
+        while (n_indexed_orders < n_orders_to_index_max) {
+            // Borrow next order to index in AVL queue.
+            let order_ref = avl_queue::borrow(avlq_ref, avlq_access_key);
+            // Get order ID from user-side order memory.
+            let order_id = option::destroy_some(
+                user::get_open_order_id_internal(
+                    order_ref.user, market_id, order_ref.custodian_id,
+                    side, order_ref.order_access_key));
+            // Push back an order view to orders view vector.
+            vector::push_back(&mut orders, OrderView{
+                market_id, side, order_id, remaining_size: order_ref.size,
+                price: order_ref.price, user: order_ref.user, custodian_id:
+                order_ref.custodian_id});
+            // Get access key for next order in AVL queue.
+            avlq_access_key = avl_queue::next_list_node_id_in_access_key(
+                avlq_ref, avlq_access_key);
+            // Stop indexing if no traversals left.
+            if (avlq_access_key == NIL) break;
+            n_indexed_orders = n_indexed_orders + 1;
+        };
+        let next_page_start = if (avlq_access_key == NIL) {
+            (NIL as u128)
+        } else {
+            // Borrow order for next page start.
+            let order_ref = avl_queue::borrow(avlq_ref, avlq_access_key);
+            let optional_order_id = user::get_open_order_id_internal(
+                order_ref.user, market_id, order_ref.custodian_id, side,
+                order_ref.order_access_key);
+            option::destroy_some(optional_order_id)
+        };
+        (orders, next_page_start)
+    }
+
+    /// Get AVL queue access key encoded in `order_id`.
+    ///
+    /// # Testing
+    ///
+    /// * `test_get_market_order_id_avl_queue_access_key()`
+    fun get_order_id_avl_queue_access_key(
+        order_id: u128
+    ): u64 {
+        ((order_id & (HI_64 as u128)) as u64)
+    }
+
+    /// Index specified number of price levels for given side of order
+    /// book.
+    ///
+    /// # Testing
+    ///
+    /// * `test_get_price_levels()`
+    /// * `test_get_price_levels_mismatch()`
+    fun get_price_levels_for_side(
+        order_book_ref_mut: &mut OrderBook,
+        side: bool,
+        n_price_levels_max: u64
+    ): vector<PriceLevel> {
+        // Initialize empty price levels vector.
+        let price_levels = vector[];
+        // Get mutable reference to orders AVL queue for given side.
+        let avlq_ref_mut = if (side == ASK) &mut order_book_ref_mut.asks else
+            &mut order_book_ref_mut.bids;
+        // While more price levels can be indexed:
+        while (vector::length(&price_levels) < n_price_levels_max) {
+            let size = 0; // Initialize price level size to 0.
+            // Get optional price of order at head of queue.
+            let optional_head_price = avl_queue::get_head_key(avlq_ref_mut);
+            // If there is an order at the head of the queue:
+            if (option::is_some(&optional_head_price)) {
+                // Unpack its price as the price tracker for the level.
+                let price = option::destroy_some(optional_head_price);
+                // While orders still left on book:
+                while (!avl_queue::is_empty(avlq_ref_mut)) {
+                    // If order at head of the queue is in price level:
+                    if (option::contains(
+                            &avl_queue::get_head_key(avlq_ref_mut), &price)) {
+                        // Pop order, storing only its size and price.
+                        let Order{
+                            size: order_size,
+                            price: order_price,
+                            user: _,
+                            custodian_id: _,
+                            order_access_key: _
+                        } = avl_queue::pop_head(avlq_ref_mut);
+                        // Verify order price equals insertion key.
+                        assert!(order_price == price, E_ORDER_PRICE_MISMATCH);
+                        // Increment tracker for price level size. Note
+                        // that no overflow is checked because an open
+                        // order's size is a u64, and an AVL queue can
+                        // hold at most 2 ^ 14 - 1 open orders.
+                        size = size + (order_size as u128);
+                    } else { // If order at head of queue not in level:
+                        break // Break of out loop over head of queue.
+                    }
+                };
+                // Push back price level to price levels vector.
+                vector::push_back(&mut price_levels, PriceLevel{price, size});
+            } else { // If no order at the head of the queue:
+                break // Break of out loop on price level vector length.
+            }
+        };
+        price_levels // Return vector of price levels.
+    }
+
+    /// Index specified number of open orders for given side of order
+    /// book into price levels, starting from given starting order ID.
+    ///
+    /// See `get_price_levels_paginated()`.
+    ///
+    /// # Testing
+    ///
+    /// * `test_price_levels_paginated()`
+    fun get_price_levels_for_side_paginated(
+        order_book_ref: &OrderBook,
+        market_id: u64,
+        side: bool,
+        n_orders_to_index_max: u64,
+        starting_order_id: u128 // If `NIL`, start from best bid/ask.
+    ): (
+        vector<PriceLevel>,
+        u128, // Order ID for start of next page, `NIL` if done.
+    ) {
+        // Get immutable reference to orders AVL queue for given side.
+        let avlq_ref = if (side == ASK) &order_book_ref.asks else
+            &order_book_ref.bids;
+        // Initialize empty price levels vector.
+        let price_levels = vector[];
+        // Return early if no orders to index.
+        if (avl_queue::is_empty(avlq_ref) || n_orders_to_index_max == 0)
+            return (price_levels, (NIL as u128));
+        // Get order ID to index. If starting from best bid/ask:
+        let order_id = if (starting_order_id == (NIL as u128)) {
+            // Lookup order ID from user memory and reassign.
+            let order_ref = avl_queue::borrow_head(avlq_ref);
+            let optional_order_id = user::get_open_order_id_internal(
+                order_ref.user, market_id, order_ref.custodian_id, side,
+                order_ref.order_access_key);
+            option::destroy_some(optional_order_id)
+        } else {
+            starting_order_id
+        };
+        // Get AVL queue access key from order ID.
+        let avlq_access_key = get_order_id_avl_queue_access_key(order_id);
+        // Get price for starting price level.
+        let price = avl_queue::borrow(avlq_ref, avlq_access_key).price;
+        // Initialize size for price level to 0.
+        let size = 0;
+        let n_indexed_orders = 0;
+        while (n_indexed_orders < n_orders_to_index_max) {
+            // Borrow next order to index in AVL queue.
+            let order_ref = avl_queue::borrow(avlq_ref, avlq_access_key);
+            // If in same price level, increment size:
+            if (order_ref.price == price) {
+                size = size + (order_ref.size as u128);
+            // If in new level, push back prior one and start anew.
+            } else {
+                vector::push_back(&mut price_levels, PriceLevel{price, size});
+                price = order_ref.price;
+                size = (order_ref.size as u128);
+            };
+            // Get access key for next order in AVL queue.
+            avlq_access_key = avl_queue::next_list_node_id_in_access_key(
+                avlq_ref, avlq_access_key);
+            // Stop indexing if no traversals left.
+            if (avlq_access_key == NIL) break;
+            n_indexed_orders = n_indexed_orders + 1;
+        };
+        // Push back final price level.
+        vector::push_back(&mut price_levels, PriceLevel{price, size});
+        let next_page_start = if (avlq_access_key == NIL) {
+            (NIL as u128)
+        } else {
+            // Borrow order for next page start.
+            let order_ref = avl_queue::borrow(avlq_ref, avlq_access_key);
+            let optional_order_id = user::get_open_order_id_internal(
+                order_ref.user, market_id, order_ref.custodian_id, side,
+                order_ref.order_access_key);
+            option::destroy_some(optional_order_id)
+        };
+        (price_levels, next_page_start)
+    }
+
     /// Initialize the order books map upon module publication.
     fun init_module(
         _econia: &signer
@@ -3365,6 +4151,32 @@ module econia::market {
          place_swap_order_event_option, cancel_order_event_option)
     }
 
+    /// Verify pagination function order IDs are valid for market.
+    ///
+    /// # Failure testing
+    ///
+    /// * `test_verify_pagination_order_ids_ask_does_not_exist()`
+    /// * `test_verify_pagination_order_ids_ask_wrong_side()`
+    /// * `test_verify_pagination_order_ids_bid_does_not_exist()`
+    /// * `test_verify_pagination_order_ids_bid_wrong_side()`
+    // fun verify_pagination_order_ids(
+    //     market_id: u64,
+    //     starting_ask_order_id: u128,
+    //     starting_bid_order_id: u128,
+    // ) acquires OrderBooks {
+    //     if (starting_ask_order_id != (NIL as u128)) {
+    //         assert!(has_open_order(market_id, starting_ask_order_id),
+    //                 E_INVALID_MARKET_ORDER_ID);
+    //         assert!(get_posted_order_id_side(starting_ask_order_id) == ASK,
+    //                 E_INVALID_MARKET_ORDER_ID);
+    //     };
+    //     if (starting_bid_order_id != (NIL as u128)) {
+    //         assert!(has_open_order(market_id, starting_bid_order_id),
+    //                 E_INVALID_MARKET_ORDER_ID);
+    //         assert!(get_posted_order_id_side(starting_bid_order_id) == BID,
+    //                 E_INVALID_MARKET_ORDER_ID);
+    //     };
+    // }
 
     // Private functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -3412,17 +4224,6 @@ module econia::market {
     // Deprecated functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     // Test-only functions >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    // Test-only functions <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-    // Test-only constants >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    
-
-    // Test-only constants <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-    // Tests >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
     // Tests <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 }
