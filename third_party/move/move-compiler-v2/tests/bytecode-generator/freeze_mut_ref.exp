@@ -108,7 +108,7 @@ module 0x42::freeze_mut_ref {
 [variant baseline]
 public fun freeze_mut_ref::borrow_mut<#0>($t0: &mut vector<#0>): &#0 {
      var $t1: &#0
-     var $t2: &#0
+     var $t2: &mut #0
      var $t3: u64
   0: $t3 := 0
   1: $t2 := vector::borrow_mut<#0>($t0, $t3)

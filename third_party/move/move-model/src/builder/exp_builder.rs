@@ -2924,7 +2924,22 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
                 // Check result type against expected type.
                 let ty = self.check_type(loc, &result_type, expected_type, context);
-                let id = self.new_node_id_with_type_loc(&ty, loc);
+                // When the expected type of this call is an immutable reference while the actual return type is mutable
+                // the type of the call should be mutable,
+                // otherwise, the type info in the bytecode will be incorrect.
+                // the freeze operation below will make sure the expression after freeze is immutable
+                let id = if result_type.is_mutable_reference() && ty.is_immutable_reference() {
+                    if let Type::Reference(_, inner_ty) = ty {
+                        self.new_node_id_with_type_loc(
+                            &Type::Reference(ReferenceKind::Mutable, inner_ty),
+                            loc,
+                        )
+                    } else {
+                        self.new_node_id_with_type_loc(&ty, loc)
+                    }
+                } else {
+                    self.new_node_id_with_type_loc(&ty, loc)
+                };
                 self.set_node_instantiation(id, instantiation.clone());
 
                 // Map implementation operations to specification ops if compiling function as spec
