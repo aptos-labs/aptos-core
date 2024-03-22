@@ -14,10 +14,13 @@
 module aptos_framework::primary_fungible_store {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
+    use aptos_framework::transaction_context;
 
     use std::option::Option;
     use std::signer;
     use std::string::String;
+
+    friend aptos_framework::transaction_fee;
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
@@ -87,7 +90,7 @@ module aptos_framework::primary_fungible_store {
     /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        object::create_user_derived_object_address(owner, metadata_addr)
+        transaction_context::create_user_derived_object_address(owner, metadata_addr)
     }
 
     #[view]
@@ -111,6 +114,26 @@ module aptos_framework::primary_fungible_store {
         } else {
             0
         }
+    }
+
+    #[view]
+    public fun apt_balance(account: address): u64 {
+        let store_addr = transaction_context::create_user_derived_object_address(account, @aptos_fungible_asset);
+        fungible_asset::balance_from_address(store_addr)
+    }
+
+    public(friend) fun burn_from_apt(
+        account: address,
+        amount: u64,
+    ) {
+        // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
+        if (amount == 0) {
+            return
+        };
+
+        let store_addr = transaction_context::create_user_derived_object_address(account, @aptos_fungible_asset);
+        let fa = fungible_asset::withdraw_internal(store_addr, amount);
+        fungible_asset::burn_internal(fa);
     }
 
     #[view]

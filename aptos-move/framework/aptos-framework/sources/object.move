@@ -177,6 +177,10 @@ module aptos_framework::object {
         Object<T> { inner: object }
     }
 
+    public(friend) fun address_to_object_unchecked<T: key>(object: address): Object<T> {
+        Object<T> { inner: object }
+    }
+
     /// Returns true if there exists an object or the remnants of an object.
     public fun is_object(object: address): bool {
         exists<ObjectCore>(object)
@@ -197,10 +201,11 @@ module aptos_framework::object {
 
     /// Derives an object address from the source address and an object: sha3_256([source | object addr | 0xFC]).
     public fun create_user_derived_object_address(source: address, derive_from: address): address {
-        let bytes = bcs::to_bytes(&source);
-        vector::append(&mut bytes, bcs::to_bytes(&derive_from));
-        vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
-        from_bcs::to_address(hash::sha3_256(bytes))
+        transaction_context::create_user_derived_object_address(source, derive_from)
+        // let bytes = bcs::to_bytes(&source);
+        // vector::append(&mut bytes, bcs::to_bytes(&derive_from));
+        // vector::push_back(&mut bytes, OBJECT_DERIVED_SCHEME);
+        // from_bcs::to_address(hash::sha3_256(bytes))
     }
 
     /// Derives an object from an Account GUID.
@@ -234,7 +239,7 @@ module aptos_framework::object {
     /// Create a new object whose address is derived based on the creator account address and another object.
     /// Derivde objects, similar to named objects, cannot be deleted.
     public(friend) fun create_user_derived_object(creator_address: address, derive_ref: &DeriveRef): ConstructorRef {
-        let obj_addr = create_user_derived_object_address(creator_address, derive_ref.self);
+        let obj_addr = transaction_context::create_user_derived_object_address(creator_address, derive_ref.self);
         create_object_internal(creator_address, obj_addr, false)
     }
 

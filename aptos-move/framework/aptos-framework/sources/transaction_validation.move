@@ -13,6 +13,9 @@ module aptos_framework::transaction_validation {
     use aptos_framework::timestamp;
     use aptos_framework::transaction_fee;
 
+    use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, MintRef, TransferRef, BurnRef};
+    use aptos_framework::primary_fungible_store;
+
     friend aptos_framework::genesis;
 
     /// This holds information that will be picked up by the VM to call the
@@ -129,12 +132,15 @@ module aptos_framework::transaction_validation {
             );
         };
 
+        // let apt_fa = coin::apt_fa_metadata(); // ensure_paired_metadata<AptosCoin>();
+
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        assert!(
-            coin::is_account_registered<AptosCoin>(gas_payer),
-            error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-        );
-        let balance = coin::balance<AptosCoin>(gas_payer);
+        // assert!(
+        //     primary_fungible_store::primary_store_exists(gas_payer, apt_fa),
+        //     error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+        // );
+        let balance = primary_fungible_store::apt_balance(gas_payer);
+        // let balance = coin::balance<AptosCoin>(gas_payer);
         assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
     }
 
@@ -274,8 +280,10 @@ module aptos_framework::transaction_validation {
         let transaction_fee_amount = txn_gas_price * gas_used;
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
+        // let apt_fa = coin::apt_fa_metadata(); // ensure_paired_metadata<AptosCoin>();
         assert!(
-            coin::balance<AptosCoin>(gas_payer) >= transaction_fee_amount,
+            primary_fungible_store::apt_balance(gas_payer) >= transaction_fee_amount,
+            // coin::balance<AptosCoin>(gas_payer) >= transaction_fee_amount,
             error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
 

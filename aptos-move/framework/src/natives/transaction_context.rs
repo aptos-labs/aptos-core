@@ -3,7 +3,7 @@
 
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeResult
 };
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use better_any::{Tid, TidAble};
@@ -11,7 +11,7 @@ use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
-use std::collections::VecDeque;
+use std::{cell::RefCell, collections::{HashMap, VecDeque}};
 
 /// The native transaction context extension. This needs to be attached to the
 /// NativeContextExtensions value which is passed into session functions, so it
@@ -24,6 +24,8 @@ pub struct NativeTransactionContext {
     auid_counter: u64,
     script_hash: Vec<u8>,
     chain_id: u8,
+
+    derived_addresses: RefCell<HashMap<(AccountAddress, AccountAddress), AccountAddress>>,
 }
 
 impl NativeTransactionContext {
@@ -35,6 +37,7 @@ impl NativeTransactionContext {
             auid_counter: 0,
             script_hash,
             chain_id,
+            derived_addresses: RefCell::new(HashMap::new()),
         }
     }
 
@@ -112,6 +115,31 @@ fn native_get_script_hash(
     )])
 }
 
+
+/**
+ * public native fun create_user_derived_object_address(source: address, derive_from: address): address;
+ */
+fn native_create_user_derived_object_address(
+    context: &mut SafeNativeContext,
+    ty_args: Vec<Type>,
+    mut args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    debug_assert!(ty_args.is_empty());
+    debug_assert!(args.len() == 2);
+    let transaction_context = context.extensions().get::<NativeTransactionContext>();
+    let derive_from = safely_pop_arg!(args, AccountAddress);
+    let source = safely_pop_arg!(args, AccountAddress);
+
+    let derived_address = *transaction_context.derived_addresses.borrow_mut().entry((derive_from, source)).or_insert_with(|| {
+        let mut bytes = source.to_vec();
+        bytes.append(&mut derive_from.to_vec());
+        bytes.push(0xFC);
+        AccountAddress::from_bytes(aptos_crypto::hash::HashValue::sha3_256_of(&bytes).to_vec()).unwrap()
+    });
+
+    Ok(smallvec![Value::address(derived_address)])
+}
+
 /***************************************************************************************************
  * module
  *
@@ -123,6 +151,7 @@ pub fn make_all(
         ("get_script_hash", native_get_script_hash as RawSafeNative),
         ("generate_unique_address", native_generate_unique_address),
         ("get_txn_hash", native_get_txn_hash),
+        ("create_user_derived_object_address", native_create_user_derived_object_address),
     ];
 
     builder.make_named_natives(natives)

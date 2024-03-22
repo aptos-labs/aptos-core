@@ -31,6 +31,7 @@ This module provides the foundation for typesafe Coins.
 -  [Constants](#@Constants_0)
 -  [Function `borrow_conversion_map_mut`](#0x1_coin_borrow_conversion_map_mut)
 -  [Function `paired_metadata`](#0x1_coin_paired_metadata)
+-  [Function `apt_fa_metadata`](#0x1_coin_apt_fa_metadata)
 -  [Function `ensure_paired_metadata`](#0x1_coin_ensure_paired_metadata)
 -  [Function `paired_coin`](#0x1_coin_paired_coin)
 -  [Function `coin_to_fungible_asset`](#0x1_coin_coin_to_fungible_asset)
@@ -1187,6 +1188,34 @@ Get the paired fungible asset metadata object of a coin type. If not exist, retu
         }
     };
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_coin_apt_fa_metadata"></a>
+
+## Function `apt_fa_metadata`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_apt_fa_metadata">apt_fa_metadata</a>(): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_apt_fa_metadata">apt_fa_metadata</a>(): Object&lt;Metadata&gt; {
+    // <b>if</b> object::exists(@aptos_fungible_asset) {
+    //     <b>return</b> <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(@aptos_fungible_asset)
+    // } <b>else</b> {
+    // }
+    <a href="object.md#0x1_object_address_to_object_unchecked">object::address_to_object_unchecked</a>&lt;Metadata&gt;(@aptos_fungible_asset)
 }
 </code></pre>
 
@@ -2391,29 +2420,29 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
     account_addr: <b>address</b>,
     amount: u64,
     burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;,
-) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
+) <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
     <b>if</b> (amount == 0) {
         <b>return</b>
     };
 
-    <b>let</b> (coin_amount_to_burn, fa_amount_to_burn) = <a href="coin.md#0x1_coin_calculate_amount_to_withdraw">calculate_amount_to_withdraw</a>&lt;CoinType&gt;(
+    // <b>let</b> (coin_amount_to_burn, fa_amount_to_burn) = <a href="coin.md#0x1_coin_calculate_amount_to_withdraw">calculate_amount_to_withdraw</a>&lt;CoinType&gt;(
+    //     account_addr,
+    //     amount
+    // );
+    // <b>if</b> (coin_amount_to_burn &gt; 0) {
+    //     <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+    //     <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, coin_amount_to_burn);
+    //     <a href="coin.md#0x1_coin_burn">burn</a>(coin_to_burn, burn_cap);
+    // };
+    // <b>if</b> (fa_amount_to_burn &gt; 0) {
+    <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(
         account_addr,
-        amount
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;())
     );
-    <b>if</b> (coin_amount_to_burn &gt; 0) {
-        <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
-        <b>let</b> coin_to_burn = <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, coin_amount_to_burn);
-        <a href="coin.md#0x1_coin_burn">burn</a>(coin_to_burn, burn_cap);
-    };
-    <b>if</b> (fa_amount_to_burn &gt; 0) {
-        <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(
-            account_addr,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;())
-        );
-        <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, fa_amount_to_burn);
-        <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
-    };
+    <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount);
+    <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
+    // };
 }
 </code></pre>
 

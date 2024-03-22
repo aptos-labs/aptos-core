@@ -24,6 +24,7 @@ module aptos_framework::coin {
     friend aptos_framework::aptos_coin;
     friend aptos_framework::genesis;
     friend aptos_framework::transaction_fee;
+    friend aptos_framework::transaction_validation;
 
     //
     // Errors.
@@ -254,6 +255,14 @@ module aptos_framework::coin {
             }
         };
         option::none()
+    }
+
+    public fun apt_fa_metadata(): Object<Metadata> {
+        // if object::exists(@aptos_fungible_asset) {
+        //     return object::address_to_object<Metadata>(@aptos_fungible_asset)
+        // } else {
+        // }
+        object::address_to_object_unchecked<Metadata>(@aptos_fungible_asset)
     }
 
     /// Get the paired fungible asset metadata object of a coin type, create if not exist.
@@ -733,30 +742,48 @@ module aptos_framework::coin {
         account_addr: address,
         amount: u64,
         burn_cap: &BurnCapability<CoinType>,
-    ) acquires CoinInfo, CoinStore, CoinConversionMap {
+    ) acquires CoinConversionMap {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount == 0) {
             return
         };
 
-        let (coin_amount_to_burn, fa_amount_to_burn) = calculate_amount_to_withdraw<CoinType>(
+        // let (coin_amount_to_burn, fa_amount_to_burn) = calculate_amount_to_withdraw<CoinType>(
+        //     account_addr,
+        //     amount
+        // );
+        // if (coin_amount_to_burn > 0) {
+        //     let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
+        //     let coin_to_burn = extract(&mut coin_store.coin, coin_amount_to_burn);
+        //     burn(coin_to_burn, burn_cap);
+        // };
+        // if (fa_amount_to_burn > 0) {
+        let store_addr = primary_fungible_store::primary_store_address(
             account_addr,
-            amount
+            option::destroy_some(paired_metadata<CoinType>())
         );
-        if (coin_amount_to_burn > 0) {
-            let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
-            let coin_to_burn = extract(&mut coin_store.coin, coin_amount_to_burn);
-            burn(coin_to_burn, burn_cap);
-        };
-        if (fa_amount_to_burn > 0) {
-            let store_addr = primary_fungible_store::primary_store_address(
-                account_addr,
-                option::destroy_some(paired_metadata<CoinType>())
-            );
-            let fa = fungible_asset::withdraw_internal(store_addr, fa_amount_to_burn);
-            fungible_asset::burn_internal(fa);
-        };
+        let fa = fungible_asset::withdraw_internal(store_addr, amount);
+        fungible_asset::burn_internal(fa);
+        // };
     }
+
+    // public fun burn_from_apt<CoinType>(
+    //     account_addr: address,
+    //     amount: u64,
+    //     burn_cap: &BurnCapability<CoinType>,
+    // ) {
+    //     // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
+    //     if (amount == 0) {
+    //         return
+    //     };
+    //     let apt_fa = apt_fa_metadata();
+    //     let store_addr = primary_fungible_store::primary_store_address(
+    //         account_addr,
+    //         apt_fa
+    //     );
+    //     let fa = fungible_asset::withdraw_internal(store_addr, amount);
+    //     fungible_asset::burn_internal(fa);
+    // }
 
     /// Deposit the coin balance into the recipient's account and emit an event.
     public fun deposit<CoinType>(

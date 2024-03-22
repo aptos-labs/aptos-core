@@ -35,6 +35,7 @@ make it so that a reference to a global object can be returned from a function.
 -  [Constants](#@Constants_0)
 -  [Function `is_burnt`](#0x1_object_is_burnt)
 -  [Function `address_to_object`](#0x1_object_address_to_object)
+-  [Function `address_to_object_unchecked`](#0x1_object_address_to_object_unchecked)
 -  [Function `is_object`](#0x1_object_is_object)
 -  [Function `object_exists`](#0x1_object_object_exists)
 -  [Function `create_object_address`](#0x1_object_create_object_address)
@@ -727,6 +728,30 @@ Produces an ObjectId from the given address. This is not verified.
 
 </details>
 
+<a id="0x1_object_address_to_object_unchecked"></a>
+
+## Function `address_to_object_unchecked`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_address_to_object_unchecked">address_to_object_unchecked</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_address_to_object_unchecked">address_to_object_unchecked</a>&lt;T: key&gt;(<a href="object.md#0x1_object">object</a>: <b>address</b>): <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; {
+    <a href="object.md#0x1_object_Object">Object</a>&lt;T&gt; { inner: <a href="object.md#0x1_object">object</a> }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_object_is_object"></a>
 
 ## Function `is_object`
@@ -822,10 +847,11 @@ Derives an object address from the source address and an object: sha3_256([sourc
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b> {
-    <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&source);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&derive_from));
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, <a href="object.md#0x1_object_OBJECT_DERIVED_SCHEME">OBJECT_DERIVED_SCHEME</a>);
-    <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes))
+    <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(source, derive_from)
+    // <b>let</b> bytes = <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&source);
+    // <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(&<b>mut</b> bytes, <a href="../../aptos-stdlib/../move-stdlib/doc/bcs.md#0x1_bcs_to_bytes">bcs::to_bytes</a>(&derive_from));
+    // <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> bytes, <a href="object.md#0x1_object_OBJECT_DERIVED_SCHEME">OBJECT_DERIVED_SCHEME</a>);
+    // <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_to_address">from_bcs::to_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash_sha3_256">hash::sha3_256</a>(bytes))
 }
 </code></pre>
 
@@ -979,7 +1005,7 @@ Derivde objects, similar to named objects, cannot be deleted.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="object.md#0x1_object_create_user_derived_object">create_user_derived_object</a>(creator_address: <b>address</b>, derive_ref: &<a href="object.md#0x1_object_DeriveRef">DeriveRef</a>): <a href="object.md#0x1_object_ConstructorRef">ConstructorRef</a> {
-    <b>let</b> obj_addr = <a href="object.md#0x1_object_create_user_derived_object_address">create_user_derived_object_address</a>(creator_address, derive_ref.self);
+    <b>let</b> obj_addr = <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(creator_address, derive_ref.self);
     <a href="object.md#0x1_object_create_object_internal">create_object_internal</a>(creator_address, obj_addr, <b>false</b>)
 }
 </code></pre>

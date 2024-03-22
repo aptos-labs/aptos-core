@@ -9,6 +9,7 @@
 -  [Function `get_txn_hash`](#0x1_transaction_context_get_txn_hash)
 -  [Function `get_transaction_hash`](#0x1_transaction_context_get_transaction_hash)
 -  [Function `generate_unique_address`](#0x1_transaction_context_generate_unique_address)
+-  [Function `create_user_derived_object_address`](#0x1_transaction_context_create_user_derived_object_address)
 -  [Function `generate_auid_address`](#0x1_transaction_context_generate_auid_address)
 -  [Function `get_script_hash`](#0x1_transaction_context_get_script_hash)
 -  [Function `generate_auid`](#0x1_transaction_context_generate_auid)
@@ -130,6 +131,28 @@ from other ways of generating unique addresses.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_generate_unique_address">generate_unique_address</a>(): <b>address</b>;
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_context_create_user_derived_object_address"></a>
+
+## Function `create_user_derived_object_address`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>native</b> <b>fun</b> <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">create_user_derived_object_address</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
 </code></pre>
 
 

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
-    move_types::account_address::AccountAddress,
+    bcs,
+    move_types::{account_address::AccountAddress, ident_str, language_storage::{ModuleId, TypeTag}},
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
+    types::{chain_id::ChainId, transaction::{EntryFunction, SignedTransaction, TransactionPayload}, LocalAccount},
 };
 use rand::{
     distributions::{Distribution, Standard},
@@ -16,6 +17,7 @@ use std::{
     cmp::{max, min},
     sync::Arc,
 };
+use std::str::FromStr;
 
 pub enum SamplingMode {
     /// See `BasicSampler`.
@@ -178,7 +180,24 @@ impl P2PTransactionGenerator {
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
         from.sign_with_transaction_builder(
-            txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
+            // txn_factory.payload(aptos_stdlib::aptos_account_transfer(*to, num_coins)),
+            // txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins)),
+
+            txn_factory.payload(TransactionPayload::EntryFunction(EntryFunction::new(
+                ModuleId::new(
+                    AccountAddress::ONE,
+                    ident_str!("primary_fungible_store").to_owned(),
+                ),
+                ident_str!("transfer").to_owned(),
+                vec![
+                    TypeTag::from_str("0x1::fungible_asset::Metadata").unwrap(),
+                ],
+                vec![
+                    bcs::to_bytes(&AccountAddress::TEN).unwrap(),
+                    bcs::to_bytes(to).unwrap(),
+                    bcs::to_bytes(&num_coins).unwrap()
+                ],
+            )))
         )
     }
 
