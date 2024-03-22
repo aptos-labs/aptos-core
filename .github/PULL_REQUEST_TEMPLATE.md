@@ -9,6 +9,7 @@
 - [ ] Refactoring
 - [ ] Dependency update
 - [ ] Documentation update
+- [ ] Tests
 
 ## Which Components or Systems Does This Change Impact?
 - [ ] Validator Node
