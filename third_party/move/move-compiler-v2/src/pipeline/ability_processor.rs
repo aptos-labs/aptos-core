@@ -113,6 +113,8 @@ impl FunctionTargetProcessor for AbilityProcessor {
             copy_drop,
         };
         transformer.run(code);
+        // Clear annotations as code has changed
+        transformer.builder.data.annotations.clear();
         transformer.builder.data
     }
 

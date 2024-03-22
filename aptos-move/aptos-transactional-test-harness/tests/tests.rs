@@ -12,7 +12,9 @@ fn runner(path: &Path) -> anyhow::Result<(), Box<dyn std::error::Error>> {
     if path.to_str().unwrap().contains("v2-tests/") {
         // TODO: we may later want to change this to comparison testing. For now we are mostly
         //    interested in debugging v2 bytecode.
-        run_aptos_test_with_config(path, TestRunConfig::CompilerV2)
+        run_aptos_test_with_config(path, TestRunConfig::CompilerV2 {
+            v2_experiments: vec![],
+        })
     } else {
         run_aptos_test_with_config(path, TestRunConfig::CompilerV1)
     }

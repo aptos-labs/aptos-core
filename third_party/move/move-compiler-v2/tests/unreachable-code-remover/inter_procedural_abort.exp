@@ -31,10 +31,25 @@ fun m::test(): u64 {
 [variant baseline]
 fun m::always_abort() {
      var $t0: u64
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   0: $t0 := 0
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   1: abort($t0)
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
   2: return ()
 }
@@ -47,20 +62,60 @@ fun m::test(): u64 {
      var $t2: u64
      var $t3: u64
      var $t4: u64
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   0: m::always_abort()
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   1: $t2 := 0
+     # live vars: $t2
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   2: $t1 := infer($t2)
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   3: $t4 := 1
+     # live vars: $t1, $t4
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   4: $t3 := +($t1, $t4)
+     # live vars: $t3
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   5: $t1 := infer($t3)
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   6: $t0 := infer($t1)
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   7: return $t0
 }

@@ -1,0 +1,28 @@
+
+Diagnostics:
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:14:18
+   │
+13 │         let c = &mut inner.f1;
+   │                 ------------- previous mutable field borrow
+14 │         let f1 = &inner.f1;
+   │                  ^^^^^^^^^ immutable borrow attempted here
+15 │         *f1;
+   │         --- requirement enforced here
+16 │         *c;
+   │         -- conflicting reference `c` used here
+
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_field_field_invalid.move:21:18
+   │
+20 │         let c = id_mut(&mut inner.f1);
+   │                 ---------------------
+   │                 │      │
+   │                 │      previous mutable field borrow
+   │                 used by mutable call result
+21 │         let f1 = &inner.f1;
+   │                  ^^^^^^^^^ immutable borrow attempted here
+22 │         *f1;
+   │         --- requirement enforced here
+23 │         *c;
+   │         -- conflicting reference `c` used here
