@@ -192,7 +192,9 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
         _history: &Vec<String>,
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
+        println!("ReuseAccountsPoolWrapperGenerator::generate_transactions: num_to_create: {}", num_to_create);
         if self.market_makers.len() < 7 {
+            println!("ReuseAccountsPoolWrapperGenerator::loading_market_maker {}", self.market_makers.len());
             self.market_makers = self.source_accounts_pool.take_from_pool(7, true, &mut StdRng::from_entropy());
         }
         // println!("generate_transactions: num_to_create: {}", num_to_create);
@@ -263,8 +265,10 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
                 return txns;
             }
         }
+        println!("ReuseAccountsPoolWrapperGenerator::generate_transactions: non-market-maker");
         let mut accounts_to_use = self.source_accounts_pool.take_from_pool(1, true, &mut self.rng);
         if accounts_to_use.is_empty() {
+            println!("ReuseAccountsPoolWrapperGenerator::generate_transactions: accounts_to_use is empty");
             return Vec::new();
         }
         let txns: Vec<SignedTransaction> = accounts_to_use
@@ -282,7 +286,7 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
         accounts_to_use = accounts_to_use.into_iter().map(|(account, history)| {
                                                         if let Some(function_name) = function_calls.get(&account.address()) {
                                                             let mut history = history.clone();
-                                                            history.push(function_name.clone()); 
+                                                            history.push(function_name.clone());
                                                             (account, history)
                                                         } else {
                                                             (account, history)
@@ -291,6 +295,7 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
                                                 ).collect();
 
         self.source_accounts_pool.add_to_pool(accounts_to_use);
+        println!("ReuseAccountsPoolWrapperGenerator::source_pool_len {}", self.source_accounts_pool.len());
         txns
     }
 }
