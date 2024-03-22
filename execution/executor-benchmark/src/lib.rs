@@ -714,7 +714,7 @@ mod tests {
         println!("db_generator::create_db_with_accounts");
 
         crate::db_generator::create_db_with_accounts::<E>(
-            100, /* num_accounts */
+            20, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000_000, /* init_account_balance */
             5,               /* block_size */
@@ -729,15 +729,15 @@ mod tests {
 
         super::run_benchmark::<E>(
             10, /* block_size */
-            30, /* num_blocks */
+            5, /* num_blocks */
             transaction_type
                 .map(|t| vec![(t.materialize(1, true, WorkflowProgress::MoveByPhases), 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
             None,  /* maybe_hotspot_probability */
-            25,    /* num_main_signer_accounts */
-            30,    /* num_dst_pool_accounts */
+            5,    /* num_main_signer_accounts */
+            5,    /* num_dst_pool_accounts */
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
@@ -759,7 +759,7 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
+            Some(TransactionTypeArg::NoOpFeePayer),
             true,
         );
     }

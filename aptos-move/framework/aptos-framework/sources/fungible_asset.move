@@ -639,7 +639,6 @@ module aptos_framework::fungible_asset {
         amount: u64,
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
         assert!(exists<FungibleStore>(store_addr), error::not_found(EFUNGIBLE_STORE_EXISTENCE));
-        assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
 
         if (auto_upgrade_to_concurrent_fungible_balance() || concurrent_fungible_balance_exists(store_addr)) {
             ensure_store_upgraded_to_concurrent_internal(store_addr);
