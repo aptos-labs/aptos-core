@@ -221,6 +221,8 @@ def workflow_dispatch_forge(
         f"FORGE_TEST_SUITE={test_suite}",
         "--field",
         f"FORGE_CLUSTER_NAME={FORGE_DEFAULT_CLUSTER_NAME}",
+        "--field",
+        f"GIT_SHA={git_sha}",
         "--repo",
         repo,
     ]
