@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{sync_info::SyncInfo, vote::Vote};
+use crate::{sync_info::SyncInfo, vote::{Vote, OrderVote}};
 use anyhow::ensure;
 use aptos_crypto::HashValue;
 use aptos_types::validator_verifier::ValidatorVerifier;
@@ -68,6 +68,39 @@ impl VoteMsg {
         // We're not verifying SyncInfo here yet: we are going to verify it only in case we need
         // it. This way we avoid verifying O(n) SyncInfo messages while aggregating the votes
         // (O(n^2) signature verifications).
+        self.vote().verify(validator)
+    }
+}
+
+
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct OrderVoteMsg {
+    /// The container for the vote (VoteData, LedgerInfo, Signature)
+    vote: OrderVote,
+}
+
+impl Display for OrderVoteMsg {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "OrderVoteMsg: [{}]", self.vote)
+    }
+}
+
+impl OrderVoteMsg {
+    pub fn new(vote: OrderVote) -> Self {
+        Self { vote }
+    }
+
+    /// Container for actual voting material
+    pub fn vote(&self) -> &OrderVote {
+        &self.vote
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.vote.epoch()
+    }
+
+    pub fn verify(&self, validator: &ValidatorVerifier) -> anyhow::Result<()> {
         self.vote().verify(validator)
     }
 }
