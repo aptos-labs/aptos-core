@@ -12,7 +12,7 @@
 //! long as the latter is in its trusted peers set.
 use aptos_config::{
     config::{
-        DiscoveryMethod, NetworkConfig, Peer, PeerRole, PeerSet, RoleType, CONNECTION_BACKOFF_BASE,
+        DiscoveryMethod, NetworkConfig, PeerSet, RoleType, CONNECTION_BACKOFF_BASE,
         CONNECTIVITY_CHECK_INTERVAL_MS, MAX_CONCURRENT_NETWORK_REQS, MAX_CONNECTION_DELAY_MS,
         MAX_FRAME_SIZE, MAX_FULLNODE_OUTBOUND_CONNECTIONS, MAX_INBOUND_CONNECTIONS,
         NETWORK_CHANNEL_SIZE,
@@ -214,7 +214,7 @@ impl NetworkBuilder {
         );
 
         // Always add a connectivity manager to keep track of known peers
-        let seeds = merge_seeds(config);
+        let seeds = config.merge_seeds();
 
         network_builder.add_connectivity_manager(
             seeds,
@@ -486,44 +486,4 @@ impl NetworkBuilder {
             max_parallel_deserialization_tasks,
         )
     }
-}
-
-/// Retrieve and merge seeds so that they have all keys associated
-fn merge_seeds(config: &NetworkConfig) -> PeerSet {
-    config.verify_seeds().expect("Seeds must be well formed");
-    let mut seeds = config.seeds.clone();
-
-    // Merge old seed configuration with new seed configuration
-    // TODO(gnazario): Once fully migrated, remove `seed_addrs`
-    config
-        .seed_addrs
-        .iter()
-        .map(|(peer_id, addrs)| {
-            (
-                peer_id,
-                Peer::from_addrs(PeerRole::ValidatorFullNode, addrs.clone()),
-            )
-        })
-        .for_each(|(peer_id, peer)| {
-            seeds
-                .entry(*peer_id)
-                // Sad clone due to Rust not realizing these are two distinct paths
-                .and_modify(|seed| seed.extend(peer.clone()).unwrap())
-                .or_insert(peer);
-        });
-
-    // Pull public keys out of addresses
-    seeds.values_mut().for_each(
-        |Peer {
-             addresses, keys, ..
-         }| {
-            addresses
-                .iter()
-                .filter_map(NetworkAddress::find_noise_proto)
-                .for_each(|pubkey| {
-                    keys.insert(pubkey);
-                });
-        },
-    );
-    seeds
 }
