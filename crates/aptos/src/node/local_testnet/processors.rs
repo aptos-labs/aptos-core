@@ -5,10 +5,15 @@ use super::{health_checker::HealthChecker, traits::ServiceManager, RunLocalTestn
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
-use diesel_async::{pg::AsyncPgConnection, AsyncConnection};
+use diesel::Connection;
+use diesel_async::{async_connection_wrapper::AsyncConnectionWrapper, pg::AsyncPgConnection};
 use maplit::hashset;
 use processor::{
-    processors::{token_processor::TokenProcessorConfig, ProcessorConfig, ProcessorName},
+    processors::{
+        objects_processor::ObjectsProcessorConfig, stake_processor::StakeProcessorConfig,
+        token_processor::TokenProcessorConfig, token_v2_processor::TokenV2ProcessorConfig,
+        ProcessorConfig, ProcessorName,
+    },
     utils::database::run_pending_migrations,
     IndexerGrpcProcessorConfig,
 };
@@ -40,6 +45,7 @@ pub struct ProcessorArgs {
             ProcessorName::StakeProcessor,
             ProcessorName::TokenProcessor,
             ProcessorName::TokenV2Processor,
+            ProcessorName::TransactionMetadataProcessor,
             ProcessorName::UserTransactionProcessor,
         ],
         requires = "with_indexer_api"
@@ -71,22 +77,42 @@ impl ProcessorManager {
             ProcessorName::DefaultProcessor => ProcessorConfig::DefaultProcessor,
             ProcessorName::EventsProcessor => ProcessorConfig::EventsProcessor,
             ProcessorName::FungibleAssetProcessor => ProcessorConfig::FungibleAssetProcessor,
+            ProcessorName::MonitoringProcessor => {
+                bail!("Monitoring processor is not supported in the local testnet")
+            },
             ProcessorName::NftMetadataProcessor => {
                 bail!("NFT Metadata processor is not supported in the local testnet")
             },
-            ProcessorName::StakeProcessor => ProcessorConfig::StakeProcessor,
+            ProcessorName::ObjectsProcessor => {
+                ProcessorConfig::ObjectsProcessor(ObjectsProcessorConfig {
+                    query_retries: Default::default(),
+                    query_retry_delay_ms: Default::default(),
+                })
+            },
+            ProcessorName::StakeProcessor => {
+                ProcessorConfig::StakeProcessor(StakeProcessorConfig {
+                    query_retries: Default::default(),
+                    query_retry_delay_ms: Default::default(),
+                })
+            },
             ProcessorName::TokenProcessor => {
                 ProcessorConfig::TokenProcessor(TokenProcessorConfig {
                     // This NFT points contract doesn't exist on local testnets.
                     nft_points_contract: None,
+                    query_retries: Default::default(),
+                    query_retry_delay_ms: Default::default(),
                 })
             },
-            ProcessorName::TokenV2Processor => ProcessorConfig::TokenV2Processor,
-            ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
-            ProcessorName::MonitoringProcessor => {
-                bail!("Monitoring processor is not supported in the local testnet")
+            ProcessorName::TokenV2Processor => {
+                ProcessorConfig::TokenV2Processor(TokenV2ProcessorConfig {
+                    query_retries: Default::default(),
+                    query_retry_delay_ms: Default::default(),
+                })
             },
-            ProcessorName::ObjectsProcessor => ProcessorConfig::ObjectsProcessor,
+            ProcessorName::TransactionMetadataProcessor => {
+                ProcessorConfig::TransactionMetadataProcessor
+            },
+            ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
         };
         let config = IndexerGrpcProcessorConfig {
             processor_config,
@@ -102,6 +128,9 @@ impl ProcessorManager {
             // many in a local testnet environment.
             db_pool_size: Some(8),
             gap_detection_batch_size: 50,
+            pb_channel_txn_chunk_size: 100_000,
+            per_table_chunk_sizes: Default::default(),
+            transaction_filter: Default::default(),
         };
         let manager = Self {
             config,
@@ -134,11 +163,18 @@ impl ProcessorManager {
 
     /// Create the necessary tables in the DB for the processors to work.
     async fn run_migrations(&self) -> Result<()> {
-        let connection_string = &self.config.postgres_connection_string;
-        let mut connection = AsyncPgConnection::establish(connection_string)
-            .await
-            .with_context(|| format!("Failed to connect to postgres at {}", connection_string))?;
-        run_pending_migrations(&mut connection).await;
+        let connection_string = self.config.postgres_connection_string.clone();
+        tokio::task::spawn_blocking(move || {
+            // This lets us use the connection like a normal diesel connection. See more:
+            // https://docs.rs/diesel-async/latest/diesel_async/async_connection_wrapper/type.AsyncConnectionWrapper.html
+            let mut conn: AsyncConnectionWrapper<AsyncPgConnection> =
+                AsyncConnectionWrapper::establish(&connection_string).with_context(|| {
+                    format!("Failed to connect to postgres at {}", connection_string)
+                })?;
+            run_pending_migrations(&mut conn);
+            anyhow::Ok(())
+        })
+        .await??;
         Ok(())
     }
 }

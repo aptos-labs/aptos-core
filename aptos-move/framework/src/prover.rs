@@ -8,6 +8,7 @@ use codespan_reporting::{
 };
 use log::LevelFilter;
 use move_core_types::account_address::AccountAddress;
+use move_package::CompilerVersion;
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -118,6 +119,7 @@ impl ProverOptions {
         package_path: &Path,
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
+        compiler_version: Option<CompilerVersion>,
         skip_attribute_checks: bool,
         known_attributes: &BTreeSet<String>,
     ) -> anyhow::Result<()> {
@@ -129,7 +131,7 @@ impl ProverOptions {
             named_addresses,
             self.filter.clone(),
             bytecode_version,
-            None, // compiler_version
+            compiler_version,
             skip_attribute_checks,
             known_attributes.clone(),
         )?;
@@ -162,7 +164,11 @@ impl ProverOptions {
                 )],
             });
         let mut writer = StandardStream::stderr(ColorChoice::Auto);
-        move_prover::run_move_prover_with_model(&mut model, &mut writer, options, Some(now))?;
+        if compiler_version.unwrap_or_default() == CompilerVersion::V1 {
+            move_prover::run_move_prover_with_model(&mut model, &mut writer, options, Some(now))?;
+        } else {
+            move_prover::run_move_prover_with_model_v2(&mut model, &mut writer, options, now)?;
+        }
         Ok(())
     }
 

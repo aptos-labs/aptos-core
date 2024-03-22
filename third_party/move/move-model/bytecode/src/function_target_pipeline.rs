@@ -13,7 +13,11 @@ use itertools::{Either, Itertools};
 use log::{debug, info};
 use move_model::model::{FunId, FunctionEnv, GlobalEnv, QualifiedId};
 use petgraph::graph::DiGraph;
-use std::{collections::BTreeMap, fmt::Formatter, fs};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Formatter,
+    fs,
+};
 
 /// A data structure which holds data for multiple function targets, and allows to
 /// manipulate them as part of a transformation pipeline.
@@ -148,6 +152,8 @@ impl<'a> fmt::Display for ProcessorResultDisplay<'a> {
 #[derive(Default)]
 pub struct FunctionTargetPipeline {
     processors: Vec<Box<dyn FunctionTargetProcessor>>,
+    /// Indices of processors which have been marked to not dump their target annotations.
+    no_annotation_dump_indices: BTreeSet<usize>,
 }
 
 impl FunctionTargetsHolder {
@@ -300,6 +306,23 @@ impl FunctionTargetPipeline {
     /// added.
     pub fn add_processor(&mut self, processor: Box<dyn FunctionTargetProcessor>) {
         self.processors.push(processor)
+    }
+
+    /// Similar to `add_processor`,
+    /// but additionally records that we should not dump its target annotations.
+    pub fn add_processor_without_annotation_dump(
+        &mut self,
+        processor: Box<dyn FunctionTargetProcessor>,
+    ) {
+        self.no_annotation_dump_indices
+            .insert(self.processors.len());
+        self.processors.push(processor)
+    }
+
+    /// Returns true if the processor at `index` should not have its target annotations dumped.
+    /// `index` is 1-based, similar to `hook_after_each_processor`.
+    pub fn should_dump_target_annotations(&self, index: usize) -> bool {
+        !self.no_annotation_dump_indices.contains(&(index - 1))
     }
 
     /// Gets the last processor in the pipeline, for testing.

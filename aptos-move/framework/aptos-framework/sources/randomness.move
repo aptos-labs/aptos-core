@@ -45,11 +45,13 @@ module aptos_framework::randomness {
     /// Must be called in tests to initialize the `PerBlockRandomness` resource.
     public fun initialize(framework: &signer) {
         system_addresses::assert_aptos_framework(framework);
-        move_to(framework, PerBlockRandomness {
-            epoch: 0,
-            round: 0,
-            seed: option::none(),
-        });
+        if (!exists<PerBlockRandomness>(@aptos_framework)) {
+            move_to(framework, PerBlockRandomness {
+                epoch: 0,
+                round: 0,
+                seed: option::none(),
+            });
+        }
     }
 
     #[test_only]

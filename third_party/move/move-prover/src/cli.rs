@@ -65,6 +65,8 @@ pub struct Options {
     pub experimental_pipeline: bool,
     /// Whether to skip checking for unknown attributes
     pub skip_attribute_checks: bool,
+    /// Whether to use compiler v2 to compile Move code
+    pub compiler_v2: bool,
 
     /// BEGIN OF STRUCTURED OPTIONS. DO NOT ADD VALUE FIELDS AFTER THIS
     /// Options for the model builder.
@@ -103,6 +105,7 @@ impl Default for Options {
             errmapgen: ErrmapOptions::default(),
             experimental_pipeline: false,
             skip_attribute_checks: false,
+            compiler_v2: false,
         }
     }
 }
@@ -162,6 +165,13 @@ impl Options {
                     .long("aptos")
                     .action(SetTrue)
                     .help("configures the prover to use Aptos natives")
+            )
+            .arg(
+                Arg::new("compiler-v2")
+                    .long("compiler-v2")
+                    .env("MOVE_COMPILER_V2")
+                    .action(SetTrue)
+                    .help("whether to use Move compiler v2 to compile to bytecode")
             )
             .arg(
                 Arg::new("output")
@@ -785,6 +795,9 @@ impl Options {
                 .move_named_address_values
                 .push("Extensions=0x1".to_string())
         }
+        if matches.get_flag("compiler-v2") {
+            options.compiler_v2 = true;
+        }
 
         options.backend.derive_options();
 
@@ -809,7 +822,8 @@ impl Options {
             .set_time_level(LevelFilter::Debug)
             .set_level_padding(LevelPadding::Off)
             .build();
-        let logger = if atty::is(atty::Stream::Stderr) && atty::is(atty::Stream::Stdout) {
+        // Ignore error if logger is already setup
+        let _logger = if atty::is(atty::Stream::Stderr) && atty::is(atty::Stream::Stdout) {
             CombinedLogger::init(vec![TermLogger::new(
                 self.verbosity_level,
                 config,
@@ -818,7 +832,6 @@ impl Options {
         } else {
             CombinedLogger::init(vec![SimpleLogger::new(self.verbosity_level, config)])
         };
-        logger.expect("Unexpected CombinedLogger init failure");
     }
 
     pub fn setup_logging_for_test(&self) {
@@ -829,8 +842,8 @@ impl Options {
             return;
         }
         TEST_MODE.store(true, Ordering::Relaxed);
-        SimpleLogger::init(self.verbosity_level, Config::default())
-            .expect("UnexpectedSimpleLogger failure");
+        // Ignore error if logger is already setup
+        let _ = SimpleLogger::init(self.verbosity_level, Config::default());
     }
 
     /// Convenience function to enable debugging (like high verbosity) on this instance.

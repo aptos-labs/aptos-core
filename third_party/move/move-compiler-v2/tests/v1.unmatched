@@ -103,25 +103,7 @@ move-compiler/tests/move_check/examples/{
   simple_money_market_token.move,
 }
 move-compiler/tests/move_check/instantiation_loops/{
-  complex_1.move,
-  mutually_recursive_just_type_params_ok.move,
-  mutually_recursive_non_generic_type_ok.move,
-  mutually_recursive_three_args_just_type_params_shitfing_ok.move,
-  mutually_recursive_three_args_type_con_non_generic_types_ok.move,
-  mutually_recursive_three_args_type_con_shifting.move,
-  mutually_recursive_two_args_non_generic_type_and_type_param_ok.move,
-  mutually_recursive_two_args_swapping_just_type_params_ok.move,
-  mutually_recursive_two_args_swapping_type_con.move,
-  mutually_recursive_type_con.move,
-  nested_types_1.move,
-  nested_types_2.move,
-  recursive_infinite_type_terminates.move,
-  recursive_one_arg_just_type_params_ok.move,
-  recursive_one_arg_non_generic_type_ok.move,
-  recursive_one_arg_type_con.move,
   recursive_struct.move,
-  recursive_two_args_swapping_type_con.move,
-  two_loops.move,
 }
 move-compiler/tests/move_check/liveness/{
   copy_after_move.move,

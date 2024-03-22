@@ -1638,6 +1638,32 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         )
     }
 
+    /// This checks whether `result_exp` contains mutable borrow of a field from an immutable reference
+    /// It needs to be called after `post_process_body`
+    pub fn check_mutable_borrow_field(&mut self, result_exp: &ExpData) {
+        result_exp.visit_pre_order(&mut |e| {
+            if let ExpData::Call(id, Operation::Borrow(ReferenceKind::Mutable), args) = &e {
+                debug_assert!(args.len() == 1);
+                if let ExpData::Call(_, Operation::Select(_, _, _), ref_targets) = args[0].as_ref()
+                {
+                    debug_assert!(ref_targets.len() == 1);
+                    if self
+                        .env()
+                        .get_node_type(ref_targets[0].node_id())
+                        .is_immutable_reference()
+                    {
+                        self.error(
+                            &self.get_node_loc(*id),
+                            "cannot mutably borrow from an immutable ref",
+                        );
+                        return false;
+                    }
+                }
+            }
+            true
+        });
+    }
+
     /// Translates a specification block embedded in an expression context, represented by
     /// a set of locals defined in this context, and returns the model representation of it.
     fn translate_spec_block(
@@ -1813,7 +1839,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &expected_type,
                         context,
                     );
-                    let id = self.new_node_id_with_type_loc(&ty, loc);
+                    let node_ty = if let Some(kind) = ref_expected {
+                        Type::Reference(kind, Box::new(ty.clone()))
+                    } else {
+                        ty.clone()
+                    };
+                    let id = self.new_node_id_with_type_loc(&node_ty, loc);
                     let mut std = struct_id;
                     if let Type::Struct(_, _, types) = ty {
                         std.inst = types;
@@ -2530,6 +2561,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.fresh_type_var_constr(loc.clone(), WideningOrder::RightToLeft, constraint);
                 let exp = self.translate_dotted(e.as_ref(), &ty, &ErrorMessageContext::General);
                 let id = self.new_node_id_with_type_loc(expected_type, &loc);
+                self.set_node_instantiation(id, vec![ty.clone()]);
                 let oper = if let Type::Struct(mid, sid, _inst) = self.subs.specialize(&ty) {
                     // Struct known at this point
                     Operation::Select(mid, sid, FieldId::new(field_name))

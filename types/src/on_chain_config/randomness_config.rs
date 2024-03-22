@@ -52,6 +52,24 @@ pub enum OnChainRandomnessConfig {
     V1(ConfigV1),
 }
 
+impl OnChainRandomnessConfig {
+    pub fn new_v1(
+        secrecy_threshold_in_percentage: u64,
+        reconstruct_threshold_in_percentage: u64,
+    ) -> Self {
+        let secrecy_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(secrecy_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        let reconstruction_threshold = FixedPoint64MoveStruct::from_u64f64(
+            U64F64::from_num(reconstruct_threshold_in_percentage) / U64F64::from_num(100),
+        );
+        Self::V1(ConfigV1 {
+            secrecy_threshold,
+            reconstruction_threshold,
+        })
+    }
+}
+
 impl TryFrom<RandomnessConfigMoveStruct> for OnChainRandomnessConfig {
     type Error = anyhow::Error;
 
@@ -94,7 +112,7 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        OnChainRandomnessConfig::Off //TODO: change to `V1` after randomness is ready.
+        OnChainRandomnessConfig::V1(ConfigV1::default())
     }
 
     pub fn randomness_enabled(&self) -> bool {
