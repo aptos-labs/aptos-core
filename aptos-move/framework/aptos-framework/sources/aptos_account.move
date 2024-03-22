@@ -45,9 +45,14 @@ module aptos_framework::aptos_account {
     /// Basic account creation methods.
     ///////////////////////////////////////////////////////////////////////////
 
+    inline fun register_apt(account: &signer) {
+        coin::register<AptosCoin>(account);
+        coin::migrate_to_fungible_store<AptosCoin>(account);
+    }
+
     public entry fun create_account(auth_key: address) {
         let signer = account::create_account(auth_key);
-        coin::register<AptosCoin>(&signer);
+        register_apt(&signer);
     }
 
     /// Batch version of APT transfer.
@@ -73,7 +78,7 @@ module aptos_framework::aptos_account {
         // Resource accounts can be created without registering them to receive APT.
         // This conveniently does the registration if necessary.
         if (!coin::is_account_registered<AptosCoin>(to)) {
-            coin::register<AptosCoin>(&create_signer(to));
+            register_apt(&create_signer(to));
         };
         coin::transfer<AptosCoin>(source, to, amount)
     }
