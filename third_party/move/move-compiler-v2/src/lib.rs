@@ -306,11 +306,7 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
     for_v1_model: bool,
     inlining_scope: RewritingScope,
 ) -> EnvProcessorPipeline<'b> {
-    // The default transformation pipeline on the GlobalEnv. No
-
     let mut env_pipeline = EnvProcessorPipeline::<'b>::default();
-
-    // -- Checks
 
     if !for_v1_model && options.experiment_on(Experiment::USAGE_CHECK) {
         env_pipeline.add(
@@ -322,12 +318,6 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             function_checker::check_for_function_typed_parameters,
         );
     }
-    if !for_v1_model && options.experiment_on(Experiment::ACCESS_CHECK) {
-        env_pipeline.add(
-            "access and use check before inlining",
-            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
-        );
-    }
 
     if !for_v1_model && options.experiment_on(Experiment::RECURSIVE_TYPE_CHECK) {
         env_pipeline.add("check recursive struct definition", |env| {
@@ -336,6 +326,13 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         env_pipeline.add("check cyclic type instantiation", |env| {
             cyclic_instantiation_checker::check_cyclic_instantiations(env)
         });
+    }
+
+    if !for_v1_model && options.experiment_on(Experiment::ACCESS_CHECK) {
+        env_pipeline.add(
+            "access and use check before inlining",
+            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
+        );
     }
 
     if options.experiment_on(Experiment::INLINING) {
@@ -361,6 +358,7 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             move |env: &mut GlobalEnv| ast_simplifier::run_simplifier(env, false)
         });
     }
+
     if options.experiment_on(Experiment::LAMBDA_LIFTING) {
         env_pipeline.add("lambda-lifting", |env: &mut GlobalEnv| {
             lambda_lifter::lift_lambdas(
@@ -371,12 +369,14 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             )
         });
     }
+
     if options.experiment_on(Experiment::SPEC_CHECK) {
         env_pipeline.add("specification checker", |env| {
             let env: &GlobalEnv = env;
             spec_checker::run_spec_checker(env)
         });
     }
+
     if options.experiment_on(Experiment::SPEC_REWRITE) {
         env_pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
     }
@@ -490,8 +490,6 @@ where
 }
 
 /// Annotate the given compiled units.
-/// TODO: this currently only fills in defaults. The annotations are only used in
-/// the prover, and compiler v2 is not yet connected to the prover.
 pub fn annotate_units(units: Vec<CompiledUnit>) -> Vec<AnnotatedCompiledUnit> {
     units
         .into_iter()

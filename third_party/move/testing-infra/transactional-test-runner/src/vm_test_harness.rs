@@ -130,7 +130,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     }
 
     fn run_config(&self) -> TestRunConfig {
-        self.run_config
+        self.run_config.clone()
     }
 
     fn init(
@@ -445,11 +445,11 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
     }
 });
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum TestRunConfig {
     CompilerV1,
-    CompilerV2,
-    ComparisonV1V2,
+    CompilerV2 { v2_experiments: Vec<(String, bool)> },
+    ComparisonV1V2 { v2_experiments: Vec<(String, bool)> },
 }
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {

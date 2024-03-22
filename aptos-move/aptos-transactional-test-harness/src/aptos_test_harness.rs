@@ -567,7 +567,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
     }
 
     fn run_config(&self) -> TestRunConfig {
-        self.run_config
+        self.run_config.clone()
     }
 
     fn init(

@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{experiments, DefaultValue};
+use crate::{experiments, DefaultValue, EXPERIMENTS};
 use clap::Parser;
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -136,10 +136,16 @@ impl Options {
 /// can be either `<exp_name>` in which case it is on, or
 /// `<exp_name>=on/off`.
 fn find_experiment(s: &[String], name: &str) -> Option<bool> {
+    let mut result = None;
     for e in s {
         let mut parts = e.split('=');
-        if parts.next().unwrap() == name {
-            // Found the experiment
+        let exp_name = parts.next().unwrap();
+        assert!(
+            EXPERIMENTS.contains_key(exp_name),
+            "undeclared experiment `{}`",
+            exp_name
+        );
+        if exp_name == name {
             let on = if let Some(value) = parts.next() {
                 match value.trim().to_lowercase().as_str() {
                     "on" => true,
@@ -154,10 +160,13 @@ fn find_experiment(s: &[String], name: &str) -> Option<bool> {
                 // Default is on
                 true
             };
-            return Some(on);
+            result = Some(on);
+            // continue going to (1) check all experiments
+            // in the list are actually declared (2) later
+            // entries override earlier ones
         }
     }
-    None
+    result
 }
 
 /// Gets the value of the env var for experiments.
