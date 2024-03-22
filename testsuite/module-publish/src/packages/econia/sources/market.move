@@ -2276,19 +2276,21 @@ module econia::market {
         let removal_possible = avl_queue::contains_active_list_node_id(
             orders_ref_mut, avlq_access_key);
         // Assert that removal from the AVL queue is possible.
-        assert!(removal_possible, E_INVALID_MARKET_ORDER_ID);
-        // Remove order from AVL queue, storing its fields.
-        let Order{size, price, user: order_user, custodian_id:
-                  order_custodian_id, order_access_key} = avl_queue::remove(
-            orders_ref_mut, avlq_access_key);
-        // Assert passed maker address is user holding order.
-        assert!(user == order_user, E_INVALID_USER);
-        // Assert passed custodian ID matches that from order.
-        assert!(custodian_id == order_custodian_id, E_INVALID_CUSTODIAN);
-        // Cancel order user-side, thus verifying market order ID.
-        user::cancel_order_internal(
-            user, market_id, custodian_id, side, size, price, order_access_key,
-            market_order_id, CANCEL_REASON_MANUAL_CANCEL);
+        if (removal_possible) {
+            // assert!(removal_possible, E_INVALID_MARKET_ORDER_ID);
+            // Remove order from AVL queue, storing its fields.
+            let Order{size, price, user: order_user, custodian_id:
+                    order_custodian_id, order_access_key} = avl_queue::remove(
+                orders_ref_mut, avlq_access_key);
+            // Assert passed maker address is user holding order.
+            assert!(user == order_user, E_INVALID_USER);
+            // Assert passed custodian ID matches that from order.
+            assert!(custodian_id == order_custodian_id, E_INVALID_CUSTODIAN);
+            // Cancel order user-side, thus verifying market order ID.
+            user::cancel_order_internal(
+                user, market_id, custodian_id, side, size, price, order_access_key,
+                market_order_id, CANCEL_REASON_MANUAL_CANCEL);
+        }
     }
 
     /// Change maker order size on book and in user's market account.
