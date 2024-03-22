@@ -1260,16 +1260,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                           ty1: Type,
                                           else_: ExpData,
                                           ty2: Type| {
-                    let mut then_exp = then.into_exp();
-                    let mut else_exp = else_.into_exp();
-                    if expected_ty.is_immutable_reference() {
-                        if ty1.is_mutable_reference() {
-                            et.try_freeze(expected_ty, &ty1, &mut then_exp);
-                        }
-                        if ty2.is_mutable_reference() {
-                            et.try_freeze(expected_ty, &ty2, &mut else_exp);
-                        }
-                    }
+                    let then_exp = et.try_freeze(expected_ty, &ty1, then.into_exp());
+                    let else_exp = et.try_freeze(expected_ty, &ty2, else_.into_exp());
                     (then_exp, else_exp)
                 };
                 let (rty, then, else_): (Type, ExpData, ExpData) =
@@ -1403,16 +1395,19 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             "Expected a single type, but found a tuple type",
                         );
                     }
-                    let mut target_exp = exp.into();
                     // Insert freeze for each expression in the exp list
-                    if self.insert_freeze && expected_tys_opt.is_some() {
+                    let target_exp = if self.insert_freeze && expected_tys_opt.is_some() {
                         let expected_tys =
                             expected_tys_opt.expect("expected types should not be None");
                         let expected_ty_opt = expected_tys.get(i);
                         if let Some(expected_ty) = expected_ty_opt {
-                            self.try_freeze(expected_ty, &ty, &mut target_exp);
+                            self.try_freeze(expected_ty, &ty, exp.into())
+                        } else {
+                            exp.into()
                         }
-                    }
+                    } else {
+                        exp.into()
+                    };
                     exps.push(target_exp);
                     exp_tys.push(ty)
                 }
@@ -1455,9 +1450,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let rhs_ty = self
                     .subs
                     .specialize(&self.env().get_node_type(rhs.node_id()));
-                let mut rhs = rhs.into_exp();
+                let rhs = rhs.into_exp();
                 // Insert freeze for rhs of the assignment
-                if lhs_ty.is_tuple()
+                let rhs = if lhs_ty.is_tuple()
                     && rhs_ty.is_tuple()
                     && matches!(rhs.as_ref(), ExpData::Call(_, Operation::Tuple, _))
                 {
@@ -1467,12 +1462,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 .iter()
                                 .map(|pat| self.get_node_type(pat.node_id()))
                                 .collect_vec();
-                            self.freeze_tuple_exp(&lhs_tys, rhs_tys, &mut rhs, &loc);
+                            self.freeze_tuple_exp(&lhs_tys, rhs_tys, rhs, &loc)
+                        } else {
+                            self.try_freeze(&lhs_ty, &rhs_ty, rhs)
                         }
+                    } else {
+                        self.try_freeze(&lhs_ty, &rhs_ty, rhs)
                     }
                 } else {
-                    self.try_freeze(&lhs_ty, &rhs_ty, &mut rhs);
-                }
+                    self.try_freeze(&lhs_ty, &rhs_ty, rhs)
+                };
                 ExpData::Assign(id, lhs, rhs)
             },
             EA::Exp_::Mutate(lhs, rhs) => {
@@ -1523,13 +1522,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self.error(&loc, "cannot borrow from a reference")
                 }
                 let id = self.new_node_id_with_type_loc(&result_ty, &loc);
-                let mut target_exp =
+                let target_exp =
                     ExpData::Call(id, Operation::Borrow(ref_kind), vec![target_exp.into_exp()])
                         .into();
                 // Insert freeze for &mut when the expected type is &
-                if self.insert_freeze {
-                    self.try_freeze(expected_type, &ty, &mut target_exp);
-                }
+                let target_exp = if self.insert_freeze {
+                    self.try_freeze(expected_type, &ty, target_exp)
+                } else {
+                    target_exp
+                };
                 target_exp.into()
             },
             EA::Exp_::Cast(exp, typ) => {
@@ -2577,16 +2578,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let ty = entry.type_.clone();
             let converted_ty = self.check_type(loc, &ty, expected_type, context);
             let id = self.new_node_id_with_type_loc(&converted_ty, loc);
-            let mut ret = if let Some(oper) = oper_opt {
+            let ret = if let Some(oper) = oper_opt {
                 ExpData::Call(id, oper, vec![]).into_exp()
             } else if let Some(index) = index_opt {
                 ExpData::Temporary(id, index).into_exp()
             } else {
                 ExpData::LocalVar(id, sym).into_exp()
             };
-            if self.insert_freeze {
-                self.try_freeze(expected_type, &ty, &mut ret);
-            }
+            let ret = if self.insert_freeze {
+                self.try_freeze(expected_type, &ty, ret)
+            } else {
+                ret
+            };
             Some(ret.into())
         } else {
             None
@@ -2755,7 +2758,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         // Translate generic arguments, if any.
         let generics = generics.as_ref().map(|ts| self.translate_types(ts));
         // Translate arguments.
-        let (arg_types, mut translated_args) = self.translate_exp_list(args);
+        let (arg_types, translated_args) = self.translate_exp_list(args);
         let args_have_errors = arg_types.iter().any(|t| t == &Type::Error);
         // Lookup candidates.
         let cand_modules = if let Some(m) = module {
@@ -2959,19 +2962,23 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         .add_used_spec_fun(module_id.qualified(spec_fun_id));
                     self.called_spec_funs.insert((module_id, spec_fun_id));
                 }
-                self.add_conversions(cand, &instantiation, &mut translated_args);
+                let translated_args = self.add_conversions(cand, &instantiation, translated_args);
                 let specialized_expected_type = self.subs.specialize(expected_type);
-                let mut call_exp = ExpData::Call(id, oper, translated_args).into_exp();
+                let call_exp = ExpData::Call(id, oper, translated_args).into_exp();
                 // Insert freeze for the return value
-                if result_type.is_tuple() && specialized_expected_type.is_tuple() {
-                    if let Tuple(result_tys) = result_type {
+                let call_exp = if result_type.is_tuple() && specialized_expected_type.is_tuple() {
+                    if let Tuple(ref result_tys) = result_type {
                         if let Tuple(expected_tys) = specialized_expected_type {
-                            self.freeze_tuple_exp(&expected_tys, &result_tys, &mut call_exp, loc);
+                            self.freeze_tuple_exp(&expected_tys, result_tys, call_exp, loc)
+                        } else {
+                            self.try_freeze(&specialized_expected_type, &result_type, call_exp)
                         }
+                    } else {
+                        self.try_freeze(&specialized_expected_type, &result_type, call_exp)
                     }
                 } else {
-                    self.try_freeze(&specialized_expected_type, &result_type, &mut call_exp);
-                }
+                    self.try_freeze(&specialized_expected_type, &result_type, call_exp)
+                };
                 call_exp.into()
             },
             _ => {
@@ -3001,45 +3008,61 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     /// Adds conversions to the given arguments for the given resolved function entry. Currently
     /// the only supported conversion is from `&mut T` to `&T` and we treat with it in an ad-hoc
     /// manor.
-    fn add_conversions(&self, entry: &AnyFunEntry, instantiation: &[Type], args: &mut [Exp]) {
+    fn add_conversions(
+        &self,
+        entry: &AnyFunEntry,
+        instantiation: &[Type],
+        args: Vec<Exp>,
+    ) -> Vec<Exp> {
+        let mut new_args = vec![];
         let params = entry.get_signature().1;
         for (param_ty, exp) in params
             .iter()
             .map(|Parameter(_, ty, _)| ty.instantiate(instantiation))
-            .zip(args.iter_mut())
+            .zip(args)
         {
             let exp_id = exp.node_id();
             let exp_ty = self.env().get_node_type(exp_id);
-            self.try_freeze(&param_ty, &exp_ty, exp);
+            new_args.push(self.try_freeze(&param_ty, &exp_ty, exp));
         }
+        new_args
     }
 
     /// Inserts the freeze operation when `expected_ty` is immutable ref and ty is mutable ref
-    fn try_freeze(&self, expected_ty: &Type, ty: &Type, exp: &mut Exp) {
-        let exp_id = exp.node_id();
+    fn try_freeze(&self, expected_ty: &Type, ty: &Type, exp: Exp) -> Exp {
         if expected_ty.is_immutable_reference() && ty.is_mutable_reference() {
-            // Insert Freeze operation
+            let exp_id = exp.node_id();
             let new_id =
                 self.new_node_id_with_type_loc(expected_ty, &self.env().get_node_loc(exp_id));
-            *exp = ExpData::Call(new_id, Operation::Freeze, vec![exp.clone()]).into_exp();
+            ExpData::Call(new_id, Operation::Freeze, vec![exp]).into_exp()
+        } else {
+            exp
         }
     }
 
     /// Inserts the freeze operation when `exp` is a tuple expression
-    fn freeze_tuple_exp(&self, lhs_tys: &Vec<Type>, rhs_tys: &Vec<Type>, exp: &mut Exp, loc: &Loc) {
-        let mut new_exp = exp.clone().into();
+    fn freeze_tuple_exp(
+        &self,
+        lhs_tys: &Vec<Type>,
+        rhs_tys: &Vec<Type>,
+        exp: Exp,
+        loc: &Loc,
+    ) -> Exp {
         if lhs_tys.len() != rhs_tys.len() || lhs_tys.eq(rhs_tys) {
-            return;
+            return exp;
         }
-        let mut new_rhs = vec![];
-        if let ExpData::Call(_, Operation::Tuple, rhs_vec) = &mut new_exp {
-            for ((lh_ty, rh_ty), rh) in lhs_tys.iter().zip(rhs_tys.iter()).zip(rhs_vec) {
-                self.try_freeze(lh_ty, rh_ty, rh);
-                new_rhs.push(rh.clone());
-            }
+        if let ExpData::Call(_, Operation::Tuple, rhs_vec) = exp.as_ref() {
+            let new_rhs = lhs_tys
+                .iter()
+                .zip(rhs_tys.iter())
+                .zip(rhs_vec)
+                .map(|((lh_ty, rh_ty), rh)| self.try_freeze(lh_ty, rh_ty, rh.clone()))
+                .collect_vec();
             let new_type = Type::Tuple(lhs_tys.clone());
             let new_id_tuple = self.new_node_id_with_type_loc(&new_type, loc);
-            *exp = ExpData::Call(new_id_tuple, Operation::Tuple, new_rhs).into_exp();
+            ExpData::Call(new_id_tuple, Operation::Tuple, new_rhs).into_exp()
+        } else {
+            exp
         }
     }
 
