@@ -9,7 +9,7 @@ use crate::{
             SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
             SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
             SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_JWT_PAYLOAD_JSON, SAMPLE_PEPPER,
-            SAMPLE_PK, SAMPLE_PROOF, SAMPLE_UID_KEY,
+            SAMPLE_PK, SAMPLE_PROOF, SAMPLE_PROOF_NO_EXTRA_FIELD,SAMPLE_UID_KEY,
         },
         get_public_inputs_hash,
         zkp_sig::ZKP,
@@ -23,6 +23,7 @@ use aptos_crypto::{
 };
 use once_cell::sync::Lazy;
 use ring::signature;
+use base64::{encode_config, URL_SAFE_NO_PAD};
 
 static DUMMY_EPHEMERAL_SIGNATURE: Lazy<EphemeralSignature> = Lazy::new(|| {
     let sk = Ed25519PrivateKey::generate_for_testing();
@@ -99,6 +100,30 @@ pub fn get_sample_groth16_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
 /// desired TXN.
+pub fn get_sample_groth16_sig_and_pk_no_extra_field() -> (KeylessSignature, KeylessPublicKey) {
+    let proof = *SAMPLE_PROOF_NO_EXTRA_FIELD;
+
+    let zks = ZeroKnowledgeSig {
+        proof: proof.into(),
+        extra_field: None,
+        exp_horizon_secs: SAMPLE_EXP_HORIZON_SECS,
+        override_aud_val: None,
+        training_wheels_signature: None,
+    };
+
+    let sig = KeylessSignature {
+        cert: EphemeralCertificate::ZeroKnowledgeSig(zks.clone()),
+        jwt_header_json: SAMPLE_JWT_HEADER_JSON.to_string(),
+        exp_date_secs: SAMPLE_EXP_DATE,
+        ephemeral_pubkey: SAMPLE_EPK.clone(),
+        ephemeral_signature: DUMMY_EPHEMERAL_SIGNATURE.clone(),
+    };
+
+    (sig, SAMPLE_PK.clone())
+}
+
+/// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the
+/// desired TXN.
 pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
     let jwt_header_b64 = SAMPLE_JWT_HEADER_B64.to_string();
     let jwt_payload_b64 = base64url_encode_str(SAMPLE_JWT_PAYLOAD_JSON.as_str());
@@ -114,6 +139,10 @@ pub fn get_sample_openid_sig_and_pk() -> (KeylessSignature, KeylessPublicKey) {
         jwt_sig.as_mut_slice(),
     )
     .unwrap();
+
+    let base64url_string = encode_config(jwt_sig.clone(), URL_SAFE_NO_PAD);
+
+    println!("JWT token is: {}.{}", msg, base64url_string);
 
     let openid_sig = OpenIdSig {
         jwt_sig,

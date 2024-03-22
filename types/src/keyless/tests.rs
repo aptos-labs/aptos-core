@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
 
+use aptos_crypto::poseidon_bn254::fr_to_bytes_le;
+
 use crate::keyless::{
     bn254_circom::get_public_inputs_hash,
     circuit_testcases::*,
@@ -23,7 +25,7 @@ fn test_keyless_groth16_proof_verification() {
 
     println!(
         "Keyless Groth16 test public inputs hash: {}",
-        public_inputs_hash
+        hex::encode(fr_to_bytes_le(&public_inputs_hash).to_vec())
     );
 
     proof
