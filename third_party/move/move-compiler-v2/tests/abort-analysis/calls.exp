@@ -23,7 +23,6 @@ fun test::nothing() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   0: return ()
 }
 
@@ -36,7 +35,6 @@ fun test::test0() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   0: test::nothing()
      # abort state: {returns}
      # live vars:
@@ -44,7 +42,6 @@ fun test::test0() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   1: return ()
      # abort state: {returns}
      # live vars:

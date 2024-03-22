@@ -34,10 +34,8 @@ fun m::g() {
 fun m::f($t0: &mut u64): &mut u64 {
      var $t1: &mut u64
      # live vars: $t0
-     # before: { no: $t1 }, after: all initialized
   0: $t1 := infer($t0)
      # live vars: $t1
-     # before: all initialized, after: all initialized
   1: return $t1
 }
 
@@ -52,31 +50,22 @@ fun m::g() {
      var $t5: &u64
      var $t6: &u64
      # live vars:
-     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6 }
   0: $t1 := 22
      # live vars: $t1
-     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t2, $t3, $t4, $t5, $t6 }
   1: $t0 := infer($t1)
      # live vars: $t0
-     # before: { no: $t2, $t3, $t4, $t5, $t6 }, after: { no: $t2, $t4, $t5, $t6 }
   2: $t3 := borrow_local($t0)
      # live vars: $t0, $t3
-     # before: { no: $t2, $t4, $t5, $t6 }, after: { no: $t4, $t5, $t6 }
   3: $t2 := infer($t3)
      # live vars: $t0, $t2
-     # before: { no: $t4, $t5, $t6 }, after: { no: $t5, $t6 }
   4: $t4 := m::f($t2)
      # live vars: $t0, $t4
-     # before: { no: $t5, $t6 }, after: { no: $t5, $t6 }
   5: $t2 := infer($t4)
      # live vars: $t0
-     # before: { no: $t5, $t6 }, after: { no: $t5 }
   6: $t6 := borrow_local($t0)
      # live vars: $t6
-     # before: { no: $t5 }, after: all initialized
   7: $t5 := infer($t6)
      # live vars:
-     # before: all initialized, after: all initialized
   8: return ()
 }
 
@@ -90,14 +79,12 @@ fun m::f($t0: &mut u64): &mut u64 {
      # locals: {$t0=@2000000}
      # globals: {}
      #
-     # before: { no: $t1 }, after: all initialized
   0: $t1 := infer($t0)
      # live vars: $t1
      # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
      # locals: {$t1=@2000000}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   1: return $t1
 }
 
@@ -116,63 +103,54 @@ fun m::g() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6 }
   0: $t1 := 22
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t2, $t3, $t4, $t5, $t6 }
   1: $t0 := infer($t1)
      # live vars: $t0
      # graph: {}
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t2, $t3, $t4, $t5, $t6 }, after: { no: $t2, $t4, $t5, $t6 }
   2: $t3 := borrow_local($t0)
      # live vars: $t0, $t3
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
      #
-     # before: { no: $t2, $t4, $t5, $t6 }, after: { no: $t4, $t5, $t6 }
   3: $t2 := infer($t3)
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
-     # before: { no: $t4, $t5, $t6 }, after: { no: $t5, $t6 }
   4: $t4 := m::f($t2)
      # live vars: $t0, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[call(true) -> @400],@400=derived[]}
      # locals: {$t0=@200,$t4=@400}
      # globals: {}
      #
-     # before: { no: $t5, $t6 }, after: { no: $t5, $t6 }
   5: $t2 := infer($t4)
      # live vars: $t0
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
-     # before: { no: $t5, $t6 }, after: { no: $t5 }
   6: $t6 := borrow_local($t0)
      # live vars: $t6
      # graph: {@200=local($t0)[borrow(false) -> @601],@601=derived[]}
      # locals: {$t0=@200,$t6=@601}
      # globals: {}
      #
-     # before: { no: $t5 }, after: all initialized
   7: $t5 := infer($t6)
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   8: return ()
 }
 
@@ -187,7 +165,6 @@ fun m::f($t0: &mut u64): &mut u64 {
      # locals: {$t0=@2000000}
      # globals: {}
      #
-     # before: { no: $t1 }, after: all initialized
   0: $t1 := infer($t0)
      # abort state: {returns}
      # live vars: $t1
@@ -195,7 +172,6 @@ fun m::f($t0: &mut u64): &mut u64 {
      # locals: {$t1=@2000000}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   1: return $t1
 }
 
@@ -215,7 +191,6 @@ fun m::g() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6 }
   0: $t1 := 22
      # abort state: {returns,aborts}
      # live vars: $t1
@@ -223,7 +198,6 @@ fun m::g() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t2, $t3, $t4, $t5, $t6 }
   1: $t0 := infer($t1)
      # abort state: {returns,aborts}
      # live vars: $t0
@@ -231,7 +205,6 @@ fun m::g() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t2, $t3, $t4, $t5, $t6 }, after: { no: $t2, $t4, $t5, $t6 }
   2: $t3 := borrow_local($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t3
@@ -239,7 +212,6 @@ fun m::g() {
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
      #
-     # before: { no: $t2, $t4, $t5, $t6 }, after: { no: $t4, $t5, $t6 }
   3: $t2 := infer($t3)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
@@ -247,7 +219,6 @@ fun m::g() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
-     # before: { no: $t4, $t5, $t6 }, after: { no: $t5, $t6 }
   4: $t4 := m::f($t2)
      # abort state: {returns}
      # live vars: $t0, $t4
@@ -255,7 +226,6 @@ fun m::g() {
      # locals: {$t0=@200,$t4=@400}
      # globals: {}
      #
-     # before: { no: $t5, $t6 }, after: { no: $t5, $t6 }
   5: $t2 := infer($t4)
      # abort state: {returns}
      # live vars: $t0
@@ -263,7 +233,6 @@ fun m::g() {
      # locals: {$t0=@200}
      # globals: {}
      #
-     # before: { no: $t5, $t6 }, after: { no: $t5 }
   6: $t6 := borrow_local($t0)
      # abort state: {returns}
      # live vars: $t6
@@ -271,7 +240,6 @@ fun m::g() {
      # locals: {$t0=@200,$t6=@601}
      # globals: {}
      #
-     # before: { no: $t5 }, after: all initialized
   7: $t5 := infer($t6)
      # abort state: {returns}
      # live vars:
@@ -279,7 +247,6 @@ fun m::g() {
      # locals: {$t0=@200}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   8: return ()
 }
 

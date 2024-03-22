@@ -94,91 +94,49 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      var $t19: vector<u8>
      var $t20: vector<u8>
      var $t21: &vector<u8>
-     # before: { no: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }
   0: $t3 := 0
-     # before: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }
   1: $t2 := infer($t3)
-     # before: { no: $t1, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t4, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }
   2: $t5 := borrow_local($t0)
-     # before: { no: $t1, $t4, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }
   3: $t4 := infer($t5)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   4: label L0
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   5: $t7 := vector::length<u8>($t4)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   6: $t6 := <($t2, $t7)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   7: if ($t6) goto 8 else goto 33
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   8: label L2
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   9: $t10 := vector::borrow<u8>($t4, $t2)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  10: $t9 := read_ref($t10)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t12, $t13, $t14, $t15, $t16, $t17 }
  11: $t11 := 0
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  12: $t8 := !=($t9, $t11)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  13: if ($t8) goto 14 else goto 17
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  14: label L5
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  15: goto 37
  16: goto 18
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  17: label L6
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  18: label L7
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t14, $t15, $t16, $t17 }
  19: $t13 := 1
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t16, $t17 }
  20: $t12 := +($t2, $t13)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t16, $t17 }
  21: $t2 := infer($t12)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t17 }
  22: $t16 := vector::borrow<u8>($t4, $t2)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t17 }
  23: $t15 := read_ref($t16)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14 }
  24: $t17 := 5
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  25: $t14 := ==($t15, $t17)
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  26: if ($t14) goto 27 else goto 30
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  27: label L8
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  28: goto 37
  29: goto 31
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  30: label L9
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  31: label L10
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  32: goto 35
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  33: label L3
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  34: goto 37
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  35: label L4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  36: goto 4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  37: label L1
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  38: $t19 := copy($t0)
-     # before: { no: $t1, $t18, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  39: $t18 := infer($t19)
-     # before: { no: $t1, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  40: $t20 := infer($t0)
-     # before: { no: $t1, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  41: $t21 := infer($t4)
-     # before: { no: $t1 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  42: $t1 := vector::length<u8>($t21)
-     # before: { maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  43: return $t1
 }
 
@@ -208,133 +166,91 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
      var $t20: vector<u8>
      var $t21: &vector<u8>
      # live vars: $t0
-     # before: { no: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }
   0: $t3 := 0
      # live vars: $t0, $t3
-     # before: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }
   1: $t2 := infer($t3)
      # live vars: $t0, $t2
-     # before: { no: $t1, $t4, $t5, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t4, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }
   2: $t5 := borrow_local($t0)
      # live vars: $t0, $t2, $t5
-     # before: { no: $t1, $t4, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17, $t18, $t19, $t20, $t21 }
   3: $t4 := infer($t5)
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   4: label L0
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t7, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   5: $t7 := vector::length<u8>($t4)
      # live vars: $t0, $t2, $t4, $t7
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t6, $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   6: $t6 := <($t2, $t7)
      # live vars: $t0, $t2, $t4, $t6
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   7: if ($t6) goto 8 else goto 33
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   8: label L2
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
   9: $t10 := vector::borrow<u8>($t4, $t2)
      # live vars: $t0, $t2, $t4, $t10
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  10: $t9 := read_ref($t10)
      # live vars: $t0, $t2, $t4, $t9
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t12, $t13, $t14, $t15, $t16, $t17 }
  11: $t11 := 0
      # live vars: $t0, $t2, $t4, $t9, $t11
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  12: $t8 := !=($t9, $t11)
      # live vars: $t0, $t2, $t4, $t8
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  13: if ($t8) goto 14 else goto 17
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  14: label L5
      # live vars: $t0, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  15: goto 37
      # live vars: $t0, $t2, $t4
  16: goto 18
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  17: label L6
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }
  18: label L7
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t14, $t15, $t16, $t17 }
  19: $t13 := 1
      # live vars: $t0, $t2, $t4, $t13
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t12, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t16, $t17 }
  20: $t12 := +($t2, $t13)
      # live vars: $t0, $t4, $t12
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t16, $t17 }
  21: $t2 := infer($t12)
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t17 }
  22: $t16 := vector::borrow<u8>($t4, $t2)
      # live vars: $t0, $t2, $t4, $t16
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t15, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t17 }
  23: $t15 := read_ref($t16)
      # live vars: $t0, $t2, $t4, $t15
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14 }
  24: $t17 := 5
      # live vars: $t0, $t2, $t4, $t15, $t17
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t14 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  25: $t14 := ==($t15, $t17)
      # live vars: $t0, $t2, $t4, $t14
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  26: if ($t14) goto 27 else goto 30
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  27: label L8
      # live vars: $t0, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  28: goto 37
      # live vars: $t0, $t2, $t4
  29: goto 31
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  30: label L9
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  31: label L10
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  32: goto 35
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  33: label L3
      # live vars: $t0, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  34: goto 37
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  35: label L4
      # live vars: $t0, $t2, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }, after: { no: $t1, $t18, $t19, $t20, $t21 }
  36: goto 4
      # live vars: $t0, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  37: label L1
      # live vars: $t0, $t4
-     # before: { no: $t1, $t18, $t19, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t18, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  38: $t19 := copy($t0)
      # live vars: $t0, $t4, $t19
-     # before: { no: $t1, $t18, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  39: $t18 := infer($t19)
      # live vars: $t0, $t4
-     # before: { no: $t1, $t20, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  40: $t20 := infer($t0)
      # live vars: $t4
-     # before: { no: $t1, $t21 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { no: $t1 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  41: $t21 := infer($t4)
      # live vars: $t21
-     # before: { no: $t1 }{ maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  42: $t1 := vector::length<u8>($t21)
      # live vars: $t1
-     # before: { maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }, after: { maybe: $t8, $t9, $t10, $t11, $t12, $t13, $t14, $t15, $t16, $t17 }
  43: return $t1
 }

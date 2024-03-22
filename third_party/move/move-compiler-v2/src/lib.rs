@@ -398,7 +398,8 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     // These are various checks on bytecode level which do not modify
     // the code.
     if options.experiment_on(Experiment::UNINITIALIZED_CHECK) {
-        pipeline.add_processor(Box::new(UninitializedUseChecker {}));
+        let keep_annotations = options.experiment_on(Experiment::KEEP_UNINIT_ANNOTATIONS);
+        pipeline.add_processor(Box::new(UninitializedUseChecker { keep_annotations }));
     }
 
     // Reference check is always run, but the processor decides internally

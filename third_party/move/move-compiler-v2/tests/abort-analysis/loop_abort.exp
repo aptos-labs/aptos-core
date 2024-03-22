@@ -73,7 +73,6 @@ fun Test::test0() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
   0: $t2 := false
      # abort state: {}
      # live vars: $t2
@@ -81,7 +80,6 @@ fun Test::test0() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1 }, after: { no: $t0 }
   1: $t1 := pack Test::Impotent($t2)
      # abort state: {}
      # live vars: $t1
@@ -89,7 +87,6 @@ fun Test::test0() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0 }, after: all initialized
   2: $t0 := infer($t1)
      # abort state: {}
      # live vars:
@@ -97,7 +94,6 @@ fun Test::test0() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   3: label L0
      # abort state: {}
      # live vars:
@@ -105,7 +101,6 @@ fun Test::test0() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   4: goto 3
      # abort state: {returns}
      # live vars:
@@ -136,7 +131,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t3 }
   0: $t2 := false
      # abort state: {returns}
      # live vars: $t2
@@ -144,7 +138,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t3 }, after: { no: $t0, $t3 }
   1: $t1 := pack Test::Impotent($t2)
      # abort state: {returns}
      # live vars: $t1
@@ -152,7 +145,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t3 }, after: { no: $t3 }
   2: $t0 := infer($t1)
      # abort state: {returns}
      # live vars:
@@ -160,7 +152,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: { maybe: $t3 }, after: { maybe: $t3 }
   3: label L0
      # abort state: {returns}
      # live vars:
@@ -168,7 +159,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: { maybe: $t3 }, after: all initialized
   4: $t3 := true
      # abort state: {returns}
      # live vars: $t3
@@ -176,7 +166,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   5: if ($t3) goto 6 else goto 8
      # abort state: {returns}
      # live vars:
@@ -184,7 +173,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   6: label L2
      # abort state: {returns}
      # live vars:
@@ -192,7 +180,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   7: goto 10
      # abort state: {returns}
      # live vars:
@@ -200,7 +187,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   8: label L3
      # abort state: {returns}
      # live vars:
@@ -208,7 +194,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   9: goto 12
      # abort state: {returns}
      # live vars:
@@ -216,7 +201,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
  10: label L4
      # abort state: {returns}
      # live vars:
@@ -224,7 +208,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
  11: goto 3
      # abort state: {returns}
      # live vars:
@@ -232,7 +215,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
  12: label L1
      # abort state: {returns}
      # live vars:
@@ -240,7 +222,6 @@ fun Test::test1() {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
  13: return ()
 }
 
@@ -257,7 +238,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t1, $t2, $t3, $t4 }, after: { no: $t1, $t2, $t4 }
   0: $t3 := false
      # abort state: {aborts}
      # live vars: $t0, $t3
@@ -265,7 +245,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t1, $t2, $t4 }, after: { no: $t1, $t4 }
   1: $t2 := pack Test::Impotent($t3)
      # abort state: {aborts}
      # live vars: $t0, $t2
@@ -273,7 +252,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t1, $t4 }, after: { no: $t4 }
   2: $t1 := infer($t2)
      # abort state: {aborts}
      # live vars: $t0
@@ -281,7 +259,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t4 }, after: { no: $t4 }
   3: if ($t0) goto 4 else goto 9
      # abort state: {}
      # live vars:
@@ -289,7 +266,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t4 }, after: { no: $t4 }
   4: label L0
      # abort state: {}
      # live vars:
@@ -297,7 +273,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t4 }, after: { no: $t4 }
   5: label L3
      # abort state: {}
      # live vars:
@@ -305,7 +280,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t4 }, after: { no: $t4 }
   6: goto 5
      # abort state: {returns}
      # live vars:
@@ -327,7 +301,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t4 }, after: { no: $t4 }
   9: label L1
      # abort state: {aborts}
      # live vars:
@@ -335,7 +308,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t4 }, after: all initialized
  10: $t4 := 42
      # abort state: {aborts}
      # live vars: $t4
@@ -343,7 +315,6 @@ fun Test::test2($t0: bool) {
      # locals: {}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
  11: abort($t4)
      # abort state: {returns}
      # live vars:

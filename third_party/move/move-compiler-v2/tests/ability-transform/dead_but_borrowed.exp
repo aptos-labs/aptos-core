@@ -22,19 +22,14 @@ fun explicate_drop::test0(): u8 {
      var $t2: &u8
      var $t3: u8
      # live vars:
-     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t2 }
   0: $t3 := 42
      # live vars: $t3
-     # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
   1: $t2 := borrow_local($t3)
      # live vars: $t2
-     # before: { no: $t0, $t1 }, after: { no: $t0 }
   2: $t1 := infer($t2)
      # live vars: $t1
-     # before: { no: $t0 }, after: all initialized
   3: $t0 := read_ref($t1)
      # live vars: $t0
-     # before: all initialized, after: all initialized
   4: return $t0
 }
 
@@ -51,35 +46,30 @@ fun explicate_drop::test0(): u8 {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t2 }
   0: $t3 := 42
      # live vars: $t3
      # graph: {}
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
   1: $t2 := borrow_local($t3)
      # live vars: $t2
      # graph: {@100=local($t3)[borrow(false) -> @101],@101=derived[]}
      # locals: {$t2=@101,$t3=@100}
      # globals: {}
      #
-     # before: { no: $t0, $t1 }, after: { no: $t0 }
   2: $t1 := infer($t2)
      # live vars: $t1
      # graph: {@100=local($t3)[borrow(false) -> @101],@101=derived[]}
      # locals: {$t1=@101,$t3=@100}
      # globals: {}
      #
-     # before: { no: $t0 }, after: all initialized
   3: $t0 := read_ref($t1)
      # live vars: $t0
      # graph: {@100=local($t3)[]}
      # locals: {$t3=@100}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   4: return $t0
 }
 
@@ -97,7 +87,6 @@ fun explicate_drop::test0(): u8 {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t2 }
   0: $t3 := 42
      # abort state: {returns}
      # live vars: $t3
@@ -105,7 +94,6 @@ fun explicate_drop::test0(): u8 {
      # locals: {}
      # globals: {}
      #
-     # before: { no: $t0, $t1, $t2 }, after: { no: $t0, $t1 }
   1: $t2 := borrow_local($t3)
      # abort state: {returns}
      # live vars: $t2
@@ -113,7 +101,6 @@ fun explicate_drop::test0(): u8 {
      # locals: {$t2=@101,$t3=@100}
      # globals: {}
      #
-     # before: { no: $t0, $t1 }, after: { no: $t0 }
   2: $t1 := infer($t2)
      # abort state: {returns}
      # live vars: $t1
@@ -121,7 +108,6 @@ fun explicate_drop::test0(): u8 {
      # locals: {$t1=@101,$t3=@100}
      # globals: {}
      #
-     # before: { no: $t0 }, after: all initialized
   3: $t0 := read_ref($t1)
      # abort state: {returns}
      # live vars: $t0
@@ -129,7 +115,6 @@ fun explicate_drop::test0(): u8 {
      # locals: {$t3=@100}
      # globals: {}
      #
-     # before: all initialized, after: all initialized
   4: return $t0
 }
 

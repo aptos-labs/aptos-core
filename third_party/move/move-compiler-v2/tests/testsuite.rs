@@ -387,10 +387,6 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exp_suffix: None,
             options: opts
                 .clone()
-                // The uninitialized check interferes with ability transform
-                // because it leaves some annotations which are unexpected, so
-                // does the ability check.
-                .set_experiment(Experiment::UNINITIALIZED_CHECK, false)
                 .set_experiment(Experiment::ABILITY_CHECK, false),
             stop_after: StopAfter::BytecodePipeline(None),
             dump_ast: DumpLevel::None,
@@ -404,7 +400,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/uninit-use-checker/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone(),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::KEEP_UNINIT_ANNOTATIONS, true),
             stop_after: StopAfter::BytecodePipeline(Some("uninitialized_use_checker")),
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,

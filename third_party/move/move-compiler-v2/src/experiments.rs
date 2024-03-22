@@ -63,6 +63,13 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::KEEP_UNINIT_ANNOTATIONS.to_string(),
+            description: "Determines whether the annotations for \
+            uninitialized variable analysis should be kept around (for testin)"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::ABILITY_CHECK.to_string(),
             description: "Turns on or off ability checks".to_string(),
             default: Inherited(Experiment::CHECKS.to_string()),
@@ -165,6 +172,7 @@ impl Experiment {
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
+    pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING: &'static str = "lambda-lifting";
     pub const OPTIMIZE: &'static str = "optimize";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
