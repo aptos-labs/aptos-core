@@ -285,14 +285,10 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "framework_usecases",
-<<<<<<< HEAD
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
-=======
-            EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
             EntryPoints::TokenMinterMint => "minter",
->>>>>>> ad2526a081 (Initial)
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
@@ -571,7 +567,6 @@ impl EntryPoints {
                     ],
                 )
             },
-<<<<<<< HEAD
             EntryPoints::TokenV2AmbassadorMint { numbered: false } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
@@ -588,7 +583,6 @@ impl EntryPoints {
                 ident_str!("burn_named_by_user").to_owned(),
                 vec![],
             ),
-=======
             EntryPoints::TokenMinterMint => {
                 // Set this to an address with a deployed `token_minter`
                 let module_id = ModuleId::new(
@@ -620,7 +614,6 @@ impl EntryPoints {
                     ],
                 )
             },
->>>>>>> ad2526a081 (Initial)
             EntryPoints::InitializeVectorPicture { length } => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![
                     bcs::to_bytes(&length).unwrap(), // length
