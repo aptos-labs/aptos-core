@@ -146,8 +146,6 @@ impl OnChainRandomnessConfig {
     }
 
     pub fn default_for_genesis() -> Self {
-        // TODO: change to `V2` after fast randomness is ready.
-        // OnChainRandomnessConfig::Off
         OnChainRandomnessConfig::V2(ConfigV2::default())
     }
 

@@ -2560,7 +2560,10 @@ name = "aptos-keyless-pepper-service"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-inspection-service",
  "aptos-keyless-pepper-common",
+ "aptos-logger",
+ "aptos-metrics-core",
  "aptos-types",
  "ark-bls12-381",
  "ark-ec",
@@ -2575,7 +2578,6 @@ dependencies = [
  "hyper",
  "jsonwebtoken 8.3.0",
  "jwt",
- "log",
  "once_cell",
  "rand 0.7.3",
  "reqwest",
@@ -2583,6 +2585,7 @@ dependencies = [
  "serde_json",
  "sha3 0.9.1",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
