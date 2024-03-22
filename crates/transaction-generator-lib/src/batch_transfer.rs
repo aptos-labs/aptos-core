@@ -42,6 +42,7 @@ impl TransactionGenerator for BatchTransferTransactionGenerator {
         account: &LocalAccount,
         num_to_create: usize,
         history: &Vec<String>,
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);
         for _ in 0..num_to_create {

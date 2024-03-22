@@ -26,6 +26,7 @@ pub type TransactionGeneratorWorker = dyn Fn(
         &mut StdRng,
         u64,
         &Vec<String>,
+        bool,
     ) -> Vec<SignedTransaction>
     + Send
     + Sync;
@@ -91,6 +92,7 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
         account: &LocalAccount,
         _num_to_create: usize,
         history: &Vec<String>,
+        market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let mut all_requests = Vec::with_capacity(self.packages.len());
 
@@ -104,6 +106,7 @@ impl TransactionGenerator for CustomModulesDelegationGenerator {
                 &mut self.rng,
                 self.txn_counter.load(std::sync::atomic::Ordering::Relaxed),
                 history,
+                market_maker
             );
             all_requests.append(&mut requests);
         }
@@ -212,7 +215,7 @@ impl CustomModulesDelegationGeneratorCreator {
         publisher_balance: Option<u64>,
         publish_packages: bool,
     ) -> Vec<(Package, LocalAccount)> {
-        let mut rng = StdRng::from_seed([51,65,6,13,12,34,24,14,11,18,23,63,15,13,54,72,147,8,212,74,25,71,35,58,28,59,8,1,5,23,98,90]);
+        let mut rng = StdRng::from_seed([51,65,6,13,62,14,94,14,11,18,23,63,15,13,54,72,147,8,212,74,25,71,35,58,28,59,8,1,5,23,98,90]);
         let mut requests_create = Vec::with_capacity(num_modules);
         let mut requests_publish = Vec::with_capacity(num_modules);
         let mut package_handler = PackageHandler::new(package_name);

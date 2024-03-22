@@ -41,6 +41,7 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
         account: &LocalAccount,
         num_to_create: usize,
         _history: &Vec<String>,
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let phase = if self.txn_mix_per_phase.len() == 1 {
             // when only single txn_mix is passed, use it for all phases, for simplicity
@@ -52,7 +53,7 @@ impl TransactionGenerator for PhasedTxnMixGenerator {
         let mut picked = self.rng.gen_range(0, self.total_weight_per_phase[phase]);
         for (gen, weight) in &mut self.txn_mix_per_phase[phase] {
             if picked < *weight {
-                return gen.generate_transactions(account, num_to_create, &Vec::new());
+                return gen.generate_transactions(account, num_to_create, &Vec::new(), false);
             }
             picked -= *weight;
         }

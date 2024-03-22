@@ -16,9 +16,10 @@ impl TransactionGenerator for BoundedBatchWrapperTransactionGenerator {
         account: &LocalAccount,
         num_to_create: usize,
         _history: &Vec<String>,
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         self.generator
-            .generate_transactions(account, num_to_create.min(self.batch_size), &Vec::new())
+            .generate_transactions(account, num_to_create.min(self.batch_size), &Vec::new(), false)
     }
 }
 

@@ -43,6 +43,7 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         _account: &LocalAccount,
         num_to_create: usize,
         history: &Vec<String>,
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let mut accounts_to_use =
             self.source_accounts_pool
@@ -52,7 +53,7 @@ impl TransactionGenerator for AccountsPoolWrapperGenerator {
         }
         let txns = accounts_to_use
             .iter_mut()
-            .flat_map(|account| self.generator.generate_transactions(account, 1, &Vec::new()))
+            .flat_map(|account| self.generator.generate_transactions(account, 1, &Vec::new(), false))
             .collect();
 
         if let Some(destination_accounts_pool) = &self.destination_accounts_pool {
@@ -122,6 +123,7 @@ impl TransactionGenerator for AddHistoryWrapperGenerator {
         _account: &LocalAccount,
         _num_to_create: usize,
         _history: &Vec<String>,
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         let length = self.source_accounts_pool.len();
         let all_source_accounts = self.source_accounts_pool.take_from_pool(length, true, &mut self.rng);
@@ -188,104 +190,107 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
     fn generate_transactions(
         &mut self,
         _account: &LocalAccount,
-        _num_to_create: usize,
+        num_to_create: usize,
         _history: &Vec<String>,
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
-        let rand = self.rng.gen_range(0,1000);
-        if rand < 476 {
-            let txns = self.generator.generate_transactions(&self.market_makers[0].0, 1, &self.market_makers[0].1);
-            for txn in txns.iter() {
-                if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
-                    let function_name = entry_function.function().as_str();
-                    self.market_makers[0].1.push(function_name.to_string());
+        println!("generate_transactions: num_to_create: {}", num_to_create);
+        if self.rng.gen_range(0,1000) < 939 {
+            let rand = self.rng.gen_range(0,1000);
+            if rand < 476 {
+                let txns = self.generator.generate_transactions(&self.market_makers[0].0, 1, &self.market_makers[0].1, true);
+                for txn in txns.iter() {
+                    if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                        let function_name = entry_function.function().as_str();
+                        self.market_makers[0].1.push(function_name.to_string());
+                    }
                 }
-            }
-            txns
-        } else if rand < 733 {
-            let txns = self.generator.generate_transactions(&self.market_makers[1].0, 1, &self.market_makers[1].1);
-            for txn in txns.iter() {
-                if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
-                    let function_name = entry_function.function().as_str();
-                    self.market_makers[1].1.push(function_name.to_string());
+                return txns;
+            } else if rand < 733 {
+                let txns = self.generator.generate_transactions(&self.market_makers[1].0, 1, &self.market_makers[1].1, true);
+                for txn in txns.iter() {
+                    if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                        let function_name = entry_function.function().as_str();
+                        self.market_makers[1].1.push(function_name.to_string());
+                    }
                 }
-            }
-            txns
-        } else if rand < 818 {
-            let txns = self.generator.generate_transactions(&self.market_makers[2].0, 1, &self.market_makers[2].1);
-            for txn in txns.iter() {
-                if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
-                    let function_name = entry_function.function().as_str();
-                    self.market_makers[2].1.push(function_name.to_string());
+                return txns;
+            } else if rand < 818 {
+                let txns = self.generator.generate_transactions(&self.market_makers[2].0, 1, &self.market_makers[2].1, true);
+                for txn in txns.iter() {
+                    if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                        let function_name = entry_function.function().as_str();
+                        self.market_makers[2].1.push(function_name.to_string());
+                    }
                 }
-            }
-            txns
-        } else if rand < 871 {
-            let txns = self.generator.generate_transactions(&self.market_makers[3].0, 1, &self.market_makers[3].1);
-            for txn in txns.iter() {
-                if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
-                    let function_name = entry_function.function().as_str();
-                    self.market_makers[3].1.push(function_name.to_string());
+                return txns;
+            } else if rand < 871 {
+                let txns = self.generator.generate_transactions(&self.market_makers[3].0, 1, &self.market_makers[3].1, true);
+                for txn in txns.iter() {
+                    if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                        let function_name = entry_function.function().as_str();
+                        self.market_makers[3].1.push(function_name.to_string());
+                    }
                 }
-            }
-            txns
-        } else if rand < 920 {
-            let txns = self.generator.generate_transactions(&self.market_makers[4].0, 1, &self.market_makers[4].1);
-            for txn in txns.iter() {
-                if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
-                    let function_name = entry_function.function().as_str();
-                    self.market_makers[4].1.push(function_name.to_string());
+                return txns;
+            } else if rand < 920 {
+                let txns = self.generator.generate_transactions(&self.market_makers[4].0, 1, &self.market_makers[4].1, true);
+                for txn in txns.iter() {
+                    if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                        let function_name = entry_function.function().as_str();
+                        self.market_makers[4].1.push(function_name.to_string());
+                    }
                 }
-            }
-            txns
-        } else if rand < 962 {
-            let txns = self.generator.generate_transactions(&self.market_makers[5].0, 1, &self.market_makers[5].1);
-            for txn in txns.iter() {
-                if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
-                    let function_name = entry_function.function().as_str();
-                    self.market_makers[5].1.push(function_name.to_string());
+                return txns;
+            } else if rand < 962 {
+                let txns = self.generator.generate_transactions(&self.market_makers[5].0, 1, &self.market_makers[5].1, true);
+                for txn in txns.iter() {
+                    if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                        let function_name = entry_function.function().as_str();
+                        self.market_makers[5].1.push(function_name.to_string());
+                    }
                 }
-            }
-            txns
-        } else if rand < 991 {
-            let txns = self.generator.generate_transactions(&self.market_makers[6].0, 1, &self.market_makers[6].1);
-            for txn in txns.iter() {
-                if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
-                    let function_name = entry_function.function().as_str();
-                    self.market_makers[6].1.push(function_name.to_string());
+                return txns;
+            } else if rand < 991 {
+                let txns = self.generator.generate_transactions(&self.market_makers[6].0, 1, &self.market_makers[6].1, true);
+                for txn in txns.iter() {
+                    if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                        let function_name = entry_function.function().as_str();
+                        self.market_makers[6].1.push(function_name.to_string());
+                    }
                 }
+                return txns;
             }
-            txns
-        } else {
-            let mut accounts_to_use = self.source_accounts_pool.take_from_pool(1, true, &mut self.rng);
-            if accounts_to_use.is_empty() {
-                return Vec::new();
-            }
-            let txns: Vec<SignedTransaction> = accounts_to_use
-                .iter_mut()
-                .flat_map(|(account, history)| self.generator.generate_transactions(account, 1, history))
-                .collect();
-
-            let mut function_calls = HashMap::new();
-            for txn in txns.iter() {
-                if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
-                    let function_name = entry_function.function().as_str();
-                    function_calls.insert(txn.sender(), function_name.to_string());
-                }
-            }
-            accounts_to_use = accounts_to_use.into_iter().map(|(account, history)| {
-                                                            if let Some(function_name) = function_calls.get(&account.address()) {
-                                                                let mut history = history.clone();
-                                                                history.push(function_name.clone()); 
-                                                                (account, history)
-                                                            } else {
-                                                                (account, history)
-                                                            }
-                                                        }
-                                                    ).collect();
-
-            self.source_accounts_pool.add_to_pool(accounts_to_use);
-            txns
         }
+        let mut accounts_to_use = self.source_accounts_pool.take_from_pool(1, true, &mut self.rng);
+        if accounts_to_use.is_empty() {
+            return Vec::new();
+        }
+        let txns: Vec<SignedTransaction> = accounts_to_use
+            .iter_mut()
+            .flat_map(|(account, history)| self.generator.generate_transactions(account, 1, history, false))
+            .collect();
+
+        let mut function_calls = HashMap::new();
+        for txn in txns.iter() {
+            if let TransactionPayload::EntryFunction(entry_function) = txn.payload() {
+                let function_name = entry_function.function().as_str();
+                function_calls.insert(txn.sender(), function_name.to_string());
+            }
+        }
+        accounts_to_use = accounts_to_use.into_iter().map(|(account, history)| {
+                                                        if let Some(function_name) = function_calls.get(&account.address()) {
+                                                            let mut history = history.clone();
+                                                            history.push(function_name.clone()); 
+                                                            (account, history)
+                                                        } else {
+                                                            (account, history)
+                                                        }
+                                                    }
+                                                ).collect();
+
+        self.source_accounts_pool.add_to_pool(accounts_to_use);
+        txns
     }
 }
 

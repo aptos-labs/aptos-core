@@ -128,6 +128,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         account: &LocalAccount,
         mut num_to_create: usize,
         _history: &Vec<String>,
+        _market_maker: bool,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);
         let stage = match &self.stage {
@@ -211,7 +212,7 @@ impl TransactionGenerator for WorkflowTxnGenerator {
         );
 
         let result = if let Some(generator) = self.generators.get_mut(stage) {
-            let txns = generator.generate_transactions(account, num_to_create, &Vec::new());
+            let txns = generator.generate_transactions(account, num_to_create, &Vec::new(), false);
             txns
         } else {
             Vec::new()

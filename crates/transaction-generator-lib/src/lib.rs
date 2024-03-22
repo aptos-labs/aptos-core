@@ -137,6 +137,7 @@ pub trait TransactionGenerator: Sync + Send {
         account: &LocalAccount,
         num_to_create: usize,
         history: &Vec<String>,
+        market_maker: bool,
     ) -> Vec<SignedTransaction>;
 }
 
