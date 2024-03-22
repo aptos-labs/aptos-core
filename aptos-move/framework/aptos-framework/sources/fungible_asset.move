@@ -404,6 +404,10 @@ module aptos_framework::fungible_asset {
     #[view]
     /// Return whether the provided address has a store initialized.
     public fun store_exists(store: address): bool {
+        store_exists_inline(store)
+    }
+
+    fun store_exists_inline(store: address): bool {
         exists<FungibleStore>(store)
     }
 
@@ -426,8 +430,9 @@ module aptos_framework::fungible_asset {
     #[view]
     /// Get the balance of a given store.
     public fun balance<T: key>(store: Object<T>): u64 acquires FungibleStore {
-        if (store_exists(object::object_address(&store))) {
-            borrow_store_resource(&store).balance
+        let store_addr = object::object_address(&store);
+        if (store_exists_inline(store_addr)) {
+            borrow_global<FungibleStore>(store_addr).balance
         } else {
             0
         }
@@ -437,8 +442,13 @@ module aptos_framework::fungible_asset {
     /// Check whether the balance of a given store is >= `amount`.
     public fun is_balance_at_least<T: key>(store: Object<T>, amount: u64): bool acquires FungibleStore {
         let store_addr = object::object_address(&store);
-        if (store_exists(store_addr)) {
-            borrow_store_resource(&store).balance >= amount
+        is_address_balance_at_least(store_addr, amount)
+    }
+
+    /// Check whether the balance of a given store is >= `amount`.
+    public(friend) fun is_address_balance_at_least(store_addr: address, amount: u64): bool acquires FungibleStore {
+        if (store_exists_inline(store_addr)) {
+            borrow_global<FungibleStore>(store_addr).balance >= amount
         } else {
             amount == 0
         }
@@ -449,7 +459,8 @@ module aptos_framework::fungible_asset {
     ///
     /// If the store has not been created, we default to returning false so deposits can be sent to it.
     public fun is_frozen<T: key>(store: Object<T>): bool acquires FungibleStore {
-        store_exists(object::object_address(&store)) && borrow_store_resource(&store).frozen
+        let store_addr = object::object_address(&store);
+        store_exists_inline(store_addr) && borrow_global<FungibleStore>(store_addr).frozen
     }
 
     #[view]
@@ -583,7 +594,7 @@ module aptos_framework::fungible_asset {
         amount: u64,
     ): FungibleAsset acquires FungibleStore, DispatchFunctionStore {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
-        assert!(store_exists(object::object_address(&store)), error::invalid_argument(ESTORE_IS_FROZEN));
+        assert!(store_exists_inline(object::object_address(&store)), error::invalid_argument(ESTORE_IS_FROZEN));
         let fa_store = borrow_store_resource(&store);
         assert!(
             !has_withdraw_dispatch_function(fa_store.metadata),
@@ -595,7 +606,7 @@ module aptos_framework::fungible_asset {
 
     /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, DispatchFunctionStore {
-        assert!(store_exists(object::object_address(&store)), error::permission_denied(ESTORE_IS_FROZEN));
+        assert!(store_exists_inline(object::object_address(&store)), error::permission_denied(ESTORE_IS_FROZEN));
         let fa_store = borrow_store_resource(&store);
         assert!(
             !has_deposit_dispatch_function(fa_store.metadata),
@@ -696,10 +707,8 @@ module aptos_framework::fungible_asset {
         store: Object<T>,
         amount: u64
     ) acquires FungibleStore, Supply, ConcurrentSupply {
-        let metadata = ref.metadata;
-        assert!(metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
-        let store_addr = object::object_address(&store);
-        burn(ref, withdraw_internal(store_addr, amount));
+        assert!(ref.metadata == store_metadata(store), error::invalid_argument(EBURN_REF_AND_STORE_MISMATCH));
+        burn(ref, withdraw_internal(object::object_address(&store), amount));
     }
 
     /// Withdraw `amount` of the fungible asset from the `store` ignoring `frozen`.
@@ -834,8 +843,8 @@ module aptos_framework::fungible_asset {
         if (amount == 0) {
             return
         };
-        let metadata_address = object::object_address(metadata);
 
+        let metadata_address = object::object_address(metadata);
         if (exists<ConcurrentSupply>(metadata_address)) {
             let supply = borrow_global_mut<ConcurrentSupply>(metadata_address);
 

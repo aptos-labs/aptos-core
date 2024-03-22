@@ -35,11 +35,13 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `symbol`](#0x1_fungible_asset_symbol)
 -  [Function `decimals`](#0x1_fungible_asset_decimals)
 -  [Function `store_exists`](#0x1_fungible_asset_store_exists)
+-  [Function `store_exists_inline`](#0x1_fungible_asset_store_exists_inline)
 -  [Function `metadata_from_asset`](#0x1_fungible_asset_metadata_from_asset)
 -  [Function `store_metadata`](#0x1_fungible_asset_store_metadata)
 -  [Function `amount`](#0x1_fungible_asset_amount)
 -  [Function `balance`](#0x1_fungible_asset_balance)
 -  [Function `is_balance_at_least`](#0x1_fungible_asset_is_balance_at_least)
+-  [Function `is_address_balance_at_least`](#0x1_fungible_asset_is_address_balance_at_least)
 -  [Function `is_frozen`](#0x1_fungible_asset_is_frozen)
 -  [Function `is_dispatchable`](#0x1_fungible_asset_is_dispatchable)
 -  [Function `deposit_dispatch_function`](#0x1_fungible_asset_deposit_dispatch_function)
@@ -1427,6 +1429,30 @@ Return whether the provided address has a store initialized.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(store: <b>address</b>): bool {
+    <a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_store_exists_inline"></a>
+
+## Function `store_exists_inline`
+
+
+
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store: <b>address</b>): bool {
     <b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store)
 }
 </code></pre>
@@ -1529,8 +1555,9 @@ Get the balance of a given store.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_balance">balance</a>&lt;T: key&gt;(store: Object&lt;T&gt;): u64 <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
-    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store))) {
-        <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).balance
+    <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
+    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store_addr)) {
+        <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).balance
     } <b>else</b> {
         0
     }
@@ -1560,8 +1587,33 @@ Check whether the balance of a given store is >= <code>amount</code>.
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_balance_at_least">is_balance_at_least</a>&lt;T: key&gt;(store: Object&lt;T&gt;, amount: u64): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
     <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
-    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(store_addr)) {
-        <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).balance &gt;= amount
+    <a href="fungible_asset.md#0x1_fungible_asset_is_address_balance_at_least">is_address_balance_at_least</a>(store_addr, amount)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_is_address_balance_at_least"></a>
+
+## Function `is_address_balance_at_least`
+
+Check whether the balance of a given store is >= <code>amount</code>.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_address_balance_at_least">is_address_balance_at_least</a>(store_addr: <b>address</b>, amount: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_address_balance_at_least">is_address_balance_at_least</a>(store_addr: <b>address</b>, amount: u64): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
+    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store_addr)) {
+        <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).balance &gt;= amount
     } <b>else</b> {
         amount == 0
     }
@@ -1592,7 +1644,8 @@ If the store has not been created, we default to returning false so deposits can
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>&lt;T: key&gt;(store: Object&lt;T&gt;): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
-    <a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)) && <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).frozen
+    <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
+    <a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(store_addr) && <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).frozen
 }
 </code></pre>
 
@@ -2006,7 +2059,7 @@ Withdraw <code>amount</code> of the fungible asset from <code>store</code> by th
     amount: u64,
 ): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a> {
     <b>assert</b>!(<a href="object.md#0x1_object_owns">object::owns</a>(store, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_ENOT_STORE_OWNER">ENOT_STORE_OWNER</a>));
-    <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
+    <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
     <b>let</b> fa_store = <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store);
     <b>assert</b>!(
         !<a href="fungible_asset.md#0x1_fungible_asset_has_withdraw_dispatch_function">has_withdraw_dispatch_function</a>(fa_store.metadata),
@@ -2038,7 +2091,7 @@ Deposit <code>amount</code> of the fungible asset to <code>store</code>.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(store: Object&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_DispatchFunctionStore">DispatchFunctionStore</a> {
-    <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
+    <b>assert</b>!(<a href="fungible_asset.md#0x1_fungible_asset_store_exists_inline">store_exists_inline</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
     <b>let</b> fa_store = <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store);
     <b>assert</b>!(
         !<a href="fungible_asset.md#0x1_fungible_asset_has_deposit_dispatch_function">has_deposit_dispatch_function</a>(fa_store.metadata),
@@ -2339,10 +2392,8 @@ Burn the <code>amount</code> of the fungible asset from the given store.
     store: Object&lt;T&gt;,
     amount: u64
 ) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a> {
-    <b>let</b> metadata = ref.metadata;
-    <b>assert</b>!(metadata == <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EBURN_REF_AND_STORE_MISMATCH">EBURN_REF_AND_STORE_MISMATCH</a>));
-    <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
-    <a href="fungible_asset.md#0x1_fungible_asset_burn">burn</a>(ref, <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(store_addr, amount));
+    <b>assert</b>!(ref.metadata == <a href="fungible_asset.md#0x1_fungible_asset_store_metadata">store_metadata</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_EBURN_REF_AND_STORE_MISMATCH">EBURN_REF_AND_STORE_MISMATCH</a>));
+    <a href="fungible_asset.md#0x1_fungible_asset_burn">burn</a>(ref, <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), amount));
 }
 </code></pre>
 
@@ -2697,8 +2748,8 @@ Decrease the supply of a fungible asset by burning.
     <b>if</b> (amount == 0) {
         <b>return</b>
     };
-    <b>let</b> metadata_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(metadata);
 
+    <b>let</b> metadata_address = <a href="object.md#0x1_object_object_address">object::object_address</a>(metadata);
     <b>if</b> (<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(metadata_address)) {
         <b>let</b> supply = <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a>&gt;(metadata_address);
 

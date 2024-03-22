@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 84511d169e7983cc4fc4b606912bf38cef3dd38d3d198d8700746df988e688ee # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: BothComparison, block_split: Whole }, element_type = U64, use_type = UseResourceType
+cc 45380e45dcac5b5751a0a5cd266e31c5c3350a6972983a7c07ff66bfcd1fcd68 # shrinks to test_env = TestEnvConfig { executor_mode: BothComparison, aggregator_execution_mode: BothComparison, block_split: Whole }

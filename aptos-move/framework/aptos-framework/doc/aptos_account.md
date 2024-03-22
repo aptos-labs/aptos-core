@@ -9,6 +9,7 @@
 -  [Struct `DirectCoinTransferConfigUpdatedEvent`](#0x1_aptos_account_DirectCoinTransferConfigUpdatedEvent)
 -  [Struct `DirectCoinTransferConfigUpdated`](#0x1_aptos_account_DirectCoinTransferConfigUpdated)
 -  [Constants](#@Constants_0)
+-  [Function `register_apt`](#0x1_aptos_account_register_apt)
 -  [Function `create_account`](#0x1_aptos_account_create_account)
 -  [Function `batch_transfer`](#0x1_aptos_account_batch_transfer)
 -  [Function `transfer`](#0x1_aptos_account_transfer)
@@ -41,6 +42,7 @@
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
 
@@ -199,11 +201,36 @@ The lengths of the recipients and amounts lists don't match.
 
 
 
+<a id="0x1_aptos_account_register_apt"></a>
+
+## Function `register_apt`
+
+Basic account creation methods.
+
+
+<pre><code><b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>);
+    <a href="coin.md#0x1_coin_migrate_to_fungible_store">coin::migrate_to_fungible_store</a>&lt;AptosCoin&gt;(<a href="account.md#0x1_account">account</a>);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_aptos_account_create_account"></a>
 
 ## Function `create_account`
 
-Basic account creation methods.
 
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(auth_key: <b>address</b>)
@@ -217,7 +244,7 @@ Basic account creation methods.
 
 <pre><code><b>public</b> entry <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(auth_key: <b>address</b>) {
     <b>let</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> = <a href="account.md#0x1_account_create_account">account::create_account</a>(auth_key);
-    <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>);
+    <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(&<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>);
 }
 </code></pre>
 
@@ -280,12 +307,8 @@ This would create the recipient account first, which also registers it to receiv
     <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
         <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(<b>to</b>)
     };
-    // Resource accounts can be created without registering them <b>to</b> receive APT.
-    // This conveniently does the registration <b>if</b> necessary.
-    <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(<b>to</b>)) {
-        <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(<b>to</b>));
-    };
-    <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(source, <b>to</b>, amount)
+
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_transfer">primary_fungible_store::apt_transfer</a>(source, <b>to</b>, amount)
 }
 </code></pre>
 

@@ -27,11 +27,15 @@ fungible asset to it. This emits an deposit event.
 -  [Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
 -  [Function `balance`](#0x1_primary_fungible_store_balance)
 -  [Function `is_balance_at_least`](#0x1_primary_fungible_store_is_balance_at_least)
+-  [Function `apt_store_address`](#0x1_primary_fungible_store_apt_store_address)
+-  [Function `is_apt_balance_at_least`](#0x1_primary_fungible_store_is_apt_balance_at_least)
+-  [Function `apt_burn_from`](#0x1_primary_fungible_store_apt_burn_from)
 -  [Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
 -  [Function `withdraw`](#0x1_primary_fungible_store_withdraw)
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
 -  [Function `force_deposit`](#0x1_primary_fungible_store_force_deposit)
 -  [Function `transfer`](#0x1_primary_fungible_store_transfer)
+-  [Function `apt_transfer`](#0x1_primary_fungible_store_apt_transfer)
 -  [Function `transfer_assert_minimum_deposit`](#0x1_primary_fungible_store_transfer_assert_minimum_deposit)
 -  [Function `mint`](#0x1_primary_fungible_store_mint)
 -  [Function `burn`](#0x1_primary_fungible_store_burn)
@@ -350,6 +354,92 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
 
 </details>
 
+<a id="0x1_primary_fungible_store_apt_store_address"></a>
+
+## Function `apt_store_address`
+
+
+
+<pre><code><b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_store_address">apt_store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_store_address">apt_store_address</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>): <b>address</b> {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_primary_apt_fungible_store_at_user_address_enabled">features::primary_apt_fungible_store_at_user_address_enabled</a>()) {
+        <a href="account.md#0x1_account">account</a>
+    } <b>else</b> {
+        <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(<a href="account.md#0x1_account">account</a>, @aptos_fungible_asset)
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_is_apt_balance_at_least"></a>
+
+## Function `is_apt_balance_at_least`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_apt_balance_at_least">is_apt_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_apt_balance_at_least">is_apt_balance_at_least</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64): bool {
+    <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_store_address">apt_store_address</a>(<a href="account.md#0x1_account">account</a>);
+    <a href="fungible_asset.md#0x1_fungible_asset_is_address_balance_at_least">fungible_asset::is_address_balance_at_least</a>(store_addr, amount)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_apt_burn_from"></a>
+
+## Function `apt_burn_from`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_burn_from">apt_burn_from</a>(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_burn_from">apt_burn_from</a>(
+    <a href="account.md#0x1_account">account</a>: <b>address</b>,
+    amount: u64,
+) {
+    // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
+    <b>if</b> (amount != 0) {
+        // TODO: <b>use</b> <a href="fungible_asset.md#0x1_fungible_asset_burn_from">fungible_asset::burn_from</a>
+        <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_store_address">apt_store_address</a>(<a href="account.md#0x1_account">account</a>);
+        <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount);
+        <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
+    };
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_primary_fungible_store_is_frozen"></a>
 
 ## Function `is_frozen`
@@ -489,6 +579,43 @@ Transfer <code>amount</code> of fungible asset from sender's primary store to re
     <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(sender, sender_store);
     <b>let</b> recipient_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient, metadata);
     <a href="dispatchable_fungible_asset.md#0x1_dispatchable_fungible_asset_transfer">dispatchable_fungible_asset::transfer</a>(sender, sender_store, recipient_store, amount);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_apt_transfer"></a>
+
+## Function `apt_transfer`
+
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_transfer">apt_transfer</a>(sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, recipient: <b>address</b>, amount: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_transfer">apt_transfer</a>(
+    sender: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    recipient: <b>address</b>,
+    amount: u64,
+) <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
+    // <b>let</b> sender_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_store_address">apt_store_address</a>(sender);
+    // <b>let</b> recipient_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_apt_store_address">apt_store_address</a>(recipient);
+
+    <b>let</b> metadata = <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(@aptos_fungible_asset);
+    <b>let</b> sender_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender), metadata);
+    // Check <b>if</b> the sender store <a href="object.md#0x1_object">object</a> <b>has</b> been burnt or not. If so, unburn it first.
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_may_be_unburn">may_be_unburn</a>(sender, sender_store);
+    <b>let</b> recipient_store = <a href="primary_fungible_store.md#0x1_primary_fungible_store_ensure_primary_store_exists">ensure_primary_store_exists</a>(recipient, metadata);
+
+    <a href="fungible_asset.md#0x1_fungible_asset_transfer">fungible_asset::transfer</a>(sender, sender_store, recipient_store, amount);
 }
 </code></pre>
 

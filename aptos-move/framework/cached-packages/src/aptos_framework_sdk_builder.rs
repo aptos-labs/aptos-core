@@ -160,7 +160,6 @@ pub enum EntryFunctionCall {
         amounts: Vec<u64>,
     },
 
-    /// Basic account creation methods.
     AptosAccountCreateAccount {
         auth_key: AccountAddress,
     },
@@ -665,6 +664,11 @@ pub enum EntryFunctionCall {
     ObjectCodeDeploymentPublish {
         metadata_serialized: Vec<u8>,
         code: Vec<Vec<u8>>,
+    },
+
+    PrimaryFungibleStoreAptTransfer {
+        recipient: AccountAddress,
+        amount: u64,
     },
 
     /// Creates a new resource account and rotates the authentication key to either
@@ -1394,6 +1398,9 @@ impl EntryFunctionCall {
                 metadata_serialized,
                 code,
             } => object_code_deployment_publish(metadata_serialized, code),
+            PrimaryFungibleStoreAptTransfer { recipient, amount } => {
+                primary_fungible_store_apt_transfer(recipient, amount)
+            },
             ResourceAccountCreateResourceAccount {
                 seed,
                 optional_auth_key,
@@ -1905,7 +1912,6 @@ pub fn aptos_account_batch_transfer_coins(
     ))
 }
 
-/// Basic account creation methods.
 pub fn aptos_account_create_account(auth_key: AccountAddress) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -3405,6 +3411,27 @@ pub fn object_code_deployment_publish(
         vec![
             bcs::to_bytes(&metadata_serialized).unwrap(),
             bcs::to_bytes(&code).unwrap(),
+        ],
+    ))
+}
+
+pub fn primary_fungible_store_apt_transfer(
+    recipient: AccountAddress,
+    amount: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("primary_fungible_store").to_owned(),
+        ),
+        ident_str!("apt_transfer").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&recipient).unwrap(),
+            bcs::to_bytes(&amount).unwrap(),
         ],
     ))
 }
@@ -5554,6 +5581,19 @@ mod decoder {
         }
     }
 
+    pub fn primary_fungible_store_apt_transfer(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::PrimaryFungibleStoreAptTransfer {
+                recipient: bcs::from_bytes(script.args().get(0)?).ok()?,
+                amount: bcs::from_bytes(script.args().get(1)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn resource_account_create_resource_account(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -6550,6 +6590,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "object_code_deployment_publish".to_string(),
             Box::new(decoder::object_code_deployment_publish),
+        );
+        map.insert(
+            "primary_fungible_store_apt_transfer".to_string(),
+            Box::new(decoder::primary_fungible_store_apt_transfer),
         );
         map.insert(
             "resource_account_create_resource_account".to_string(),

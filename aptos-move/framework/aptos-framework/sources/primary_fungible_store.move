@@ -21,6 +21,9 @@ module aptos_framework::primary_fungible_store {
     use std::signer;
     use std::string::String;
 
+    friend aptos_framework::transaction_fee;
+    friend aptos_framework::transaction_validation;
+
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// A resource that holds the derive ref for the fungible asset metadata object. This is used to create primary
     /// stores for users with deterministic addresses so that users can easily deposit/withdraw/transfer fungible
@@ -132,6 +135,33 @@ module aptos_framework::primary_fungible_store {
         }
     }
 
+    inline fun apt_store_address(account: address): address {
+        if (features::primary_apt_fungible_store_at_user_address_enabled()) {
+            account
+        } else {
+            object::create_user_derived_object_address(account, @aptos_fungible_asset)
+        }
+    }
+
+    public(friend) fun is_apt_balance_at_least(account: address, amount: u64): bool {
+        let store_addr = apt_store_address(account);
+        fungible_asset::is_address_balance_at_least(store_addr, amount)
+    }
+
+    // convert AptosCoinCapabilities.burn_cap into BurnRef
+    public(friend) fun apt_burn_from(
+        account: address,
+        amount: u64,
+    ) {
+        // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
+        if (amount != 0) {
+            // TODO: use fungible_asset::burn_from
+            let store_addr = apt_store_address(account);
+            let fa = fungible_asset::withdraw_internal(store_addr, amount);
+            fungible_asset::burn_internal(fa);
+        };
+    }
+
     #[view]
     /// Return whether the given account's primary store is frozen.
     public fun is_frozen<T: key>(account: address, metadata: Object<T>): bool {
@@ -176,6 +206,23 @@ module aptos_framework::primary_fungible_store {
         may_be_unburn(sender, sender_store);
         let recipient_store = ensure_primary_store_exists(recipient, metadata);
         dispatchable_fungible_asset::transfer(sender, sender_store, recipient_store, amount);
+    }
+
+    public entry fun apt_transfer(
+        sender: &signer,
+        recipient: address,
+        amount: u64,
+    ) acquires DeriveRefPod {
+        // let sender_store = apt_store_address(sender);
+        // let recipient_store = apt_store_address(recipient);
+
+        let metadata = object::address_to_object<Metadata>(@aptos_fungible_asset);
+        let sender_store = ensure_primary_store_exists(signer::address_of(sender), metadata);
+        // Check if the sender store object has been burnt or not. If so, unburn it first.
+        may_be_unburn(sender, sender_store);
+        let recipient_store = ensure_primary_store_exists(recipient, metadata);
+
+        fungible_asset::transfer(sender, sender_store, recipient_store, amount);
     }
 
     /// Transfer `amount` of fungible asset from sender's primary store to receiver's primary store.

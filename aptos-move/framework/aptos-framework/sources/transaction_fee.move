@@ -3,6 +3,7 @@ module aptos_framework::transaction_fee {
     use aptos_framework::coin::{Self, AggregatableCoin, BurnCapability, Coin, MintCapability};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::stake;
+    use aptos_framework::primary_fungible_store;
     use aptos_framework::system_addresses;
     use std::error;
     use std::option::{Self, Option};
@@ -197,12 +198,9 @@ module aptos_framework::transaction_fee {
     }
 
     /// Burn transaction fees in epilogue.
-    public(friend) fun burn_fee(account: address, fee: u64) acquires AptosCoinCapabilities {
-        coin::burn_from<AptosCoin>(
-            account,
-            fee,
-            &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap,
-        );
+    public(friend) fun burn_fee(account: address, fee: u64) {
+        // convert AptosCoinCapabilities.burn_cap into BurnRef
+        primary_fungible_store::apt_burn_from(account, fee);
     }
 
     /// Mint refund in epilogue.
