@@ -59,58 +59,193 @@ fun m::test() {
      var $t9: u64
      var $t10: u64
      var $t11: u64
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   0: $t1 := 0
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   1: $t0 := infer($t1)
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   2: label L0
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   3: $t3 := 1
+     # live vars: $t0, $t3
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   4: $t2 := +($t0, $t3)
+     # live vars: $t2
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   5: $t0 := infer($t2)
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   6: $t5 := 10
+     # live vars: $t0, $t5
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   7: $t4 := ==($t0, $t5)
+     # live vars: $t0, $t4
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   8: if ($t4) goto 9 else goto 15
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   9: label L2
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
  10: goto 25
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  11: $t7 := 1
+     # live vars: $t0, $t7
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  12: $t6 := +($t0, $t7)
+     # live vars: $t6
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  13: $t0 := infer($t6)
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  14: goto 20
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
  15: label L3
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
  16: goto 2
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  17: $t9 := 1
+     # live vars: $t0, $t9
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  18: $t8 := +($t0, $t9)
+     # live vars: $t8
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  19: $t0 := infer($t8)
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  20: label L4
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  21: $t11 := 1
+     # live vars: $t0, $t11
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  22: $t10 := +($t0, $t11)
+     # live vars: $t10
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  23: $t0 := infer($t10)
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
  24: goto 2
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
  25: label L1
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
  26: return ()
 }

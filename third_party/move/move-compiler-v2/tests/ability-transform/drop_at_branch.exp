@@ -19,20 +19,28 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
 fun explicate_drop::drop_at_branch($t0: bool): u8 {
      var $t1: u8
      # live vars: $t0
+     # before: { no: $t1 }, after: { no: $t1 }
   0: if ($t0) goto 1 else goto 4
      # live vars:
+     # before: { no: $t1 }, after: { no: $t1 }
   1: label L0
      # live vars:
+     # before: { no: $t1 }, after: all initialized
   2: $t1 := 1
      # live vars: $t1
+     # before: all initialized, after: all initialized
   3: goto 6
      # live vars:
+     # before: { no: $t1 }, after: { no: $t1 }
   4: label L1
      # live vars:
+     # before: { no: $t1 }, after: all initialized
   5: $t1 := 0
      # live vars: $t1
+     # before: all initialized, after: all initialized
   6: label L2
      # live vars: $t1
+     # before: all initialized, after: all initialized
   7: return $t1
 }
 
@@ -46,48 +54,56 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: { no: $t1 }
   0: if ($t0) goto 1 else goto 4
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: { no: $t1 }
   1: label L0
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: all initialized
   2: $t1 := 1
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   3: goto 6
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: { no: $t1 }
   4: label L1
      # live vars:
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: all initialized
   5: $t1 := 0
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   6: label L2
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   7: return $t1
 }
 
@@ -102,6 +118,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: { no: $t1 }
   0: if ($t0) goto 1 else goto 4
      # abort state: {returns}
      # live vars:
@@ -109,6 +126,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: { no: $t1 }
   1: label L0
      # abort state: {returns}
      # live vars:
@@ -116,6 +134,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: all initialized
   2: $t1 := 1
      # abort state: {returns}
      # live vars: $t1
@@ -123,6 +142,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   3: goto 6
      # abort state: {returns}
      # live vars:
@@ -130,6 +150,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: { no: $t1 }
   4: label L1
      # abort state: {returns}
      # live vars:
@@ -137,6 +158,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1 }, after: all initialized
   5: $t1 := 0
      # abort state: {returns}
      # live vars: $t1
@@ -144,6 +166,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   6: label L2
      # abort state: {returns}
      # live vars: $t1
@@ -151,6 +174,7 @@ fun explicate_drop::drop_at_branch($t0: bool): u8 {
      # locals: {}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   7: return $t1
 }
 

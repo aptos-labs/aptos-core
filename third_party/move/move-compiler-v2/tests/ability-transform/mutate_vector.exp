@@ -45,24 +45,34 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      var $t7: &mut m::Scalar
      var $t8: u64
      # live vars: $t0
+     # before: { no: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8 }
   0: $t3 := m::scalar_zero()
      # live vars: $t0, $t3
+     # before: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t4, $t5, $t6, $t7, $t8 }
   1: $t2 := infer($t3)
      # live vars: $t0, $t2
+     # before: { no: $t1, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t4, $t5, $t6, $t8 }
   2: $t7 := borrow_local($t2)
      # live vars: $t0, $t2, $t7
+     # before: { no: $t1, $t4, $t5, $t6, $t8 }, after: { no: $t1, $t4, $t5, $t8 }
   3: $t6 := borrow_field<m::Scalar>.data($t7)
      # live vars: $t0, $t2, $t6
+     # before: { no: $t1, $t4, $t5, $t8 }, after: { no: $t1, $t4, $t5 }
   4: $t8 := 0
      # live vars: $t0, $t2, $t6, $t8
+     # before: { no: $t1, $t4, $t5 }, after: { no: $t1, $t4 }
   5: $t5 := vector::borrow_mut<u8>($t6, $t8)
      # live vars: $t0, $t2, $t5
+     # before: { no: $t1, $t4 }, after: { no: $t1 }
   6: $t4 := infer($t5)
      # live vars: $t0, $t2, $t4
+     # before: { no: $t1 }, after: { no: $t1 }
   7: write_ref($t4, $t0)
      # live vars: $t2
+     # before: { no: $t1 }, after: all initialized
   8: $t1 := infer($t2)
      # live vars: $t1
+     # before: all initialized, after: all initialized
   9: return $t1
 }
 
@@ -72,10 +82,13 @@ public fun m::scalar_zero(): m::Scalar {
      var $t0: m::Scalar
      var $t1: vector<u8>
      # live vars:
+     # before: { no: $t0, $t1 }, after: { no: $t0 }
   0: $t1 := [0]
      # live vars: $t1
+     # before: { no: $t0 }, after: all initialized
   1: $t0 := pack m::Scalar($t1)
      # live vars: $t0
+     # before: all initialized, after: all initialized
   2: return $t0
 }
 
@@ -96,60 +109,70 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8 }
   0: $t3 := m::scalar_zero()
      # live vars: $t0, $t3
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t4, $t5, $t6, $t7, $t8 }
   1: $t2 := infer($t3)
      # live vars: $t0, $t2
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t4, $t5, $t6, $t8 }
   2: $t7 := borrow_local($t2)
      # live vars: $t0, $t2, $t7
      # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t2=@200,$t7=@201}
      # globals: {}
      #
+     # before: { no: $t1, $t4, $t5, $t6, $t8 }, after: { no: $t1, $t4, $t5, $t8 }
   3: $t6 := borrow_field<m::Scalar>.data($t7)
      # live vars: $t0, $t2, $t6
      # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[borrow_field(true) -> @301],@301=derived[]}
      # locals: {$t2=@200,$t6=@301}
      # globals: {}
      #
+     # before: { no: $t1, $t4, $t5, $t8 }, after: { no: $t1, $t4, $t5 }
   4: $t8 := 0
      # live vars: $t0, $t2, $t6, $t8
      # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[borrow_field(true) -> @301],@301=derived[]}
      # locals: {$t2=@200,$t6=@301}
      # globals: {}
      #
+     # before: { no: $t1, $t4, $t5 }, after: { no: $t1, $t4 }
   5: $t5 := vector::borrow_mut<u8>($t6, $t8)
      # live vars: $t0, $t2, $t5
      # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[borrow_field(true) -> @301],@301=derived[call(true) -> @500],@500=derived[]}
      # locals: {$t2=@200,$t5=@500}
      # globals: {}
      #
+     # before: { no: $t1, $t4 }, after: { no: $t1 }
   6: $t4 := infer($t5)
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t2)[borrow(true) -> @201],@201=derived[borrow_field(true) -> @301],@301=derived[call(true) -> @500],@500=derived[]}
      # locals: {$t2=@200,$t4=@500}
      # globals: {}
      #
+     # before: { no: $t1 }, after: { no: $t1 }
   7: write_ref($t4, $t0)
      # live vars: $t2
      # graph: {@200=local($t2)[]}
      # locals: {$t2=@200}
      # globals: {}
      #
+     # before: { no: $t1 }, after: all initialized
   8: $t1 := infer($t2)
      # live vars: $t1
      # graph: {@200=local($t2)[]}
      # locals: {$t2=@200}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   9: return $t1
 }
 
@@ -163,18 +186,21 @@ public fun m::scalar_zero(): m::Scalar {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t0, $t1 }, after: { no: $t0 }
   0: $t1 := [0]
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t0 }, after: all initialized
   1: $t0 := pack m::Scalar($t1)
      # live vars: $t0
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   2: return $t0
 }
 
@@ -196,6 +222,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8 }
   0: $t3 := m::scalar_zero()
      # abort state: {returns,aborts}
      # live vars: $t0, $t3
@@ -203,6 +230,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1, $t2, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t4, $t5, $t6, $t7, $t8 }
   1: $t2 := infer($t3)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
@@ -210,6 +238,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t1, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t1, $t4, $t5, $t6, $t8 }
   2: $t7 := borrow_local($t2)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t7
@@ -217,6 +246,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {$t2=@200,$t7=@201}
      # globals: {}
      #
+     # before: { no: $t1, $t4, $t5, $t6, $t8 }, after: { no: $t1, $t4, $t5, $t8 }
   3: $t6 := borrow_field<m::Scalar>.data($t7)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t6
@@ -224,6 +254,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {$t2=@200,$t6=@301}
      # globals: {}
      #
+     # before: { no: $t1, $t4, $t5, $t8 }, after: { no: $t1, $t4, $t5 }
   4: $t8 := 0
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t6, $t8
@@ -231,6 +262,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {$t2=@200,$t6=@301}
      # globals: {}
      #
+     # before: { no: $t1, $t4, $t5 }, after: { no: $t1, $t4 }
   5: $t5 := vector::borrow_mut<u8>($t6, $t8)
      # abort state: {returns}
      # live vars: $t0, $t2, $t5
@@ -238,6 +270,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {$t2=@200,$t5=@500}
      # globals: {}
      #
+     # before: { no: $t1, $t4 }, after: { no: $t1 }
   6: $t4 := infer($t5)
      # abort state: {returns}
      # live vars: $t0, $t2, $t4
@@ -245,6 +278,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {$t2=@200,$t4=@500}
      # globals: {}
      #
+     # before: { no: $t1 }, after: { no: $t1 }
   7: write_ref($t4, $t0)
      # abort state: {returns}
      # live vars: $t2
@@ -252,6 +286,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {$t2=@200}
      # globals: {}
      #
+     # before: { no: $t1 }, after: all initialized
   8: $t1 := infer($t2)
      # abort state: {returns}
      # live vars: $t1
@@ -259,6 +294,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # locals: {$t2=@200}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   9: return $t1
 }
 
@@ -273,6 +309,7 @@ public fun m::scalar_zero(): m::Scalar {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t0, $t1 }, after: { no: $t0 }
   0: $t1 := [0]
      # abort state: {returns}
      # live vars: $t1
@@ -280,6 +317,7 @@ public fun m::scalar_zero(): m::Scalar {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t0 }, after: all initialized
   1: $t0 := pack m::Scalar($t1)
      # abort state: {returns}
      # live vars: $t0
@@ -287,6 +325,7 @@ public fun m::scalar_zero(): m::Scalar {
      # locals: {}
      # globals: {}
      #
+     # before: all initialized, after: all initialized
   2: return $t0
 }
 

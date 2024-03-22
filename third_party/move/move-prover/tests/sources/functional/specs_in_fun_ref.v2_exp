@@ -1,0 +1,4 @@
+Move prover returns: [internal] boogie exited with compilation errors:
+specs_in_fun_ref.bpl(4393,20): Error: invalid type for argument 0 in application of $IsEqual'u64': $Mutation int (expected: int)
+specs_in_fun_ref.bpl(4403,20): Error: invalid type for argument 0 in application of $IsEqual'u64': $Mutation int (expected: int)
+2 type checking errors detected in specs_in_fun_ref.bpl

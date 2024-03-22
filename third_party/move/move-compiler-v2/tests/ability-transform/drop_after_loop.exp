@@ -60,62 +60,91 @@ fun m::drop_after_loop() {
      var $t9: u64
      var $t10: u64
      # live vars:
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   0: $t1 := 1
      # live vars: $t1
+     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   1: $t0 := infer($t1)
      # live vars: $t0
+     # before: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   2: $t3 := borrow_local($t0)
      # live vars: $t0, $t3
+     # before: { no: $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   3: $t2 := infer($t3)
      # live vars: $t0, $t2
+     # before: { no: $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t4, $t6, $t7, $t8, $t9, $t10 }
   4: $t5 := true
      # live vars: $t0, $t2, $t5
+     # before: { no: $t4, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t6, $t7, $t8, $t9, $t10 }
   5: $t4 := infer($t5)
      # live vars: $t0, $t2, $t4
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   6: label L0
      # live vars: $t0, $t2, $t4
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   7: if ($t4) goto 8 else goto 14
      # live vars: $t0, $t2
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   8: label L2
      # live vars: $t0, $t2
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t7 }
   9: $t6 := 2
      # live vars: $t0, $t2, $t6
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t7 }
  10: write_ref($t2, $t6)
      # live vars: $t0, $t2
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t7 }, after: { no: $t8, $t9, $t10 }
  11: $t7 := false
      # live vars: $t0, $t2, $t7
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  12: $t4 := infer($t7)
      # live vars: $t0, $t2, $t4
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  13: goto 16
      # live vars: $t0, $t2
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  14: label L3
      # live vars: $t0
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  15: goto 18
      # live vars: $t0, $t2, $t4
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  16: label L4
      # live vars: $t0, $t2, $t4
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  17: goto 6
      # live vars: $t0
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  18: label L1
      # live vars: $t0
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t10 }{ maybe: $t6, $t7 }
  19: $t9 := 2
      # live vars: $t0, $t9
+     # before: { no: $t8, $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  20: $t8 := ==($t0, $t9)
      # live vars: $t8
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  21: if ($t8) goto 22 else goto 24
      # live vars:
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  22: label L5
      # live vars:
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  23: goto 27
      # live vars:
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  24: label L6
      # live vars:
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { maybe: $t6, $t7 }
  25: $t10 := 0
      # live vars: $t10
+     # before: { maybe: $t6, $t7 }, after: { maybe: $t6, $t7 }
  26: abort($t10)
      # live vars:
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  27: label L7
      # live vars:
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  28: return ()
 }
 
@@ -139,174 +168,203 @@ fun m::drop_after_loop() {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   0: $t1 := 1
      # live vars: $t1
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   1: $t0 := infer($t1)
      # live vars: $t0
      # graph: {}
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   2: $t3 := borrow_local($t0)
      # live vars: $t0, $t3
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
      #
+     # before: { no: $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   3: $t2 := infer($t3)
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t4, $t6, $t7, $t8, $t9, $t10 }
   4: $t5 := true
      # live vars: $t0, $t2, $t5
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t4, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t6, $t7, $t8, $t9, $t10 }
   5: $t4 := infer($t5)
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   6: label L0
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   7: if ($t4) goto 8 else goto 14
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   8: label L2
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t7 }
   9: $t6 := 2
      # live vars: $t0, $t2, $t6
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t7 }
  10: write_ref($t2, $t6)
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t7 }, after: { no: $t8, $t9, $t10 }
  11: $t7 := false
      # live vars: $t0, $t2, $t7
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  12: $t4 := infer($t7)
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  13: goto 16
      # live vars: $t0, $t2
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  14: label L3
      # live vars: $t0
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  15: goto 18
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  16: label L4
      # live vars: $t0, $t2, $t4
      # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  17: goto 6
      # live vars: $t0
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  18: label L1
      # live vars: $t0
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t10 }{ maybe: $t6, $t7 }
  19: $t9 := 2
      # live vars: $t0, $t9
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t8, $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  20: $t8 := ==($t0, $t9)
      # live vars: $t8
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  21: if ($t8) goto 22 else goto 24
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  22: label L5
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  23: goto 27
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  24: label L6
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { maybe: $t6, $t7 }
  25: $t10 := 0
      # live vars: $t10
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { maybe: $t6, $t7 }, after: { maybe: $t6, $t7 }
  26: abort($t10)
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  27: label L7
      # live vars:
      # graph: {@200=local($t0)[]}
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  28: return ()
 }
 
@@ -331,6 +389,7 @@ fun m::drop_after_loop() {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   0: $t1 := 1
      # abort state: {returns,aborts}
      # live vars: $t1
@@ -338,6 +397,7 @@ fun m::drop_after_loop() {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   1: $t0 := infer($t1)
      # abort state: {returns,aborts}
      # live vars: $t0
@@ -345,6 +405,7 @@ fun m::drop_after_loop() {
      # locals: {}
      # globals: {}
      #
+     # before: { no: $t2, $t3, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   2: $t3 := borrow_local($t0)
      # abort state: {returns,aborts}
      # live vars: $t0, $t3
@@ -352,6 +413,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t3=@201}
      # globals: {}
      #
+     # before: { no: $t2, $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t4, $t5, $t6, $t7, $t8, $t9, $t10 }
   3: $t2 := infer($t3)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
@@ -359,6 +421,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t4, $t5, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t4, $t6, $t7, $t8, $t9, $t10 }
   4: $t5 := true
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t5
@@ -366,6 +429,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t4, $t6, $t7, $t8, $t9, $t10 }, after: { no: $t6, $t7, $t8, $t9, $t10 }
   5: $t4 := infer($t5)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4
@@ -373,6 +437,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   6: label L0
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4
@@ -380,6 +445,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   7: if ($t4) goto 8 else goto 14
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
@@ -387,6 +453,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
   8: label L2
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
@@ -394,6 +461,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t7 }
   9: $t6 := 2
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t6
@@ -401,6 +469,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t7 }
  10: write_ref($t2, $t6)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
@@ -408,6 +477,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t7 }, after: { no: $t8, $t9, $t10 }
  11: $t7 := false
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t7
@@ -415,6 +485,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  12: $t4 := infer($t7)
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4
@@ -422,6 +493,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  13: goto 16
      # abort state: {returns,aborts}
      # live vars: $t0, $t2
@@ -429,6 +501,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  14: label L3
      # abort state: {returns,aborts}
      # live vars: $t0
@@ -436,6 +509,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  15: goto 18
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4
@@ -443,6 +517,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  16: label L4
      # abort state: {returns,aborts}
      # live vars: $t0, $t2, $t4
@@ -450,6 +525,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200,$t2=@201}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }, after: { no: $t8, $t9, $t10 }
  17: goto 6
      # abort state: {returns,aborts}
      # live vars: $t0
@@ -457,6 +533,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }
  18: label L1
      # abort state: {returns,aborts}
      # live vars: $t0
@@ -464,6 +541,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t8, $t9, $t10 }{ maybe: $t6, $t7 }, after: { no: $t8, $t10 }{ maybe: $t6, $t7 }
  19: $t9 := 2
      # abort state: {returns,aborts}
      # live vars: $t0, $t9
@@ -471,6 +549,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t8, $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  20: $t8 := ==($t0, $t9)
      # abort state: {returns,aborts}
      # live vars: $t8
@@ -478,6 +557,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  21: if ($t8) goto 22 else goto 24
      # abort state: {returns}
      # live vars:
@@ -485,6 +565,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  22: label L5
      # abort state: {returns}
      # live vars:
@@ -492,6 +573,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  23: goto 27
      # abort state: {aborts}
      # live vars:
@@ -499,6 +581,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  24: label L6
      # abort state: {aborts}
      # live vars:
@@ -506,6 +589,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { maybe: $t6, $t7 }
  25: $t10 := 0
      # abort state: {aborts}
      # live vars: $t10
@@ -513,6 +597,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { maybe: $t6, $t7 }, after: { maybe: $t6, $t7 }
  26: abort($t10)
      # abort state: {returns}
      # live vars:
@@ -520,6 +605,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  27: label L7
      # abort state: {returns}
      # live vars:
@@ -527,6 +613,7 @@ fun m::drop_after_loop() {
      # locals: {$t0=@200}
      # globals: {}
      #
+     # before: { no: $t10 }{ maybe: $t6, $t7 }, after: { no: $t10 }{ maybe: $t6, $t7 }
  28: return ()
 }
 

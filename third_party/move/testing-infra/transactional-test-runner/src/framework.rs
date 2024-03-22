@@ -815,6 +815,7 @@ pub fn run_test_impl<'a, Adapter>(
     config: TestRunConfig,
     path: &Path,
     fully_compiled_program_opt: Option<&'a FullyCompiledProgram>,
+    exp_suffix: &Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>>
 where
     Adapter: MoveTestAdapter<'a>,
@@ -904,7 +905,7 @@ where
         if !last_output.is_empty() && last_output != output {
             let diff = format_diff_no_color(&last_output, &output);
             let output = format!("comparison between v1 and v2 failed:\n{}", diff);
-            handle_expected_output(path, output)?;
+            handle_expected_output(path, output, exp_suffix)?;
             return Ok(());
         }
         last_output = output
@@ -925,7 +926,7 @@ where
             out
         );
     }
-    handle_expected_output(path, last_output)?;
+    handle_expected_output(path, last_output, exp_suffix)?;
     Ok(())
 }
 
@@ -968,10 +969,18 @@ fn handle_known_task<'a, Adapter: MoveTestAdapter<'a>>(
     .unwrap();
 }
 
-fn handle_expected_output(test_path: &Path, output: impl AsRef<str>) -> Result<()> {
+fn handle_expected_output(
+    test_path: &Path,
+    output: impl AsRef<str>,
+    exp_suffix: &Option<String>,
+) -> Result<()> {
     let output = output.as_ref();
     assert!(!output.is_empty());
-    let exp_path = test_path.with_extension(EXP_EXT);
+    let exp_path = if let Some(suffix) = exp_suffix {
+        test_path.with_extension(suffix)
+    } else {
+        test_path.with_extension(EXP_EXT)
+    };
 
     if read_env_update_baseline() {
         std::fs::write(exp_path, output).unwrap();

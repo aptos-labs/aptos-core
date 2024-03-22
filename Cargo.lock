@@ -10874,6 +10874,7 @@ dependencies = [
  "once_cell",
  "petgraph 0.6.4",
  "serde",
+ "walkdir",
 ]
 
 [[package]]
@@ -10881,10 +10882,12 @@ name = "move-compiler-v2-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "itertools 0.10.5",
  "move-command-line-common",
  "move-compiler-v2",
  "move-transactional-test-runner",
  "once_cell",
+ "walkdir",
 ]
 
 [[package]]

@@ -47,6 +47,7 @@ move-command-line-common = { path = "../move-command-line-common" }
 move-ir-types = { path = "../move-ir/types" }
 move-prover-test-utils = { path = "../move-prover/test-utils" }
 move-stdlib = { path = "../move-stdlib" }
+walkdir = "2.3.3"
 
 [lib]
 doctest = false
