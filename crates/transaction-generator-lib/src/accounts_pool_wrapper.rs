@@ -175,13 +175,11 @@ impl ReuseAccountsPoolWrapperGenerator {
         generator: Box<dyn TransactionGenerator>,
         source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
     ) -> Self {
-        let mut market_makers = source_accounts_pool
-            .take_from_pool(7, true, &mut StdRng::from_entropy());
         Self {
             rng,
             generator,
             source_accounts_pool,
-            market_makers,
+            market_makers: vec![],
         }
     }
 }
@@ -194,7 +192,10 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
         _history: &Vec<String>,
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
-        println!("generate_transactions: num_to_create: {}", num_to_create);
+        if self.market_makers.len() < 7 {
+            self.market_makers = self.source_accounts_pool.take_from_pool(7, true, &mut StdRng::from_entropy());
+        }
+        // println!("generate_transactions: num_to_create: {}", num_to_create);
         if self.rng.gen_range(0,1000) < 939 {
             let rand = self.rng.gen_range(0,1000);
             if rand < 476 {
