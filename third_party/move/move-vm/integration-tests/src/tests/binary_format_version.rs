@@ -90,10 +90,14 @@ fn test_run_script_with_custom_max_binary_format_version() {
     let s = basic_test_script();
     let mut b_new = vec![];
     let mut b_old = vec![];
-    s.serialize_for_version(Some(VERSION_MAX), &mut b_new)
+    s.serialize_for_version(Some(VERSION_MAX), &mut b_new, "max_binary_format_version 1")
         .unwrap();
-    s.serialize_for_version(Some(VERSION_MAX.checked_sub(1).unwrap()), &mut b_old)
-        .unwrap();
+    s.serialize_for_version(
+        Some(VERSION_MAX.checked_sub(1).unwrap()),
+        &mut b_old,
+        "max_binary_format_version 2",
+    )
+    .unwrap();
 
     // Should accept both modules with the default settings
     {

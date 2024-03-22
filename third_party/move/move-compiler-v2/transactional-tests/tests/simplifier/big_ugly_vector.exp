@@ -1,0 +1,16 @@
+comparison between v1 and v2 failed:
+= processed 2 tasks
+= 
+= task 0 'publish'. lines 1-99:
+= 
+= 
+= 
++ task 1 'run'. lines 101-101:
++ Error: Function execution failed with VMError: {
++     major_status: ABORTED,
++     sub_status: Some(2849),
++     location: 0xcafe::vectors,
++     indices: redacted,
++     offsets: redacted,
++ }
++ 
