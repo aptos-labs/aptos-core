@@ -345,7 +345,7 @@ use aptos_framework::{};
 use aptos_framework::aptos_governance;
 use std::option;
 fun main(core_resources: &signer) {{
-    let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+    let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
     {}::update_training_wheels(&framework_signer, option::none());
 }}
 }}
