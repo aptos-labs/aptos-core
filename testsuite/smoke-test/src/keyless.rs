@@ -357,7 +357,7 @@ fun main(core_resources: &signer) {{
 
     let mut info = swarm.aptos_public_info();
 
-    // Increment sequence number since we patched a JWK
+    // Increment sequence number as we ran a governance proposal
     info.root_account().increment_sequence_number();
 
     let configuration_type_tag = format!("0x1::{}::Configuration", KEYLESS_ACCOUNT_MODULE_NAME);
