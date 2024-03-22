@@ -103,7 +103,7 @@ impl<D: TAugmentedData> AugDataStore<D> {
                 data.author()
             );
         } else {
-            self.db.save_aug_data(&data)?;
+            // self.db.save_aug_data(&data)?;
         }
         let sig = AugDataSignature::new(self.epoch, self.signer.sign(&data)?);
         self.data.insert(*data.author(), data);
@@ -117,7 +117,7 @@ impl<D: TAugmentedData> AugDataStore<D> {
         if self.certified_data.contains_key(certified_data.author()) {
             return Ok(CertifiedAugDataAck::new(self.epoch));
         }
-        self.db.save_certified_aug_data(&certified_data)?;
+        // self.db.save_certified_aug_data(&certified_data)?;
         certified_data
             .data()
             .augment(&self.config, &self.fast_config, certified_data.author());
