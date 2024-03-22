@@ -216,7 +216,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::BytecodePipeline(Some("LiveVarAnalysisProcessor")),
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter: Some(vec!["LiveVarAnalysisProcessor"]),
         },
         // Reference safety tests (with optimizations on)
         TestConfig {
