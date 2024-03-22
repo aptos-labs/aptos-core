@@ -9,7 +9,7 @@ use crate::{
             SAMPLE_EPK, SAMPLE_EPK_BLINDER, SAMPLE_ESK, SAMPLE_EXP_DATE, SAMPLE_EXP_HORIZON_SECS,
             SAMPLE_JWK, SAMPLE_JWK_SK, SAMPLE_JWT_EXTRA_FIELD, SAMPLE_JWT_HEADER_B64,
             SAMPLE_JWT_HEADER_JSON, SAMPLE_JWT_PARSED, SAMPLE_JWT_PAYLOAD_JSON, SAMPLE_PEPPER,
-            SAMPLE_PK, SAMPLE_PROOF, SAMPLE_PROOF_NO_EXTRA_FIELD,SAMPLE_UID_KEY,
+            SAMPLE_PK, SAMPLE_PROOF, SAMPLE_PROOF_NO_EXTRA_FIELD, SAMPLE_UID_KEY,
         },
         get_public_inputs_hash,
         zkp_sig::ZKP,
@@ -21,9 +21,9 @@ use crate::{
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey, poseidon_bn254::fr_to_bytes_le, SigningKey, Uniform,
 };
+use base64::{encode_config, URL_SAFE_NO_PAD};
 use once_cell::sync::Lazy;
 use ring::signature;
-use base64::{encode_config, URL_SAFE_NO_PAD};
 
 static DUMMY_EPHEMERAL_SIGNATURE: Lazy<EphemeralSignature> = Lazy::new(|| {
     let sk = Ed25519PrivateKey::generate_for_testing();

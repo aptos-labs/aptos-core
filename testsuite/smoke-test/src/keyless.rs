@@ -18,7 +18,12 @@ use aptos_types::{
         AllProvidersJWKs, PatchedJWKs, ProviderJWKs,
     },
     keyless::{
-        get_public_inputs_hash, test_utils::{self, get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk, get_sample_openid_sig_and_pk},
+        get_public_inputs_hash,
+        test_utils::{
+            self, get_sample_esk, get_sample_groth16_sig_and_pk,
+            get_sample_groth16_sig_and_pk_no_extra_field, get_sample_iss, get_sample_jwk,
+            get_sample_openid_sig_and_pk,
+        },
         Configuration, EphemeralCertificate, Groth16ProofAndStatement, Groth16VerificationKey,
         KeylessPublicKey, KeylessSignature, TransactionAndProof, KEYLESS_ACCOUNT_MODULE_NAME,
     },
@@ -116,7 +121,8 @@ async fn test_keyless_groth16_verifies() {
 
 #[tokio::test]
 async fn test_keyless_groth16_verifies_no_extra_field() {
-    let (_, _, mut swarm, signed_txn) = get_transaction(get_sample_groth16_sig_and_pk_no_extra_field).await;
+    let (_, _, mut swarm, signed_txn) =
+        get_transaction(get_sample_groth16_sig_and_pk_no_extra_field).await;
 
     info!("Submit keyless Groth16 transaction");
     let result = swarm
@@ -132,7 +138,7 @@ async fn test_keyless_groth16_verifies_no_extra_field() {
 
 #[tokio::test]
 async fn test_keyless_groth16_verifies_no_training_wheels() {
-    let (tw_sk, config, jwk, mut swarm, mut cli) = setup_local_net().await;
+    let (_tw_sk, config, jwk, mut swarm, mut cli) = setup_local_net().await;
     let (sig, pk) = get_sample_groth16_sig_and_pk();
 
     let mut info = swarm.aptos_public_info();
@@ -181,7 +187,8 @@ async fn test_keyless_groth16_with_bad_tw_signature() {
     let mut info = swarm.aptos_public_info();
 
     // using the sample ESK rather than the TW SK to get a bad training wheels signature
-    let signed_txn = sign_transaction(&mut info, sig, pk, &jwk, &config, Some(&get_sample_esk())).await;
+    let signed_txn =
+        sign_transaction(&mut info, sig, pk, &jwk, &config, Some(&get_sample_esk())).await;
 
     info!("Submit keyless Groth16 transaction");
     let result = info
@@ -296,13 +303,26 @@ async fn get_transaction(
     let (sig, pk) = get_pk_and_sig_func();
 
     let mut info = swarm.aptos_public_info();
-    let signed_txn =
-        sign_transaction(&mut info, sig.clone(), pk.clone(), &jwk, &config, Some(&tw_sk)).await;
+    let signed_txn = sign_transaction(
+        &mut info,
+        sig.clone(),
+        pk.clone(),
+        &jwk,
+        &config,
+        Some(&tw_sk),
+    )
+    .await;
 
     (sig, pk, swarm, signed_txn)
 }
 
-async fn setup_local_net() -> (Ed25519PrivateKey, Configuration, RSA_JWK, LocalSwarm, CliTestFramework) {
+async fn setup_local_net() -> (
+    Ed25519PrivateKey,
+    Configuration,
+    RSA_JWK,
+    LocalSwarm,
+    CliTestFramework,
+) {
     let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
         .with_aptos()
         .build_with_cli(0)
@@ -312,10 +332,7 @@ async fn setup_local_net() -> (Ed25519PrivateKey, Configuration, RSA_JWK, LocalS
     (tw_sk, config, jwk, swarm, cli)
 }
 
-async fn remove_training_wheels(
-    swarm: &mut LocalSwarm,
-    cli: &mut CliTestFramework,
-) {
+async fn remove_training_wheels(swarm: &mut LocalSwarm, cli: &mut CliTestFramework) {
     let client = swarm.validators().next().unwrap().rest_client();
     let root_idx = cli.add_account_with_address_to_cli(
         swarm.root_key(),
@@ -333,8 +350,7 @@ fun main(core_resources: &signer) {{
 }}
 }}
 "#,
-        KEYLESS_ACCOUNT_MODULE_NAME,
-        KEYLESS_ACCOUNT_MODULE_NAME
+        KEYLESS_ACCOUNT_MODULE_NAME, KEYLESS_ACCOUNT_MODULE_NAME
     );
     let txn_summary = cli.run_script(root_idx, &jwk_patch_script).await.unwrap();
     debug!("txn_summary={:?}", txn_summary);
