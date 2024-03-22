@@ -148,7 +148,7 @@ impl SwarmBuilder {
     ) -> (LocalSwarm, CliTestFramework, JoinHandle<anyhow::Result<()>>) {
         let swarm = self.build().await;
         let chain_id = swarm.chain_id();
-        let validator = swarm.validators().next().unwrap();
+        let validator = swarm.fullnodes().next().unwrap();
         let root_key = swarm.root_key();
         let faucet_port = get_available_port();
         let faucet = launch_faucet(
