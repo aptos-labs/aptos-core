@@ -25,7 +25,7 @@ fn test_keyless_groth16_proof_verification() {
 
     println!(
         "Keyless Groth16 test public inputs hash: {}",
-        hex::encode(fr_to_bytes_le(&public_inputs_hash).to_vec())
+        hex::encode(fr_to_bytes_le(&public_inputs_hash))
     );
 
     proof
