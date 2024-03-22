@@ -173,10 +173,12 @@ module aptos_framework::fungible_asset {
     }
 
     inline fun default_to_concurrent_fungible_balance(): bool {
+        // false
         features::concurrent_fungible_assets_enabled()
     }
 
     inline fun auto_upgrade_to_concurrent_fungible_balance(): bool {
+        // false
         features::concurrent_fungible_assets_enabled()
     }
 
@@ -356,6 +358,20 @@ module aptos_framework::fungible_asset {
             borrow_store_resource(&store).balance
         } else {
             0
+        }
+    }
+
+    #[view]
+    /// Get the balance of a given store.
+    public fun is_balance_at_least<T: key>(store: Object<T>, min_amount: u64): bool acquires FungibleStore, ConcurrentFungibleBalance {
+        let store_addr = object::object_address(&store);
+        if (concurrent_fungible_balance_exists(store_addr)) {
+            let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
+            aggregator_v2::is_at_least(&mut balance_resource.balance, min_amount)
+        } else if (store_exists(store_addr)) {
+            borrow_store_resource(&store).balance >= min_amount
+        } else {
+            min_amount == 0
         }
     }
 
@@ -654,8 +670,10 @@ module aptos_framework::fungible_asset {
             };
 
             event::emit<Withdraw>(Withdraw { store: store_addr, amount });
-        }
+        };
 
+        let store = borrow_global<FungibleStore>(store_addr);
+        let metadata = store.metadata;
         FungibleAsset { metadata, amount }
     }
 

@@ -136,12 +136,13 @@ module aptos_framework::transaction_validation {
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
         // assert!(
-        //     primary_fungible_store::primary_store_exists(gas_payer, apt_fa),
+        //     coin::is_account_registered<AptosCoin>(gas_payer),
         //     error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         // );
-        let balance = primary_fungible_store::balance(gas_payer, apt_fa);
-        // let balance = coin::balance<AptosCoin>(gas_payer);
-        assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+        assert!(
+            primary_fungible_store::is_balance_at_least(gas_payer, apt_fa, max_transaction_fee),
+            error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
+        );
     }
 
     fun script_prologue(
@@ -282,8 +283,7 @@ module aptos_framework::transaction_validation {
         // to do failed transaction cleanup.
         let apt_fa = coin::apt_fa_metadata(); // ensure_paired_metadata<AptosCoin>();
         assert!(
-            primary_fungible_store::balance(gas_payer, apt_fa) >= transaction_fee_amount,
-            // coin::balance<AptosCoin>(gas_payer) >= transaction_fee_amount,
+            primary_fungible_store::is_balance_at_least(gas_payer, apt_fa, transaction_fee_amount),
             error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
 
