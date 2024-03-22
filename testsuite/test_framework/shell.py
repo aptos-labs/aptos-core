@@ -56,6 +56,7 @@ class LocalShell(Shell):
         stream_output: bool = False,
         timeout_secs: Optional[float] = None,
     ) -> RunResult:
+        print(command)
         self.logger.debug(f"+ {' '.join(command)}")
 
         process = subprocess.Popen(
