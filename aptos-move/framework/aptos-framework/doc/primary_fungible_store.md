@@ -26,6 +26,7 @@ fungible asset to it. This emits an deposit event.
 -  [Function `primary_store`](#0x1_primary_fungible_store_primary_store)
 -  [Function `primary_store_exists`](#0x1_primary_fungible_store_primary_store_exists)
 -  [Function `balance`](#0x1_primary_fungible_store_balance)
+-  [Function `is_balance_at_least`](#0x1_primary_fungible_store_is_balance_at_least)
 -  [Function `is_frozen`](#0x1_primary_fungible_store_is_frozen)
 -  [Function `withdraw`](#0x1_primary_fungible_store_withdraw)
 -  [Function `deposit`](#0x1_primary_fungible_store_deposit)
@@ -301,6 +302,35 @@ Get the balance of <code><a href="account.md#0x1_account">account</a></code>'s p
         <a href="fungible_asset.md#0x1_fungible_asset_balance">fungible_asset::balance</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata))
     } <b>else</b> {
         0
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_primary_fungible_store_is_balance_at_least"></a>
+
+## Function `is_balance_at_least`
+
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_balance_at_least">is_balance_at_least</a>&lt;T: key&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, metadata: Object&lt;T&gt;, amount: u64): bool {
+    <b>if</b> (<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_exists">primary_store_exists</a>(<a href="account.md#0x1_account">account</a>, metadata)) {
+        <a href="fungible_asset.md#0x1_fungible_asset_is_balance_at_least">fungible_asset::is_balance_at_least</a>(<a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_store</a>(<a href="account.md#0x1_account">account</a>, metadata), amount)
+    } <b>else</b> {
+        amount == 0
     }
 }
 </code></pre>
