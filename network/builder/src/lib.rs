@@ -105,10 +105,6 @@ impl NetworkBuilder {
         self.apps = apps;
     }
 
-    pub fn add_health_checker(&mut self) {
-
-    }
-
     pub fn active_protocol_ids(&self) -> ProtocolIdSet {
         let mut out = ProtocolIdSet::empty();
         for (protocol_id, _) in self.apps.iter() {

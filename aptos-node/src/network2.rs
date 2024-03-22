@@ -342,9 +342,6 @@ pub fn setup_networks(
             Some(runtime.handle().clone()),
         );
 
-        // Register consensus (both client and server) with the network
-        // let network_id = network_config.network_id;
-        // if network_id.is_validator_network() {}
         // Build and start the network on the runtime
         network_builder.build(runtime.handle().clone());
         debug!(
