@@ -58,6 +58,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `migrate_to_fungible_store`](#0x1_coin_migrate_to_fungible_store)
 -  [Function `coin_address`](#0x1_coin_coin_address)
 -  [Function `balance`](#0x1_coin_balance)
+-  [Function `is_balance_at_least`](#0x1_coin_is_balance_at_least)
 -  [Function `coin_balance`](#0x1_coin_coin_balance)
 -  [Function `is_coin_initialized`](#0x1_coin_is_coin_initialized)
 -  [Function `is_coin_store_frozen`](#0x1_coin_is_coin_store_frozen)
@@ -2099,6 +2100,45 @@ Returns the balance of <code>owner</code> for provided <code>CoinType</code> and
             <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> paired_metadata)
         )
     } <b>else</b> { 0 }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_coin_is_balance_at_least"></a>
+
+## Function `is_balance_at_least`
+
+Returns the balance of <code>owner</code> for provided <code>CoinType</code> and its paired FA if exists.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_balance_at_least">is_balance_at_least</a>&lt;CoinType&gt;(owner: <b>address</b>, amount: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_balance_at_least">is_balance_at_least</a>&lt;CoinType&gt;(owner: <b>address</b>, amount: u64): bool <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinStore">CoinStore</a> {
+    <b>let</b> paired_metadata = <a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;();
+    <b>let</b> coin_balance = <a href="coin.md#0x1_coin_coin_balance">coin_balance</a>&lt;CoinType&gt;(owner);
+    <b>if</b> (coin_balance &gt;= amount) {
+        <b>return</b> <b>true</b>;
+    };
+
+    <b>let</b> left_amount = amount - coin_balance;
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&paired_metadata)) {
+        <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_balance_at_least">primary_fungible_store::is_balance_at_least</a>(
+            owner,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> paired_metadata),
+            left_amount
+        )
+    } <b>else</b> { <b>false</b> }
 }
 </code></pre>
 

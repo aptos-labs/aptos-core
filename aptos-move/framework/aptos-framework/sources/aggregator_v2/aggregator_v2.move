@@ -93,6 +93,14 @@ module aptos_framework::aggregator_v2 {
         assert!(try_sub(aggregator, value), error::out_of_range(EAGGREGATOR_UNDERFLOW));
     }
 
+    public fun is_at_least<IntElement: copy + drop>(aggregator: &mut Aggregator<IntElement>, min_amount: IntElement): bool {
+        let result = try_sub(aggregator, min_amount);
+        if (result) {
+            add(aggregator, min_amount);
+        };
+        result
+    }
+
     /// Returns a value stored in this aggregator.
     /// Note: This operation is resource-intensive, and reduces parallelism.
     /// (Especially if called in a transaction that also modifies the aggregator,

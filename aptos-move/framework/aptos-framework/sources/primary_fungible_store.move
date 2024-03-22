@@ -115,6 +115,15 @@ module aptos_framework::primary_fungible_store {
     }
 
     #[view]
+    public fun is_balance_at_least<T: key>(account: address, metadata: Object<T>, amount: u64): bool {
+        if (primary_store_exists(account, metadata)) {
+            fungible_asset::is_balance_at_least(primary_store(account, metadata), amount)
+        } else {
+            amount == 0
+        }
+    }
+
+    #[view]
     /// Return whether the given account's primary store is frozen.
     public fun is_frozen<T: key>(account: address, metadata: Object<T>): bool {
         if (primary_store_exists(account, metadata)) {

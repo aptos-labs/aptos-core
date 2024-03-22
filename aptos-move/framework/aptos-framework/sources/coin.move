@@ -639,6 +639,25 @@ module aptos_framework::coin {
         } else { 0 }
     }
 
+    #[view]
+    /// Returns the balance of `owner` for provided `CoinType` and its paired FA if exists.
+    public fun is_balance_at_least<CoinType>(owner: address, amount: u64): bool acquires CoinConversionMap, CoinStore {
+        let paired_metadata = paired_metadata<CoinType>();
+        let coin_balance = coin_balance<CoinType>(owner);
+        if (coin_balance >= amount) {
+            return true;
+        };
+
+        let left_amount = amount - coin_balance;
+        if (option::is_some(&paired_metadata)) {
+            primary_fungible_store::is_balance_at_least(
+                owner,
+                option::extract(&mut paired_metadata),
+                left_amount
+            )
+        } else { false }
+    }
+
     inline fun coin_balance<CoinType>(owner: address): u64 {
         if (exists<CoinStore<CoinType>>(owner)) {
             borrow_global<CoinStore<CoinType>>(owner).coin.value
