@@ -202,8 +202,11 @@ module aptos_framework::delegation_pool {
     /// Changing operator commission rate in delegation pool is not supported.
     const ECOMMISSION_RATE_CHANGE_NOT_SUPPORTED: u64 = 22;
 
+    /// Converting staking contracts to delegation pools is not supported.
+    const ESTAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION_NOT_SUPPORTED: u64 = 23;
+
     /// A staking contract cannot be converted to a delegation pool while owning pending_active stake.
-    const EPENDING_ACTIVE_STAKE_ON_STAKING_CONTRACT: u64 = 23;
+    const EPENDING_ACTIVE_STAKE_ON_STAKING_CONTRACT: u64 = 24;
 
     const MAX_U64: u64 = 18446744073709551615;
 
@@ -727,6 +730,11 @@ module aptos_framework::delegation_pool {
         operator: address,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         assert!(features::delegation_pools_enabled(), error::invalid_state(EDELEGATION_POOLS_DISABLED));
+        assert!(
+            features::staking_contract_to_delegation_pool_conversion_enabled(),
+            error::invalid_state(ESTAKING_CONTRACT_TO_DELEGATION_POOL_CONVERSION_NOT_SUPPORTED)
+        );
+
         let staker_address = signer::address_of(staker);
         assert!(!owner_cap_exists(staker_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
 
@@ -4435,6 +4443,39 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234)]
+    #[expected_failure(abort_code = 0x30017, location = Self)]
+    public entry fun test_initialize_from_staking_contract_not_supported(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(aptos_framework);
+        features::change_feature_flags(
+            aptos_framework,
+            vector[],
+            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
+        );
+        staking_contract::setup_staking_contract(
+            aptos_framework,
+            staker,
+            operator,
+            1_000_000 * ONE_APT,
+            20
+        );
+
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = staking_contract::stake_pool_address(staker_address, operator_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        initialize_delegation_pool_from_staking_contract(staker, operator_address);
+    }
+
+    #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234)]
     /// Produce rewards for staker and operator, but do not request commission by the time of conversion.
     public entry fun test_initialize_from_staking_contract_scenario_1(
         aptos_framework: &signer,
@@ -4446,6 +4487,7 @@ module aptos_framework::delegation_pool {
         features::change_feature_flags(
             aptos_framework,
             vector[
+                features::get_staking_contract_to_delegation_pool_conversion_feature(),
                 features::get_partial_governance_voting(),
                 features::get_delegation_pool_partial_governance_voting()
             ],
@@ -4540,6 +4582,7 @@ module aptos_framework::delegation_pool {
         features::change_feature_flags(
             aptos_framework,
             vector[
+                features::get_staking_contract_to_delegation_pool_conversion_feature(),
                 features::get_partial_governance_voting(),
                 features::get_delegation_pool_partial_governance_voting()
             ],
@@ -4634,6 +4677,7 @@ module aptos_framework::delegation_pool {
         features::change_feature_flags(
             aptos_framework,
             vector[
+                features::get_staking_contract_to_delegation_pool_conversion_feature(),
                 features::get_partial_governance_voting(),
                 features::get_delegation_pool_partial_governance_voting()
             ],
