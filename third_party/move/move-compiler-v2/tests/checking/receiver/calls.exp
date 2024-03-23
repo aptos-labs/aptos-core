@@ -15,6 +15,10 @@ module 0x42::m {
     private fun test_call_styles(s: m::S): u64 {
         m::receiver(s, 1);
         m::receiver_ref(Borrow(Immutable)(s), 1);
-        m::receiver_ref_mut(Borrow(Mutable)(s), 1)
+        m::receiver_ref_mut(Borrow(Mutable)(s), 1);
+        {
+          let (self: &mut m::S, y: u64): (&mut m::S, u64) = Tuple(Borrow(Mutable)(s), 1);
+          Add<u64>(select m::S.x<&mut m::S>(self), 1)
+        }
     }
 } // end 0x42::m

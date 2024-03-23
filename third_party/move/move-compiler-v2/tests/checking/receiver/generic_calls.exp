@@ -13,6 +13,9 @@ module 0x42::m {
     private fun receiver_more_generics<T,R>(self: m::S<#0>,_y: #1) {
         Tuple()
     }
+    private fun receiver_needs_type_args<T,R>(self: m::S<#0>,_y: #0) {
+        Abort(1)
+    }
     private fun receiver_ref<T>(self: &m::S<#0>,_y: #0) {
         Tuple()
     }
@@ -23,7 +26,9 @@ module 0x42::m {
         m::receiver<u64>(s, x);
         m::receiver_ref<u64>(Borrow(Immutable)(s), x);
         m::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
-        m::receiver_more_generics<u64, u64>(s, 22)
+        m::receiver_more_generics<u64, u64>(s, 22);
+        m::receiver_needs_type_args<u64, u8>(s, x);
+        Tuple()
     }
     private fun test_receiver_inference(s: m::S<u64>) {
         {
