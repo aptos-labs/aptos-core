@@ -4476,6 +4476,43 @@ module aptos_framework::delegation_pool {
     }
 
     #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234)]
+    #[expected_failure(abort_code = 0x30018, location = Self)]
+    public entry fun test_initialize_from_staking_contract_with_pending_active_stake(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(aptos_framework);
+        features::change_feature_flags(
+            aptos_framework,
+            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
+            vector[],
+        );
+        staking_contract::setup_staking_contract(
+            aptos_framework,
+            staker,
+            operator,
+            1_000_000 * ONE_APT,
+            20
+        );
+
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = staking_contract::stake_pool_address(staker_address, operator_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Add some pending_active stake.
+        stake::mint(staker, ONE_APT);
+        staking_contract::add_stake(staker, operator_address, ONE_APT);
+
+        initialize_delegation_pool_from_staking_contract(staker, operator_address);
+    }
+
+    #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234)]
     /// Produce rewards for staker and operator, but do not request commission by the time of conversion.
     public entry fun test_initialize_from_staking_contract_scenario_1(
         aptos_framework: &signer,
@@ -4664,6 +4701,83 @@ module aptos_framework::delegation_pool {
         assert_pending_withdrawal(operator_address, pool_address, true, 0, false, 203216000000);
         assert_delegation(staker_address, pool_address, 102624080000000 - 203216000000, 0, 0);
         stake::assert_stake_pool(pool_address, 102624080000000 - 203216000000, 0, 0, 203216000000);
+    }
+
+    #[test(
+        aptos_framework = @aptos_framework,
+        staker = @0x123,
+        operator_1 = @0x234,
+        operator_2 = @0x345,
+        operator_3 = @0x456
+    )]
+    /// Produce rewards for staker and multiple operators and check that all distributions are preserved.
+    public entry fun test_initialize_from_staking_contract_scenario_3(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator_1: &signer,
+        operator_2: &signer,
+        operator_3: &signer,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(aptos_framework);
+        // conversion would fail when setting staker's delegated voter unless partial voting is supported
+        features::change_feature_flags(
+            aptos_framework,
+            vector[
+                features::get_staking_contract_to_delegation_pool_conversion_feature(),
+                features::get_partial_governance_voting(),
+                features::get_delegation_pool_partial_governance_voting()
+            ],
+            vector[],
+        );
+        staking_contract::setup_staking_contract(
+            aptos_framework,
+            staker,
+            operator_1,
+            1_000_000 * ONE_APT,
+            20
+        );
+
+        let staker_address = signer::address_of(staker);
+        let operator_1_address = signer::address_of(operator_1);
+        let operator_2_address = signer::address_of(operator_2);
+        let operator_3_address = signer::address_of(operator_3);
+        let pool_address = staking_contract::stake_pool_address(staker_address, operator_1_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator_1, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+        staking_contract::switch_operator_with_same_commission(staker, operator_1_address, operator_2_address);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+        staking_contract::switch_operator_with_same_commission(staker, operator_2_address, operator_3_address);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+        staking_contract::request_commission(staker, staker_address, operator_3_address);
+
+        staking_contract::assert_distribution(staker_address, operator_3_address, operator_1_address, 203212800001);
+        staking_contract::assert_distribution(staker_address, operator_3_address, operator_2_address, 203616000000);
+        staking_contract::assert_distribution(staker_address, operator_3_address, operator_3_address, 204019999998);
+        let (total_active_stake, accumulated_rewards, commission_amount) = staking_contract::staking_contract_amounts(
+            staker_address,
+            operator_3_address
+        );
+        assert!(total_active_stake == 102419251200000, total_active_stake);
+        assert!(accumulated_rewards == 0, accumulated_rewards);
+        assert!(commission_amount == 0, commission_amount);
+
+        initialize_delegation_pool_from_staking_contract(staker, operator_3_address);
+
+        assert_delegation(operator_1_address, pool_address, 0, 0, 203212800001);
+        assert_delegation(operator_2_address, pool_address, 0, 0, 203616000000);
+        assert_delegation(operator_3_address, pool_address, 0, 0, 204019999999);
+        assert_delegation(staker_address, pool_address, 102419251200000, 0, 0);
+        stake::assert_stake_pool(pool_address, 102419251200000, 0, 0, 203212800001 + 203616000000 + 204019999999);
     }
 
     #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234)]
