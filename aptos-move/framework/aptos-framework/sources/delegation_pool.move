@@ -738,7 +738,7 @@ module aptos_framework::delegation_pool {
         let staker_address = signer::address_of(staker);
         assert!(!owner_cap_exists(staker_address), error::already_exists(EOWNER_CAP_ALREADY_EXISTS));
 
-        // does not have to withhold the `add_stake` fee from staker if there is no pending_active stake
+        // do not have to withhold the `add_stake` fee from staker if there is no pending_active stake
         let (_, _, pending_active, _) = stake::get_stake(
             staking_contract::stake_pool_address(staker_address, operator)
         );
@@ -821,18 +821,18 @@ module aptos_framework::delegation_pool {
         // store ownership capability of delegation pool on staker
         move_to(staker, DelegationPoolOwnership { pool_address });
 
-        // get staker's voter before being set to the resource account
-        let staker_delegated_voter = stake::get_delegated_voter(pool_address);
-
         // enable partial governance voting
         if (features::partial_governance_voting_enabled(
         ) && features::delegation_pool_partial_governance_voting_enabled()) {
+            // get staker's voter before being set to the resource account
+            let staker_delegated_voter = stake::get_delegated_voter(pool_address);
+
             // partial governance voting could not have been enabled as the following would fail
             enable_partial_governance_voting(pool_address);
-        };
 
-        // set delegated voter of staker which takes effect immediately
-        initialize_staker_delegated_voter(staker_address, pool_address, staker_delegated_voter);
+            // set delegated voter of staker which takes effect immediately
+            initialize_staker_delegated_voter(staker_address, pool_address, staker_delegated_voter);
+        };
     }
 
     #[view]
@@ -4520,14 +4520,9 @@ module aptos_framework::delegation_pool {
         operator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        // conversion would fail when setting staker's delegated voter unless partial voting is supported
         features::change_feature_flags(
             aptos_framework,
-            vector[
-                features::get_staking_contract_to_delegation_pool_conversion_feature(),
-                features::get_partial_governance_voting(),
-                features::get_delegation_pool_partial_governance_voting()
-            ],
+            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
             vector[],
         );
         staking_contract::setup_staking_contract(
@@ -4615,14 +4610,9 @@ module aptos_framework::delegation_pool {
         operator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        // conversion would fail when setting staker's delegated voter unless partial voting is supported
         features::change_feature_flags(
             aptos_framework,
-            vector[
-                features::get_staking_contract_to_delegation_pool_conversion_feature(),
-                features::get_partial_governance_voting(),
-                features::get_delegation_pool_partial_governance_voting()
-            ],
+            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
             vector[],
         );
         staking_contract::setup_staking_contract(
@@ -4719,14 +4709,9 @@ module aptos_framework::delegation_pool {
         operator_3: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        // conversion would fail when setting staker's delegated voter unless partial voting is supported
         features::change_feature_flags(
             aptos_framework,
-            vector[
-                features::get_staking_contract_to_delegation_pool_conversion_feature(),
-                features::get_partial_governance_voting(),
-                features::get_delegation_pool_partial_governance_voting()
-            ],
+            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
             vector[],
         );
         staking_contract::setup_staking_contract(
@@ -4787,7 +4772,6 @@ module aptos_framework::delegation_pool {
         operator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolOwnership {
         initialize_for_test(aptos_framework);
-        // conversion would fail when setting staker's delegated voter unless partial voting is supported
         features::change_feature_flags(
             aptos_framework,
             vector[
