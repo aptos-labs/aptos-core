@@ -17,7 +17,6 @@ async fn long_running_crash_recovery() {
     let epoch_duration_secs = 20;
 
     let (mut swarm, mut aptos_cli, _faucet) = SwarmBuilder::new_local(4)
-        .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
@@ -33,13 +32,15 @@ async fn long_running_crash_recovery() {
     let root_addr = swarm.chain_info().root_account().address();
     let root_idx = aptos_cli.add_account_with_address_to_cli(swarm.root_key(), root_addr);
 
-    let client_endpoint = swarm.fullnodes().nth(0).unwrap().rest_api_endpoint();
+    // We will not touch node 0 and make it the R/W gateway.
+    let client_endpoint = swarm.validators().nth(0).unwrap().rest_api_endpoint();
     let rest_cli = Client::new(client_endpoint.clone());
 
     swarm
         .wait_for_all_nodes_to_catchup_to_epoch(3, Duration::from_secs(epoch_duration_secs * 2))
         .await
         .expect("Waited too long for epoch 3.");
+
     let mut rng = thread_rng();
     let mut validator_power_status_vec = vec![true; 4];
     let mut num_iterations = 0;
@@ -48,6 +49,7 @@ async fn long_running_crash_recovery() {
         make_change(&mut validator_power_status_vec, &rest_cli, &aptos_cli, root_idx, &mut swarm).await;
         let sleep_sec = rng.gen_range(5, 30);
         println!("Acted. Sleeping for {} secs.", sleep_sec);
+        println!();
         tokio::time::sleep(Duration::from_secs(sleep_sec)).await;
         assert_state(&validator_power_status_vec, &mut swarm).await;
         num_iterations += 1;
@@ -81,7 +83,7 @@ async fn start_random_node(validator_power_status_vec: &mut Vec<bool>, swarm: &m
 
 async fn stop_random_node(validator_power_status_vec: &mut Vec<bool>, swarm: &mut LocalSwarm) {
     let started_nodes: Vec<usize> = validator_power_status_vec.iter().enumerate().filter_map(|(idx, &power_on)|if power_on {Some(idx)} else {None}).collect();
-    let i = started_nodes[thread_rng().gen_range(0, started_nodes.len())];
+    let i = started_nodes[thread_rng().gen_range(1, started_nodes.len())]; // Ensure node 0 is never stopped.
     println!("Action: stop node {}", i);
     println!();
     swarm.validators_mut().nth(i).unwrap().stop();
