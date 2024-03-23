@@ -1,5 +1,11 @@
 
 Diagnostics:
+error: cannot freeze local `s` which is still mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:12:9
+   │
+12 │         freeze(s);
+   │         ^^^^^^^^^ frozen here
+
 error: cannot mutably borrow since immutable references exist
    ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:18:17
    │
@@ -10,3 +16,9 @@ error: cannot mutably borrow since immutable references exist
 19 │         freeze(s);
 20 │         *f;
    │         -- requirement enforced here
+
+error: cannot freeze local `s` which is still mutably borrowed
+   ┌─ tests/reference-safety/v1-tests/freeze_field_invalid.move:19:9
+   │
+19 │         freeze(s);
+   │         ^^^^^^^^^ frozen here

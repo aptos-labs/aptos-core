@@ -1,0 +1,16 @@
+
+Diagnostics:
+error: cannot freeze local `r` which is still mutably borrowed
+  ┌─ tests/reference-safety/freeze_mutable_borrow.move:6:48
+  │
+6 │         *vector::borrow_mut(r, *vector::borrow(r, 1)) = 4;
+  │          --------------------------------------^-----
+  │          │                                     │
+  │          │                                     frozen here
+  │          conflicting reference used here
+
+error: cannot freeze local `y` which is still mutably borrowed
+   ┌─ tests/reference-safety/freeze_mutable_borrow.move:14:18
+   │
+14 │         let _z = freeze(y);
+   │                  ^^^^^^^^^ frozen here

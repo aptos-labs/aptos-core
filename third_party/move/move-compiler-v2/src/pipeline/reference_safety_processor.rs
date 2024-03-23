@@ -776,6 +776,30 @@ impl LifetimeState {
         result
     }
 
+    fn transitive_mut_children(&self, label: &LifetimeLabel) -> BTreeSet<LifetimeLabel> {
+        // Helper function to collect the target nodes of the children.
+        let get_children = |label: &LifetimeLabel| {
+            self.node(label)
+                .children
+                .iter()
+                .filter(|e| e.kind.is_mut())
+                .map(|e| e.target)
+        };
+        let mut result = BTreeSet::new();
+        let mut todo = get_children(label).collect::<Vec<_>>();
+        if todo.is_empty() {
+            result.insert(*label);
+        } else {
+            while let Some(l) = todo.pop() {
+                if !result.insert(l) {
+                    continue;
+                }
+                todo.extend(get_children(&l));
+            }
+        }
+        result
+    }
+
     /// Returns the temporaries borrowed
     pub fn borrowed_locals(&self) -> impl Iterator<Item = TempIndex> + '_ {
         self.temp_to_label_map.keys().cloned()
@@ -985,6 +1009,52 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     .into_iter()
                     .chain(self.usage_info(label, |t| t != &local)),
             )
+        }
+    }
+
+    fn check_freeze(&self, src: TempIndex) {
+        let label = *self.state.label_for_temp(src).expect("label for reference");
+        let mut err_flag = false;
+        for root in &self.state.roots(&label) {
+            for lbl in self.state.transitive_mut_children(root) {
+                if !self.state.is_ancestor(&lbl, &label)
+                    && (self.state.is_leaf(&lbl) || self.state.has_mut_edges(&lbl))
+                {
+                    self.error_with_hints(
+                        self.cur_loc(),
+                        format!(
+                            "cannot freeze {} which is still mutably borrowed",
+                            self.display(src)
+                        ),
+                        "frozen here",
+                        self.borrow_info(&lbl, |_| true).into_iter(),
+                    );
+                    err_flag = true;
+                    break;
+                }
+            }
+            if err_flag {
+                break;
+            }
+        }
+        if self
+            .state
+            .leaves()
+            .get(&label)
+            .is_some_and(|set| set.len() > 1)
+        {
+            let usage_info = || self.usage_info(&label, |t| t != &src);
+            self.error_with_hints(
+                self.cur_loc(),
+                format!(
+                    "cannot freeze {} which is still mutably borrowed",
+                    self.display(src)
+                ),
+                "frozen here",
+                self.borrow_info(&label, |e| e.kind.is_mut())
+                    .into_iter()
+                    .chain(usage_info()),
+            );
         }
     }
 
@@ -1470,6 +1540,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a FreezeRef instruction.
     fn freeze_ref(&mut self, code_offset: CodeOffset, dest: TempIndex, src: TempIndex) {
         let label = *self.state.label_for_temp(src).expect("label for reference");
+        self.check_freeze(src);
         let target = self.state.replace_ref(dest, code_offset, 0);
         self.state.add_edge(label, BorrowEdge {
             kind: BorrowEdgeKind::Freeze,

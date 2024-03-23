@@ -42,6 +42,12 @@ module 0x8675309::M {
 
 
 Diagnostics:
+error: cannot freeze local `s` which is still mutably borrowed
+   ┌─ tests/simplifier/simplifier_test4.move:11:17
+   │
+11 │             foo(freeze(s), { *({x = x + 1; f}) = 0; 1 })
+   │                 ^^^^^^^^^ frozen here
+
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/simplifier/simplifier_test4.move:11:17
    │

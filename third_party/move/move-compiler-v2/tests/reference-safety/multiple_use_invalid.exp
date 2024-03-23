@@ -28,3 +28,9 @@ error: same mutable reference in local `r1` is also used in other local `r2` in 
    │                  ------ previous mutable local borrow
 20 │         s(r1, r2)
    │         ^^^^^^^^^ requirement enforced here
+
+error: cannot freeze local `r1` which is still mutably borrowed
+   ┌─ tests/reference-safety/multiple_use_invalid.move:27:9
+   │
+27 │         r1 == r2
+   │         ^^ frozen here
