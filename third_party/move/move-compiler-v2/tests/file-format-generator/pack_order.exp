@@ -17,8 +17,8 @@ B0:
 	4: Ret
 }
 pack2(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 1 */ {
-L0:	loc0: u8
-L1:	loc1: u8
+L3:	loc0: u8
+L4:	loc1: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
@@ -31,7 +31,7 @@ B0:
 	8: Ret
 }
 pack3(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 2 */ {
-L0:	loc0: u8
+L3:	loc0: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
@@ -42,8 +42,8 @@ B0:
 	6: Ret
 }
 pack4(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 3 */ {
-L0:	loc0: u8
-L1:	loc1: u8
+L3:	loc0: u8
+L4:	loc1: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
@@ -56,7 +56,7 @@ B0:
 	8: Ret
 }
 pack5(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 4 */ {
-L0:	loc0: u8
+L3:	loc0: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
@@ -67,8 +67,8 @@ B0:
 	6: Ret
 }
 pack6(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 5 */ {
-L0:	loc0: u8
-L1:	loc1: u8
+L3:	loc0: u8
+L4:	loc1: u8
 B0:
 	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)

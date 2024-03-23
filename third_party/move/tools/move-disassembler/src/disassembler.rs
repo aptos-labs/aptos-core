@@ -445,14 +445,18 @@ impl<'a> Disassembler<'a> {
         }
     }
 
-    fn format_function_body(locals: Vec<String>, bytecode: Vec<String>) -> String {
+    fn format_function_body(
+        locals: Vec<String>,
+        bytecode: Vec<String>,
+        params_len: usize,
+    ) -> String {
         if locals.is_empty() && bytecode.is_empty() {
             "".to_string()
         } else {
             let body_iter: Vec<String> = locals
                 .into_iter()
                 .enumerate()
-                .map(|(local_idx, local)| format!("L{}:\t{}", local_idx, local))
+                .map(|(local_idx, local)| format!("L{}:\t{}", local_idx + params_len, local))
                 .chain(bytecode)
                 .collect();
             format!(" {{\n{}\n}}", body_iter.join("\n"))
@@ -1143,7 +1147,7 @@ impl<'a> Disassembler<'a> {
                 let locals = self.disassemble_locals(function_source_map, code.locals)?;
                 let bytecode =
                     self.disassemble_bytecode(function_source_map, name, parameters, code)?;
-                Self::format_function_body(locals, bytecode)
+                Self::format_function_body(locals, bytecode, params.len())
             },
             None => "".to_string(),
         };
