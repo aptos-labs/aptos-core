@@ -12,6 +12,10 @@ module 0x42::m {
         self.x = y
     }
 
+    fun receiver_needs_type_args<T, R>(self: S<T>, _y: T) {
+        abort 1
+    }
+
     fun test_call_styles(s: S<u64>, x: u64) {
         s.receiver_wrongly_spelled(x);
         s.receiver(x, x);
@@ -20,5 +24,6 @@ module 0x42::m {
         s.receiver_ref_mut(1u8);
         s.receiver_ref_mut::<u8>(1);
         s.receiver_ref_mut::<u8, u8>(1);
+        s.receiver_needs_type_args(x)
     }
 }

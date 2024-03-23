@@ -588,8 +588,11 @@ pub type QuantKind = Spanned<QuantKind_>;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum CallKind {
+    /// Regular function call.
     Regular,
+    /// Macro style call (e.g. `assert!(c, x)`)
     Macro,
+    /// Receiver style call (e.g. `x.f(y)`)
     Receiver,
 }
 

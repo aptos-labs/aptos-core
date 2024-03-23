@@ -205,16 +205,15 @@ impl Constraint {
             ) => {
                 if name1 == name2 {
                     if let (Some(gens1), Some(gens2)) = (generics1, generics2) {
-                        if gens1.len() == gens2.len() {
-                            subs.unify_vec(
-                                context,
-                                Variance::NoVariance,
-                                WideningOrder::Join,
-                                None,
-                                gens1,
-                                gens2,
-                            )?;
-                        }
+                        subs.unify_vec_maybe_type_args(
+                            context,
+                            true,
+                            Variance::NoVariance,
+                            WideningOrder::Join,
+                            None,
+                            gens1,
+                            gens2,
+                        )?;
                     }
                     subs.unify_vec(
                         context,
@@ -311,7 +310,7 @@ impl Constraint {
 #[derive(Debug)]
 pub enum TypeUnificationError {
     TypeMismatch(Type, Type),
-    ArityMismatch(usize, usize),
+    ArityMismatch(/*type parameter context*/ bool, usize, usize),
     CyclicSubstitution(Type, Type),
     MutabilityMismatch(ReferenceKind, ReferenceKind),
     ConstraintUnsatisfied(Loc, Type, WideningOrder, Constraint),
@@ -1042,8 +1041,8 @@ pub trait UnificationContext {
     /// If the function is generic it will be instantiated with fresh type variables.
     fn get_receiver_function(
         &mut self,
-        _ty: &Type,
-        _name: Symbol,
+        ty: &Type,
+        name: Symbol,
     ) -> Option<ReceiverFunctionInstance>;
 
     /// Get the abilities of the type.
@@ -1270,8 +1269,9 @@ impl Substitution {
                         }
                         if let Some(ty_args) = ty_args {
                             // The call has explicit type parameters (`x.f<T>()`), check them.
-                            self.unify_vec(
+                            self.unify_vec_maybe_type_args(
                                 context,
+                                true,
                                 variance,
                                 WideningOrder::Join,
                                 None,
@@ -1475,13 +1475,16 @@ impl Substitution {
                 return Ok(Type::Reference(*k, Box::new(ty)));
             },
             (Type::Tuple(ts1), Type::Tuple(ts2)) => {
-                return Ok(Type::Tuple(self.unify_vec(
-                    // Note for tuples, we pass on `variance` not `sub_variance`. A shallow
-                    // variance type will be effective for the elements of tuples,
-                    // which are treated similar as expression lists in function calls, and allow
-                    // e.g. reference type conversions.
-                    context, variance, order, None, ts1, ts2,
-                )?));
+                return Ok(Type::Tuple(
+                    self.unify_vec(
+                        // Note for tuples, we pass on `variance` not `sub_variance`. A shallow
+                        // variance type will be effective for the elements of tuples,
+                        // which are treated similar as expression lists in function calls, and allow
+                        // e.g. reference type conversions.
+                        context, variance, order, None, ts1, ts2,
+                    )
+                    .map_err(TypeUnificationError::lift(t1, t2))?,
+                ));
             },
             (Type::Fun(a1, r1), Type::Fun(a2, r2)) => {
                 // Same as for tuples, we pass on `variance` not `sub_variance`, allowing
@@ -1491,8 +1494,14 @@ impl Substitution {
                 // of type T2 can be passed as a T1 -- which is the case since T1 >= T2 (every
                 // T2 is also a T1).
                 return Ok(Type::Fun(
-                    Box::new(self.unify(context, variance, order.swap(), a1, a2)?),
-                    Box::new(self.unify(context, variance, order, r1, r2)?),
+                    Box::new(
+                        self.unify(context, variance, order.swap(), a1, a2)
+                            .map_err(TypeUnificationError::lift(t1, t2))?,
+                    ),
+                    Box::new(
+                        self.unify(context, variance, order, r1, r2)
+                            .map_err(TypeUnificationError::lift(t1, t2))?,
+                    ),
                 ));
             },
             (Type::Struct(m1, s1, ts1), Type::Struct(m2, s2, ts2)) => {
@@ -1502,7 +1511,8 @@ impl Substitution {
                     return Ok(Type::Struct(
                         *m1,
                         *s1,
-                        self.unify_vec(context, variance, order, None, ts1, ts2)?,
+                        self.unify_vec(context, variance, order, None, ts1, ts2)
+                            .map_err(TypeUnificationError::lift(t1, t2))?,
                     ));
                 }
             },
@@ -1577,9 +1587,10 @@ impl Substitution {
     }
 
     /// Helper to unify two type vectors.
-    pub fn unify_vec(
+    pub fn unify_vec_maybe_type_args(
         &mut self,
         context: &mut impl UnificationContext,
+        for_type_args: bool,
         variance: Variance,
         order: WideningOrder,
         locs: Option<&[Loc]>,
@@ -1595,7 +1606,11 @@ impl Substitution {
                 } else {
                     (ts2n, ts1n)
                 };
-            return Err(TypeUnificationError::ArityMismatch(given, expected));
+            return Err(TypeUnificationError::ArityMismatch(
+                for_type_args,
+                given,
+                expected,
+            ));
         }
         let mut rs = vec![];
         for i in 0..ts1.len() {
@@ -1606,6 +1621,19 @@ impl Substitution {
             rs.push(res?);
         }
         Ok(rs)
+    }
+
+    /// Helper to unify two type vectors, no type argument context.
+    pub fn unify_vec(
+        &mut self,
+        context: &mut impl UnificationContext,
+        variance: Variance,
+        order: WideningOrder,
+        locs: Option<&[Loc]>,
+        ts1: &[Type],
+        ts2: &[Type],
+    ) -> Result<Vec<Type>, TypeUnificationError> {
+        self.unify_vec_maybe_type_args(context, false, variance, order, locs, ts1, ts2)
     }
 
     /// Tries to substitute or assign a variable. Returned option is Some if unification
@@ -1875,6 +1903,8 @@ pub enum ErrorMessageContext {
     Assignment,
     /// The error appears in the argument list of a function.
     Argument,
+    /// The error appears in the argument of a receiver style function.
+    ReceiverArgument,
     /// The error appears in the argument of an operator.
     OperatorArgument,
     /// The error appears in a type annotation.
@@ -1891,7 +1921,7 @@ pub enum ErrorMessageContext {
 impl ErrorMessageContext {
     pub fn type_mismatch(
         self,
-        display_context: &crate::ty::TypeDisplayContext,
+        display_context: &TypeDisplayContext,
         actual: &Type,
         expected: &Type,
     ) -> String {
@@ -1918,7 +1948,7 @@ impl ErrorMessageContext {
                 "cannot assign `{}` to left-hand side of type `{}`",
                 actual, expected
             ),
-            Argument => format!(
+            Argument | ReceiverArgument => format!(
                 "cannot pass `{}` to a function which expects argument of type `{}`",
                 actual, expected
             ),
@@ -1965,7 +1995,7 @@ impl ErrorMessageContext {
         }
     }
 
-    pub fn arity_mismatch(self, actual: usize, expected: usize) -> String {
+    pub fn arity_mismatch(self, for_type_args: bool, actual: usize, expected: usize) -> String {
         use ErrorMessageContext::*;
         match self {
             Binding | Assignment => format!(
@@ -1977,9 +2007,30 @@ impl ErrorMessageContext {
             Argument => format!(
                 "the function takes {} {} but {} were provided",
                 expected,
-                pluralize("argument", expected),
+                if for_type_args {
+                    pluralize("type argument", expected)
+                } else {
+                    pluralize("argument", expected)
+                },
                 actual
             ),
+            ReceiverArgument => {
+                if for_type_args {
+                    format!(
+                        "the receiver function takes {} type {} but {} were provided",
+                        expected,
+                        pluralize("argument", expected),
+                        actual
+                    )
+                } else {
+                    format!(
+                        "the receiver function takes {} {} but {} were provided",
+                        expected - 1,
+                        pluralize("argument", expected - 1),
+                        actual - 1
+                    )
+                }
+            },
             OperatorArgument => format!(
                 "the operator takes {} {} but {} were provided",
                 expected,
@@ -2005,7 +2056,7 @@ impl ErrorMessageContext {
                 "the left-hand side expected {} but {} was provided",
                 expected, actual
             ),
-            Argument => format!(
+            Argument | ReceiverArgument => format!(
                 "the function takes {} but {} was provided",
                 expected, actual
             ),
@@ -2027,7 +2078,7 @@ impl ErrorMessageContext {
         use ErrorMessageContext::*;
         let actual = actual.display(display_context);
         match self {
-            Argument => format!(
+            Argument | ReceiverArgument => format!(
                 "the function takes a reference but `{}` was provided",
                 actual
             ),
@@ -2048,6 +2099,20 @@ impl TypeUnificationError {
     /// Redirect the error to be reported at given location instead of default location.
     pub fn redirect(self, loc: Loc) -> Self {
         Self::RedirectedError(loc, Box::new(self))
+    }
+
+    /// Lifts a type mismatch error to a pair of context type
+    pub fn lift<'a>(
+        cty1: &'a Type,
+        cty2: &'a Type,
+    ) -> impl Fn(TypeUnificationError) -> TypeUnificationError + 'a {
+        |this| {
+            if let TypeUnificationError::TypeMismatch(_ty1, _ty2) = this {
+                TypeUnificationError::TypeMismatch(cty1.clone(), cty2.clone())
+            } else {
+                this
+            }
+        }
     }
 
     /// If this error is associated with a specific location, return it.
@@ -2072,8 +2137,8 @@ impl TypeUnificationError {
             TypeUnificationError::TypeMismatch(actual, expected) => {
                 error_context.type_mismatch(display_context, actual, expected)
             },
-            TypeUnificationError::ArityMismatch(actual, expected) => {
-                error_context.arity_mismatch(*actual, *expected)
+            TypeUnificationError::ArityMismatch(for_type_args, actual, expected) => {
+                error_context.arity_mismatch(*for_type_args, *actual, *expected)
             },
             TypeUnificationError::CyclicSubstitution(_actual, _expected) => {
                 // We could print the types but users may find this more confusing than
@@ -2514,7 +2579,7 @@ impl<'a> fmt::Display for TypeDisplay<'a> {
             },
             Var(idx) => {
                 if let Some(ty) = self.context.subs_opt.and_then(|s| s.subs.get(idx)) {
-                    ty.fmt(f)
+                    write!(f, "{}", ty.display(self.context))
                 } else if let Some(ctrs) =
                     self.context.subs_opt.and_then(|s| s.constraints.get(idx))
                 {

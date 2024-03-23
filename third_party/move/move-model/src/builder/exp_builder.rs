@@ -20,8 +20,8 @@ use crate::{
     ty,
     ty::{
         Constraint, ErrorMessageContext, PrimitiveType, ReceiverFunctionInstance, ReferenceKind,
-        Substitution, Type, Type::Tuple, TypeDisplayContext, TypeUnificationError, UnificationContext, Variance,
-        WideningOrder, BOOL_TYPE,
+        Substitution, Type, Type::Tuple, TypeDisplayContext, TypeUnificationError,
+        UnificationContext, Variance, WideningOrder, BOOL_TYPE,
     },
 };
 use codespan_reporting::diagnostic::Severity;
@@ -105,6 +105,7 @@ pub enum ExpPlaceholder {
     /// resolved yet, but should be at the end of function body checking.
     ReceiverCallInfo {
         name: Symbol,
+        generics: Option<Vec<Type>>,
         arg_types: Vec<Type>,
         result_type: Type,
     },
@@ -221,7 +222,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     pub fn get_type_params_with_name(&self) -> Vec<(Symbol, Type, Loc)> {
         self.type_params
             .iter()
-            .map(|(name, ty, _abilities, loc)| (name.clone(), ty.clone(), loc.clone()))
+            .map(|(name, ty, _abilities, loc)| (*name, ty.clone(), loc.clone()))
             .collect()
     }
 
@@ -367,7 +368,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
     }
 
-    /// Finalize the the given type, producing an error if it is not complete, or if
+    /// Finalize the given type, producing an error if it is not complete, or if
     /// invalid type instantiations are found.
     fn finalize_type(
         &mut self,
@@ -1272,7 +1273,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let loc = self.to_loc(loc);
                 let elem_ty = if let Some(tys) = ty_opt {
                     if tys.len() != 1 {
-                        self.error(&loc, &context.arity_mismatch(tys.len(), 1));
+                        self.error(&loc, &context.arity_mismatch(true, tys.len(), 1));
                         Type::Error
                     } else {
                         self.translate_type(&tys[0])
@@ -1761,12 +1762,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                             },
                             ExpPlaceholder::ReceiverCallInfo {
                                 name,
+                                generics,
                                 arg_types,
                                 result_type,
                             } => {
                                 // Clone info to avoid borrowing conflicts
-                                let (name, mut arg_types, result_type) =
-                                    (*name, arg_types.clone(), result_type.clone());
+                                let (name, generics, mut arg_types, result_type) = (
+                                    *name,
+                                    generics.clone(),
+                                    arg_types.clone(),
+                                    result_type.clone(),
+                                );
                                 let receiver_arg_ty = self.subs.specialize(
                                     arg_types
                                         .first()
@@ -1777,43 +1783,79 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 {
                                     let receiver_param_type =
                                         inst.arg_types.first().expect("argument").clone();
-                                    // Determine whether an automatic borrow needs to be inserted and its kind.
+                                    // Determine whether an automatic borrow needs to be inserted
+                                    // and it's kind.
                                     let borrow_kind_opt =
                                         inst.receiver_needs_borrow(&receiver_arg_ty);
                                     if !inst.type_inst.is_empty() {
-                                        // We need to annotate the instantiation of the function at the node.
-                                        // To obtain it, unification needs to be run again.
-                                        // If unification fails, errors will have been already reported, so
-                                        // we can ignore the result.
+                                        // We need to annotate the instantiation of the function
+                                        // at the node. To obtain it, unification needs to be run
+                                        // again. If unification fails, errors will have been
+                                        // already reported, so we can ignore the result.
                                         let mut subs = self.subs.clone();
+                                        let mut ok = true;
+                                        if let Some(tys) = generics {
+                                            ok = ok
+                                                && subs
+                                                    .unify_vec_maybe_type_args(
+                                                        self,
+                                                        true,
+                                                        Variance::NoVariance,
+                                                        WideningOrder::LeftToRight,
+                                                        None,
+                                                        &inst.type_inst,
+                                                        &tys,
+                                                    )
+                                                    .is_ok()
+                                        }
                                         if let Some(ref_kind) = &borrow_kind_opt {
                                             // Need to wrap reference around argument type
                                             let ty = &mut arg_types[0];
                                             *ty = Type::Reference(*ref_kind, Box::new(ty.clone()));
                                         }
-                                        let _ = subs.unify_vec(
-                                            self,
-                                            self.type_variance(),
-                                            WideningOrder::LeftToRight,
-                                            None,
-                                            &arg_types,
-                                            &inst.arg_types,
-                                        );
-                                        let _ = subs.unify(
-                                            self,
-                                            self.type_variance(),
-                                            WideningOrder::RightToLeft,
-                                            &result_type,
-                                            &inst.result_type,
-                                        );
-                                        // `type.inst` is now unified with the actual types.
-                                        self.env().set_node_instantiation(
-                                            id,
-                                            inst.type_inst
+                                        ok = ok
+                                            && subs
+                                                .unify_vec(
+                                                    self,
+                                                    self.type_variance(),
+                                                    WideningOrder::LeftToRight,
+                                                    None,
+                                                    &arg_types,
+                                                    &inst.arg_types,
+                                                )
+                                                .is_ok();
+                                        ok = ok
+                                            && subs
+                                                .unify(
+                                                    self,
+                                                    self.type_variance(),
+                                                    WideningOrder::RightToLeft,
+                                                    &result_type,
+                                                    &inst.result_type,
+                                                )
+                                                .is_ok();
+                                        // `type.inst` is now unified with the actual types,
+                                        // annotate the instance. Since this post processor
+                                        // is run after type finalization, we need to finalize
+                                        // it to report any un-inferred type errors. However,
+                                        // to avoid follow up errors, only do if unification'
+                                        // succeeded
+                                        if ok {
+                                            self.subs = subs;
+                                            let inst = inst
+                                                .type_inst
                                                 .iter()
-                                                .map(|t| subs.specialize_with_defaults(t))
-                                                .collect(),
-                                        )
+                                                .map(|t| {
+                                                    self.finalize_type(
+                                                        id,
+                                                        t,
+                                                        &mut BTreeSet::new(),
+                                                        &mut BTreeSet::new(),
+                                                    )
+                                                })
+                                                .collect();
+                                            self.env().set_node_instantiation(id, inst)
+                                        }
                                     }
                                     // Inject borrow operation if required.
                                     if let Some(ref_kind) = borrow_kind_opt {
@@ -1959,7 +2001,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if elem_expected_types.len() != list.value.len() {
             self.error(
                 &loc,
-                &context.arity_mismatch(elem_expected_types.len(), list.value.len()),
+                &context.arity_mismatch(false, elem_expected_types.len(), list.value.len()),
             );
             return self.new_error_pat(&loc);
         }
@@ -2011,7 +2053,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     let specialized_expected_type = self.subs.specialize(expected_type);
                     if let Type::Tuple(tys) = specialized_expected_type {
                         if tys.len() != 1 {
-                            self.error(loc, &context.arity_mismatch(1, tys.len()));
+                            self.error(loc, &context.arity_mismatch(false, 1, tys.len()));
                             return self.new_error_pat(loc);
                         }
                     }
@@ -2984,8 +3026,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 outruled.push((
                     cand,
                     None,
-                    ErrorMessageContext::Argument
-                        .arity_mismatch(translated_args.len(), params.len()),
+                    ErrorMessageContext::Argument.arity_mismatch(
+                        false,
+                        translated_args.len(),
+                        params.len(),
+                    ),
                 ));
                 continue;
             }
@@ -3000,12 +3045,18 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let mut subs = self.subs.clone();
             // If there are any type constraints, impose them on the type parameter instantiation.
             if let AnyFunEntry::SpecOrBuiltin(sbf) = cand {
-                if let Err(err) = self.add_constraints(
-                    &mut subs,
-                    loc,
-                    &instantiation,
-                    &sbf.type_param_constraints,
-                ) {
+                // Filter out ability constraints in spec mode. See also #12656
+                let constraints = if self.mode == ExpTranslationMode::Spec {
+                    sbf.type_param_constraints
+                        .iter()
+                        .filter(|c| !matches!(c, Constraint::HasAbility(_)))
+                        .cloned()
+                        .collect()
+                } else {
+                    sbf.type_param_constraints.clone()
+                };
+                if let Err(err) = self.add_constraints(&mut subs, loc, &instantiation, &constraints)
+                {
                     let mut display_context = self.type_display_context();
                     display_context.subs_opt = Some(&subs);
                     outruled.push((
@@ -3272,10 +3323,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let receiver_type = arg_types.first().expect("at least one argument");
         self.add_constraint_and_report(
             loc,
+            &ErrorMessageContext::ReceiverArgument,
             receiver_type,
             Constraint::SomeReceiverFunction(
                 name,
-                generics,
+                generics.clone(),
                 args.iter()
                     .zip(arg_types.iter())
                     .map(|(e, t)| (self.env().get_node_loc(e.node_id()), t.clone()))
@@ -3287,6 +3339,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         self.placeholder_map
             .insert(id, ExpPlaceholder::ReceiverCallInfo {
                 name,
+                generics,
                 arg_types,
                 result_type: expected_type.clone(),
             });
@@ -3382,9 +3435,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     }
 
     /// Adds a single constraint and reports error if the constraint is not satisfied.
-    fn add_constraint_and_report(&mut self, loc: &Loc, ty: &Type, c: Constraint) {
+    fn add_constraint_and_report(
+        &mut self,
+        loc: &Loc,
+        error_context: &ErrorMessageContext,
+        ty: &Type,
+        c: Constraint,
+    ) {
         if let Err(e) = self.add_constraint(loc, ty, WideningOrder::LeftToRight, c) {
-            self.report_unification_error(loc, e, &ErrorMessageContext::General)
+            self.report_unification_error(loc, e, error_context)
         }
     }
 

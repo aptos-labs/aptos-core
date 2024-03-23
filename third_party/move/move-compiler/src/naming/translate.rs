@@ -1039,6 +1039,13 @@ fn exp_(context: &mut Context, e: E::Exp) -> N::Exp {
             let nes = call_args(context, rhs);
             NE::Builtin(sp(mloc, BF::Assert(true)), nes)
         },
+        EE::Call(sp!(mloc, _), CallKind::Receiver, ..) => {
+            context.env.add_diag(diag!(
+                Syntax::UnsupportedLanguageItem,
+                (mloc, "receiver style syntax not supported by this compiler")
+            ));
+            NE::UnresolvedError
+        },
         EE::Call(sp!(mloc, ma_), kind, tys_opt, rhs) => {
             use E::ModuleAccess_ as EA;
             let ty_args = tys_opt.map(|tys| types(context, tys));
