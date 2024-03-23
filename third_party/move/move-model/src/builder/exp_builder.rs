@@ -1456,16 +1456,12 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     && rhs_ty.is_tuple()
                     && matches!(rhs.as_ref(), ExpData::Call(_, Operation::Tuple, _))
                 {
-                    if let Pattern::Tuple(_, lhs_tys) = &lhs {
-                        if let Type::Tuple(rhs_tys) = &rhs_ty {
-                            let lhs_tys = lhs_tys
-                                .iter()
-                                .map(|pat| self.get_node_type(pat.node_id()))
-                                .collect_vec();
-                            self.freeze_tuple_exp(&lhs_tys, rhs_tys, rhs, &loc)
-                        } else {
-                            self.try_freeze(&lhs_ty, &rhs_ty, rhs)
-                        }
+                    if let (Pattern::Tuple(_, lhs_pats), Type::Tuple(rhs_tys)) = (&lhs, &rhs_ty) {
+                        let lhs_tys = lhs_pats
+                            .iter()
+                            .map(|pat| self.get_node_type(pat.node_id()))
+                            .collect_vec();
+                        self.freeze_tuple_exp(&lhs_tys, rhs_tys, rhs, &loc)
                     } else {
                         self.try_freeze(&lhs_ty, &rhs_ty, rhs)
                     }
@@ -2966,16 +2962,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 let specialized_expected_type = self.subs.specialize(expected_type);
                 let call_exp = ExpData::Call(id, oper, translated_args).into_exp();
                 // Insert freeze for the return value
-                let call_exp = if result_type.is_tuple() && specialized_expected_type.is_tuple() {
-                    if let Tuple(ref result_tys) = result_type {
-                        if let Tuple(expected_tys) = specialized_expected_type {
-                            self.freeze_tuple_exp(&expected_tys, result_tys, call_exp, loc)
-                        } else {
-                            self.try_freeze(&specialized_expected_type, &result_type, call_exp)
-                        }
-                    } else {
-                        self.try_freeze(&specialized_expected_type, &result_type, call_exp)
-                    }
+                let call_exp = if let (Tuple(ref result_tys), Tuple(expected_tys)) =
+                    (result_type.clone(), specialized_expected_type.clone())
+                {
+                    self.freeze_tuple_exp(&expected_tys, result_tys, call_exp, loc)
                 } else {
                     self.try_freeze(&specialized_expected_type, &result_type, call_exp)
                 };
@@ -3014,17 +3004,16 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         instantiation: &[Type],
         args: Vec<Exp>,
     ) -> Vec<Exp> {
-        let mut new_args = vec![];
         let params = entry.get_signature().1;
-        for (param_ty, exp) in params
+        let new_args = params
             .iter()
             .map(|Parameter(_, ty, _)| ty.instantiate(instantiation))
             .zip(args)
-        {
-            let exp_id = exp.node_id();
-            let exp_ty = self.env().get_node_type(exp_id);
-            new_args.push(self.try_freeze(&param_ty, &exp_ty, exp));
-        }
+            .map(|(param_ty, exp)| {
+                let exp_ty = self.env().get_node_type(exp.node_id());
+                self.try_freeze(&param_ty, &exp_ty, exp)
+            })
+            .collect_vec();
         new_args
     }
 
@@ -3051,7 +3040,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         if lhs_tys.len() != rhs_tys.len() || lhs_tys.eq(rhs_tys) {
             return exp;
         }
-        if let ExpData::Call(_, Operation::Tuple, rhs_vec) = exp.as_ref() {
+        let need_freeze = lhs_tys
+            .iter()
+            .zip(rhs_tys.iter())
+            .any(|(lh_ty, rh_ty)| lh_ty.is_immutable_reference() && rh_ty.is_mutable_reference());
+        if let (true, ExpData::Call(_, Operation::Tuple, rhs_vec)) = (need_freeze, exp.as_ref()) {
             let new_rhs = lhs_tys
                 .iter()
                 .zip(rhs_tys.iter())
