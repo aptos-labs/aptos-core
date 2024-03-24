@@ -1,0 +1,9 @@
+[package]
+name = "GemCoin"
+version = "0.0.0"
+
+[addresses]
+gem_coin = "_"
+
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
