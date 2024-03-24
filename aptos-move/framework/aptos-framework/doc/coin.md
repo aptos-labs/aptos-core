@@ -31,6 +31,7 @@ This module provides the foundation for typesafe Coins.
 -  [Constants](#@Constants_0)
 -  [Function `borrow_conversion_map_mut`](#0x1_coin_borrow_conversion_map_mut)
 -  [Function `paired_metadata`](#0x1_coin_paired_metadata)
+-  [Function `apt_fa_metadata`](#0x1_coin_apt_fa_metadata)
 -  [Function `ensure_paired_metadata`](#0x1_coin_ensure_paired_metadata)
 -  [Function `paired_coin`](#0x1_coin_paired_coin)
 -  [Function `coin_to_fungible_asset`](#0x1_coin_coin_to_fungible_asset)
@@ -68,6 +69,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `coin_supply`](#0x1_coin_coin_supply)
 -  [Function `burn`](#0x1_coin_burn)
 -  [Function `burn_from`](#0x1_coin_burn_from)
+-  [Function `burn_from_apt`](#0x1_coin_burn_from_apt)
 -  [Function `deposit`](#0x1_coin_deposit)
 -  [Function `migrated_primary_fungible_store_exists`](#0x1_coin_migrated_primary_fungible_store_exists)
 -  [Function `force_deposit`](#0x1_coin_force_deposit)
@@ -1187,6 +1189,34 @@ Get the paired fungible asset metadata object of a coin type. If not exist, retu
         }
     };
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_coin_apt_fa_metadata"></a>
+
+## Function `apt_fa_metadata`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_apt_fa_metadata">apt_fa_metadata</a>(): <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_apt_fa_metadata">apt_fa_metadata</a>(): Object&lt;Metadata&gt; {
+    // <b>if</b> object::exists(@aptos_fungible_asset) {
+    //     <b>return</b> <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(@aptos_fungible_asset)
+    // } <b>else</b> {
+    // }
+    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(@aptos_fungible_asset)
 }
 </code></pre>
 
@@ -2391,7 +2421,7 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
     account_addr: <b>address</b>,
     amount: u64,
     burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;,
-) <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
+) <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>{
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
     <b>if</b> (amount == 0) {
         <b>return</b>
@@ -2414,6 +2444,44 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
     <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount);
     <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
     // };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_coin_burn_from_apt"></a>
+
+## Function `burn_from_apt`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_burn_from_apt">burn_from_apt</a>&lt;CoinType&gt;(account_addr: <b>address</b>, amount: u64, burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_burn_from_apt">burn_from_apt</a>&lt;CoinType&gt;(
+    account_addr: <b>address</b>,
+    amount: u64,
+    burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;,
+) {
+    // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
+    <b>if</b> (amount == 0) {
+        <b>return</b>
+    };
+    <b>let</b> apt_fa = <a href="coin.md#0x1_coin_apt_fa_metadata">apt_fa_metadata</a>();
+    <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(
+        account_addr,
+        apt_fa
+    );
+    <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, amount);
+    <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
 }
 </code></pre>
 
@@ -4216,6 +4284,27 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
     symbol: symbol.bytes
 };
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
+</code></pre>
+
+
+Make sure <code>name</code> and <code>symbol</code> are legal length.
+Only the creator of <code>CoinType</code> can initialize.
+
+
+<a id="0x1_coin_InitializeInternalSchema"></a>
+
+
+<pre><code><b>schema</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt; {
+    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
+    name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+    <b>let</b> coin_address = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
+    <b>aborts_if</b> coin_address != account_addr;
+    <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
+    <b>aborts_if</b> len(name) &gt; <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>;
+    <b>aborts_if</b> len(symbol) &gt; <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>;
+}
 </code></pre>
 
 
