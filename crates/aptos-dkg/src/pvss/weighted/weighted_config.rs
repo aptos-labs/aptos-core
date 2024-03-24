@@ -47,12 +47,6 @@ impl WeightedConfig {
         }
         let max_player_weight = *weights.iter().max().unwrap();
 
-        for (idx, w) in weights.iter().enumerate() {
-            if *w == 0 {
-                return Err(anyhow!("expected player at index {idx} to have weight > 0"));
-            }
-        }
-
         let n = weights.len();
         let W = weights.iter().sum();
 
