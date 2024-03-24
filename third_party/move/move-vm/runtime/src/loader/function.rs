@@ -32,21 +32,21 @@ pub(crate) enum Scope {
 // A runtime function
 // #[derive(Debug)]
 // https://github.com/rust-lang/rust/issues/70263
-pub(crate) struct Function {
+pub struct Function {
     #[allow(unused)]
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
-    pub(crate) type_parameters: Vec<AbilitySet>,
+    pub type_parameters: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) def_is_native: bool,
     pub(crate) def_is_friend_or_private: bool,
     pub(crate) scope: Scope,
     pub(crate) name: Identifier,
-    pub(crate) return_types: Vec<Type>,
+    pub return_types: Vec<Type>,
     pub(crate) local_types: Vec<Type>,
-    pub(crate) parameter_types: Vec<Type>,
+    pub parameter_types: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
 }
 

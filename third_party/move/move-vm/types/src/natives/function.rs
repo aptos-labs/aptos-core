@@ -17,8 +17,9 @@
 //! This module contains the declarations and utilities to implement a native
 //! function.
 
-use crate::values::Value;
+use crate::{values::Value, loaded_data::runtime_types::Type};
 pub use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_core_types::{language_storage::ModuleId, identifier::Identifier};
 pub use move_core_types::{gas_algebra::InternalGas, vm_status::StatusCode};
 use smallvec::{smallvec, SmallVec};
 
@@ -43,6 +44,13 @@ pub enum NativeResult {
     OutOfGas {
         partial_cost: InternalGas,
     },
+    CallFunction {
+        cost: InternalGas,
+        module_name: ModuleId,
+        func_name: Identifier,
+        ty_args: Vec<Type>,
+        args: SmallVec<[Value; 1]>,
+    }
 }
 
 impl NativeResult {

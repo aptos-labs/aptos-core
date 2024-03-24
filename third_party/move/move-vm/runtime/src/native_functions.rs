@@ -3,7 +3,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache, interpreter::Interpreter, loader::Resolver,
+    data_cache::TransactionDataCache,
+    interpreter::Interpreter,
+    loader::{Function, Resolver},
     native_extensions::NativeContextExtensions,
 };
 use move_binary_format::errors::{
@@ -13,7 +15,7 @@ use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumBytes},
     identifier::Identifier,
-    language_storage::TypeTag,
+    language_storage::{ModuleId, TypeTag},
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
@@ -181,5 +183,21 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn gas_balance(&self) -> InternalGas {
         self.gas_balance
+    }
+
+    pub fn load_function(
+        &mut self,
+        module: &ModuleId,
+        function_name: &Identifier,
+    ) -> PartialVMResult<Arc<Function>> {
+        // TODO: Charge gas here?
+        self.resolver
+            .loader()
+            .load_module(module, &mut self.data_store, &self.resolver.module_store())
+            .map_err(|err| err.to_partial())?;
+
+        self.resolver
+            .module_store()
+            .resolve_function_by_name(function_name, module)
     }
 }

@@ -101,6 +101,11 @@ module aptos_framework::fungible_asset {
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct GlobalFreeze has key {
+        frozen: bool,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     /// The store object that holds fungible assets of a specific type associated with an account.
     struct FungibleStore has key {
         /// The address of the base metadata object.
@@ -319,8 +324,20 @@ module aptos_framework::fungible_asset {
     /// Return whether a store is frozen.
     ///
     /// If the store has not been created, we default to returning false so deposits can be sent to it.
-    public fun is_frozen<T: key>(store: Object<T>): bool acquires FungibleStore {
-        store_exists(object::object_address(&store)) && borrow_store_resource(&store).frozen
+    public fun is_frozen<T: key>(store: Object<T>): bool acquires FungibleStore, GlobalFreeze {
+        if(!store_exists(object::object_address(&store))) {
+            return false
+        };
+
+        let fa_store = borrow_store_resource(&store);
+        let metadata_addr = object::object_address(&fa_store.metadata);
+        let global_freeze = if(exists<GlobalFreeze>(metadata_addr)) {
+            borrow_global<GlobalFreeze>(metadata_addr).frozen
+        } else {
+            false
+        };
+
+         fa_store.frozen || global_freeze
     }
 
     public fun asset_metadata(fa: &FungibleAsset): Object<Metadata> {
@@ -349,7 +366,7 @@ module aptos_framework::fungible_asset {
         from: Object<T>,
         to: Object<T>,
         amount: u64,
-    ) acquires FungibleStore {
+    ) acquires FungibleStore, GlobalFreeze {
         let fa = withdraw(sender, from, amount);
         deposit(to, fa);
     }
@@ -394,14 +411,14 @@ module aptos_framework::fungible_asset {
         owner: &signer,
         store: Object<T>,
         amount: u64,
-    ): FungibleAsset acquires FungibleStore {
+    ): FungibleAsset acquires FungibleStore, GlobalFreeze {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         withdraw_internal(object::object_address(&store), amount)
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
-    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
+    public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore, GlobalFreeze {
         assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
         deposit_internal(store, fa);
     }
@@ -420,7 +437,7 @@ module aptos_framework::fungible_asset {
 
     /// Mint the specified `amount` of the fungible asset to a destination store.
     public fun mint_to<T: key>(ref: &MintRef, store: Object<T>, amount: u64)
-    acquires FungibleStore, Supply, ConcurrentSupply {
+    acquires FungibleStore, GlobalFreeze, Supply, ConcurrentSupply {
         deposit(store, mint(ref, amount));
     }
 
@@ -438,6 +455,24 @@ module aptos_framework::fungible_asset {
         borrow_global_mut<FungibleStore>(store_addr).frozen = frozen;
 
         event::emit(Frozen { store: store_addr, frozen });
+    }
+
+    /// Enable/disable a store's ability to do direct transfers to this particular type of fungible asset.
+    public fun set_global_frozen_flag(
+        ref: &ExtendRef,
+        frozen: bool,
+    ) acquires GlobalFreeze {
+        let metadata_object_address = object::address_from_extend_ref(ref);
+        let metadata_object_signer = object::generate_signer_for_extending(ref);
+
+        if(exists<GlobalFreeze>(metadata_object_address)) {
+            borrow_global_mut<GlobalFreeze>(metadata_object_address).frozen = frozen;
+        } else {
+            move_to<GlobalFreeze>(&metadata_object_signer, GlobalFreeze {
+                frozen,
+            })
+        };
+        event::emit(Frozen { store: metadata_object_address, frozen });
     }
 
     /// Burns a fungible asset
@@ -747,7 +782,7 @@ module aptos_framework::fungible_asset {
     fun test_e2e_basic_flow(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, GlobalFreeze, Supply, ConcurrentSupply {
         let (mint_ref, transfer_ref, burn_ref, test_token) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);
@@ -779,7 +814,7 @@ module aptos_framework::fungible_asset {
     #[expected_failure(abort_code = 0x10003, location = Self)]
     fun test_frozen(
         creator: &signer
-    ) acquires FungibleStore, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, GlobalFreeze, Supply, ConcurrentSupply {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
 
         let creator_store = create_test_store(creator, mint_ref.metadata);
@@ -788,11 +823,26 @@ module aptos_framework::fungible_asset {
         deposit(creator_store, fa);
     }
 
+    #[test(creator = @0xcafe)]
+    #[expected_failure(abort_code = 0x10003, location = Self)]
+    fun test_global_frozen(
+        creator: &signer
+    ) acquires FungibleStore, GlobalFreeze, Supply, ConcurrentSupply {
+        let (creator_ref, _) = create_test_token(creator);
+        let (mint_ref, _, _) = init_test_metadata(&creator_ref);
+        let creator_store = create_test_store(creator, mint_ref.metadata);
+        let fa = mint(&mint_ref, 100);
+
+        let extend_ref = object::generate_extend_ref(&creator_ref);
+        set_global_frozen_flag(&extend_ref, true);
+        deposit(creator_store, fa);
+    }
+
     #[test(creator = @0xcafe, aaron = @0xface)]
     fun test_transfer_with_ref(
         creator: &signer,
         aaron: &signer,
-    ) acquires FungibleStore, Supply, ConcurrentSupply {
+    ) acquires FungibleStore, GlobalFreeze, Supply, ConcurrentSupply {
         let (mint_ref, transfer_ref, _burn_ref, _) = create_fungible_asset(creator);
         let metadata = mint_ref.metadata;
         let creator_store = create_test_store(creator, metadata);

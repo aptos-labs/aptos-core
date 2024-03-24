@@ -143,6 +143,19 @@ impl SafeNativeBuilder {
                     OutOfGas => Ok(NativeResult::out_of_gas(context.gas_used)),
                     // TODO(Gas): Check if err is indeed an invariant violation.
                     InvariantViolation(err) => Err(err),
+                    CallFunction {
+                        cost,
+                        module_name,
+                        func_name,
+                        ty_args,
+                        args,
+                    } => Ok(NativeResult::CallFunction {
+                        cost,
+                        module_name,
+                        func_name,
+                        ty_args,
+                        args,
+                    }),
                 },
             }
         };

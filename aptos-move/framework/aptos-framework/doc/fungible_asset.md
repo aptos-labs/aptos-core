@@ -10,6 +10,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Resource `Supply`](#0x1_fungible_asset_Supply)
 -  [Resource `ConcurrentSupply`](#0x1_fungible_asset_ConcurrentSupply)
 -  [Resource `Metadata`](#0x1_fungible_asset_Metadata)
+-  [Resource `GlobalFreeze`](#0x1_fungible_asset_GlobalFreeze)
 -  [Resource `FungibleStore`](#0x1_fungible_asset_FungibleStore)
 -  [Struct `FungibleAsset`](#0x1_fungible_asset_FungibleAsset)
 -  [Struct `MintRef`](#0x1_fungible_asset_MintRef)
@@ -50,6 +51,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `mint`](#0x1_fungible_asset_mint)
 -  [Function `mint_to`](#0x1_fungible_asset_mint_to)
 -  [Function `set_frozen_flag`](#0x1_fungible_asset_set_frozen_flag)
+-  [Function `set_global_frozen_flag`](#0x1_fungible_asset_set_global_frozen_flag)
 -  [Function `burn`](#0x1_fungible_asset_burn)
 -  [Function `burn_from`](#0x1_fungible_asset_burn_from)
 -  [Function `withdraw_with_ref`](#0x1_fungible_asset_withdraw_with_ref)
@@ -197,6 +199,34 @@ Metadata of a Fungible asset
 </dt>
 <dd>
  The Uniform Resource Identifier (uri) pointing to the website for the fungible asset.
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_fungible_asset_GlobalFreeze"></a>
+
+## Resource `GlobalFreeze`
+
+
+
+<pre><code>#[resource_group_member(#[group = <a href="object.md#0x1_object_ObjectGroup">0x1::object::ObjectGroup</a>])]
+<b>struct</b> <a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>frozen: bool</code>
+</dt>
+<dd>
+
 </dd>
 </dl>
 
@@ -1324,8 +1354,20 @@ If the store has not been created, we default to returning false so deposits can
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>&lt;T: key&gt;(store: Object&lt;T&gt;): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
-    <a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store)) && <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).frozen
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>&lt;T: key&gt;(store: Object&lt;T&gt;): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a> {
+    <b>if</b>(!<a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store))) {
+        <b>return</b> <b>false</b>
+    };
+
+    <b>let</b> fa_store = <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store);
+    <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&fa_store.metadata);
+    <b>let</b> global_freeze = <b>if</b>(<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a>&gt;(metadata_addr)) {
+        <b>borrow_global</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a>&gt;(metadata_addr).frozen
+    } <b>else</b> {
+        <b>false</b>
+    };
+
+     fa_store.frozen || global_freeze
 }
 </code></pre>
 
@@ -1454,7 +1496,7 @@ Note: it does not move the underlying object.
     from: Object&lt;T&gt;,
     <b>to</b>: Object&lt;T&gt;,
     amount: u64,
-) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a> {
     <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw">withdraw</a>(sender, from, amount);
     <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>(<b>to</b>, fa);
 }
@@ -1559,7 +1601,7 @@ Withdraw <code>amount</code> of the fungible asset from <code>store</code> by th
     owner: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     store: Object&lt;T&gt;,
     amount: u64,
-): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
+): <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a> <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a> {
     <b>assert</b>!(<a href="object.md#0x1_object_owns">object::owns</a>(store, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner)), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="fungible_asset.md#0x1_fungible_asset_ENOT_STORE_OWNER">ENOT_STORE_OWNER</a>));
     <b>assert</b>!(!<a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
     <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">withdraw_internal</a>(<a href="object.md#0x1_object_object_address">object::object_address</a>(&store), amount)
@@ -1586,7 +1628,7 @@ Deposit <code>amount</code> of the fungible asset to <code>store</code>.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(store: Object&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>&lt;T: key&gt;(store: Object&lt;T&gt;, fa: <a href="fungible_asset.md#0x1_fungible_asset_FungibleAsset">FungibleAsset</a>) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a> {
     <b>assert</b>!(!<a href="fungible_asset.md#0x1_fungible_asset_is_frozen">is_frozen</a>(store), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="fungible_asset.md#0x1_fungible_asset_ESTORE_IS_FROZEN">ESTORE_IS_FROZEN</a>));
     <a href="fungible_asset.md#0x1_fungible_asset_deposit_internal">deposit_internal</a>(store, fa);
 }
@@ -1645,7 +1687,7 @@ Mint the specified <code>amount</code> of the fungible asset to a destination st
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_mint_to">mint_to</a>&lt;T: key&gt;(ref: &<a href="fungible_asset.md#0x1_fungible_asset_MintRef">MintRef</a>, store: Object&lt;T&gt;, amount: u64)
-<b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a> {
+<b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>, <a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a>, <a href="fungible_asset.md#0x1_fungible_asset_Supply">Supply</a>, <a href="fungible_asset.md#0x1_fungible_asset_ConcurrentSupply">ConcurrentSupply</a> {
     <a href="fungible_asset.md#0x1_fungible_asset_deposit">deposit</a>(store, <a href="fungible_asset.md#0x1_fungible_asset_mint">mint</a>(ref, amount));
 }
 </code></pre>
@@ -1683,6 +1725,44 @@ Enable/disable a store's ability to do direct transfers of the fungible asset.
     <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a>&gt;(store_addr).frozen = frozen;
 
     <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Frozen">Frozen</a> { store: store_addr, frozen });
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_set_global_frozen_flag"></a>
+
+## Function `set_global_frozen_flag`
+
+Enable/disable a store's ability to do direct transfers to this particular type of fungible asset.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_global_frozen_flag">set_global_frozen_flag</a>(ref: &<a href="object.md#0x1_object_ExtendRef">object::ExtendRef</a>, frozen: bool)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_set_global_frozen_flag">set_global_frozen_flag</a>(
+    ref: &ExtendRef,
+    frozen: bool,
+) <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a> {
+    <b>let</b> metadata_object_address = <a href="object.md#0x1_object_address_from_extend_ref">object::address_from_extend_ref</a>(ref);
+    <b>let</b> metadata_object_signer = <a href="object.md#0x1_object_generate_signer_for_extending">object::generate_signer_for_extending</a>(ref);
+
+    <b>if</b>(<b>exists</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a>&gt;(metadata_object_address)) {
+        <b>borrow_global_mut</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a>&gt;(metadata_object_address).frozen = frozen;
+    } <b>else</b> {
+        <b>move_to</b>&lt;<a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a>&gt;(&metadata_object_signer, <a href="fungible_asset.md#0x1_fungible_asset_GlobalFreeze">GlobalFreeze</a> {
+            frozen,
+        })
+    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="fungible_asset.md#0x1_fungible_asset_Frozen">Frozen</a> { store: metadata_object_address, frozen });
 }
 </code></pre>
 
