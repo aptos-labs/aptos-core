@@ -12,10 +12,7 @@ use move_binary_format::{
         AbilitySet, SignatureToken, StructHandle, StructTypeParameter, TypeParameterIndex,
     },
 };
-use move_core_types::{
-    gas_algebra::AbstractMemorySize, identifier::Identifier, language_storage::ModuleId,
-    vm_status::StatusCode,
-};
+use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
 use smallbitvec::SmallBitVec;
 use smallvec::{smallvec, SmallVec};
 use std::{
@@ -283,9 +280,6 @@ impl AbilityInfo {
 }
 
 impl Type {
-    #[allow(deprecated)]
-    const LEGACY_BASE_MEMORY_SIZE: AbstractMemorySize = AbstractMemorySize::new(1);
-
     fn clone_impl(&self, depth: usize) -> PartialVMResult<Type> {
         self.apply_subst(|idx, _| Ok(Type::TyParam(idx)), depth)
     }
@@ -351,57 +345,6 @@ impl Type {
             },
             1,
         )
-    }
-
-    /// Returns the abstract memory size the data structure occupies.
-    ///
-    /// This kept only for legacy reasons.
-    /// New applications should not use this.
-    pub fn size(&self) -> AbstractMemorySize {
-        use Type::*;
-
-        match self {
-            TyParam(_) | Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer => {
-                Self::LEGACY_BASE_MEMORY_SIZE
-            },
-            Reference(ty) | MutableReference(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
-            Vector(ty) => Self::LEGACY_BASE_MEMORY_SIZE + ty.size(),
-            Struct { .. } => Self::LEGACY_BASE_MEMORY_SIZE,
-            StructInstantiation { ty_args: tys, .. } => tys
-                .iter()
-                .fold(Self::LEGACY_BASE_MEMORY_SIZE, |acc, ty| acc + ty.size()),
-        }
-    }
-
-    pub fn from_const_signature(constant_signature: &SignatureToken) -> PartialVMResult<Self> {
-        use SignatureToken as S;
-        use Type as L;
-
-        Ok(match constant_signature {
-            S::Bool => L::Bool,
-            S::U8 => L::U8,
-            S::U16 => L::U16,
-            S::U32 => L::U32,
-            S::U64 => L::U64,
-            S::U128 => L::U128,
-            S::U256 => L::U256,
-            S::Address => L::Address,
-            S::Vector(inner) => L::Vector(TriompheArc::new(Self::from_const_signature(inner)?)),
-            // Not yet supported
-            S::Struct(_) | S::StructInstantiation(_, _) => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Unable to load const type signature".to_string()),
-                )
-            },
-            // Not allowed/Not meaningful
-            S::TypeParameter(_) | S::Reference(_) | S::MutableReference(_) | S::Signer => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message("Unable to load const type signature".to_string()),
-                )
-            },
-        })
     }
 
     pub fn check_vec_ref(&self, inner_ty: &Type, is_mut: bool) -> PartialVMResult<Type> {
@@ -693,6 +636,38 @@ impl TypeBuilder {
 
     pub fn create_mut_reference_ty(ty: Type) -> PartialVMResult<Type> {
         Ok(Type::MutableReference(Box::new(ty)))
+    }
+
+    pub fn create_constant_ty(constant_tok: &SignatureToken) -> PartialVMResult<Type> {
+        use SignatureToken::*;
+
+        Ok(match constant_tok {
+            Bool => Self::create_bool_ty(),
+            U8 => Self::create_u8_ty(),
+            U16 => Self::create_u16_ty(),
+            U32 => Self::create_u32_ty(),
+            U64 => Self::create_u64_ty(),
+            U128 => Self::create_u128_ty(),
+            U256 => Self::create_u256_ty(),
+            Address => Self::create_address_ty(),
+            Vector(elem_tok) => Self::create_vector_ty(Self::create_constant_ty(elem_tok)?)?,
+
+            // Not supported.
+            Struct(_) | StructInstantiation(_, _) => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Constant structs are not supported".to_string()),
+                )
+            },
+
+            // Not allowed or not meaningful.
+            TypeParameter(_) | Reference(_) | MutableReference(_) | Signer => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("Unable to load type signature for a constant".to_string()),
+                )
+            },
+        })
     }
 }
 
