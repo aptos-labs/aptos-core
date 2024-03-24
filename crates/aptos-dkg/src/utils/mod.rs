@@ -59,10 +59,10 @@ pub fn g1_multi_exp(bases: &[G1Projective], scalars: &[Scalar]) -> G1Projective 
         );
     }
 
-    if bases.len() == 1 {
-        bases[0].mul(scalars[0])
-    } else {
-        G1Projective::multi_exp(bases, scalars)
+    match bases.len() {
+        0 => G1Projective::identity(),
+        1 => bases[0].mul(scalars[0]),
+        _ => G1Projective::multi_exp(bases, scalars),
     }
 }
 
