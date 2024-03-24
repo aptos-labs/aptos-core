@@ -829,7 +829,9 @@ module aptos_framework::delegation_pool {
             enable_partial_governance_voting(pool_address);
 
             // set delegated voter of staker which takes effect immediately
-            initialize_staker_delegated_voter(staker_address, pool_address, staker_delegated_voter);
+            if (staker_delegated_voter != staker_address) {
+                initialize_staker_delegated_voter(staker_address, pool_address, staker_delegated_voter);
+            };
         };
     }
 
