@@ -809,9 +809,7 @@ module aptos_framework::delegation_pool {
             // no need to assert on minimum required stake as any next operation of delegator enforces it
             buy_in_pending_inactive_shares(&mut pool, recipient, amount_to_distribute);
         };
-
-        // destroy distribution pool of 0 remaining shares, any dust will be distributed as pending_inactive rewards
-        pool_u64_iterable::update_total_coins(&mut distribution_pool, 0);
+        // destroy distribution pool of 0 remaining coins, any dust will be distributed as pending_inactive rewards
         pool_u64_iterable::destroy_empty(distribution_pool);
 
         // store `DelegationPool` on the resource account storing the `StakePool` of the destroyed staking contract
@@ -4759,8 +4757,11 @@ module aptos_framework::delegation_pool {
         initialize_delegation_pool_from_staking_contract(staker, operator_3_address);
 
         assert_delegation(operator_1_address, pool_address, 0, 0, 203212800001);
+        assert_pending_withdrawal(operator_1_address, pool_address, true, 0, false, 203212800001);
         assert_delegation(operator_2_address, pool_address, 0, 0, 203616000000);
+        assert_pending_withdrawal(operator_2_address, pool_address, true, 0, false, 203616000000);
         assert_delegation(operator_3_address, pool_address, 0, 0, 204019999999);
+        assert_pending_withdrawal(operator_3_address, pool_address, true, 0, false, 204019999999);
         assert_delegation(staker_address, pool_address, 102419251200000, 0, 0);
         stake::assert_stake_pool(pool_address, 102419251200000, 0, 0, 203212800001 + 203616000000 + 204019999999);
     }
@@ -4785,7 +4786,7 @@ module aptos_framework::delegation_pool {
             aptos_framework,
             staker,
             operator,
-            1_000_000 * ONE_APT,
+            1_100_000 * ONE_APT,
             20
         );
 
@@ -4808,6 +4809,9 @@ module aptos_framework::delegation_pool {
         // Operator sets a different beneficiary than themselves on all delegation pool.
         let operator_beneficiary_delegation_pools = @0x567;
         set_beneficiary_for_operator(operator, operator_beneficiary_delegation_pools);
+
+        // Staker unlocks some stake.
+        staking_contract::unlock_stake(staker, operator_address, 100_000 * ONE_APT);
 
         initialize_delegation_pool_from_staking_contract(staker, operator_address);
 
@@ -4834,7 +4838,8 @@ module aptos_framework::delegation_pool {
         assert_partial_governance_voting_enabled(pool_address);
         assert!(calculate_and_update_delegator_voter(pool_address, staker_address) == staker_voter, 0);
         assert!(calculate_and_update_voter_total_voting_power(pool_address, staker_address) == 0, 0);
-        assert!(calculate_and_update_voter_total_voting_power(pool_address, staker_voter) == 1_000_000 * ONE_APT, 0);
+        // Both active and pending-inactive stake of staker is voting power for staker's voter.
+        assert!(calculate_and_update_voter_total_voting_power(pool_address, staker_voter) == 1_100_000 * ONE_APT, 0);
 
         // Operator's beneficiary configured on the delegation pool module is used.
         assert!(beneficiary_for_operator(operator_address) == operator_beneficiary_delegation_pools, 0);
@@ -4847,9 +4852,118 @@ module aptos_framework::delegation_pool {
         assert!(observed_lockup_cycle(pool_address) == 0, 0);
 
         // Active stake is consistently owned.
-        stake::assert_stake_pool(pool_address, 1_000_000 * ONE_APT, 0, 0, 0);
-        assert_delegation(staker_address, pool_address, 1_000_000 * ONE_APT, 0, 0);
+        stake::assert_stake_pool(pool_address, 1_000_000 * ONE_APT, 0, 0, 100_000 * ONE_APT);
+        assert_delegation(staker_address, pool_address, 1_000_000 * ONE_APT, 0, 100_000 * ONE_APT);
         assert_delegation(operator_address, pool_address, 0, 0, 0);
+    }
+
+    #[test(aptos_framework = @aptos_framework, staker = @0x123, operator = @0x234, delegator = @0x345)]
+    /// Test that new delegators can join the pool while former participants of the staking contract can leave it.
+    public entry fun test_initialize_from_staking_contract_e2e(
+        aptos_framework: &signer,
+        staker: &signer,
+        operator: &signer,
+        delegator: &signer,
+    ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
+        initialize_for_test(aptos_framework);
+        features::change_feature_flags(
+            aptos_framework,
+            vector[features::get_staking_contract_to_delegation_pool_conversion_feature()],
+            vector[],
+        );
+        staking_contract::setup_staking_contract(
+            aptos_framework,
+            staker,
+            operator,
+            1_000_000 * ONE_APT,
+            20
+        );
+
+        let staker_address = signer::address_of(staker);
+        let operator_address = signer::address_of(operator);
+        let pool_address = staking_contract::stake_pool_address(staker_address, operator_address);
+
+        let delegator_address = signer::address_of(delegator);
+        account::create_account_for_test(delegator_address);
+
+        // Validator joins the validator set and then becomes active.
+        let (_, pk, pop) = stake::generate_identity();
+        stake::join_validator_set_for_test(&pk, &pop, operator, pool_address, true);
+        assert!(stake::get_validator_state(pool_address) == VALIDATOR_STATUS_ACTIVE, 1);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+
+        initialize_delegation_pool_from_staking_contract(staker, operator_address);
+        // 100000000000000 * 1.008 active
+        assert_delegation(staker_address, pool_address, 100800000000000, 0, 0);
+        // 100000000000000 * .002 pending-inactive
+        assert_delegation(operator_address, pool_address, 0, 0, 200000000000);
+
+        // Other accounts can add stake from now.
+        stake::mint(delegator, 100 * ONE_APT);
+        add_stake(delegator, pool_address, 100 * ONE_APT);
+
+        // Unlock some stake as staker.
+        unlock(staker, pool_address, 400000000000);
+        // Reactivate former commission rewards as operator.
+        reactivate_stake(operator, pool_address, 200000000000);
+
+        // Fast forward to generate rewards.
+        stake::end_epoch();
+        // Restake operator's rewards each epoch for simplified calculation.
+        synchronize_delegation_pool(pool_address);
+
+        // (100800000000000 - 400000000000) * 1.008 active and 400000000000 * 1.008 pending-inactive
+        assert_delegation(staker_address, pool_address, 101203199999999, 0, 403200000000);
+        // (100800000000000 - 400000000000) * .002 + 200000000000 * 1.01 active and 400000000000 * .002 pending-inactive
+        assert_delegation(operator_address, pool_address, 402799999999, 0, 799999999);
+        assert_delegation(delegator_address, pool_address, 100 * ONE_APT, 0, 0);
+
+        // Fast forward to unlock.
+        stake::fast_forward_to_unlock(pool_address);
+        synchronize_delegation_pool(pool_address);
+
+        // 101203200000000 * 1.008 active and 403200000000 * 1.008 inactive
+        assert_delegation(staker_address, pool_address, 102012825599999, 406425600000, 0);
+        // 402800000000 * 1.01 + 101203200000000 * .002 + 10000000000 * .002 active
+        // 800000000 * 1.01 + 403200000000 * .002 inactive
+        assert_delegation(operator_address, pool_address, 609254399999, 1614399999, 0);
+        // 10000000000 * 1.008 active
+        assert_delegation(delegator_address, pool_address, 10080000000, 0, 0);
+
+        let staker_balance = coin::balance<AptosCoin>(staker_address);
+        withdraw(staker, pool_address, 406425600000);
+        assert!(
+            coin::balance<AptosCoin>(staker_address) == staker_balance + 406425600000,
+            coin::balance<AptosCoin>(staker_address)
+        );
+
+        let operator_balance = coin::balance<AptosCoin>(operator_address);
+        withdraw(operator, pool_address, 1614400000);
+        assert!(
+            coin::balance<AptosCoin>(operator_address) == operator_balance + 1614400000,
+            coin::balance<AptosCoin>(operator_address)
+        );
+
+        // Unlock some stake as new delegator.
+        unlock(delegator, pool_address, 5080000000);
+        assert_delegation(delegator_address, pool_address, 5000000000, 0, 5079999999);
+
+        // Fast forward to unlock.
+        stake::fast_forward_to_unlock(pool_address);
+        synchronize_delegation_pool(pool_address);
+
+        // 5000000000 * 1.008 active and 5080000000 * 1.008 pending-inactive
+        assert_delegation(delegator_address, pool_address, 5040000000, 5120639999, 0);
+
+        // New delegators can withdraw.
+        let delegator_balance = coin::balance<AptosCoin>(delegator_address);
+        withdraw(delegator, pool_address, 5120640000);
+        assert!(
+            coin::balance<AptosCoin>(delegator_address) == delegator_balance + 5120639999,
+            coin::balance<AptosCoin>(delegator_address)
+        );
     }
 
     #[test_only]
