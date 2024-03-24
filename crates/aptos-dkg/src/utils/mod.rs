@@ -6,7 +6,7 @@ use crate::utils::{
 use blstrs::{
     pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt, Scalar,
 };
-use group::Curve;
+use group::{Curve, Group};
 use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
@@ -75,11 +75,10 @@ pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[Scalar]) -> G2Projective 
             scalars.len()
         );
     }
-
-    if bases.len() == 1 {
-        bases[0].mul(scalars[0])
-    } else {
-        G2Projective::multi_exp(bases, scalars)
+    match bases.len() {
+        0 => G2Projective::identity(),
+        1 => bases[0].mul(scalars[0]),
+        _ => G2Projective::multi_exp(bases, scalars),
     }
 }
 
