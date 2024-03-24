@@ -1317,8 +1317,6 @@ module aptos_framework::delegation_pool {
         pool_address: address,
         voter: address
     ) acquires DelegationPool, GovernanceRecords {
-        assert_partial_governance_voting_enabled(pool_address);
-
         let delegation_pool = borrow_global<DelegationPool>(pool_address);
         let governance_records = borrow_global_mut<GovernanceRecords>(pool_address);
         let last_locked_until_secs = stake::get_lockup_secs(pool_address);
@@ -1344,6 +1342,12 @@ module aptos_framework::delegation_pool {
             pending_inactive_shares,
             active_shares_next_lockup: active_shares,
             last_locked_until_secs,
+        });
+
+        event::emit_event(&mut governance_records.delegate_voting_power_events, DelegateVotingPowerEvent {
+            pool_address,
+            delegator: staker_address,
+            voter,
         });
     }
 
