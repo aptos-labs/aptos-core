@@ -1522,35 +1522,35 @@ impl Frame {
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::StLoc(_) => (),
-            Bytecode::MutBorrowLoc(idx) => {
-                let ty = local_tys[*idx as usize].clone();
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
-            },
             Bytecode::ImmBorrowLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(ty)?)?;
+            },
+            Bytecode::MutBorrowLoc(idx) => {
+                let ty = local_tys[*idx as usize].clone();
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_mut_reference_ty(ty)?)?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_ref_eq(&expected_ty)?;
+                let field_ty = resolver.get_field_type(*fh_idx)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(resolver.get_field_type(*fh_idx)?)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(field_ty)?)?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_eq(&Type::MutableReference(Box::new(expected_ty)))?;
+                let field_ty = resolver.get_field_type(*fh_idx)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(
-                        resolver.get_field_type(*fh_idx)?,
-                    )))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(field_ty)?)?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
@@ -1559,18 +1559,20 @@ impl Frame {
                 top_ty.check_ref_eq(expected_struct_ty)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(expected_field_ty.clone())))?;
+                    .push_ty(TypeBuilder::create_reference_ty(expected_field_ty.clone())?)?;
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.check_eq(&Type::MutableReference(Box::new(
+                top_ty.check_eq(&TypeBuilder::create_mut_reference_ty(
                     expected_struct_ty.clone(),
-                )))?;
+                )?)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(expected_field_ty.clone())))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(
+                        expected_field_ty.clone(),
+                    )?)?;
             },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
@@ -1792,7 +1794,7 @@ impl Frame {
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(ty)?)?;
             },
             Bytecode::ImmBorrowGlobal(idx) => {
                 let address_ty = TypeBuilder::create_address_ty();
@@ -1801,7 +1803,7 @@ impl Frame {
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(ty)?)?;
             },
             Bytecode::MutBorrowGlobalGeneric(idx) => {
                 let address_ty = TypeBuilder::create_address_ty();
@@ -1810,7 +1812,7 @@ impl Frame {
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(ty)?)?;
             },
             Bytecode::ImmBorrowGlobalGeneric(idx) => {
                 let address_ty = TypeBuilder::create_address_ty();
@@ -1819,7 +1821,7 @@ impl Frame {
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(ty)?)?;
             },
             Bytecode::Exists(_) | Bytecode::ExistsGeneric(_) => {
                 let bool_ty = TypeBuilder::create_bool_ty();
@@ -1829,19 +1831,21 @@ impl Frame {
             },
             Bytecode::MoveTo(idx) => {
                 let ty = interpreter.operand_stack.pop_ty()?;
+                let signer_ref_ty = TypeBuilder::create_signer_reference_ty()?;
                 interpreter
                     .operand_stack
                     .pop_ty()?
-                    .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
+                    .check_eq(&signer_ref_ty)?;
                 ty.check_eq(&resolver.get_struct_type(*idx))?;
                 check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveToGeneric(idx) => {
                 let ty = interpreter.operand_stack.pop_ty()?;
+                let signer_ref_ty = TypeBuilder::create_signer_reference_ty()?;
                 interpreter
                     .operand_stack
                     .pop_ty()?
-                    .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
+                    .check_eq(&signer_ref_ty)?;
                 ty.check_eq(ty_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
                 check_ability(ty.abilities()?.has_key())?;
             },
@@ -1860,7 +1864,8 @@ impl Frame {
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::FreezeRef => {
-                match interpreter.operand_stack.pop_ty()? {
+                let ty = interpreter.operand_stack.pop_ty()?;
+                match ty {
                     Type::MutableReference(ty) => {
                         interpreter.operand_stack.push_ty(Type::Reference(ty))?
                     },
@@ -1886,7 +1891,7 @@ impl Frame {
                 }
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Vector(triomphe::Arc::new(ty.clone())))?;
+                    .push_ty(TypeBuilder::create_vector_ty(ty.clone())?)?;
             },
             Bytecode::VecLen(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
@@ -1907,7 +1912,7 @@ impl Frame {
                     .check_vec_ref(ty, false)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(inner_ty)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(inner_ty)?)?;
             },
             Bytecode::VecMutBorrow(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
@@ -1919,7 +1924,7 @@ impl Frame {
                     .check_vec_ref(ty, true)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(inner_ty)))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(inner_ty)?)?;
             },
             Bytecode::VecPushBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;

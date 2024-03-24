@@ -638,6 +638,10 @@ impl TypeBuilder {
         Ok(Type::MutableReference(Box::new(ty)))
     }
 
+    pub fn create_signer_reference_ty() -> PartialVMResult<Type> {
+        Self::create_reference_ty(Self::create_signer_ty())
+    }
+
     pub fn create_constant_ty(constant_tok: &SignatureToken) -> PartialVMResult<Type> {
         use SignatureToken::*;
 
