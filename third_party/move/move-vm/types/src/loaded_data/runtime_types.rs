@@ -624,6 +624,78 @@ impl fmt::Display for Type {
     }
 }
 
+pub struct TypeBuilder;
+
+impl TypeBuilder {
+    pub fn create_u8_ty() -> Type {
+        Type::U8
+    }
+
+    pub fn create_u16_ty() -> Type {
+        Type::U16
+    }
+
+    pub fn create_u32_ty() -> Type {
+        Type::U32
+    }
+
+    pub fn create_u64_ty() -> Type {
+        Type::U64
+    }
+
+    pub fn create_u128_ty() -> Type {
+        Type::U128
+    }
+
+    pub fn create_u256_ty() -> Type {
+        Type::U256
+    }
+
+    pub fn create_bool_ty() -> Type {
+        Type::Bool
+    }
+
+    pub fn create_address_ty() -> Type {
+        Type::Address
+    }
+
+    pub fn create_signer_ty() -> Type {
+        Type::Signer
+    }
+
+    pub fn create_struct_ty(idx: StructNameIndex, ability: AbilityInfo) -> Type {
+        Type::Struct { idx, ability }
+    }
+
+    // TODO: The signature of these functions return a result because it is not
+    //       always possible to construct a nested type - the type can be too deep
+    //       or too large. Shift the checks from runtime to construction time.
+
+    pub fn create_struct_instantiation_ty(
+        idx: StructNameIndex,
+        ability: AbilityInfo,
+        ty_args: Vec<Type>,
+    ) -> PartialVMResult<Type> {
+        Ok(Type::StructInstantiation {
+            idx,
+            ty_args: TriompheArc::new(ty_args),
+            ability,
+        })
+    }
+
+    pub fn create_vector_ty(elem_ty: Type) -> PartialVMResult<Type> {
+        Ok(Type::Vector(TriompheArc::new(elem_ty)))
+    }
+
+    pub fn create_reference_ty(ty: Type) -> PartialVMResult<Type> {
+        Ok(Type::Reference(Box::new(ty)))
+    }
+
+    pub fn create_mut_reference_ty(ty: Type) -> PartialVMResult<Type> {
+        Ok(Type::MutableReference(Box::new(ty)))
+    }
+}
+
 #[cfg(test)]
 mod unit_tests {
     use super::*;

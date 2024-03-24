@@ -53,8 +53,9 @@ mod type_loader;
 
 pub(crate) use function::{Function, FunctionHandle, FunctionInstantiation, LoadedFunction, Scope};
 pub(crate) use modules::{Module, ModuleCache, ModuleStorage, ModuleStorageAdapter};
+use move_vm_types::loaded_data::runtime_types::TypeBuilder;
 pub(crate) use script::{Script, ScriptCache};
-use type_loader::intern_type;
+use type_loader::create_ty_from_sig_token;
 
 type ScriptHash = [u8; 32];
 
@@ -778,47 +779,44 @@ impl Loader {
         module_store: &ModuleStorageAdapter,
     ) -> VMResult<Type> {
         Ok(match type_tag {
-            TypeTag::Bool => Type::Bool,
-            TypeTag::U8 => Type::U8,
-            TypeTag::U16 => Type::U16,
-            TypeTag::U32 => Type::U32,
-            TypeTag::U64 => Type::U64,
-            TypeTag::U128 => Type::U128,
-            TypeTag::U256 => Type::U256,
-            TypeTag::Address => Type::Address,
-            TypeTag::Signer => Type::Signer,
-            TypeTag::Vector(tt) => Type::Vector(triomphe::Arc::new(self.load_type(
-                tt,
-                data_store,
-                module_store,
-            )?)),
+            TypeTag::Bool => TypeBuilder::create_bool_ty(),
+            TypeTag::U8 => TypeBuilder::create_u8_ty(),
+            TypeTag::U16 => TypeBuilder::create_u16_ty(),
+            TypeTag::U32 => TypeBuilder::create_u32_ty(),
+            TypeTag::U64 => TypeBuilder::create_u64_ty(),
+            TypeTag::U128 => TypeBuilder::create_u128_ty(),
+            TypeTag::U256 => TypeBuilder::create_u256_ty(),
+            TypeTag::Address => TypeBuilder::create_address_ty(),
+            TypeTag::Signer => TypeBuilder::create_signer_ty(),
+            TypeTag::Vector(elem_tag) => {
+                let elem_ty = self.load_type(elem_tag, data_store, module_store)?;
+                TypeBuilder::create_vector_ty(elem_ty).map_err(|e| e.finish(Location::Undefined))?
+            },
             TypeTag::Struct(struct_tag) => {
                 let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
                 self.load_module(&module_id, data_store, module_store)?;
                 let struct_type = module_store
-                    // GOOD module was loaded above
                     .get_struct_type_by_identifier(&struct_tag.name, &module_id)
                     .map_err(|e| e.finish(Location::Undefined))?;
                 if struct_type.type_parameters.is_empty() && struct_tag.type_params.is_empty() {
-                    Type::Struct {
-                        idx: struct_type.idx,
-                        ability: AbilityInfo::struct_(struct_type.abilities),
-                    }
+                    TypeBuilder::create_struct_ty(
+                        struct_type.idx,
+                        AbilityInfo::struct_(struct_type.abilities),
+                    )
                 } else {
-                    let mut type_params = vec![];
-                    for ty_param in &struct_tag.type_params {
-                        type_params.push(self.load_type(ty_param, data_store, module_store)?);
+                    let mut ty_args = vec![];
+                    for ty_arg in &struct_tag.type_params {
+                        ty_args.push(self.load_type(ty_arg, data_store, module_store)?);
                     }
-                    self.verify_ty_args(struct_type.type_param_constraints(), &type_params)
+                    self.verify_ty_args(struct_type.type_param_constraints(), &ty_args)
                         .map_err(|e| e.finish(Location::Undefined))?;
-                    Type::StructInstantiation {
-                        idx: struct_type.idx,
-                        ty_args: triomphe::Arc::new(type_params),
-                        ability: AbilityInfo::generic_struct(
-                            struct_type.abilities,
-                            struct_type.phantom_ty_args_mask.clone(),
-                        ),
-                    }
+
+                    let ability = AbilityInfo::generic_struct(
+                        struct_type.abilities,
+                        struct_type.phantom_ty_args_mask.clone(),
+                    );
+                    TypeBuilder::create_struct_instantiation_ty(struct_type.idx, ability, ty_args)
+                        .map_err(|e| e.finish(Location::Undefined))?
                 }
             },
         })
@@ -1433,15 +1431,12 @@ impl<'a> Resolver<'a> {
     // Type resolution
     //
 
-    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> PartialVMResult<Type> {
+    pub(crate) fn get_struct_type(&self, idx: StructDefinitionIndex) -> Type {
         let struct_def = match &self.binary {
             BinaryType::Module(module) => module.struct_at(idx),
             BinaryType::Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        Ok(Type::Struct {
-            idx: struct_def.idx,
-            ability: AbilityInfo::struct_(struct_def.abilities),
-        })
+        TypeBuilder::create_struct_ty(struct_def.idx, AbilityInfo::struct_(struct_def.abilities))
     }
 
     pub(crate) fn get_struct_type_generic(
