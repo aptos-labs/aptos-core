@@ -130,6 +130,12 @@ impl DKGRoundingProfile {
         assert!(secrecy_threshold_in_stake_ratio < reconstruct_threshold_in_stake_ratio);
         assert!(reconstruct_threshold_in_stake_ratio * U64F64::from_num(3) <= U64F64::from_num(2));
 
+        return Self::default(
+            validator_stakes.len(),
+            secrecy_threshold_in_stake_ratio,
+            reconstruct_threshold_in_stake_ratio,
+        );
+
         let mut weight_low = total_weight_min as u64;
         let mut weight_high = total_weight_max as u64;
         let mut best_profile = compute_profile_fixed_point(
@@ -178,11 +184,13 @@ impl DKGRoundingProfile {
         secrecy_threshold_in_stake_ratio: U64F64,
         reconstruct_threshold_in_stake_ratio: U64F64,
     ) -> Self {
+        let mut validator_weights = vec![1; num_validators];
+        validator_weights[0] = 0;
         Self {
-            validator_weights: vec![1; num_validators],
+            validator_weights,
             secrecy_threshold_in_stake_ratio,
             reconstruct_threshold_in_stake_ratio,
-            reconstruct_threshold_in_weights: (U64F64::from_num(num_validators)
+            reconstruct_threshold_in_weights: (U64F64::from_num(num_validators - 1)
                 * secrecy_threshold_in_stake_ratio)
                 .to_num::<u64>(),
         }
