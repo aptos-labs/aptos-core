@@ -154,7 +154,7 @@ module aptos_framework::reconfiguration {
             },
         );
 
-        // reconfiguration_state::on_reconfig_finish();
+        reconfiguration_state::on_reconfig_finish();
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {
