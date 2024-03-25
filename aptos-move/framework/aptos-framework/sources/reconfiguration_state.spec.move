@@ -71,8 +71,6 @@ spec aptos_framework::reconfiguration_state {
 
     spec on_reconfig_finish  {
         aborts_if false;
-        let pre_state = global<State>(@aptos_framework);
-        requires !(exists<State>(@aptos_framework) && copyable_any::type_name(pre_state.variant).bytes == b"0x1::reconfiguration_state::StateInactive");
     }
 
     spec start_time_secs(): u64 {
