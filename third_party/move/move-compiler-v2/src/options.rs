@@ -204,16 +204,18 @@ mod tests {
             .borrow_mut()
             .insert(test_key.clone(), true);
 
-        if let Some(on) = options1.experiment_cache.borrow().get(&test_key) {
-            assert!(on);
-        } else {
-            assert!(false);
-        }
+        let x1 = *(options1
+            .experiment_cache
+            .borrow()
+            .get(&test_key)
+            .expect("we just set foo"));
+        assert!(x1);
 
-        if let Some(on) = options2.experiment_cache.borrow().get(&test_key) {
-            assert!(!on);
-        } else {
-            assert!(false);
-        };
+        let x2 = *(options2
+            .experiment_cache
+            .borrow()
+            .get(&test_key)
+            .expect("we just set foo"));
+        assert!(!x2);
     }
 }
