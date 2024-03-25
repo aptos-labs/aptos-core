@@ -301,7 +301,7 @@ fn collect_enabled_tests(reqs: &mut Vec<Requirements>, group: &str, feature: &Fe
             feature.runner,
             format!("prover {}[{}]", group, feature.name),
             path.to_string(),
-            files.into_iter().join("|"),
+            files.into_iter().map(|s| s + "$").join("|"),
         ));
     }
 }
