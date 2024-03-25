@@ -15,6 +15,7 @@ pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod recursive_struct_checker;
+pub mod access_control_analyzer;
 
 use crate::{
     env_pipeline::{
@@ -347,6 +348,12 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
             "access and use check after inlining",
             |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
         );
+    }
+
+    if !for_v1_model && options.experiment_on(Experiment::ACQUIRES_CHECK) {
+        env_pipeline.add("acquires check", |env| {
+            access_control_analyzer::acquires_checker(env)
+        });
     }
 
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
