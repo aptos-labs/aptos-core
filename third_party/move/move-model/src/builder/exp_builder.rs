@@ -1708,7 +1708,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     return RewriteResult::Unchanged(e);
                 }
                 let exp_data: ExpData = e.into();
-                if let ExpData::Call(id, Operation::NoOp, mut args) = exp_data {
+                if let ExpData::Call(id, Operation::NoOp, args) = exp_data {
                     if let Some(info) = self.placeholder_map.get(&id) {
                         let loc = self.get_node_loc(id);
                         match info {
@@ -1767,7 +1767,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 result_type,
                             } => {
                                 // Clone info to avoid borrowing conflicts
-                                let (name, generics, mut arg_types, result_type) = (
+                                let (name, generics, arg_types, result_type) = (
                                     *name,
                                     generics.clone(),
                                     arg_types.clone(),
@@ -1781,104 +1781,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                                 if let Some(inst) =
                                     self.get_receiver_function(&receiver_arg_ty, name)
                                 {
-                                    let receiver_param_type =
-                                        inst.arg_types.first().expect("argument").clone();
-                                    // Determine whether an automatic borrow needs to be inserted
-                                    // and it's kind.
-                                    let borrow_kind_opt =
-                                        inst.receiver_needs_borrow(&receiver_arg_ty);
-                                    if !inst.type_inst.is_empty() {
-                                        // We need to annotate the instantiation of the function
-                                        // at the node. To obtain it, unification needs to be run
-                                        // again. If unification fails, errors will have been
-                                        // already reported, so we can ignore the result.
-                                        let mut subs = self.subs.clone();
-                                        let mut ok = true;
-                                        if let Some(tys) = generics {
-                                            ok = ok
-                                                && subs
-                                                    .unify_vec_maybe_type_args(
-                                                        self,
-                                                        true,
-                                                        Variance::NoVariance,
-                                                        WideningOrder::LeftToRight,
-                                                        None,
-                                                        &inst.type_inst,
-                                                        &tys,
-                                                    )
-                                                    .is_ok()
-                                        }
-                                        if let Some(ref_kind) = &borrow_kind_opt {
-                                            // Need to wrap reference around argument type
-                                            let ty = &mut arg_types[0];
-                                            *ty = Type::Reference(*ref_kind, Box::new(ty.clone()));
-                                        }
-                                        ok = ok
-                                            && subs
-                                                .unify_vec(
-                                                    self,
-                                                    self.type_variance(),
-                                                    WideningOrder::LeftToRight,
-                                                    None,
-                                                    &arg_types,
-                                                    &inst.arg_types,
-                                                )
-                                                .is_ok();
-                                        ok = ok
-                                            && subs
-                                                .unify(
-                                                    self,
-                                                    self.type_variance(),
-                                                    WideningOrder::RightToLeft,
-                                                    &result_type,
-                                                    &inst.result_type,
-                                                )
-                                                .is_ok();
-                                        // `type.inst` is now unified with the actual types,
-                                        // annotate the instance. Since this post processor
-                                        // is run after type finalization, we need to finalize
-                                        // it to report any un-inferred type errors. However,
-                                        // to avoid follow up errors, only do if unification'
-                                        // succeeded
-                                        if ok {
-                                            self.subs = subs;
-                                            let inst = inst
-                                                .type_inst
-                                                .iter()
-                                                .map(|t| {
-                                                    self.finalize_type(
-                                                        id,
-                                                        t,
-                                                        &mut BTreeSet::new(),
-                                                        &mut BTreeSet::new(),
-                                                    )
-                                                })
-                                                .collect();
-                                            self.env().set_node_instantiation(id, inst)
-                                        }
-                                    }
-                                    // Inject borrow operation if required.
-                                    if let Some(ref_kind) = borrow_kind_opt {
-                                        let borrow_id = self
-                                            .new_node_id_with_type_loc(&receiver_param_type, &loc);
-                                        let arg = args.remove(0);
-                                        args.insert(
-                                            0,
-                                            ExpData::Call(
-                                                borrow_id,
-                                                Operation::Borrow(ref_kind),
-                                                vec![arg],
-                                            )
-                                            .into_exp(),
-                                        );
-                                    }
-                                    RewriteResult::RewrittenAndDescend(
-                                        ExpData::Call(
-                                            id,
-                                            Operation::MoveFunction(inst.id.module_id, inst.id.id),
-                                            args,
-                                        )
-                                        .into_exp(),
+                                    self.post_process_receiver_call(
+                                        id,
+                                        generics,
+                                        args,
+                                        arg_types,
+                                        &result_type,
+                                        &receiver_arg_ty,
+                                        inst,
                                     )
                                 } else {
                                     // Error reported
@@ -1910,6 +1820,108 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 },
                 _ => None,
             },
+        )
+    }
+
+    /// Post processes a receiver-style call.
+    fn post_process_receiver_call(
+        &mut self,
+        id: NodeId,
+        generics: Option<Vec<Type>>,
+        mut args: Vec<Exp>,
+        mut arg_types: Vec<Type>,
+        result_type: &Type,
+        receiver_arg_ty: &Type,
+        inst: ReceiverFunctionInstance,
+    ) -> RewriteResult {
+        let receiver_param_type = inst.arg_types.first().expect("argument").clone();
+        // Determine whether an automatic borrow needs to be inserted
+        // and it's kind.
+        let borrow_kind_opt = inst.receiver_needs_borrow(receiver_arg_ty);
+        if !inst.type_inst.is_empty() {
+            // We need to annotate the instantiation of the function
+            // at the node. To obtain it, unification needs to be run
+            // again. If unification fails, errors will have been
+            // already reported, so we can ignore the result.
+            let mut subs = self.subs.clone();
+            let mut ok = true;
+            if let Some(tys) = generics {
+                let _ = subs
+                    .unify_vec_maybe_type_args(
+                        self,
+                        true,
+                        Variance::NoVariance,
+                        WideningOrder::LeftToRight,
+                        None,
+                        &inst.type_inst,
+                        &tys,
+                    )
+                    .map_err(|_| ok = false);
+            }
+            if let Some(ref_kind) = &borrow_kind_opt {
+                // Need to wrap reference around argument type
+                let ty = &mut arg_types[0];
+                *ty = Type::Reference(*ref_kind, Box::new(ty.clone()));
+            }
+            let _ = subs
+                .unify_vec(
+                    self,
+                    self.type_variance(),
+                    WideningOrder::LeftToRight,
+                    None,
+                    &arg_types,
+                    &inst.arg_types,
+                )
+                .map_err(|_| ok = false);
+            let _ = subs
+                .unify(
+                    self,
+                    self.type_variance(),
+                    WideningOrder::RightToLeft,
+                    &result_type,
+                    &inst.result_type,
+                )
+                .map_err(|_| ok = false);
+            // `type.inst` is now unified with the actual types,
+            // annotate the instance. Since this post processor
+            // is run after type finalization, we need to finalize
+            // it to report any un-inferred type errors. However,
+            // to avoid follow-up errors, only do if unification
+            // succeeded
+            if ok {
+                self.subs = subs;
+                let inst = inst
+                    .type_inst
+                    .iter()
+                    .map(|t| self.finalize_type(id, t, &mut BTreeSet::new(), &mut BTreeSet::new()))
+                    .collect();
+                self.env().set_node_instantiation(id, inst)
+            }
+        }
+        // Inject borrow operation if required.
+        if let Some(ref_kind) = borrow_kind_opt {
+            let borrow_id =
+                self.new_node_id_with_type_loc(&receiver_param_type, &self.get_node_loc(id));
+            let arg = args.remove(0);
+            args.insert(
+                0,
+                ExpData::Call(borrow_id, Operation::Borrow(ref_kind), vec![arg]).into_exp(),
+            );
+        }
+        // Inject freeze operation if needed
+        if receiver_param_type.is_reference() {
+            let arg = args.remove(0);
+            let arg_type = self.get_node_type(arg.node_id());
+            args.insert(0, self.try_freeze(&receiver_param_type, &arg_type, arg));
+        }
+        // Construct result
+        RewriteResult::RewrittenAndDescend(
+            ExpData::Call(
+                id,
+                Operation::MoveFunction(inst.id.module_id, inst.id.id),
+                args,
+            )
+            .into_exp(),
         )
     }
 
@@ -3048,9 +3060,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 // Filter out ability constraints in spec mode. See also #12656
                 let constraints = if self.mode == ExpTranslationMode::Spec {
                     sbf.type_param_constraints
-                        .iter()
-                        .filter(|c| !matches!(c, Constraint::HasAbility(_)))
-                        .cloned()
+                        .clone()
+                        .into_iter()
+                        .filter(|(_, c)| !matches!(c, Constraint::HasAbility(_)))
                         .collect()
                 } else {
                     sbf.type_param_constraints.clone()
