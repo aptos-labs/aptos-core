@@ -224,12 +224,11 @@ module aptos_std::smart_table {
             let num_buckets = table_ref.num_buckets;
             let num_keys_checked = 0;
             let buckets_ref = &table_ref.buckets;
-            let bucket_index = starting_bucket_index;
             assert!(
                 starting_bucket_index == 0 || starting_bucket_index < num_buckets,
                 EINVALID_BUCKET_INDEX
             );
-            let bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
+            let bucket_ref = table_with_length::borrow(buckets_ref, starting_bucket_index);
             let bucket_length = vector::length(bucket_ref);
             let vector_index = starting_vector_index;
             assert!(
