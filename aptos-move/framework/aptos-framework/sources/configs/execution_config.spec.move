@@ -20,13 +20,13 @@ spec aptos_framework::execution_config {
         pragma verify_duration_estimate = 600;
         let addr = signer::address_of(account);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        requires chain_status::is_operating();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         requires len(config) > 0;
         include features::spec_periodical_reward_rate_decrease_enabled() ==> staking_config::StakingRewardsConfigEnabledRequirement;
         include aptos_coin::ExistsAptosCoin;
         requires system_addresses::is_aptos_framework_address(addr);
+        aborts_if chain_status::is_operating();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
 
         ensures exists<ExecutionConfig>(@aptos_framework);

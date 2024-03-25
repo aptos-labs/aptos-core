@@ -37,13 +37,13 @@ spec aptos_framework::version {
         pragma verify_duration_estimate = 120;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
-        requires chain_status::is_operating();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
 
         aborts_if !exists<SetVersionCapability>(signer::address_of(account));
         aborts_if !exists<Version>(@aptos_framework);
+        aborts_if chain_status::is_operating();
 
         let old_major = global<Version>(@aptos_framework).major;
         /// [high-level-req-2]

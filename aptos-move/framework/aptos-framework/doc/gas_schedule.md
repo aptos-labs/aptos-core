@@ -456,6 +456,7 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 <b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigRequirement">staking_config::StakingRewardsConfigRequirement</a>;
 // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
 <b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
+<b>aborts_if</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
 // This enforces <a id="high-level-req-3.2" href="#high-level-req">high-level requirement 3</a>:
 <b>aborts_if</b> len(gas_schedule_blob) == 0;
 <b>let</b> new_gas_schedule = <a href="util.md#0x1_util_spec_from_bytes">util::spec_from_bytes</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(gas_schedule_blob);
