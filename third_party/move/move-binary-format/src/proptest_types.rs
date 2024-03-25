@@ -372,6 +372,7 @@ impl CompiledModuleStrategyGen {
                     // Build a compiled module
                     CompiledModule {
                         version: crate::file_format_common::VERSION_MAX,
+                        compiler_id: String::new(),
                         module_handles,
                         self_module_handle_idx,
                         struct_handles,

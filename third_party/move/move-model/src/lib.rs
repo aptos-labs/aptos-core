@@ -610,6 +610,7 @@ pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> Compil
 
     let module = CompiledModule {
         version: script.version,
+        compiler_id: String::new(),
         module_handles: script.module_handles,
         self_module_handle_idx,
         struct_handles: script.struct_handles,

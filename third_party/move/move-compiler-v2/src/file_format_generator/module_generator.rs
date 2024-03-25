@@ -98,6 +98,7 @@ impl ModuleGenerator {
         let module = move_binary_format::CompiledModule {
             version: file_format_common::VERSION_DEFAULT,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
+            compiler_id: "Move on Aptos Compiler v1.0".to_string(),
             ..Default::default()
         };
         let source_map = {

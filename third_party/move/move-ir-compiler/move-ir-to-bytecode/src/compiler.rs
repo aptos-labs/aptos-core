@@ -377,6 +377,7 @@ pub fn compile_script<'a>(
     ) = context.materialize_pools();
     let script = CompiledScript {
         version: VERSION_6,
+        compiler_id: String::new(),
         module_handles,
         struct_handles,
         function_handles,
@@ -469,6 +470,7 @@ pub fn compile_module<'a>(
     ) = context.materialize_pools();
     let module = CompiledModule {
         version: VERSION_6,
+        compiler_id: String::new(),
         module_handles,
         self_module_handle_idx,
         struct_handles,
@@ -548,6 +550,7 @@ fn compile_explicit_dependency_declarations(
         ) = context.materialize_pools();
         let compiled_module = CompiledModule {
             version: VERSION_6,
+            compiler_id: String::new(),
             module_handles,
             self_module_handle_idx,
             struct_handles,

@@ -42,6 +42,7 @@ fn make_script(parameters: Signature) -> Vec<u8> {
     };
     CompiledScript {
         version: move_binary_format::file_format_common::VERSION_MAX,
+        compiler_id: String::new(),
         module_handles: vec![],
         struct_handles: vec![],
         function_handles: vec![],
@@ -88,6 +89,7 @@ fn make_script_with_non_linking_structs(parameters: Signature) -> Vec<u8> {
     };
     CompiledScript {
         version: move_binary_format::file_format_common::VERSION_MAX,
+        compiler_id: String::new(),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex(0),
@@ -161,6 +163,7 @@ fn make_module_with_function(
     };
     let module = CompiledModule {
         version: move_binary_format::file_format_common::VERSION_MAX,
+        compiler_id: String::new(),
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
