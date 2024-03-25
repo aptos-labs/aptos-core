@@ -232,7 +232,6 @@ module aptos_std::smart_table {
             );
             let bucket_ref = table_with_length::borrow(buckets_ref, starting_bucket_index);
             let bucket_length = vector::length(bucket_ref);
-            let vector_index = starting_vector_index;
             assert!(
                 starting_vector_index == 0 || starting_vector_index < bucket_length,
                 EINVALID_VECTOR_INDEX
@@ -240,11 +239,11 @@ module aptos_std::smart_table {
             for (bucket_index in starting_bucket_index..num_buckets) {
                 bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
                 bucket_length = vector::length(bucket_ref);
-                while (vector_index < bucket_length) {
+                for (vector_index in starting_vector_index..bucket_length) {
                     vector::push_back(&mut keys, vector::borrow(bucket_ref, vector_index).key);
                     num_keys_checked = num_keys_checked + 1;
-                    vector_index = vector_index + 1;
                     if (num_keys_checked == num_keys_to_get) {
+                        vector_index = vector_index + 1;
                         return if (vector_index == bucket_length) {
                             bucket_index = bucket_index + 1;
                             if (bucket_index < num_buckets) {
@@ -257,7 +256,7 @@ module aptos_std::smart_table {
                         }
                     };
                 };
-                vector_index = 0;
+                starting_vector_index = 0;
             };
         };
         (keys, option::none(), option::none())
