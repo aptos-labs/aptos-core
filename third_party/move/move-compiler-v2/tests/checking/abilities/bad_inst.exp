@@ -1,0 +1,12 @@
+
+Diagnostics:
+error: type `T` is missing required ability `drop`
+   ┌─ tests/checking/abilities/bad_inst.move:13:7
+   │
+ 4 │     struct S<Y: drop> {
+   │              - declaration of type parameter `Y`
+   ·
+13 │         U<S<T>> { x: S { x: T { } } }
+   │             ^
+   │
+   = required by instantiating type parameter `Y` of struct `S`

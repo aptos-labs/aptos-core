@@ -5,3 +5,15 @@ error: cannot return `integer` from a function with result type `bool`
    │
 36 │         f1
    │         ^^
+
+error: type `R` is missing required ability `drop` (type was inferred)
+   ┌─ tests/checking/typing/type_variable_join_threaded_unpack_assign_invalid.move:44:47
+   │
+ 6 │     public fun new<V>(): T<V> {
+   │                    - declaration of type parameter `V`
+   ·
+44 │         Container::put(&mut v, Box { f1: R{}, f2 });
+   │                                               ^^
+   │
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `V` of function `new`

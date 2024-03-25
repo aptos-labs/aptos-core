@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `integer` but found a value of type `()`
+error: expected expression with no value but found `integer`
   ┌─ tests/checking/typing/if_mismatched_branches.move:3:9
   │
 3 │         if (cond) () else 0;
@@ -12,7 +12,7 @@ error: expected expression with no value but found `integer`
 4 │         if (cond) 0 else ();
   │         ^^^^^^^^^^^^^^^^^^^
 
-error: expected `integer` but found a value of type `address`
+error: expected `address` but found a value of type `integer`
   ┌─ tests/checking/typing/if_mismatched_branches.move:8:9
   │
 8 │         if (cond) @0x0 else 0;

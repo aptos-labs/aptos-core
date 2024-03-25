@@ -30,7 +30,7 @@ error: cannot pass `u8` to a function which expects argument of type `u64`
 24 │         s.receiver_ref_mut(1u8);
    │                            ^^^
 
-error: cannot pass `S<u64>` to a function which expects argument of type `S<u8>`
+error: cannot pass `&mut S<u64>` to a function which expects argument of type `&mut S<u8>`
    ┌─ tests/checking/receiver/call_errors.move:25:9
    │
 25 │         s.receiver_ref_mut::<u8>(1);

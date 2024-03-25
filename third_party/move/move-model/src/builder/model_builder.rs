@@ -13,17 +13,13 @@ use crate::{
     intrinsics::IntrinsicDecl,
     model::{
         FunId, FunctionKind, GlobalEnv, Loc, ModuleId, Parameter, QualifiedId, QualifiedInstId,
-        SpecFunId, SpecVarId, StructId, TypeParameter, TypeParameterKind,
+        SpecFunId, SpecVarId, StructId, TypeParameter,
     },
     symbol::Symbol,
-    ty::{
-        gen_get_ty_param_kinds, infer_abilities, infer_and_check_abilities, is_phantom_type_arg,
-        Constraint, Type, TypeDisplayContext,
-    },
+    ty::{Constraint, Type, TypeDisplayContext},
     well_known,
 };
 use codespan_reporting::diagnostic::Severity;
-use itertools::Itertools;
 use move_binary_format::file_format::{AbilitySet, Visibility};
 use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
@@ -533,66 +529,8 @@ impl<'env> ModelBuilder<'env> {
             .expect("invalid Type::Struct")
     }
 
-    /// returns the type parameter kinds and the abilities of the struct
-    fn get_struct_sig(&self, mid: ModuleId, sid: StructId) -> (Vec<TypeParameterKind>, AbilitySet) {
-        let struct_entry = self.lookup_struct_entry(mid.qualified(sid));
-        let struct_abilities = struct_entry.abilities;
-        let ty_param_kinds = struct_entry
-            .type_params
-            .iter()
-            .map(|tp| tp.1.clone())
-            .collect_vec();
-        (ty_param_kinds, struct_abilities)
-    }
-
-    fn gen_get_struct_sig(
-        &self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
-        |mid, sid| self.get_struct_sig(mid, sid)
-    }
-
-    /// Specialized `ty::infer_and_check_abilities`
-    /// where the abilities of type arguments are given by `ty_params`
-    pub fn check_instantiation(&self, ty: &Type, ty_params: &[TypeParameter], loc: &Loc) {
-        infer_and_check_abilities(
-            ty,
-            gen_get_ty_param_kinds(ty_params),
-            self.gen_get_struct_sig(),
-            loc,
-            |loc, _, err| self.error(loc, err),
-        );
-    }
-
-    /// Infers the abilities the given type may have,
-    /// if all type params have all abilities.
-    pub fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
-        // since all type params have all abilities, it doesn't matter whether it's phantom or not
-        infer_abilities(
-            ty,
-            |_| TypeParameterKind {
-                abilities: AbilitySet::ALL,
-                is_phantom: false,
-            },
-            self.gen_get_struct_sig(),
-        )
-    }
-
-    /// Checks whether a struct is well defined.
-    pub fn ability_check_struct_def(&self, struct_entry: &StructEntry) {
-        if let Some(fields) = &struct_entry.fields {
-            let ty_params = &struct_entry.type_params;
-            for (_field_name, (loc, _field_idx, field_ty)) in fields.iter() {
-                // check fields are properly instantiated
-                self.check_instantiation(field_ty, ty_params, loc);
-                if is_phantom_type_arg(gen_get_ty_param_kinds(ty_params), field_ty) {
-                    self.error(loc, "phantom type arguments cannot be used")
-                }
-            }
-        }
-    }
-
     /// Gets the name of the struct
-    fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
+    pub fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
         self.reverse_struct_table
             .get(&(qid.module_id, qid.id))
             .expect("invalid Type::Struct")
