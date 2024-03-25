@@ -120,6 +120,7 @@ impl FeatureFlag {
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
+            FeatureFlag::VM_BINARY_FORMAT_V7,
         ]
     }
 }
