@@ -20,7 +20,7 @@ spec aptos_framework::execution_config {
         pragma verify_duration_estimate = 600;
         let addr = signer::address_of(account);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        requires chain_status::is_operating();
+        requires chain_status::is_genesis();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         requires len(config) > 0;

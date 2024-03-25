@@ -17,6 +17,7 @@ Structs and functions related to JWK consensus configurations.
 -  [Function `new_off`](#0x1_jwk_consensus_config_new_off)
 -  [Function `new_v1`](#0x1_jwk_consensus_config_new_v1)
 -  [Function `new_oidc_provider`](#0x1_jwk_consensus_config_new_oidc_provider)
+-  [Specification](#@Specification_1)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
@@ -344,6 +345,15 @@ Construct an <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OID
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>&gt;(@aptos_framework);
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
