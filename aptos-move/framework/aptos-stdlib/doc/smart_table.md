@@ -70,6 +70,7 @@ it tolerates collisions.
 <pre><code><b>use</b> <a href="hash.md#0x1_aptos_hash">0x1::aptos_hash</a>;
 <b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="math64.md#0x1_math64">0x1::math64</a>;
+<b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
 <b>use</b> <a href="type_info.md#0x1_type_info">0x1::type_info</a>;
@@ -633,13 +634,14 @@ limits depends on the data types in the smart table.
 
 When starting pagination, pass <code>starting_bucket_index</code> = <code>starting_vector_index</code> = 0.
 
-The function will then return a vector of keys, a bucket index, and a vector index. The
-return indices can then be used as inputs to another pagination call, which will return a
-vector of more keys. This process can be repeated until the returned bucket index and vector
-index values are both 0, which means that pagination is complete.
+The function will then return a vector of keys, an optional bucket index, and an optional
+vector index. The unpacked return indices can then be used as inputs to another pagination
+call, which will return a vector of more keys. This process can be repeated until the
+returned bucket index and vector index value options are both none, which means that
+pagination is complete. For an example, see <code>test_keys()</code>.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_keys_paginated">keys_paginated</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(table_ref: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, starting_bucket_index: u64, starting_vector_index: u64, num_keys_to_get: u64): (<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, u64, u64)
+<pre><code><b>public</b> <b>fun</b> <a href="smart_table.md#0x1_smart_table_keys_paginated">keys_paginated</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(table_ref: &<a href="smart_table.md#0x1_smart_table_SmartTable">smart_table::SmartTable</a>&lt;K, V&gt;, starting_bucket_index: u64, starting_vector_index: u64, num_keys_to_get: u64): (<a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -655,45 +657,48 @@ index values are both 0, which means that pagination is complete.
     num_keys_to_get: u64,
 ): (
     <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;K&gt;,
-    u64,
-    u64,
+    Option&lt;u64&gt;,
+    Option&lt;u64&gt;,
 ) {
     <b>let</b> keys = <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
     <b>if</b> (num_keys_to_get &gt; 0) {
         <b>let</b> num_buckets = table_ref.num_buckets;
         <b>let</b> num_keys_checked = 0;
         <b>let</b> buckets_ref = &table_ref.buckets;
-        <b>let</b> bucket_index = starting_bucket_index;
-        <b>if</b> (starting_bucket_index != 0) {
-            <b>assert</b>!(starting_bucket_index &lt; num_buckets, <a href="smart_table.md#0x1_smart_table_EINVALID_BUCKET_INDEX">EINVALID_BUCKET_INDEX</a>);
-        };
-        <b>let</b> bucket_ref = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(buckets_ref, bucket_index);
+        <b>assert</b>!(
+            starting_bucket_index == 0 || starting_bucket_index &lt; num_buckets,
+            <a href="smart_table.md#0x1_smart_table_EINVALID_BUCKET_INDEX">EINVALID_BUCKET_INDEX</a>
+        );
+        <b>let</b> bucket_ref = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(buckets_ref, starting_bucket_index);
         <b>let</b> bucket_length = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket_ref);
-        <b>let</b> vector_index = starting_vector_index;
-        <b>if</b> (starting_vector_index != 0) {
-            <b>assert</b>!(starting_vector_index &lt; bucket_length, <a href="smart_table.md#0x1_smart_table_EINVALID_VECTOR_INDEX">EINVALID_VECTOR_INDEX</a>);
-        };
-        <b>while</b> (<a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a> &lt; num_buckets) {
+        <b>assert</b>!(
+            starting_vector_index == 0 || starting_vector_index &lt; bucket_length,
+            <a href="smart_table.md#0x1_smart_table_EINVALID_VECTOR_INDEX">EINVALID_VECTOR_INDEX</a>
+        );
+        for (bucket_index in starting_bucket_index..num_buckets) {
             bucket_ref = <a href="table_with_length.md#0x1_table_with_length_borrow">table_with_length::borrow</a>(buckets_ref, bucket_index);
             bucket_length = <a href="../../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(bucket_ref);
-            <b>while</b> (vector_index &lt; bucket_length) {
+            for (vector_index in starting_vector_index..bucket_length) {
                 <a href="../../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> keys, <a href="../../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(bucket_ref, vector_index).key);
                 num_keys_checked = num_keys_checked + 1;
-                vector_index = vector_index + 1;
                 <b>if</b> (num_keys_checked == num_keys_to_get) {
-                    <b>if</b> (vector_index == bucket_length) {
-                        vector_index = 0;
+                    vector_index = vector_index + 1;
+                    <b>return</b> <b>if</b> (vector_index == bucket_length) {
                         bucket_index = bucket_index + 1;
-                        bucket_index = <b>if</b> (<a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a> &lt; num_buckets) bucket_index <b>else</b> 0;
-                    };
-                    <b>return</b> (keys, bucket_index, vector_index)
+                        <b>if</b> (<a href="smart_table.md#0x1_smart_table_bucket_index">bucket_index</a> &lt; num_buckets) {
+                            (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(bucket_index), <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(0))
+                        } <b>else</b> {
+                            (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
+                        }
+                    } <b>else</b> {
+                        (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(bucket_index), <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(vector_index))
+                    }
                 };
             };
-            bucket_index = bucket_index + 1;
-            vector_index = 0;
+            starting_vector_index = 0;
         };
     };
-    (keys, 0, 0)
+    (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
 }
 </code></pre>
 
