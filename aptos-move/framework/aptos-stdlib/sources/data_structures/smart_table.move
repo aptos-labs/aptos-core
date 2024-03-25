@@ -225,15 +225,17 @@ module aptos_std::smart_table {
             let num_keys_checked = 0;
             let buckets_ref = &table_ref.buckets;
             let bucket_index = starting_bucket_index;
-            if (starting_bucket_index != 0) {
-                assert!(starting_bucket_index < num_buckets, EINVALID_BUCKET_INDEX);
-            };
+            assert!(
+                starting_bucket_index == 0 || starting_bucket_index < num_buckets,
+                EINVALID_BUCKET_INDEX
+            );
             let bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
             let bucket_length = vector::length(bucket_ref);
             let vector_index = starting_vector_index;
-            if (starting_vector_index != 0) {
-                assert!(starting_vector_index < bucket_length, EINVALID_VECTOR_INDEX);
-            };
+            assert!(
+                starting_vector_index == 0 || starting_vector_index < bucket_length,
+                EINVALID_VECTOR_INDEX
+            );
             while (bucket_index < num_buckets) {
                 bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
                 bucket_length = vector::length(bucket_ref);
