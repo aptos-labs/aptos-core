@@ -26,6 +26,7 @@ WARNING: <code><a href="reconfiguration_state.md#0x1_reconfiguration_state_initi
     -  [Function `is_in_progress`](#@Specification_1_is_in_progress)
     -  [Function `on_reconfig_start`](#@Specification_1_on_reconfig_start)
     -  [Function `start_time_secs`](#@Specification_1_start_time_secs)
+    -  [Function `on_reconfig_finish`](#@Specification_1_on_reconfig_finish)
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
@@ -567,6 +568,24 @@ Abort if the current state is not "in progress".
     <b>aborts_if</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(<b>global</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework).variant).bytes
         != b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateActive">0x1::reconfiguration_state::StateActive</a>";
 }
+</code></pre>
+
+
+
+<a id="@Specification_1_on_reconfig_finish"></a>
+
+### Function `on_reconfig_finish`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_on_reconfig_finish">on_reconfig_finish</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> <b>false</b>;
+<b>let</b> pre_state = <b>global</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework);
+<b>requires</b> !(<b>exists</b>&lt;<a href="reconfiguration_state.md#0x1_reconfiguration_state_State">State</a>&gt;(@aptos_framework) && <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any_type_name">copyable_any::type_name</a>(pre_state.variant).bytes == b"<a href="reconfiguration_state.md#0x1_reconfiguration_state_StateInactive">0x1::reconfiguration_state::StateInactive</a>");
 </code></pre>
 
 

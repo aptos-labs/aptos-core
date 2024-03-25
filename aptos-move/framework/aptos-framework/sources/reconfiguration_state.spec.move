@@ -69,6 +69,12 @@ spec aptos_framework::reconfiguration_state {
             == b"0x1::reconfiguration_state::StateInactive") ==> from_bcs::deserializable<StateActive>(post_state.variant.data);
     }
 
+    spec on_reconfig_finish  {
+        aborts_if false;
+        let pre_state = global<State>(@aptos_framework);
+        requires !(exists<State>(@aptos_framework) && copyable_any::type_name(pre_state.variant).bytes == b"0x1::reconfiguration_state::StateInactive");
+    }
+
     spec start_time_secs(): u64 {
         include StartTimeSecsAbortsIf;
     }
@@ -105,5 +111,4 @@ spec aptos_framework::reconfiguration_state {
         aborts_if copyable_any::type_name(global<State>(@aptos_framework).variant).bytes
             != b"0x1::reconfiguration_state::StateActive";
     }
-
 }
