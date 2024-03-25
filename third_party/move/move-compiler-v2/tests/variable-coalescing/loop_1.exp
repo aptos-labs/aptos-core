@@ -34,6 +34,42 @@ fun m::test($t0: u64): u64 {
  20: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+  0: $t3 := 0
+  1: $t2 := move($t3)
+  2: $t5 := 0
+  3: $t4 := move($t5)
+  4: label L0
+  5: $t7 := 10
+  6: $t6 := <($t4, $t7)
+  7: if ($t6) goto 8 else goto 14
+  8: label L2
+  9: $t2 := copy($t0)
+ 10: $t9 := 1
+ 11: $t8 := +($t4, $t9)
+ 12: $t4 := move($t8)
+ 13: goto 16
+ 14: label L3
+ 15: goto 18
+ 16: label L4
+ 17: goto 4
+ 18: label L1
+ 19: $t1 := move($t2)
+ 20: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]

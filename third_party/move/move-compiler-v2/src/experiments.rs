@@ -65,7 +65,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::KEEP_UNINIT_ANNOTATIONS.to_string(),
             description: "Determines whether the annotations for \
-            uninitialized variable analysis should be kept around (for testin)"
+            uninitialized variable analysis should be kept around (for testing)"
                 .to_string(),
             default: Given(false),
         },
@@ -150,7 +150,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         },
         Experiment {
             name: Experiment::AST_SIMPLIFY_FULL.to_string(),
-            description: "Whether to run the ast simplifier. including code elimination"
+            description: "Whether to run the ast simplifier, including code elimination"
                 .to_string(),
             default: Given(false),
         },

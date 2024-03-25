@@ -1,7 +1,7 @@
 
 Diagnostics:
 warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
-  ┌─ tests/default-sbc-optimize/cant_coalesce_1.move:3:13
+  ┌─ tests/variable-coalescing/cant_coalesce_1.move:3:13
   │
 3 │         let x = a + a;
   │             ^
@@ -13,25 +13,37 @@ public fun m::test($t0: u64): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
-     var $t5: u64
   0: $t3 := +($t0, $t0)
   1: $t2 := infer($t3)
-  2: $t5 := 2
-  3: $t4 := infer($t5)
-  4: $t1 := infer($t4)
-  5: return $t1
+  2: $t1 := 2
+  3: return $t1
 }
 
-============ after DeadStoreElimination: ================
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+public fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+     # events: b:$t0, e:$t0, e:$t3, b:$t3
+  0: $t3 := +($t0, $t0)
+     # live vars:
+     # events: b:$t1
+  1: $t1 := 2
+     # live vars: $t1
+     # events: e:$t1
+  2: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
 
 [variant baseline]
 public fun m::test($t0: u64): u64 {
      var $t1: u64 [unused]
      var $t2: u64 [unused]
      var $t3: u64
-     var $t4: u64 [unused]
-     var $t5: u64 [unused]
   0: $t0 := +($t0, $t0)
   1: $t3 := 2
   2: return $t3

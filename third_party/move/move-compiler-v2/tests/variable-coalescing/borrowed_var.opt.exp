@@ -66,7 +66,7 @@ fun m::test() {
      # events: b:$t8
   9: $t8 := 5
      # live vars: $t7, $t8
-     # events: e:$t7, e:$t8
+     # events: e:$t6, e:$t7, e:$t8, b:$t6
  10: $t6 := ==($t7, $t8)
      # live vars:
  11: return ()
