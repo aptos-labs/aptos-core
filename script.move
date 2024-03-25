@@ -1,20 +1,19 @@
 script {
+    use aptos_framework::jwks;
     use aptos_framework::aptos_governance;
-    use aptos_framework::jwk_consensus_config;
     use std::string::utf8;
-
     fun main(core_resources: &signer) {
-        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-        let provider_google = jwk_consensus_config::new_oidc_provider(
-            utf8(b"https://accounts.google.com"),
-            utf8(b"https://accounts.google.com/.well-known/openid-configuration"),
+        let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
+        let jwk = jwks::new_rsa_jwk(
+            utf8(b"test-rsa"),
+            utf8(b"RS256"),
+            utf8(b"AQAB"),
+            utf8(b"6S7asUuzq5Q_3U9rbs-PkDVIdjgmtgWreG5qWPsC9xXZKiMV1AiV9LXyqQsAYpCqEDM3XbfmZqGb48yLhb_XqZaKgSYaC_h2DjM7lgrIQAp9902Rr8fUmLN2ivr5tnLxUUOnMOc2SQtr9dgzTONYW5Zu3PwyvAWk5D6ueIUhLtYzpcB-etoNdL3Ir2746KIy_VUsDwAM7dhrqSK8U2xFCGlau4ikOTtvzDownAMHMrfE7q1B6WZQDAQlBmxRQsyKln5DIsKv6xauNsHRgBAKctUxZG8M4QJIx3S6Aughd3RZC4Ca5Ae9fd8L8mlNYBCrQhOZ7dS0f4at4arlLcajtw")
         );
-        let provider_test = jwk_consensus_config::new_oidc_provider(
-            utf8(b"test.oidc.provider"),
-            utf8(b"https://storage.googleapis.com/aptos-keyless-jwks/keys.json"),
-        );
-        let config = jwk_consensus_config::new_v1(vector[provider_google, provider_test]);
-        jwk_consensus_config::set_for_next_epoch(&framework, config);
+        let patches = vector[
+            jwks::new_patch_upsert_jwk(b"test.oidc.provider", jwk),
+        ];
+        jwks::set_patches(&framework_signer, patches);
         aptos_governance::reconfigure(&framework);
     }
 }
