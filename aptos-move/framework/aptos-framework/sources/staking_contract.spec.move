@@ -299,6 +299,8 @@ spec aptos_framework::staking_contract {
     old_operator: address,
     new_operator: address,
     ) {
+        // TODO: These function passed locally however failed in github CI
+        pragma verify_duration_estimate = 120;
         // TODO: Call `update_distribution_pool` and could not verify `update_distribution_pool`.
         pragma aborts_if_is_partial;
         let staker_address = signer::address_of(staker);
@@ -399,6 +401,7 @@ spec aptos_framework::staking_contract {
     voter: address,
     contract_creation_seed: vector<u8>,
     ): (signer, SignerCapability, OwnerCapability) {
+        pragma verify_duration_estimate = 120;
         include stake::ResourceRequirement;
         let staker_address = signer::address_of(staker);
         // postconditions account::create_resource_account()
