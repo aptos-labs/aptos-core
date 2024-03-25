@@ -82,7 +82,7 @@ impl TransactionTypeArg {
                 }
             },
             TransactionTypeArg::CoinTransferWithInvalid => TransactionType::CoinTransfer {
-                invalid_transaction_ratio: 10,
+                invalid_transaction_ratio: 50,
                 sender_use_account_pool,
             },
             TransactionTypeArg::AccountGeneration => TransactionType::AccountGeneration {

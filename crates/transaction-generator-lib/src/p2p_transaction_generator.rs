@@ -219,6 +219,13 @@ impl P2PTransactionGenerator {
                     reqs[random_index].clone()
                 }
             },
+            InvalidTransactionType::OldSeqNum => {
+                let builder = self.txn_factory.payload(aptos_stdlib::aptos_coin_transfer(
+                    *receiver,
+                    self.send_amount,
+                ));
+                sender.sign_with_transaction_builder_no_seqnum_increase(builder)
+            },
         }
     }
 }
@@ -233,15 +240,18 @@ enum InvalidTransactionType {
     Receiver,
     /// duplicate an exist tx
     Duplication,
+    /// Use old SeqNum.
+    OldSeqNum,
 }
 
 impl Distribution<InvalidTransactionType> for Standard {
     fn sample<R: RngCore + ?Sized>(&self, rng: &mut R) -> InvalidTransactionType {
-        match rng.gen_range(0, 4) {
+        match rng.gen_range(0, 100) {
             0 => InvalidTransactionType::ChainId,
             1 => InvalidTransactionType::Sender,
             2 => InvalidTransactionType::Receiver,
-            _ => InvalidTransactionType::Duplication,
+            3 => InvalidTransactionType::Duplication,
+            _ => InvalidTransactionType::OldSeqNum,
         }
     }
 }

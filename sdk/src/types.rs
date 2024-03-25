@@ -103,6 +103,17 @@ impl LocalAccount {
         self.sign_transaction(raw_txn)
     }
 
+    pub fn sign_with_transaction_builder_no_seqnum_increase(
+        &self,
+        builder: TransactionBuilder,
+    ) -> SignedTransaction {
+        let raw_txn = builder
+            .sender(self.address())
+            .sequence_number(self.sequence_number())
+            .build();
+        self.sign_transaction(raw_txn)
+    }
+
     pub fn sign_multi_agent_with_transaction_builder(
         &self,
         secondary_signers: Vec<&Self>,
