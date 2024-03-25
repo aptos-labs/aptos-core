@@ -653,7 +653,7 @@ fn collect_tests(root: &str) -> Vec<Requirements> {
             // This will appear in the output of cargo test/nextest
             format!("compiler-v2[config={}]", config.name),
             root.to_string(),
-            files.into_iter().join("|"),
+            files.into_iter().map(|s| s + "$").join("|"),
         ));
     }
     reqs
