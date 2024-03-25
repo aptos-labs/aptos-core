@@ -51,6 +51,8 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<execution_config::ExecutionConfig>;
         include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
+        include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;
+        include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
         aborts_if false;
     }
 

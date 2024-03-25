@@ -18,6 +18,7 @@ Structs and functions for on-chain randomness configurations.
 -  [Function `new_v1`](#0x1_randomness_config_new_v1)
 -  [Function `current`](#0x1_randomness_config_current)
 -  [Specification](#@Specification_1)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
     -  [Function `current`](#@Specification_1_current)
 
 
@@ -342,6 +343,22 @@ Get the currently effective randomness configuration object.
 <a id="@Specification_1"></a>
 
 ## Specification
+
+
+<a id="@Specification_1_on_new_epoch"></a>
+
+### Function `on_new_epoch`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="randomness_config.md#0x1_randomness_config_on_new_epoch">on_new_epoch</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochAbortsIf">config_buffer::OnNewEpochAbortsIf</a>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;;
+</code></pre>
+
 
 
 <a id="@Specification_1_current"></a>
