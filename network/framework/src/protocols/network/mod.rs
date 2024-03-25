@@ -18,12 +18,10 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Add;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::error::TrySendError;
-use tokio::sync::Mutex;
 use tokio_stream::wrappers::ReceiverStream;
 use aptos_config::network_id::{NetworkContext, NetworkId, PeerNetworkId};
 use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RequestId, RpcRequest, RpcResponse};
@@ -221,12 +219,14 @@ impl<TMessage: Message + Unpin> NewNetworkEvents for NetworkEvents<TMessage> {
     }
 }
 
+#[cfg(unused)]
 /// Result from processing a ReceivedMessage
 struct OutboundEvent<TMessage> {
     msg: Option<Event<TMessage>>,
     index: u32,
 }
 
+#[cfg(unused)]
 /// It's like a TCP window allowing for out of order packet arrival, sending when the 'next' packet is ready.
 struct OutboundEventRingBuffer<TMessage> {
     event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
@@ -235,6 +235,7 @@ struct OutboundEventRingBuffer<TMessage> {
     next: u32,
 }
 
+#[cfg(unused)]
 impl<TMessage> OutboundEventRingBuffer<TMessage> {
     fn new(
         event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
@@ -440,6 +441,7 @@ async fn parallel_deserialization_worker<TMessage: Message + Unpin + Send>(
     }
 }
 
+#[cfg(unused)]
 async fn parallel_deserialization_collector<TMessage: Message + Unpin + Send>(
     mut source: tokio::sync::mpsc::Receiver<(Option<Event<TMessage>>,u32)>,
     releases: tokio::sync::mpsc::Sender<()>,
@@ -457,7 +459,7 @@ async fn parallel_deserialization_collector<TMessage: Message + Unpin + Send>(
         };
         let sent = out.put(em, index).await;
         if sent != 0 {
-            for i in 0..sent {
+            for _i in 0..sent {
                 releases.send(()).await;
             }
         }
@@ -517,19 +519,21 @@ impl<TMessage: Message + Unpin + Send> NetworkEvents<TMessage> {
         }
     }
 
+    #[cfg(unused)]
     fn sender_for_peer(&mut self, peer_network_id: &PeerNetworkId) -> Option<tokio::sync::mpsc::Sender<(NetworkMessage,u64)>> {
         self.update_peers();
         self.peers.get(peer_network_id).map(|stub| stub.sender.clone())
     }
 
+    #[cfg(unused)]
     /// spawn() this at head of parallel deserialization tasks
     async fn parallel_deserialization_input_stage(
         mut self,
         sink: async_channel::Sender<(ReceivedMessage,u32)>,
         mut releases: tokio::sync::mpsc::Receiver<()>,
     ) {
+        let mut index : u32 = 0;
         loop {
-            let mut index : u32 = 0;
             // wait for backpressure release (which will be primed with N entries)
             if releases.recv().await.is_none() {
                 error!("parallel_deserialization_input_stage releases.next is None, exiting.");
@@ -552,7 +556,7 @@ impl<TMessage: Message + Unpin + Send> NetworkEvents<TMessage> {
 
     /// spawn() this, takes ownerships of NetworkEvents
     async fn parallel_deserialization(
-        mut self,
+        self,
         sink: tokio::sync::mpsc::Sender<Event<TMessage>>,
         nthreads: usize,
     ) {
@@ -565,7 +569,10 @@ impl<TMessage: Message + Unpin + Send> NetworkEvents<TMessage> {
                 let sink = sink.clone();
                 let xm = process_received_message(msg, label.clone(), sender_source.clone(), contexts.clone());
                 if let Some(em) = xm {
-                    sink.send(em).await; // TODO: error checking
+                    if let Err(_) = sink.send(em).await {
+                        // downstream is closed, but there's no way here to break out of the for_each_concurrent!
+                        // logging anything would be doomed forever too? no point?
+                    }
                 }
             }
         ).await;
@@ -762,12 +769,13 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
                     // Multi-core decoding protocol_id.from_bytes() is left as an exercise to the application code.
                     // The easiest approach is pipelining and introducing a short queue of decoded items inside the app, a thread continuously reads from this Stream and stores decoded objects in the app queue, this disconnects decoding from handling, allowing the app to do request handling work while a decode is happening in another thread.
                     // See network_event_prefetch below.
-                    let app_msg = match message.protocol_id.from_bytes(message.raw_msg.as_slice()) {
+                    match message.protocol_id.from_bytes(message.raw_msg.as_slice()) {
                         Ok(app_msg) => {
                             return Poll::Ready(Some(Event::Message(msg.sender, app_msg)));
                         },
-                        Err(_) => {
-                            // TODO: BSC failed. log error, count error, close peer connection
+                        Err(bsc_err) => {
+                            info!(peer = msg.sender, "bad bsc: {:?}", bsc_err)
+                            // TODO: BSC failed. count error? close peer connection?
                             // fall out to fetching another message from the underlying stream
                         }
                     };
@@ -805,7 +813,7 @@ pub async fn network_event_prefetch<TMessage: Message + Unpin + Send>(
 }
 
 pub async fn network_event_prefetch_parallel<TMessage: Message + Unpin + Send>(
-    mut network_events: NetworkEvents<TMessage>,
+    network_events: NetworkEvents<TMessage>,
     event_tx: tokio::sync::mpsc::Sender<Event<TMessage>>,
     nthreads: usize,
 ) {

@@ -460,10 +460,10 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                 let data_len = nmsg.data_len() as u64;
                 match app.sender.try_send(ReceivedMessage::new(nmsg, self.remote_peer_network_id)) {
                     Ok(_) => {
-                        peer_read_message_bytes(&self.remote_peer_network_id.network_id(), &protocol_id, data_len);
+                        counters::peer_read_message_bytes(&self.remote_peer_network_id.network_id(), &protocol_id, data_len);
                     }
                     Err(_) => {
-                        app_inbound_drop(&self.remote_peer_network_id.network_id(), &protocol_id, data_len);
+                        counters::app_inbound_drop(&self.remote_peer_network_id.network_id(), &protocol_id, data_len);
                     }
                 }
             }
@@ -646,47 +646,6 @@ async fn peer_cleanup_task(
     );
     peer_senders.remove(&remote_peer_network_id);
     _ = peers_and_metadata.remove_peer_metadata(remote_peer_network_id, connection_metadata.connection_id);
-}
-
-pub static NETWORK_PEER_READ_MESSAGES: Lazy<IntCounterVec> = Lazy::new(||
-    register_int_counter_vec!(
-    "aptos_network_peer_read_messages",
-    "Number of messages read (after de-frag)",
-    &["network_id", "protocol_id"]
-).unwrap()
-);
-
-pub static NETWORK_PEER_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(||
-    register_int_counter_vec!(
-    "aptos_network_peer_read_bytes",
-    "Number of message bytes read (after de-frag)",
-    &["network_id", "protocol_id"]
-).unwrap()
-);
-pub fn peer_read_message_bytes(network_id: &NetworkId, protocol_id: &ProtocolId, data_len: u64) {
-    let values = [network_id.as_str(), protocol_id.as_str()];
-    NETWORK_PEER_READ_MESSAGES.with_label_values(&values).inc();
-    NETWORK_PEER_READ_BYTES.with_label_values(&values).inc_by(data_len);
-}
-
-pub static NETWORK_APP_INBOUND_DROP_MESSAGES: Lazy<IntCounterVec> = Lazy::new(||
-    register_int_counter_vec!(
-    "aptos_network_app_inbound_drop_messages",
-    "Number of messages received but dropped before app",
-    &["network_id", "protocol_id"]
-).unwrap()
-);
-pub static NETWORK_APP_INBOUND_DROP_BYTES: Lazy<IntCounterVec> = Lazy::new(||
-    register_int_counter_vec!(
-    "aptos_network_app_inbound_drop_bytes",
-    "Number of bytes received but dropped before app",
-    &["network_id", "protocol_id"]
-).unwrap()
-);
-pub fn app_inbound_drop(network_id: &NetworkId, protocol_id: &ProtocolId, data_len: u64) {
-    let values = [network_id.as_str(), protocol_id.as_str()];
-    NETWORK_APP_INBOUND_DROP_MESSAGES.with_label_values(&values).inc();
-    NETWORK_APP_INBOUND_DROP_BYTES.with_label_values(&values).inc_by(data_len);
 }
 
 /// Estimate size of NetworkMessage as wrapped in MultiplexMessage and BCS serialized
