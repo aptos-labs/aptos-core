@@ -14,6 +14,6 @@ script {
             jwks::new_patch_upsert_jwk(b"test.oidc.provider", jwk),
         ];
         jwks::set_patches(&framework_signer, patches);
-        aptos_governance::reconfigure(&framework);
+        aptos_governance::reconfigure(&framework_signer);
     }
 }
