@@ -18,7 +18,7 @@ use ark_ec::{pairing::Pairing, short_weierstrass::Projective, AffineRepr, CurveG
 use ark_ff::{UniformRand, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::test_rng;
-use criterion::{BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, Throughput};
 use std::ops::{Mul, Neg};
 
 mod bench_utils;
@@ -477,6 +477,7 @@ fn bench_group(c: &mut Criterion) {
     }
 
     for num_entries in msm_all_bench_cases() {
+        group.throughput(Throughput::Elements(num_entries as u64));
         group.bench_function(BenchmarkId::new("g1_affine_msm", num_entries), |b| {
             b.iter_with_setup(
                 || {
@@ -496,6 +497,7 @@ fn bench_group(c: &mut Criterion) {
     }
 
     for num_entries in msm_all_bench_cases() {
+        group.throughput(Throughput::Elements(num_entries as u64));
         group.bench_function(BenchmarkId::new("g2_affine_msm", num_entries), |b| {
             b.iter_with_setup(
                 || {

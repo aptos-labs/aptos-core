@@ -1042,6 +1042,7 @@ dependencies = [
  "proptest-derive 0.4.0",
  "rand 0.7.3",
  "rand_core 0.5.1",
+ "rayon",
  "ring 0.16.20",
  "serde",
  "serde-name",
