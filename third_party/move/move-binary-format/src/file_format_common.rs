@@ -478,8 +478,12 @@ pub const VERSION_6: u32 = 6;
 /// + access specifiers (read/write set)
 pub const VERSION_7: u32 = 7;
 
+/// Version 8: changes compare to version 7
+/// place holder for next version
+pub const VERSION_8: u32 = 8;
+
 /// Mark which version is the default version
-pub const VERSION_DEFAULT: u32 = VERSION_6;
+pub const VERSION_DEFAULT: u32 = VERSION_7;
 
 /// Mark which version is the latest version
 pub const VERSION_MAX: u32 = VERSION_7;
@@ -490,7 +494,7 @@ pub const VERSION_MAX: u32 = VERSION_7;
 ///
 /// This is currently set to VERSION_7, the next major version, and should be updated once
 /// this version is ready for production.
-pub const VERSION_NEXT: u32 = VERSION_7;
+pub const VERSION_NEXT: u32 = VERSION_8;
 
 // Mark which oldest version is supported.
 // TODO(#145): finish v4 compatibility; as of now, only metadata is implemented
