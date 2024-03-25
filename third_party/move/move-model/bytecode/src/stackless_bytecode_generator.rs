@@ -240,7 +240,12 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 ));
                 global_env
                     .find_module(&vec_module)
-                    .expect("unexpected reference to module not found in global env")
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "unexpected reference to module: `{}` not found in global env",
+                            vec_module.display_full(global_env)
+                        )
+                    })
                     .get_id()
             });
 

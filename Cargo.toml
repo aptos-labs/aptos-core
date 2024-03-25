@@ -508,14 +508,16 @@ crossbeam-channel = "0.5.4"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = "5.2.0"
+dashmap = { version = "5.5.3", features = ["inline"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 determinator = "0.12.0"
 derive_more = "0.99.11"
 diesel = "2.1"
-diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
+# Use the crate version once this feature gets released on crates.io:
+# https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
+diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = ["async-connection-wrapper", "postgres", "bb8", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
@@ -544,7 +546,7 @@ glob = "0.3.0"
 goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
 group = "0.13"
-guppy = "0.17.0"
+guppy = "0.17.5"
 handlebars = "4.2.2"
 heck = "0.4.1"
 hex = { version = "0.4.3", features = ["serde"] }
@@ -560,7 +562,7 @@ indicatif = "0.15.0"
 indoc = "1.0.6"
 inferno = "0.11.14"
 ipnet = "2.5.0"
-itertools = "0.10.3"
+itertools = "0.12"
 jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",

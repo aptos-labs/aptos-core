@@ -113,6 +113,8 @@ impl FunctionTargetProcessor for AbilityProcessor {
             copy_drop,
         };
         transformer.run(code);
+        // Clear annotations as code has changed
+        transformer.builder.data.annotations.clear();
         transformer.builder.data
     }
 
@@ -705,9 +707,9 @@ impl<'a> Transformer<'a> {
         temp: TempIndex,
     ) -> Vec<(Loc, String)> {
         if let Some(info) = self.live_var.get_info_at(code_offset).after.get(&temp) {
-            info.usages
-                .iter()
-                .map(|loc| (loc.clone(), "used here".to_owned()))
+            info.usage_locations()
+                .into_iter()
+                .map(|loc| (loc, "used here".to_owned()))
                 .collect()
         } else {
             vec![]

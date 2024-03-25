@@ -293,7 +293,7 @@ impl TryFrom<&[u8]> for IdCommitment {
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct KeylessPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
-    /// e.g., https://accounts.google.com
+    /// e.g., <https://accounts.google.com>
     pub iss_val: String,
 
     /// SNARK-friendly commitment to:

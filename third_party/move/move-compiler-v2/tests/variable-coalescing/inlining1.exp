@@ -1,0 +1,70 @@
+============ initial bytecode ================
+
+[variant baseline]
+public fun Test::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 10
+  1: $t1 := infer($t2)
+  2: $t0 := 3
+  3: return $t0
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+public fun Test::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     # live vars:
+     # events: b:$t2
+  0: $t2 := 10
+     # live vars: $t2
+     # events: e:$t2
+  1: $t1 := move($t2)
+     # live vars:
+     # events: b:$t0
+  2: $t0 := 3
+     # live vars: $t0
+     # events: e:$t0
+  3: return $t0
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun Test::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+  0: $t2 := 10
+  1: $t1 := move($t2)
+  2: $t2 := 3
+  3: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun Test::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+  0: $t2 := 3
+  1: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.Test {
+
+
+public test(): u64 /* def_idx: 0 */ {
+B0:
+	0: LdU64(3)
+	1: Ret
+}
+}

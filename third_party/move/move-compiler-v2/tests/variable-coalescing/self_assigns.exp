@@ -1,0 +1,471 @@
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+  0: $t0 := infer($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64): u64 {
+     var $t1: u64
+  0: $t0 := infer($t0)
+  1: $t1 := infer($t0)
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test3(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+  0: $t2 := 0
+  1: $t1 := infer($t2)
+  2: $t4 := 1
+  3: $t3 := infer($t4)
+  4: label L0
+  5: $t6 := 42
+  6: $t5 := <($t1, $t6)
+  7: if ($t5) goto 8 else goto 14
+  8: label L2
+  9: $t3 := infer($t3)
+ 10: $t8 := 1
+ 11: $t7 := +($t1, $t8)
+ 12: $t1 := infer($t7)
+ 13: goto 16
+ 14: label L3
+ 15: goto 18
+ 16: label L4
+ 17: goto 4
+ 18: label L1
+ 19: $t0 := infer($t3)
+ 20: return $t0
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := 0
+  1: $t2 := infer($t3)
+  2: label L0
+  3: $t5 := 42
+  4: $t4 := <($t2, $t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L2
+  7: $t0 := infer($t0)
+  8: $t7 := 1
+  9: $t6 := +($t2, $t7)
+ 10: $t2 := infer($t6)
+ 11: goto 14
+ 12: label L3
+ 13: goto 16
+ 14: label L4
+ 15: goto 2
+ 16: label L1
+ 17: $t1 := infer($t0)
+ 18: return $t1
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     # live vars: $t0
+     # events: b:$t0, e:$t0
+  0: $t0 := move($t0)
+     # live vars:
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64): u64 {
+     var $t1: u64
+     # live vars: $t0
+     # events: b:$t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+     # events: e:$t0, b:$t1
+  1: $t1 := move($t0)
+     # live vars: $t1
+     # events: e:$t1
+  2: return $t1
+}
+
+
+[variant baseline]
+public fun m::test3(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     # live vars:
+     # events: b:$t2
+  0: $t2 := 0
+     # live vars: $t2
+     # events: e:$t2, b:$t1
+  1: $t1 := move($t2)
+     # live vars: $t1
+     # events: b:$t4
+  2: $t4 := 1
+     # live vars: $t1, $t4
+     # events: e:$t4, b:$t3
+  3: $t3 := move($t4)
+     # live vars: $t1, $t3
+  4: label L0
+     # live vars: $t1, $t3
+     # events: b:$t6
+  5: $t6 := 42
+     # live vars: $t1, $t3, $t6
+     # events: e:$t6, b:$t5
+  6: $t5 := <($t1, $t6)
+     # live vars: $t1, $t3, $t5
+     # events: e:$t5
+  7: if ($t5) goto 8 else goto 14
+     # live vars: $t1, $t3
+  8: label L2
+     # live vars: $t1, $t3
+  9: $t3 := move($t3)
+     # live vars: $t1, $t3
+     # events: b:$t8
+ 10: $t8 := 1
+     # live vars: $t1, $t3, $t8
+     # events: e:$t8, b:$t7
+ 11: $t7 := +($t1, $t8)
+     # live vars: $t3, $t7
+     # events: e:$t7
+ 12: $t1 := move($t7)
+     # live vars: $t1, $t3
+ 13: goto 16
+     # live vars: $t1, $t3
+ 14: label L3
+     # live vars: $t3
+ 15: goto 18
+     # live vars: $t1, $t3
+ 16: label L4
+     # live vars: $t1, $t3
+     # events: e:$t1
+ 17: goto 4
+     # live vars: $t3
+ 18: label L1
+     # live vars: $t3
+     # events: e:$t3, b:$t0
+ 19: $t0 := move($t3)
+     # live vars: $t0
+     # events: e:$t0
+ 20: return $t0
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0
+     # events: b:$t0, b:$t3
+  0: $t3 := 0
+     # live vars: $t0, $t3
+     # events: e:$t3, b:$t2
+  1: $t2 := move($t3)
+     # live vars: $t0, $t2
+  2: label L0
+     # live vars: $t0, $t2
+     # events: b:$t5
+  3: $t5 := 42
+     # live vars: $t0, $t2, $t5
+     # events: e:$t5, b:$t4
+  4: $t4 := <($t2, $t5)
+     # live vars: $t0, $t2, $t4
+     # events: e:$t4
+  5: if ($t4) goto 6 else goto 12
+     # live vars: $t0, $t2
+  6: label L2
+     # live vars: $t0, $t2
+  7: $t0 := move($t0)
+     # live vars: $t0, $t2
+     # events: b:$t7
+  8: $t7 := 1
+     # live vars: $t0, $t2, $t7
+     # events: e:$t7, b:$t6
+  9: $t6 := +($t2, $t7)
+     # live vars: $t0, $t6
+     # events: e:$t6
+ 10: $t2 := move($t6)
+     # live vars: $t0, $t2
+ 11: goto 14
+     # live vars: $t0, $t2
+ 12: label L3
+     # live vars: $t0
+ 13: goto 16
+     # live vars: $t0, $t2
+ 14: label L4
+     # live vars: $t0, $t2
+     # events: e:$t2
+ 15: goto 2
+     # live vars: $t0
+ 16: label L1
+     # live vars: $t0
+     # events: e:$t0, b:$t1
+ 17: $t1 := move($t0)
+     # live vars: $t1
+     # events: e:$t1
+ 18: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+  0: $t0 := move($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64): u64 {
+     var $t1: u64 [unused]
+  0: $t0 := move($t0)
+  1: $t0 := move($t0)
+  2: return $t0
+}
+
+
+[variant baseline]
+public fun m::test3(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+  0: $t2 := 0
+  1: $t2 := move($t2)
+  2: $t4 := 1
+  3: $t4 := move($t4)
+  4: label L0
+  5: $t6 := 42
+  6: $t5 := <($t2, $t6)
+  7: if ($t5) goto 8 else goto 14
+  8: label L2
+  9: $t4 := move($t4)
+ 10: $t6 := 1
+ 11: $t6 := +($t2, $t6)
+ 12: $t2 := move($t6)
+ 13: goto 16
+ 14: label L3
+ 15: goto 18
+ 16: label L4
+ 17: goto 4
+ 18: label L1
+ 19: $t4 := move($t4)
+ 20: return $t4
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+  0: $t3 := 0
+  1: $t3 := move($t3)
+  2: label L0
+  3: $t5 := 42
+  4: $t4 := <($t3, $t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L2
+  7: $t0 := move($t0)
+  8: $t5 := 1
+  9: $t5 := +($t3, $t5)
+ 10: $t3 := move($t5)
+ 11: goto 14
+ 12: label L3
+ 13: goto 16
+ 14: label L4
+ 15: goto 2
+ 16: label L1
+ 17: $t0 := move($t0)
+ 18: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64): u64 {
+     var $t1: u64 [unused]
+  0: return $t0
+}
+
+
+[variant baseline]
+public fun m::test3(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+  0: $t2 := 0
+  1: $t4 := 1
+  2: label L0
+  3: $t6 := 42
+  4: $t5 := <($t2, $t6)
+  5: if ($t5) goto 6 else goto 11
+  6: label L2
+  7: $t6 := 1
+  8: $t6 := +($t2, $t6)
+  9: $t2 := move($t6)
+ 10: goto 13
+ 11: label L3
+ 12: goto 15
+ 13: label L4
+ 14: goto 2
+ 15: label L1
+ 16: return $t4
+}
+
+
+[variant baseline]
+public fun m::test4($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+  0: $t3 := 0
+  1: label L0
+  2: $t5 := 42
+  3: $t4 := <($t3, $t5)
+  4: if ($t4) goto 5 else goto 10
+  5: label L2
+  6: $t5 := 1
+  7: $t5 := +($t3, $t5)
+  8: $t3 := move($t5)
+  9: goto 12
+ 10: label L3
+ 11: goto 14
+ 12: label L4
+ 13: goto 1
+ 14: label L1
+ 15: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+public test1(Arg0: u64) /* def_idx: 0 */ {
+B0:
+	0: Ret
+}
+public test2(Arg0: u64): u64 /* def_idx: 1 */ {
+B0:
+	0: MoveLoc[0](Arg0: u64)
+	1: Ret
+}
+public test3(): u64 /* def_idx: 2 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+L2:	loc2: u64
+B0:
+	0: LdU64(0)
+	1: LdU64(1)
+	2: StLoc[0](loc0: u64)
+	3: StLoc[1](loc1: u64)
+B1:
+	4: LdU64(42)
+	5: StLoc[2](loc2: u64)
+	6: CopyLoc[1](loc1: u64)
+	7: MoveLoc[2](loc2: u64)
+	8: Lt
+	9: BrFalse(17)
+B2:
+	10: LdU64(1)
+	11: StLoc[2](loc2: u64)
+	12: MoveLoc[1](loc1: u64)
+	13: CopyLoc[2](loc2: u64)
+	14: Add
+	15: StLoc[1](loc1: u64)
+	16: Branch(18)
+B3:
+	17: Branch(19)
+B4:
+	18: Branch(4)
+B5:
+	19: MoveLoc[0](loc0: u64)
+	20: Ret
+}
+public test4(Arg0: u64): u64 /* def_idx: 3 */ {
+L0:	loc1: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[1](loc0: u64)
+B1:
+	2: LdU64(42)
+	3: StLoc[2](loc1: u64)
+	4: CopyLoc[1](loc0: u64)
+	5: MoveLoc[2](loc1: u64)
+	6: Lt
+	7: BrFalse(15)
+B2:
+	8: LdU64(1)
+	9: StLoc[2](loc1: u64)
+	10: MoveLoc[1](loc0: u64)
+	11: CopyLoc[2](loc1: u64)
+	12: Add
+	13: StLoc[1](loc0: u64)
+	14: Branch(16)
+B3:
+	15: Branch(17)
+B4:
+	16: Branch(2)
+B5:
+	17: MoveLoc[0](Arg0: u64)
+	18: Ret
+}
+}

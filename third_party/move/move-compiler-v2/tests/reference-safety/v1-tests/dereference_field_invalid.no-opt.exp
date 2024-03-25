@@ -1,0 +1,24 @@
+
+Diagnostics:
+error: mutable reference in local `s` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_field_invalid.move:12:9
+   │
+11 │         let f = &mut s.f;
+   │                 -------- previous mutable field borrow
+12 │         *s;
+   │         ^^ requirement enforced here
+13 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: mutable reference in local `s` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_field_invalid.move:16:9
+   │
+15 │         let f = id_mut(&mut s.f);
+   │                 ----------------
+   │                 │      │
+   │                 │      previous mutable field borrow
+   │                 used by mutable call result
+16 │         *s;
+   │         ^^ requirement enforced here
+17 │         *f;
+   │         -- conflicting reference `f` used here

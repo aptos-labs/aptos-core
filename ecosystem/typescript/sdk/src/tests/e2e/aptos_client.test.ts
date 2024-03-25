@@ -407,9 +407,7 @@ test(
     const txn = await client.submitSignedBCSTransaction(bcsTxn);
     expect(async () => {
       await client.waitForTransactionWithResult(txn.hash, { checkSuccess: true });
-    }).rejects.toThrow(
-      `Transaction ${txn.hash} failed with an error: Transaction Executed and Committed with Error NUMBER_OF_ARGUMENTS_MISMATCH`,
-    );
+    }).rejects.toThrow(`Transaction ${txn.hash} failed with an error: NUMBER_OF_ARGUMENTS_MISMATCH`);
   },
   longTestTimeout,
 );
