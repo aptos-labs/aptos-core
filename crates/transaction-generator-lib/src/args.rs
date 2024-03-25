@@ -23,6 +23,7 @@ pub enum TransactionTypeArg {
     // Simple EntryPoints
     NoOp,
     NoOpFeePayer,
+    NoOpKeyless,
     NoOp2Signers,
     NoOp5Signers,
     AccountResource32B,
@@ -157,6 +158,11 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::NoOpFeePayer => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::NopFeePayer,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::NoOpKeyless => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::NoOpKeyless,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

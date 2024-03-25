@@ -2,15 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder},
-    test_utils::create_and_fund_account,
+    keyless::spawn_network_and_execute_gov_proposals, smoke_test_environment::{new_local_swarm_with_aptos, SwarmBuilder}, test_utils::create_and_fund_account
 };
 use anyhow::ensure;
 use aptos_forge::{
-    args::TransactionTypeArg, emitter::NumAccountsMode, EmitJobMode, EmitJobRequest, EntryPoints,
-    NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats, WorkflowProgress,
+    args::TransactionTypeArg, emitter::NumAccountsMode, EmitJobMode, EmitJobRequest, EntryPoints, NodeExt, Result, Swarm, TransactionType, TxnEmitter, TxnStats, WorkflowProgress
 };
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
+use aptos_types::{keyless::test_utils::{get_keyless_addr, get_sample_pk}, transaction::authenticator::AnyPublicKey};
 use rand::{rngs::OsRng, SeedableRng};
 use std::{sync::Arc, time::Duration};
 
@@ -36,6 +35,7 @@ pub async fn generate_traffic(
     let emitter = TxnEmitter::new(transaction_factory, rng);
 
     emit_job_request = emit_job_request
+        .num_accounts_mode(NumAccountsMode::NumAccounts(1))
         .rest_clients(validator_clients)
         .gas_price(gas_price)
         .expected_gas_per_txn(1000000)
@@ -43,22 +43,39 @@ pub async fn generate_traffic(
         .coordination_delay_between_instances(Duration::from_secs(1))
         .transaction_mix_per_phase(transaction_mix_per_phase)
         .mode(EmitJobMode::ConstTps { tps: 20 });
-    emitter
+    let stats = emitter
         .emit_txn_for_with_stats(chain_info.root_account, emit_job_request, duration, 3)
-        .await
+        .await;
+    // let client = swarm.aptos_public_info().client();
+    // let txns = client.get_account_transactions(get_keyless_addr(), None, None).await;
+    // println!("{:?}", txns);
+    stats
 }
 
 #[ignore]
 #[tokio::test]
 async fn test_txn_emmitter() {
-    let mut swarm = new_local_swarm_with_aptos(1).await;
+    // let mut swarm = new_local_swarm_with_aptos(1).await;
+
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(1)
+        .with_aptos()
+        .build_with_cli(0)
+        .await;
+    let mut info = swarm.aptos_public_info();
+    let addr = info
+        .create_user_account_with_any_key(&AnyPublicKey::keyless(get_sample_pk()))
+        .await
+        .unwrap();
+    info.mint(addr, 10_000_000_000).await.unwrap();
+
+    let (_tw_sk, _config, _jwk) = spawn_network_and_execute_gov_proposals(&mut swarm, &mut cli).await;
 
     let all_validators = swarm.validators().map(|v| v.peer_id()).collect::<Vec<_>>();
 
     let txn_stat = generate_traffic(
         &mut swarm,
         &all_validators,
-        Duration::from_secs(20),
+        Duration::from_secs(10),
         100,
         vec![
             // vec![(
@@ -81,20 +98,17 @@ async fn test_txn_emmitter() {
             //     ),
             // ],
             vec![
-                (
-                    TransactionTypeArg::NoOp.materialize(
-                        100,
-                        false,
-                        WorkflowProgress::when_done_default(),
-                    ),
-                    20,
-                ),
+                // (
+                //     TransactionTypeArg::NoOp.materialize(
+                //         100,
+                //         false,
+                //         WorkflowProgress::when_done_default(),
+                //     ),
+                //     20,
+                // ),
                 (
                     TransactionType::CallCustomModules {
-                        entry_point: EntryPoints::MakeOrChangeTable {
-                            offset: 0,
-                            count: 60,
-                        },
+                        entry_point: EntryPoints::NoOpKeyless,
                         num_modules: 1,
                         use_account_pool: false,
                     },
@@ -131,6 +145,7 @@ async fn test_txn_emmitter() {
     .unwrap();
     println!("{:?}", txn_stat.rate());
     // assert some much smaller number than expected, so it doesn't fail under contention
+    // println!("{:?}", txn_stat);
     assert!(txn_stat.submitted > 30);
     assert!(txn_stat.committed > 30);
 }

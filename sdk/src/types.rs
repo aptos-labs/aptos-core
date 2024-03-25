@@ -15,9 +15,9 @@ use crate::{
     },
 };
 use anyhow::Result;
-use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_crypto::{ed25519::Ed25519Signature, SigningKey};
 use aptos_ledger::AptosLedgerError;
-use aptos_types::event::EventKey;
+use aptos_types::{event::EventKey, keyless::{test_utils::{get_keyless_addr, get_sample_esk, get_sample_groth16_sig_and_pk, get_sample_proof}, TransactionAndProof}, transaction::authenticator::EphemeralSignature};
 pub use aptos_types::*;
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
@@ -101,6 +101,32 @@ impl LocalAccount {
             .sequence_number(self.increment_sequence_number())
             .build();
         self.sign_transaction(raw_txn)
+    }
+
+    pub fn sign_keyless_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
+        let (mut sig, pk) = get_sample_groth16_sig_and_pk();
+
+        let raw_txn = builder
+            .sender(get_keyless_addr())
+            .sequence_number(self.increment_sequence_number())
+            .build();
+
+        let esk = get_sample_esk();
+        let proof = get_sample_proof();
+
+
+        let txn_and_zkp = TransactionAndProof {
+            message: raw_txn.clone(),
+            proof: Some(proof.into()),
+        };
+
+        let ephemeral_signature = EphemeralSignature::ed25519(esk.sign(&txn_and_zkp).unwrap());
+
+        sig.ephemeral_signature = ephemeral_signature;
+
+        println!("{:?}", self.sequence_number());
+
+        SignedTransaction::new_keyless(raw_txn, pk, sig)
     }
 
     pub fn sign_multi_agent_with_transaction_builder(

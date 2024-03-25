@@ -16,11 +16,12 @@ use crate::{
         Configuration, EphemeralCertificate, Groth16Proof, KeylessPublicKey, KeylessSignature,
         OpenIdSig, ZeroKnowledgeSig,
     },
-    transaction::{authenticator::EphemeralSignature, RawTransaction, SignedTransaction},
+    transaction::{authenticator::{AnyPublicKey, AuthenticationKey, EphemeralSignature}, RawTransaction, SignedTransaction},
 };
 use aptos_crypto::{
     ed25519::Ed25519PrivateKey, poseidon_bn254::fr_to_bytes_le, SigningKey, Uniform,
 };
+use move_core_types::account_address::AccountAddress;
 use once_cell::sync::Lazy;
 use ring::signature;
 
@@ -71,6 +72,18 @@ pub fn get_sample_groth16_zkp_and_statement() -> Groth16ProofAndStatement {
         },
         public_inputs_hash,
     }
+}
+
+pub fn get_sample_proof() -> Groth16Proof {
+    *SAMPLE_PROOF
+}
+
+pub fn get_sample_pk() -> KeylessPublicKey {
+    SAMPLE_PK.clone()
+}
+
+pub fn get_keyless_addr() -> AccountAddress {
+    AuthenticationKey::any_key(AnyPublicKey::keyless(SAMPLE_PK.clone())).account_address()
 }
 
 /// Note: Does not have a valid ephemeral signature. Use the SAMPLE_ESK to compute one over the

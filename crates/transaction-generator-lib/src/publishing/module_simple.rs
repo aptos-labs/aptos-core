@@ -122,6 +122,8 @@ pub enum EntryPoints {
     Nop,
     /// Empty (NoOp) function, signed by publisher as fee-payer
     NopFeePayer,
+    /// Empty (NoOp) function, signed by keyless
+    NoOpKeyless,
     /// Empty (NoOp) function, signed by 2 accounts
     Nop2Signers,
     /// Empty (NoOp) function, signed by 5 accounts
@@ -249,6 +251,7 @@ impl EntryPoints {
         match self {
             EntryPoints::Nop
             | EntryPoints::NopFeePayer
+            | EntryPoints::NoOpKeyless
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
             | EntryPoints::Step
@@ -298,6 +301,7 @@ impl EntryPoints {
         match self {
             EntryPoints::Nop
             | EntryPoints::NopFeePayer
+            | EntryPoints::NoOpKeyless
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
             | EntryPoints::Step
@@ -353,7 +357,7 @@ impl EntryPoints {
     ) -> TransactionPayload {
         match self {
             // 0 args
-            EntryPoints::Nop | EntryPoints::NopFeePayer => {
+            EntryPoints::Nop | EntryPoints::NopFeePayer | EntryPoints::NoOpKeyless => {
                 get_payload_void(module_id, ident_str!("nop").to_owned())
             },
             EntryPoints::Nop2Signers => {
@@ -662,6 +666,7 @@ impl EntryPoints {
         match self {
             EntryPoints::Nop
             | EntryPoints::NopFeePayer
+            | EntryPoints::NoOpKeyless
             | EntryPoints::Step
             | EntryPoints::GetCounter
             | EntryPoints::ResetData

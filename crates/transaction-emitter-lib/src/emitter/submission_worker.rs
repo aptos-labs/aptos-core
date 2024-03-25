@@ -15,6 +15,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
 };
 use aptos_transaction_generator_lib::TransactionGenerator;
+use aptos_types::keyless::test_utils::get_keyless_addr;
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
@@ -398,4 +399,7 @@ pub async fn submit_transactions(
             }
         },
     };
+    // let txns = client.get_account_transactions(get_keyless_addr(), None, None).await;
+    // println!("{:?}", txns);
+    // println!("keyless txns")
 }

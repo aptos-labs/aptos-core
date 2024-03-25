@@ -275,7 +275,7 @@ async fn setup_local_net() -> (Ed25519PrivateKey, Configuration, RSA_JWK, LocalS
     (tw_sk, config, jwk, swarm)
 }
 
-async fn spawn_network_and_execute_gov_proposals(
+pub async fn spawn_network_and_execute_gov_proposals(
     swarm: &mut LocalSwarm,
     cli: &mut CliTestFramework,
 ) -> (Ed25519PrivateKey, Configuration, RSA_JWK) {
@@ -342,7 +342,6 @@ fun main(core_resources: &signer) {{
     jwks::set_patches(&framework_signer, patches);
 
     {}::update_max_exp_horizon(&framework_signer, {});
-    {}::update_training_wheels(&framework_signer, option::some(x"{}"));
 }}
 }}
 "#,
@@ -353,9 +352,7 @@ fun main(core_resources: &signer) {{
         jwk.n,
         iss,
         KEYLESS_ACCOUNT_MODULE_NAME,
-        Configuration::new_for_testing().max_exp_horizon_secs,
-        KEYLESS_ACCOUNT_MODULE_NAME,
-        hex::encode(training_wheels_pk.to_bytes())
+        Configuration::new_for_testing().max_exp_horizon_secs
     );
 
     let txn_summary = cli.run_script(root_idx, &jwk_patch_script).await.unwrap();

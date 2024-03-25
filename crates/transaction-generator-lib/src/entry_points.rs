@@ -98,8 +98,19 @@ impl UserModuleTransactionGenerator for EntryPointTransactionGenerator {
             );
             let builder = txn_factory.payload(payload);
 
+            match entry_point {
+                EntryPoints::NoOpKeyless => {
+                    println!("keyless txn");
+                    return Some(account.sign_keyless_with_transaction_builder(builder))
+                }
+                _ => {}
+            }
+
             Some(match entry_point.multi_sig_additional_num() {
-                MultiSigConfig::None => account.sign_with_transaction_builder(builder),
+                MultiSigConfig::None => {
+                    println!("signing txn {}", account.sequence_number());
+                    account.sign_with_transaction_builder(builder)
+                },
                 MultiSigConfig::Random(_) => account.sign_multi_agent_with_transaction_builder(
                     additional_signers.as_ref().unwrap().iter().collect(),
                     builder,

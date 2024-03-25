@@ -433,9 +433,9 @@ impl EmitJobRequest {
                     NumAccountsMode::TransactionsPerAccount(transactions_per_account) => {
                         transactions_per_account
                     },
-                    _ => 10,
+                    _ => 100,
                 };
-                let transactions_per_account = min(transactions_per_account, tps);
+                // let transactions_per_account = min(transactions_per_account, tps);
                 assert!(
                     transactions_per_account > 0,
                     "TPS ({}) needs to be larger than 0",
@@ -668,6 +668,9 @@ impl TxnEmitter {
         ensure!(req.gas_price > 0, "gas_price is required to be non zero");
 
         let mode_params = req.calculate_mode_params();
+
+        println!("{:?}", mode_params);
+
         let num_accounts = mode_params.num_accounts;
 
         info!(
