@@ -120,7 +120,7 @@ module aptos_framework::reconfiguration {
             return
         };
 
-        reconfiguration_state::on_reconfig_start();
+        // reconfiguration_state::on_reconfig_start();
 
         // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we must process the collected fees
         // explicitly so that staking can distribute them.
@@ -154,7 +154,7 @@ module aptos_framework::reconfiguration {
             },
         );
 
-        reconfiguration_state::on_reconfig_finish();
+        // reconfiguration_state::on_reconfig_finish();
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {

@@ -49,6 +49,7 @@ module aptos_framework::reconfiguration_with_dkg {
         jwks::on_new_epoch();
         randomness_config::on_new_epoch();
         features::on_new_epoch(account);
+        reconfiguration::reconfigure();
     }
 
     /// Complete the current reconfiguration with DKG.
