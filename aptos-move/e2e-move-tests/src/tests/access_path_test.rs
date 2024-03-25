@@ -14,7 +14,6 @@ use move_binary_format::{
         StructDefinitionIndex, StructFieldInformation, StructHandle, StructHandleIndex,
         StructTypeParameter, TypeSignature,
     },
-    file_format_common::{COMPILER_VERSION_MAJOR_1, COMPILER_VERSION_MINOR_0},
     CompiledModule,
 };
 use move_core_types::{identifier::Identifier, vm_status::StatusCode};
@@ -31,8 +30,6 @@ fn access_path_panic() {
 
     let cm = CompiledModule {
         version: 6,
-        compiler_version_major: COMPILER_VERSION_MAJOR_1,
-        compiler_version_minor: COMPILER_VERSION_MINOR_0,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),

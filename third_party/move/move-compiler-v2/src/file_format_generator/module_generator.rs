@@ -96,9 +96,7 @@ impl ModuleGenerator {
         module_env: &ModuleEnv,
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_MAX,
-            compiler_version_major: file_format_common::COMPILER_VERSION_MAJOR_MAX,
-            compiler_version_minor: file_format_common::COMPILER_VERSION_MINOR_MAX,
+            version: file_format_common::VERSION_NEXT,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
             ..Default::default()
         };

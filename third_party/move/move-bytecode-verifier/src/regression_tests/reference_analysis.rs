@@ -14,7 +14,6 @@ use move_binary_format::{
         StructHandleIndex, TypeSignature, Visibility,
         Visibility::*,
     },
-    file_format_common::{COMPILER_VERSION_MAJOR_DEFAULT, COMPILER_VERSION_MINOR_DEFAULT},
     CompiledModule,
 };
 use move_core_types::{
@@ -121,8 +120,6 @@ fn too_many_locals() {
         .collect::<Vec<_>>();
     let module = CompiledModule {
         version: 5,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
@@ -172,8 +169,6 @@ fn too_many_locals() {
 fn borrow_graph() {
     let module = CompiledModule {
         version: 5,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
@@ -271,8 +266,6 @@ fn indirect_code() {
     assert_eq!(code.len(), (u16::MAX as usize));
     let module = CompiledModule {
         version: 5,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
