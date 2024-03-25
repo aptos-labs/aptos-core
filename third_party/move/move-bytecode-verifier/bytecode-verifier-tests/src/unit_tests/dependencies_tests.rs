@@ -1,10 +1,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::{
-    file_format::*,
-    file_format_common::{COMPILER_VERSION_MAJOR_DEFAULT, COMPILER_VERSION_MINOR_DEFAULT},
-};
+use move_binary_format::file_format::*;
 use move_bytecode_verifier::dependencies;
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, vm_status::StatusCode,
@@ -13,8 +10,6 @@ use move_core_types::{
 fn mk_script_function_module() -> CompiledModule {
     let m = CompiledModule {
         version: move_binary_format::file_format_common::VERSION_4,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MAJOR_DEFAULT,
         module_handles: vec![
             // only self module
             ModuleHandle {
@@ -100,8 +95,6 @@ fn mk_invoking_module(use_generic: bool, valid: bool) -> CompiledModule {
     };
     let m = CompiledModule {
         version: move_binary_format::file_format_common::VERSION_4,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         module_handles: vec![
             // self module
             ModuleHandle {
@@ -197,8 +190,6 @@ fn mk_invoking_script(use_generic: bool) -> CompiledScript {
     };
     let s = CompiledScript {
         version: move_binary_format::file_format_common::VERSION_4,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         module_handles: vec![
             // other module
             ModuleHandle {

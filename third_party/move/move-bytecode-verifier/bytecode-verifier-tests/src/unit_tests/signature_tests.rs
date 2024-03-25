@@ -3,12 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use invalid_mutations::signature::{FieldRefMutation, SignatureRefMutation};
-use move_binary_format::{
-    file_format::{Bytecode::*, CompiledModule, SignatureToken::*, Visibility::Public, *},
-    file_format_common::{
-        COMPILER_VERSION_MAJOR_DEFAULT, COMPILER_VERSION_MAJOR_MAX, COMPILER_VERSION_MINOR_DEFAULT,
-        COMPILER_VERSION_MINOR_MAX,
-    },
+use move_binary_format::file_format::{
+    Bytecode::*, CompiledModule, SignatureToken::*, Visibility::Public, *,
 };
 use move_bytecode_verifier::{
     verify_module, verify_module_with_config_for_test, SignatureChecker, VerifierConfig,
@@ -65,8 +61,7 @@ proptest! {
 fn no_verify_locals_good() {
     let compiled_module_good = CompiledModule {
         version: move_binary_format::file_format_common::VERSION_MAX,
-        compiler_version_major: COMPILER_VERSION_MAJOR_MAX,
-        compiler_version_minor: COMPILER_VERSION_MINOR_MAX,
+
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex(0),
@@ -170,8 +165,6 @@ fn big_signature_test() {
 
     let module = CompiledModule {
         version: 5,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),

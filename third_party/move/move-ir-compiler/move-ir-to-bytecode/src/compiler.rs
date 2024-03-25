@@ -12,9 +12,7 @@ use move_binary_format::{
         StructHandleIndex, StructTypeParameter, TableIndex, TypeParameterIndex, TypeSignature,
         Visibility,
     },
-    file_format_common::{
-        COMPILER_VERSION_MAJOR_DEFAULT, COMPILER_VERSION_MINOR_DEFAULT, VERSION_DEFAULT,
-    },
+    file_format_common::VERSION_DEFAULT,
 };
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::value::{MoveTypeLayout, MoveValue};
@@ -379,8 +377,6 @@ pub fn compile_script<'a>(
     ) = context.materialize_pools();
     let script = CompiledScript {
         version: VERSION_DEFAULT,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         module_handles,
         struct_handles,
         function_handles,
@@ -473,8 +469,6 @@ pub fn compile_module<'a>(
     ) = context.materialize_pools();
     let module = CompiledModule {
         version: VERSION_DEFAULT,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         module_handles,
         self_module_handle_idx,
         struct_handles,
@@ -554,8 +548,6 @@ fn compile_explicit_dependency_declarations(
         ) = context.materialize_pools();
         let compiled_module = CompiledModule {
             version: VERSION_DEFAULT,
-            compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-            compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
             module_handles,
             self_module_handle_idx,
             struct_handles,

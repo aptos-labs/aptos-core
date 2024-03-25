@@ -1,11 +1,8 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use move_binary_format::{
-    file_format::{
-        Bytecode::*, CodeUnit, CompiledScript, Signature, SignatureIndex, SignatureToken::*,
-    },
-    file_format_common::{COMPILER_VERSION_MAJOR_DEFAULT, COMPILER_VERSION_MINOR_DEFAULT},
+use move_binary_format::file_format::{
+    Bytecode::*, CodeUnit, CompiledScript, Signature, SignatureIndex, SignatureToken::*,
 };
 use move_vm_runtime::move_vm::MoveVM;
 use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
@@ -21,8 +18,6 @@ fn leak_with_abort() {
     }
     let cs = CompiledScript {
         version: 6,
-        compiler_version_major: COMPILER_VERSION_MAJOR_DEFAULT,
-        compiler_version_minor: COMPILER_VERSION_MINOR_DEFAULT,
         module_handles: vec![],
         struct_handles: vec![],
         function_handles: vec![],
