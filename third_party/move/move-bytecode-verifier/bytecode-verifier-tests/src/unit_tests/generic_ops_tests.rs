@@ -14,6 +14,7 @@ use move_core_types::{
 fn make_module() -> CompiledModule {
     CompiledModule {
         version: move_binary_format::file_format_common::VERSION_MAX,
+        compiler_id: String::new(),
         module_handles: vec![
             // only self module
             ModuleHandle {

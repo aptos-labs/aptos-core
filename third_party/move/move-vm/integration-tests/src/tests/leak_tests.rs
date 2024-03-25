@@ -18,6 +18,7 @@ fn leak_with_abort() {
     }
     let cs = CompiledScript {
         version: 6,
+        compiler_id: String::new(),
         module_handles: vec![],
         struct_handles: vec![],
         function_handles: vec![],

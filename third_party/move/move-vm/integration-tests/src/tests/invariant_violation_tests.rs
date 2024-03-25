@@ -13,6 +13,7 @@ use move_vm_test_utils::{gas_schedule::GasStatus, InMemoryStorage};
 fn merge_borrow_states_infinite_loop() {
     let cs = CompiledScript {
         version: 6,
+        compiler_id: String::new(),
         module_handles: vec![],
         struct_handles: vec![],
         function_handles: vec![],

@@ -2016,6 +2016,8 @@ pub struct CompiledScript {
     pub type_parameters: Vec<AbilitySet>,
 
     pub parameters: SignatureIndex,
+    /// The compiler that generates the module
+    pub compiler_id: String,
 }
 
 impl CompiledScript {
@@ -2078,6 +2080,8 @@ pub struct CompiledModule {
     pub struct_defs: Vec<StructDefinition>,
     /// Function defined in this module.
     pub function_defs: Vec<FunctionDefinition>,
+    /// The compiler that generates the module
+    pub compiler_id: String,
 }
 
 // Need a custom implementation of Arbitrary because as of proptest-derive 0.1.1, the derivation
@@ -2116,6 +2120,7 @@ impl Arbitrary for CompiledScript {
                     // TODO actual constant generation
                     CompiledScript {
                         version: file_format_common::VERSION_MAX,
+                        compiler_id: String::new(),
                         module_handles,
                         struct_handles,
                         function_handles,
@@ -2172,6 +2177,7 @@ impl Arbitrary for CompiledModule {
                     // TODO actual constant generation
                     CompiledModule {
                         version: file_format_common::VERSION_MAX,
+                        compiler_id: String::new(),
                         module_handles,
                         struct_handles,
                         function_handles,
@@ -2256,6 +2262,7 @@ impl CompiledModule {
 pub fn empty_module() -> CompiledModule {
     CompiledModule {
         version: file_format_common::VERSION_MAX,
+        compiler_id: String::new(),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
             name: IdentifierIndex(0),
@@ -2338,6 +2345,7 @@ pub fn basic_test_module() -> CompiledModule {
 pub fn empty_script() -> CompiledScript {
     CompiledScript {
         version: file_format_common::VERSION_MAX,
+        compiler_id: String::new(),
         module_handles: vec![],
         struct_handles: vec![],
         function_handles: vec![],

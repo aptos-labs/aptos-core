@@ -61,6 +61,7 @@ proptest! {
 fn no_verify_locals_good() {
     let compiled_module_good = CompiledModule {
         version: move_binary_format::file_format_common::VERSION_MAX,
+        compiler_id: String::new(),
 
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
@@ -165,6 +166,7 @@ fn big_signature_test() {
 
     let module = CompiledModule {
         version: 5,
+        compiler_id: String::new(),
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),

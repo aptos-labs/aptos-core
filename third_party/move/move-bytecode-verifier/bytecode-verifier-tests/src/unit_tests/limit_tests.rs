@@ -197,6 +197,7 @@ fn big_vec_unpacks() {
     };
     let module = CompiledModule {
         version: 5,
+        compiler_id: String::new(),
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),
