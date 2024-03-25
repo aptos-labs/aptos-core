@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Performs strict acquire analysis as outlined in the move book, that is:
-//! A Move function m::f must be annotated with acquires T if and only if,
-//! - The body of m::f contains a move_from<T>, borrow_global_mut<T>, or borrow_global<T> instruction, or
-//! - The body of m::f invokes a function m::g declared in the same module that is annotated with acquires
+//! A Move function `m::f` must be annotated with acquires `T`` if and only if,
+//! - The body of `m::f` contains a `move_from<T>`, `borrow_global_mut<T>`, or `borrow_global<T>` instruction, or
+//! - The body of `m::f` invokes a function `m::g` declared in the same module that is annotated with acquires
 
 use move_binary_format::file_format;
 use move_model::{
