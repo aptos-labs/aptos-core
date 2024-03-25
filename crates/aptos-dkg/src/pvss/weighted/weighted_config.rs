@@ -124,7 +124,6 @@ impl WeightedConfig {
     ///
     /// Returns the index of this player's share in the vector of shares, or None if out of bounds.
     pub fn get_share_index(&self, i: usize, j: usize) -> Option<usize> {
-        assert_lt!(i, self.tc.n);
         if j < self.weight[i] {
             Some(self.starting_index[i] + j)
         } else {
