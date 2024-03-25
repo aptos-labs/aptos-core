@@ -61,8 +61,15 @@ impl AptosDebugger {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
+        for i in 0..10000 {
+            let result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
+                .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+            if i == 9999 {
+                return Ok(result);
+            }
+            println!("Finished round {} with {} transactions", i, sig_verified_txns.len());
+        }
+        panic!();
     }
 
     pub fn execute_transaction_at_version_with_gas_profiler(

@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use core::panic;
+
 use crate::bounded_math::SignedU128;
 use aptos_logger::error;
 // TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
@@ -47,7 +49,8 @@ pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
         message
     );
     error!("{}", msg);
-    PanicError::CodeInvariantError(msg)
+    panic!("{}", msg);
+    // PanicError::CodeInvariantError(msg)
 }
 
 pub fn expect_ok<V, E: std::fmt::Debug>(value: Result<V, E>) -> Result<V, PanicError> {
