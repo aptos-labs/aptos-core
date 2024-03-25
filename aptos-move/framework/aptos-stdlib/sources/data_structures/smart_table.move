@@ -256,7 +256,7 @@ module aptos_std::smart_table {
                         }
                     };
                 };
-                starting_vector_index = 0;
+                starting_vector_index = 0; // Start parsing the next bucket at vector index 0.
             };
         };
         (keys, option::none(), option::none())

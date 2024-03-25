@@ -695,7 +695,7 @@ pagination is complete. For an example, see <code>test_keys()</code>.
                     }
                 };
             };
-            starting_vector_index = 0;
+            starting_vector_index = 0; // Start parsing the next bucket at <a href="../../move-stdlib/doc/vector.md#0x1_vector">vector</a> index 0.
         };
     };
     (keys, <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
