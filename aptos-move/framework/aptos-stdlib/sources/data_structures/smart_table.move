@@ -13,6 +13,7 @@ module aptos_std::smart_table {
     use aptos_std::math64::max;
     use aptos_std::simple_map::SimpleMap;
     use aptos_std::simple_map;
+    use std::option::{Self, Option};
 
     /// Key not found in the smart table
     const ENOT_FOUND: u64 = 1;
@@ -205,10 +206,11 @@ module aptos_std::smart_table {
     ///
     /// When starting pagination, pass `starting_bucket_index` = `starting_vector_index` = 0.
     ///
-    /// The function will then return a vector of keys, a bucket index, and a vector index. The
-    /// return indices can then be used as inputs to another pagination call, which will return a
-    /// vector of more keys. This process can be repeated until the returned bucket index and vector
-    /// index values are both 0, which means that pagination is complete.
+    /// The function will then return a vector of keys, an optional bucket index, and an optional
+    /// vector index. The unpacked return indices can then be used as inputs to another pagination
+    /// call, which will return a vector of more keys. This process can be repeated until the
+    /// returned bucket index and vector index value options are both none, which means that
+    /// pagination is complete. For an example, see `test_keys()`.
     public fun keys_paginated<K: store + copy + drop, V: store + copy>(
         table_ref: &SmartTable<K, V>,
         starting_bucket_index: u64,
@@ -216,8 +218,8 @@ module aptos_std::smart_table {
         num_keys_to_get: u64,
     ): (
         vector<K>,
-        u64,
-        u64,
+        Option<u64>,
+        Option<u64>,
     ) {
         let keys = vector[];
         if (num_keys_to_get > 0) {
@@ -243,18 +245,22 @@ module aptos_std::smart_table {
                     num_keys_checked = num_keys_checked + 1;
                     vector_index = vector_index + 1;
                     if (num_keys_checked == num_keys_to_get) {
-                        if (vector_index == bucket_length) {
-                            vector_index = 0;
+                        return if (vector_index == bucket_length) {
                             bucket_index = bucket_index + 1;
-                            bucket_index = if (bucket_index < num_buckets) bucket_index else 0;
-                        };
-                        return (keys, bucket_index, vector_index)
+                            if (bucket_index < num_buckets) {
+                                (keys, option::some(bucket_index), option::some(0))
+                            } else {
+                                (keys, option::none(), option::none())
+                            }
+                        } else {
+                            (keys, option::some(bucket_index), option::some(vector_index))
+                        }
                     };
                 };
                 vector_index = 0;
             };
         };
-        (keys, 0, 0)
+        (keys, option::none(), option::none())
     }
 
     /// Decide which is the next bucket to split and split it into two with the elements inside the bucket.
@@ -628,14 +634,14 @@ module aptos_std::smart_table {
         assert!(vector::is_empty(&keys), 0);
         let starting_bucket_index = 0;
         let starting_vector_index = 0;
-        (keys, starting_bucket_index, starting_vector_index) = keys_paginated(
+        let (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
             &table,
             starting_bucket_index,
             starting_vector_index,
             0
         );
-        assert!(starting_bucket_index == 0, 0);
-        assert!(starting_vector_index == 0, 0);
+        assert!(starting_bucket_index_r == option::none(), 0);
+        assert!(starting_vector_index_r == option::none(), 0);
         assert!(vector::is_empty(&keys), 0);
         while (i < 100) {
             add(&mut table, i, 0);
@@ -653,14 +659,19 @@ module aptos_std::smart_table {
         let returned_keys = vector[];
         vector::length(&returned_keys); // To eliminate erroneous compiler "unused" warning
         loop {
-            (returned_keys, starting_bucket_index, starting_vector_index) = keys_paginated(
+            (returned_keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
                 &table,
                 starting_bucket_index,
                 starting_vector_index,
                 15
             );
             vector::append(&mut keys, returned_keys);
-            if (starting_bucket_index == 0 && starting_vector_index == 0) break;
+            if (
+                starting_bucket_index_r == option::none() ||
+                starting_vector_index_r == option::none()
+            ) break;
+            starting_bucket_index = option::destroy_some(starting_bucket_index_r);
+            starting_vector_index = option::destroy_some(starting_vector_index_r);
         };
         assert!(vector::length(&keys) == vector::length(&expected_keys), 0);
         vector::for_each_ref(&keys, |e_ref| {
@@ -670,21 +681,21 @@ module aptos_std::smart_table {
         table = new();
         add(&mut table, 1, 0);
         add(&mut table, 2, 0);
-        (keys, starting_bucket_index, starting_vector_index) = keys_paginated(&table, 0, 0, 1);
-        (returned_keys, starting_bucket_index, starting_vector_index) = keys_paginated(
+        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(&table, 0, 0, 1);
+        (returned_keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
             &table,
-            starting_bucket_index,
-            starting_vector_index,
+            option::destroy_some(starting_bucket_index_r),
+            option::destroy_some(starting_vector_index_r),
             1,
         );
         vector::append(&mut keys, returned_keys);
         assert!(keys == vector[1, 2] || keys == vector[2, 1], 0);
-        assert!(starting_bucket_index == 0, 0);
-        assert!(starting_vector_index == 0, 0);
-        (keys, starting_bucket_index, starting_vector_index) = keys_paginated(&table, 0, 0, 0);
+        assert!(starting_bucket_index_r == option::none(), 0);
+        assert!(starting_vector_index_r == option::none(), 0);
+        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(&table, 0, 0, 0);
         assert!(keys == vector[], 0);
-        assert!(starting_bucket_index == 0, 0);
-        assert!(starting_vector_index == 0, 0);
+        assert!(starting_bucket_index_r == option::none(), 0);
+        assert!(starting_vector_index_r == option::none(), 0);
         destroy(table);
     }
 
