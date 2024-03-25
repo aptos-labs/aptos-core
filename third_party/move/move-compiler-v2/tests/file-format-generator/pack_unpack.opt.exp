@@ -11,6 +11,7 @@ struct S {
 }
 
 pack(Arg0: u64, Arg1: u64): S /* def_idx: 0 */ {
+L2:	loc0: T
 B0:
 	0: MoveLoc[1](Arg1: u64)
 	1: Pack[0](T)

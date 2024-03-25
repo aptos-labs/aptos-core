@@ -276,6 +276,7 @@ B0:
 	0: Ret
 }
 public test(Arg0: bool, Arg1: u32) /* def_idx: 2 */ {
+L2:	loc0: u32
 B0:
 	0: CopyLoc[1](Arg1: u32)
 	1: StLoc[2](loc0: u32)
@@ -303,6 +304,8 @@ B6:
 	17: Ret
 }
 public test_struct(Arg0: bool, Arg1: W) /* def_idx: 3 */ {
+L2:	loc0: W
+L3:	loc1: W
 B0:
 	0: CopyLoc[1](Arg1: W)
 	1: StLoc[2](loc0: W)

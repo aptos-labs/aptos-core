@@ -368,7 +368,8 @@ B5:
 	20: Ret
 }
 public test4(Arg0: u64): u64 /* def_idx: 3 */ {
-L0:	loc1: u64
+L1:	loc0: u64
+L2:	loc1: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[1](loc0: u64)

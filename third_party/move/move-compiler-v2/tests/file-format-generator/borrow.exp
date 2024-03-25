@@ -21,6 +21,7 @@ struct S {
 }
 
 field(Arg0: &S): u64 /* def_idx: 0 */ {
+L1:	loc0: &u64
 B0:
 	0: MoveLoc[0](Arg0: &S)
 	1: ImmBorrowField[0](S.f: u64)
@@ -30,7 +31,8 @@ B0:
 	5: Ret
 }
 local(Arg0: u64): u64 /* def_idx: 1 */ {
-L0:	loc1: &u64
+L1:	loc0: u64
+L2:	loc1: &u64
 B0:
 	0: LdU64(33)
 	1: StLoc[1](loc0: u64)
@@ -41,6 +43,7 @@ B0:
 	6: Ret
 }
 param(Arg0: u64): u64 /* def_idx: 2 */ {
+L1:	loc0: &u64
 B0:
 	0: ImmBorrowLoc[0](Arg0: u64)
 	1: StLoc[1](loc0: &u64)
@@ -49,6 +52,7 @@ B0:
 	4: Ret
 }
 mut_field(Arg0: &mut S): u64 /* def_idx: 3 */ {
+L1:	loc0: &mut u64
 B0:
 	0: MoveLoc[0](Arg0: &mut S)
 	1: MutBorrowField[0](S.f: u64)
@@ -61,7 +65,8 @@ B0:
 	8: Ret
 }
 mut_local(Arg0: u64): u64 /* def_idx: 4 */ {
-L0:	loc1: &mut u64
+L1:	loc0: u64
+L2:	loc1: &mut u64
 B0:
 	0: LdU64(33)
 	1: StLoc[1](loc0: u64)
@@ -75,6 +80,7 @@ B0:
 	9: Ret
 }
 mut_param(Arg0: u64): u64 /* def_idx: 5 */ {
+L1:	loc0: &mut u64
 B0:
 	0: MutBorrowLoc[0](Arg0: u64)
 	1: StLoc[1](loc0: &mut u64)

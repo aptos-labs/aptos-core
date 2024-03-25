@@ -225,6 +225,7 @@ module c0ffee.m {
 
 
 public test1(Arg0: u64, Arg1: u64, Arg2: u64) /* def_idx: 0 */ {
+L3:	loc0: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[3](loc0: u64)
@@ -253,6 +254,8 @@ B5:
 	19: Ret
 }
 public test2(Arg0: u64, Arg1: u64) /* def_idx: 1 */ {
+L2:	loc0: u64
+L3:	loc1: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[2](loc0: u64)
