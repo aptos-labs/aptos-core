@@ -172,7 +172,7 @@ pub struct OrderVote {
     author: Author,
     /// LedgerInfo of a block that is going to be ordered in case this vote gathers QC.
     ledger_info: LedgerInfo,
-    /// Signature of the LedgerInfo
+    /// Signature of the LedgerInfo.
     signature: bls12381::Signature,
 }
 
@@ -215,8 +215,7 @@ impl OrderVote {
     }
 
     pub fn epoch(&self) -> u64 {
-        // TODO: Is this correct?
-        self.ledger_info.epoch() + 1
+        self.ledger_info.epoch()
     }
 
     /// Verifies that the consensus data hash of LedgerInfo corresponds to the vote info,

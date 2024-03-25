@@ -40,7 +40,7 @@ use aptos_consensus_types::{
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
     vote::Vote,
-    vote_msg::VoteMsg,
+    vote_msg::{VoteMsg, OrderVoteMsg},
 };
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
@@ -983,6 +983,18 @@ impl RoundManager {
             .await
     }
 
+    async fn process_order_vote_msg(&mut self, order_vote: &OrderVoteMsg) -> anyhow::Result<()> {
+        let order_vote = order_vote.vote();
+        let round = order_vote.ledger_info().round();
+        let block_id = order_vote.ledger_info().consensus_block_id();
+        
+        let vote_reception_result = self
+            .round_state
+            .insert_order_vote(order_vote, &self.epoch_state.verifier);
+        self.process_vote_reception_result(order_vote, vote_reception_result)
+            .await
+    }
+
     async fn process_vote_reception_result(
         &mut self,
         vote: &Vote,
@@ -1161,13 +1173,19 @@ impl RoundManager {
                     let result = match event {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
-                        }
+                        },
+                        VerifiedEvent:OrderVoteMsg(order_vote_msg) => {
+                            monitor!(
+                                "order_vote_msg",
+                                self.process_order_vote_msg(*order_vote_msg).await
+                            )
+                        },
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {
                             monitor!(
                                 "process_sync_info",
                                 self.process_sync_info_msg(*sync_info, peer_id).await
                             )
-                        }
+                        },
                         VerifiedEvent::LocalTimeout(round) => monitor!(
                             "process_local_timeout",
                             self.process_local_timeout(round).await
