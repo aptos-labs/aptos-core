@@ -394,7 +394,7 @@ impl UserModuleTransactionGenerator for EconiaRealOrderTransactionGenerator {
         _rng: &mut StdRng,
     ) -> Arc<TransactionGeneratorWorker> {
         Arc::new(move |account, package, publisher, txn_factory, rng, _txn_counter, history, market_maker| {
-            println!("EconiaRealOrderTransactionGenerator. account: {}, history: {:?}", account.address(), history);
+            // println!("EconiaRealOrderTransactionGenerator. account: {}, history: {:?}", account.address(), history);
             let size = rng.gen_range(4, 10000);
             if market_maker || rng.gen_range(0, 1000) < 138 {
                 // Market makers always do only limit and cancel orders

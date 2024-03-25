@@ -188,13 +188,13 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
     fn generate_transactions(
         &mut self,
         _account: &LocalAccount,
-        num_to_create: usize,
+        _num_to_create: usize,
         _history: &Vec<String>,
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
-        println!("ReuseAccountsPoolWrapperGenerator::generate_transactions: num_to_create: {}", num_to_create);
+        // println!("ReuseAccountsPoolWrapperGenerator::generate_transactions: num_to_create: {}", num_to_create);
         if self.market_makers.len() < 7 {
-            println!("ReuseAccountsPoolWrapperGenerator::loading_market_maker {}", self.market_makers.len());
+            // println!("ReuseAccountsPoolWrapperGenerator::loading_market_maker {}", self.market_makers.len());
             self.market_makers = self.source_accounts_pool.take_from_pool(7, true, &mut StdRng::from_entropy());
         }
         // println!("generate_transactions: num_to_create: {}", num_to_create);
