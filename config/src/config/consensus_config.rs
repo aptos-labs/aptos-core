@@ -70,6 +70,7 @@ pub struct ConsensusConfig {
     pub max_blocks_per_receiving_request: u64,
     pub max_blocks_per_receiving_request_quorum_store_override: u64,
     pub broadcast_vote: bool,
+    pub proof_cache_capacity: u64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -285,6 +286,7 @@ impl Default for ConsensusConfig {
             max_blocks_per_receiving_request: 10,
             max_blocks_per_receiving_request_quorum_store_override: 100,
             broadcast_vote: true,
+            proof_cache_capacity: 10_000,
         }
     }
 }

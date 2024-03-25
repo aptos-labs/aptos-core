@@ -231,7 +231,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_manager: Arc::new(PayloadManager::DirectMempool),
             rand_storage,
             proof_cache: Cache::builder()
-                .max_capacity(10_000)
+                .max_capacity(node_config.consensus.proof_cache_capacity)
                 .initial_capacity(1_000)
                 .time_to_live(Duration::from_secs(20))
                 .build(),
