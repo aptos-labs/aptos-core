@@ -60,11 +60,11 @@ spec aptos_framework::consensus_config {
         let addr = signer::address_of(account);
         /// [high-level-req-2]
         aborts_if !system_addresses::is_aptos_framework_address(addr);
+        aborts_if !chain_status::is_operating();
         aborts_if !exists<ConsensusConfig>(@aptos_framework);
         /// [high-level-req-3.2]
         aborts_if !(len(config) > 0);
 
-        requires chain_status::is_operating();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
