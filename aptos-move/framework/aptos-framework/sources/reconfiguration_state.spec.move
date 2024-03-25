@@ -51,7 +51,6 @@ spec aptos_framework::reconfiguration_state {
         use aptos_std::type_info;
         use std::bcs;
         aborts_if false;
-        requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let state = Any {
             type_name: type_info::type_name<StateActive>(),
             data: bcs::serialize(StateActive {
