@@ -1,12 +1,24 @@
 script {
     use aptos_framework::aptos_governance;
-    use aptos_framework::jwks;
+    use aptos_framework::jwk_consensus_config;
+    use std::string::utf8;
 
-    fun main(core_resources: &signer) {
-        let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
-        let issuer = b"test.oidc.provider";
-        let config_url = b"https://storage.googleapis.com/aptos-keyless-jwks/keys.json";
-        jwks::upsert_oidc_provider(&framework, issuer, config_url);
+    fun main(proposal_id: u64) {
+        let framework = aptos_governance::resolve_multi_step_proposal(
+            proposal_id,
+            @0x1,
+            {{ script_hash }},
+        );
+        let provider_google = jwk_consensus_config::new_oidc_provider(
+            utf8(b"https://accounts.google.com"),
+            utf8(b"https://accounts.google.com/.well-known/openid-configuration"),
+        );
+        let provider_test = jwk_consensus_config::new_oidc_provider(
+            utf8(b"test.oidc.provider"),
+            utf8(b"https://storage.googleapis.com/aptos-keyless-jwks/keys.json"),
+        );
+        let config = jwk_consensus_config::new_v1(vector[provider_google, provider_test]);
+        jwk_consensus_config::set_for_next_epoch(&framework, config);
         aptos_governance::reconfigure(&framework);
     }
 }
