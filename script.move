@@ -3,7 +3,7 @@ script {
     use aptos_framework::jwk_consensus_config;
     use std::string::utf8;
 
-    fun main(proposal_id: u64) {
+    fun main(core_resources: &signer) {
         let framework = aptos_governance::get_signer_testnet_only(core_resources, @0x1);
         let provider_google = jwk_consensus_config::new_oidc_provider(
             utf8(b"https://accounts.google.com"),
