@@ -32,9 +32,7 @@ module 0x42::m {
     struct S {
         dummy_field: bool,
     }
-    private fun f1()
-        acquires m::S(*)
-     {
+    private fun f1() {
         Tuple()
     }
     private fun f10(x: u64)
@@ -62,9 +60,7 @@ module 0x42::m {
      {
         Tuple()
     }
-    private fun f4()
-        acquires m::S(*)
-     {
+    private fun f4() {
         Tuple()
     }
     private fun f5()
@@ -93,7 +89,6 @@ module 0x42::m {
         Tuple()
     }
     private fun f_multiple()
-        acquires m::R(*)
         reads m::R(*)
         writes m::T(*)
         writes m::S(*)
