@@ -1,6 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Performs strict acquire analysis as outlined in the move book, that is:
+//! A Move function m::f must be annotated with acquires T if and only if,
+//! - The body of m::f contains a move_from<T>, borrow_global_mut<T>, or borrow_global<T> instruction, or
+//! - The body of m::f invokes a function m::g declared in the same module that is annotated with acquires
+
 use move_binary_format::file_format;
 use move_model::{
     ast::{AddressSpecifier, ExpData, Operation, ResourceSpecifier},
@@ -9,6 +14,7 @@ use move_model::{
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+/// Performs acquire checking
 pub fn acquires_checker(env: &GlobalEnv) {
     for module in env.get_modules() {
         if module.is_target() {
@@ -42,6 +48,7 @@ pub fn acquires_checker(env: &GlobalEnv) {
     }
 }
 
+/// Gets the acquried resources declared by `acquire R`
 fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
     if let Some(access_specifiers) = fun_env.get_access_specifiers() {
         access_specifiers
@@ -74,7 +81,9 @@ fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
 }
 
 enum AcquiredAt {
+    /// Acquired by move_from<T>, borrow_global_mut<T>, or borrow_global<T>
     Directly(Loc),
+    /// Acquired by a call to another function
     Indirectly(Loc, FunId),
 }
 
@@ -88,9 +97,11 @@ impl AcquiredAt {
     }
 }
 
+/// Maps to resource acquired by where it's acquired
 struct AcquiredResources(BTreeMap<StructId, AcquiredAt>);
 
 impl AcquiredResources {
+    /// Joins the resources acquired by `other_fun`
     fn join(&mut self, other_fun: FunId, other_fun_called_at: Loc, other_acquries: &Self) -> bool {
         let mut changed = false;
         for (sid, _) in other_acquries.0.iter() {
