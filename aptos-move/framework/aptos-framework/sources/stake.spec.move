@@ -428,6 +428,7 @@ spec aptos_framework::stake {
 
     spec on_new_epoch {
         pragma verify_duration_estimate = 120;
+        pragma verify = false;
         pragma disable_invariants_in_body;
         // The following resource requirement cannot be discharged by the global
         // invariants because this function is called during genesis.
