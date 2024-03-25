@@ -52,10 +52,10 @@ module aptos_framework::reconfiguration_with_dkg {
         reconfiguration::reconfigure();
     }
 
-    /// Complete the current reconfiguration with DKG.
-    /// Abort if no DKG is in progress.
-    fun finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
-        dkg::finish(dkg_result);
-        finish(account);
-    }
+    // /// Complete the current reconfiguration with DKG.
+    // /// Abort if no DKG is in progress.
+    // fun finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
+    //     dkg::finish(dkg_result);
+    //     finish(account);
+    // }
 }

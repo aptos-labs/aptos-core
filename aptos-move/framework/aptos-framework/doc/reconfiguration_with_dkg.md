@@ -8,11 +8,9 @@ Reconfiguration with DKG helper functions.
 
 -  [Function `try_start`](#0x1_reconfiguration_with_dkg_try_start)
 -  [Function `finish`](#0x1_reconfiguration_with_dkg_finish)
--  [Function `finish_with_dkg_result`](#0x1_reconfiguration_with_dkg_finish_with_dkg_result)
 -  [Specification](#@Specification_0)
     -  [Function `try_start`](#@Specification_0_try_start)
     -  [Function `finish`](#@Specification_0_finish)
-    -  [Function `finish_with_dkg_result`](#@Specification_0_finish_with_dkg_result)
 
 
 <pre><code><b>use</b> <a href="consensus_config.md#0x1_consensus_config">0x1::consensus_config</a>;
@@ -110,33 +108,6 @@ Run the default reconfiguration to enter the new epoch.
 
 </details>
 
-<a id="0x1_reconfiguration_with_dkg_finish_with_dkg_result"></a>
-
-## Function `finish_with_dkg_result`
-
-Complete the current reconfiguration with DKG.
-Abort if no DKG is in progress.
-
-
-<pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_dkg_result">finish_with_dkg_result</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_dkg_result">finish_with_dkg_result</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
-    <a href="dkg.md#0x1_dkg_finish">dkg::finish</a>(dkg_result);
-    <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">finish</a>(<a href="account.md#0x1_account">account</a>);
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="@Specification_0"></a>
 
 ## Specification
@@ -211,25 +182,6 @@ Abort if no DKG is in progress.
     <b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochRequirement">config_buffer::OnNewEpochRequirement</a>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">randomness_config::RandomnessConfig</a>&gt;;
     <b>aborts_if</b> <b>false</b>;
 }
-</code></pre>
-
-
-
-<a id="@Specification_0_finish_with_dkg_result"></a>
-
-### Function `finish_with_dkg_result`
-
-
-<pre><code><b>fun</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish_with_dkg_result">finish_with_dkg_result</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, dkg_result: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
-<b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">FinishRequirement</a>;
-<b>requires</b> <a href="dkg.md#0x1_dkg_has_incomplete_session">dkg::has_incomplete_session</a>();
-<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
