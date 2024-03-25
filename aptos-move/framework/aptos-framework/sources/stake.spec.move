@@ -690,6 +690,8 @@ spec aptos_framework::stake {
     }
 
     spec add_stake {
+        // TODO: These function passed locally however failed in github CI
+        pragma verify_duration_estimate = 120;
         // TODO(fa_migration)
         pragma aborts_if_is_partial;
         aborts_if reconfiguration_state::spec_is_in_progress();
