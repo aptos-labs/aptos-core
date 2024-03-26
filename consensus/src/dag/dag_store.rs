@@ -447,6 +447,7 @@ impl InMemDag {
 }
 
 pub struct DagStore {
+    dag_id: u8,
     dag: RwLock<InMemDag>,
     storage: Arc<dyn DAGStorage>,
     payload_manager: Arc<dyn TPayloadManager>,
@@ -454,17 +455,19 @@ pub struct DagStore {
 
 impl DagStore {
     pub fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
         start_round: Round,
         window_size: u64,
     ) -> Self {
-        let mut all_nodes = storage.get_certified_nodes().unwrap_or_default();
+        let mut all_nodes = storage.get_certified_nodes(dag_id).unwrap_or_default();
         all_nodes.sort_unstable_by_key(|(_, node)| node.round());
         let mut to_prune = vec![];
         // Reconstruct the continuous dag starting from start_round and gc unrelated nodes
         let dag = Self::new_empty(
+            dag_id,
             epoch_state,
             storage.clone(),
             payload_manager,
@@ -478,7 +481,7 @@ impl DagStore {
                 to_prune.push(digest);
             }
         }
-        if let Err(e) = storage.delete_certified_nodes(to_prune) {
+        if let Err(e) = storage.delete_certified_nodes(to_prune, dag_id) {
             error!("Error deleting expired nodes: {:?}", e);
         }
         if dag.read().is_empty() {
@@ -491,6 +494,7 @@ impl DagStore {
     }
 
     pub fn new_empty(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
@@ -499,6 +503,7 @@ impl DagStore {
     ) -> Self {
         let dag = InMemDag::new_empty(epoch_state, start_round, window_size);
         Self {
+            dag_id,
             dag: RwLock::new(dag),
             storage,
             payload_manager,
@@ -511,6 +516,7 @@ impl DagStore {
         payload_manager: Arc<dyn TPayloadManager>,
     ) -> Self {
         Self {
+            dag_id: 0, // TODO: fix test
             dag: RwLock::new(dag),
             storage,
             payload_manager,
@@ -525,7 +531,7 @@ impl DagStore {
         // due to this race will be cleaned up with the next prune operation.
 
         // mutate after all checks pass
-        self.storage.save_certified_node(&node)?;
+        self.storage.save_certified_node(&node, self.dag_id)?;
 
         debug!("Added node {}", node.id());
         self.payload_manager
@@ -542,7 +548,7 @@ impl DagStore {
                 .flat_map(|(_, round_ref)| round_ref.iter().flatten())
                 .map(|node_status| *node_status.as_node().metadata().digest())
                 .collect();
-            if let Err(e) = self.storage.delete_certified_nodes(digests) {
+            if let Err(e) = self.storage.delete_certified_nodes(digests, self.dag_id) {
                 error!("Error deleting expired nodes: {:?}", e);
             }
         }

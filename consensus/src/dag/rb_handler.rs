@@ -34,6 +34,7 @@ use dashmap::DashSet;
 use std::{collections::BTreeMap, mem, sync::Arc};
 
 pub(crate) struct NodeBroadcastHandler {
+    dag_id: u8,
     dag: Arc<DagStore>,
     order_rule: Arc<dyn TOrderRule>,
     /// Note: The mutex around BTreeMap is to work around Rust Sync semantics.
@@ -52,6 +53,7 @@ pub(crate) struct NodeBroadcastHandler {
 
 impl NodeBroadcastHandler {
     pub fn new(
+        dag_id: u8,
         dag: Arc<DagStore>,
         order_rule: Arc<dyn TOrderRule>,
         signer: Arc<ValidatorSigner>,
@@ -64,9 +66,10 @@ impl NodeBroadcastHandler {
         health_backoff: HealthBackoff,
     ) -> Self {
         let epoch = epoch_state.epoch;
-        let votes_by_round_peer = read_votes_from_storage(&storage, epoch);
+        let votes_by_round_peer = read_votes_from_storage(dag_id, &storage, epoch);
 
         Self {
+            dag_id,
             dag,
             order_rule,
             votes_by_round_peer: Mutex::new(votes_by_round_peer),
@@ -103,7 +106,7 @@ impl NodeBroadcastHandler {
                     .map(|(author, _)| NodeId::new(self.epoch_state.epoch, *r, *author))
             })
             .collect();
-        self.storage.delete_votes(to_delete)
+        self.storage.delete_votes(to_delete, self.dag_id)
     }
 
     fn validate(&self, node: Node) -> anyhow::Result<Node> {
@@ -180,12 +183,13 @@ impl NodeBroadcastHandler {
 }
 
 fn read_votes_from_storage(
+    dag_id: u8,
     storage: &Arc<dyn DAGStorage>,
     epoch: u64,
 ) -> BTreeMap<u64, BTreeMap<Author, Vote>> {
     let mut votes_by_round_peer = BTreeMap::new();
 
-    let all_votes = storage.get_votes().unwrap_or_default();
+    let all_votes = storage.get_votes(dag_id).unwrap_or_default();
     let mut to_delete = vec![];
     for (node_id, vote) in all_votes {
         if node_id.epoch() == epoch {
@@ -197,7 +201,7 @@ fn read_votes_from_storage(
             to_delete.push(node_id);
         }
     }
-    if let Err(err) = storage.delete_votes(to_delete) {
+    if let Err(err) = storage.delete_votes(to_delete, dag_id) {
         error!("unable to clear old signatures: {}", err);
     }
 
@@ -242,7 +246,7 @@ impl RpcHandler for NodeBroadcastHandler {
 
         let signature = node.sign_vote(&self.signer)?;
         let vote = Vote::new(node.metadata().clone(), signature);
-        self.storage.save_vote(&node.id(), &vote)?;
+        self.storage.save_vote(&node.id(), &vote, self.dag_id)?;
         self.votes_by_round_peer
             .lock()
             .get_mut(&node.round())

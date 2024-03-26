@@ -72,7 +72,7 @@ impl StateSyncTrigger {
     fn verify_ledger_info(&self, ledger_info: &LedgerInfoWithSignatures) -> anyhow::Result<()> {
         ensure!(ledger_info.commit_info().epoch() == self.epoch_state.epoch);
 
-        if ledger_info.commit_info().round() > 0 {
+        if ledger_info.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize] > 0 {
             ledger_info
                 .verify_signatures(&self.epoch_state.verifier)
                 .map_err(|e| anyhow::anyhow!("unable to verify ledger info: {}", e))?;
@@ -114,13 +114,13 @@ impl StateSyncTrigger {
         if self
             .ledger_info_provider
             .get_highest_committed_anchor_round(self.dag_id)
-            < ledger_info.commit_info().round()
+            < ledger_info.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
             && self
                 .dag_store
                 .read()
                 .highest_ordered_anchor_round()
                 .unwrap_or_default()
-                >= ledger_info.commit_info().round()
+                >= ledger_info.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
         {
             self.proof_notifier
                 .send_commit_proof(ledger_info.clone())
@@ -131,7 +131,7 @@ impl StateSyncTrigger {
     /// Check if we're far away from this ledger info and need to sync.
     /// This ensures that the block referred by the ledger info is not in buffer manager.
     fn need_sync_for_ledger_info(&self, li: &LedgerInfoWithSignatures) -> bool {
-        if li.commit_info().round()
+        if li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
             <= self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round(self.dag_id)
@@ -148,16 +148,17 @@ impl StateSyncTrigger {
         // fetch can't work since nodes are garbage collected
         dag_reader.is_empty()
             || dag_reader.highest_round() + 1 + self.dag_window_size_config
-                < li.commit_info().round()
+                < li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
             || self
                 .ledger_info_provider
                 .get_highest_committed_anchor_round(self.dag_id)
                 + 2 * self.dag_window_size_config
-                < li.commit_info().round()
+                < li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
     }
 }
 
 pub(super) struct DagStateSynchronizer {
+    dag_id: u8,
     epoch_state: Arc<EpochState>,
     time_service: TimeService,
     execution_client: Arc<dyn TExecutionClient>,
@@ -168,6 +169,7 @@ pub(super) struct DagStateSynchronizer {
 
 impl DagStateSynchronizer {
     pub fn new(
+        dag_id: u8,
         epoch_state: Arc<EpochState>,
         time_service: TimeService,
         execution_client: Arc<dyn TExecutionClient>,
@@ -176,6 +178,7 @@ impl DagStateSynchronizer {
         dag_window_size_config: Round,
     ) -> Self {
         Self {
+            dag_id,
             epoch_state,
             time_service,
             execution_client,
@@ -199,9 +202,9 @@ impl DagStateSynchronizer {
                 dag_reader
                     .highest_ordered_anchor_round()
                     .unwrap_or_default()
-                    < commit_li.commit_info().round()
+                    < commit_li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
                     || highest_committed_anchor_round + self.dag_window_size_config
-                        < commit_li.commit_info().round()
+                        < commit_li.get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
             );
         }
 
@@ -211,10 +214,12 @@ impl DagStateSynchronizer {
         // Create a new DAG store and Fetch blocks
         let target_round = node.round();
         let start_round = commit_li
-            .commit_info()
-            .round()
+            .get_highest_committed_rounds_for_shoalpp()[self.dag_id as usize]
+            // .commit_info()
+            // .round()
             .saturating_sub(self.dag_window_size_config);
         let sync_dag_store = Arc::new(DagStore::new_empty(
+            self.dag_id,
             self.epoch_state.clone(),
             self.storage.clone(),
             self.payload_manager.clone(),

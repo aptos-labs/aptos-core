@@ -896,6 +896,14 @@ impl DAGMessage {
         }
     }
 
+    pub fn round(&self) -> anyhow::Result<Round> {
+        match self {
+            DAGMessage::NodeMsg(node) => Ok(node.metadata.round),
+            DAGMessage::CertifiedNodeMsg(node) => Ok(node.metadata.round),
+            _ => bail!("message does not support round field"),
+        }
+    }
+
     pub fn verify(&self, sender: Author, verifier: &ValidatorVerifier) -> anyhow::Result<()> {
         match self {
             DAGMessage::NodeMsg(node) => node.verify(sender, verifier),

@@ -92,7 +92,7 @@ impl DagDriver {
         broadcast_sender: Sender<(oneshot::Sender<BoltBCRet>, BoltBCParms)>,
     ) -> Self {
         let pending_node = storage
-            .get_pending_node()
+            .get_pending_node(dag_id)
             .expect("should be able to read dag storage");
         let highest_strong_links_round =
             dag.read().highest_strong_links_round(&epoch_state.verifier);
@@ -165,6 +165,10 @@ impl DagDriver {
 
         self.check_new_round();
         Ok(())
+    }
+
+    pub fn dag_id(&self) -> u8 {
+        self.dag_id
     }
 
     pub fn get_payload_filter(&self) -> PayloadFilter {
@@ -338,9 +342,10 @@ impl DagDriver {
             Extensions::empty(),
         );
         self.storage
-            .save_pending_node(&new_node)
+            .save_pending_node(&new_node, self.dag_id)
             .expect("node must be saved");
-        block_on(self.broadcast_node(new_node));
+        // block_on(self.broadcast_node(new_node));
+        self.broadcast_node(new_node).await;
     }
 
     pub async fn broadcast_node(&self, node: Node) {

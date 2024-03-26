@@ -6,15 +6,13 @@ use super::{
     // observability::counters::{NUM_NODES_PER_BLOCK, NUM_ROUNDS_PER_BLOCK},
 };
 use crate::{
-    // block_storage::tracing::{BlockStage},
-    consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
-    // counters::update_counters_for_committed_blocks,
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
     },
     // pipeline::buffer_manager::OrderedBlocks,
 };
+use crate::consensusdb::{ConsensusDB, Dag0CertifiedNodeSchema, Dag0NodeSchema, Dag0VoteSchema, Dag1CertifiedNodeSchema, Dag1NodeSchema, Dag1VoteSchema, Dag2CertifiedNodeSchema, Dag2NodeSchema, Dag2VoteSchema};
 use anyhow::{anyhow, bail};
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::{
@@ -71,7 +69,9 @@ pub(crate) fn compute_initial_block_and_ledger_info(
             ledger_info_from_storage.ledger_info(),
             genesis.id(),
         );
-        let genesis_ledger_info = genesis_qc.ledger_info().clone();
+        let mut genesis_ledger_info = genesis_qc.ledger_info().clone();
+        let committed_rounds = HashValue::new([0; HashValue::LENGTH]);
+        genesis_ledger_info.set_consensus_data_hash(committed_rounds);
         (
             genesis.gen_block_info(
                 ledger_info.transaction_accumulator_hash(),
@@ -248,42 +248,86 @@ impl StorageAdapter {
 }
 
 impl DAGStorage for StorageAdapter {
-    fn save_pending_node(&self, node: &Node) -> anyhow::Result<()> {
-        Ok(self.consensus_db.put::<NodeSchema>(&(), node)?)
+    fn save_pending_node(&self, node: &Node, dag_id: u8) -> anyhow::Result<()> {
+        match dag_id {
+            0 => Ok(self.consensus_db.put::<Dag0NodeSchema>(&(), node)?),
+            1 => Ok(self.consensus_db.put::<Dag1NodeSchema>(&(), node)?),
+            2 => Ok(self.consensus_db.put::<Dag2NodeSchema>(&(), node)?),
+            _ => {unreachable!()}
+        }
     }
 
-    fn get_pending_node(&self) -> anyhow::Result<Option<Node>> {
-        Ok(self.consensus_db.get::<NodeSchema>(&())?)
+    fn get_pending_node(&self, dag_id: u8) -> anyhow::Result<Option<Node>> {
+        match dag_id {
+            0 => Ok(self.consensus_db.get::<Dag0NodeSchema>(&())?),
+            1 => Ok(self.consensus_db.get::<Dag1NodeSchema>(&())?),
+            2 => Ok(self.consensus_db.get::<Dag2NodeSchema>(&())?),
+            _ => {unreachable!()}
+        }
+
     }
 
-    fn delete_pending_node(&self) -> anyhow::Result<()> {
-        Ok(self.consensus_db.delete::<NodeSchema>(vec![()])?)
+    fn delete_pending_node(&self, dag_id: u8) -> anyhow::Result<()> {
+        match dag_id {
+            0 => Ok(self.consensus_db.delete::<Dag0NodeSchema>(vec![()])?),
+            1 => Ok(self.consensus_db.delete::<Dag1NodeSchema>(vec![()])?),
+            2 => Ok(self.consensus_db.delete::<Dag2NodeSchema>(vec![()])?),
+            _ => {unreachable!()}
+        }
     }
 
-    fn save_vote(&self, node_id: &NodeId, vote: &Vote) -> anyhow::Result<()> {
-        Ok(self.consensus_db.put::<DagVoteSchema>(node_id, vote)?)
+    fn save_vote(&self, node_id: &NodeId, vote: &Vote, dag_id: u8) -> anyhow::Result<()> {
+        match dag_id {
+            0 => Ok(self.consensus_db.put::<Dag0VoteSchema>(node_id, vote)?),
+            1 => Ok(self.consensus_db.put::<Dag1VoteSchema>(node_id, vote)?),
+            2 => Ok(self.consensus_db.put::<Dag2VoteSchema>(node_id, vote)?),
+            _ => {unreachable!()}
+        }
     }
 
-    fn get_votes(&self) -> anyhow::Result<Vec<(NodeId, Vote)>> {
-        Ok(self.consensus_db.get_all::<DagVoteSchema>()?)
+    fn get_votes(&self, dag_id: u8) -> anyhow::Result<Vec<(NodeId, Vote)>> {
+        match dag_id {
+            0 => Ok(self.consensus_db.get_all::<Dag0VoteSchema>()?),
+            1 => Ok(self.consensus_db.get_all::<Dag1VoteSchema>()?),
+            2 => Ok(self.consensus_db.get_all::<Dag2VoteSchema>()?),
+            _ => {unreachable!()}
+        }
     }
 
-    fn delete_votes(&self, node_ids: Vec<NodeId>) -> anyhow::Result<()> {
-        Ok(self.consensus_db.delete::<DagVoteSchema>(node_ids)?)
+    fn delete_votes(&self, node_ids: Vec<NodeId>, dag_id: u8) -> anyhow::Result<()> {
+        match dag_id {
+            0 => Ok(self.consensus_db.delete::<Dag0VoteSchema>(node_ids)?),
+            1 => Ok(self.consensus_db.delete::<Dag1VoteSchema>(node_ids)?),
+            2 => Ok(self.consensus_db.delete::<Dag2VoteSchema>(node_ids)?),
+            _ => {unreachable!()}
+        }
     }
 
-    fn save_certified_node(&self, node: &CertifiedNode) -> anyhow::Result<()> {
-        Ok(self
-            .consensus_db
-            .put::<CertifiedNodeSchema>(&node.digest(), node)?)
+    fn save_certified_node(&self, node: &CertifiedNode, dag_id: u8) -> anyhow::Result<()> {
+        match dag_id {
+            0 => Ok(self.consensus_db.put::<Dag0CertifiedNodeSchema>(&node.digest(), node)?),
+            1 => Ok(self.consensus_db.put::<Dag1CertifiedNodeSchema>(&node.digest(), node)?),
+            2 => Ok(self.consensus_db.put::<Dag2CertifiedNodeSchema>(&node.digest(), node)?),
+            _ => {unreachable!()}
+        }
     }
 
-    fn get_certified_nodes(&self) -> anyhow::Result<Vec<(HashValue, CertifiedNode)>> {
-        Ok(self.consensus_db.get_all::<CertifiedNodeSchema>()?)
+    fn get_certified_nodes(&self, dag_id: u8) -> anyhow::Result<Vec<(HashValue, CertifiedNode)>> {
+        match dag_id {
+            0 => Ok(self.consensus_db.get_all::<Dag0CertifiedNodeSchema>()?),
+            1 => Ok(self.consensus_db.get_all::<Dag1CertifiedNodeSchema>()?),
+            2 => Ok(self.consensus_db.get_all::<Dag2CertifiedNodeSchema>()?),
+            _ => {unreachable!()}
+        }
     }
 
-    fn delete_certified_nodes(&self, digests: Vec<HashValue>) -> anyhow::Result<()> {
-        Ok(self.consensus_db.delete::<CertifiedNodeSchema>(digests)?)
+    fn delete_certified_nodes(&self, digests: Vec<HashValue>, dag_id: u8) -> anyhow::Result<()> {
+        match dag_id {
+            0 => Ok(self.consensus_db.delete::<Dag0CertifiedNodeSchema>(digests)?),
+            1 => Ok(self.consensus_db.delete::<Dag1CertifiedNodeSchema>(digests)?),
+            2 => Ok(self.consensus_db.delete::<Dag2CertifiedNodeSchema>(digests)?),
+            _ => {unreachable!()}
+        }
     }
 
     fn get_latest_k_committed_events(&self, k: u64) -> anyhow::Result<Vec<CommitEvent>> {
@@ -342,7 +386,7 @@ impl TLedgerInfoProvider for RwLock<LedgerInfoProvider> {
         let committed_anchor_rounds = self
             .read()
             .latest_ledger_info
-            .get_highest_committed_rounds_for_bolt();
+            .get_highest_committed_rounds_for_shoalpp();
         committed_anchor_rounds[dag_id as usize]
     }
 }

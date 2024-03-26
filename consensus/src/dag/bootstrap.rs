@@ -206,6 +206,7 @@ impl SyncMode {
         bootstrapper: &DagBootstrapper,
     ) -> Option<Mode> {
         let sync_manager = DagStateSynchronizer::new(
+            self.base_state.dag_id,
             bootstrapper.epoch_state.clone(),
             bootstrapper.time_service.clone(),
             bootstrapper.execution_client.clone(),
@@ -519,6 +520,7 @@ impl DagBootstrapper {
         );
 
         let dag = Arc::new(DagStore::new(
+            self.dag_id,
             self.epoch_state.clone(),
             self.storage.clone(),
             self.payload_manager.clone(),
@@ -638,6 +640,7 @@ impl DagBootstrapper {
             self.broadcast_sender.clone(),
         );
         let rb_handler = NodeBroadcastHandler::new(
+            self.dag_id,
             dag_store.clone(),
             order_rule.clone(),
             self.signer.clone(),

@@ -17,15 +17,17 @@ use aptos_schemadb::{
 use aptos_storage_interface::AptosDbError;
 pub use schema::{
     block::BlockSchema,
-    dag::{CertifiedNodeSchema, DagVoteSchema, NodeSchema},
+    dag::{Dag0CertifiedNodeSchema, Dag1CertifiedNodeSchema, Dag2CertifiedNodeSchema, Dag0VoteSchema, Dag1VoteSchema, Dag2VoteSchema, Dag0NodeSchema, Dag1NodeSchema, Dag2NodeSchema},
     quorum_certificate::QCSchema,
 };
 use schema::{
     single_entry::{SingleEntryKey, SingleEntrySchema},
-    BLOCK_CF_NAME, CERTIFIED_NODE_CF_NAME, DAG_VOTE_CF_NAME, NODE_CF_NAME, QC_CF_NAME,
+    BLOCK_CF_NAME, QC_CF_NAME,
     SINGLE_ENTRY_CF_NAME,
 };
 use std::{iter::Iterator, path::Path, time::Instant};
+pub use crate::consensusdb::schema::dag::{DAG0_CERTIFIED_NODE_CF_NAME, DAG0_NODE_CF_NAME, DAG0_VOTE_CF_NAME, DAG1_CERTIFIED_NODE_CF_NAME, DAG1_NODE_CF_NAME, DAG1_VOTE_CF_NAME, DAG2_CERTIFIED_NODE_CF_NAME, DAG2_NODE_CF_NAME, DAG2_VOTE_CF_NAME};
+// use crate::consensusdb::schema::DAG2_NODE_CF_NAME;
 
 /// The name of the consensus db file
 pub const CONSENSUS_DB_NAME: &str = "consensus_db";
@@ -57,9 +59,15 @@ impl ConsensusDB {
             BLOCK_CF_NAME,
             QC_CF_NAME,
             SINGLE_ENTRY_CF_NAME,
-            NODE_CF_NAME,
-            CERTIFIED_NODE_CF_NAME,
-            DAG_VOTE_CF_NAME,
+            DAG0_NODE_CF_NAME,
+            DAG1_NODE_CF_NAME,
+            DAG2_NODE_CF_NAME,
+            DAG0_CERTIFIED_NODE_CF_NAME,
+            DAG1_CERTIFIED_NODE_CF_NAME,
+            DAG2_CERTIFIED_NODE_CF_NAME,
+            DAG0_VOTE_CF_NAME,
+            DAG1_VOTE_CF_NAME,
+            DAG2_VOTE_CF_NAME,
             "ordered_anchor_id", // deprecated CF
         ];
 

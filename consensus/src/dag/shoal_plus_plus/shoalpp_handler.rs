@@ -4,10 +4,9 @@
 use crate::network::{IncomingShoalppRequest, IncomingDAGRequest};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
-use aptos_logger::{debug, error};
+use aptos_logger::{debug};
 use aptos_types::epoch_state::EpochState;
 use futures::StreamExt;
-use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
 use std::sync::Arc;
 
@@ -22,31 +21,14 @@ impl BoltHandler {
 
     pub async fn run(
         self,
+        // mut shoalpp_rpc_rx: aptos_channel::Receiver<Author, (AccountAddress, IncomingShoalppRequest)>,
+        // mut shutdown_rx: oneshot::Receiver<oneshot::Sender<()>>,
         mut shoalpp_rpc_rx: aptos_channel::Receiver<Author, (AccountAddress, IncomingShoalppRequest)>,
-        mut shutdown_rx: oneshot::Receiver<oneshot::Sender<()>>,
         dag_rpc_tx_vec: Vec<aptos_channel::Sender<AccountAddress, IncomingDAGRequest>>,
-        mut dag_shutdown_tx_vec: Vec<oneshot::Sender<oneshot::Sender<()>>>,
+        // mut dag_shutdown_tx_vec: Vec<oneshot::Sender<oneshot::Sender<()>>>,
     ) {
         loop {
             tokio::select! {
-                biased;
-                Ok(ack_tx) = &mut shutdown_rx => {
-                    while !dag_shutdown_tx_vec.is_empty() {
-                        let (ack_tx, ack_rx) = oneshot::channel();
-                        dag_shutdown_tx_vec
-                            .pop()
-                            .unwrap()
-                            .send(ack_tx)
-                            .expect("[BoltHandler] Fail to drop DAG bootstrapper");
-                        ack_rx
-                            .await
-                            .expect("[BoltHandler] Fail to drop DAG bootstrapper");
-                    }
-                    if let Err(e) = ack_tx.send(()) {
-                        error!(error = ?e, "unable to ack to shutdown signal");
-                    }
-                    return;
-                },
 
                 (peer_id, msg) = shoalpp_rpc_rx.select_next_some() => {
                     match self.convert(msg) {

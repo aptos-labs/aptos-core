@@ -289,7 +289,10 @@ impl OnChainConsensusConfig {
 /// TODO: rename to "default_if_missing()" to be consistent with others?
 impl Default for OnChainConsensusConfig {
     fn default() -> Self {
-        OnChainConsensusConfig::V2(ConsensusConfigV1::default())
+        OnChainConsensusConfig::V3 {
+            alg: ConsensusAlgorithmConfig::default_if_missing(),
+            vtxn: ValidatorTxnConfig::default_if_missing(),
+        }
     }
 }
 

@@ -8,6 +8,7 @@ use futures_channel::oneshot;
 use std::sync::Arc;
 use tokio::sync::mpsc::Receiver;
 use tokio_retry::strategy::ExponentialBackoff;
+use aptos_logger::debug;
 use crate::dag::shoal_plus_plus::shoalpp_types::{BoltBCParms, BoltBCRet};
 
 #[async_trait]
@@ -73,8 +74,15 @@ impl BroadcastSync for BoltBroadcastSync {
 
         let mut inx = 2;
         loop {
-            let (ret_tx1, bolt_bc_parms1) = self.receivers[inx].recv().await.unwrap();
-            let (ret_tx2, bolt_bc_parms2) = self.receivers[(inx + 1) % 3].recv().await.unwrap();
+            // let (ret_tx1, bolt_bc_parms1) = self.receivers[inx].recv().await.unwrap();
+            // let (ret_tx2, bolt_bc_parms2) = self.receivers[(inx + 1) % 3].recv().await.unwrap();
+            let dag_id_1 = inx;
+            let dag_id_2 = (inx + 1) % 3;
+            debug!("[Bolt] waiting for BC request from dag_id: {}", dag_id_1);
+            let (ret_tx1, bolt_bc_parms1) = self.receivers[dag_id_1].recv().await.unwrap();
+            debug!("[Bolt] waiting for BC request from dag_id: {}", dag_id_2);
+            let (ret_tx2, bolt_bc_parms2) = self.receivers[dag_id_2].recv().await.unwrap();
+            debug!("[Bolt] 3");
 
             let ret1 = bolt_bc_parms1.broadcast(self.reliable_broadcast.clone());
             let ret2 = bolt_bc_parms2.broadcast(self.reliable_broadcast.clone());
@@ -86,7 +94,7 @@ impl BroadcastSync for BoltBroadcastSync {
                 // TODO: should we panic here?
             }
 
-            inx = (inx + 1) % 3;
+            inx = dag_id_2;
         }
     }
 }

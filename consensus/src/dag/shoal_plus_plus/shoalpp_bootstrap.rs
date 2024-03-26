@@ -4,6 +4,7 @@
 
 use std::{sync::Arc, time::Duration};
 use arc_swap::ArcSwapOption;
+use futures::executor::block_on;
 use futures_channel::mpsc::UnboundedSender;
 use futures_channel::oneshot;
 use tokio::sync::mpsc::{channel, Receiver};
@@ -14,6 +15,7 @@ use aptos_channels::message_queues::QueueStyle;
 use aptos_config::config::DagConsensusConfig;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::RwLock;
+use aptos_logger::{debug, error};
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_types::epoch_state::EpochState;
 use aptos_types::on_chain_config::{DagConsensusConfigV1, Features, ValidatorTxnConfig};
@@ -161,19 +163,45 @@ impl ShoalppBootstrapper {
             ));
         });
 
-        tokio::spawn(self.shoalpp_order_notifier.run());
+        let notifier_tokio_handler = tokio::spawn(self.shoalpp_order_notifier.run());
 
-        let bolt_handler = BoltHandler::new(self.epoch_state.clone());
-        tokio::spawn(bolt_handler.run(
+        let shoalpp_handler = BoltHandler::new(self.epoch_state.clone());
+        let handler_tokio_handler = tokio::spawn(shoalpp_handler.run(
             shoalpp_rpc_rx,
-            shutdown_rx,
             dag_rpc_tx_vec,
-            dag_shutdown_tx_vec,
         ));
 
         let broadcast_sync = BoltBroadcastSync::new(self.rb.clone(), self.receivers);
-        tokio::spawn(broadcast_sync.run());
-    }
+        let broadcast_sync_tokio_handler = tokio::spawn(broadcast_sync.run());
 
+        if let Ok(ack_tx) = shutdown_rx.await  {
+            debug!("[Bolt] shutting down Bolt");
+            notifier_tokio_handler.abort();
+            broadcast_sync_tokio_handler.abort();
+            let _ = block_on(notifier_tokio_handler);
+            let _ = block_on(broadcast_sync_tokio_handler);
+            while !dag_shutdown_tx_vec.is_empty() {
+                let (ack_tx, ack_rx) = oneshot::channel();
+                dag_shutdown_tx_vec
+                    .pop()
+                    .unwrap()
+                    .send(ack_tx)
+                    .expect("[Bolt] Fail to drop DAG bootstrapper");
+                ack_rx
+                    .await
+                    .expect("[Bolt] Fail to drop DAG bootstrapper");
+            }
+            if let Err(e) = ack_tx.send(()) {
+                error!(error = ?e, "unable to ack to shutdown signal");
+            }
+            debug!("[Bolt] shutting down Bolt");
+            handler_tokio_handler.abort();
+            let _ = block_on(handler_tokio_handler);
+
+            return;
+        } else {
+            error!("[Bolt] failed to receive shutdown");
+        }
+    }
 }
 

@@ -11,7 +11,7 @@ use futures_channel::mpsc::UnboundedSender;
 
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::block::Block;
-use aptos_consensus_types::common::{Payload, Round};
+use aptos_consensus_types::common::{Payload};
 use aptos_consensus_types::pipelined_block::PipelinedBlock;
 // use aptos_consensus_types::executed_block::ExecutedBlock;
 use aptos_crypto::HashValue;
@@ -24,7 +24,7 @@ use aptos_types::epoch_state::EpochState;
 use aptos_types::ledger_info::{LedgerInfo, LedgerInfoWithSignatures};
 
 use crate::counters::update_counters_for_committed_blocks;
-use crate::dag::adapter::{ShoalppOrderBlocksInfo, LedgerInfoProvider, TLedgerInfoProvider};
+use crate::dag::adapter::{ShoalppOrderBlocksInfo, LedgerInfoProvider};
 use crate::dag::dag_store::{DagStore};
 use crate::pipeline::buffer_manager::OrderedBlocks;
 
@@ -37,6 +37,7 @@ pub struct ShoalppOrderNotifier {
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     epoch_state: Arc<EpochState>,
     parent_block_info: BlockInfo,
+    sent_to_commit_anchor_rounds: Vec<u64>,
 }
 
 impl ShoalppOrderNotifier {
@@ -54,29 +55,17 @@ impl ShoalppOrderNotifier {
             ledger_info_provider,
             epoch_state,
             parent_block_info,
+            sent_to_commit_anchor_rounds: vec![0, 0, 0, 0],
         }
     }
 
-    fn get_new_rounds(&self, dag_id: u8, round: Round) -> (Round, HashValue) {
-        let mut old_committed_anchor_rounds = self.ledger_info_provider
-            .get_latest_ledger_info()
-            .ledger_info()
-            .consensus_data_hash()
-            .to_u64_vec();
-
-        old_committed_anchor_rounds[dag_id as usize] = round;
-
-        let mut bytes: Vec<u8> = Vec::with_capacity(old_committed_anchor_rounds.len() * 8);
-        for &value in old_committed_anchor_rounds.iter() {
+    fn committed_anchors_to_hashvalue(&self) -> HashValue {
+        let mut bytes: Vec<u8> = Vec::with_capacity(self.sent_to_commit_anchor_rounds.len() * 8);
+        for &value in self.sent_to_commit_anchor_rounds.iter() {
             bytes.extend_from_slice(&value.to_le_bytes());
         }
-
-        let block_round = old_committed_anchor_rounds
-            .iter()
-            .sum();
-
         // TODO: verify that from_slice cannot fail in this case.
-        (block_round, HashValue::from_slice(&bytes).expect("Failed to create HashValue from committed rounds"))
+        HashValue::from_slice(&bytes).expect("Failed to create HashValue from committed rounds")
     }
 
     fn create_block(
@@ -89,7 +78,11 @@ impl ShoalppOrderNotifier {
 
 
         let anchor = ordered_nodes.last().unwrap();
-        let (block_round, new_committed_rounds) = self.get_new_rounds(dag_id, anchor.round());
+        assert!(anchor.round() > self.sent_to_commit_anchor_rounds[dag_id as usize]);
+        self.sent_to_commit_anchor_rounds[dag_id as usize] = anchor.round();
+        let block_round = self.sent_to_commit_anchor_rounds
+            .iter()
+            .sum();
         let epoch = anchor.epoch();
         let timestamp = anchor.metadata().timestamp();
         let parent_timestamp = self.parent_block_info.timestamp_usecs();
@@ -142,16 +135,17 @@ impl ShoalppOrderNotifier {
             })
             .collect();
 
+        let consensus_data_hash = self.committed_anchors_to_hashvalue();
         OrderedBlocks {
             ordered_blocks: vec![block],
             ordered_proof: LedgerInfoWithSignatures::new(
-                LedgerInfo::new(block_info, new_committed_rounds),
+                LedgerInfo::new(block_info, consensus_data_hash),
                 AggregateSignature::empty(),
             ),
             callback: Box::new(
                 move |committed_blocks: &[Arc<PipelinedBlock>],
                       commit_decision: LedgerInfoWithSignatures| {
-                    let committed_rounds = commit_decision.get_highest_committed_rounds_for_bolt();
+                    let committed_rounds = commit_decision.get_highest_committed_rounds_for_shoalpp();
                     dag_vec
                         .iter()
                         .enumerate()
