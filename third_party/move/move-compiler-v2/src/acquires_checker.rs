@@ -62,6 +62,7 @@ fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
                     && !access_specifier.negated
                     && access_specifier.address.1 == AddressSpecifier::Any
                 {
+                    #[allow(clippy::single_match)]
                     match &access_specifier.resource.1 {
                         ResourceSpecifier::Resource(inst_qid) => {
                             if inst_qid.inst.is_empty()
@@ -172,18 +173,15 @@ impl<'a> AccessControlAnalyzer<'a> {
         call_graph: BTreeMap<FunId, BTreeMap<FunId, Loc>>,
         mut acquire_env: BTreeMap<FunId, AcquiredResources>,
     ) -> BTreeMap<FunId, AcquiredResources> {
-        let reversed_call_graph =
-            call_graph
-                .iter()
-                .fold(BTreeMap::new(), |mut reversed, (caller, callees)| {
-                    for (callee, _) in callees.iter() {
-                        reversed
-                            .entry(*callee)
-                            .or_insert(BTreeSet::new())
-                            .insert(*caller);
-                    }
-                    reversed
-                });
+        let reversed_call_graph = call_graph.iter().fold(
+            BTreeMap::new(),
+            |mut reversed: BTreeMap<FunId, BTreeSet<FunId>>, (caller, callees)| {
+                for (callee, _) in callees.iter() {
+                    reversed.entry(*callee).or_default().insert(*caller);
+                }
+                reversed
+            },
+        );
         let mut work_list: VecDeque<_> = self
             .mod_env
             .get_functions()
@@ -196,7 +194,7 @@ impl<'a> AccessControlAnalyzer<'a> {
                 if *callee == fun_id {
                     continue;
                 }
-                let callee_acquires = acquire_env.get(&callee).expect("callee acquires");
+                let callee_acquires = acquire_env.get(callee).expect("callee acquires");
                 let changed = caller_acquires.join(*callee, loc.clone(), callee_acquires);
                 any_changes = any_changes || changed;
             }
@@ -243,7 +241,7 @@ fn get_callees_and_acquired_resources(
                 match op {
                     Operation::MoveFrom | Operation::BorrowGlobal(..) => {
                         let ty_params = fun_env.module_env.env.get_node_instantiation(*node_id);
-                        let ty_param = ty_params.get(0).expect("type parameter");
+                        let ty_param = ty_params.first().expect("type parameter");
                         if let Type::Struct(exp_mid, sid, _insts) = ty_param {
                             if *exp_mid == mid {
                                 let loc = fun_env.module_env.env.get_node_loc(*node_id);

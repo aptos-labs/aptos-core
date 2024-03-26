@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod acquires_checker;
 pub mod ast_simplifier;
 mod bytecode_generator;
 pub mod cyclic_instantiation_checker;
@@ -15,7 +16,6 @@ pub mod logging;
 pub mod options;
 pub mod pipeline;
 pub mod recursive_struct_checker;
-pub mod acquires_checker;
 
 use crate::{
     env_pipeline::{
