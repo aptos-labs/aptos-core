@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 /// Maximum retry time for exponential backoff (2 sec = 3-4 retries)
 pub const MAX_RETRY_TIME_SECONDS: u64 = 2;

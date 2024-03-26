@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::v2::{counters::MISC_TIMERS_SECONDS, state::PartitionState, PartitionerV2};
 use aptos_types::{
