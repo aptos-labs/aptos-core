@@ -103,9 +103,9 @@ proptest! {
         let mixed_pub_point = pub_point.add(torsion_component);
         prop_assert_eq!(pub_point.mul_by_cofactor(), mixed_pub_point.mul_by_cofactor());
 
-        //////////////////////////
-        // Compute k = H(RAm) //
-        //////////////////////////
+        ////////////////////////////
+        // Compute k = H(R||A||m) //
+        ////////////////////////////
         let mut h: Sha512 = Sha512::default();
         h.update(mixed_r_point.compress().to_bytes());
         h.update(mixed_pub_point.compress().to_bytes());
@@ -221,7 +221,7 @@ proptest! {
             &bad_scalar.to_bytes()[..]
         ].concat()).unwrap();
 
-        // Seek k = H(R, A, M)  1 [8] so that sB - kA = R <=> -kA = -A <=> k mod order(A) = 0
+        // Seek k = H(R, A, M) == 1 [8] so that sB - kA = R <=> -kA = -A <=> k mod order(A) = 0
         prop_assume!(bad_key.verify(&message[..], &bad_signature).is_ok());
         prop_assert!(bad_key.verify_strict(&message[..], &bad_signature).is_err());
     }
@@ -547,7 +547,7 @@ pub const EIGHT_TORSION: [[u8; 32]; 8] = [
 ];
 
 /// The `Scalar52` struct represents an element in
-/// Z/l$! as 5 52-bit limbs.
+/// Z/lZ as 5 52-bit limbs.
 pub struct Scalar52(pub [u64; 5]);
 
 /// `L` is the order of base point, i.e. 2^252 + 27742317777372353535851937790883648493

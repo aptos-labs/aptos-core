@@ -56,8 +56,8 @@
 //! algorithm, we need to build a tree of transactions like the following:
 //! ```text
 //! Committed -> T5 -> T6  -> T7
-//!              +---> T6' -> T7'
-//!                    +----> T7"
+//!               \--> T6' -> T7'
+//!                     \---> T7"
 //! ```
 //! Once T5 is executed, we will have a tree that stores the modified portion of the state. Later
 //! when we execute T6 on top of T5, the output of T5 can be visible to T6.

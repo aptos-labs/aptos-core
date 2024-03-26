@@ -66,16 +66,16 @@ fn gen_ledger_info(block_id: HashValue, reconfig: bool) -> LedgerInfo {
 
 fn create_tree() -> BlockTree {
     //    * ---> 1 ---> 2
-    //    |      |
-    //    |      +----> 3 ---> 4
-    //    |             |
-    //    |             +----> 5
+    //    |      \
+    //    |       \---> 3 ---> 4
+    //    |              \
+    //    |               \--> 5
     //    |
     //    +----> 6 ---> 7 ---> 8
-    //           |
-    //           +----> 9 ---> 10
-    //                  |
-    //                  +----> 11
+    //            \
+    //             \--> 9 ---> 10
+    //                   \
+    //                    \--> 11
     // *: PRE_GENESIS_BLOCK_ID
     let block_tree = BlockTree::new_empty();
 

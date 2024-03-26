@@ -1058,9 +1058,9 @@ mod test {
         );
 
         // The first `e` in `example.com` is a unicode character and not a regular `e`!
-        let bad_address = "/dns6/xample.com/tcp/123";
+        let bad_address = format!("/dns6/\u{0435}xample.com/tcp/123");
         assert_matches!(
-            NetworkAddress::from_str(bad_address),
+            NetworkAddress::from_str(&bad_address),
             Err(ParseError::DnsNameNonASCII(_))
         );
     }
