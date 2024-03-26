@@ -10,8 +10,8 @@ use crate::{
         storage::PeersAndMetadata,
     },
     peer_manager::{
-        ConnectionRequestSender, PeerManagerNotification, PeerManagerRequest,
-        PeerManagerRequestSender,
+        ConnectionNotification, ConnectionRequestSender, PeerManagerNotification,
+        PeerManagerRequest, PeerManagerRequestSender,
     },
     protocols::{
         network::{Event, NetworkEvents, NetworkSender, NewNetworkEvents, NewNetworkSender},
@@ -19,10 +19,11 @@ use crate::{
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
     },
     transport::ConnectionMetadata,
+    DisconnectReason,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{Peer, PeerRole, PeerSet},
+    config::{Peer, PeerRole, PeerSet, RoleType},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
@@ -39,7 +40,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::time::timeout;
+use tokio::{sync::mpsc::error::TryRecvError, time::timeout};
 
 // Useful test constants for timeouts
 const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
@@ -425,6 +426,72 @@ fn test_peers_and_metadata_caching() {
         PeerSet::new(),
         expected_peers_and_metadata.clone(),
     );
+}
+
+#[tokio::test]
+async fn test_peers_and_metadata_subscriptions() {
+    // Create the peers and metadata container
+    let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
+    let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+
+    let mut connection_events = peers_and_metadata.subscribe();
+
+    match connection_events.try_recv() {
+        Ok(wat) => {
+            panic!("connection_events should be empty but got {:?}", wat)
+        },
+        Err(tre) => match tre {
+            TryRecvError::Empty => {
+                // ok
+            },
+            TryRecvError::Disconnected => {
+                panic!("connection_events disconnected early")
+            },
+        },
+    }
+
+    let (peer_network_id_1, connection_1) = create_peer_and_connection(
+        NetworkId::Validator,
+        vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
+        peers_and_metadata.clone(),
+    );
+    match connection_events.try_recv() {
+        Ok(notif) => match notif {
+            ConnectionNotification::NewPeer(conn_meta, nc) => {
+                assert_eq!(nc.network_id(), NetworkId::Validator);
+                assert_eq!(nc.peer_id(), PeerId::ZERO);
+                assert_eq!(nc.role(), RoleType::Validator);
+                assert_eq!(conn_meta, connection_1);
+            },
+            ConnectionNotification::LostPeer(_, _, _) => {
+                panic!("should get connect but got lost")
+            },
+        },
+        Err(_tre) => {
+            panic!("no pending connection event")
+        },
+    }
+
+    peers_and_metadata
+        .remove_peer_metadata(peer_network_id_1, connection_1.connection_id)
+        .unwrap();
+    match connection_events.try_recv() {
+        Ok(notif) => match notif {
+            ConnectionNotification::NewPeer(_, _) => {
+                panic!("expecting lost but got new")
+            },
+            ConnectionNotification::LostPeer(conn_meta, nc, reason) => {
+                assert_eq!(nc.network_id(), NetworkId::Validator);
+                assert_eq!(nc.peer_id(), PeerId::ZERO);
+                assert_eq!(nc.role(), RoleType::Validator);
+                assert_eq!(conn_meta, connection_1);
+                assert_eq!(reason, DisconnectReason::Requested);
+            },
+        },
+        Err(_tre) => {
+            panic!("no pending connection event")
+        },
+    }
 }
 
 #[test]
