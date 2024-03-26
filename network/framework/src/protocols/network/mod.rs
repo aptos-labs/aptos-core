@@ -349,7 +349,7 @@ impl<TMessage: Message + Unpin + Send> NetworkEvents<TMessage> {
                 let sink = sink.clone();
                 let xm = process_received_message(msg, label.clone(), sender_source.clone(), contexts.clone());
                 if let Some(em) = xm {
-                    if let Err(_) = sink.send(em).await {
+                    if sink.send(em).await.is_err() {
                         // downstream is closed, but there's no way here to break out of the for_each_concurrent!
                         // logging anything would be doomed forever too? no point?
                     }

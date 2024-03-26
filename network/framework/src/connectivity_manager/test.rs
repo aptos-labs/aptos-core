@@ -13,20 +13,10 @@ use futures::future;
 use maplit::{hashmap, hashset};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{io, str::FromStr};
-// use std::future::Future;
 use std::sync::Once;
 use tokio::runtime::Runtime;
-//use tokio::time::error::Elapsed;
-//use tokio::time::Timeout;
 use tokio_retry::strategy::FixedInterval;
 use aptos_config::network_id::NetworkId;
-// use crate::application::error::Error;
-// use aptos_crypto::x25519::PrivateKey;
-// use aptos_netcore::transport::memory::MemoryTransport;
-// use aptos_types::chain_id::ChainId;
-use crate::application::metadata::PeerMetadata;
-// use crate::protocols::wire::handshake::v1::ProtocolIdSet;
-// use crate::transport::AptosNetTransport;
 use crate::transport::util::{MockTransportEvent, new_mock_transport};
 
 const MAX_TEST_CONNECTIONS: usize = 3;
@@ -312,7 +302,7 @@ impl TestHarness {
                 return;
             }
             if tokio::time::Instant::now() > after {
-                assert!(false, "dial queue still {:?}", dqsize);
+                panic!("dial queue still {:?}", dqsize);
             }
             let _ = tokio::time::sleep(Duration::from_millis(1)).await;
         }

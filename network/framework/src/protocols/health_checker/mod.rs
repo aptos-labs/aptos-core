@@ -157,7 +157,7 @@ async fn network_id_ticker(time_service: TimeService, network_id: NetworkId, pin
     tokio::pin!(ticker);
     let mut sequential_errors = 0;
     loop {
-        let _ = ticker.select_next_some();
+        let _ = ticker.select_next_some().await;
         if let Err(x) = sender.send(network_id).await {
             error!("{} health checker ticker could not send: {}", network_id, x);
             sequential_errors += 1;

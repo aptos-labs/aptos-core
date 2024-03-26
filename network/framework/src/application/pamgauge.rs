@@ -68,7 +68,7 @@ impl PeersAndMetadataGaugeInner {
                 let role_type = peer_metadata.connection_metadata.role;
                 let direction = peer_metadata.connection_metadata.origin;
                 let key = (network_id, direction, role_type);
-                counts.entry(key).and_modify(|x| *x = *x + 1).or_insert(1);
+                counts.entry(key).and_modify(|x| *x += 1).or_insert(1);
             }
         }
         let mut metric_data = Vec::new();
@@ -97,7 +97,7 @@ impl PeersAndMetadataGaugeInner {
         metric.set_help(help);
         metric.set_field_type(prometheus::proto::MetricType::GAUGE);
         metric.set_metric(metric_data);
-        return vec![metric];
+        vec![metric]
     }
 
 }
