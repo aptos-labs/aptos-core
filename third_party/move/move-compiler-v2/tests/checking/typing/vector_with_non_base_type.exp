@@ -1,44 +1,25 @@
 
 Diagnostics:
-warning: Unused local variable `v`. Consider removing or prefixing with an underscore: `_v`
-  ┌─ tests/checking/typing/vector_with_non_base_type.move:4:13
+error: reference type `&u64` is not allowed as a type argument
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:4:17
   │
 4 │         let v = vector<&u64>[];
-  │             ^
+  │                 ^^^^^^
+  │
+  = required by instantiating vector type parameter
 
-warning: Unused local variable `v`. Consider removing or prefixing with an underscore: `_v`
-  ┌─ tests/checking/typing/vector_with_non_base_type.move:5:13
+error: reference type `&mut u64` is not allowed as a type argument
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:5:17
   │
 5 │         let v = vector<&mut u64>[];
-  │             ^
-
-warning: Unused local variable `v`. Consider removing or prefixing with an underscore: `_v`
-  ┌─ tests/checking/typing/vector_with_non_base_type.move:6:13
+  │                 ^^^^^^
   │
-6 │         let v = vector<()>[];
-  │             ^
+  = required by instantiating vector type parameter
 
-warning: Unused local variable `v`. Consider removing or prefixing with an underscore: `_v`
-  ┌─ tests/checking/typing/vector_with_non_base_type.move:7:13
+error: tuple type `(u64, bool)` is not allowed as a type argument
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:7:17
   │
 7 │         let v = vector<(u64, bool)>[];
-  │             ^
-
-// -- Model dump before bytecode pipeline
-module 0x42::Test {
-    private fun t() {
-        {
-          let v: vector<&u64> = Vector<&u64>();
-          {
-            let v: vector<&mut u64> = Vector<&mut u64>();
-            {
-              let v: vector<()> = Vector<()>();
-              {
-                let v: vector<(u64, bool)> = Vector<(u64, bool)>();
-                Tuple()
-              }
-            }
-          }
-        }
-    }
-} // end 0x42::Test
+  │                 ^^^^^^
+  │
+  = required by instantiating vector type parameter

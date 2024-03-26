@@ -1,12 +1,41 @@
-// -- Model dump before bytecode pipeline
-module 0x42::Test {
-    private fun t() {
-        Vector<&u64>(Borrow(Immutable)(0));
-        Vector<&mut u64>(Borrow(Mutable)(0));
-        Vector<()>(Tuple());
-        Vector<(u64, bool)>(Tuple(0, false));
-        Vector<&u64>(Borrow(Immutable)(0), Borrow(Mutable)(0));
-        Vector<&u64>(Borrow(Mutable)(0), Borrow(Immutable)(0));
-        Tuple()
-    }
-} // end 0x42::Test
+
+Diagnostics:
+error: reference type `&integer` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/vector_with_non_base_type_inferred.move:4:9
+  │
+4 │         vector[&0];
+  │         ^^^^^^
+  │
+  = required by instantiating vector type parameter
+
+error: reference type `&mut integer` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/vector_with_non_base_type_inferred.move:5:9
+  │
+5 │         vector[&mut 0];
+  │         ^^^^^^
+  │
+  = required by instantiating vector type parameter
+
+error: tuple type `(integer, bool)` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/vector_with_non_base_type_inferred.move:7:9
+  │
+7 │         vector[(0, false)];
+  │         ^^^^^^
+  │
+  = required by instantiating vector type parameter
+
+error: reference type `&integer` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/vector_with_non_base_type_inferred.move:9:9
+  │
+9 │         vector[&0, &mut 0];
+  │         ^^^^^^
+  │
+  = required by instantiating vector type parameter
+
+error: reference type `&integer` is not allowed as a type argument (type was inferred)
+   ┌─ tests/checking/typing/vector_with_non_base_type_inferred.move:10:9
+   │
+10 │         vector[&mut 0, &0];
+   │         ^^^^^^
+   │
+   = required by instantiating vector type parameter

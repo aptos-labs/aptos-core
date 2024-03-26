@@ -1307,19 +1307,29 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             },
             EA::Exp_::Vector(loc, ty_opt, exps) => {
                 let loc = self.to_loc(loc);
-                let elem_ty = if let Some(tys) = ty_opt {
+                let (elem_ty, constr_ctx) = if let Some(tys) = ty_opt {
                     if tys.len() != 1 {
                         self.error(
                             &loc,
                             &ErrorMessageContext::TypeArgument.arity_mismatch(true, tys.len(), 1),
                         );
-                        Type::Error
+                        (Type::Error, ConstraintContext::default())
                     } else {
-                        self.translate_type(&tys[0])
+                        (self.translate_type(&tys[0]), ConstraintContext::default())
                     }
                 } else {
-                    self.fresh_type_var()
+                    (self.fresh_type_var(), ConstraintContext::inferred())
                 };
+                // Impose vector constraints on element type.
+                for ctr in Constraint::for_vector() {
+                    self.add_constraint_and_report(
+                        &loc,
+                        &ErrorMessageContext::TypeArgument,
+                        &elem_ty,
+                        ctr,
+                        Some(constr_ctx.clone().for_vector_type_param()),
+                    )
+                }
                 let result_ty = self.check_type(
                     &loc,
                     &Type::Vector(Box::new(elem_ty.clone())),
