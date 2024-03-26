@@ -81,8 +81,8 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         },
         Experiment {
             name: Experiment::ACQUIRES_CHECK.to_string(),
-            description: "Turns on or off acquires checks".to_string(),
-            default: Inherited(Experiment::CHECKS.to_string()),
+            description: "Turns on or off v1 style acquires checks".to_string(),
+            default: Given(false),
         },
         Experiment {
             name: Experiment::INLINING.to_string(),
