@@ -1,7 +1,7 @@
 error: enum variant must have exactly one field
- --> tests/cases/multiple_fields.rs:6:1
+ --> tests/cases/multiple_fields.rs:7:1
   |
-6 | / enum Messages {
-7 | |     Test(String, String)
-8 | | }
+7 | / enum Messages {
+8 | |     Test(String, String)
+9 | | }
   | |_^
