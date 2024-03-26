@@ -1,7 +1,7 @@
-#![forbid(unsafe_code)]
-
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
+
+#![forbid(unsafe_code)]
 
 use aptos_telemetry_service::AptosTelemetryServiceArgs;
 use clap::Parser;

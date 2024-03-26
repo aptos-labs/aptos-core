@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{components::get_signer_arg, utils::generate_governance_proposal};
 use aptos_types::on_chain_config::OnChainJWKConsensusConfig;

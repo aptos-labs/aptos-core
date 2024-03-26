@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::SCALAR_NUM_BYTES;
 use blstrs::Scalar;

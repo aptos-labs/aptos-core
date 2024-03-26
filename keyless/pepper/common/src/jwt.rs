@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use anyhow::anyhow;
 use jsonwebtoken::{DecodingKey, TokenData, Validation};

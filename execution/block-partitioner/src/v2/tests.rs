@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 #![allow(clippy::arc_with_non_send_sync)]
 

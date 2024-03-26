@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 /// Implements public parameters $(h, g) \in G$ for an ElGamal encryption scheme where $h$
 /// is the message base and $g$ is the PK base.

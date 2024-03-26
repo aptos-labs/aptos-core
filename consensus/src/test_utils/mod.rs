@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::block_storage::{BlockReader, BlockStore};
@@ -57,9 +57,9 @@ pub async fn build_simple_tree() -> (Vec<Arc<PipelinedBlock>>, Arc<BlockStore>) 
     assert_eq!(block_store.child_links(), block_store.len() - 1);
     assert!(block_store.block_exists(genesis_block.id()));
 
-    //       ╭--> A1--> A2--> A3
+    //        /-> A1--> A2--> A3
     // Genesis--> B1--> B2
-    //             ╰--> C1
+    //              \-> C1
     let a1 = inserter
         .insert_block_with_qc(certificate_for_genesis(), &genesis_block, 1)
         .await;

@@ -1,7 +1,7 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! This module implements a transformation that reuses locals of the same type when
+//! This module implements a transformation that reuses locals of the same type when
 //! possible.
 //!
 //! prerequisites:

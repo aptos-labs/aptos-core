@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::transcript_aggregation::TranscriptAggregationState;
 use aptos_crypto::{bls12381::bls12381_keys, Uniform};

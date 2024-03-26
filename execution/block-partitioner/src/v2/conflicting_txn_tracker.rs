@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::v2::types::{PrePartitionedTxnIdx, ShardedTxnIndexV2};
 #[cfg(test)]

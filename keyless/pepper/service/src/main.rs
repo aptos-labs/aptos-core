@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_keyless_pepper_common::{BadPepperRequestError, PepperRequest};
 use aptos_keyless_pepper_service::{

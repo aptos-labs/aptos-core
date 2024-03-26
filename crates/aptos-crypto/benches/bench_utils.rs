@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use ark_ff::{BigInteger256, Field};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};

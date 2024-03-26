@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     schema::nft_metadata_crawler::parsed_asset_uris, utils::constants::MAX_RETRY_TIME_SECONDS,

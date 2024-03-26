@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{metrics::JWK_FETCH_SECONDS, Issuer, KeyID};
 use anyhow::{anyhow, Result};

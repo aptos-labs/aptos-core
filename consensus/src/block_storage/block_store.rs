@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -51,17 +51,17 @@ fn update_counters_for_ordered_blocks(ordered_blocks: &[Arc<PipelinedBlock>]) {
 /// and is thread-safe.
 ///
 /// Example tree block structure based on parent links.
-///                         ╭--> A3
+///                          /-> A3
 /// Genesis--> B0--> B1--> B2--> B3
-///             ╰--> C1--> C2
-///                         ╰--> D3
+///              \-> C1--> C2
+///                          \-> D3
 ///
 /// Example corresponding tree block structure for the QC links (must follow QC constraints).
-///                         ╭--> A3
+///                          /-> A3
 /// Genesis--> B0--> B1--> B2--> B3
-///             ├--> C1
-///             ├--------> C2
-///             ╰--------------> D3
+///             +--> C1
+///             +--------> C2
+///              \-------------> D3
 pub struct BlockStore {
     inner: Arc<RwLock<BlockTree>>,
     execution_client: Arc<dyn TExecutionClient>,
@@ -399,7 +399,7 @@ impl BlockStore {
     ///
     /// For example, root = B0
     /// B0--> B1--> B2
-    ///        ╰--> B3--> B4
+    ///         \-> B3--> B4
     ///
     /// prune_tree(B3) should be left with
     /// B3--> B4, root = B3

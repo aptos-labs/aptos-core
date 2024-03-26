@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};

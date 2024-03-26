@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::DKGMessage;
 use aptos_config::network_id::{NetworkId, PeerNetworkId};

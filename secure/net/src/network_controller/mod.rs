@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::network_controller::{
     inbound_handler::InboundHandler, outbound_handler::OutboundHandler,

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_types::transaction::authenticator::EphemeralPublicKey;
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};

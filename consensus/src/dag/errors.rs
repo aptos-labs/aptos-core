@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::Round;

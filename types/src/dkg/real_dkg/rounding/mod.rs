@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_dkg::pvss::WeightedConfig;
 use fixed::types::U64F64;

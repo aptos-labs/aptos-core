@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::remote_executor_service::ExecutorService;
 use aptos_logger::info;

@@ -22,13 +22,13 @@ pub enum SourcePackageLayout {
 impl SourcePackageLayout {
     /// A Move source package is laid out on-disk as
     /// a_move_package
-    /// ├── Move.toml      (required)
-    /// ├── sources        (required)
-    /// ├── examples       (optional, dev mode)
-    /// ├── scripts        (optional)
-    /// ├── specifications (optional)
-    /// ├── doc_templates      (optional)
-    /// └── tests          (optional, test mode)
+    /// +-- Move.toml      (required)
+    /// +-- sources        (required)
+    /// +-- examples       (optional, dev mode)
+    /// +-- scripts        (optional)
+    /// +-- specifications (optional)
+    /// +-- doc_templates      (optional)
+    /// +-- tests          (optional, test mode)
     pub fn path(&self) -> &Path {
         Path::new(self.location_str())
     }

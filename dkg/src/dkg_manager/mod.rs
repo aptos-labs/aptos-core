@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 use crate::{
     agg_trx_producer::TAggTranscriptProducer, counters::DKG_STAGE_SECONDS,
     network::IncomingRpcRequest, DKGMessage,

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::pipeline::signing_phase::CommitSignerProvider;
 use aptos_crypto::bls12381;

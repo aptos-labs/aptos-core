@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::transaction_bench_state::TransactionBenchState;
 use aptos_language_e2e_tests::account_universe::{AUTransactionGen, AccountPickStyle};

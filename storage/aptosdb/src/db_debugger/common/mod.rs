@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{db_debugger::ShardingConfig, ledger_db::LedgerDb, state_merkle_db::StateMerkleDb};

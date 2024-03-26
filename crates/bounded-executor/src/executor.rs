@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 //! A bounded tokio [`Handle`]. Only a bounded number of tasks can run
 //! concurrently when spawned through this executor, defined by the initial

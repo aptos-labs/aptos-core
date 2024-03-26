@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_rest_client::Client;
 use aptos_types::on_chain_config::OnChainConsensusConfig;

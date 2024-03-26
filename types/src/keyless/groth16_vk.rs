@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     keyless::KEYLESS_ACCOUNT_MODULE_NAME, move_utils::as_move_value::AsMoveValue, serialize,

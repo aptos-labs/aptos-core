@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 // @generated
 /// Transaction is a simplified representation for the transaction

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{components::get_signer_arg, utils::generate_governance_proposal};
 use move_model::{code_writer::CodeWriter, emitln, model::Loc};

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_language_e2e_tests::{

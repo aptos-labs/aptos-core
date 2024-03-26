@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_crypto::hash::CryptoHash;
 use aptos_dkg::{

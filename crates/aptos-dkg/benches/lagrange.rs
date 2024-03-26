@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_dkg::algebra::{
     evaluation_domain::BatchEvaluationDomain, lagrange::lagrange_coefficients,

@@ -95,7 +95,7 @@ proptest! {
         prop_assert_eq!(pub_point.mul_by_cofactor(), mixed_pub_point.mul_by_cofactor());
 
         //////////////////////////
-        // Compute k = H(R∥A∥m) //
+        // Compute k = H(RAm) //
         //////////////////////////
         let mut h: Sha512 = Sha512::default();
         h.update(mixed_r_point.compress().to_bytes());
@@ -164,7 +164,7 @@ proptest! {
         prop_assert!(Ed25519PublicKey::try_from(&mixed_pub_point.compress().to_bytes()[..]).is_ok());
 
         let mixed_signature_bits : Vec<u8> = [mixed_r_point.compress().to_bytes(), s.to_bytes()].concat();
-        // this will error if we don't have 0 ≤ s < l
+        // this will error if we don't have 0 <= s < l
         let mixed_signature = ed25519_dalek::Signature::from_bytes(&mixed_signature_bits).unwrap();
 
         // Check, however, that dalek is doing the raw equation check sB = R + kA
@@ -212,7 +212,7 @@ proptest! {
             &bad_scalar.to_bytes()[..]
         ].concat()).unwrap();
 
-        // Seek k = H(R, A, M) ≡ 1 [8]
+        // Seek k = H(R, A, M)  1 [8]
         prop_assume!(bad_key.verify(&message[..], &bad_signature).is_ok());
         prop_assert!(bad_key.verify_strict(&message[..], &bad_signature).is_err());
 
@@ -499,7 +499,7 @@ const EIGHT_TORSION: [[u8; 32]; 8] = [
 ];
 
 /// The `Scalar52` struct represents an element in
-/// ℤ/ℓℤ as 5 52-bit limbs.
+/// Z/l$! as 5 52-bit limbs.
 struct Scalar52(pub [u64; 5]);
 
 /// `L` is the order of base point, i.e. 2^252 + 27742317777372353535851937790883648493
@@ -579,7 +579,7 @@ impl Scalar52 {
         s
     }
 
-    /// Compute `a + b` (without mod ℓ)
+    /// Compute `a + b` (without mod l)
     fn add(a: &Scalar52, b: &Scalar52) -> Scalar52 {
         let mut sum = Scalar52::zero();
         let mask = (1u64 << 52) - 1;

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_keyless_pepper_common::{

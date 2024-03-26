@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::utils::random::random_scalar;
 use aptos_crypto::Uniform;

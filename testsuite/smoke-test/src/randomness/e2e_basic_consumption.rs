@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::smoke_test_environment::SwarmBuilder;
 use aptos::{move_tool::MemberId, test::CliTestFramework};

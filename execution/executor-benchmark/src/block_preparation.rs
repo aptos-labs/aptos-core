@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{metrics::TIMER, pipeline::ExecuteBlockMessage};
 use aptos_block_partitioner::{BlockPartitioner, PartitionerConfig};

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::protocols::wire::messaging::v1::{MultiplexMessage, NetworkMessage};

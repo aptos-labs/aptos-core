@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 /// A generic transformation from an unweighted PVSS to a weighted PVSS.
 ///
 /// WARNING: This will **NOT** necessarily be secure for any PVSS scheme, since it will reuse encryption

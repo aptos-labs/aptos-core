@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use super::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, ChainHealthBackoffValues,

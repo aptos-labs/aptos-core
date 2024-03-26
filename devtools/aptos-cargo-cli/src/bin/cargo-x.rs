@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_cargo_cli::{AptosCargoCommand, SelectedPackageArgs};
 use clap::Parser;

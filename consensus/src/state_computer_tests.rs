@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     error::MempoolError, payload_manager::PayloadManager, state_computer::ExecutionProxy,

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use anyhow::{bail, Context, Result};
 use aptos_indexer_grpc_cache_worker::IndexerGrpcCacheWorkerConfig;

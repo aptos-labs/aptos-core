@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     consensus::consensus_fault_tolerance::{start_traffic, ActiveTrafficGuard},

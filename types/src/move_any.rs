@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::move_utils::as_move_value::AsMoveValue;
 use anyhow::bail;

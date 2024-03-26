@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use anyhow::{anyhow, ensure, Result};
 use aptos_crypto::{compat::Sha3_256, Uniform};

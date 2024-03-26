@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 //! Node types of [`JellyfishMerkleTree`](crate::JellyfishMerkleTree)
@@ -544,13 +544,13 @@ impl InternalNode {
     ///     4      [f   e   d   c   b   a   9   8   7   6   5   4   3   2   1   0] -> root level
     ///            ---------------------------------------------------------------
     ///     3      [f   e   d   c   b   a   9   8] [7   6   5   4   3   2   1   0] width = 8
-    ///                                  chs <--┘                        shs <--┘
+    ///                                  chs <--/                        shs <--/
     ///     2      [f   e   d   c] [b   a   9   8] [7   6   5   4] [3   2   1   0] width = 4
-    ///                  shs <--┘               └--> chs
+    ///                  shs <--/               \--> chs
     ///     1      [f   e] [d   c] [b   a] [9   8] [7   6] [5   4] [3   2] [1   0] width = 2
-    ///                          chs <--┘       └--> shs
+    ///                          chs <--/       \--> shs
     ///     0      [f] [e] [d] [c] [b] [a] [9] [8] [7] [6] [5] [4] [3] [2] [1] [0] width = 1
-    ///     ^                chs <--┘   └--> shs
+    ///     ^                chs <--/   \--> shs
     ///     |   MSB|<---------------------- uint 16 ---------------------------->|LSB
     ///  height    chs: `child_half_start`         shs: `sibling_half_start`
     /// ```

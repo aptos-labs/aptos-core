@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_indexer_grpc_server_framework::ServerArgs;
 use aptos_nft_metadata_crawler_parser::config::ParserConfig;

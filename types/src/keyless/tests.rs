@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::keyless::{
     bn254_circom::get_public_inputs_hash,

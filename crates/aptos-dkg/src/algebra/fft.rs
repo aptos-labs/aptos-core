@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::algebra::evaluation_domain::EvaluationDomain;
 use blstrs::Scalar;

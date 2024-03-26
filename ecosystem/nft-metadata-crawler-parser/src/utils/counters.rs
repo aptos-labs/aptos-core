@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_metrics_core::{
     register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec,

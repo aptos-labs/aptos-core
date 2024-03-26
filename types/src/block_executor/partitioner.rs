@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::transaction::{
     analyzed_transaction::{AnalyzedTransaction, StorageLocation},

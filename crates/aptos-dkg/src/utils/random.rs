@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 /// TODO(Security): This file is a workaround for the `rand_core_hell` issue, briefly described below.
 ///
 /// Ideally, we would write the following sane code:

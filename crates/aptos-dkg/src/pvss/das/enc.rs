@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::pvss::{
     encryption_dlog::g1::{DecryptPrivKey, EncryptPubKey},

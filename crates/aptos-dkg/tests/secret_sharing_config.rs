@@ -1,7 +1,7 @@
+// Copyright (c) Aptos Foundation
+
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
-
-// Copyright © Aptos Foundation
 
 use aptos_dkg::pvss::{
     test_utils::get_weighted_configs_for_benchmarking, traits::SecretSharingConfig,

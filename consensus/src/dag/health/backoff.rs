@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use super::{pipeline_health::TPipelineHealth, TChainHealth};
 use aptos_config::config::DagPayloadConfig;

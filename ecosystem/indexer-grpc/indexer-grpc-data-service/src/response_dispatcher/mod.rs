@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_indexer_grpc_data_access::StorageClient;
 use aptos_protos::indexer::v1::TransactionsResponse;

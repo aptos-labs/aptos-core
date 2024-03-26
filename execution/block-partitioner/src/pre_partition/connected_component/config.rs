@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::pre_partition::{
     connected_component::ConnectedComponentPartitioner, PrePartitioner, PrePartitionerConfig,

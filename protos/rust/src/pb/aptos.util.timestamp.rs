@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 // @generated
 #[allow(clippy::derive_partial_eq_without_eq)]

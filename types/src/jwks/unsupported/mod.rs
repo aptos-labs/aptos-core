@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use aptos_crypto::HashValue;

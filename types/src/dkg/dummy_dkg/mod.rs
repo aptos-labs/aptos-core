@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::dkg::{DKGSessionMetadata, DKGTrait};
 use anyhow::{anyhow, ensure};

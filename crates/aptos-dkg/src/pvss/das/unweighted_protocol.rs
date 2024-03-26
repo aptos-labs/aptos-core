@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share},

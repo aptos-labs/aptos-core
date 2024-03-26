@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 #[cfg(test)]
 use crate::test_utils::P2PBlockGenerator;

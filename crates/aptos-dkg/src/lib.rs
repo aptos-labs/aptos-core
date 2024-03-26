@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 #![allow(clippy::redundant_static_lifetimes)]
 #![allow(clippy::needless_return)]

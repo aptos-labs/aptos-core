@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_types::validator_txn::ValidatorTransaction;
 use aptos_validator_transaction_pool as vtxn_pool;

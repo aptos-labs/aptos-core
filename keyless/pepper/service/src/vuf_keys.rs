@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use anyhow::{anyhow, ensure};
 use aptos_keyless_pepper_common::{

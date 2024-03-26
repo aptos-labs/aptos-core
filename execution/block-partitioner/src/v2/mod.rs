@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     pre_partition::PrePartitioner, v2::counters::BLOCK_PARTITIONING_SECONDS, BlockPartitioner,

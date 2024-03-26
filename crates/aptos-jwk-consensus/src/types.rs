@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_crypto::bls12381::Signature;
 use aptos_enum_conversion_derive::EnumConversion;

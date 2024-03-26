@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -296,7 +296,7 @@ impl BlockTree {
     ///
     /// For example, root = B0
     /// B0--> B1--> B2
-    ///        ╰--> B3--> B4
+    ///         \-> B3--> B4
     ///
     /// prune_tree(B_3) should be left with
     /// B3--> B4, root = B3

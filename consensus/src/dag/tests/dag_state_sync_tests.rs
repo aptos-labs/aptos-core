@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use super::helpers::TEST_DAG_WINDOW;
 use crate::{

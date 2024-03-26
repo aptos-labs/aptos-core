@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::common::{Author, Payload, Round};
 use aptos_types::validator_txn::ValidatorTransaction;

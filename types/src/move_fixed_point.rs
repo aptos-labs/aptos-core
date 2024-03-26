@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use fixed::types::U64F64;
 use serde::{Deserialize, Serialize};

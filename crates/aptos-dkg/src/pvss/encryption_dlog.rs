@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 /// Implements public parameters $h \in G$ for a simple DLOG-based encryption scheme.
 macro_rules! encryption_dlog_pp_impl {

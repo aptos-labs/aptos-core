@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use super::{types::DAGMessage, DAGRpcResult};
 use aptos_consensus_types::common::Author;

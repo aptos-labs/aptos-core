@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use blst::blst_fp12;
 use blstrs::{Fp12, G1Affine, G2Affine, Gt};

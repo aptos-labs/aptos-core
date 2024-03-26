@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 // @generated
 /// A block on Aptos holds transactions in chronological order (ordered by a transactions monotonically increasing `version` field)

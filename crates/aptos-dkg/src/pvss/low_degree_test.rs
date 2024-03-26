@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 /// Low-degree test from the SCRAPE paper that checks whether $n$ evaluations encode a degree $\le t-1$
 /// polynomial.
 use crate::{

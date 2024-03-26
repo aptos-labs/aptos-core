@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 // @generated
 // Transaction data is transferred via 1 stream with batches until terminated.

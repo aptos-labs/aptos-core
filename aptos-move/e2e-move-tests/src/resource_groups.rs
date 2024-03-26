@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{assert_success, harness::MoveHarness, BlockSplit};
 use aptos_language_e2e_tests::{

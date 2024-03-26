@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use num_bigint::BigUint;
 use once_cell::sync::Lazy;

@@ -1,6 +1,6 @@
-#![no_main]
+// Copyright (c) Aptos Foundation
 
-// Copyright © Aptos Foundation
+#![no_main]
 
 use aptos_language_e2e_tests::{
     account::Account, data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor,

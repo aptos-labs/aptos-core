@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 //! This submodule implements the *public parameters* for this PVSS scheme.
 

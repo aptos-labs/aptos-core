@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{access_trait::AccessMetadata, REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY};
 use anyhow::Context;

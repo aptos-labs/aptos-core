@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_inspection_service::utils::get_encoded_metrics;
 use aptos_metrics_core::{exponential_buckets, register_histogram_vec, HistogramVec, TextEncoder};

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     abort_unless_arithmetics_enabled_for_structure, abort_unless_feature_flag_enabled,

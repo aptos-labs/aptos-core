@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 // Persistent checking is a mechanism to increase tolerancy to eventual consistency issues. In our
 // earlier tests we have observed that parallel runs of the flows returned higher failure rates

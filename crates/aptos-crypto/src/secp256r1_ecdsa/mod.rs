@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 //! This module provides an API for the ECDSA signature scheme over the NIST-P256 curve as defined in [NIST SP 800-186](https://csrc.nist.gov/publications/detail/sp/800-186/final).
 //! NIST-P256 is also known as Secp256r1 or Prime256v1.

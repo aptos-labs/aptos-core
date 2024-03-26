@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     algebra::{lagrange::lagrange_coefficients, polynomials::get_powers_of_tau},

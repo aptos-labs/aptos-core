@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{counters::CHANNEL_SIZE, stream_coordinator::IndexerStreamCoordinator, ServiceContext};
 use aptos_indexer_grpc_utils::counters::{log_grpc_step_fullnode, IndexerGrpcStep};

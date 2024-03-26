@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use super::{Groth16ProofAndStatement, Pepper, TransactionAndProof};
 use crate::{

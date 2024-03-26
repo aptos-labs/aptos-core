@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_protos::transaction::v1::Transaction;
 use std::fmt::Debug;

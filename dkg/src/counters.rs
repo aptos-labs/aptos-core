@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_metrics_core::{register_histogram_vec, register_int_gauge, HistogramVec, IntGauge};
 use once_cell::sync::Lazy;

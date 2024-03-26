@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::utils::{hash_to_scalar, random::random_scalar, HasMultiExp};
 use anyhow::bail;

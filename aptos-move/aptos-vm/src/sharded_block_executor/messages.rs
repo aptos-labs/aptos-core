@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOp};
 use serde::{Deserialize, Serialize};

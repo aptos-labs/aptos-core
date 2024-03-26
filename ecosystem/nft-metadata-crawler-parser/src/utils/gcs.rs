@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::utils::{
     constants::MAX_RETRY_TIME_SECONDS,

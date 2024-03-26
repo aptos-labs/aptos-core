@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::pvss::{
     traits::{transcript::Transcript, Convert, HasEncryptionPublicParams, SecretSharingConfig},

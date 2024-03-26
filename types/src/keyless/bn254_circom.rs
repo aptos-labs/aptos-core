@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use super::circuit_constants::MAX_EXTRA_FIELD_BYTES;
 use crate::{

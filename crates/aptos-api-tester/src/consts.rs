@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::utils::NetworkName;
 use once_cell::sync::Lazy;

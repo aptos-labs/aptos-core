@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::keyless::Groth16Proof;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::default_file_storage_format;
 use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};

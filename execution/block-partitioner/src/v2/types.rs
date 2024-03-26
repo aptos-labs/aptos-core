@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_types::block_executor::partitioner::{
     RoundId, ShardId, GLOBAL_ROUND_ID, GLOBAL_SHARD_ID,

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 mod dummy_provider;
 mod jwk_consensus_basic;

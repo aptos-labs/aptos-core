@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use anyhow::{Context, Result};
 #[cfg(target_os = "linux")]

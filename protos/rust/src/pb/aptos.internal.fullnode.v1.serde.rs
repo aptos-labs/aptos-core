@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 // @generated
 impl serde::Serialize for GetTransactionsFromNodeRequest {

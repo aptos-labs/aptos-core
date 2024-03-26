@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     models::{ledger_info::LedgerInfo, nft_metadata_crawler_uris::NFTMetadataCrawlerURIs},

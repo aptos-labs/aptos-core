@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use std::collections::{
     vec_deque::{IntoIter, Iter},

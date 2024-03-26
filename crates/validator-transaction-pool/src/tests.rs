@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{TransactionFilter, VTxnPoolState};
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};

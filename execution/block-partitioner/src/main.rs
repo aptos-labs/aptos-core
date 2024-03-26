@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_block_partitioner::{
     test_utils::P2PBlockGenerator, v2::config::PartitionerV2Config, PartitionerConfig,

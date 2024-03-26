@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     randomness::{decrypt_key_map, get_on_chain_resource, verify_dkg_transcript},

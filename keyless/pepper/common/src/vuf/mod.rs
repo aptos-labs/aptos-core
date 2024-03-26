@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use anyhow::Result;
 use ark_std::rand::{CryptoRng, RngCore};

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use itertools::Itertools;
 use std::collections::BinaryHeap;

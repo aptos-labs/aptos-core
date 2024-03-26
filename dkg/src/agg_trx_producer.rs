@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{
     transcript_aggregation::TranscriptAggregationState, types::DKGTranscriptRequest, DKGMessage,

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_metrics_core::{
     exponential_buckets, register_histogram, register_histogram_vec, Histogram, HistogramVec,

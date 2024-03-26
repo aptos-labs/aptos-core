@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;

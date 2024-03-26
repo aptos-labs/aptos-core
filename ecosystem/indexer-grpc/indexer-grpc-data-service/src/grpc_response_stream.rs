@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use crate::response_dispatcher::{GrpcResponseDispatcher, ResponseDispatcher};
 use aptos_indexer_grpc_data_access::StorageClient;

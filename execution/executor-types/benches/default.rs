@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 
 use aptos_executor_types::should_forward_to_subscription_service;
 #[cfg(feature = "bench")]
