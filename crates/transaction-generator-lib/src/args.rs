@@ -616,7 +616,7 @@ impl TransactionTypeArg {
                     reuse_accounts_for_orders: true,
                     publish_packages: true,
                 },
-                progress_type: WorkflowProgress::MoveByPhases,
+                progress_type: WorkflowProgress::WhenDone { delay_between_stages_s: 60 },
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
