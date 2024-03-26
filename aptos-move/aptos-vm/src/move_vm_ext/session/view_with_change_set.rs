@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_aggregator::{
     bounded_math::{BoundedMath, SignedU128},

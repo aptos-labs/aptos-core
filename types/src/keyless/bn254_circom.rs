@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::circuit_constants::MAX_EXTRA_FIELD_BYTES;
 use crate::{
