@@ -12,6 +12,7 @@ use move_prover::{cli::Options, run_move_prover, run_move_prover_v2};
 use move_prover_test_utils::{baseline_test::verify_or_update_baseline, extract_test_directives};
 use once_cell::sync::OnceCell;
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     sync::atomic::{AtomicBool, Ordering},
 };
@@ -255,6 +256,7 @@ fn get_flags_and_baseline(
 /// in the source. We still use datatest to finally run the tests to utilize its
 /// execution engine.
 fn collect_enabled_tests(reqs: &mut Vec<Requirements>, group: &str, feature: &Feature, path: &str) {
+    let mut test_groups: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
     let mut p = PathBuf::new();
     p.push(path);
     for entry in WalkDir::new(p.clone())
@@ -284,19 +286,23 @@ fn collect_enabled_tests(reqs: &mut Vec<Requirements>, group: &str, feature: &Fe
                     .unwrap_or_default()
                     .is_empty();
         }
-        let root_str = p.to_string_lossy().to_string();
         let path_str = path.to_string_lossy().to_string();
         if included {
             included = (feature.enabling_condition)(group, &path_str);
         }
         if included {
-            reqs.push(Requirements::new(
-                feature.runner,
-                format!("prover {}[{}]", group, feature.name),
-                root_str,
-                path_str,
-            ));
+            test_groups.entry(feature.name).or_default().push(path_str);
         }
+    }
+
+    for (name, files) in test_groups {
+        let feature = get_feature_by_name(name);
+        reqs.push(Requirements::new(
+            feature.runner,
+            format!("prover {}[{}]", group, feature.name),
+            path.to_string(),
+            files.into_iter().map(|s| s + "$").join("|"),
+        ));
     }
 }
 

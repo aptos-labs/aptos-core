@@ -60,8 +60,9 @@ error: post-condition does not hold
    =     at ../move-stdlib/sources/signer.move:13: address_of
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
-   =     at tests/sources/functional/type_dependent_code.move:47: test1
    =         account = <redacted>
+   =     at tests/sources/functional/type_dependent_code.move:47: test1
+   =         x = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:48: test1
    =     at tests/sources/functional/type_dependent_code.move:50: test1 (spec)
 
@@ -82,7 +83,8 @@ error: post-condition does not hold
    =     at ../move-stdlib/sources/signer.move:13: address_of
    =         result = <redacted>
    =     at ../move-stdlib/sources/signer.move:14: address_of
-   =     at tests/sources/functional/type_dependent_code.move:63: test2
    =         account = <redacted>
+   =     at tests/sources/functional/type_dependent_code.move:63: test2
+   =         t1 = <redacted>
    =     at tests/sources/functional/type_dependent_code.move:64: test2
    =     at tests/sources/functional/type_dependent_code.move:66: test2 (spec)

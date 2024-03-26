@@ -1,0 +1,12 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct S {
+        f: #0,
+    }
+    private fun f<T>() {
+        M::g<M::S<T>>()
+    }
+    private fun g<T>() {
+        M::f<u64>()
+    }
+} // end 0x8675309::M

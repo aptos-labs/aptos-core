@@ -147,8 +147,6 @@ impl Default for StateSyncDriverConfig {
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageServiceConfig {
-    /// Maximum number of concurrent storage server tasks
-    pub max_concurrent_requests: u64,
     /// Maximum number of epoch ending ledger infos per chunk
     pub max_epoch_chunk_size: u64,
     /// Maximum number of invalid requests per peer
@@ -182,7 +180,6 @@ pub struct StorageServiceConfig {
 impl Default for StorageServiceConfig {
     fn default() -> Self {
         Self {
-            max_concurrent_requests: 4000,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_invalid_requests_per_peer: 500,
             max_lru_cache_size: 500, // At ~0.6MiB per chunk, this should take no more than 0.5GiB
@@ -213,10 +210,10 @@ pub struct DataStreamingServiceConfig {
     /// The interval (milliseconds) at which to refresh the global data summary.
     pub global_summary_refresh_interval_ms: u64,
 
-    /// Maximum number of concurrent data client requests (per stream).
+    /// Maximum number of in-flight data client requests (per stream).
     pub max_concurrent_requests: u64,
 
-    /// Maximum number of concurrent data client requests (per stream) for state keys/values.
+    /// Maximum number of in-flight data client requests (per stream) for state keys/values.
     pub max_concurrent_state_requests: u64,
 
     /// Maximum channel sizes for each data stream listener (per stream).
@@ -256,10 +253,10 @@ impl Default for DataStreamingServiceConfig {
             max_concurrent_state_requests: MAX_CONCURRENT_STATE_REQUESTS,
             max_data_stream_channel_sizes: 50,
             max_notification_id_mappings: 300,
-            max_num_consecutive_subscriptions: 40, // At ~4 blocks per second, this should last 10 seconds
+            max_num_consecutive_subscriptions: 45, // At ~3 blocks per second, this should last ~15 seconds
             max_pending_requests: 50,
             max_request_retry: 5,
-            max_subscription_stream_lag_secs: 15, // 15 seconds
+            max_subscription_stream_lag_secs: 10, // 10 seconds
             progress_check_interval_ms: 50,
         }
     }
@@ -273,6 +270,9 @@ pub struct DynamicPrefetchingConfig {
 
     /// The initial number of concurrent prefetching requests
     pub initial_prefetching_value: u64,
+
+    /// Maximum number of in-flight subscription requests
+    pub max_in_flight_subscription_requests: u64,
 
     /// The maximum number of concurrent prefetching requests
     pub max_prefetching_value: u64,
@@ -295,6 +295,7 @@ impl Default for DynamicPrefetchingConfig {
         Self {
             enable_dynamic_prefetching: true,
             initial_prefetching_value: 3,
+            max_in_flight_subscription_requests: 9, // At ~3 blocks per second, this should last ~3 seconds
             max_prefetching_value: 30,
             min_prefetching_value: 3,
             prefetching_value_increase: 1,
@@ -434,15 +435,15 @@ impl Default for AptosDataClientConfig {
             latency_monitor_loop_interval_ms: 100,
             max_epoch_chunk_size: MAX_EPOCH_CHUNK_SIZE,
             max_num_output_reductions: 0,
-            max_optimistic_fetch_lag_secs: 30, // 30 seconds
+            max_optimistic_fetch_lag_secs: 20, // 20 seconds
             max_response_timeout_ms: 60_000,   // 60 seconds
             max_state_chunk_size: MAX_STATE_CHUNK_SIZE,
-            max_subscription_lag_secs: 30, // 30 seconds
+            max_subscription_lag_secs: 20, // 20 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
             optimistic_fetch_timeout_ms: 5000,        // 5 seconds
             response_timeout_ms: 10_000,              // 10 seconds
-            subscription_response_timeout_ms: 20_000, // 20 seconds (must be longer than a regular timeout because of pre-fetching)
+            subscription_response_timeout_ms: 15_000, // 15 seconds (longer than a regular timeout because of prefetching)
             use_compression: true,
         }
     }

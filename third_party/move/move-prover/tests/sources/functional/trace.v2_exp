@@ -14,8 +14,6 @@ error: post-condition does not hold
    =         a = <redacted>
    =         b = <redacted>
    =     at tests/sources/functional/trace.move:16: add_invalid
-   =         b = <redacted>
-   =         a = <redacted>
    =         result = <redacted>
    =     at tests/sources/functional/trace.move:17: add_invalid
    =     at tests/sources/functional/trace.move:19: add_invalid (spec)
@@ -36,8 +34,6 @@ error: post-condition does not hold
    =         a = <redacted>
    =         b = <redacted>
    =     at tests/sources/functional/trace.move:23: update_invalid
-   =         a = <redacted>
-   =         b = <redacted>
    =         a = <redacted>
    =     at tests/sources/functional/trace.move:24: update_invalid
    =     at tests/sources/functional/trace.move:26: update_invalid (spec)

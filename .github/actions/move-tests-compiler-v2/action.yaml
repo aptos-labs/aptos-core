@@ -23,7 +23,7 @@ runs:
 
     # Run Aptos Move tests with compiler V2
     - name: Run Aptos Move tests with compiler V2
-      run: cargo nextest run --release --profile ci --locked -p e2e-move-tests -p aptos-framework --retries 3 --no-fail-fast
+      run: cargo nextest run --release --profile ci --locked -p e2e-move-tests -p aptos-framework --no-fail-fast
       shell: bash
       env:
         MOVE_COMPILER_V2: true

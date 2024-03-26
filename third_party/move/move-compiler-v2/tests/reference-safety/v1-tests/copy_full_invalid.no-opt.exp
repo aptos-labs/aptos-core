@@ -1,0 +1,24 @@
+
+Diagnostics:
+error: cannot pass local `x` which is still mutably borrowed as function argument
+   ┌─ tests/reference-safety/v1-tests/copy_full_invalid.move:13:9
+   │
+12 │         let f = &mut x;
+   │                 ------ previous mutable local borrow
+13 │         x + 0;
+   │         ^^^^^ passed here
+14 │         *f;
+   │         -- conflicting reference `f` used here
+
+error: cannot pass local `x` which is still mutably borrowed as function argument
+   ┌─ tests/reference-safety/v1-tests/copy_full_invalid.move:19:9
+   │
+18 │         let f = id_mut(&mut x);
+   │                 --------------
+   │                 │      │
+   │                 │      previous mutable local borrow
+   │                 used by mutable call result
+19 │         x + 0;
+   │         ^^^^^ passed here
+20 │         *f;
+   │         -- conflicting reference `f` used here

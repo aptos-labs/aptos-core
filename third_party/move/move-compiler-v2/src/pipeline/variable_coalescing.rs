@@ -7,6 +7,8 @@
 //! prerequisites:
 //! - livevar annotation is available by performing liveness analysis.
 //! - copy inference is already performed.
+//! - it is preferable, but not required, to have run dead store elimination (so that
+//!   dead stores do not consume and retain variable slots).
 //! side effect: this transformation removes all pre-existing annotations.
 //!
 //! This transformation is closely related to the register allocation problem in
@@ -132,14 +134,18 @@ impl VariableCoalescing {
         let mut live_intervals = std::iter::repeat_with(|| None)
             .take(target.get_local_count())
             .collect::<Vec<_>>();
+        let code = target.get_bytecode();
         for (offset, live_var_info) in live_var_infos.iter() {
             live_var_info
                 .after
                 .keys()
                 .chain(live_var_info.before.keys())
+                .chain(code[*offset as usize].dests().iter())
                 .filter(|local| !pinned_locals.contains(local))
                 .for_each(|local| {
-                    // non-pinned local that is live before and/or after the code offset.
+                    // non-pinned local that is:
+                    // - live before and/or after the code offset.
+                    // - written to at the code offset (but may never be live).
                     let interval =
                         live_intervals[*local].get_or_insert_with(|| LiveInterval::new(*offset));
                     interval.include(*offset);

@@ -62,3 +62,9 @@ impl<T> From<tokio::sync::mpsc::error::SendError<T>> for RpcError {
         RpcError::TokioMpscSendError
     }
 }
+
+impl From<tokio::task::JoinError> for RpcError {
+    fn from(err: tokio::task::JoinError) -> RpcError {
+        RpcError::Error(anyhow!("JoinError: {:?}", err))
+    }
+}
