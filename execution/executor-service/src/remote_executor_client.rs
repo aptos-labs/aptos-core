@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     remote_state_view_service::RemoteStateViewService, ExecuteBlockCommand, RemoteExecutionRequest,

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::sharded_block_executor::remote_state_value::RemoteStateValue;
 use anyhow::Result;

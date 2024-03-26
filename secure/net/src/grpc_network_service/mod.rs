@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::network_controller::{metrics::NETWORK_HANDLER_TIMER, Message, MessageType};

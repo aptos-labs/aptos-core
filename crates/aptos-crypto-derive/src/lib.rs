@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
@@ -350,7 +350,7 @@ pub fn derive_enum_signature(input: TokenStream) -> TokenStream {
 }
 
 // There is a unit test for this logic in the crypto crate, at
-// aptos_crypto::unit_tests::cryptohasher — you may have to modify it if you
+// aptos_crypto::unit_tests::cryptohasher - you may have to modify it if you
 // edit the below.
 #[proc_macro_derive(CryptoHasher)]
 pub fn hasher_dispatch(input: TokenStream) -> TokenStream {

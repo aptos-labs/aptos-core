@@ -66,9 +66,7 @@ fn struct_one_field_equiv_value() {
         .simple_serialize()
         .unwrap();
     let s2 = val.simple_serialize().unwrap();
-    assert_eq!(s1, s2);
-
-    let utf8_str = "çå∞≠¢õß∂ƒ∫";
+    assert_eq!(s1, s2);??";
     let vec_u8 = MoveValue::Vector(
         utf8_str
             .as_bytes()

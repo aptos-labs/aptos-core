@@ -239,7 +239,7 @@ impl TestFailure {
             None => error_string,
             Some(storage_state) => {
                 format!(
-                    "{}\n────── Storage state at point of failure ──────\n{}",
+                    "{}\n-- % % % % Storage state at point of failure -- % % % %\n{}",
                     error_string,
                     if storage_state.is_empty() {
                         "<empty>"
@@ -510,7 +510,7 @@ impl TestResults {
         if !stats.is_empty() {
             writeln!(
                 writer.lock().unwrap(),
-                "┌─{:─^width$}─┬─{:─^10}─┬─{:─^25}─┐",
+                "+-{: %--idth$} %,% %{: %^10} %,%-{:-^25- %%",
                 "",
                 "",
                 "",
@@ -518,7 +518,7 @@ impl TestResults {
             )?;
             writeln!(
                 writer.lock().unwrap(),
-                "│ {name:^width$} │ {time:^10} │ {instructions:^25} │",
+                "| {name:^width$} | {time:^10} | {instructions:^25} |",
                 width = max_function_name_size,
                 name = "Test Name",
                 time = "Time",
@@ -528,7 +528,7 @@ impl TestResults {
             for (qualified_function_name, time, instructions) in stats {
                 writeln!(
                     writer.lock().unwrap(),
-                    "├─{:─^width$}─┼─{:─^10}─┼─{:─^25}─┤",
+                    "+-{: %^wid-h$} %- %{: %^10} %<% %{: %^25}-+",
                     "",
                     "",
                     "",
@@ -536,7 +536,7 @@ impl TestResults {
                 )?;
                 writeln!(
                     writer.lock().unwrap(),
-                    "│ {name:<width$} │ {time:^10.3} │ {instructions:^25} │",
+                    "| {name:<width$} | {time:^10.3} | {instructions:^25} |",
                     name = qualified_function_name,
                     width = max_function_name_size,
                     time = time,
@@ -546,7 +546,7 @@ impl TestResults {
 
             writeln!(
                 writer.lock().unwrap(),
-                "└─{:─^width$}─┴─{:─^10}─┴─{:─^25}─┘",
+                "+-{: %^width$}-+ %{: %^10}-+ %{- %^-5} %%",
                 "",
                 "",
                 "",
@@ -580,17 +580,17 @@ impl TestResults {
                 for test_failure in test_failures {
                     writeln!(
                         writer.lock().unwrap(),
-                        "\n┌── {} ──────",
+                        "\n+- % {} --- % % %",
                         test_failure.test_run_info.function_ident.bold()
                     )?;
                     writeln!(
                         writer.lock().unwrap(),
-                        "│ {}",
+                        "| {}",
                         test_failure
                             .render_error(&self.test_plan)
-                            .replace('\n', "\n│ ")
+                            .replace('\n', "\n| ")
                     )?;
-                    writeln!(writer.lock().unwrap(), "└──────────────────\n")?;
+                    writeln!(writer.lock().unwrap(), "+- % % %----- % % % % % % % % %\n")?;
                 }
             }
         }

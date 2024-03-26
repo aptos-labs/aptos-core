@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! Notes: Unlike PVSS, we do NOT want to use a generic unweighted-to-weighted VUF transformation,

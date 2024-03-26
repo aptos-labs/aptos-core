@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /// Implements public parameters $(h, g) \in G$ for an ElGamal encryption scheme where $h$

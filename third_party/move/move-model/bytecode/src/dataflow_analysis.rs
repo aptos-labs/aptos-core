@@ -24,7 +24,7 @@ pub struct BlockState<State: Clone> {
 
 pub type StateMap<State> = BTreeMap<BlockId, BlockState<State>>;
 
-/// Take a pre-state + instruction and mutate it to produce a post-state。
+/// Take a pre-state + instruction and mutate it to produce a post-state
 pub trait TransferFunctions {
     type State: AbstractDomain + Clone;
     const BACKWARD: bool;

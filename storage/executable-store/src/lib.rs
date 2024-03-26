@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_infallible::Mutex;
@@ -50,15 +50,15 @@ use std::{
 /// Empty ----------> Updated(None)
 ///                      |
 ///                      |
-///                      ↓
+///                      V
 ///                   Pruned(None)
 ///                      |
 ///                      |
-///                      ↓
+///                      V
 ///   --------------- After(id) -------------> Before(id')
 ///   |                                            |
 ///   |                                            |
-///   ↓                                            |
+///   V                                            |
 /// Empty ----------> Updated(Option<ID>) <---------
 ///                     ...
 ///                     ...
