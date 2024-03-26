@@ -362,6 +362,7 @@ impl SuccessCriteriaChecker {
             } else {
                 if prev_ts > 0 {
                     let round_gap = current_gap + failed_from_nil;
+                    println!("epoch={}, round={}, current_gap={}, failed_from_nil={}", block.event.epoch(), block.event.round(), current_gap, failed_from_nil);
                     let time_gap = block.event.proposed_time() as i64 - prev_ts as i64;
 
                     if time_gap < 0 {

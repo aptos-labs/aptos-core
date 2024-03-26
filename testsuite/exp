@@ -94,7 +94,7 @@ def wait_for_workflow(shell: Shell, branch: str, workflow_name: str, repo: str) 
         "--jq",
         ".[0].databaseId",
         "--repo",
-        str,
+        repo,
     ]
     gh_run_list_cmd_ret = shell.run(gh_run_list_cmd)
     # get the URL
@@ -221,6 +221,8 @@ def workflow_dispatch_forge(
         f"FORGE_TEST_SUITE={test_suite}",
         "--field",
         f"FORGE_CLUSTER_NAME={FORGE_DEFAULT_CLUSTER_NAME}",
+        "--field",
+        f"GIT_SHA={git_sha}",
         "--repo",
         repo,
     ]
