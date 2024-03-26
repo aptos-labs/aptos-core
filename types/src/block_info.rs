@@ -74,6 +74,10 @@ impl BlockInfo {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        *self == Self::empty()
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn random(round: Round) -> Self {
         Self {
