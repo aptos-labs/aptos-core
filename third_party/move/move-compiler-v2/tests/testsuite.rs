@@ -461,7 +461,11 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     options.warn_unused = path_str.contains("/unused/");
     options.sources = extract_test_directives(path, "// dep:")?;
     options.sources.push(path_str.clone());
-    options.dependencies = vec![path_from_crate_root("../move-stdlib/sources")];
+    options.dependencies = if extract_test_directives(path, "// no-stdlib")?.is_empty() {
+        vec![path_from_crate_root("../move-stdlib/sources")]
+    } else {
+        vec![]
+    };
     options.named_address_mapping = vec!["std=0x1".to_string()];
 
     // Putting the generated test baseline into a Refcell to avoid problems with mut borrow
