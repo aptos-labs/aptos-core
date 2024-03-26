@@ -105,7 +105,7 @@ where
 {
     let s = serde_json::Value::deserialize(deserializer)?;
     // iterate the json string to convert key-value pair
-    // assume the format of {"map": {"dat" : "{"key :  Yuri ,  value": {""y"e :  String ,  value : "0x42656e"}}" " key :  Tarded , "value"" { ty"e :  String ,  value": "0x446f766572"}}]}}
+    // assume the format of {"map": {"data": [{"key": "Yuri", "value": {"type": "String", "value": "0x42656e"}}, {"key": "Tarded", "value"" {"type": "String", "value": "0x446f766572"}}]}}
     // if successfully parsing we return the decoded property_map string otherwise return the original string
     Ok(convert_bcs_propertymap(s.clone()).unwrap_or(s))
 }
