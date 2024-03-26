@@ -40,7 +40,8 @@ use aptos_consensus_types::{
     sync_info::SyncInfo,
     timeout_2chain::TwoChainTimeoutCertificate,
     vote::Vote,
-    vote_msg::{VoteMsg, OrderVoteMsg},
+    vote_msg::VoteMsg,
+    order_vote_msg::OrderVoteMsg,
 };
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
@@ -1008,8 +1009,17 @@ impl RoundManager {
                         qc.certified_block().timestamp_usecs(),
                         BlockStage::QC_AGGREGATED,
                     );
+                }                
+                let result = self.new_qc_aggregated(qc, vote.author()).await;
+                if result.is_ok() {
+                    let order_vote = self
+                        .safety_rules
+                        .lock()
+                        .construct_and_sign_order_vote(qc.certified_block().id());
+                    info!(self.new_log(LogEvent::OrderVote), "{}", vote);
+                    self.network.broadcast_vote(vote_msg).await;
                 }
-                self.new_qc_aggregated(qc, vote.author()).await
+                result
             },
             VoteReceptionResult::New2ChainTimeoutCertificate(tc) => {
                 self.new_2chain_tc_aggregated(tc).await
