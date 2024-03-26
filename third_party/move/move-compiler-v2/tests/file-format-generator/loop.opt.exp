@@ -5,6 +5,7 @@ module 42.loops {
 
 
 nested_loop(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
@@ -44,6 +45,7 @@ B6:
 	29: Ret
 }
 while_loop(Arg0: u64): u64 /* def_idx: 1 */ {
+L1:	loc0: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[1](loc0: u64)
@@ -68,6 +70,7 @@ B4:
 	16: Ret
 }
 while_loop_with_break_and_continue(Arg0: u64): u64 /* def_idx: 2 */ {
+L1:	loc0: u64
 B0:
 	0: LdU64(0)
 	1: StLoc[1](loc0: u64)

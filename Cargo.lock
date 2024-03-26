@@ -927,6 +927,7 @@ dependencies = [
  "hex",
  "itertools 0.12.1",
  "maplit",
+ "mini-moka",
  "mirai-annotations",
  "move-core-types",
  "num-derive",
@@ -981,6 +982,7 @@ dependencies = [
  "bcs 0.1.4",
  "futures",
  "itertools 0.12.1",
+ "mini-moka",
  "mirai-annotations",
  "once_cell",
  "proptest",
@@ -3908,7 +3910,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
- "aptos-bounded-executor",
  "aptos-channels",
  "aptos-config",
  "aptos-crypto",

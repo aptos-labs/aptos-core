@@ -110,7 +110,7 @@ fn main() {
                 c.runner,
                 format!("compiler-v2-txn[config={}]", c.name),
                 "tests".to_string(),
-                files.clone().into_iter().join("|"),
+                files.clone().into_iter().map(|s| s + "$").join("|"),
             )
         })
         .collect_vec();
