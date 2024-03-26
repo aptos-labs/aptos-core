@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::pvss::{
     traits::{transcript::Transcript, Convert, HasEncryptionPublicParams, SecretSharingConfig},
