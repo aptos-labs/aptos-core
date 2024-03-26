@@ -78,32 +78,26 @@ public fun m::test1(): u64 {
 [variant baseline]
 public fun m::test2($t0: u64): u64 {
      var $t1: u64
-     var $t2: u64
+     var $t2: u64 [unused]
      # live vars: $t0
-     # events: b:$t0
-  0: $t2 := copy($t0)
-     # live vars: $t0
-     # events: e:$t0, b:$t1
-  1: $t1 := move($t0)
+     # events: b:$t0, e:$t0, b:$t1
+  0: $t1 := move($t0)
      # live vars: $t1
      # events: e:$t1
-  2: return $t1
+  1: return $t1
 }
 
 
 [variant baseline]
 public fun m::test3($t0: u64): u64 {
      var $t1: u64
-     var $t2: u64
+     var $t2: u64 [unused]
      # live vars: $t0
-     # events: b:$t0, e:$t0
-  0: $t2 := move($t0)
-     # live vars:
-     # events: b:$t1
-  1: $t1 := 8
+     # events: b:$t0, e:$t0, b:$t1
+  0: $t1 := 8
      # live vars: $t1
      # events: e:$t1
-  2: return $t1
+  1: return $t1
 }
 
 
@@ -131,20 +125,18 @@ public fun m::test1(): u64 {
 [variant baseline]
 public fun m::test2($t0: u64): u64 {
      var $t1: u64 [unused]
-     var $t2: u64
-  0: $t2 := copy($t0)
-  1: $t0 := move($t0)
-  2: return $t0
+     var $t2: u64 [unused]
+  0: $t0 := move($t0)
+  1: return $t0
 }
 
 
 [variant baseline]
 public fun m::test3($t0: u64): u64 {
      var $t1: u64 [unused]
-     var $t2: u64
-  0: $t2 := move($t0)
-  1: $t0 := 8
-  2: return $t0
+     var $t2: u64 [unused]
+  0: $t0 := 8
+  1: return $t0
 }
 
 

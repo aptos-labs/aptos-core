@@ -25,6 +25,24 @@ public fun m::test() {
   6: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64
+  0: $t1 := 1
+  1: $t0 := move($t1)
+  2: $t3 := 2
+  3: $t2 := move($t3)
+  4: $t5 := +($t0, $t2)
+  5: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -33,7 +51,7 @@ public fun m::test() {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
+     var $t4: u64 [unused]
      var $t5: u64
      # live vars:
      # events: b:$t1
@@ -48,13 +66,10 @@ public fun m::test() {
      # events: e:$t3, b:$t2
   3: $t2 := move($t3)
      # live vars: $t0, $t2
-     # events: e:$t0, e:$t2, b:$t5
+     # events: e:$t0, e:$t2, e:$t5, b:$t5
   4: $t5 := +($t0, $t2)
-     # live vars: $t5
-     # events: e:$t5
-  5: $t4 := move($t5)
      # live vars:
-  6: return ()
+  5: return ()
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -65,15 +80,14 @@ public fun m::test() {
      var $t1: u64
      var $t2: u64 [unused]
      var $t3: u64
-     var $t4: u64
+     var $t4: u64 [unused]
      var $t5: u64 [unused]
   0: $t1 := 1
   1: $t1 := move($t1)
   2: $t3 := 2
   3: $t3 := move($t3)
   4: $t1 := +($t1, $t3)
-  5: $t4 := move($t1)
-  6: return ()
+  5: return ()
 }
 
 ============ after DeadStoreElimination: ================

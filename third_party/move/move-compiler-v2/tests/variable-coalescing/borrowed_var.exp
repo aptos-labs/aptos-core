@@ -24,6 +24,33 @@ fun m::test() {
  10: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &u64
+     var $t3: &u64
+     var $t4: &u64
+     var $t5: &u64
+     var $t6: bool
+     var $t7: u64
+     var $t8: u64
+  0: $t1 := 5
+  1: $t0 := move($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := move($t3)
+  4: $t4 := move($t2)
+  5: drop($t4)
+  6: $t5 := borrow_local($t0)
+  7: $t2 := move($t5)
+  8: $t7 := read_ref($t2)
+  9: $t8 := 5
+ 10: $t6 := ==($t7, $t8)
+ 11: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -68,7 +95,7 @@ fun m::test() {
      # events: b:$t8
   9: $t8 := 5
      # live vars: $t7, $t8
-     # events: e:$t7, e:$t8
+     # events: e:$t6, e:$t7, e:$t8, b:$t6
  10: $t6 := ==($t7, $t8)
      # live vars:
  11: return ()

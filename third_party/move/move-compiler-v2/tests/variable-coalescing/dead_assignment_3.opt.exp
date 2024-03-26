@@ -35,30 +35,24 @@ public fun m::test($t0: bool): u32 {
   1: $t2 := move($t3)
      # live vars: $t0, $t2
      # events: e:$t0
-  2: if ($t0) goto 3 else goto 8
+  2: if ($t0) goto 3 else goto 6
      # live vars: $t2
   3: label L0
      # live vars: $t2
-  4: $t2 := move($t2)
-     # live vars: $t2
-  5: $t2 := move($t2)
-     # live vars: $t2
      # events: b:$t1
-  6: $t1 := move($t2)
+  4: $t1 := move($t2)
      # live vars: $t1
-  7: goto 11
-     # live vars: $t2
-  8: label L1
+  5: goto 8
      # live vars: $t2
      # events: e:$t2
-  9: $t2 := move($t2)
+  6: label L1
      # live vars:
- 10: $t1 := 9
+  7: $t1 := 9
      # live vars: $t1
- 11: label L2
+  8: label L2
      # live vars: $t1
      # events: e:$t1
- 12: return $t1
+  9: return $t1
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -70,17 +64,14 @@ public fun m::test($t0: bool): u32 {
      var $t3: u32
   0: $t3 := 1
   1: $t3 := move($t3)
-  2: if ($t0) goto 3 else goto 8
+  2: if ($t0) goto 3 else goto 6
   3: label L0
-  4: $t3 := move($t3)
-  5: $t3 := move($t3)
-  6: $t1 := move($t3)
-  7: goto 11
-  8: label L1
-  9: $t3 := move($t3)
- 10: $t1 := 9
- 11: label L2
- 12: return $t1
+  4: $t1 := move($t3)
+  5: goto 8
+  6: label L1
+  7: $t1 := 9
+  8: label L2
+  9: return $t1
 }
 
 
