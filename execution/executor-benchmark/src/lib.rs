@@ -236,6 +236,10 @@ pub fn run_benchmark<V>(
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader.clone());
     }
+
+    // Assert there were no error log lines in the run.
+    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+
     log_total_supply(&db.reader);
 }
 
@@ -387,6 +391,9 @@ fn add_accounts_impl<V>(
         now_version,
         generator.num_existing_accounts() + num_new_accounts,
     );
+
+    // Assert there were no error log lines in the run.
+    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
 
     log_total_supply(&db.reader);
 
