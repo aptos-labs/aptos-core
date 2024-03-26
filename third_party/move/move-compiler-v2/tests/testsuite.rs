@@ -312,6 +312,20 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 "AbilityProcessor",
             ]),
         },
+        TestConfig {
+            name: "acquires-checker",
+            runner: |p| run_test(p, get_config_by_name("acquires-checker")),
+            include: vec!["/acquires-checker/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts
+                .clone()
+                .set_experiment(Experiment::ACQUIRES_CHECK, true),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
         // Bytecode verifier tests
         TestConfig {
             name: "bytecode-verify",
