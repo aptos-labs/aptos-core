@@ -28,20 +28,22 @@ pub fn acquires_checker(env: &GlobalEnv) {
                         let s_name = module.get_struct(sid).get_name();
                         let note = match acquired {
                             AcquiredAt::Directly(loc) => (loc, "acquired here".to_owned()),
-                            AcquiredAt::Indirectly(loc, _fun_id) => (loc, "acquired by call".to_owned()),
+                            AcquiredAt::Indirectly(loc, _fun_id) => {
+                                (loc, "acquired by call".to_owned())
+                            },
                         };
                         env.error_with_labels(
                             &fun_env.get_id_loc(),
-                            &format!("missing acquries annotation for {}", s_name.display(env.symbol_pool())),
+                            &format!(
+                                "missing acquries annotation for {}",
+                                s_name.display(env.symbol_pool())
+                            ),
                             vec![note],
                         )
                     }
                 }
                 for (_sid, loc) in declared_acquires {
-                    env.error(
-                        &loc,
-                        "unnecessary acquires annotation",
-                    );
+                    env.error(&loc, "unnecessary acquires annotation");
                 }
             }
         }
@@ -63,16 +65,17 @@ fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
                             if inst_qid.inst.is_empty()
                                 && inst_qid.module_id == fun_env.module_env.get_id()
                             {
-                                Some((inst_qid.id, access_specifier.resource.0.clone()))
-                            } else {
-                                None
+                                return Some((inst_qid.id, access_specifier.resource.0.clone()));
                             }
                         },
-                        _ => None,
+                        _ => {},
                     }
-                } else {
-                    None
                 }
+                fun_env.module_env.env.error(
+                    &access_specifier.loc,
+                    "access specifier not enabled. Only plain `acquires R` is enabled.",
+                );
+                None
             })
             .collect()
     } else {
@@ -220,44 +223,40 @@ fn get_callees_and_acquired_resources(
     let mut resources = BTreeMap::new();
     let mid = fun_env.module_env.get_id();
     if let Some(fun_body) = fun_env.get_def() {
-        let mut collect_calls = |exp: &ExpData| {
-            match exp {
-                ExpData::Call(node_id, op, _) => {
-                    if let Operation::MoveFunction(exp_mid, exp_fid) = op {
-                        if *exp_mid == fun_env.module_env.get_id() {
-                            let loc = fun_env.module_env.env.get_node_loc(*node_id);
-                            callees.entry(*exp_fid).or_insert(loc);
-                        }
+        let mut collect_callees = |exp: &ExpData| match exp {
+            ExpData::Call(node_id, op, _) => {
+                if let Operation::MoveFunction(exp_mid, exp_fid) = op {
+                    if *exp_mid == fun_env.module_env.get_id() {
+                        let loc = fun_env.module_env.env.get_node_loc(*node_id);
+                        callees.entry(*exp_fid).or_insert(loc);
                     }
-                    true
                 }
-                ExpData::SpecBlock(..) => false,
-                _ => true,
-            }
+                true
+            },
+            ExpData::SpecBlock(..) => false,
+            _ => true,
         };
-        let mut collect_resources = |exp: &ExpData| {
-            match exp {
-                ExpData::Call(node_id, op, _) => {
-                    match op {
-                        Operation::MoveFrom | Operation::BorrowGlobal(..) => {
-                            let ty_params = fun_env.module_env.env.get_node_instantiation(*node_id);
-                            let ty_param = ty_params.get(0).expect("type parameter");
-                            if let Type::Struct(exp_mid, sid, _insts) = ty_param {
-                                if *exp_mid == mid {
-                                    let loc = fun_env.module_env.env.get_node_loc(*node_id);
-                                    resources.entry(*sid).or_insert(loc);
-                                }
+        let mut collect_directly_used_resources = |exp: &ExpData| match exp {
+            ExpData::Call(node_id, op, _) => {
+                match op {
+                    Operation::MoveFrom | Operation::BorrowGlobal(..) => {
+                        let ty_params = fun_env.module_env.env.get_node_instantiation(*node_id);
+                        let ty_param = ty_params.get(0).expect("type parameter");
+                        if let Type::Struct(exp_mid, sid, _insts) = ty_param {
+                            if *exp_mid == mid {
+                                let loc = fun_env.module_env.env.get_node_loc(*node_id);
+                                resources.entry(*sid).or_insert(loc);
                             }
-                        },
-                        _ => {},
-                    }
-                    true
+                        }
+                    },
+                    _ => {},
                 }
-                ExpData::SpecBlock(..) => false,
-                _ => true,
-            }
+                true
+            },
+            ExpData::SpecBlock(..) => false,
+            _ => true,
         };
-        fun_body.visit_pre_order(&mut |e| collect_calls(e) && collect_resources(e));
+        fun_body.visit_pre_order(&mut |e| collect_callees(e) && collect_directly_used_resources(e));
     }
     (callees, resources)
 }
