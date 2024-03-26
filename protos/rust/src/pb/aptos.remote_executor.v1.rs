@@ -5,15 +5,14 @@
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct NetworkMessage {
-    #[prost(bytes="vec", tag="1")]
+    #[prost(bytes = "vec", tag = "1")]
     pub message: ::prost::alloc::vec::Vec<u8>,
-    #[prost(string, tag="2")]
+    #[prost(string, tag = "2")]
     pub message_type: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Empty {
-}
+pub struct Empty {}
 /// Encoded file descriptor set for the `aptos.remote_executor.v1` package
 pub const FILE_DESCRIPTOR_SET: &[u8] = &[
     0x0a, 0xa0, 0x06, 0x0a, 0x2a, 0x61, 0x70, 0x74, 0x6f, 0x73, 0x2f, 0x72, 0x65, 0x6d, 0x6f, 0x74,

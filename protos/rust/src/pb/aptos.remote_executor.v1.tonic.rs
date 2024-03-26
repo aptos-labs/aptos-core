@@ -5,8 +5,7 @@
 /// Generated client implementations.
 pub mod network_message_service_client {
     #![allow(unused_variables, dead_code, missing_docs, clippy::let_unit_value)]
-    use tonic::codegen::*;
-    use tonic::codegen::http::Uri;
+    use tonic::codegen::{http::Uri, *};
     ///
     #[derive(Debug, Clone)]
     pub struct NetworkMessageServiceClient<T> {
@@ -34,10 +33,12 @@ pub mod network_message_service_client {
             let inner = tonic::client::Grpc::new(inner);
             Self { inner }
         }
+
         pub fn with_origin(inner: T, origin: Uri) -> Self {
             let inner = tonic::client::Grpc::with_origin(inner, origin);
             Self { inner }
         }
+
         pub fn with_interceptor<F>(
             inner: T,
             interceptor: F,
@@ -51,12 +52,12 @@ pub mod network_message_service_client {
                     <T as tonic::client::GrpcService<tonic::body::BoxBody>>::ResponseBody,
                 >,
             >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::BoxBody>,
-            >>::Error: Into<StdError> + Send + Sync,
+            <T as tonic::codegen::Service<http::Request<tonic::body::BoxBody>>>::Error:
+                Into<StdError> + Send + Sync,
         {
             NetworkMessageServiceClient::new(InterceptedService::new(inner, interceptor))
         }
+
         /// Compress requests with the given encoding.
         ///
         /// This requires the server to support it otherwise it might respond with an
@@ -66,12 +67,14 @@ pub mod network_message_service_client {
             self.inner = self.inner.send_compressed(encoding);
             self
         }
+
         /// Enable decompressing responses.
         #[must_use]
         pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.inner = self.inner.accept_compressed(encoding);
             self
         }
+
         /// Limits the maximum size of a decoded message.
         ///
         /// Default: `4MB`
@@ -80,6 +83,7 @@ pub mod network_message_service_client {
             self.inner = self.inner.max_decoding_message_size(limit);
             self
         }
+
         /// Limits the maximum size of an encoded message.
         ///
         /// Default: `usize::MAX`
@@ -88,32 +92,27 @@ pub mod network_message_service_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
+
         ///
         pub async fn simple_msg_exchange(
             &mut self,
             request: impl tonic::IntoRequest<super::NetworkMessage>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
-            self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::new(
-                        tonic::Code::Unknown,
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+            self.inner.ready().await.map_err(|e| {
+                tonic::Status::new(
+                    tonic::Code::Unknown,
+                    format!("Service was not ready: {}", e.into()),
+                )
+            })?;
             let codec = tonic::codec::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange",
             );
             let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "aptos.remote_executor.v1.NetworkMessageService",
-                        "SimpleMsgExchange",
-                    ),
-                );
+            req.extensions_mut().insert(GrpcMethod::new(
+                "aptos.remote_executor.v1.NetworkMessageService",
+                "SimpleMsgExchange",
+            ));
             self.inner.unary(req, path, codec).await
         }
     }
@@ -145,6 +144,7 @@ pub mod network_message_service_server {
         pub fn new(inner: T) -> Self {
             Self::from_arc(Arc::new(inner))
         }
+
         pub fn from_arc(inner: Arc<T>) -> Self {
             let inner = _Inner(inner);
             Self {
@@ -155,27 +155,28 @@ pub mod network_message_service_server {
                 max_encoding_message_size: None,
             }
         }
-        pub fn with_interceptor<F>(
-            inner: T,
-            interceptor: F,
-        ) -> InterceptedService<Self, F>
+
+        pub fn with_interceptor<F>(inner: T, interceptor: F) -> InterceptedService<Self, F>
         where
             F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
         }
+
         /// Enable decompressing requests with the given encoding.
         #[must_use]
         pub fn accept_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.accept_compression_encodings.enable(encoding);
             self
         }
+
         /// Compress responses with the given encoding, if the client supports it.
         #[must_use]
         pub fn send_compressed(mut self, encoding: CompressionEncoding) -> Self {
             self.send_compression_encodings.enable(encoding);
             self
         }
+
         /// Limits the maximum size of a decoded message.
         ///
         /// Default: `4MB`
@@ -184,6 +185,7 @@ pub mod network_message_service_server {
             self.max_decoding_message_size = Some(limit);
             self
         }
+
         /// Limits the maximum size of an encoded message.
         ///
         /// Default: `usize::MAX`
@@ -193,45 +195,42 @@ pub mod network_message_service_server {
             self
         }
     }
-    impl<T, B> tonic::codegen::Service<http::Request<B>>
-    for NetworkMessageServiceServer<T>
+    impl<T, B> tonic::codegen::Service<http::Request<B>> for NetworkMessageServiceServer<T>
     where
         T: NetworkMessageService,
         B: Body + Send + 'static,
         B::Error: Into<StdError> + Send + 'static,
     {
-        type Response = http::Response<tonic::body::BoxBody>;
         type Error = std::convert::Infallible;
         type Future = BoxFuture<Self::Response, Self::Error>;
+        type Response = http::Response<tonic::body::BoxBody>;
+
         fn poll_ready(
             &mut self,
             _cx: &mut Context<'_>,
         ) -> Poll<std::result::Result<(), Self::Error>> {
             Poll::Ready(Ok(()))
         }
+
         fn call(&mut self, req: http::Request<B>) -> Self::Future {
             let inner = self.inner.clone();
             match req.uri().path() {
                 "/aptos.remote_executor.v1.NetworkMessageService/SimpleMsgExchange" => {
                     #[allow(non_camel_case_types)]
                     struct SimpleMsgExchangeSvc<T: NetworkMessageService>(pub Arc<T>);
-                    impl<
-                        T: NetworkMessageService,
-                    > tonic::server::UnaryService<super::NetworkMessage>
-                    for SimpleMsgExchangeSvc<T> {
+                    impl<T: NetworkMessageService>
+                        tonic::server::UnaryService<super::NetworkMessage>
+                        for SimpleMsgExchangeSvc<T>
+                    {
+                        type Future = BoxFuture<tonic::Response<Self::Response>, tonic::Status>;
                         type Response = super::Empty;
-                        type Future = BoxFuture<
-                            tonic::Response<Self::Response>,
-                            tonic::Status,
-                        >;
+
                         fn call(
                             &mut self,
                             request: tonic::Request<super::NetworkMessage>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
-                            let fut = async move {
-                                (*inner).simple_msg_exchange(request).await
-                            };
+                            let fut = async move { (*inner).simple_msg_exchange(request).await };
                             Box::pin(fut)
                         }
                     }
@@ -257,19 +256,15 @@ pub mod network_message_service_server {
                         Ok(res)
                     };
                     Box::pin(fut)
-                }
-                _ => {
-                    Box::pin(async move {
-                        Ok(
-                            http::Response::builder()
-                                .status(200)
-                                .header("grpc-status", "12")
-                                .header("content-type", "application/grpc")
-                                .body(empty_body())
-                                .unwrap(),
-                        )
-                    })
-                }
+                },
+                _ => Box::pin(async move {
+                    Ok(http::Response::builder()
+                        .status(200)
+                        .header("grpc-status", "12")
+                        .header("content-type", "application/grpc")
+                        .body(empty_body())
+                        .unwrap())
+                }),
             }
         }
     }
@@ -295,8 +290,7 @@ pub mod network_message_service_server {
             write!(f, "{:?}", self.0)
         }
     }
-    impl<T: NetworkMessageService> tonic::server::NamedService
-    for NetworkMessageServiceServer<T> {
+    impl<T: NetworkMessageService> tonic::server::NamedService for NetworkMessageServiceServer<T> {
         const NAME: &'static str = "aptos.remote_executor.v1.NetworkMessageService";
     }
 }

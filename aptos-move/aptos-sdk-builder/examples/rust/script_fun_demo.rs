@@ -20,7 +20,7 @@ fn demo_p2p_entry_function() {
         Some(EntryFunctionCall::AptosCoinTransfer { amount: a, to: p }) => {
             assert_eq!(a, amount);
             assert_eq!(p, payee.clone());
-        }
+        },
         _ => panic!("unexpected type of entry function"),
     };
 

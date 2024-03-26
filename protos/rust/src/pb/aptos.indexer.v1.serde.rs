@@ -19,7 +19,8 @@ impl serde::Serialize for GetTransactionsRequest {
         if self.batch_size.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.GetTransactionsRequest", len)?;
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.indexer.v1.GetTransactionsRequest", len)?;
         if let Some(v) = self.starting_version.as_ref() {
             struct_ser.serialize_field("startingVersion", ToString::to_string(&v).as_str())?;
         }
@@ -63,7 +64,10 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -73,8 +77,12 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                         E: serde::de::Error,
                     {
                         match value {
-                            "startingVersion" | "starting_version" => Ok(GeneratedField::StartingVersion),
-                            "transactionsCount" | "transactions_count" => Ok(GeneratedField::TransactionsCount),
+                            "startingVersion" | "starting_version" => {
+                                Ok(GeneratedField::StartingVersion)
+                            },
+                            "transactionsCount" | "transactions_count" => {
+                                Ok(GeneratedField::TransactionsCount)
+                            },
                             "batchSize" | "batch_size" => Ok(GeneratedField::BatchSize),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
@@ -91,9 +99,12 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                 formatter.write_str("struct aptos.indexer.v1.GetTransactionsRequest")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<GetTransactionsRequest, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            fn visit_map<V>(
+                self,
+                mut map: V,
+            ) -> std::result::Result<GetTransactionsRequest, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 let mut starting_version__ = None;
                 let mut transactions_count__ = None;
@@ -107,7 +118,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                             starting_version__ =
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
-                        }
+                        },
                         GeneratedField::TransactionsCount => {
                             if transactions_count__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactionsCount"));
@@ -115,7 +126,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                             transactions_count__ =
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
-                        }
+                        },
                         GeneratedField::BatchSize => {
                             if batch_size__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("batchSize"));
@@ -123,7 +134,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                             batch_size__ =
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
-                        }
+                        },
                     }
                 }
                 Ok(GetTransactionsRequest {
@@ -133,7 +144,11 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsRequest {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.indexer.v1.GetTransactionsRequest", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct(
+            "aptos.indexer.v1.GetTransactionsRequest",
+            FIELDS,
+            GeneratedVisitor,
+        )
     }
 }
 impl serde::Serialize for TransactionsInStorage {
@@ -150,7 +165,8 @@ impl serde::Serialize for TransactionsInStorage {
         if self.starting_version.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.TransactionsInStorage", len)?;
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.indexer.v1.TransactionsInStorage", len)?;
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
         }
@@ -166,11 +182,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &[
-            "transactions",
-            "starting_version",
-            "startingVersion",
-        ];
+        const FIELDS: &[&str] = &["transactions", "starting_version", "startingVersion"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -187,7 +199,10 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -198,7 +213,9 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
                     {
                         match value {
                             "transactions" => Ok(GeneratedField::Transactions),
-                            "startingVersion" | "starting_version" => Ok(GeneratedField::StartingVersion),
+                            "startingVersion" | "starting_version" => {
+                                Ok(GeneratedField::StartingVersion)
+                            },
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -214,9 +231,12 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
                 formatter.write_str("struct aptos.indexer.v1.TransactionsInStorage")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsInStorage, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            fn visit_map<V>(
+                self,
+                mut map: V,
+            ) -> std::result::Result<TransactionsInStorage, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 let mut transactions__ = None;
                 let mut starting_version__ = None;
@@ -227,7 +247,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
                                 return Err(serde::de::Error::duplicate_field("transactions"));
                             }
                             transactions__ = Some(map.next_value()?);
-                        }
+                        },
                         GeneratedField::StartingVersion => {
                             if starting_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startingVersion"));
@@ -235,7 +255,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
                             starting_version__ =
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
-                        }
+                        },
                     }
                 }
                 Ok(TransactionsInStorage {
@@ -244,7 +264,11 @@ impl<'de> serde::Deserialize<'de> for TransactionsInStorage {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.indexer.v1.TransactionsInStorage", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct(
+            "aptos.indexer.v1.TransactionsInStorage",
+            FIELDS,
+            GeneratedVisitor,
+        )
     }
 }
 impl serde::Serialize for TransactionsResponse {
@@ -261,7 +285,8 @@ impl serde::Serialize for TransactionsResponse {
         if self.chain_id.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.indexer.v1.TransactionsResponse", len)?;
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.indexer.v1.TransactionsResponse", len)?;
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
         }
@@ -277,11 +302,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &[
-            "transactions",
-            "chain_id",
-            "chainId",
-        ];
+        const FIELDS: &[&str] = &["transactions", "chain_id", "chainId"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -298,7 +319,10 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -326,8 +350,8 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsResponse, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 let mut transactions__ = None;
                 let mut chain_id__ = None;
@@ -338,7 +362,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                                 return Err(serde::de::Error::duplicate_field("transactions"));
                             }
                             transactions__ = Some(map.next_value()?);
-                        }
+                        },
                         GeneratedField::ChainId => {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
@@ -346,7 +370,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                             chain_id__ =
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
-                        }
+                        },
                     }
                 }
                 Ok(TransactionsResponse {
@@ -355,6 +379,10 @@ impl<'de> serde::Deserialize<'de> for TransactionsResponse {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.indexer.v1.TransactionsResponse", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct(
+            "aptos.indexer.v1.TransactionsResponse",
+            FIELDS,
+            GeneratedVisitor,
+        )
     }
 }

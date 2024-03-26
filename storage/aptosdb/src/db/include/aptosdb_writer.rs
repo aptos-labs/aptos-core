@@ -497,9 +497,8 @@ impl AptosDB {
                     &batch,
                 )?;
 
-
-            Ok(())
-        })?;
+                Ok(())
+            })?;
 
         let _timer = OTHER_TIMERS_SECONDS
             .with_label_values(&["commit_transaction_auxiliary_data___commit"])

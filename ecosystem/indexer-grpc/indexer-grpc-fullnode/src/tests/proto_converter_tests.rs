@@ -5,7 +5,6 @@ use crate::{
     runtime::FullnodeDataService,
     tests::{new_test_context, TestContext},
 };
-
 use aptos_api_test_context::current_function_name;
 use aptos_framework::extended_checks;
 use aptos_protos::extractor::v1::{
@@ -14,9 +13,7 @@ use aptos_protos::extractor::v1::{
     write_set_change::Change::WriteTableItem,
     Transaction as TransactionPB,
 };
-
 use aptos_sdk::types::{account_config::aptos_test_root_address, LocalAccount};
-
 use move_core_types::{account_address::AccountAddress, value::MoveValue};
 use move_package::BuildConfig;
 use serde_json::{json, Value};
@@ -221,8 +218,7 @@ async fn test_table_item_parsing_works() {
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
     let module = build_test_module(account.address()).await;
 
-    ctx.api_publish_module(account, module.into())
-        .await;
+    ctx.api_publish_module(account, module.into()).await;
     ctx.api_execute_entry_function(
         account,
         "TableTestData",

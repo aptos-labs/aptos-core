@@ -41,7 +41,8 @@ impl DbReader for AptosDB {
         gauged_api("get_transaction_auxiliary_data_by_version", || {
             self.error_if_ledger_pruned("Transaction", version)?;
             self.ledger_db
-                .transaction_auxiliary_data_db().get_transaction_auxiliary_data(version)
+                .transaction_auxiliary_data_db()
+                .get_transaction_auxiliary_data(version)
         })
     }
 
@@ -208,13 +209,19 @@ impl DbReader for AptosDB {
                 let (block_version, index, _seq_num) = self
                     .event_store
                     .lookup_event_at_or_after_version(&new_block_event_key(), min_version)?
-                    .ok_or_else(|| AptosDbError::NotFound(format!("NewBlockEvent at or after version {}", min_version)))?;
-                let event = self.event_store.get_event_by_version_and_index(block_version, index)?;
+                    .ok_or_else(|| {
+                        AptosDbError::NotFound(format!(
+                            "NewBlockEvent at or after version {}",
+                            min_version
+                        ))
+                    })?;
+                let event = self
+                    .event_store
+                    .get_event_by_version_and_index(block_version, index)?;
                 return Ok((block_version, event.expect_new_block_event()?.height()));
             }
 
-            self
-                .ledger_db
+            self.ledger_db
                 .metadata_db()
                 .get_block_height_at_or_after_version(min_version)
         })
@@ -480,8 +487,11 @@ impl DbReader for AptosDB {
         gauged_api("get_state_value_with_proof_by_version_ext", || {
             self.error_if_state_merkle_pruned("State merkle", version)?;
 
-            self.state_store
-                .get_state_value_with_proof_by_version_ext(state_store_key, version, root_depth)
+            self.state_store.get_state_value_with_proof_by_version_ext(
+                state_store_key,
+                version,
+                root_depth,
+            )
         })
     }
 
@@ -557,7 +567,10 @@ impl DbReader for AptosDB {
             for item in iter.take(num_events) {
                 let (_block_height, block_info) = item?;
                 let first_version = block_info.first_version();
-                let event = self.ledger_db.event_db().expect_new_block_event(first_version)?;
+                let event = self
+                    .ledger_db
+                    .event_db()
+                    .expect_new_block_event(first_version)?;
                 events.push(EventWithVersion::new(first_version, event));
             }
 

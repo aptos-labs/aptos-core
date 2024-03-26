@@ -7,25 +7,25 @@
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionsInStorage {
     /// Required; transactions data.
-    #[prost(message, repeated, tag="1")]
+    #[prost(message, repeated, tag = "1")]
     pub transactions: ::prost::alloc::vec::Vec<super::super::transaction::v1::Transaction>,
     /// Required; chain id.
-    #[prost(uint64, optional, tag="2")]
+    #[prost(uint64, optional, tag = "2")]
     pub starting_version: ::core::option::Option<u64>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetTransactionsRequest {
     /// Required; start version of current stream.
-    #[prost(uint64, optional, tag="1")]
+    #[prost(uint64, optional, tag = "1")]
     pub starting_version: ::core::option::Option<u64>,
     /// Optional; number of transactions to return in current stream.
     /// If not present, return an infinite stream of transactions.
-    #[prost(uint64, optional, tag="2")]
+    #[prost(uint64, optional, tag = "2")]
     pub transactions_count: ::core::option::Option<u64>,
     /// Optional; number of transactions in each `TransactionsResponse` for current stream.
     /// If not present, default to 1000. If larger than 1000, request will be rejected.
-    #[prost(uint64, optional, tag="3")]
+    #[prost(uint64, optional, tag = "3")]
     pub batch_size: ::core::option::Option<u64>,
 }
 /// TransactionsResponse is a batch of transactions.
@@ -33,10 +33,10 @@ pub struct GetTransactionsRequest {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct TransactionsResponse {
     /// Required; transactions data.
-    #[prost(message, repeated, tag="1")]
+    #[prost(message, repeated, tag = "1")]
     pub transactions: ::prost::alloc::vec::Vec<super::super::transaction::v1::Transaction>,
     /// Required; chain id.
-    #[prost(uint64, optional, tag="2")]
+    #[prost(uint64, optional, tag = "2")]
     pub chain_id: ::core::option::Option<u64>,
 }
 /// Encoded file descriptor set for the `aptos.indexer.v1` package

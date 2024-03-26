@@ -16,7 +16,10 @@ impl serde::Serialize for GetTransactionsFromNodeRequest {
         if self.transactions_count.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest", len)?;
+        let mut struct_ser = serializer.serialize_struct(
+            "aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest",
+            len,
+        )?;
         if let Some(v) = self.starting_version.as_ref() {
             struct_ser.serialize_field("startingVersion", ToString::to_string(&v).as_str())?;
         }
@@ -54,7 +57,10 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -64,8 +70,12 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                         E: serde::de::Error,
                     {
                         match value {
-                            "startingVersion" | "starting_version" => Ok(GeneratedField::StartingVersion),
-                            "transactionsCount" | "transactions_count" => Ok(GeneratedField::TransactionsCount),
+                            "startingVersion" | "starting_version" => {
+                                Ok(GeneratedField::StartingVersion)
+                            },
+                            "transactionsCount" | "transactions_count" => {
+                                Ok(GeneratedField::TransactionsCount)
+                            },
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -78,12 +88,16 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
             type Value = GetTransactionsFromNodeRequest;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest")
+                formatter
+                    .write_str("struct aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<GetTransactionsFromNodeRequest, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            fn visit_map<V>(
+                self,
+                mut map: V,
+            ) -> std::result::Result<GetTransactionsFromNodeRequest, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 let mut starting_version__ = None;
                 let mut transactions_count__ = None;
@@ -96,7 +110,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                             starting_version__ =
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
-                        }
+                        },
                         GeneratedField::TransactionsCount => {
                             if transactions_count__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("transactionsCount"));
@@ -104,7 +118,7 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                             transactions_count__ =
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
-                        }
+                        },
                     }
                 }
                 Ok(GetTransactionsFromNodeRequest {
@@ -113,7 +127,11 @@ impl<'de> serde::Deserialize<'de> for GetTransactionsFromNodeRequest {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct(
+            "aptos.internal.fullnode.v1.GetTransactionsFromNodeRequest",
+            FIELDS,
+            GeneratedVisitor,
+        )
     }
 }
 impl serde::Serialize for StreamStatus {
@@ -133,14 +151,19 @@ impl serde::Serialize for StreamStatus {
         if self.end_version.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.StreamStatus", len)?;
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.internal.fullnode.v1.StreamStatus", len)?;
         if self.r#type != 0 {
-            let v = stream_status::StatusType::from_i32(self.r#type)
-                .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.r#type)))?;
+            let v = stream_status::StatusType::from_i32(self.r#type).ok_or_else(|| {
+                serde::ser::Error::custom(format!("Invalid variant {}", self.r#type))
+            })?;
             struct_ser.serialize_field("type", &v)?;
         }
         if self.start_version != 0 {
-            struct_ser.serialize_field("startVersion", ToString::to_string(&self.start_version).as_str())?;
+            struct_ser.serialize_field(
+                "startVersion",
+                ToString::to_string(&self.start_version).as_str(),
+            )?;
         }
         if let Some(v) = self.end_version.as_ref() {
             struct_ser.serialize_field("endVersion", ToString::to_string(&v).as_str())?;
@@ -178,7 +201,10 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -207,8 +233,8 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<StreamStatus, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 let mut r#type__ = None;
                 let mut start_version__ = None;
@@ -220,15 +246,16 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                                 return Err(serde::de::Error::duplicate_field("type"));
                             }
                             r#type__ = Some(map.next_value::<stream_status::StatusType>()? as i32);
-                        }
+                        },
                         GeneratedField::StartVersion => {
                             if start_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("startVersion"));
                             }
-                            start_version__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
-                        }
+                            start_version__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        },
                         GeneratedField::EndVersion => {
                             if end_version__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("endVersion"));
@@ -236,7 +263,7 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                             end_version__ =
                                 map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
                             ;
-                        }
+                        },
                     }
                 }
                 Ok(StreamStatus {
@@ -246,7 +273,11 @@ impl<'de> serde::Deserialize<'de> for StreamStatus {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.StreamStatus", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct(
+            "aptos.internal.fullnode.v1.StreamStatus",
+            FIELDS,
+            GeneratedVisitor,
+        )
     }
 }
 impl serde::Serialize for stream_status::StatusType {
@@ -339,7 +370,10 @@ impl serde::Serialize for TransactionsFromNodeResponse {
         if self.response.is_some() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.TransactionsFromNodeResponse", len)?;
+        let mut struct_ser = serializer.serialize_struct(
+            "aptos.internal.fullnode.v1.TransactionsFromNodeResponse",
+            len,
+        )?;
         if self.chain_id != 0 {
             struct_ser.serialize_field("chainId", &self.chain_id)?;
         }
@@ -347,10 +381,10 @@ impl serde::Serialize for TransactionsFromNodeResponse {
             match v {
                 transactions_from_node_response::Response::Status(v) => {
                     struct_ser.serialize_field("status", v)?;
-                }
+                },
                 transactions_from_node_response::Response::Data(v) => {
                     struct_ser.serialize_field("data", v)?;
-                }
+                },
             }
         }
         struct_ser.end()
@@ -362,12 +396,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &[
-            "chain_id",
-            "chainId",
-            "status",
-            "data",
-        ];
+        const FIELDS: &[&str] = &["chain_id", "chainId", "status", "data"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -385,7 +414,10 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -410,12 +442,16 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
             type Value = TransactionsFromNodeResponse;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("struct aptos.internal.fullnode.v1.TransactionsFromNodeResponse")
+                formatter
+                    .write_str("struct aptos.internal.fullnode.v1.TransactionsFromNodeResponse")
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsFromNodeResponse, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            fn visit_map<V>(
+                self,
+                mut map: V,
+            ) -> std::result::Result<TransactionsFromNodeResponse, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 let mut chain_id__ = None;
                 let mut response__ = None;
@@ -425,24 +461,27 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
                             if chain_id__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("chainId"));
                             }
-                            chain_id__ =
-                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
-                            ;
-                        }
+                            chain_id__ = Some(
+                                map.next_value::<::pbjson::private::NumberDeserialize<_>>()?
+                                    .0,
+                            );
+                        },
                         GeneratedField::Status => {
                             if response__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("status"));
                             }
-                            response__ = map.next_value::<::std::option::Option<_>>()?.map(transactions_from_node_response::Response::Status)
-;
-                        }
+                            response__ = map
+                                .next_value::<::std::option::Option<_>>()?
+                                .map(transactions_from_node_response::Response::Status);
+                        },
                         GeneratedField::Data => {
                             if response__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("data"));
                             }
-                            response__ = map.next_value::<::std::option::Option<_>>()?.map(transactions_from_node_response::Response::Data)
-;
-                        }
+                            response__ = map
+                                .next_value::<::std::option::Option<_>>()?
+                                .map(transactions_from_node_response::Response::Data);
+                        },
                     }
                 }
                 Ok(TransactionsFromNodeResponse {
@@ -451,7 +490,11 @@ impl<'de> serde::Deserialize<'de> for TransactionsFromNodeResponse {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.TransactionsFromNodeResponse", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct(
+            "aptos.internal.fullnode.v1.TransactionsFromNodeResponse",
+            FIELDS,
+            GeneratedVisitor,
+        )
     }
 }
 impl serde::Serialize for TransactionsOutput {
@@ -465,7 +508,8 @@ impl serde::Serialize for TransactionsOutput {
         if !self.transactions.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.internal.fullnode.v1.TransactionsOutput", len)?;
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.internal.fullnode.v1.TransactionsOutput", len)?;
         if !self.transactions.is_empty() {
             struct_ser.serialize_field("transactions", &self.transactions)?;
         }
@@ -478,9 +522,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &[
-            "transactions",
-        ];
+        const FIELDS: &[&str] = &["transactions"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -496,7 +538,10 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -523,8 +568,8 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<TransactionsOutput, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 let mut transactions__ = None;
                 while let Some(k) = map.next_key()? {
@@ -534,7 +579,7 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                                 return Err(serde::de::Error::duplicate_field("transactions"));
                             }
                             transactions__ = Some(map.next_value()?);
-                        }
+                        },
                     }
                 }
                 Ok(TransactionsOutput {
@@ -542,6 +587,10 @@ impl<'de> serde::Deserialize<'de> for TransactionsOutput {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.internal.fullnode.v1.TransactionsOutput", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct(
+            "aptos.internal.fullnode.v1.TransactionsOutput",
+            FIELDS,
+            GeneratedVisitor,
+        )
     }
 }

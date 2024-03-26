@@ -65,11 +65,11 @@ impl<T> List<T> {
                 (*old_head).borrow_mut().prev = Some(new_head.clone());
                 (*new_head).borrow_mut().next = Some(old_head);
                 self.head = Some(new_head);
-            }
+            },
             None => {
                 self.tail = Some(new_head.clone());
                 self.head = Some(new_head);
-            }
+            },
         }
     }
 
@@ -80,11 +80,11 @@ impl<T> List<T> {
                 (*old_tail).borrow_mut().next = Some(new_tail.clone());
                 (*new_tail).borrow_mut().prev = Some(old_tail);
                 self.tail = Some(new_tail);
-            }
+            },
             None => {
                 self.head = Some(new_tail.clone());
                 self.tail = Some(new_tail);
-            }
+            },
         }
     }
 
@@ -94,10 +94,10 @@ impl<T> List<T> {
                 Some(new_tail) => {
                     (*new_tail).borrow_mut().next.take();
                     self.tail = Some(new_tail);
-                }
+                },
                 None => {
                     self.head.take();
-                }
+                },
             }
             Rc::try_unwrap(old_tail)
                 .ok()
@@ -114,10 +114,10 @@ impl<T> List<T> {
                 Some(new_head) => {
                     (*new_head).borrow_mut().prev.take();
                     self.head = Some(new_head);
-                }
+                },
                 None => {
                     self.tail.take();
-                }
+                },
             }
             Rc::try_unwrap(old_head)
                 .ok()

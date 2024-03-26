@@ -20,12 +20,10 @@ impl<'de> serde::Deserialize<'de> for Empty {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &[
-        ];
+        const FIELDS: &[&str] = &[];
 
         #[allow(clippy::enum_variant_names)]
-        enum GeneratedField {
-        }
+        enum GeneratedField {}
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
             where
@@ -36,7 +34,10 @@ impl<'de> serde::Deserialize<'de> for Empty {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -45,7 +46,7 @@ impl<'de> serde::Deserialize<'de> for Empty {
                     where
                         E: serde::de::Error,
                     {
-                            Err(serde::de::Error::unknown_field(value, FIELDS))
+                        Err(serde::de::Error::unknown_field(value, FIELDS))
                     }
                 }
                 deserializer.deserialize_identifier(GeneratedVisitor)
@@ -60,14 +61,13 @@ impl<'de> serde::Deserialize<'de> for Empty {
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<Empty, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 while map.next_key::<GeneratedField>()?.is_some() {
                     let _ = map.next_value::<serde::de::IgnoredAny>()?;
                 }
-                Ok(Empty {
-                })
+                Ok(Empty {})
             }
         }
         deserializer.deserialize_struct("aptos.remote_executor.v1.Empty", FIELDS, GeneratedVisitor)
@@ -87,9 +87,13 @@ impl serde::Serialize for NetworkMessage {
         if !self.message_type.is_empty() {
             len += 1;
         }
-        let mut struct_ser = serializer.serialize_struct("aptos.remote_executor.v1.NetworkMessage", len)?;
+        let mut struct_ser =
+            serializer.serialize_struct("aptos.remote_executor.v1.NetworkMessage", len)?;
         if !self.message.is_empty() {
-            struct_ser.serialize_field("message", pbjson::private::base64::encode(&self.message).as_str())?;
+            struct_ser.serialize_field(
+                "message",
+                pbjson::private::base64::encode(&self.message).as_str(),
+            )?;
         }
         if !self.message_type.is_empty() {
             struct_ser.serialize_field("messageType", &self.message_type)?;
@@ -103,11 +107,7 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
     where
         D: serde::Deserializer<'de>,
     {
-        const FIELDS: &[&str] = &[
-            "message",
-            "message_type",
-            "messageType",
-        ];
+        const FIELDS: &[&str] = &["message", "message_type", "messageType"];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
@@ -124,7 +124,10 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                 impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
                     type Value = GeneratedField;
 
-                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(
+                        &self,
+                        formatter: &mut std::fmt::Formatter<'_>,
+                    ) -> std::fmt::Result {
                         write!(formatter, "expected one of: {:?}", &FIELDS)
                     }
 
@@ -152,8 +155,8 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
             }
 
             fn visit_map<V>(self, mut map: V) -> std::result::Result<NetworkMessage, V::Error>
-                where
-                    V: serde::de::MapAccess<'de>,
+            where
+                V: serde::de::MapAccess<'de>,
             {
                 let mut message__ = None;
                 let mut message_type__ = None;
@@ -163,16 +166,17 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                             if message__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("message"));
                             }
-                            message__ =
-                                Some(map.next_value::<::pbjson::private::BytesDeserialize<_>>()?.0)
-                            ;
-                        }
+                            message__ = Some(
+                                map.next_value::<::pbjson::private::BytesDeserialize<_>>()?
+                                    .0,
+                            );
+                        },
                         GeneratedField::MessageType => {
                             if message_type__.is_some() {
                                 return Err(serde::de::Error::duplicate_field("messageType"));
                             }
                             message_type__ = Some(map.next_value()?);
-                        }
+                        },
                     }
                 }
                 Ok(NetworkMessage {
@@ -181,6 +185,10 @@ impl<'de> serde::Deserialize<'de> for NetworkMessage {
                 })
             }
         }
-        deserializer.deserialize_struct("aptos.remote_executor.v1.NetworkMessage", FIELDS, GeneratedVisitor)
+        deserializer.deserialize_struct(
+            "aptos.remote_executor.v1.NetworkMessage",
+            FIELDS,
+            GeneratedVisitor,
+        )
     }
 }
