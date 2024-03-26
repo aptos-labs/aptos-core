@@ -639,7 +639,7 @@ module veiled_coin::veiled_coin {
         sender_veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
         // Once everything succeeds, emit an event to indicate a veiled withdrawal occurred
-        event::emit<Withdraw>(
+        event::emit(
             Withdraw { user: sender_addr },
         );
 

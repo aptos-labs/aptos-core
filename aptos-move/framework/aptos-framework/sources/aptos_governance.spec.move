@@ -49,7 +49,7 @@ spec aptos_framework::aptos_governance {
     }
 
     /// Signer address must be @aptos_framework.
-    /// The signer does not allow these resources (GovernanceProposal, GovernanceConfig, GovernanceEvents, VotingRecords, ApprovedExecutionHashes) to exist.
+    /// The signer does not allow these resources (GovernanceProposal, GovernanceConfig, VotingRecords, ApprovedExecutionHashes) to exist.
     /// The signer must have an Account.
     /// Limit addition overflow.
     spec initialize(
@@ -107,7 +107,7 @@ spec aptos_framework::aptos_governance {
     }
 
     /// Signer address must be @aptos_framework.
-    /// Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
+    /// Address @aptos_framework must exist GovernanceConfig.
     spec update_governance_config(
         aptos_framework: &signer,
         min_voting_threshold: u128,
@@ -120,7 +120,6 @@ spec aptos_framework::aptos_governance {
         let post new_governance_config = global<GovernanceConfig>(@aptos_framework);
         aborts_if addr != @aptos_framework;
         aborts_if !exists<GovernanceConfig>(@aptos_framework);
-        aborts_if !exists<GovernanceEvents>(@aptos_framework);
         modifies global<GovernanceConfig>(addr);
 
         ensures new_governance_config.voting_duration_secs == voting_duration_secs;
@@ -129,7 +128,7 @@ spec aptos_framework::aptos_governance {
     }
 
     /// Signer address must be @aptos_framework.
-    /// Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
+    /// Address @aptos_framework must exist GovernanceConfig.
     spec toggle_features(
         aptos_framework: &signer,
         enable: vector<u64>,
@@ -218,7 +217,6 @@ spec aptos_framework::aptos_governance {
 
     /// `stake_pool` must exist StakePool.
     /// The delegated voter under the resource StakePool of the stake_pool must be the proposer address.
-    /// Address @aptos_framework must exist GovernanceEvents.
     spec schema CreateProposalAbortsIf {
         use aptos_framework::stake;
 
@@ -277,7 +275,6 @@ spec aptos_framework::aptos_governance {
         aborts_if !string::spec_internal_check_utf8(voting::IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY);
         aborts_if table::spec_contains(voting_forum.proposals,proposal_id);
         ensures table::spec_contains(post_voting_forum.proposals, proposal_id);
-        aborts_if !exists<GovernanceEvents>(@aptos_framework);
     }
 
     spec schema VotingGetDelegatedVoterAbortsIf {
@@ -422,7 +419,6 @@ spec aptos_framework::aptos_governance {
         aborts_if !features::spec_partial_governance_voting_enabled() && table::spec_contains(voting_records.votes, record_key);
 
 
-        aborts_if !exists<GovernanceEvents>(@aptos_framework);
 
         // verify voting::get_proposal_state
         let early_resolution_threshold = option::spec_borrow(proposal.early_resolution_vote_threshold);
