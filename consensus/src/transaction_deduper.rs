@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::txn_hash_and_authenticator_deduper::TxnHashAndAuthenticatorDeduper;
