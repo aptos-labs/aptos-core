@@ -72,7 +72,7 @@ DEFAULT_NUM_INIT_ACCOUNTS = (
 DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
 
 MAX_BLOCK_SIZE = int(os.environ.get("MAX_BLOCK_SIZE", default=DEFAULT_MAX_BLOCK_SIZE))
-NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=15))
+NUM_BLOCKS = int(os.environ.get("NUM_BLOCKS_PER_TEST", default=45))
 NUM_BLOCKS_DETAILED = 10
 NUM_ACCOUNTS = max(
     [
@@ -93,11 +93,11 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # fmt: off
 TESTS = [
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-basic1-market"), expected_stages=10, included_in=Flow.ECONIA),
-    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced1-market"), expected_stages=10, included_in=Flow.ECONIA),
-    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced10-market"), expected_stages=10, included_in=Flow.ECONIA),
-    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-advanced100-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed1-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed10-market"), expected_stages=10, included_in=Flow.ECONIA),
+    # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-mixed100-market"), expected_stages=10, included_in=Flow.ECONIA),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-market10-market-reuse-accounts"), expected_stages=10, included_in=Flow.ECONIA),
     # RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), expected_stages=10, included_in=Flow.ECONIA),
-    RunGroupConfig(expected_tps=10000, key=RunGroupKey("econia-real"), expected_stages=10, included_in=Flow.ECONIA),
     
     RunGroupConfig(expected_tps=10000, key=RunGroupKey("emit-events"), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),

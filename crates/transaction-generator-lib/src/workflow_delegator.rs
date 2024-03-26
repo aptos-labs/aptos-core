@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, AddHistoryWrapperCreator, ReuseAccountsPoolWrapperCreator}, call_custom_modules::CustomModulesDelegationGeneratorCreator, econia_order_generator::{register_econia_markets, EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, EconiaRealOrderTransactionGenerator, EconiaRegisterMarketUserTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
+    account_generator::AccountGeneratorCreator, accounts_pool_wrapper::{AccountsPoolWrapperCreator, AddHistoryWrapperCreator, ReuseAccountsPoolWrapperCreator, MarketMakerPoolWrapperCreator}, call_custom_modules::CustomModulesDelegationGeneratorCreator, econia_order_generator::{register_econia_markets, EconiaDepositCoinsTransactionGenerator, EconiaLimitOrderTransactionGenerator, EconiaRealOrderTransactionGenerator, EconiaRegisterMarketUserTransactionGenerator, EconiaMarketOrderTransactionGenerator}, entry_points::EntryPointTransactionGenerator, EconiaFlowType, EntryPoints, ObjectPool, ReliableTransactionSubmitter, RootAccountHandle, TransactionGenerator, TransactionGeneratorCreator, WorkflowKind, WorkflowProgress
 };
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
@@ -431,12 +431,23 @@ impl WorkflowTxnGeneratorCreator {
                             },
                         )
                         .await,
-                    EconiaFlowType::Advanced => CustomModulesDelegationGeneratorCreator::create_worker(
+                    EconiaFlowType::Mixed => CustomModulesDelegationGeneratorCreator::create_worker(
                             init_txn_factory.clone(),
                             root_account,
                             txn_executor,
                             &mut packages,
                             &mut EconiaLimitOrderTransactionGenerator::new(
+                                num_markets,
+                                (num_users as u64)*2,
+                            )
+                        )
+                        .await,
+                    EconiaFlowType::Market => CustomModulesDelegationGeneratorCreator::create_worker(
+                            init_txn_factory.clone(),
+                            root_account,
+                            txn_executor,
+                            &mut packages,
+                            &mut EconiaMarketOrderTransactionGenerator::new(
                                 num_markets,
                                 (num_users as u64)*2,
                             )
@@ -485,18 +496,27 @@ impl WorkflowTxnGeneratorCreator {
                     Some(deposit_coins_pool.clone()),
                 )));
 
-                if reuse_accounts_for_orders {
+                if flow_type == EconiaFlowType::Real {
                     creators.push(Box::new(AddHistoryWrapperCreator::new(
                         deposit_coins_pool.clone(),
                         deposit_coins_pool_with_added_history.clone(),
                     )));
-                    creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
+                    creators.push(Box::new(MarketMakerPoolWrapperCreator::new(
                         Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
                             txn_factory.clone(),
                             packages.clone(),
                             econia_place_orders_worker,
                         )),
                         deposit_coins_pool_with_added_history.clone(),
+                    )));
+                } else if reuse_accounts_for_orders {
+                    creators.push(Box::new(ReuseAccountsPoolWrapperCreator::new(
+                        Box::new(CustomModulesDelegationGeneratorCreator::new_raw(
+                            txn_factory.clone(),
+                            packages.clone(),
+                            econia_place_orders_worker,
+                        )),
+                        deposit_coins_pool.clone(),
                     )));
                 } else {
                     creators.push(Box::new(AccountsPoolWrapperCreator::new(
@@ -516,10 +536,11 @@ impl WorkflowTxnGeneratorCreator {
                 }
                 pool_per_stage.push(Pool::AccountPool(register_market_accounts_pool));
                 pool_per_stage.push(Pool::AccountPool(deposit_coins_pool));
-                if reuse_accounts_for_orders {
+                if flow_type == EconiaFlowType::Real {
                     pool_per_stage.push(Pool::AccountWithHistoryPool(deposit_coins_pool_with_added_history));
+                } else if !reuse_accounts_for_orders {
+                    pool_per_stage.push(Pool::AccountPool(place_orders_pool));
                 }
-                pool_per_stage.push(Pool::AccountPool(place_orders_pool));
                 // let pool_per_stage = if create_accounts {
                 //     vec![
                 //         created_pool,

@@ -162,14 +162,14 @@ impl TransactionGeneratorCreator for AddHistoryWrapperCreator {
 
 
 
-pub struct ReuseAccountsPoolWrapperGenerator {
+pub struct MarketMakerPoolWrapperGenerator {
     rng: StdRng,
     generator: Box<dyn TransactionGenerator>,
     source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
     market_makers: Vec<(LocalAccount, Vec<String>)>,
 }
 
-impl ReuseAccountsPoolWrapperGenerator {
+impl MarketMakerPoolWrapperGenerator {
     pub fn new(
         rng: StdRng,
         generator: Box<dyn TransactionGenerator>,
@@ -184,7 +184,7 @@ impl ReuseAccountsPoolWrapperGenerator {
     }
 }
 
-impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
+impl TransactionGenerator for MarketMakerPoolWrapperGenerator {
     fn generate_transactions(
         &mut self,
         _account: &LocalAccount,
@@ -192,12 +192,9 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
         _history: &Vec<String>,
         _market_maker: bool,
     ) -> Vec<SignedTransaction> {
-        // println!("ReuseAccountsPoolWrapperGenerator::generate_transactions: num_to_create: {}", num_to_create);
         if self.market_makers.len() < 7 {
-            // println!("ReuseAccountsPoolWrapperGenerator::loading_market_maker {}", self.market_makers.len());
             self.market_makers = self.source_accounts_pool.take_from_pool(7, true, &mut StdRng::from_entropy());
         }
-        // println!("generate_transactions: num_to_create: {}", num_to_create);
         if self.rng.gen_range(0,1000) < 939 {
             let rand = self.rng.gen_range(0,1000);
             if rand < 476 {
@@ -265,10 +262,10 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
                 return txns;
             }
         }
-        println!("ReuseAccountsPoolWrapperGenerator::generate_transactions: non-market-maker");
+        println!("MarketMakerPoolWrapperGenerator::generate_transactions: non-market-maker");
         let mut accounts_to_use = self.source_accounts_pool.take_from_pool(1, true, &mut self.rng);
         if accounts_to_use.is_empty() {
-            println!("ReuseAccountsPoolWrapperGenerator::generate_transactions: accounts_to_use is empty");
+            println!("MarketMakerPoolWrapperGenerator::generate_transactions: accounts_to_use is empty");
             return Vec::new();
         }
         let txns: Vec<SignedTransaction> = accounts_to_use
@@ -295,20 +292,92 @@ impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
                                                 ).collect();
 
         self.source_accounts_pool.add_to_pool(accounts_to_use);
-        println!("ReuseAccountsPoolWrapperGenerator::source_pool_len {}", self.source_accounts_pool.len());
+        println!("MarketMakerPoolWrapperGenerator::source_pool_len {}", self.source_accounts_pool.len());
+        txns
+    }
+}
+
+pub struct MarketMakerPoolWrapperCreator {
+    creator: Box<dyn TransactionGeneratorCreator>,
+    source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
+}
+
+impl MarketMakerPoolWrapperCreator {
+    pub fn new(
+        creator: Box<dyn TransactionGeneratorCreator>,
+        source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
+    ) -> Self {
+        Self {
+            creator,
+            source_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGeneratorCreator for MarketMakerPoolWrapperCreator {
+    fn create_transaction_generator(&self, txn_counter: Arc<AtomicU64>) -> Box<dyn TransactionGenerator> {
+        Box::new(MarketMakerPoolWrapperGenerator::new(
+            StdRng::from_entropy(),
+            self.creator.create_transaction_generator(txn_counter),
+            self.source_accounts_pool.clone(),
+        ))
+    }
+}
+
+
+pub struct ReuseAccountsPoolWrapperGenerator {
+    rng: StdRng,
+    generator: Box<dyn TransactionGenerator>,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+}
+
+impl ReuseAccountsPoolWrapperGenerator {
+    pub fn new(
+        rng: StdRng,
+        generator: Box<dyn TransactionGenerator>,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
+    ) -> Self {
+        Self {
+            rng,
+            generator,
+            source_accounts_pool,
+        }
+    }
+}
+
+impl TransactionGenerator for ReuseAccountsPoolWrapperGenerator {
+    fn generate_transactions(
+        &mut self,
+        _account: &LocalAccount,
+        num_to_create: usize,
+        _history: &Vec<String>,
+        _market_maker: bool,
+    ) -> Vec<SignedTransaction> {
+        let mut accounts_to_use =
+            self.source_accounts_pool
+                .take_from_pool(num_to_create, true, &mut self.rng);
+        if accounts_to_use.is_empty() {
+            return Vec::new();
+        }
+        let txns = accounts_to_use
+            .iter_mut()
+            .flat_map(|account| self.generator.generate_transactions(account, 1, &Vec::new(), false))
+            .collect();
+
+        self.source_accounts_pool.add_to_pool(accounts_to_use);
         txns
     }
 }
 
 pub struct ReuseAccountsPoolWrapperCreator {
     creator: Box<dyn TransactionGeneratorCreator>,
-    source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
+    source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
 }
 
 impl ReuseAccountsPoolWrapperCreator {
     pub fn new(
         creator: Box<dyn TransactionGeneratorCreator>,
-        source_accounts_pool: Arc<ObjectPool<(LocalAccount, Vec<String>)>>,
+        source_accounts_pool: Arc<ObjectPool<LocalAccount>>,
     ) -> Self {
         Self {
             creator,
@@ -326,7 +395,6 @@ impl TransactionGeneratorCreator for ReuseAccountsPoolWrapperCreator {
         ))
     }
 }
-
 
 
 

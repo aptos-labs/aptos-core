@@ -362,6 +362,73 @@ impl UserModuleTransactionGenerator for EconiaLimitOrderTransactionGenerator {
 }
 
 
+pub struct EconiaMarketOrderTransactionGenerator {
+    num_markets: Arc<u64>,
+    num_prev_transactions: Arc<u64>,
+}
+
+impl EconiaMarketOrderTransactionGenerator {
+    pub fn new(
+        num_markets: u64,
+        num_prev_transactions: u64,
+    ) -> Self {
+        Self {
+            num_markets: Arc::new(num_markets),
+            num_prev_transactions: Arc::new(num_prev_transactions),
+        }
+    }
+}
+
+#[async_trait]
+impl UserModuleTransactionGenerator for EconiaMarketOrderTransactionGenerator {
+    fn initialize_package(
+        &mut self,
+        _package: &Package,
+        _publisher: &mut LocalAccount,
+        _txn_factory: &TransactionFactory,
+        _rng: &mut StdRng,
+    ) -> Vec<SignedTransaction> {
+        vec![]
+    }
+
+    async fn create_generator_fn(
+        &mut self,
+        _root_account: &dyn RootAccountHandle,
+        _txn_factory: &TransactionFactory,
+        _txn_executor: &dyn ReliableTransactionSubmitter,
+        _rng: &mut StdRng,
+    ) -> Arc<TransactionGeneratorWorker> {
+        let num_markets = self.num_markets.clone();
+        let num_prev_transactions = self.num_prev_transactions.clone();
+        Arc::new(move |account, package, publisher, txn_factory, rng, txn_counter, _prev_orders, _market_maker| {
+            let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
+            let bid_size = rng.gen_range(4, 10000);
+            let ask_size = rng.gen_range(4, 10000);
+
+            if txn_counter <= (*num_prev_transactions) + (*num_markets)*200 {
+                if rng.gen_range(0,2) == 0 {
+                    let bid_price = rng.gen_range(13000, 13200);
+                    let bid_builder = txn_factory.payload(place_bid_limit_order(package.get_module_id("txn_generator_utils"), bid_size, bid_price, market_id, publisher.address()));
+                    return vec![account.sign_with_transaction_builder(bid_builder)];
+                } else {
+                    let ask_price = rng.gen_range(13201, 13400);
+                    let ask_builder = txn_factory.payload(place_ask_limit_order(package.get_module_id("txn_generator_utils"), ask_size, ask_price, market_id, publisher.address()));
+                    return vec![account.sign_with_transaction_builder(ask_builder)];
+                }
+            } else {
+                if rng.gen_range(0,2) == 0 {
+                    let bid_builder = txn_factory.payload(place_bid_market_order(package.get_module_id("txn_generator_utils"), bid_size, market_id, publisher.address()));
+                    return vec![account.sign_with_transaction_builder(bid_builder)];
+                } else {
+                    let ask_builder = txn_factory.payload(place_ask_market_order(package.get_module_id("txn_generator_utils"), ask_size, market_id, publisher.address()));
+                    return vec![account.sign_with_transaction_builder(ask_builder)];
+                }
+            }
+        })
+    }
+}
+
+
 
 
 pub struct EconiaRealOrderTransactionGenerator {

@@ -92,7 +92,8 @@ pub enum TransactionType {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EconiaFlowType {
     Basic,
-    Advanced,
+    Mixed,
+    Market,
     Real,
 }
 
