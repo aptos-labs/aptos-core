@@ -101,7 +101,7 @@ fn run_test_impl(path: &Path) -> anyhow::Result<()> {
         ..UnitTestingConfig::default_with_bound(None)
     };
 
-    let regex = RegexBuilder::new(r"(┌─ ).+/([^/]+)$")
+    let regex = RegexBuilder::new(r"(+- ).+/([^/]+)$")
         .multi_line(true)
         .build()
         .unwrap();

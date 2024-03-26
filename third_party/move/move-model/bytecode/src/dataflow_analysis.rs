@@ -24,7 +24,7 @@ pub struct BlockState<State: Clone> {
 
 pub type StateMap<State> = BTreeMap<BlockId, BlockState<State>>;
 
-/// Take a pre-state + instruction and mutate it to produce a post-state。
+/// Take a pre-state + instruction and mutate it to produce a post-state.
 pub trait TransferFunctions {
     type State: AbstractDomain + Clone;
     const BACKWARD: bool;
@@ -82,10 +82,13 @@ pub trait DataflowAnalysis: TransferFunctions {
         let mut state_map: StateMap<Self::State> = StateMap::new();
         let mut work_list = VecDeque::new();
         work_list.push_back(cfg.entry_block());
-        state_map.insert(cfg.entry_block(), BlockState {
-            pre: initial_state.clone(),
-            post: initial_state.clone(),
-        });
+        state_map.insert(
+            cfg.entry_block(),
+            BlockState {
+                pre: initial_state.clone(),
+                post: initial_state.clone(),
+            },
+        );
         while let Some(block_id) = work_list.pop_front() {
             let pre = state_map.get(&block_id).expect("basic block").pre.clone();
             debug_print_state(block_id, "pre", &pre);
@@ -113,10 +116,13 @@ pub trait DataflowAnalysis: TransferFunctions {
                     None => {
                         // Haven't visited the next block yet. Use the post of the current block as
                         // its pre and schedule it.
-                        state_map.insert(*next_block_id, BlockState {
-                            pre: post.clone(),
-                            post: initial_state.clone(),
-                        });
+                        state_map.insert(
+                            *next_block_id,
+                            BlockState {
+                                pre: post.clone(),
+                                post: initial_state.clone(),
+                            },
+                        );
                         work_list.push_back(*next_block_id);
                     },
                 }

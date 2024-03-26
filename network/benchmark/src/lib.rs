@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::{
@@ -442,7 +442,7 @@ pub async fn rpc_sender(
                         let nowu = time_service.now_unix_time().as_micros() as u64;
                         if let NetbenchMessage::DataReply(msg) = msg_wrapper {
                             let send_dt = nowu - msg.request_send_micros;
-                            info!("netbench [{}] rpc at {} µs, took {} µs", msg.request_counter, nowu, send_dt);
+                            info!("netbench [{}] rpc at {} us, took {} us", msg.request_counter, nowu, send_dt);
                             rpc_messages("ok");
                             rpc_bytes("ok").inc_by(data_size as u64);
                             rpc_micros("ok").inc_by(send_dt);

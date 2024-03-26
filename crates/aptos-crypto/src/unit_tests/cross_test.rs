@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // This is necessary for the derive macros which rely on being used in a
@@ -62,7 +62,7 @@ enum Sig {
 }
 
 ///////////////////////////////////////////////////////
-// End of declarations — let's now prove type safety //
+// End of declarations - let's now prove type safety //
 ///////////////////////////////////////////////////////
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]

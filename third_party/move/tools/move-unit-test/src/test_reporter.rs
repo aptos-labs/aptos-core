@@ -239,7 +239,7 @@ impl TestFailure {
             None => error_string,
             Some(storage_state) => {
                 format!(
-                    "{}\n────── Storage state at point of failure ──────\n{}",
+                    "{}\n--\u{2500}\u{2500}\u{2500}\u{2500} Storage state at point of failure --\u{2500}\u{2500}\u{2500}\u{2500}\n{}",
                     error_string,
                     if storage_state.is_empty() {
                         "<empty>"
@@ -510,7 +510,7 @@ impl TestResults {
         if !stats.is_empty() {
             writeln!(
                 writer.lock().unwrap(),
-                "┌─{:─^width$}─┬─{:─^10}─┬─{:─^25}─┐",
+                "\u{250C}\u{2500}{:\u{2500}^width$}\u{2500}\u{252C}\u{2500}{:\u{2500}^10}\u{2500}\u{252C}\u{2500}{:\u{2500}^25}\u{2500}\u{2510}",
                 "",
                 "",
                 "",
@@ -518,7 +518,7 @@ impl TestResults {
             )?;
             writeln!(
                 writer.lock().unwrap(),
-                "│ {name:^width$} │ {time:^10} │ {instructions:^25} │",
+                "\u{2502} {name:^width$} \u{2502} {time:^10} | {instructions:^25} \u{2502}",
                 width = max_function_name_size,
                 name = "Test Name",
                 time = "Time",
@@ -528,7 +528,7 @@ impl TestResults {
             for (qualified_function_name, time, instructions) in stats {
                 writeln!(
                     writer.lock().unwrap(),
-                    "├─{:─^width$}─┼─{:─^10}─┼─{:─^25}─┤",
+                    "\u{251C}\u{2500}{:\u{2500}^width$}\u{2500}\u{253C}\u{2500}{:\u{2500}^10}\u{2500}\u{253C}\u{2500}{:\u{2500}^25}\u{2500}\u{2524}",
                     "",
                     "",
                     "",
@@ -536,7 +536,7 @@ impl TestResults {
                 )?;
                 writeln!(
                     writer.lock().unwrap(),
-                    "│ {name:<width$} │ {time:^10.3} │ {instructions:^25} │",
+                    "\u{2502} {name:<width$} \u{2502} {time:^10.3} \u{2502} {instructions:^25} \u{2502}",
                     name = qualified_function_name,
                     width = max_function_name_size,
                     time = time,
@@ -546,7 +546,8 @@ impl TestResults {
 
             writeln!(
                 writer.lock().unwrap(),
-                "└─{:─^width$}─┴─{:─^10}─┴─{:─^25}─┘",
+                "\u{2514}\u{2500}{:\u{2500}^width$}\u{2500}\u{2534}\u{2500}{:\u{2500}^10}\u{2500}\u{2534}\u{2500}{:\u{2500}^25}\u{2500}\u{2518}",
+
                 "",
                 "",
                 "",
@@ -580,17 +581,19 @@ impl TestResults {
                 for test_failure in test_failures {
                     writeln!(
                         writer.lock().unwrap(),
-                        "\n┌── {} ──────",
+                        "\u{250C}\u{2500}\u{2500} {} \u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}",
+
                         test_failure.test_run_info.function_ident.bold()
                     )?;
                     writeln!(
                         writer.lock().unwrap(),
-                        "│ {}",
+                        "\u{2502} {}",
                         test_failure
                             .render_error(&self.test_plan)
-                            .replace('\n', "\n│ ")
+                            .replace('\n', "\n\u{2502} ")
                     )?;
-                    writeln!(writer.lock().unwrap(), "└──────────────────\n")?;
+                    writeln!(writer.lock().unwrap(),
+                             "\u{2514}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\n")?;
                 }
             }
         }

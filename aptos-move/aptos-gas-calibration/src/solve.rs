@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -100,7 +100,7 @@ fn report_computed_times(
             continue;
         };
         println!(
-            "- {} | Computed {}µs vs. Actual {}µs | Error {}\n",
+            "- {} | Computed {}us vs. Actual {}us | Error {}\n",
             equation_names[*idx],
             cr,
             format_args!("{:.3}", ar),
@@ -124,7 +124,7 @@ fn report_outliers(equation_names: &[String], outliers: &Vec<(usize, f64, f64, f
             continue;
         };
         println!(
-            "- {} | Computed {}µs vs. Actual {}µs | Error {}\n",
+            "- {} | Computed {}us vs. Actual {}us | Error {}\n",
             equation_names[*idx],
             cr,
             format_args!("{:.3}", ar),
@@ -184,7 +184,7 @@ fn convert_to_internal_gas_cost(
         (max_execution_gas / max_execution_time) / MILLISECONDS_TO_MICROSECONDS;
 
     println!(
-        "\ninternal gas cost ({} InternalGas per 1µ):\n",
+        "\ninternal gas cost ({} InternalGas per 1u):\n",
         one_microsec_per_internal_gas
     );
 
