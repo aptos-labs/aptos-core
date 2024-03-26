@@ -1204,8 +1204,8 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                     return None;
                 }
 
-                if let Ok(Some(metadata)) = self.get_resource_state_value_metadata(&key) {
-                    return Some(
+                match self.get_resource_state_value_metadata(&key) {
+                    Ok(Some(metadata)) => Some(
                         if let Ok(GroupReadResult::Size(group_size)) =
                             parallel_state.read_group_size(&key, self.txn_idx)
                         {
@@ -1216,12 +1216,25 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 key
                             )))
                         },
-                    );
+                    ),
+                    Ok(None) => Some(Err(code_invariant_error(format!(
+                        "Cannot find metadata op for the group read {:?}",
+                        key
+                    )))),
+                    Err(e) => {
+                        if e.major_status() == StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR {
+                            parallel_state.captured_reads.borrow_mut().mark_failure();
+                            None
+                        } else {
+                            Some(Err(code_invariant_error(format!(
+                                "[{}] Cannot compute metadata op for the group read {:?}, error {:?}",
+                                self.txn_idx,
+                                key,
+                                e
+                            ))))
+                        }
+                    }
                 }
-                Some(Err(code_invariant_error(format!(
-                    "Cannot compute metadata op for the group read {:?}",
-                    key
-                ))))
             })
             .collect()
     }
