@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::components::block_tree::{epoch_genesis_block_id, BlockLookup, BlockTree};
@@ -66,16 +66,16 @@ fn gen_ledger_info(block_id: HashValue, reconfig: bool) -> LedgerInfo {
 
 fn create_tree() -> BlockTree {
     //    * ---> 1 ---> 2
-    //    |      |
-    //    |      └----> 3 ---> 4
-    //    |             |
-    //    |             └----> 5
+    //    |      \
+    //    |       \---> 3 ---> 4
+    //    |              \
+    //    |               \--> 5
     //    |
-    //    └----> 6 ---> 7 ---> 8
-    //           |
-    //           └----> 9 ---> 10
-    //                  |
-    //                  └----> 11
+    //    +----> 6 ---> 7 ---> 8
+    //            \
+    //             \--> 9 ---> 10
+    //                   \
+    //                    \--> 11
     // *: PRE_GENESIS_BLOCK_ID
     let block_tree = BlockTree::new_empty();
 

@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -88,7 +88,7 @@ impl<I: Copy + Clone> DelayedChange<I> {
     // from a different AggregatorID to be able to merge them together.
     // In particular SnapshotDelta represents a change from the aggregator at the beginning of the transaction,
     // and squashing changes where the aggregator will be at the beginning of the transaction.
-    // For example, let’s say we have two change sets that we need to squash:
+    // For example, let's say we have two change sets that we need to squash:
     // change1: agg1 -> Delta(+3)
     // change2: agg1 -> Delta(+6), snap1 -> (base=agg1, Delta(+2))
     // the correct squashing of snapshot depends on the change for the base aggregator. I.e. the correct output would be:

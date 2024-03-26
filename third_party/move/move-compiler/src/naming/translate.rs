@@ -138,7 +138,7 @@ impl<'env> Context<'env> {
     }
 
     fn resolve_module(&mut self, m: &ModuleIdent) -> bool {
-        // NOTE: piggybacking on `scoped_functions` to provide a set of modules in the context。
+        // NOTE: piggybacking on `scoped_functions` to provide a set of modules in the context.
         // TODO: a better solution would be to have a single `BTreeMap<ModuleIdent, ModuleInfo>`
         // in the context that can be used to resolve modules, types, and functions.
         let resolved = self.scoped_functions.contains_key(m);

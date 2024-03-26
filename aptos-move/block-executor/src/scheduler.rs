@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::explicit_sync_wrapper::ExplicitSyncWrapper;
@@ -126,15 +126,15 @@ pub enum SchedulerTask {
 /// Ready(i)                                                                               ---
 ///    |  try_incarnate (incarnate successfully)                                             |
 ///    |                                                                                     |
-///    ↓         suspend (waiting on dependency)                resume                       |
+///    V         suspend (waiting on dependency)                resume                       |
 /// Executing(i) -----------------------------> Suspended(i) ------------> Ready(i)          |
 ///    |                                                                                     | halt_transaction_execution
 ///    |  finish_execution                                                                   |-----------------> ExecutionHalted
-///    ↓                                                                                     |
+///    V                                                                                     |
 /// Executed(i) (pending for (re)validations) ---------------------------> Committed(i)      |
 ///    |                                                                                     |
 ///    |  try_abort (abort successfully)                                                     |
-///    ↓                finish_abort                                                         |
+///    V                finish_abort                                                         |
 /// Aborting(i) ---------------------------------------------------------> Ready(i+1)      ---
 ///
 #[derive(Debug)]

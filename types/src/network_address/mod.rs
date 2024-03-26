@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
+// Copyright (c) Aptos Foundation
+// Parts of the project are originally copyright (c) Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::arc_with_non_send_sync)]
@@ -1058,9 +1058,9 @@ mod test {
         );
 
         // The first `e` in `example.com` is a unicode character and not a regular `e`!
-        let bad_address = "/dns6/еxample.com/tcp/123";
+        let bad_address = format!("/dns6/\u{0435}xample.com/tcp/123");
         assert_matches!(
-            NetworkAddress::from_str(bad_address),
+            NetworkAddress::from_str(&bad_address),
             Err(ParseError::DnsNameNonASCII(_))
         );
     }

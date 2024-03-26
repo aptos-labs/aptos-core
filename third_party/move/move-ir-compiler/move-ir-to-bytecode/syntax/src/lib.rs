@@ -7,20 +7,20 @@
 //! # Grammar
 //! ## Identifiers
 //! ```text
-//! f ∈ FieldName     // [a-zA-Z$_][a-zA-Z0-9$_]*
-//! p ∈ ProcedureName // [a-zA-Z$_][a-zA-Z0-9$_]*
-//! m ∈ ModuleName    // [a-zA-Z$_][a-zA-Z0-9$_]*
-//! n ∈ StructName    // [a-zA-Z$_][a-zA-Z0-9$_]*
-//! x ∈ Var           // [a-zA-Z$_][a-zA-Z0-9$_]*
+//! f in FieldName     // [a-zA-Z$_][a-zA-Z0-9$_]*
+//! p in ProcedureName // [a-zA-Z$_][a-zA-Z0-9$_]*
+//! m in ModuleName    // [a-zA-Z$_][a-zA-Z0-9$_]*
+//! n in StructName    // [a-zA-Z$_][a-zA-Z0-9$_]*
+//! x in Var           // [a-zA-Z$_][a-zA-Z0-9$_]*
 //! ```
 //!
 //! ## Types
 //! ```text
-//! k ∈ Kind ::=
+//! k in Kind ::=
 //!   | R // Linear resource struct value. Must be used, cannot be copied
 //!   | V // Non-resource struct value. Can be silently discarded, can be copied
 //!
-//! g ∈ GroundType ::=
+//! g in GroundType ::=
 //!   | bool
 //!   | u8        // unsigned 8 bit integer
 //!   | u16       // unsigned 16 bit integer
@@ -31,32 +31,32 @@
 //!   | address   // 32 byte account address
 //!   | bytearray // immutable, arbitrarily sized array of bytes
 //!
-//! d ∈ ModuleAlias ::=
+//! d in ModuleAlias ::=
 //!   | m         // module name that is an alias to a declared module, addr.m
 //!   | Self      // current module
 //!
-//! t ∈ BaseType ::=
+//! t in BaseType ::=
 //!   | g     // ground type
 //!   | k#d.n // struct 'n' declared in the module referenced by 'd' with kind 'k'
 //!           // the kind 'k' cannot differ from the declared kind
 //!
-//! 𝛕 ∈ Type ::=
+//! tau in Type ::=
 //!   | t      // base type
 //!   | &t     // immutable reference to a base type
 //!   | &mut t // mutable reference to a base type
 //!
-//! 𝛕-list ∈ [Type] ::=
-//!   | unit            // empty type list.
-//!                     // in the actual syntax, it is represented by the abscense of a type
-//!   | 𝛕_1 * ... * 𝛕_j // 'j' >= 1. list of multiple types. used for multiple return values
+//! -list  [Type] ::=
+//!   | unit                // empty type list.
+//!                         // in the actual syntax, it is represented by the abscense of a type
+//!   | tau_1 * ... * tau_j // 'j' >= 1. list of multiple types. used for multiple return values
 //! ```
 //!
 //! ## Values
 //! ```text
-//! u ∈ Unsigned64        // Unsigned, 64-bit Integer
-//! addr ∈ AccountAddress // addresses of blockchain accounts
-//! bytes ∈ vector<u8>    // byte array of arbitrary length
-//! v ∈ Value ::=
+//! u in Unsigned64        // Unsigned, 64-bit Integer
+//! addr in AccountAddress // addresses of blockchain accounts
+//! bytes  vector<u8>      // byte array of arbitrary length
+//! v in Value ::=
 //!   | true
 //!   | false
 //!   | u        // u64 literal
@@ -66,11 +66,11 @@
 //!
 //! ## Expressions
 //! ```text
-//! o ∈ VarOp ::=
+//! o in VarOp ::=
 //!   | copy(x) // returns value bound to 'x'
 //!   | move(x) // moves the value out of 'x', i.e. returns the value and makes 'x' unusable
 //!
-//! r ∈ ReferenceOp ::=
+//! r in ReferenceOp ::=
 //!   | &x        // type: 't -> &mut t'
 //!               // creates an exclusive, mutable reference to a local
 //!   | &e.f      // type: '&t_1 -> &t_2' or '&mut t_1 -> &mut t_2'
@@ -78,11 +78,11 @@
 //!               // 't_1' must be a struct declared in the current module, i.e. 'f' is "private"
 //!   | *e        // type: '&t -> t' or '&mut t -> t'. Dereferencing. Not valid for resources
 //!
-//! e ∈ Exp ::=
+//! e in Exp ::=
 //!   | v
 //!   | o
 //!   | r
-//!   | n { f_1: e_1, ... , f_j: e_j } // type: '𝛕-list -> k#Self.n'
+//!   | n { f_1: e_1, ... , f_j: e_j } // type: 'tau-list -> k#Self.n'
 //!                                    // "constructor" for 'n'
 //!                                    // "packs" the values, binding them to the fields, and creates a new instance of 'n'
 //!                                    // 'n' must be declared in the current module
@@ -110,7 +110,7 @@
 //! ## Commands
 //! ```text
 //! // module operators are available only inside the module that declares n.
-//! mop ∈ ModuleOp ::=
+//! mop in ModuleOp ::=
 //!   | move_from<n>(e)      // type: 'address -> Self.n'
 //!                          // removes the resource struct 'n' at the specified address
 //!                          // fails if there is no resource present for 'Self.n'
@@ -122,7 +122,7 @@
 //!                          // returns 'true' if the resource struct 'n' at the specified address exists
 //!                          // returns 'false' otherwise
 //!
-//! builtin ∈ Builtin ::=
+//! builtin in Builtin ::=
 //!   | create_account(e)         // type: 'addr -> unit'
 //!                               // creates new account at the specified address, failing if it already exists
 //!   | release(e)                // type: '&t -> unit' or '&mut t -> unit'
@@ -130,12 +130,12 @@
 //!   | freeze(x)                 // type: '&mut t -> &t'
 //!                               // coerce a mutable reference to an immutable reference
 //!
-//! call ∈ Call ::=
+//! call in Call ::=
 //!   | mop
 //!   | builtin
 //!   | d.p(e_1, ..., e_j) // procedure 'p' defined in the module referenced by 'd'
 //!
-//! c ∈ Cmd ::=
+//! c in Cmd ::=
 //!   | x = e                               // assign the result of evaluating 'e' to 'x'
 //!   | x_1, ..., x_j = call                // Invokes 'call', assigns result to 'x_1' to 'x_j'
 //!   | call                                // Invokes 'call' that has a return type of 'unit'
@@ -152,7 +152,7 @@
 //!
 //! ## Statements
 //! ```text
-//! s ∈ Stmt ::=
+//! s in Stmt ::=
 //!   | if (e) { s_1 } else { s_2 } // conditional
 //!   | if (e) { s }                // conditional without else branch
 //!   | while (e) { s }             // while loop
@@ -163,28 +163,28 @@
 //!
 //! ## Imports
 //!```text
-//! idecl ∈ Import ::=
+//! idecl in Import ::=
 //!   | import addr.m_1 as m_2; // imports 'addr.m_1' with the alias 'm_2'
 //!   | import addr.m_1;        // imports 'addr.m_1' with the alias 'm_1'
 //! ```
 //! ## Modules
 //! ```text
-//! sdecl ∈ StructDecl ::=
+//! sdecl in StructDecl ::=
 //!   | resource n { f_1: t_1, ..., f_j: t_j } // declaration of a resource struct
 //!   | struct n { f_1: t_1, ..., f_j: t_j }   // declaration of a non-resource (value) struct
 //!                                            // s.t. any 't_i' is not of resource kind
 //!
-//! body ∈ ProcedureBody ::=
+//! body in ProcedureBody ::=
 //!  | let x_1; ... let x_j; s // The locals declared in this procedure, and the code for that procedure
 //!
-//! pdecl ∈ ProcedureDecl ::=
-//!   | (public?) p(x_1: 𝛕_1, ..., x_j: 𝛕_j): 𝛕-list { body } // declaration of a defined procedure
+//! pdecl in ProcedureDecl ::=
+//!   | (public?) p(x_1: tau_1, ..., x_j: tau_j): tau-list { body } // declaration of a defined procedure
 //!                                                          // the procedure may be public, or internal to the module
-//!   | native (public?) p(x_1: 𝛕_1, ..., x_j: 𝛕_j): 𝛕-list; // declaration of a native procedure
+//!   | native (public?) p(x_1: tau_1, ..., x_j: tau_j): tau-list; // declaration of a native procedure
 //!                                                         // the implementation is provided by the VM
 //!                                                         // the procedure may be public, or internal to the module
 //!
-//! mdecl ∈ ModuleDecl ::=
+//! mdecl in ModuleDecl ::=
 //!   | module m { idecl_1 ... idecl_i sdecl_1 ... sdecl_j pdecl_1 ... pdecl_k }
 //! ```
 //!

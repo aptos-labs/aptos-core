@@ -63,7 +63,7 @@ enum Sig {
 }
 
 ///////////////////////////////////////////////////////
-// End of declarations — let's now prove type safety //
+// End of declarations - let's now prove type safety //
 ///////////////////////////////////////////////////////
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(20))]
