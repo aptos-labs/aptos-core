@@ -139,7 +139,7 @@ impl<'a> AcquireChecker<'a> {
     /// Computes the resources acquired by each function in the module
     pub fn analyze(&self) -> BTreeMap<FunId, AcquiredResources> {
         let (call_graph, acquire_env) = self.get_call_graph_and_directly_acquired_resoruces();
-        self.compute_fixed_points(call_graph, acquire_env)
+        self.compute_fixed_point(call_graph, acquire_env)
     }
 
     /// Returns
@@ -168,7 +168,7 @@ impl<'a> AcquireChecker<'a> {
         (call_graph, acquire_env)
     }
 
-    fn compute_fixed_points(
+    fn compute_fixed_point(
         &self,
         call_graph: BTreeMap<FunId, BTreeMap<FunId, Loc>>,
         mut acquire_env: BTreeMap<FunId, AcquiredResources>,
