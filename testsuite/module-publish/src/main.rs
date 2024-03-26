@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
@@ -72,7 +72,7 @@ fn main() -> Result<()> {
     //
     writeln!(
         generic_mod,
-        r#"// Copyright © Aptos Foundation
+        r#"// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0"#
     )
     .expect("Writing header comment failed");
