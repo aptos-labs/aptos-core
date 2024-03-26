@@ -57,12 +57,24 @@ impl AptosDebugger {
         &self,
         version: Version,
         txns: Vec<Transaction>,
+        repeat_execution_times: u64,
     ) -> Result<Vec<TransactionOutput>> {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
-            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))
+        for i in 0..repeat_execution_times {
+            let result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
+                .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+            if i == repeat_execution_times - 1 {
+                return Ok(result);
+            }
+            println!(
+                "Finished round {} with {} transactions",
+                i,
+                sig_verified_txns.len()
+            );
+        }
+        unreachable!();
     }
 
     pub fn execute_transaction_at_version_with_gas_profiler(
@@ -126,6 +138,7 @@ impl AptosDebugger {
         &self,
         mut begin: Version,
         mut limit: u64,
+        repeat_execution_times: u64,
     ) -> Result<Vec<TransactionOutput>> {
         let (mut txns, mut txn_infos) = self
             .debugger
@@ -139,7 +152,7 @@ impl AptosDebugger {
                 begin, limit
             );
             let mut epoch_result = self
-                .execute_transactions_by_epoch(begin, txns.clone())
+                .execute_transactions_by_epoch(begin, txns.clone(), repeat_execution_times)
                 .await?;
             begin += epoch_result.len() as u64;
             limit -= epoch_result.len() as u64;
@@ -171,8 +184,9 @@ impl AptosDebugger {
         &self,
         begin: Version,
         txns: Vec<Transaction>,
+        repeat_execution_times: u64,
     ) -> Result<Vec<TransactionOutput>> {
-        let results = self.execute_transactions_at_version(begin, txns)?;
+        let results = self.execute_transactions_at_version(begin, txns, repeat_execution_times)?;
         let mut ret = vec![];
         let mut is_reconfig = false;
 
