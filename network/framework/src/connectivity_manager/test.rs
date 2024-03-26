@@ -98,9 +98,6 @@ struct TestHarness {
 
     mock_transport_events: tokio::sync::mpsc::Receiver<MockTransportEvent>,
     conn_mgr_reqs_tx: tokio::sync::mpsc::Sender<ConnectivityRequest>,
-
-    peer_cache: Vec<(PeerNetworkId,PeerMetadata)>,
-    peer_cache_generation: u32,
 }
 
 impl TestHarness {
@@ -154,19 +151,8 @@ impl TestHarness {
             peer_senders,
             mock_transport_events,
             conn_mgr_reqs_tx,
-            peer_cache: vec![],
-            peer_cache_generation: 0,
         };
         (mock, conn_mgr)
-    }
-
-    fn maybe_update_peer_cache(&mut self) {
-        // if no update is needed, this should be very fast
-        // otherwise make copy of peers for use by this thread/task
-        if let Some((update, update_generation)) = self.peers_and_metadata.get_all_peers_and_metadata_generational(self.peer_cache_generation, true, &[]) {
-            self.peer_cache = update;
-            self.peer_cache_generation = update_generation;
-        }
     }
 
     async fn trigger_connectivity_check(&self) {
@@ -182,8 +168,7 @@ impl TestHarness {
     }
 
     async fn get_connected_size(&mut self) -> usize {
-        self.maybe_update_peer_cache();
-        self.peer_cache.len()
+        self.peers_and_metadata.count_connected_peers(None)
     }
 
     async fn get_dial_queue_size(&mut self) -> usize {

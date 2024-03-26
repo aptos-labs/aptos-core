@@ -23,13 +23,13 @@ use std::{
     sync::Arc,
 };
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicU32, Ordering};
 use aptos_config::config::{PeerRole, RoleType};
 use aptos_config::network_id::NetworkContext;
 use std::fmt;
 use tokio::sync::mpsc::error::TrySendError;
 use serde::Serialize;
 use aptos_logger::info;
+use aptos_netcore::transport::ConnectionOrigin;
 
 /// A simple container that tracks all peers and peer metadata for the node.
 /// This container is updated by both the networking code (e.g., for new
@@ -39,7 +39,6 @@ use aptos_logger::info;
 pub struct PeersAndMetadata {
     network_ids: Vec<NetworkId>,
     peers_and_metadata: RwLock<HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>>,
-    generation: AtomicU32,
 
     // trusted_peers have separate locking and access
     trusted_peers: HashMap<NetworkId, Arc<RwLock<PeerSet>>>,
@@ -63,7 +62,6 @@ impl PeersAndMetadata {
         let mut peers_and_metadata = PeersAndMetadata {
             network_ids,
             peers_and_metadata: RwLock::new(HashMap::new()),
-            generation: AtomicU32::new(1),
             trusted_peers: HashMap::new(),
             subscribers: RwLock::new(vec![]),
             cached_peers_and_metadata: Arc::new(ArcSwap::from(Arc::new(HashMap::new()))),
@@ -107,68 +105,6 @@ impl PeersAndMetadata {
         all_peers
     }
 
-    /// Return copy of list of peers if generation is different than previously held.
-    /// May optionally filter for connected peers only.
-    /// May optionally filter on match for any of a set of ProtocolId.
-    pub fn get_all_peers_generational(
-        &self,
-        generation: u32,
-        require_connected: bool,
-        protocol_ids: &[ProtocolId],
-    ) -> Option<(Vec<PeerNetworkId>, u32)> {
-        let generation_test = self.generation.load(Ordering::SeqCst);
-        if generation == generation_test {
-            return None;
-        }
-        let mut all_peers = Vec::new();
-        let read = self.peers_and_metadata.read();
-        for (network_id, peers) in read.iter() {
-            for (peer_id, peer_metadata) in peers.iter() {
-                if require_connected && !peer_metadata.is_connected() {
-                    continue;
-                }
-                if !protocol_ids.is_empty() && !peer_metadata.supports_any_protocol(protocol_ids) {
-                    continue;
-                }
-                let peer_network_id = PeerNetworkId::new(*network_id, *peer_id);
-                all_peers.push(peer_network_id);
-            }
-        }
-        let generation_actual = self.generation.load(Ordering::SeqCst);
-        Some((all_peers, generation_actual))
-    }
-
-    /// Return copy of list of peers if generation is different than previously held.
-    /// May optionally filter for connected peers only.
-    /// May optionally filter on match for any of a set of ProtocolId.
-    pub fn get_all_peers_and_metadata_generational(
-        &self,
-        generation: u32,
-        require_connected: bool,
-        protocol_ids: &[ProtocolId],
-    ) -> Option<(Vec<(PeerNetworkId,PeerMetadata)>, u32)> {
-        let generation_test = self.generation.load(Ordering::SeqCst);
-        if generation == generation_test {
-            return None;
-        }
-        let mut all_data = Vec::new();
-        let read = self.peers_and_metadata.read();
-        for (network_id, peers) in read.iter() {
-            for (peer_id, peer_metadata) in peers.iter() {
-                if require_connected && !peer_metadata.is_connected() {
-                    continue;
-                }
-                if (!protocol_ids.is_empty()) && !peer_metadata.supports_any_protocol(protocol_ids) {
-                    continue;
-                }
-                let peer_network_id = PeerNetworkId::new(*network_id, *peer_id);
-                all_data.push((peer_network_id, peer_metadata.clone()));
-            }
-        }
-        let generation_actual = self.generation.load(Ordering::SeqCst);
-        Some((all_data, generation_actual))
-    }
-
     /// Returns metadata for all peers currently connected to the node
     pub fn get_connected_peers_and_metadata(
         &self,
@@ -187,6 +123,35 @@ impl PeersAndMetadata {
             }
         }
         Ok(connected_peers_and_metadata)
+    }
+
+    pub fn count_connected_peers(&self, direction: Option<ConnectionOrigin>) -> usize {
+        let mut out = 0;
+        for (_network_id, peers_and_metadata) in self.cached_peers_and_metadata.load().iter() {
+            for (_peer_id, peer_metadata) in peers_and_metadata.iter() {
+                if !peer_metadata.is_connected() {
+                    continue;
+                }
+                match direction {
+                    Some(origin) => {
+                        if peer_metadata.connection_metadata.origin == origin {
+                            out += 1;
+                        }
+                    }
+                    None => {
+                        out += 1
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Returns an Arc<> that is atomically some consistent snapshot of all peers and metadata.
+    /// New data might be posted while using this snapshot, caller should be okay with that.
+    /// This is the _fastest_ _lowest overhead_ way to get the data. The underlying HashMaps are not copied or cloned, it's all smart reference counting pointers. (The client code might need to have a couple more lines of code to then do its own work filtering through the data for what it wants.)
+    pub fn get_all_peers_and_metadata(&self) -> Arc<HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>> {
+        self.cached_peers_and_metadata.load().clone()
     }
 
     /// Returns all connected peers that support at least one of
@@ -253,7 +218,6 @@ impl PeersAndMetadata {
         );
         let mut writer = self.peers_and_metadata.write();
         let peer_metadata_for_network = writer.get_mut(&peer_network_id.network_id()).unwrap();
-        self.generation.fetch_add(1 , Ordering::SeqCst);
         let net_context = NetworkContext::new(peer_role_to_role_type(connection_metadata.role), peer_network_id.network_id(), peer_network_id.peer_id());
         peer_metadata_for_network.entry(peer_network_id.peer_id())
             .and_modify(|peer_metadata| {
@@ -295,7 +259,6 @@ impl PeersAndMetadata {
             // have multiple connections for a peer
             let active_connection_id = entry.get().connection_metadata.connection_id;
             if active_connection_id == connection_id {
-                self.generation.fetch_add(1 , Ordering::SeqCst);
 
                 let peer_metadata = entry.remove();
 		// Update the cached peers and metadata
@@ -336,7 +299,6 @@ impl PeersAndMetadata {
             .get_mut(&peer_network_id.peer_id())
         {
             peer_metadata.connection_state = connection_state;
-            self.generation.fetch_add(1 , Ordering::SeqCst);
             // Update the cached peers and metadata
             self.set_cached_peers_and_metadata(writer.clone());
             Ok(())
@@ -365,7 +327,6 @@ impl PeersAndMetadata {
             .get_mut(&peer_network_id.peer_id())
         {
             peer_metadata.peer_monitoring_metadata = peer_monitoring_metadata;
-            self.generation.fetch_add(1 , Ordering::SeqCst);
             // Update the cached peers and metadata
             self.set_cached_peers_and_metadata(writer.clone());
             Ok(())

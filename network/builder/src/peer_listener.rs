@@ -13,7 +13,6 @@ use aptos_types::network_address::NetworkAddress;
 use tokio::runtime::Handle;
 use aptos_logger::{error, info, warn};
 use aptos_network2::{counters, peer};
-use aptos_network2::application::metadata::PeerMetadata;
 use aptos_short_hex_str::AsShortHexStr;
 use futures::{AsyncRead, AsyncWrite, AsyncWriteExt, StreamExt};
 use std::marker::PhantomData;
@@ -27,8 +26,6 @@ pub struct PeerListener<TTransport, TSocket>
 {
     transport: TTransport,
     peers_and_metadata: Arc<PeersAndMetadata>,
-    peer_cache: Vec<(PeerNetworkId,PeerMetadata)>,
-    peer_cache_generation: u32,
     config: NetworkConfig,
     network_context: NetworkContext,
     apps: Arc<ApplicationCollector>,
@@ -54,23 +51,12 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
         Self{
             transport,
             peers_and_metadata,
-            peer_cache: vec![],
-            peer_cache_generation: 0,
             config,
             network_context,
             apps,
             peer_senders,
             time_service,
             _ph2: Default::default(),
-        }
-    }
-
-    fn maybe_update_peer_cache(&mut self) {
-        // if no update is needed, this should be very fast
-        // otherwise make copy of peers for use by this thread/task
-        if let Some((update, update_generation)) = self.peers_and_metadata.get_all_peers_and_metadata_generational(self.peer_cache_generation, true, &[]) {
-            self.peer_cache = update;
-            self.peer_cache_generation = update_generation;
         }
     }
 
@@ -160,7 +146,6 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
         }
 
         // Count unknown inbound connections
-        self.maybe_update_peer_cache();
         let mut unknown_inbound_conns = 0;
         let mut already_connected = false;
         let remote_peer_id = conn.metadata.remote_peer_id;
@@ -175,13 +160,21 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
             return false;
         }
 
-        for wat in self.peer_cache.iter() {
-            if wat.0.peer_id() == remote_peer_id {
-                already_connected = true;
-            }
-            let remote_metadata = wat.1.get_connection_metadata();
-            if remote_metadata.origin == ConnectionOrigin::Inbound && remote_metadata.role == PeerRole::Unknown {
-                unknown_inbound_conns += 1;
+        // get a current count of all inbound connections, filter for maybe already being connected to the peer we are currently getting a connection from
+        let pam_all = self.peers_and_metadata.get_all_peers_and_metadata();
+
+        for (_network_id, netpeers) in pam_all.iter() {
+            for (peer_id, peer_metadata) in netpeers.iter() {
+                if !peer_metadata.is_connected() {
+                    continue;
+                }
+                if *peer_id == remote_peer_id {
+                    already_connected = true;
+                }
+                let remote_metadata = peer_metadata.get_connection_metadata();
+                if remote_metadata.origin == ConnectionOrigin::Inbound && remote_metadata.role == PeerRole::Unknown {
+                    unknown_inbound_conns += 1;
+                }
             }
         }
 

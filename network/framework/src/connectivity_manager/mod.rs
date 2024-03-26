@@ -70,7 +70,6 @@ use tokio_retry::strategy::jitter;
 use tokio_stream::wrappers::ReceiverStream;
 use aptos_config::config::NetworkConfig;
 use crate::application::ApplicationCollector;
-use crate::application::metadata::PeerMetadata;
 use crate::application::storage::ConnectionNotification;
 use crate::protocols::network::OutboundPeerConnections;
 use crate::transport::AptosNetTransportActual;
@@ -108,8 +107,6 @@ pub struct ConnectivityManager<TBackoff> {
     time_service: TimeService,
     /// Peers and metadata
     peers_and_metadata: Arc<PeersAndMetadata>,
-    peer_metadata_generation: u32,
-    peer_metadata_cache: Vec<(PeerNetworkId,PeerMetadata)>,
     /// All information about peers from discovery sources.
     discovered_peers: Arc<RwLock<DiscoveredPeerSet>>,
     /// Channel over which we receive requests from other actors.
@@ -403,8 +400,6 @@ where
             network_context,
             time_service,
             peers_and_metadata,
-            peer_metadata_generation: 0,
-            peer_metadata_cache: Vec::new(),
             discovered_peers: Arc::new(RwLock::new(DiscoveredPeerSet::default())),
             requests_rx,
             dial_queue: HashMap::new(),
@@ -427,17 +422,6 @@ where
         connmgr
     }
 
-    fn update_peer_metadata_cache(&mut self) {
-        let maybe_update = self.peers_and_metadata.get_all_peers_and_metadata_generational(self.peer_metadata_generation, true, &[]);
-        match maybe_update {
-            None => {},
-            Some((new_peer_meta, new_generation)) => {
-                self.peer_metadata_cache = new_peer_meta;
-                self.peer_metadata_generation = new_generation;
-            }
-        }
-    }
-
     /// Starts the [`ConnectivityManager`] actor.
     pub async fn start(mut self, handle: Handle) {
         // The ConnectivityManager actor is interested in 3 kinds of events:
@@ -458,7 +442,6 @@ where
 
         let connection_notifs_rx = self.peers_and_metadata.subscribe();
         let mut connection_notifs_rx = ReceiverStream::new(connection_notifs_rx).fuse();
-        self.update_peer_metadata_cache();
 
         loop {
             self.event_id = self.event_id.wrapping_add(1);
@@ -476,7 +459,6 @@ where
                 maybe_notif = connection_notifs_rx.next() => {
                     // Shutdown the connectivity manager when the PeerManager
                     // shuts down.
-                    self.update_peer_metadata_cache();
                     match maybe_notif {
                         Some(notif) => {
                             self.handle_control_notification(notif.clone());
@@ -533,38 +515,42 @@ where
     /// this function will close our connection to it.
     async fn close_stale_connections(&mut self) {
         // see disable below...
-        self.update_peer_metadata_cache();
         if let Some(trusted_peers) = self.get_trusted_peers() {
             // Identify stale peer connections
             let trusted_peers = trusted_peers.read().clone();
-            for (peer_network_id, metadata) in self.peer_metadata_cache.iter() {
-                if trusted_peers.contains_key(&peer_network_id.peer_id()) {
-                    continue; // trusted is never stale
-                }
-                if !self.config.mutual_authentication
-                    && metadata.connection_metadata.origin == ConnectionOrigin::Inbound
-                    && (metadata.connection_metadata.role == PeerRole::ValidatorFullNode || metadata.connection_metadata.role == PeerRole::Unknown) {
-                    // aka
-                    // IF (not in trusted set) AND ((mutual auth on) OR (outbound connection) OR (role is other than {VFN, Unknown})) THEN STALE
-                    continue; // not stale
-                }
-
-                // is stale! Close...
-
-                match self.peer_senders.get_generational(self.peer_senders_generation) {
-                    None => {}
-                    Some((new_peer_senders, new_generation)) => {
-                        self.peer_senders_cache = new_peer_senders;
-                        self.peer_senders_generation = new_generation;
+            let pam_all = self.peers_and_metadata.get_all_peers_and_metadata();
+            for (_network_id, netpeers) in pam_all.iter() {
+                for (peer_id, metadata) in netpeers.iter() {
+                    if !metadata.is_connected() {
+                        continue;
                     }
-                }
-                #[cfg(disabled)] // TODO: actually closing 'stale' is disabled until fixed
-                match self.peer_senders_cache.get(peer_network_id) {
-                    None => {
-                        // already gone, nothing to do
+                    if trusted_peers.contains_key(peer_id) {
+                        continue; // trusted is never stale
                     }
-                    Some(stub) => {
-                        info!(
+                    if !self.config.mutual_authentication
+                        && metadata.connection_metadata.origin == ConnectionOrigin::Inbound
+                        && (metadata.connection_metadata.role == PeerRole::ValidatorFullNode || metadata.connection_metadata.role == PeerRole::Unknown) {
+                        // aka
+                        // IF (not in trusted set) AND ((mutual auth on) OR (outbound connection) OR (role is other than {VFN, Unknown})) THEN STALE
+                        continue; // not stale
+                    }
+
+                    // is stale! Close...
+
+                    match self.peer_senders.get_generational(self.peer_senders_generation) {
+                        None => {}
+                        Some((new_peer_senders, new_generation)) => {
+                            self.peer_senders_cache = new_peer_senders;
+                            self.peer_senders_generation = new_generation;
+                        }
+                    }
+                    #[cfg(disabled)] // TODO: actually closing 'stale' is disabled until fixed
+                    match self.peer_senders_cache.get(peer_network_id) {
+                        None => {
+                            // already gone, nothing to do
+                        }
+                        Some(stub) => {
+                            info!(
                             NetworkSchema::new(&self.network_context).remote_peer(&peer_network_id.peer_id()),
                             net = self.network_context,
                             peer = peer_network_id,
@@ -573,7 +559,8 @@ where
                             metadata = metadata,
                             "peerclose"
                         );
-                        stub.close.close().await;
+                            stub.close.close().await;
+                        }
                     }
                 }
             }
@@ -627,12 +614,11 @@ where
     }
 
     fn has_connected_peer(&self, peer_network_id: &PeerNetworkId) -> bool {
-        for (xpni, _) in self.peer_metadata_cache.iter() {
-            if *xpni == *peer_network_id {
-                return true;
-            }
+        if let Ok(metadata) = self.peers_and_metadata.get_metadata_for_peer(*peer_network_id) {
+            metadata.is_connected()
+        } else {
+            false
         }
-        false
     }
 
     /// Selects a set of peers to dial
@@ -690,11 +676,7 @@ where
         let num_peers_to_dial =
             if let Some(outbound_connection_limit) = self.outbound_connection_limit {
                 // Get the number of outbound connections
-                let num_outbound_connections = self
-                    .peer_metadata_cache
-                    .iter()
-                    .filter(|(_, metadata)| metadata.connection_metadata.origin == ConnectionOrigin::Outbound)
-                    .count();
+                let num_outbound_connections = self.peers_and_metadata.count_connected_peers(Some(ConnectionOrigin::Outbound));
 
                 // Add any pending dials to the count
                 let total_outbound_connections =
@@ -972,7 +954,6 @@ where
             );
         // });
 
-        self.update_peer_metadata_cache();
         // Cancel dials to peers that are no longer eligible.
         self.cancel_stale_dials().await;
         // Disconnect from connected peers that are no longer eligible.
@@ -995,11 +976,18 @@ where
         }
 
         // Update the connected peer ping latencies
-        for (peer_id, _) in &self.peer_metadata_cache {
-            if let Some(ping_latency_secs) =
-                self.discovered_peers.read().get_ping_latency_secs(&peer_id.peer_id())
-            {
-                counters::observe_connected_ping_time(&self.network_context, ping_latency_secs);
+        let pam_all = self.peers_and_metadata.get_all_peers_and_metadata();
+        for (_network_id, netpeers) in pam_all.iter() {
+            for (peer_id, peer_metadata) in netpeers.iter() {
+                if !peer_metadata.is_connected() {
+                    continue;
+                }
+
+                if let Some(ping_latency_secs) =
+                    self.discovered_peers.read().get_ping_latency_secs(peer_id)
+                {
+                    counters::observe_connected_ping_time(&self.network_context, ping_latency_secs);
+                }
             }
         }
     }
@@ -1028,8 +1016,8 @@ where
             },
             // GetConnectedSize only used by test code
             ConnectivityRequest::GetConnectedSize(sender) => {
-                self.update_peer_metadata_cache();
-                sender.send(self.peer_metadata_cache.len()).unwrap();
+                let count = self.peers_and_metadata.count_connected_peers(None);
+                sender.send(count).unwrap();
             },
         }
     }

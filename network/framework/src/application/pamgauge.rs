@@ -2,10 +2,8 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use aptos_config::network_id::PeerNetworkId;
 use aptos_infallible::RwLock;
 use aptos_logger::info;
-use crate::application::metadata::PeerMetadata;
 use crate::application::storage::PeersAndMetadata;
 
 pub struct PeersAndMetadataGauge {
@@ -46,33 +44,32 @@ impl prometheus::core::Collector for PeersAndMetadataGauge {
 
 struct PeersAndMetadataGaugeInner {
     peers_and_metadata: Arc<PeersAndMetadata>,
-    cache_generation: u32,
-    cache_peers: Vec<(PeerNetworkId,PeerMetadata)>,
 }
 
 impl PeersAndMetadataGaugeInner {
     pub fn new(peers_and_metadata: Arc<PeersAndMetadata>) -> Self {
         Self {
             peers_and_metadata,
-            cache_generation: 0,
-            cache_peers: Vec::new(),
         }
     }
     pub fn collect(&mut self, name: String, help: String) -> Vec<prometheus::proto::MetricFamily> {
-        if let Some((new_peers, new_gen)) = self.peers_and_metadata.get_all_peers_and_metadata_generational(self.cache_generation, true, &[]) {
-            self.cache_generation = new_gen;
-            self.cache_peers = new_peers;
-        }
+        let pam_raw = self.peers_and_metadata.get_all_peers_and_metadata();
 
         let mut counts = HashMap::new();
-        for (peer_network_id, peer_metadata) in self.cache_peers.iter() {
-            // Before 2024-02 this was: {network_id, peer_id, role_type, direction}
-            // But blowing up the metrics with count 1 for every peer_id connected in or out is dumb and wasteful, so skip peer_id.
-            let network_id = peer_network_id.network_id();
-            let role_type = peer_metadata.connection_metadata.role;
-            let direction = peer_metadata.connection_metadata.origin;
-            let key = (network_id, direction, role_type);
-            counts.entry(key).and_modify(|x| *x = *x + 1).or_insert(1);
+        for (network_id, netpeers) in pam_raw.iter() {
+            for (_peer_id, peer_metadata) in netpeers.iter() {
+                if !peer_metadata.is_connected() {
+                    continue;
+                }
+
+                // Before 2024-02 this was: {network_id, peer_id, role_type, direction}
+                // But blowing up the metrics with count 1 for every peer_id connected in or out is dumb and wasteful, so skip peer_id.
+                //let network_id = peer_network_id.network_id();
+                let role_type = peer_metadata.connection_metadata.role;
+                let direction = peer_metadata.connection_metadata.origin;
+                let key = (network_id, direction, role_type);
+                counts.entry(key).and_modify(|x| *x = *x + 1).or_insert(1);
+            }
         }
         let mut metric_data = Vec::new();
         for (key, count) in counts.iter() {

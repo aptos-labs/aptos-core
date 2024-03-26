@@ -690,7 +690,7 @@ mod tests {
         let open_outbound_rpc = OutboundRpcMatcher::new();
 
         let handle = Handle::current();
-        handle.spawn(writer_task(network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type, closed.clone()));
+        handle.spawn(writer_task(remote_peer_network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type, closed.clone()));
         handle.spawn(reader_task(reader, apps, remote_peer_network_id, open_outbound_rpc.clone(), handle.clone(), closed.clone(), role_type));
 
         let max_data_len = max_frame_size * 13;

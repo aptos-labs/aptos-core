@@ -5,10 +5,10 @@
 use super::*;
 use crate::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
-    peer_manager::{
-        self, conn_notifs_channel, ConnectionRequest, ConnectionRequestSender,
-        PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
-    },
+    // peer_manager::{
+    //     self, conn_notifs_channel, ConnectionRequest, ConnectionRequestSender,
+    //     PeerManagerNotification, PeerManagerRequest, PeerManagerRequestSender,
+    // },
     protocols::{
         network::{NetworkSender, NewNetworkEvents, NewNetworkSender},
         rpc::InboundRpcRequest,
