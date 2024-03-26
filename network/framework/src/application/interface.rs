@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::protocols::{network::RpcError, wire::messaging::v1::RequestId};
 use crate::{
     application::{error::Error, storage::PeersAndMetadata},
     counters,
@@ -10,20 +11,23 @@ use crate::{
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
     },
 };
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
+use anyhow::anyhow;
+use aptos_config::{
+    config::RoleType,
+    network_id::{NetworkId, PeerNetworkId},
+};
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
 use aptos_types::network_address::NetworkAddress;
 use async_trait::async_trait;
-use itertools::Itertools;
-use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
-use std::collections::BTreeMap;
-use std::sync::RwLock;
-use anyhow::anyhow;
 use bytes::Bytes;
 use futures::channel::oneshot;
-use aptos_config::config::RoleType;
-use crate::protocols::network::RpcError;
-use crate::protocols::wire::messaging::v1::RequestId;
+use itertools::Itertools;
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Debug,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 /// A simple definition to handle all the trait bounds for messages.
 // TODO: we should remove the duplication across the different files
@@ -65,7 +69,11 @@ pub trait NetworkClientInterface<Message: NetworkMessageTrait>: Clone + Send + S
     /// Sends the given message to the specified peer. Note: this
     /// method does not guarantee message delivery or handle responses.
     /// Wait until message in enqueued or an error occurs.
-    async fn send_to_peer_blocking(&self, _message: Message, _peer: PeerNetworkId) -> Result<(), Error>;
+    async fn send_to_peer_blocking(
+        &self,
+        _message: Message,
+        _peer: PeerNetworkId,
+    ) -> Result<(), Error>;
 
     /// Sends the given message to each peer in the specified peer list.
     /// Note: this method does not guarantee message delivery or handle responses.
@@ -143,11 +151,15 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
                 return Ok(*protocol);
             }
         }
-        Err(Error::NetworkError(anyhow!(
-            "None of the preferred protocols are supported by this peer! \
+        Err(Error::NetworkError(
+            anyhow!(
+                "None of the preferred protocols are supported by this peer! \
             Peer: {:?}, supported protocols: {:?}",
-            peer, protocols_supported_by_peer
-        ).into()))
+                peer,
+                protocols_supported_by_peer
+            )
+            .into(),
+        ))
     }
 }
 
@@ -187,11 +199,17 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         Ok(network_sender.send_to(peer.peer_id(), direct_send_protocol_id, message)?)
     }
 
-    async fn send_to_peer_blocking(&self, message: Message, peer: PeerNetworkId) -> Result<(), Error> {
+    async fn send_to_peer_blocking(
+        &self,
+        message: Message,
+        peer: PeerNetworkId,
+    ) -> Result<(), Error> {
         let network_sender = self.get_sender_for_network_id(&peer.network_id())?;
         let direct_send_protocol_id = self
             .get_preferred_protocol_for_peer(&peer, &self.direct_send_protocols_and_preferences)?;
-        Ok(network_sender.send_async(peer.peer_id(), direct_send_protocol_id, message).await?)
+        Ok(network_sender
+            .send_async(peer.peer_id(), direct_send_protocol_id, message)
+            .await?)
     }
 
     fn send_to_peers(&self, message: Message, peers: &[PeerNetworkId]) -> Result<(), Error> {
@@ -246,7 +264,13 @@ impl<Message: NetworkMessageTrait> NetworkClientInterface<Message> for NetworkCl
         let rpc_protocol_id =
             self.get_preferred_protocol_for_peer(&peer, &self.rpc_protocols_and_preferences)?;
         Ok(network_sender
-            .send_rpc(peer.peer_id(), rpc_protocol_id, message, rpc_timeout, protocol_is_high_priority(rpc_protocol_id))
+            .send_rpc(
+                peer.peer_id(),
+                rpc_protocol_id,
+                message,
+                rpc_timeout,
+                protocol_is_high_priority(rpc_protocol_id),
+            )
             .await?)
     }
 }
@@ -279,11 +303,11 @@ pub struct OpenRpcRequestState {
     pub started: tokio::time::Instant, // for metrics
     pub deadline: tokio::time::Instant,
     pub network_id: NetworkId, // for metrics
-    pub role_type: RoleType, // for metrics
+    pub role_type: RoleType,   // for metrics
 }
 
 /// OutboundRpcMatcher contains an Arc-RwLock of oneshot reply channels
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 pub struct OutboundRpcMatcher {
     open_outbound_rpc: Arc<RwLock<BTreeMap<RequestId, OpenRpcRequestState>>>,
 }
@@ -291,7 +315,7 @@ pub struct OutboundRpcMatcher {
 impl OutboundRpcMatcher {
     pub fn new() -> Self {
         Self {
-            open_outbound_rpc: Arc::new(RwLock::new(BTreeMap::new()))
+            open_outbound_rpc: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 
@@ -311,7 +335,7 @@ impl OutboundRpcMatcher {
         network_id: NetworkId,
         role_type: RoleType,
     ) {
-        let val = OpenRpcRequestState{
+        let val = OpenRpcRequestState {
             id: request_id,
             sender,
             protocol_id,
@@ -320,14 +344,17 @@ impl OutboundRpcMatcher {
             network_id,
             role_type,
         };
-        self.open_outbound_rpc.write().unwrap().insert(request_id, val);
+        self.open_outbound_rpc
+            .write()
+            .unwrap()
+            .insert(request_id, val);
     }
 
     /// Periodic cleanup task, run ~ 10Hz
     /// Assume normal flow is for RPCs to _not_ timeout.
     pub async fn cleanup(self, period: Duration, mut closed: Closer) {
         loop {
-            tokio::select!{
+            tokio::select! {
                 () = tokio::time::sleep(period) => {}
                 _ = closed.wait() => {return}
             }
@@ -351,7 +378,15 @@ impl OutboundRpcMatcher {
                 let reqo = they.remove(&k);
                 if let Some(rpc_state) = reqo {
                     // we were waiting for a reply and never got one
-                    counters::rpc_messages(rpc_state.network_id, rpc_state.protocol_id.as_str(), rpc_state.role_type, counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "timeoutI").inc();
+                    counters::rpc_messages(
+                        rpc_state.network_id,
+                        rpc_state.protocol_id.as_str(),
+                        rpc_state.role_type,
+                        counters::RESPONSE_LABEL,
+                        counters::INBOUND_LABEL,
+                        "timeoutI",
+                    )
+                    .inc();
                 }
             }
         }
@@ -366,21 +401,21 @@ impl Default for OutboundRpcMatcher {
 
 pub fn protocol_is_high_priority(protocol_id: ProtocolId) -> bool {
     match protocol_id {
-        ProtocolId::ConsensusRpcBcs => {true}
-        ProtocolId::ConsensusDirectSendBcs => {true}
+        ProtocolId::ConsensusRpcBcs => true,
+        ProtocolId::ConsensusDirectSendBcs => true,
         // ProtocolId::MempoolDirectSend => {}
-        ProtocolId::StateSyncDirectSend => {true}
+        ProtocolId::StateSyncDirectSend => true,
         // ProtocolId::DiscoveryDirectSend => {}
         // ProtocolId::HealthCheckerRpc => {}
-        ProtocolId::ConsensusDirectSendJson => {true}
-        ProtocolId::ConsensusRpcJson => {true}
-        ProtocolId::StorageServiceRpc => {true}
+        ProtocolId::ConsensusDirectSendJson => true,
+        ProtocolId::ConsensusRpcJson => true,
+        ProtocolId::StorageServiceRpc => true,
         // ProtocolId::MempoolRpc => {}
         // ProtocolId::PeerMonitoringServiceRpc => {}
-        ProtocolId::ConsensusRpcCompressed => {true}
-        ProtocolId::ConsensusDirectSendCompressed => {true}
+        ProtocolId::ConsensusRpcCompressed => true,
+        ProtocolId::ConsensusDirectSendCompressed => true,
         // ProtocolId::NetbenchDirectSend => {}
         // ProtocolId::NetbenchRpc => {}
-        _ => {false}
+        _ => false,
     }
 }

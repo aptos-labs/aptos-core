@@ -2,9 +2,11 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use std::error::Error;
-use std::fmt::{Display, Formatter};
-use std::io;
+use std::{
+    error::Error,
+    fmt::{Display, Formatter},
+    io,
+};
 
 /// Errors propagated from the network module.
 #[derive(Debug)]
@@ -23,7 +25,6 @@ pub enum NetworkError {
     // #[error("Peer not connected")]
     NotConnected,
 }
-
 
 impl From<anyhow::Error> for NetworkError {
     fn from(err: anyhow::Error) -> NetworkError {
@@ -49,29 +50,20 @@ impl From<bcs::Error> for NetworkError {
     }
 }
 
-
 impl Display for NetworkError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            NetworkError::Error(err_str) => {
-                f.write_fmt(format_args!("NetworkError({})", err_str))
-            }
+            NetworkError::Error(err_str) => f.write_fmt(format_args!("NetworkError({})", err_str)),
             NetworkError::IoError(io_err) => {
                 f.write_fmt(format_args!("NetworkError Io({})", io_err))
-            }
+            },
             NetworkError::BcsError(bcs_err) => {
                 f.write_fmt(format_args!("NetworkError BCS({:?})", bcs_err))
-            }
-            NetworkError::PeerFullCondition => {
-                f.write_str("NetworkError::PeerFullCondition")
-            }
-            NetworkError::NotConnected => {
-                f.write_str("NetworkError::NotConnected")
-            }
+            },
+            NetworkError::PeerFullCondition => f.write_str("NetworkError::PeerFullCondition"),
+            NetworkError::NotConnected => f.write_str("NetworkError::NotConnected"),
         }
     }
 }
 
-impl Error for NetworkError {
-
-}
+impl Error for NetworkError {}

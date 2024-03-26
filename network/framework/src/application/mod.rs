@@ -2,15 +2,14 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{protocols::network::ReceivedMessage, ProtocolId};
 use aptos_logger::info;
-use crate::ProtocolId;
-use crate::protocols::network::ReceivedMessage;
 
 pub mod error;
 pub mod interface;
 pub mod metadata;
-pub mod storage;
 pub mod pamgauge;
+pub mod storage;
 
 /// Container for connection to application code listening on a ProtocolId
 #[derive(Debug)]
@@ -25,14 +24,30 @@ pub struct ApplicationConnections {
 }
 
 impl ApplicationConnections {
-    pub fn build(protocol_id: ProtocolId, queue_size: usize, label: &str) -> (ApplicationConnections, tokio::sync::mpsc::Receiver<ReceivedMessage>) {
+    pub fn build(
+        protocol_id: ProtocolId,
+        queue_size: usize,
+        label: &str,
+    ) -> (
+        ApplicationConnections,
+        tokio::sync::mpsc::Receiver<ReceivedMessage>,
+    ) {
         let (sender, receiver) = tokio::sync::mpsc::channel(queue_size);
-        info!("app_int setup AC.build {} {} -> {:?} -> {:?}", label, protocol_id.as_str(), &sender, &receiver);
-        (ApplicationConnections {
-            protocol_id,
-            sender,
-            label: label.to_string(),
-        }, receiver)
+        info!(
+            "app_int setup AC.build {} {} -> {:?} -> {:?}",
+            label,
+            protocol_id.as_str(),
+            &sender,
+            &receiver
+        );
+        (
+            ApplicationConnections {
+                protocol_id,
+                sender,
+                label: label.to_string(),
+            },
+            receiver,
+        )
     }
 }
 
@@ -47,9 +62,7 @@ pub struct ApplicationCollector {
 
 impl ApplicationCollector {
     pub fn new() -> Self {
-        Self {
-            apps: Vec::new(),
-        }
+        Self { apps: Vec::new() }
     }
 
     pub fn add(&mut self, connections: ApplicationConnections) {
@@ -72,23 +85,22 @@ impl Default for ApplicationCollector {
 }
 
 pub struct Iter<'a> {
-    subi: std::slice::Iter<'a,ApplicationConnections>,
+    subi: std::slice::Iter<'a, ApplicationConnections>,
 }
 
 impl<'a> Iter<'a> {
-    fn new(subi: std::slice::Iter<'a,ApplicationConnections>) -> Self {
-        Self{subi}
+    fn new(subi: std::slice::Iter<'a, ApplicationConnections>) -> Self {
+        Self { subi }
     }
 }
 
 impl<'a> Iterator for Iter<'a> {
-    type Item = (&'a ProtocolId,&'a ApplicationConnections);
+    type Item = (&'a ProtocolId, &'a ApplicationConnections);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.subi.next().map(|sv| (&sv.protocol_id,sv))
+        self.subi.next().map(|sv| (&sv.protocol_id, sv))
     }
 }
-
 
 #[cfg(test)]
 mod tests;

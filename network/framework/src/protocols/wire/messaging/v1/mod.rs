@@ -55,21 +55,21 @@ pub enum MultiplexMessage {
 // TODO: principled system of determining the actual overhead bytes.
 // Best guess by inspection was 9 bytes but things failed.
 // Given 4 MiB fragment size, a few bytes wasted is okay?
-pub const STREAM_HEADER_OVERHEAD_BYTES : usize = 20;
-pub const STREAM_FRAGMENT_OVERHEAD_BYTES : usize = 20;
+pub const STREAM_HEADER_OVERHEAD_BYTES: usize = 20;
+pub const STREAM_FRAGMENT_OVERHEAD_BYTES: usize = 20;
 
 impl MultiplexMessage {
     pub fn data_len(&self) -> usize {
         match self {
-            MultiplexMessage::Message(msg) => {msg.data_len()}
-            MultiplexMessage::Stream(sm) => {sm.data_len()}
+            MultiplexMessage::Message(msg) => msg.data_len(),
+            MultiplexMessage::Stream(sm) => sm.data_len(),
         }
     }
 
     pub fn header_len(&self) -> usize {
         match self {
-            MultiplexMessage::Message(msg) => {msg.header_len() + 1}
-            MultiplexMessage::Stream(sm) => {sm.header_len() + 1}
+            MultiplexMessage::Message(msg) => msg.header_len() + 1,
+            MultiplexMessage::Stream(sm) => sm.header_len() + 1,
         }
     }
 }
@@ -97,10 +97,10 @@ impl NetworkMessage {
 
     pub fn protocol_id_as_str(&self) -> &'static str {
         match self {
-            NetworkMessage::Error(_) => {"err"}
-            NetworkMessage::RpcRequest(r) => {r.protocol_id.as_str()}
-            NetworkMessage::RpcResponse(_) => {"rpc_resp"}
-            NetworkMessage::DirectSendMsg(m) => {m.protocol_id.as_str()}
+            NetworkMessage::Error(_) => "err",
+            NetworkMessage::RpcRequest(r) => r.protocol_id.as_str(),
+            NetworkMessage::RpcResponse(_) => "rpc_resp",
+            NetworkMessage::DirectSendMsg(m) => m.protocol_id.as_str(),
         }
     }
 }

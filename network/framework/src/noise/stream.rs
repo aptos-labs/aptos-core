@@ -522,6 +522,8 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    // use std::sync::Arc;
+    use crate::application::storage::PeersAndMetadata;
     use crate::{
         noise::{AntiReplayTimestamps, NoiseUpgrader},
         testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
@@ -536,8 +538,6 @@ mod test {
     };
     use rand::SeedableRng as _;
     use std::io;
-    // use std::sync::Arc;
-    use crate::application::storage::PeersAndMetadata;
 
     /// helper to setup two testing peers
     fn build_peers() -> (

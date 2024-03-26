@@ -3,8 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::*;
-use crate::transport::ConnectionMetadata;
-use aptos_config::config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION};
+use crate::transport::{
+    util::{new_mock_transport, MockTransportEvent},
+    ConnectionMetadata,
+};
+use aptos_config::{
+    config::{Peer, PeerRole, PeerSet, HANDSHAKE_VERSION},
+    network_id::NetworkId,
+};
 use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use aptos_logger::info;
 use aptos_time_service::{MockTimeService, TimeService};
@@ -12,12 +18,9 @@ use aptos_types::{account_address::AccountAddress, network_address::NetworkAddre
 use futures::future;
 use maplit::{hashmap, hashset};
 use rand::{rngs::StdRng, SeedableRng};
-use std::{io, str::FromStr};
-use std::sync::Once;
+use std::{io, str::FromStr, sync::Once};
 use tokio::runtime::Runtime;
 use tokio_retry::strategy::FixedInterval;
-use aptos_config::network_id::NetworkId;
-use crate::transport::util::{MockTransportEvent, new_mock_transport};
 
 const MAX_TEST_CONNECTIONS: usize = 3;
 const CONNECTIVITY_CHECK_INTERVAL: Duration = Duration::from_secs(5);
@@ -33,7 +36,7 @@ const MAX_DELAY_WITH_JITTER: Duration = Duration::from_millis(
     CONNECTION_DELAY.as_millis() as u64 + MAX_CONNECTION_DELAY_JITTER.as_millis() as u64,
 );
 
-static SETUP_ONCE :Once = Once::new();
+static SETUP_ONCE: Once = Once::new();
 
 fn setup() {
     SETUP_ONCE.call_once(|| {
@@ -189,7 +192,9 @@ impl TestHarness {
         );
         metadata.addr = address;
         let peer_network_id = PeerNetworkId::new(self.network_context.network_id(), peer_id);
-        _ = self.peers_and_metadata.insert_connection_metadata(peer_network_id, metadata);
+        _ = self
+            .peers_and_metadata
+            .insert_connection_metadata(peer_network_id, metadata);
         // TODO: this does not 'await delivery' of subscribers and their new-peer message
         let _ = tokio::time::sleep(Duration::from_millis(1)).await;
     }
@@ -213,12 +218,18 @@ impl TestHarness {
         // );
         // self.send_notification_await_delivery(peer_id, notif).await;
         let peer_network_id = PeerNetworkId::new(self.network_context.network_id(), peer_id);
-        let pm = self.peers_and_metadata.get_metadata_for_peer(peer_network_id).unwrap();
-        match self.peers_and_metadata.remove_peer_metadata(peer_network_id, pm.connection_metadata.connection_id) {
-            Ok(_) => {}
+        let pm = self
+            .peers_and_metadata
+            .get_metadata_for_peer(peer_network_id)
+            .unwrap();
+        match self
+            .peers_and_metadata
+            .remove_peer_metadata(peer_network_id, pm.connection_metadata.connection_id)
+        {
+            Ok(_) => {},
             Err(err) => {
                 panic!("could not remove peer: {:?}", err);
-            }
+            },
         }
         // TODO: this does not 'await delivery' of subscribers and their disconnect message
         let _ = tokio::time::sleep(Duration::from_millis(1)).await;
@@ -248,20 +259,26 @@ impl TestHarness {
             None => {
                 info!("no peer_senders");
                 return;
-            }
-            Some((they,_gen)) => {they}
+            },
+            Some((they, _gen)) => they,
         };
         match they.get(&peer_network_id) {
             None => {
-                info!("expect_disconnect_inner: {:?} not present, already gone?", peer_network_id);
+                info!(
+                    "expect_disconnect_inner: {:?} not present, already gone?",
+                    peer_network_id
+                );
                 // already gone, okay
-            }
+            },
             Some(stub) => {
-                info!("Waiting to receive disconnect request for {:?}", peer_network_id);
+                info!(
+                    "Waiting to receive disconnect request for {:?}",
+                    peer_network_id
+                );
                 let mut close = stub.close.clone();
                 close.wait().await;
                 info!("close finished for {:?}", peer_network_id);
-            }
+            },
         }
         // let success = result.is_ok();
         // match self.connection_reqs_rx.next().await.unwrap() {
@@ -286,8 +303,7 @@ impl TestHarness {
 
     async fn expect_disconnect_fail(&mut self, peer_id: PeerId, address: NetworkAddress) {
         // let error = PeerManagerError::NotConnected(peer_id);
-        self.expect_disconnect_inner(peer_id, address, false)
-            .await;
+        self.expect_disconnect_inner(peer_id, address, false).await;
     }
 
     async fn wait_until_empty_dial_queue(&mut self, timeout: Duration) {
@@ -321,20 +337,20 @@ impl TestHarness {
                 None => {
                     println!("dial request returned None");
                     return None;
-                }
-                Some(event) => {event}
-            }
+                },
+                Some(event) => event,
+            },
             Err(_timeout) => {
                 println!("dial request timed out after {:?}", timeout);
                 return None;
-            }
+            },
         };
         let (peer_id, address) = match event {
             MockTransportEvent::Dial(dial) => {
                 println!("got dial {:?}", dial);
                 _ = dial.result_sender.send(result);
                 (dial.remote_peer_network_id.peer_id(), dial.network_address)
-            }
+            },
         };
         if success {
             self.send_new_peer_await_delivery(peer_id, peer_id, address.clone())
@@ -354,10 +370,8 @@ impl TestHarness {
         let (peer_id, address) = match self.expect_one_dial_inner(result, timeout).await {
             None => {
                 panic!("expect_one_dial timeout");
-            }
-            Some((peer_id, address)) => {
-                (peer_id, address)
-            }
+            },
+            Some((peer_id, address)) => (peer_id, address),
         };
 
         assert_eq!(peer_id, expected_peer_id);
@@ -455,18 +469,24 @@ fn connect_to_seeds_on_startup() {
         mock.trigger_pending_dials().await;
         println!("connect_to_seeds_on_startup 5.3");
         // wait for a dial but send that dial an error
-        mock.expect_one_dial_fail(seed_peer_id, new_seed_addr, Duration::from_secs(5)).await;
+        mock.expect_one_dial_fail(seed_peer_id, new_seed_addr, Duration::from_secs(5))
+            .await;
 
         println!("connect_to_seeds_on_startup 6");
         // Waiting to receive dial request to seed peer at seed address
         mock.trigger_connectivity_check().await;
         mock.trigger_pending_dials().await;
-        mock.expect_one_dial_success(seed_peer_id, seed_addr, Duration::from_secs(1)).await;
+        mock.expect_one_dial_success(seed_peer_id, seed_addr, Duration::from_secs(1))
+            .await;
 
         mock.peers_and_metadata.close_subscribers();
         println!("connect_to_seeds_on_startup done");
     };
-    let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_time().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_time()
+        .build()
+        .unwrap();
     let _enter_context = runtime.enter();
     let conn_mgr_future = conn_mgr.start(runtime.handle().clone());
     runtime.block_on(future::join(conn_mgr_future, test));
@@ -529,7 +549,11 @@ fn addr_change() {
         info!("addr_change done");
     };
     // Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
-    let runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(2).enable_time().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_time()
+        .build()
+        .unwrap();
     let _enter_context = runtime.enter();
     let conn_mgr_future = conn_mgr.start(runtime.handle().clone());
     runtime.block_on(future::join(conn_mgr_future, test));
@@ -573,7 +597,9 @@ fn lost_connection() {
         mock.peers_and_metadata.close_subscribers();
         info!("lost_connection done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 #[ignore] // TODO: broken until stale-close is fixed
@@ -618,7 +644,9 @@ fn disconnect() {
         mock.peers_and_metadata.close_subscribers();
         info!("disconnect done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 // Tests that connectivity manager retries dials and disconnects on failure.
@@ -674,7 +702,9 @@ fn retry_on_failure() {
         mock.peers_and_metadata.close_subscribers();
         info!("retry_on_failure done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 // Tests that if we dial an already connected peer or disconnect from an already disconnected
@@ -732,7 +762,9 @@ fn no_op_requests() {
         mock.peers_and_metadata.close_subscribers();
         info!("no_op_requests done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 fn generate_account_address(val: usize) -> AccountAddress {
@@ -775,11 +807,14 @@ fn backoff_on_failure() {
         mock.trigger_connectivity_check().await;
         mock.trigger_pending_dials().await;
         info!("backoff_on_failure -1");
-        mock.expect_one_dial_success(peer_id_a, peer_a_addr, Duration::from_secs(1)).await;
+        mock.expect_one_dial_success(peer_id_a, peer_a_addr, Duration::from_secs(1))
+            .await;
         mock.peers_and_metadata.close_subscribers();
         info!("backoff_on_failure done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 // Test that connectivity manager will still connect to a peer if it advertises
@@ -807,7 +842,8 @@ fn multiple_addrs_basic() {
         mock.trigger_connectivity_check().await;
         mock.trigger_pending_dials().await;
         info!("multiple_addrs_basic 1");
-        mock.expect_one_dial_fail(other_peer_id, other_addr_1, Duration::from_secs(1)).await;
+        mock.expect_one_dial_fail(other_peer_id, other_addr_1, Duration::from_secs(1))
+            .await;
 
         // Since the last connection attempt failed for other_addr_1, we should
         // attempt the next available listener address. In this case, the call
@@ -820,7 +856,9 @@ fn multiple_addrs_basic() {
         mock.peers_and_metadata.close_subscribers();
         info!("multiple_addrs_basic done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 // Test that connectivity manager will work with multiple addresses even if we
@@ -853,7 +891,8 @@ fn multiple_addrs_wrapping() {
         mock.trigger_connectivity_check().await;
         mock.trigger_pending_dials().await;
         info!("multiple_addrs_wrapping 2");
-        mock.expect_one_dial_fail(other_peer_id, other_addr_2, Duration::from_secs(1)).await;
+        mock.expect_one_dial_fail(other_peer_id, other_addr_2, Duration::from_secs(1))
+            .await;
 
         // Our next attempt should wrap around to the first address.
         mock.trigger_connectivity_check().await;
@@ -864,7 +903,9 @@ fn multiple_addrs_wrapping() {
         mock.peers_and_metadata.close_subscribers();
         info!("multiple_addrs_wrapping done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 // Test that connectivity manager will still work when dialing a peer with
@@ -892,7 +933,8 @@ fn multiple_addrs_shrinking() {
         mock.trigger_connectivity_check().await;
         mock.trigger_pending_dials().await;
         info!("multiple_addrs_shrinking 2");
-        mock.expect_one_dial_fail(other_peer_id, other_addr_1, Duration::from_secs(1)).await;
+        mock.expect_one_dial_fail(other_peer_id, other_addr_1, Duration::from_secs(1))
+            .await;
 
         let other_addr_4 = network_address_with_pubkey("/ip4/127.0.0.1/tcp/9094", pubkey);
         let other_addr_5 = network_address_with_pubkey("/ip4/127.0.0.1/tcp/9095", pubkey);
@@ -917,7 +959,9 @@ fn multiple_addrs_shrinking() {
         mock.peers_and_metadata.close_subscribers();
         info!("multiple_addrs_shrinking done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 #[test]
@@ -940,7 +984,8 @@ fn public_connection_limit() {
         mock.trigger_connectivity_check().await;
         mock.trigger_pending_dials().await;
         info!("public_connection_limit 1");
-        mock.expect_num_dials(num_seeds, Duration::from_secs(1)).await;
+        mock.expect_num_dials(num_seeds, Duration::from_secs(1))
+            .await;
 
         // Should be expected number of connnections
         assert_eq!(num_seeds, mock.get_connected_size().await);
@@ -954,7 +999,9 @@ fn public_connection_limit() {
         mock.peers_and_metadata.close_subscribers();
         info!("public_connection_limit done");
     };
-    Runtime::new().unwrap().block_on(future::join(conn_mgr.test_start(), test));
+    Runtime::new()
+        .unwrap()
+        .block_on(future::join(conn_mgr.test_start(), test));
 }
 
 #[test]

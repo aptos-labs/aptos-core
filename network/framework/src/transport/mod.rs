@@ -2,6 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::application::storage::PeersAndMetadata;
 use crate::{
     logging::NetworkSchema,
     noise::{stream::NoiseStream, AntiReplayTimestamps, NoiseUpgrader}, // HandshakeAuthMode
@@ -34,7 +35,6 @@ use futures::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, convert::TryFrom, fmt, io, pin::Pin, sync::Arc, time::Duration};
-use crate::application::storage::PeersAndMetadata;
 
 pub mod util;
 
@@ -464,7 +464,12 @@ where
         let identity_pubkey = identity_key.public_key();
 
         let upgrade_context = UpgradeContext::new(
-            NoiseUpgrader::new(network_context, identity_key, peers_and_metadata, mutual_auth),
+            NoiseUpgrader::new(
+                network_context,
+                identity_key,
+                peers_and_metadata,
+                mutual_auth,
+            ),
             handshake_version,
             supported_protocols,
             chain_id,

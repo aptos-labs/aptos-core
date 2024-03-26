@@ -1,28 +1,40 @@
 // Copyright © Aptos Foundation
 
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::runtime::Handle;
-use tokio::sync::mpsc::Receiver;
-use crate::protocols::wire::messaging::v1::{ErrorCode, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream, NetworkMessage, STREAM_FRAGMENT_OVERHEAD_BYTES, STREAM_HEADER_OVERHEAD_BYTES};
-use futures::io::{AsyncRead,AsyncReadExt,AsyncWrite};
-use futures::StreamExt;
-use futures::SinkExt;
-use futures::stream::Fuse;
-use tokio::sync::mpsc::error::TryRecvError;
-use aptos_config::config::{NetworkConfig, RoleType};
-use aptos_config::network_id::{NetworkContext, NetworkId, PeerNetworkId};
+use crate::{
+    application::{
+        interface::{OpenRpcRequestState, OutboundRpcMatcher},
+        storage::PeersAndMetadata,
+        ApplicationCollector,
+    },
+    counters,
+    protocols::{
+        network::{Closer, OutboundPeerConnections, PeerStub, ReceivedMessage},
+        stream::{StreamFragment, StreamHeader, StreamMessage},
+        wire::messaging::v1::{
+            ErrorCode, MultiplexMessage, MultiplexMessageSink, MultiplexMessageStream,
+            NetworkMessage, STREAM_FRAGMENT_OVERHEAD_BYTES, STREAM_HEADER_OVERHEAD_BYTES,
+        },
+    },
+    transport::ConnectionMetadata,
+    ProtocolId,
+};
+use aptos_config::{
+    config::{NetworkConfig, RoleType},
+    network_id::{NetworkContext, NetworkId, PeerNetworkId},
+};
 use aptos_logger::{error, info, warn};
-use aptos_metrics_core::{IntCounter, IntCounterVec, register_int_counter_vec};
-use crate::application::ApplicationCollector;
-use crate::application::interface::{OpenRpcRequestState, OutboundRpcMatcher};
-use crate::application::storage::PeersAndMetadata;
-use crate::ProtocolId;
-use crate::protocols::network::{Closer, OutboundPeerConnections, PeerStub, ReceivedMessage};
-use crate::protocols::stream::{StreamFragment, StreamHeader, StreamMessage};
-use crate::transport::ConnectionMetadata;
+use aptos_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
+use futures::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite},
+    stream::Fuse,
+    SinkExt, StreamExt,
+};
 use once_cell::sync::Lazy;
-use crate::counters;
+use std::{sync::Arc, time::Duration};
+use tokio::{
+    runtime::Handle,
+    sync::mpsc::{error::TryRecvError, Receiver},
+};
 
 pub fn start_peer<TSocket>(
     config: &NetworkConfig,
@@ -34,29 +46,60 @@ pub fn start_peer<TSocket>(
     peers_and_metadata: Arc<PeersAndMetadata>,
     peer_senders: Arc<OutboundPeerConnections>,
     network_context: NetworkContext,
-)
-where
-    TSocket: crate::transport::TSocket
+) where
+    TSocket: crate::transport::TSocket,
 {
     let role_type = network_context.role();
-    let (sender, to_send) = tokio::sync::mpsc::channel::<(NetworkMessage,u64)>(config.network_channel_size);
-    let (sender_high_prio, to_send_high_prio) = tokio::sync::mpsc::channel::<(NetworkMessage,u64)>(config.network_channel_size);
+    let (sender, to_send) =
+        tokio::sync::mpsc::channel::<(NetworkMessage, u64)>(config.network_channel_size);
+    let (sender_high_prio, to_send_high_prio) =
+        tokio::sync::mpsc::channel::<(NetworkMessage, u64)>(config.network_channel_size);
     let open_outbound_rpc = OutboundRpcMatcher::new();
     let max_frame_size = config.max_frame_size;
     let (read_socket, write_socket) = socket.split();
-    let reader =
-        MultiplexMessageStream::new(read_socket, max_frame_size).fuse();
+    let reader = MultiplexMessageStream::new(read_socket, max_frame_size).fuse();
     let writer = MultiplexMessageSink::new(write_socket, max_frame_size);
     let closed = Closer::new();
-    handle.spawn(open_outbound_rpc.clone().cleanup(Duration::from_millis(100), closed.clone()));
-    handle.spawn(writer_task(remote_peer_network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type, closed.clone()));
-    handle.spawn(reader_task(reader, apps, remote_peer_network_id, open_outbound_rpc.clone(), handle.clone(), closed.clone(), role_type));
+    handle.spawn(
+        open_outbound_rpc
+            .clone()
+            .cleanup(Duration::from_millis(100), closed.clone()),
+    );
+    handle.spawn(writer_task(
+        remote_peer_network_id,
+        to_send,
+        to_send_high_prio,
+        writer,
+        max_frame_size,
+        role_type,
+        closed.clone(),
+    ));
+    handle.spawn(reader_task(
+        reader,
+        apps,
+        remote_peer_network_id,
+        open_outbound_rpc.clone(),
+        handle.clone(),
+        closed.clone(),
+        role_type,
+    ));
     let stub = PeerStub::new(sender, sender_high_prio, open_outbound_rpc, closed.clone());
-    if let Err(err) = peers_and_metadata.insert_connection_metadata(remote_peer_network_id, connection_metadata.clone()) {
-        error!("start_peer PeersAndMetadata could not insert metadata: {:?}", err);
+    if let Err(err) = peers_and_metadata
+        .insert_connection_metadata(remote_peer_network_id, connection_metadata.clone())
+    {
+        error!(
+            "start_peer PeersAndMetadata could not insert metadata: {:?}",
+            err
+        );
     }
     peer_senders.insert(remote_peer_network_id, stub);
-    handle.spawn(peer_cleanup_task(remote_peer_network_id, connection_metadata, closed, peers_and_metadata, peer_senders));
+    handle.spawn(peer_cleanup_task(
+        remote_peer_network_id,
+        connection_metadata,
+        closed,
+        peers_and_metadata,
+        peer_senders,
+    ));
 }
 
 /// state needed in writer_task()
@@ -64,7 +107,7 @@ struct WriterContext<WriteThing: AsyncWrite + Unpin + Send> {
     /// Who is on the other end of this connection
     peer_network_id: PeerNetworkId,
     /// increment for each new fragment stream
-    stream_request_id : u32,
+    stream_request_id: u32,
     /// remaining payload bytes of curretnly fragmenting large message
     large_message: Option<Vec<u8>>,
     /// index into chain of fragments
@@ -79,8 +122,8 @@ struct WriterContext<WriteThing: AsyncWrite + Unpin + Send> {
     role_type: RoleType,
 
     /// messages from apps to send to the peer
-    to_send: Receiver<(NetworkMessage,u64)>,
-    to_send_high_prio: Receiver<(NetworkMessage,u64)>,
+    to_send: Receiver<(NetworkMessage, u64)>,
+    to_send_high_prio: Receiver<(NetworkMessage, u64)>,
     /// encoder wrapper around socket write half
     writer: MultiplexMessageSink<WriteThing>,
 }
@@ -88,8 +131,8 @@ struct WriterContext<WriteThing: AsyncWrite + Unpin + Send> {
 impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
     fn new(
         peer_network_id: PeerNetworkId,
-        to_send: Receiver<(NetworkMessage,u64)>,
-        to_send_high_prio: Receiver<(NetworkMessage,u64)>,
+        to_send: Receiver<(NetworkMessage, u64)>,
+        to_send_high_prio: Receiver<(NetworkMessage, u64)>,
         writer: MultiplexMessageSink<WriteThing>,
         max_frame_size: usize,
         role_type: RoleType,
@@ -127,11 +170,16 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
     }
 
     fn start_large(&mut self, msg: NetworkMessage) -> MultiplexMessage {
-        peer_message_large_msg_fragmented(&self.peer_network_id.network_id(), msg.protocol_id_as_str()).inc();
+        peer_message_large_msg_fragmented(
+            &self.peer_network_id.network_id(),
+            msg.protocol_id_as_str(),
+        )
+        .inc();
         self.stream_request_id += 1;
         self.send_large = false;
         self.large_fragment_id = 0;
-        let header_payload_size = self.max_frame_size - STREAM_HEADER_OVERHEAD_BYTES - msg.header_len();
+        let header_payload_size =
+            self.max_frame_size - STREAM_HEADER_OVERHEAD_BYTES - msg.header_len();
         let fragment_payload_size = self.max_frame_size - STREAM_FRAGMENT_OVERHEAD_BYTES;
         let payload_len = msg.data_len();
         let fragments_len = payload_len - header_payload_size;
@@ -140,10 +188,17 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
         while (num_fragments - 1) * fragment_payload_size < fragments_len {
             num_fragments += 1;
         }
-        if num_fragments > 0x0ff {
-            panic!("huge message cannot be fragmented {:?} > 255 * {:?}", msg.data_len(), self.max_frame_size);
+        if num_fragments > 0x0FF {
+            panic!(
+                "huge message cannot be fragmented {:?} > 255 * {:?}",
+                msg.data_len(),
+                self.max_frame_size
+            );
         }
-        info!("start large: payload len {:?}, num_frag {:?}", payload_len, num_fragments);
+        info!(
+            "start large: payload len {:?}, num_frag {:?}",
+            payload_len, num_fragments
+        );
         let num_fragments = num_fragments as u8;
         let rest = match &mut msg {
             NetworkMessage::Error(_) => {
@@ -171,9 +226,23 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
         match self.to_send_high_prio.try_recv() {
             Ok((msg, enqueue_micros)) => {
                 // info!("writer_thread to_send_high_prio {} bytes prot={}", msg.data_len(), msg.protocol_id_as_str());
-                counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
-                let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
-                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
+                counters::network_application_outbound_traffic(
+                    self.role_type.as_str(),
+                    self.peer_network_id.network_id().as_str(),
+                    msg.protocol_id_as_str(),
+                    msg.data_len() as u64,
+                );
+                let queue_micros = (std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_micros() as u64)
+                    - enqueue_micros;
+                counters::network_peer_outbound_queue_time(
+                    self.role_type.as_str(),
+                    self.peer_network_id.network_id().as_str(),
+                    msg.protocol_id_as_str(),
+                    queue_micros,
+                );
                 if estimate_serialized_length(&msg) > self.max_frame_size {
                     // finish prior large message before starting a new large message
                     if self.large_message.is_some() {
@@ -187,10 +256,8 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                     self.send_large = true;
                     Some(MultiplexMessage::Message(msg))
                 }
-            }
-            Err(_) => {
-                None
-            }
+            },
+            Err(_) => None,
         }
     }
 
@@ -199,11 +266,26 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
             return Some(mm);
         }
         match self.to_send.try_recv() {
-            Ok((msg,enqueue_micros)) => {
-                counters::network_application_outbound_traffic(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), msg.data_len() as u64);
-                let queue_micros = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64) - enqueue_micros;
-                counters::network_peer_outbound_queue_time(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), msg.protocol_id_as_str(), queue_micros);
-                if estimate_serialized_length(&msg) > self.max_frame_size { // TODO: FIXME, serialize msg to find out if it is bigger than max_frame_size?
+            Ok((msg, enqueue_micros)) => {
+                counters::network_application_outbound_traffic(
+                    self.role_type.as_str(),
+                    self.peer_network_id.network_id().as_str(),
+                    msg.protocol_id_as_str(),
+                    msg.data_len() as u64,
+                );
+                let queue_micros = (std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_micros() as u64)
+                    - enqueue_micros;
+                counters::network_peer_outbound_queue_time(
+                    self.role_type.as_str(),
+                    self.peer_network_id.network_id().as_str(),
+                    msg.protocol_id_as_str(),
+                    queue_micros,
+                );
+                if estimate_serialized_length(&msg) > self.max_frame_size {
+                    // TODO: FIXME, serialize msg to find out if it is bigger than max_frame_size?
                     // finish prior large message before starting a new large message
                     if self.large_message.is_some() {
                         self.next_large_msg = Some(msg);
@@ -216,7 +298,7 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                     self.send_large = true;
                     Some(MultiplexMessage::Message(msg))
                 }
-            }
+            },
             Err(err) => match err {
                 TryRecvError::Empty => {
                     // ok, no next small msg, continue with chunks of large message
@@ -225,12 +307,12 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                     } else {
                         None
                     }
-                }
+                },
                 TryRecvError::Disconnected => {
                     info!("writer_thread source closed");
                     None
-                }
-            }
+                },
+            },
         }
     }
 
@@ -245,8 +327,8 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                         None => {
                             close_reason = "try_next_msg None";
                             break;
-                        }
-                        Some(mm) => {mm}
+                        },
+                        Some(mm) => mm,
                     }
                 }
             } else if self.next_large_msg.is_some() {
@@ -300,10 +382,16 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                     }
                 }
             };
-            if let MultiplexMessage::Message(NetworkMessage::Error(ErrorCode::DisconnectCommand)) = &mm {
+            if let MultiplexMessage::Message(NetworkMessage::Error(ErrorCode::DisconnectCommand)) =
+                &mm
+            {
                 // some app code decided we should disconnect from this peer
                 close_reason = "got DisconnectCommand";
-                counters::connection_closed(self.role_type.as_str(), self.peer_network_id.network_id().as_str(), "dc");
+                counters::connection_closed(
+                    self.role_type.as_str(),
+                    self.peer_network_id.network_id().as_str(),
+                    "dc",
+                );
                 break;
             }
             let data_len = mm.data_len();
@@ -337,49 +425,62 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
     }
 }
 
-pub static NETWORK_PEER_MESSAGE_FRAMES_WRITTEN: Lazy<IntCounterVec> = Lazy::new(||
+pub static NETWORK_PEER_MESSAGE_FRAMES_WRITTEN: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-    "aptos_network_frames_written",
-    "Number of messages written to MultiplexMessageSink",
-    &["network_id"]
-).unwrap()
-);
+        "aptos_network_frames_written",
+        "Number of messages written to MultiplexMessageSink",
+        &["network_id"]
+    )
+    .unwrap()
+});
 pub fn peer_message_frames_written(network_id: &NetworkId) -> IntCounter {
     NETWORK_PEER_MESSAGE_FRAMES_WRITTEN.with_label_values(&[network_id.as_str()])
 }
 
-pub static NETWORK_PEER_MESSAGE_BYTES_WRITTEN: Lazy<IntCounterVec> = Lazy::new(||
+pub static NETWORK_PEER_MESSAGE_BYTES_WRITTEN: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-    "aptos_network_bytes_written",
-    "Number of bytes written to MultiplexMessageSink",
-    &["network_id"]
-).unwrap()
-);
+        "aptos_network_bytes_written",
+        "Number of bytes written to MultiplexMessageSink",
+        &["network_id"]
+    )
+    .unwrap()
+});
 pub fn peer_message_bytes_written(network_id: &NetworkId) -> IntCounter {
     NETWORK_PEER_MESSAGE_BYTES_WRITTEN.with_label_values(&[network_id.as_str()])
 }
 
-pub static NETWORK_PEER_MESSAGES_FRAGMENTED: Lazy<IntCounterVec> = Lazy::new(||
+pub static NETWORK_PEER_MESSAGES_FRAGMENTED: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-    "aptos_network_messages_fragmented",
-    "Number of large messages broken up into segments",
-    &["network_id","protocol_id"]
-).unwrap()
-);
-pub fn peer_message_large_msg_fragmented(network_id: &NetworkId, protocol_id: &'static str) -> IntCounter {
+        "aptos_network_messages_fragmented",
+        "Number of large messages broken up into segments",
+        &["network_id", "protocol_id"]
+    )
+    .unwrap()
+});
+pub fn peer_message_large_msg_fragmented(
+    network_id: &NetworkId,
+    protocol_id: &'static str,
+) -> IntCounter {
     NETWORK_PEER_MESSAGES_FRAGMENTED.with_label_values(&[network_id.as_str(), protocol_id])
 }
 
 async fn writer_task(
     peer_network_id: PeerNetworkId,
-    to_send: Receiver<(NetworkMessage,u64)>,
-    to_send_high_prio: Receiver<(NetworkMessage,u64)>,
+    to_send: Receiver<(NetworkMessage, u64)>,
+    to_send_high_prio: Receiver<(NetworkMessage, u64)>,
     writer: MultiplexMessageSink<impl AsyncWrite + Unpin + Send + 'static>,
     max_frame_size: usize,
     role_type: RoleType,
     closed: Closer,
 ) {
-    let wt = WriterContext::new(peer_network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type);
+    let wt = WriterContext::new(
+        peer_network_id,
+        to_send,
+        to_send_high_prio,
+        writer,
+        max_frame_size,
+        role_type,
+    );
     wt.run(closed).await;
     info!("peer writer exited")
 }
@@ -392,12 +493,33 @@ async fn complete_rpc(rpc_state: OpenRpcRequestState, nmsg: NetworkMessage, rx_t
         let data_len = blob.len() as u64;
         match rpc_state.sender.send(Ok((blob.into(), rx_time))) {
             Ok(_) => {
-                counters::rpc_message_bytes(rpc_state.network_id, rpc_state.protocol_id.as_str(), rpc_state.role_type.as_str(), counters::RESPONSE_LABEL, counters::INBOUND_LABEL, counters::RECEIVED_LABEL, data_len);
-                counters::outbound_rpc_request_latency(rpc_state.role_type, rpc_state.network_id, rpc_state.protocol_id).observe(dt.as_secs_f64());
-            }
+                counters::rpc_message_bytes(
+                    rpc_state.network_id,
+                    rpc_state.protocol_id.as_str(),
+                    rpc_state.role_type.as_str(),
+                    counters::RESPONSE_LABEL,
+                    counters::INBOUND_LABEL,
+                    counters::RECEIVED_LABEL,
+                    data_len,
+                );
+                counters::outbound_rpc_request_latency(
+                    rpc_state.role_type,
+                    rpc_state.network_id,
+                    rpc_state.protocol_id,
+                )
+                .observe(dt.as_secs_f64());
+            },
             Err(_) => {
-                counters::rpc_message_bytes(rpc_state.network_id, rpc_state.protocol_id.as_str(), rpc_state.role_type.as_str(), counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "declined", data_len);
-            }
+                counters::rpc_message_bytes(
+                    rpc_state.network_id,
+                    rpc_state.protocol_id.as_str(),
+                    rpc_state.role_type.as_str(),
+                    counters::RESPONSE_LABEL,
+                    counters::INBOUND_LABEL,
+                    "declined",
+                    data_len,
+                );
+            },
         }
     } else {
         unreachable!("read_thread complete_rpc called on other than NetworkMessage::RpcResponse")
@@ -413,10 +535,10 @@ struct ReaderContext<ReadThing: AsyncRead + Unpin + Send> {
     role_type: RoleType, // for metrics
 
     // defragment context
-    current_stream_id : u32,
-    large_message : Option<NetworkMessage>,
-    fragment_index : u8,
-    num_fragments : u8,
+    current_stream_id: u32,
+    large_message: Option<NetworkMessage>,
+    fragment_index: u8,
+    num_fragments: u8,
 }
 
 impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
@@ -447,60 +569,113 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
         match self.apps.get(&protocol_id) {
             None => {
                 // TODO: counter
-                error!("read_thread got rpc req for protocol {:?} we don't handle", protocol_id);
+                error!(
+                    "read_thread got rpc req for protocol {:?} we don't handle",
+                    protocol_id
+                );
                 // TODO: drop connection
-            }
+            },
             Some(app) => {
                 if app.protocol_id != protocol_id {
                     for (xpi, ac) in self.apps.iter() {
-                        error!("read_thread app err {} -> {} {} {:?}", xpi.as_str(), ac.protocol_id, ac.label, &ac.sender);
+                        error!(
+                            "read_thread app err {} -> {} {} {:?}",
+                            xpi.as_str(),
+                            ac.protocol_id,
+                            ac.label,
+                            &ac.sender
+                        );
                     }
-                    unreachable!("read_thread apps[{}] => {} {:?}", protocol_id, app.protocol_id, &app.sender);
+                    unreachable!(
+                        "read_thread apps[{}] => {} {:?}",
+                        protocol_id, app.protocol_id, &app.sender
+                    );
                 }
                 let data_len = nmsg.data_len() as u64;
-                match app.sender.try_send(ReceivedMessage::new(nmsg, self.remote_peer_network_id)) {
+                match app
+                    .sender
+                    .try_send(ReceivedMessage::new(nmsg, self.remote_peer_network_id))
+                {
                     Ok(_) => {
-                        counters::peer_read_message_bytes(&self.remote_peer_network_id.network_id(), &protocol_id, data_len);
-                    }
+                        counters::peer_read_message_bytes(
+                            &self.remote_peer_network_id.network_id(),
+                            &protocol_id,
+                            data_len,
+                        );
+                    },
                     Err(_) => {
-                        counters::app_inbound_drop(&self.remote_peer_network_id.network_id(), &protocol_id, data_len);
-                    }
+                        counters::app_inbound_drop(
+                            &self.remote_peer_network_id.network_id(),
+                            &protocol_id,
+                            data_len,
+                        );
+                    },
                 }
-            }
+            },
         }
     }
 
     async fn handle_message(&self, nmsg: NetworkMessage) {
-        counters::network_application_inbound_traffic(self.role_type.as_str(), self.remote_peer_network_id.network_id().as_str(), nmsg.protocol_id_as_str(), nmsg.data_len() as u64);
+        counters::network_application_inbound_traffic(
+            self.role_type.as_str(),
+            self.remote_peer_network_id.network_id().as_str(),
+            nmsg.protocol_id_as_str(),
+            nmsg.data_len() as u64,
+        );
         match &nmsg {
             NetworkMessage::Error(errm) => {
                 // TODO: counter
                 warn!("read_thread got error message: {:?}", errm)
-            }
+            },
             NetworkMessage::RpcRequest(request) => {
                 let protocol_id = request.protocol_id;
                 let data_len = request.raw_request.len() as u64;
-                counters::rpc_message_bytes(self.remote_peer_network_id.network_id(), protocol_id.as_str(), self.role_type.as_str(), counters::REQUEST_LABEL, counters::INBOUND_LABEL, counters::RECEIVED_LABEL, data_len);
+                counters::rpc_message_bytes(
+                    self.remote_peer_network_id.network_id(),
+                    protocol_id.as_str(),
+                    self.role_type.as_str(),
+                    counters::REQUEST_LABEL,
+                    counters::INBOUND_LABEL,
+                    counters::RECEIVED_LABEL,
+                    data_len,
+                );
                 self.forward(protocol_id, nmsg).await;
-            }
+            },
             NetworkMessage::RpcResponse(response) => {
                 match self.open_outbound_rpc.remove(&response.request_id) {
                     None => {
                         let data_len = response.raw_response.len() as u64;
-                        counters::rpc_message_bytes(self.remote_peer_network_id.network_id(), "unk", self.role_type.as_str(), counters::RESPONSE_LABEL, counters::INBOUND_LABEL, "miss", data_len);
-                    }
+                        counters::rpc_message_bytes(
+                            self.remote_peer_network_id.network_id(),
+                            "unk",
+                            self.role_type.as_str(),
+                            counters::RESPONSE_LABEL,
+                            counters::INBOUND_LABEL,
+                            "miss",
+                            data_len,
+                        );
+                    },
                     Some(rpc_state) => {
-                        let rx_time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_micros() as u64;
+                        let rx_time = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_micros() as u64;
                         self.handle.spawn(complete_rpc(rpc_state, nmsg, rx_time));
-                    }
+                    },
                 }
-            }
+            },
             NetworkMessage::DirectSendMsg(message) => {
                 let protocol_id = message.protocol_id;
                 let data_len = message.raw_msg.len() as u64;
-                counters::direct_send_message_bytes(self.remote_peer_network_id.network_id(), protocol_id.as_str(), self.role_type, counters::RECEIVED_LABEL, data_len);
+                counters::direct_send_message_bytes(
+                    self.remote_peer_network_id.network_id(),
+                    protocol_id.as_str(),
+                    self.role_type,
+                    counters::RECEIVED_LABEL,
+                    data_len,
+                );
                 self.forward(protocol_id, nmsg).await;
-            }
+            },
         }
     }
 
@@ -508,24 +683,38 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
         match fragment {
             StreamMessage::Header(head) => {
                 if self.num_fragments != self.fragment_index {
-                    warn!("fragment index = {:?} of {:?} total fragments with new stream header", self.fragment_index, self.num_fragments);
+                    warn!(
+                        "fragment index = {:?} of {:?} total fragments with new stream header",
+                        self.fragment_index, self.num_fragments
+                    );
                 }
-                info!("read_thread shed id={}, {}b {}", head.request_id, head.message.data_len(), head.message.protocol_id_as_str());
+                info!(
+                    "read_thread shed id={}, {}b {}",
+                    head.request_id,
+                    head.message.data_len(),
+                    head.message.protocol_id_as_str()
+                );
                 self.current_stream_id = head.request_id;
                 self.num_fragments = head.num_fragments;
                 self.large_message = Some(head.message);
                 self.fragment_index = 1;
-            }
+            },
             StreamMessage::Fragment(more) => {
                 if more.request_id != self.current_stream_id {
-                    warn!("got stream request_id={:?} while {:?} was in progress", more.request_id, self.current_stream_id);
+                    warn!(
+                        "got stream request_id={:?} while {:?} was in progress",
+                        more.request_id, self.current_stream_id
+                    );
                     // TODO: counter? disconnect from peer?
                     self.num_fragments = 0;
                     self.fragment_index = 0;
                     return;
                 }
                 if more.fragment_id != self.fragment_index {
-                    warn!("got fragment_id {:?}, expected {:?}", more.fragment_id, self.fragment_index);
+                    warn!(
+                        "got fragment_id {:?}, expected {:?}",
+                        more.fragment_id, self.fragment_index
+                    );
                     // TODO: counter? disconnect from peer?
                     self.num_fragments = 0;
                     self.fragment_index = 0;
@@ -536,31 +725,43 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                     None => {
                         warn!("got fragment without header");
                         return;
-                    }
+                    },
                     Some(lm) => match lm {
                         NetworkMessage::Error(_) => {
                             unreachable!("stream fragment should never be NetworkMessage::Error")
-                        }
+                        },
                         NetworkMessage::RpcRequest(request) => {
-                            request.raw_request.extend_from_slice(more.raw_data.as_slice());
-                        }
+                            request
+                                .raw_request
+                                .extend_from_slice(more.raw_data.as_slice());
+                        },
                         NetworkMessage::RpcResponse(response) => {
-                            response.raw_response.extend_from_slice(more.raw_data.as_slice());
-                        }
+                            response
+                                .raw_response
+                                .extend_from_slice(more.raw_data.as_slice());
+                        },
                         NetworkMessage::DirectSendMsg(message) => {
                             message.raw_msg.extend_from_slice(more.raw_data.as_slice());
-                        }
-                    }
+                        },
+                    },
                 }
                 self.fragment_index += 1;
                 if self.fragment_index == self.num_fragments {
-                    info!("read_thread more id={}, {}b done", more.request_id, more.raw_data.len());
+                    info!(
+                        "read_thread more id={}, {}b done",
+                        more.request_id,
+                        more.raw_data.len()
+                    );
                     let large_message = self.large_message.take().unwrap();
                     self.handle_message(large_message).await;
                 } else {
-                    info!("read_thread more id={}, {}b", more.request_id, more.raw_data.len());
+                    info!(
+                        "read_thread more id={}, {}b",
+                        more.request_id,
+                        more.raw_data.len()
+                    );
                 }
-            }
+            },
         }
     }
 
@@ -586,23 +787,27 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                     Ok(msg) => match msg {
                         MultiplexMessage::Message(nmsg) => {
                             self.handle_message(nmsg).await;
-                        }
+                        },
                         MultiplexMessage::Stream(fragment) => {
                             self.handle_stream(fragment).await;
-                        }
-                    }
+                        },
+                    },
                     Err(err) => {
                         info!("read_thread {} err {}", self.remote_peer_network_id, err);
                         // Error, but not a close-worthy error?
-                    }
-                }
+                    },
+                },
                 None => {
                     // the other peer closed connection and there was nothing left to read
                     info!("read_thread {} None", self.remote_peer_network_id);
                     close_reason = "reader next none";
-                    counters::connection_closed(self.role_type.as_str(), self.remote_peer_network_id.network_id().as_str(), "hup");
+                    counters::connection_closed(
+                        self.role_type.as_str(),
+                        self.remote_peer_network_id.network_id().as_str(),
+                        "hup",
+                    );
                     break;
-                }
+                },
             };
         }
 
@@ -625,7 +830,14 @@ async fn reader_task(
     closed: Closer,
     role_type: RoleType,
 ) {
-    let rc = ReaderContext::new(reader, apps, remote_peer_network_id, open_outbound_rpc, handle, role_type);
+    let rc = ReaderContext::new(
+        reader,
+        apps,
+        remote_peer_network_id,
+        open_outbound_rpc,
+        handle,
+        role_type,
+    );
     rc.run(closed).await;
     info!("peer {} reader finished", remote_peer_network_id);
 }
@@ -645,7 +857,8 @@ async fn peer_cleanup_task(
         "peerclose"
     );
     peer_senders.remove(&remote_peer_network_id);
-    _ = peers_and_metadata.remove_peer_metadata(remote_peer_network_id, connection_metadata.connection_id);
+    _ = peers_and_metadata
+        .remove_peer_metadata(remote_peer_network_id, connection_metadata.connection_id);
 }
 
 /// Estimate size of NetworkMessage as wrapped in MultiplexMessage and BCS serialized
@@ -656,12 +869,13 @@ fn estimate_serialized_length(msg: &NetworkMessage) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        application::ApplicationConnections, protocols::wire::messaging::v1::DirectSendMsg,
+    };
     use aptos_memsocket::MemorySocket;
-    use rand::{rngs::OsRng, Rng};
-    use crate::protocols::wire::messaging::v1::DirectSendMsg;
     use aptos_types::account_address::AccountAddress;
-    use crate::application::ApplicationConnections;
     use hex::ToHex;
+    use rand::{rngs::OsRng, Rng};
     use std::cmp::min;
 
     #[tokio::test]
@@ -670,28 +884,50 @@ mod tests {
         // much borrowed from start_peer()
         let config = NetworkConfig::default();
         let max_frame_size = 128; // smaller than real to force fragmentation of many messages to test fragmentation
-        // let (async_write, async_read) = async_pipe::pipe();
+                                  // let (async_write, async_read) = async_pipe::pipe();
         let (outbound, inbound) = MemorySocket::new_pair();
         let reader = MultiplexMessageStream::new(inbound, max_frame_size).fuse();
         let writer = MultiplexMessageSink::new(outbound, max_frame_size);
         let role_type = RoleType::Validator;
         let closed = Closer::new();
         let network_id = NetworkId::Validator;
-        let (sender, to_send) = tokio::sync::mpsc::channel::<(NetworkMessage, u64)>(config.network_channel_size);
-        let (_sender_high_prio, to_send_high_prio) = tokio::sync::mpsc::channel::<(NetworkMessage, u64)>(config.network_channel_size);
+        let (sender, to_send) =
+            tokio::sync::mpsc::channel::<(NetworkMessage, u64)>(config.network_channel_size);
+        let (_sender_high_prio, to_send_high_prio) =
+            tokio::sync::mpsc::channel::<(NetworkMessage, u64)>(config.network_channel_size);
 
         let queue_size = 101;
         let counter_label = "test";
         let mut apps = ApplicationCollector::new();
-        let (app_con, mut receiver) = ApplicationConnections::build(ProtocolId::NetbenchDirectSend, queue_size, counter_label);
+        let (app_con, mut receiver) = ApplicationConnections::build(
+            ProtocolId::NetbenchDirectSend,
+            queue_size,
+            counter_label,
+        );
         apps.add(app_con);
         let apps = Arc::new(apps);
         let remote_peer_network_id = PeerNetworkId::new(network_id, AccountAddress::random());
         let open_outbound_rpc = OutboundRpcMatcher::new();
 
         let handle = Handle::current();
-        handle.spawn(writer_task(remote_peer_network_id, to_send, to_send_high_prio, writer, max_frame_size, role_type, closed.clone()));
-        handle.spawn(reader_task(reader, apps, remote_peer_network_id, open_outbound_rpc.clone(), handle.clone(), closed.clone(), role_type));
+        handle.spawn(writer_task(
+            remote_peer_network_id,
+            to_send,
+            to_send_high_prio,
+            writer,
+            max_frame_size,
+            role_type,
+            closed.clone(),
+        ));
+        handle.spawn(reader_task(
+            reader,
+            apps,
+            remote_peer_network_id,
+            open_outbound_rpc.clone(),
+            handle.clone(),
+            closed.clone(),
+            role_type,
+        ));
 
         let max_data_len = max_frame_size * 13;
         let mut blob = Vec::<u8>::with_capacity(max_data_len);
@@ -701,9 +937,7 @@ mod tests {
         }
 
         let num_test_messages = 300; // this should be about 2.5x max_frame_size so we cover the unsplit case up to about 3 fragments.
-        let test_len = move |i| {
-            i + max_frame_size - 50
-        };
+        let test_len = move |i| i + max_frame_size - 50;
 
         // limit the number of sends in flight, test needs to cheat and have this rate limiting between source and sink otherwise messages will get dropped and this tests wants to see perfect message sequence. Normal operation drops messages when the application can't read them as fast as they're coming in, but in test mode we can easily get to where tokio doesn't let the consumer threads run and they drop messages even though they are runnable.
         let send_sem = Arc::new(tokio::sync::Semaphore::new(50));
@@ -746,25 +980,23 @@ mod tests {
             match receiver.recv().await {
                 None => {
                     panic!("recv end early at i={:?}", i)
-                }
-                Some(rmsg) => {
-                    match rmsg.message {
-                        NetworkMessage::DirectSendMsg(msg) => {
-                            if raw_msg == msg.raw_msg {
-                                info!("got {:?} ok [{:?}] bytes", i, msg.raw_msg.len());
-                            } else {
-                                info!("msg {:?} not equal [{:?}] bytes", i, msg.raw_msg.len());
-                                errcount += 1;
-                                if errcount >= 10 {
-                                    panic!("too many errors");
-                                }
+                },
+                Some(rmsg) => match rmsg.message {
+                    NetworkMessage::DirectSendMsg(msg) => {
+                        if raw_msg == msg.raw_msg {
+                            info!("got {:?} ok [{:?}] bytes", i, msg.raw_msg.len());
+                        } else {
+                            info!("msg {:?} not equal [{:?}] bytes", i, msg.raw_msg.len());
+                            errcount += 1;
+                            if errcount >= 10 {
+                                panic!("too many errors");
                             }
                         }
-                        _ => {
-                            panic!("bad message")
-                        }
-                    }
-                }
+                    },
+                    _ => {
+                        panic!("bad message")
+                    },
+                },
             }
             send_sem_readside.add_permits(1);
         }

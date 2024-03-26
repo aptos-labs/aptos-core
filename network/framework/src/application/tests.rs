@@ -2,17 +2,19 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+//use tokio::sync::mpsc::error::TryRecvError;
+//use tokio::time::timeout;
+use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 use crate::{
     application::{
-        ApplicationCollector,
-        ApplicationConnections,
         error::Error,
         interface::{NetworkClient, NetworkClientInterface},
         metadata::{ConnectionState, PeerMetadata},
         storage::PeersAndMetadata,
+        ApplicationCollector, ApplicationConnections,
     },
     protocols::{
-        network::{ReceivedMessage},//Event, NetworkEvents, NetworkSender,NewNetworkEvents, NewNetworkSender,
+        network::ReceivedMessage, //Event, NetworkEvents, NetworkSender,NewNetworkEvents, NewNetworkSender,
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
     },
     transport::ConnectionMetadata,
@@ -32,9 +34,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-//use tokio::sync::mpsc::error::TryRecvError;
-//use tokio::time::timeout;
-use crate::protocols::wire::messaging::v1::{DirectSendMsg, NetworkMessage, RpcRequest};
 
 // Useful test constants for timeouts
 // const MAX_CHANNEL_TIMEOUT_SECS: u64 = 1;
@@ -65,14 +64,14 @@ impl DummyMessage {
 fn test_application_collector_simple() {
     let mut apps = ApplicationCollector::new();
     let (s1, mut r1) = tokio::sync::mpsc::channel::<ReceivedMessage>(10);
-    let ac1 = ApplicationConnections{
+    let ac1 = ApplicationConnections {
         protocol_id: ProtocolId::ConsensusRpcBcs,
         sender: s1,
         label: "consensus".to_string(),
     };
     apps.add(ac1);
     let (s2, mut r2) = tokio::sync::mpsc::channel::<ReceivedMessage>(10);
-    let ac2 = ApplicationConnections{
+    let ac2 = ApplicationConnections {
         protocol_id: ProtocolId::MempoolDirectSend,
         sender: s2,
         label: "mempool".to_string(),
@@ -81,60 +80,68 @@ fn test_application_collector_simple() {
 
     let sender = PeerNetworkId::new(NetworkId::Validator, PeerId::random());
 
-    let msg1 = ReceivedMessage{ message: NetworkMessage::RpcRequest(RpcRequest{
-        protocol_id: ProtocolId::ConsensusRpcBcs,
-        request_id: 12,
-        priority: 0,
-        raw_request: vec![],
-    }), sender, rx_at: 0 };
+    let msg1 = ReceivedMessage {
+        message: NetworkMessage::RpcRequest(RpcRequest {
+            protocol_id: ProtocolId::ConsensusRpcBcs,
+            request_id: 12,
+            priority: 0,
+            raw_request: vec![],
+        }),
+        sender,
+        rx_at: 0,
+    };
     match apps.get(&ProtocolId::ConsensusRpcBcs) {
         None => {
             panic!("missing consensus app");
-        }
+        },
         Some(app) => {
             let tse = app.sender.try_send(msg1.clone());
             assert_eq!(Ok(()), tse);
-        }
+        },
     };
     match r1.try_recv() {
         Ok(msg) => {
             assert_eq!(msg, msg1);
-        }
+        },
         Err(err) => {
             panic!("should have message: {:?}", err);
-        }
+        },
     };
 
-    let msg2 = ReceivedMessage{ message: NetworkMessage::DirectSendMsg(DirectSendMsg{
-        protocol_id: ProtocolId::MempoolDirectSend,
-        priority: 0,
-        raw_msg: vec![],
-    }), sender, rx_at: 0 };
+    let msg2 = ReceivedMessage {
+        message: NetworkMessage::DirectSendMsg(DirectSendMsg {
+            protocol_id: ProtocolId::MempoolDirectSend,
+            priority: 0,
+            raw_msg: vec![],
+        }),
+        sender,
+        rx_at: 0,
+    };
     match apps.get(&ProtocolId::MempoolDirectSend) {
         None => {
             panic!("missing mempool app");
-        }
+        },
         Some(app) => {
             let tse = app.sender.try_send(msg2.clone());
             assert_eq!(Ok(()), tse);
-        }
+        },
     };
     match r2.try_recv() {
         Ok(msg) => {
             assert_eq!(msg, msg2);
-        }
+        },
         Err(err) => {
             panic!("should have message: {:?}", err);
-        }
+        },
     };
 
     match apps.get(&ProtocolId::DiscoveryDirectSend) {
         None => {
             // correct!
-        }
+        },
         Some(app) => {
             panic!("found garbage discovery app: {:?}", app);
-        }
+        },
     };
 
     let prots: Vec<ProtocolId> = apps.iter().map(|ac| ac.1.protocol_id).collect();

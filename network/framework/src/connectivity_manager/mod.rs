@@ -28,14 +28,18 @@
 //! using a relay protocol.
 
 use crate::{
-    application::storage::PeersAndMetadata,
+    application::{
+        storage::{ConnectionNotification, PeersAndMetadata},
+        ApplicationCollector,
+    },
     counters,
     logging::NetworkSchema,
-    protocols::network::PeerStub,
+    protocols::network::{OutboundPeerConnections, PeerStub},
+    transport::AptosNetTransportActual,
 };
 use aptos_config::{
-    config::{Peer, PeerRole, PeerSet},
-    network_id::{NetworkContext,PeerNetworkId},
+    config::{NetworkConfig, Peer, PeerRole, PeerSet},
+    network_id::{NetworkContext, PeerNetworkId},
 };
 use aptos_crypto::x25519;
 use aptos_infallible::RwLock;
@@ -50,8 +54,7 @@ use futures::{
     future::{BoxFuture, FutureExt},
     stream::{FuturesUnordered, StreamExt},
 };
-use futures_util::future::join_all;
-use futures_util::stream::Fuse;
+use futures_util::{future::join_all, stream::Fuse};
 use itertools::Itertools;
 use ordered_float::OrderedFloat;
 use rand_latest::Rng;
@@ -64,15 +67,9 @@ use std::{
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
-use tokio::runtime::Handle;
-use tokio::task::JoinHandle;
+use tokio::{runtime::Handle, task::JoinHandle};
 use tokio_retry::strategy::jitter;
 use tokio_stream::wrappers::ReceiverStream;
-use aptos_config::config::NetworkConfig;
-use crate::application::ApplicationCollector;
-use crate::application::storage::ConnectionNotification;
-use crate::protocols::network::OutboundPeerConnections;
-use crate::transport::AptosNetTransportActual;
 
 mod selection;
 
@@ -110,7 +107,7 @@ pub struct ConnectivityManager<TBackoff> {
     /// All information about peers from discovery sources.
     discovered_peers: Arc<RwLock<DiscoveredPeerSet>>,
     /// Channel over which we receive requests from other actors.
-    requests_rx: Fuse<ReceiverStream<ConnectivityRequest>>,//futures::Stream<Item=ConnectivityRequest>,
+    requests_rx: Fuse<ReceiverStream<ConnectivityRequest>>, //futures::Stream<Item=ConnectivityRequest>,
     /// Peers queued to be dialed, potentially with some delay. The dial can be canceled by
     /// sending over (or dropping) the associated oneshot sender.
     dial_queue: HashMap<PeerId, oneshot::Sender<()>>,
@@ -367,7 +364,8 @@ where
         apps: Arc<ApplicationCollector>,
         peer_senders: Arc<OutboundPeerConnections>,
     ) -> Self {
-        let connectivity_check_interval = Duration::from_millis(config.connectivity_check_interval_ms);
+        let connectivity_check_interval =
+            Duration::from_millis(config.connectivity_check_interval_ms);
         let max_delay = Duration::from_millis(config.max_connection_delay_ms);
         let outbound_connection_limit = if network_context.network_id().is_validator_network() {
             None
@@ -529,7 +527,9 @@ where
                     }
                     if !self.config.mutual_authentication
                         && metadata.connection_metadata.origin == ConnectionOrigin::Inbound
-                        && (metadata.connection_metadata.role == PeerRole::ValidatorFullNode || metadata.connection_metadata.role == PeerRole::Unknown) {
+                        && (metadata.connection_metadata.role == PeerRole::ValidatorFullNode
+                            || metadata.connection_metadata.role == PeerRole::Unknown)
+                    {
                         // aka
                         // IF (not in trusted set) AND ((mutual auth on) OR (outbound connection) OR (role is other than {VFN, Unknown})) THEN STALE
                         continue; // not stale
@@ -537,30 +537,34 @@ where
 
                     // is stale! Close...
 
-                    match self.peer_senders.get_generational(self.peer_senders_generation) {
-                        None => {}
+                    match self
+                        .peer_senders
+                        .get_generational(self.peer_senders_generation)
+                    {
+                        None => {},
                         Some((new_peer_senders, new_generation)) => {
                             self.peer_senders_cache = new_peer_senders;
                             self.peer_senders_generation = new_generation;
-                        }
+                        },
                     }
                     #[cfg(disabled)] // TODO: actually closing 'stale' is disabled until fixed
                     match self.peer_senders_cache.get(peer_network_id) {
                         None => {
                             // already gone, nothing to do
-                        }
+                        },
                         Some(stub) => {
                             info!(
-                            NetworkSchema::new(&self.network_context).remote_peer(&peer_network_id.peer_id()),
-                            net = self.network_context,
-                            peer = peer_network_id,
-                            op = "stale",
-                            trusted = trusted_peers,
-                            metadata = metadata,
-                            "peerclose"
-                        );
+                                NetworkSchema::new(&self.network_context)
+                                    .remote_peer(&peer_network_id.peer_id()),
+                                net = self.network_context,
+                                peer = peer_network_id,
+                                op = "stale",
+                                trusted = trusted_peers,
+                                metadata = metadata,
+                                "peerclose"
+                            );
                             stub.close.close().await;
-                        }
+                        },
                     }
                 }
             }
@@ -606,7 +610,8 @@ where
         let to_connect = self.choose_peers_to_dial().await;
         info!(
             NetworkSchema::new(&self.network_context),
-            "dial_eligible_peers found {:?} to connect to", to_connect.len(),
+            "dial_eligible_peers found {:?} to connect to",
+            to_connect.len(),
         );
         for (peer_id, peer) in to_connect {
             self.queue_dial_peer(peer_id, peer, pending_dials, handle);
@@ -614,7 +619,10 @@ where
     }
 
     fn has_connected_peer(&self, peer_network_id: &PeerNetworkId) -> bool {
-        if let Ok(metadata) = self.peers_and_metadata.get_metadata_for_peer(*peer_network_id) {
+        if let Ok(metadata) = self
+            .peers_and_metadata
+            .get_metadata_for_peer(*peer_network_id)
+        {
             metadata.is_connected()
         } else {
             false
@@ -656,7 +664,7 @@ where
         }
         // aptos_logger::sample!(
         //     aptos_logger::sample::SampleRate::Frequency(10),
-            info!(
+        info!(
             NetworkSchema::new(&self.network_context),
             "peers: {} discovered, {} eligible, {} ineligible, {} already connected, {} already in dial queue, {} wrong role", num_discovered, eligible_peers.len(), ineligible, already_connected, already_in_dial_queue, wrong_role,
         );
@@ -676,7 +684,9 @@ where
         let num_peers_to_dial =
             if let Some(outbound_connection_limit) = self.outbound_connection_limit {
                 // Get the number of outbound connections
-                let num_outbound_connections = self.peers_and_metadata.count_connected_peers(Some(ConnectionOrigin::Outbound));
+                let num_outbound_connections = self
+                    .peers_and_metadata
+                    .count_connected_peers(Some(ConnectionOrigin::Outbound));
 
                 // Add any pending dials to the count
                 let total_outbound_connections =
@@ -836,7 +846,10 @@ where
         let f_delay = self.time_service.sleep(dial_delay);
         info!(
             NetworkSchema::new(&self.network_context),
-            "queue_dial_peer going to dial {} @ {} after delay {:?}", peer_id.short_str_lossless(), addr, dial_delay,
+            "queue_dial_peer going to dial {} @ {} after delay {:?}",
+            peer_id.short_str_lossless(),
+            addr,
+            dial_delay,
         );
 
         let (cancel_tx, cancel_rx) = oneshot::channel();
@@ -947,11 +960,11 @@ where
 
         // Log the eligible peers with addresses from discovery
         // sample!(SampleRate::Duration(Duration::from_secs(60)), {
-            info!(
-                NetworkSchema::new(&self.network_context),
-                discovered_peers = ?self.discovered_peers,
-                "Active discovered peers"
-            );
+        info!(
+            NetworkSchema::new(&self.network_context),
+            discovered_peers = ?self.discovered_peers,
+            "Active discovered peers"
+        );
         // });
 
         // Cancel dials to peers that are no longer eligible.
@@ -1159,14 +1172,14 @@ where
                 counters::peer_connected(&self.network_context, &peer_id, 0);
 
                 info!(
-                        NetworkSchema::new(&self.network_context)
-                            .remote_peer(&peer_id)
-                            .connection_metadata(&metadata),
-                        "{} Removing peer '{}' event metadata: {}",
-                        self.network_context,
-                        peer_id.short_str(),
-                        metadata
-                    );
+                    NetworkSchema::new(&self.network_context)
+                        .remote_peer(&peer_id)
+                        .connection_metadata(&metadata),
+                    "{} Removing peer '{}' event metadata: {}",
+                    self.network_context,
+                    peer_id.short_str(),
+                    metadata
+                );
                 // Cancel possible queued dial to this peer.
                 self.dial_states.remove(&peer_id);
                 self.dial_queue.remove(&peer_id).map(|x| x.send(()));
@@ -1215,16 +1228,16 @@ fn log_dial_result(
         },
         DialResult::Failed => {
             info!(
-                    NetworkSchema::new(&network_context)
-                        .remote_peer(&peer_id)
-                        .network_address(&addr),
-                    // error = %e,
-                    "{} Failed to connect to peer: {} at address: {}",
-                    network_context,
-                    peer_id.short_str(),
-                    addr,
-                    //e
-                );
+                NetworkSchema::new(&network_context)
+                    .remote_peer(&peer_id)
+                    .network_address(&addr),
+                // error = %e,
+                "{} Failed to connect to peer: {} at address: {}",
+                network_context,
+                peer_id.short_str(),
+                addr,
+                //e
+            );
         },
     }
 }

@@ -18,7 +18,7 @@
 //! - Make the policy for interpreting ping failures pluggable
 //! - Use successful inbound pings as a sign of remote note being healthy
 //! - Ping a peer only in periods of no application-level communication with the peer
-use std::collections::BTreeMap;
+pub use crate::protocols::health_checker::interface::HealthCheckNetworkInterface;
 use crate::{
     application::interface::{NetworkClient, NetworkClientInterface},
     // constants::NETWORK_CHANNEL_SIZE,
@@ -36,7 +36,10 @@ use crate::{
     },
     ProtocolId,
 };
-use aptos_config::network_id::{NetworkContext, NetworkId, PeerNetworkId};
+use aptos_config::{
+    config::{NetworkConfig, NodeConfig},
+    network_id::{NetworkContext, NetworkId, PeerNetworkId},
+};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_time_service::{TimeService, TimeServiceTrait};
@@ -48,11 +51,9 @@ use futures::{
 };
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 use tokio::runtime::Handle;
 use tokio_stream::wrappers::ReceiverStream;
-use aptos_config::config::{NetworkConfig, NodeConfig};
-pub use crate::protocols::health_checker::interface::HealthCheckNetworkInterface;
 
 // pub mod builder;
 mod interface;
@@ -103,7 +104,6 @@ pub fn start(
     _network_events: NetworkEvents<HealthCheckerMsg>,
     _time_service: TimeService,
 ) {
-
 }
 
 /// The part that is per Validator/Vfn/Public/etc network
@@ -120,16 +120,14 @@ pub struct HealthCheckerNetwork {
 }
 
 impl HealthCheckerNetwork {
-    pub fn new(
-        node_config: &NodeConfig,
-        network_config: &NetworkConfig,
-    ) -> Self {
+    pub fn new(node_config: &NodeConfig, network_config: &NetworkConfig) -> Self {
         let ping_interval = Duration::from_millis(network_config.ping_interval_ms);
         let ping_timeout = Duration::from_millis(network_config.ping_timeout_ms);
         let ping_failures_tolerated = network_config.ping_failures_tolerated;
         let role = node_config.base.role;
-        let network_context = NetworkContext::new(role, network_config.network_id, network_config.peer_id());
-        HealthCheckerNetwork{
+        let network_context =
+            NetworkContext::new(role, network_config.network_id, network_config.peer_id());
+        HealthCheckerNetwork {
             network_context,
             ping_interval,
             ping_timeout,
@@ -140,7 +138,7 @@ impl HealthCheckerNetwork {
 
 /// The actor performing health checks by running the Ping protocol
 pub struct HealthChecker<NetworkClient> {
-    networks: BTreeMap<NetworkId,HealthCheckerNetwork>,
+    networks: BTreeMap<NetworkId, HealthCheckerNetwork>,
     /// A handle to a time service for easily mocking time-related operations.
     time_service: TimeService,
     /// Network interface to send requests to the Network Layer
@@ -152,7 +150,12 @@ pub struct HealthChecker<NetworkClient> {
     // tick_handlers: FuturesUnordered<(PeerId, u64, u32, Result<Pong, RpcError>)>,
 }
 
-async fn network_id_ticker(time_service: TimeService, network_id: NetworkId, ping_interval: Duration, sender: tokio::sync::mpsc::Sender<NetworkId>) {
+async fn network_id_ticker(
+    time_service: TimeService,
+    network_id: NetworkId,
+    ping_interval: Duration,
+    sender: tokio::sync::mpsc::Sender<NetworkId>,
+) {
     let ticker = time_service.interval(ping_interval);
     tokio::pin!(ticker);
     let mut sequential_errors = 0;
@@ -207,7 +210,12 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         // tokio::pin!(ticker);
         let (net_ticks_sender, net_ticks) = tokio::sync::mpsc::channel(10);
         for (network_id, net) in self.networks.iter() {
-            handle.spawn(network_id_ticker(self.time_service.clone(), *network_id, net.ping_interval, net_ticks_sender.clone()));
+            handle.spawn(network_id_ticker(
+                self.time_service.clone(),
+                *network_id,
+                net.ping_interval,
+                net_ticks_sender.clone(),
+            ));
         }
         let mut net_ticks = ReceiverStream::new(net_ticks).fuse();
 
@@ -375,11 +383,12 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 self.network_interface
                     .increment_peer_round_failure(peer_id.peer_id(), round);
 
-                let ping_failures_tolerated = if let Some(net) = self.networks.get(&peer_id.network_id()) {
-                    net.ping_failures_tolerated
-                } else {
-                    999
-                };
+                let ping_failures_tolerated =
+                    if let Some(net) = self.networks.get(&peer_id.network_id()) {
+                        net.ping_failures_tolerated
+                    } else {
+                        999
+                    };
 
                 // If the ping failures are now more than
                 // `self.ping_failures_tolerated`, we disconnect from the node.
@@ -390,15 +399,8 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     .get_peer_failures(peer_id.peer_id())
                     .unwrap_or(0);
                 if failures > ping_failures_tolerated {
-                    info!(
-                        "Disconnecting from peer: {}",
-                        peer_id
-                    );
-                    if let Err(err) = self
-                        .network_interface
-                        .disconnect_peer(peer_id)
-                        .await
-                    {
+                    info!("Disconnecting from peer: {}", peer_id);
+                    if let Err(err) = self.network_interface.disconnect_peer(peer_id).await {
                         warn!(
                             error = ?err,
                             "Failed to disconnect from peer: {} with error: {:?}",

@@ -4,17 +4,19 @@
 
 // use std::time::Duration;
 use crate::protocols::wire::handshake::v1::ProtocolId;
-use aptos_config::network_id::{NetworkContext, NetworkId};
+use aptos_config::{
+    config::RoleType,
+    network_id::{NetworkContext, NetworkId},
+};
 use aptos_metrics_core::{
     exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
     register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
-    IntGauge, IntGaugeVec
+    IntGauge, IntGaugeVec,
 };
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
 use once_cell::sync::Lazy;
-use aptos_config::config::RoleType;
 
 // some type labels
 pub const REQUEST_LABEL: &str = "request";
@@ -52,11 +54,13 @@ pub static APTOS_CONNECTIONS_CLOSED: Lazy<IntCounterVec> = Lazy::new(|| {
         "Count of connections that have been closed",
         &["role_type", "network_id", "reason"]
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn connection_closed(role: &'static str, network_id: &'static str, reason: &'static str) {
-    APTOS_CONNECTIONS_CLOSED.with_label_values(&[role, network_id, reason]).inc();
+    APTOS_CONNECTIONS_CLOSED
+        .with_label_values(&[role, network_id, reason])
+        .inc();
 }
 
 pub static APTOS_CONNECTIONS_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -65,7 +69,7 @@ pub static APTOS_CONNECTIONS_REJECTED: Lazy<IntCounterVec> = Lazy::new(|| {
         "Number of connections rejected per interface",
         &["role_type", "network_id", "peer_id", "direction"]
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn connections_rejected(
@@ -226,7 +230,7 @@ pub static APTOS_NETWORK_RPC_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
 pub fn rpc_message_bytes(
     network_id: NetworkId,
     protocol_id: &'static str, // ProtocolId.as_str() or "unk"
-    role_type: &'static str, // RoleType.as_str() or "unk"
+    role_type: &'static str,   // RoleType.as_str() or "unk"
     message_type_label: &'static str,
     message_direction_label: &'static str,
     state_label: &'static str,
@@ -243,7 +247,9 @@ pub fn rpc_message_bytes(
     //rpc_messages(network_id, protocol_id, role_type, message_type_label, message_direction_label, state_label).inc();
     //rpc_bytes(network_id, protocol_id, role_type, message_type_label, message_direction_label, state_label).inc_by(data_len);
     APTOS_NETWORK_RPC_MESSAGES.with_label_values(values).inc();
-    APTOS_NETWORK_RPC_BYTES.with_label_values(values).inc_by(data_len);
+    APTOS_NETWORK_RPC_BYTES
+        .with_label_values(values)
+        .inc_by(data_len);
 }
 
 pub static INVALID_NETWORK_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
@@ -307,7 +313,7 @@ pub static APTOS_NETWORK_OUTBOUND_RPC_REQUEST_API_LATENCY: Lazy<HistogramVec> = 
             "protocol_id",
         ]
     )
-        .unwrap()
+    .unwrap()
 });
 
 // this is measured in common library code on the application end of queues
@@ -373,9 +379,18 @@ pub fn direct_send_message_bytes(
     state_label: &'static str,
     data_len: u64,
 ) {
-    let values = [role_type.as_str(), network_id.as_str(), protocol_id, state_label];
-    APTOS_NETWORK_DIRECT_SEND_MESSAGES.with_label_values(&values).inc();
-    APTOS_NETWORK_DIRECT_SEND_BYTES.with_label_values(&values).inc_by(data_len);
+    let values = [
+        role_type.as_str(),
+        network_id.as_str(),
+        protocol_id,
+        state_label,
+    ];
+    APTOS_NETWORK_DIRECT_SEND_MESSAGES
+        .with_label_values(&values)
+        .inc();
+    APTOS_NETWORK_DIRECT_SEND_BYTES
+        .with_label_values(&values)
+        .inc_by(data_len);
 }
 
 /// Counters(queued,dequeued,dropped) related to inbound network notifications for RPCs and
@@ -577,12 +592,7 @@ pub static NETWORK_APPLICATION_INBOUND_METRIC: Lazy<HistogramVec> = Lazy::new(||
     register_histogram_vec!(
         "aptos_network_app_inbound_traffic",
         "Network Inbound Traffic by application",
-        &[
-            "role_type",
-            "network_id",
-            "protocol_id",
-            "metric"
-        ]
+        &["role_type", "network_id", "protocol_id", "metric"]
     )
     .unwrap()
 });
@@ -594,12 +604,7 @@ pub fn network_application_inbound_traffic(
     size: u64,
 ) {
     NETWORK_APPLICATION_INBOUND_METRIC
-        .with_label_values(&[
-            role_type,
-            network_id,
-            protocol_id,
-            "size",
-        ])
+        .with_label_values(&[role_type, network_id, protocol_id, "size"])
         .observe(size as f64);
 }
 
@@ -607,12 +612,7 @@ pub static NETWORK_APPLICATION_OUTBOUND_METRIC: Lazy<HistogramVec> = Lazy::new(|
     register_histogram_vec!(
         "aptos_network_app_outbound_traffic",
         "Network Outbound Traffic by application",
-        &[
-            "role_type",
-            "network_id",
-            "protocol_id",
-            "metric"
-        ]
+        &["role_type", "network_id", "protocol_id", "metric"]
     )
     .unwrap()
 });
@@ -624,12 +624,7 @@ pub fn network_application_outbound_traffic(
     size: u64,
 ) {
     NETWORK_APPLICATION_OUTBOUND_METRIC
-        .with_label_values(&[
-            role_type,
-            network_id,
-            protocol_id,
-            "size",
-        ])
+        .with_label_values(&[role_type, network_id, protocol_id, "size"])
         .observe(size as f64);
 }
 
@@ -637,13 +632,9 @@ pub static NETWORK_PEER_OUTBOUND_QUEUE_TIME: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
         "aptos_network_peer_outbound_queue_time",
         "Network Outbound Traffic peer-queue time",
-        &[
-            "role_type",
-            "network_id",
-            "protocol_id",
-        ]
+        &["role_type", "network_id", "protocol_id",]
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn network_peer_outbound_queue_time(
@@ -653,11 +644,7 @@ pub fn network_peer_outbound_queue_time(
     micros: u64,
 ) {
     NETWORK_PEER_OUTBOUND_QUEUE_TIME
-        .with_label_values(&[
-            role_type,
-            network_id,
-            protocol_id,
-        ])
+        .with_label_values(&[role_type, network_id, protocol_id])
         .observe((micros as f64) / 1_000_000.0);
 }
 
@@ -678,7 +665,6 @@ pub fn start_serialization_timer(protocol_id: ProtocolId, operation: &str) -> Hi
         .with_label_values(&[protocol_id.as_str(), operation])
         .start_timer()
 }
-
 
 // pub static NETWORK_BCS_ENCODE_NANOS: Lazy<IntCounter> = Lazy::new(|| {
 //     register_int_counter!("aptos_network_bcs_encode_nanos", "Nanoseconds spent encoding outbound messages").unwrap()
@@ -701,11 +687,13 @@ pub static APTOS_NETWORK_INBOUND_QUEUE_DELAY: Lazy<HistogramVec> = Lazy::new(|| 
         "Inbound delay between receipt and app handler",
         &["network_id", "protocol_id"]
     )
-        .unwrap()
+    .unwrap()
 });
 
 pub fn inbound_queue_delay(network_id: &'static str, protocol_id: &'static str, micros: u64) {
-    APTOS_NETWORK_INBOUND_QUEUE_DELAY.with_label_values(&[network_id, protocol_id]).observe((micros as f64) / 1_000_000.0)
+    APTOS_NETWORK_INBOUND_QUEUE_DELAY
+        .with_label_values(&[network_id, protocol_id])
+        .observe((micros as f64) / 1_000_000.0)
 }
 
 /// Counters related to peer ping times (before and after dialing)
@@ -734,43 +722,53 @@ fn observe_ping_time(network_context: &NetworkContext, ping_latency_secs: f64, l
         .with_label_values(&[network_context.network_id().as_str(), label])
         .observe(ping_latency_secs);
 }
-pub static NETWORK_PEER_READ_MESSAGES: Lazy<IntCounterVec> = Lazy::new(||
+pub static NETWORK_PEER_READ_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-    "aptos_network_peer_read_messages",
-    "Number of messages read (after de-frag)",
-    &["network_id", "protocol_id"]
-).unwrap()
-);
+        "aptos_network_peer_read_messages",
+        "Number of messages read (after de-frag)",
+        &["network_id", "protocol_id"]
+    )
+    .unwrap()
+});
 
-pub static NETWORK_PEER_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(||
+pub static NETWORK_PEER_READ_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-    "aptos_network_peer_read_bytes",
-    "Number of message bytes read (after de-frag)",
-    &["network_id", "protocol_id"]
-).unwrap()
-);
+        "aptos_network_peer_read_bytes",
+        "Number of message bytes read (after de-frag)",
+        &["network_id", "protocol_id"]
+    )
+    .unwrap()
+});
 pub fn peer_read_message_bytes(network_id: &NetworkId, protocol_id: &ProtocolId, data_len: u64) {
     let values = [network_id.as_str(), protocol_id.as_str()];
     NETWORK_PEER_READ_MESSAGES.with_label_values(&values).inc();
-    NETWORK_PEER_READ_BYTES.with_label_values(&values).inc_by(data_len);
+    NETWORK_PEER_READ_BYTES
+        .with_label_values(&values)
+        .inc_by(data_len);
 }
 
-pub static NETWORK_APP_INBOUND_DROP_MESSAGES: Lazy<IntCounterVec> = Lazy::new(||
+pub static NETWORK_APP_INBOUND_DROP_MESSAGES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-    "aptos_network_app_inbound_drop_messages",
-    "Number of messages received but dropped before app",
-    &["network_id", "protocol_id"]
-).unwrap()
-);
-pub static NETWORK_APP_INBOUND_DROP_BYTES: Lazy<IntCounterVec> = Lazy::new(||
+        "aptos_network_app_inbound_drop_messages",
+        "Number of messages received but dropped before app",
+        &["network_id", "protocol_id"]
+    )
+    .unwrap()
+});
+pub static NETWORK_APP_INBOUND_DROP_BYTES: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
-    "aptos_network_app_inbound_drop_bytes",
-    "Number of bytes received but dropped before app",
-    &["network_id", "protocol_id"]
-).unwrap()
-);
+        "aptos_network_app_inbound_drop_bytes",
+        "Number of bytes received but dropped before app",
+        &["network_id", "protocol_id"]
+    )
+    .unwrap()
+});
 pub fn app_inbound_drop(network_id: &NetworkId, protocol_id: &ProtocolId, data_len: u64) {
     let values = [network_id.as_str(), protocol_id.as_str()];
-    NETWORK_APP_INBOUND_DROP_MESSAGES.with_label_values(&values).inc();
-    NETWORK_APP_INBOUND_DROP_BYTES.with_label_values(&values).inc_by(data_len);
+    NETWORK_APP_INBOUND_DROP_MESSAGES
+        .with_label_values(&values)
+        .inc();
+    NETWORK_APP_INBOUND_DROP_BYTES
+        .with_label_values(&values)
+        .inc_by(data_len);
 }

@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::application::storage::PeersAndMetadata;
 use aptos_infallible::RwLock;
 use aptos_logger::info;
-use crate::application::storage::PeersAndMetadata;
+use std::{collections::HashMap, sync::Arc};
 
 pub struct PeersAndMetadataGauge {
     actual: RwLock<PeersAndMetadataGaugeInner>,
@@ -22,14 +21,24 @@ impl PeersAndMetadataGauge {
             desc_singleton: prometheus::core::Desc::new(
                 name,
                 help,
-                vec!["network_id".to_string(), "role_type".to_string(), "direction".to_string()],
+                vec![
+                    "network_id".to_string(),
+                    "role_type".to_string(),
+                    "direction".to_string(),
+                ],
                 HashMap::new(),
-            ).unwrap(),
+            )
+            .unwrap(),
         }
     }
 
     pub fn register(name: String, help: String, peers_and_metadata: Arc<PeersAndMetadata>) {
-        prometheus::register(Box::new(PeersAndMetadataGauge::new(name, help, peers_and_metadata))).unwrap()
+        prometheus::register(Box::new(PeersAndMetadataGauge::new(
+            name,
+            help,
+            peers_and_metadata,
+        )))
+        .unwrap()
     }
 }
 
@@ -37,8 +46,11 @@ impl prometheus::core::Collector for PeersAndMetadataGauge {
     fn desc(&self) -> Vec<&prometheus::core::Desc> {
         vec![&self.desc_singleton]
     }
+
     fn collect(&self) -> Vec<prometheus::proto::MetricFamily> {
-        self.actual.write().collect(self.name.clone(), self.help.clone())
+        self.actual
+            .write()
+            .collect(self.name.clone(), self.help.clone())
     }
 }
 
@@ -48,10 +60,9 @@ struct PeersAndMetadataGaugeInner {
 
 impl PeersAndMetadataGaugeInner {
     pub fn new(peers_and_metadata: Arc<PeersAndMetadata>) -> Self {
-        Self {
-            peers_and_metadata,
-        }
+        Self { peers_and_metadata }
     }
+
     pub fn collect(&mut self, name: String, help: String) -> Vec<prometheus::proto::MetricFamily> {
         let pam_raw = self.peers_and_metadata.get_all_peers_and_metadata();
 
@@ -74,7 +85,10 @@ impl PeersAndMetadataGaugeInner {
         let mut metric_data = Vec::new();
         for (key, count) in counts.iter() {
             let (network_id, direction, role_type) = key;
-            info!("metrics: {} {} {}: {}", network_id, role_type, direction, count);
+            info!(
+                "metrics: {} {} {}: {}",
+                network_id, role_type, direction, count
+            );
             let labels = vec![
                 prom_label_pair("network_id", network_id.as_str()),
                 prom_label_pair("role_type", role_type.as_str()),
@@ -99,7 +113,6 @@ impl PeersAndMetadataGaugeInner {
         metric.set_metric(metric_data);
         vec![metric]
     }
-
 }
 
 fn prom_label_pair(name: &str, value: &str) -> prometheus::proto::LabelPair {

@@ -1,8 +1,7 @@
 // Copyright © Aptos Foundation
 
-use aptos_types::network_address::{parse_ip_tcp,NetworkAddress};
-use std::io::Result;
-use std::net::SocketAddr;
+use aptos_types::network_address::{parse_ip_tcp, NetworkAddress};
+use std::{io::Result, net::SocketAddr};
 //use core::net::SocketAddr;
 
 pub fn listen(addr: NetworkAddress) -> Result<(tokio::net::TcpListener, NetworkAddress)> {
@@ -33,10 +32,7 @@ pub fn listen(addr: NetworkAddress) -> Result<(tokio::net::TcpListener, NetworkA
     let listener = socket.listen(256)?;
     let listen_addr = NetworkAddress::from(listener.local_addr()?);
 
-    Ok((
-        listener,
-        listen_addr,
-    ))
+    Ok((listener, listen_addr))
 }
 
 pub fn invalid_addr_error(addr: &NetworkAddress) -> std::io::Error {

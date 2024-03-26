@@ -18,24 +18,24 @@ pub enum StreamMessage {
 impl StreamMessage {
     pub fn data_len(&self) -> usize {
         match self {
-            StreamMessage::Header(head) => {head.message.data_len()}
-            StreamMessage::Fragment(frag) => {frag.raw_data.len()}
+            StreamMessage::Header(head) => head.message.data_len(),
+            StreamMessage::Fragment(frag) => frag.raw_data.len(),
         }
     }
+
     pub fn header_len(&self) -> usize {
         match self {
             StreamMessage::Header(head) => {
                 // 5 bytes for {request_id: u32, num_fragments: u8} in StreamMessage::Header(StreamHeader{...})
                 head.message.header_len() + 5
-            }
+            },
             StreamMessage::Fragment(_frag) => {
                 // 5 bytes for {request_id: u32, frament_id: u8} in StreamMessage::Fragment(StreamFragment{...})
                 5
-            }
+            },
         }
     }
 }
-
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]

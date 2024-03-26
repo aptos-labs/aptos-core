@@ -2,9 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::protocols::network::OutboundPeerConnections;
 use crate::{
-    application::storage::PeersAndMetadata,
     application::metadata::ConnectionState,
+    application::storage::PeersAndMetadata,
     // application::{metadata::ConnectionState, storage::{PeersAndMetadata,DisconnectReason}},
     // peer_manager::{ConnectionNotification, PeerManagerNotification, PeerManagerRequest},
     // protocols::{
@@ -24,7 +25,6 @@ use aptos_types::PeerId;
 use async_trait::async_trait;
 // use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc};
-use crate::protocols::network::OutboundPeerConnections;
 
 /// A sender to a node to mock an inbound network message from [`PeerManager`]
 pub type InboundMessageSender = tokio::sync::mpsc::Sender<ReceivedMessage>;
@@ -56,7 +56,7 @@ impl InboundNetworkHandle {
     /// Push connection update, and update the local storage
     pub fn connect(
         &self,
-        _role: RoleType,// TODO: use in logging?
+        _role: RoleType, // TODO: use in logging?
         self_peer_network_id: PeerNetworkId,
         conn_metadata: ConnectionMetadata,
     ) {

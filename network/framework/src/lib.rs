@@ -9,9 +9,9 @@ pub mod logging;
 pub mod noise;
 pub mod protocols;
 // pub mod setup;
+pub mod peer;
 pub mod transport;
 pub mod util;
-pub mod peer;
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 pub mod testutils;

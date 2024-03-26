@@ -10,6 +10,7 @@
 //
 
 use crate::{
+    application::storage::PeersAndMetadata,
     noise::{stream::NoiseStream, AntiReplayTimestamps, NoiseUpgrader},
     testutils::fake_socket::{ReadOnlyTestSocket, ReadWriteTestSocket},
 };
@@ -19,7 +20,6 @@ use futures::{executor::block_on, future::join};
 use futures_util::io::AsyncReadExt;
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
-use crate::application::storage::PeersAndMetadata;
 
 //
 // Corpus generation
@@ -73,7 +73,10 @@ fn generate_first_two_messages() -> (Vec<u8>, Vec<u8>) {
         (initiator_private_key, initiator_public_key, initiator_network_context),
         (responder_private_key, responder_public_key, responder_network_context),
     ) = KEYPAIRS.clone();
-    let peers_and_metadata = PeersAndMetadata::new(&[initiator_network_context.network_id(), responder_network_context.network_id()]);
+    let peers_and_metadata = PeersAndMetadata::new(&[
+        initiator_network_context.network_id(),
+        responder_network_context.network_id(),
+    ]);
     let initiator = NoiseUpgrader::new(
         initiator_network_context,
         initiator_private_key,
