@@ -4,7 +4,7 @@ To play with these examples:
 1. Clone this repo by running `git clone https://github.com/aptos-labs/aptos-core.git`
 2. Open a new terminal and navigate to this folder by running `cd aptos-move/move-examples`
 3. Navigate into the specific tutorial you are interested (ex. `cd hello_blockchain`)
-4. You can use the Aptos CLI to compile, test, publish, and run these contracts by using the commands outlined here: https://aptos.dev/move/move-on-aptos/cli/#multisig-governance
+4. You can use the Aptos CLI to compile, test, publish, and run these contracts by using the commands outlined here: https://aptos.dev/move/move-on-aptos/cli/
      - If you need to install the Aptos CLI, you can follow these instructions: https://aptos.dev/tools/aptos-cli/install-cli/
 
 **WARNING:** These Move examples have NOT been audited. If you are using them in a production system, proceed at your own risk.
