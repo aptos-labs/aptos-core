@@ -94,15 +94,15 @@ where
             .with_label_values(&[S::COLUMN_FAMILY_NAME])
             .observe((raw_key.len() + raw_value.len()) as f64);
 
-        let key = <S::Key as KeyCodec<S>>::decode_key(raw_key)?;
-        let value = <S::Value as ValueCodec<S>>::decode_value(raw_value)?;
+        let key = <S::Key as KeyCodec<S>>::decode_key(raw_key);
+        let value = <S::Value as ValueCodec<S>>::decode_value(raw_value);
 
         match self.direction {
             ScanDirection::Forward => self.db_iter.next(),
             ScanDirection::Backward => self.db_iter.prev(),
         }
 
-        Ok(Some((key, value)))
+        Ok(Some((key?, value?)))
     }
 }
 
