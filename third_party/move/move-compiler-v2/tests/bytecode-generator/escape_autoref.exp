@@ -9,17 +9,13 @@ module 0x42::m {
     private fun make(): m::Object {
         Abort(0)
     }
-    private fun owner_correct(o: m::Object): address
-        acquires m::ObjectCore(*)
-     {
+    private fun owner_correct(o: m::Object): address {
         {
           let addr: address = select m::Object.inner<m::Object>(o);
           select m::ObjectCore.owner<&m::ObjectCore>(BorrowGlobal(Immutable)<m::ObjectCore>(addr))
         }
     }
-    private fun owner_read_ref_missing(o: m::Object): address
-        acquires m::ObjectCore(*)
-     {
+    private fun owner_read_ref_missing(o: m::Object): address {
         select m::ObjectCore.owner<&m::ObjectCore>(BorrowGlobal(Immutable)<m::ObjectCore>(select m::Object.inner<m::Object>(o)))
     }
     private fun will_autoref(): address {

@@ -5,7 +5,7 @@ module 0x42::m {
     struct T has store {}
     struct G<T> has store {}
 
-    fun f1() {
+    fun f1() acquires S {
     }
 
     fun f2() reads S {
@@ -14,10 +14,10 @@ module 0x42::m {
     fun f3() writes S {
     }
 
-    fun f4() {
+    fun f4() acquires S(*) {
     }
 
-    fun f_multiple() reads R writes T, S reads G<u64> {
+    fun f_multiple() acquires R reads R writes T, S reads G<u64> {
     }
 
     fun f5() acquires 0x42::*::* {
