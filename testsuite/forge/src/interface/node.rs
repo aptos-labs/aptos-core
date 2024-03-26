@@ -89,6 +89,11 @@ pub trait Validator: Node + Sync {
         self.get_connected_peers(network_id, None)
             .await
             .map(|maybe_n| maybe_n.map(|n| n >= expected_peers as i64).unwrap_or(false))
+        // let peer_count = self.get_connected_peers(NetworkId::Validator, None).await?;
+        // match peer_count {
+        //     None => {false}
+        //     Some(peer_count) => {Ok(peer_count >= expected_peers as i64)}
+        // }
     }
 
     async fn wait_for_connectivity(

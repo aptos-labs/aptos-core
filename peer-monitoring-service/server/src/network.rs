@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_config::network_id::{NetworkId, PeerNetworkId};
-use aptos_network::{
-    application::interface::NetworkServiceEvents,
+use aptos_config::network_id::PeerNetworkId;
+use aptos_network2::{
+    application::interface::NetworkEvents,
     protocols::network::{Event, RpcError},
     ProtocolId,
 };
@@ -15,7 +15,7 @@ use bytes::Bytes;
 use futures::{
     channel::oneshot,
     future,
-    stream::{select_all, BoxStream, Stream, StreamExt},
+    stream::{BoxStream, Stream, StreamExt},
 };
 use std::{
     pin::Pin,
@@ -32,24 +32,17 @@ pub struct NetworkRequest {
 
 /// A stream of requests from the network. Each request also comes with a
 /// callback to send the response.
+/// TODO: PeerMonitoringServiceNetworkEvents adds no value, but rather hides common code. Having only the common code to understand would be simpler. remove PeerMonitoringServiceNetworkEvents. use NetworkEvents<PeerMonitoringServiceMessage> directly
 pub struct PeerMonitoringServiceNetworkEvents {
     network_request_stream: BoxStream<'static, NetworkRequest>,
 }
 
 impl PeerMonitoringServiceNetworkEvents {
-    pub fn new(network_service_events: NetworkServiceEvents<PeerMonitoringServiceMessage>) -> Self {
-        // Transform the event streams to also include the network ID
-        let network_events: Vec<_> = network_service_events
-            .into_network_and_events()
-            .into_iter()
-            .map(|(network_id, events)| events.map(move |event| (network_id, event)))
-            .collect();
-        let network_events = select_all(network_events).fuse();
-
+    pub fn new(network_events: NetworkEvents<PeerMonitoringServiceMessage>) -> Self {
         // Transform each event to a network request
         let network_request_stream = network_events
-            .filter_map(|(network_id, event)| {
-                future::ready(Self::event_to_request(network_id, event))
+            .filter_map(|event| {
+                future::ready(Self::event_to_request(event))
             })
             .boxed();
 
@@ -60,18 +53,17 @@ impl PeerMonitoringServiceNetworkEvents {
 
     /// Filters out everything except Rpc requests
     fn event_to_request(
-        network_id: NetworkId,
         event: Event<PeerMonitoringServiceMessage>,
     ) -> Option<NetworkRequest> {
         match event {
             Event::RpcRequest(
-                peer_id,
+                peer_network_id,
                 PeerMonitoringServiceMessage::Request(peer_monitoring_service_request),
                 protocol_id,
                 response_tx,
             ) => {
                 let response_sender = ResponseSender::new(response_tx);
-                let peer_network_id = PeerNetworkId::new(network_id, peer_id);
+                //let peer_network_id = PeerNetworkId::new(network_id, peer_id);
                 Some(NetworkRequest {
                     peer_network_id,
                     protocol_id,

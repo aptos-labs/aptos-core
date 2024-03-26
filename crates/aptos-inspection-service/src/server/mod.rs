@@ -5,7 +5,7 @@ use crate::server::utils::CONTENT_TYPE_TEXT;
 use aptos_config::config::NodeConfig;
 use aptos_data_client::client::AptosDataClient;
 use aptos_logger::debug;
-use aptos_network::application::storage::PeersAndMetadata;
+use aptos_network2::application::storage::PeersAndMetadata;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Request, Response, Server, StatusCode,
@@ -87,6 +87,7 @@ pub fn start_inspection_service(
             }
         });
 
+        debug!{"starting aptos-inspection-service on {:?}", address}
         // Start and block on the server
         runtime
             .block_on(async {
@@ -104,6 +105,7 @@ async fn serve_requests(
     aptos_data_client: AptosDataClient,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> Result<Response<Body>, hyper::Error> {
+    debug!("{} {}", req.method(), req.uri());
     // Process the request and get the response components
     let (status_code, body, content_type) = match req.uri().path() {
         CONFIGURATION_PATH => {

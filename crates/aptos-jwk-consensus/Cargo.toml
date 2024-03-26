@@ -26,7 +26,7 @@ aptos-global-constants = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
-aptos-network = { workspace = true }
+aptos-network2 = { workspace = true }
 aptos-reliable-broadcast = { workspace = true }
 aptos-runtimes = { workspace = true }
 aptos-time-service = { workspace = true }

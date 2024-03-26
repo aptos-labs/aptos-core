@@ -16,13 +16,20 @@ use aptos_config::{
 };
 use aptos_infallible::RwLock;
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
-use aptos_types::{account_address::AccountAddress, PeerId};
+use aptos_types::PeerId;
 use arc_swap::ArcSwap;
 use std::{
     collections::{hash_map::Entry, HashMap},
-    ops::Deref,
-    sync::{Arc, RwLockWriteGuard},
+    sync::Arc,
 };
+use std::sync::OnceLock;
+use aptos_config::config::{PeerRole, RoleType};
+use aptos_config::network_id::NetworkContext;
+use std::fmt;
+use tokio::sync::mpsc::error::TrySendError;
+use serde::Serialize;
+use aptos_logger::info;
+use aptos_netcore::transport::ConnectionOrigin;
 
 /// A simple container that tracks all peers and peer metadata for the node.
 /// This container is updated by both the networking code (e.g., for new
@@ -30,8 +37,13 @@ use std::{
 /// applications (e.g., peer monitoring service).
 #[derive(Debug)]
 pub struct PeersAndMetadata {
+    network_ids: Vec<NetworkId>,
     peers_and_metadata: RwLock<HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>>,
-    trusted_peers: HashMap<NetworkId, Arc<ArcSwap<PeerSet>>>,
+
+    // trusted_peers have separate locking and access
+    trusted_peers: HashMap<NetworkId, Arc<RwLock<PeerSet>>>,
+
+    subscribers: RwLock<Vec<tokio::sync::mpsc::Sender<ConnectionNotification>>>,
 
     // We maintain a cached copy of the peers and metadata. This is useful to
     // reduce lock contention, as we expect very heavy and frequent reads,
@@ -41,29 +53,31 @@ pub struct PeersAndMetadata {
     cached_peers_and_metadata: Arc<ArcSwap<HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>>>,
 }
 
+pub static PEERS_AND_METADATA_SINGLETON: OnceLock<Arc<PeersAndMetadata>> = OnceLock::new();
+
 impl PeersAndMetadata {
     pub fn new(network_ids: &[NetworkId]) -> Arc<PeersAndMetadata> {
         // Create the container
+        let network_ids = network_ids.to_vec();
         let mut peers_and_metadata = PeersAndMetadata {
+            network_ids,
             peers_and_metadata: RwLock::new(HashMap::new()),
             trusted_peers: HashMap::new(),
+            subscribers: RwLock::new(vec![]),
             cached_peers_and_metadata: Arc::new(ArcSwap::from(Arc::new(HashMap::new()))),
         };
 
         // Initialize each network mapping and trusted peer set
-        network_ids.iter().for_each(|network_id| {
-            // Update the peers and metadata map
-            peers_and_metadata
-                .peers_and_metadata
-                .write()
-                .insert(*network_id, HashMap::new());
+        {
+            let mut writer = peers_and_metadata.peers_and_metadata.write();
+            peers_and_metadata.network_ids.iter().for_each(|network_id| {
+                writer.insert(*network_id, HashMap::new());
 
-            // Update the trusted peer set
-            peers_and_metadata.trusted_peers.insert(
-                *network_id,
-                Arc::new(ArcSwap::from(Arc::new(PeerSet::new()))),
-            );
-        });
+                peers_and_metadata
+                    .trusted_peers
+                    .insert(*network_id, Arc::new(RwLock::new(PeerSet::new())));
+            });
+        }
 
         // Initialize the cached peers and metadata
         let cached_peers_and_metadata = peers_and_metadata.peers_and_metadata.read().clone();
@@ -109,6 +123,35 @@ impl PeersAndMetadata {
             }
         }
         Ok(connected_peers_and_metadata)
+    }
+
+    pub fn count_connected_peers(&self, direction: Option<ConnectionOrigin>) -> usize {
+        let mut out = 0;
+        for (_network_id, peers_and_metadata) in self.cached_peers_and_metadata.load().iter() {
+            for (_peer_id, peer_metadata) in peers_and_metadata.iter() {
+                if !peer_metadata.is_connected() {
+                    continue;
+                }
+                match direction {
+                    Some(origin) => {
+                        if peer_metadata.connection_metadata.origin == origin {
+                            out += 1;
+                        }
+                    }
+                    None => {
+                        out += 1
+                    }
+                }
+            }
+        }
+        out
+    }
+
+    /// Returns an Arc<> that is atomically some consistent snapshot of all peers and metadata.
+    /// New data might be posted while using this snapshot, caller should be okay with that.
+    /// This is the _fastest_ _lowest overhead_ way to get the data. The underlying HashMaps are not copied or cloned, it's all smart reference counting pointers. (The client code might need to have a couple more lines of code to then do its own work filtering through the data for what it wants.)
+    pub fn get_all_peers_and_metadata(&self) -> Arc<HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>> {
+        self.cached_peers_and_metadata.load().clone()
     }
 
     /// Returns all connected peers that support at least one of
@@ -157,15 +200,7 @@ impl PeersAndMetadata {
 
     /// Returns the networks currently held in the container
     pub fn get_registered_networks(&self) -> impl Iterator<Item = NetworkId> + '_ {
-        // Get the cached peers and metadata
-        let cached_peers_and_metadata = self.cached_peers_and_metadata.load();
-
-        // Collect all registered networks
-        cached_peers_and_metadata
-            .keys()
-            .cloned()
-            .collect::<Vec<_>>()
-            .into_iter()
+        self.network_ids.iter().copied()
     }
 
     /// Updates the connection metadata associated with the given peer.
@@ -175,23 +210,26 @@ impl PeersAndMetadata {
         peer_network_id: PeerNetworkId,
         connection_metadata: ConnectionMetadata,
     ) -> Result<(), Error> {
-        // Grab the write lock for the peer metadata
-        let mut peers_and_metadata = self.peers_and_metadata.write();
-
-        // Fetch the peer metadata for the given network
-        let peer_metadata_for_network =
-            get_peer_metadata_for_network(&peer_network_id, &mut peers_and_metadata)?;
-
-        // Update the metadata for the peer or insert a new entry
-        peer_metadata_for_network
-            .entry(peer_network_id.peer_id())
+        info!(
+            peer = peer_network_id.to_string(),
+            op = "icm",
+            direction = connection_metadata.origin,
+            "pamtrace"
+        );
+        let mut writer = self.peers_and_metadata.write();
+        let peer_metadata_for_network = writer.get_mut(&peer_network_id.network_id()).unwrap();
+        let net_context = NetworkContext::new(peer_role_to_role_type(connection_metadata.role), peer_network_id.network_id(), peer_network_id.peer_id());
+        peer_metadata_for_network.entry(peer_network_id.peer_id())
             .and_modify(|peer_metadata| {
                 peer_metadata.connection_metadata = connection_metadata.clone()
             })
-            .or_insert_with(|| PeerMetadata::new(connection_metadata));
-
+            .or_insert_with(|| {
+                PeerMetadata::new(connection_metadata.clone())
+            });
         // Update the cached peers and metadata
-        self.set_cached_peers_and_metadata(peers_and_metadata.clone());
+        self.set_cached_peers_and_metadata(writer.clone());
+        let event = ConnectionNotification::NewPeer(connection_metadata, net_context);
+        self.broadcast(event);
 
         Ok(())
     }
@@ -204,38 +242,41 @@ impl PeersAndMetadata {
         peer_network_id: PeerNetworkId,
         connection_id: ConnectionId,
     ) -> Result<PeerMetadata, Error> {
-        // Grab the write lock for the peer metadata
-        let mut peers_and_metadata = self.peers_and_metadata.write();
+        info!(
+            peer = peer_network_id.to_string(),
+            op = "rpm",
+            "pamtrace"
+        );
+        let mut writer = self.peers_and_metadata.write();
+        let peer_metadata_for_network = writer.get_mut(&peer_network_id.network_id()).unwrap();
 
-        // Fetch the peer metadata for the given network
-        let peer_metadata_for_network =
-            get_peer_metadata_for_network(&peer_network_id, &mut peers_and_metadata)?;
-
-        // Remove the peer metadata for the peer
-        let peer_metadata = if let Entry::Occupied(entry) =
-            peer_metadata_for_network.entry(peer_network_id.peer_id())
+        // Remove the peer metadata for the peer or return a missing metadata error
+        if let Entry::Occupied(entry) = peer_metadata_for_network
+            .entry(peer_network_id.peer_id())
         {
             // Don't remove the peer if the connection doesn't match!
             // For now, remove the peer entirely, we could in the future
             // have multiple connections for a peer
             let active_connection_id = entry.get().connection_metadata.connection_id;
             if active_connection_id == connection_id {
-                entry.remove()
+
+                let peer_metadata = entry.remove();
+		// Update the cached peers and metadata
+		self.set_cached_peers_and_metadata(writer.clone());
+                // TODO: fix network context and disconnect reason?
+                let nc = NetworkContext::new(RoleType::Validator, peer_network_id.network_id(), PeerId::ZERO);
+                let event = ConnectionNotification::LostPeer(peer_metadata.connection_metadata.clone(), nc, DisconnectReason::Requested);
+                self.broadcast(event);
+                Ok(peer_metadata)
             } else {
-                return Err(Error::UnexpectedError(format!(
+                Err(Error::UnexpectedError(format!(
                     "The peer connection id did not match! Given: {:?}, found: {:?}.",
                     connection_id, active_connection_id
-                )));
+                )))
             }
         } else {
-            // Unable to find the peer metadata for the given peer
-            return Err(missing_peer_metadata_error(&peer_network_id));
-        };
-
-        // Update the cached peers and metadata
-        self.set_cached_peers_and_metadata(peers_and_metadata.clone());
-
-        Ok(peer_metadata)
+            Err(missing_peer_metadata_error(&peer_network_id))
+        }
     }
 
     /// Updates the connection state associated with the given peer.
@@ -245,25 +286,25 @@ impl PeersAndMetadata {
         peer_network_id: PeerNetworkId,
         connection_state: ConnectionState,
     ) -> Result<(), Error> {
-        // Grab the write lock for the peer metadata
-        let mut peers_and_metadata = self.peers_and_metadata.write();
+        info!(
+            peer = peer_network_id.to_string(),
+            op = "ucs",
+            "pamtrace"
+        );
+        let mut writer = self.peers_and_metadata.write();
+        let peer_metadata_for_network = writer.get_mut(&peer_network_id.network_id()).unwrap();
 
-        // Fetch the peer metadata for the given network
-        let peer_metadata_for_network =
-            get_peer_metadata_for_network(&peer_network_id, &mut peers_and_metadata)?;
-
-        // Update the connection state for the peer
-        if let Some(peer_metadata) = peer_metadata_for_network.get_mut(&peer_network_id.peer_id()) {
+        // Update the connection state for the peer or return a missing metadata error
+        if let Some(peer_metadata) = peer_metadata_for_network
+            .get_mut(&peer_network_id.peer_id())
+        {
             peer_metadata.connection_state = connection_state;
+            // Update the cached peers and metadata
+            self.set_cached_peers_and_metadata(writer.clone());
+            Ok(())
         } else {
-            // Unable to find the peer metadata for the given peer
-            return Err(missing_peer_metadata_error(&peer_network_id));
+            Err(missing_peer_metadata_error(&peer_network_id))
         }
-
-        // Update the cached peers and metadata
-        self.set_cached_peers_and_metadata(peers_and_metadata.clone());
-
-        Ok(())
     }
 
     /// Updates the peer monitoring state associated with the given peer.
@@ -273,24 +314,25 @@ impl PeersAndMetadata {
         peer_network_id: PeerNetworkId,
         peer_monitoring_metadata: PeerMonitoringMetadata,
     ) -> Result<(), Error> {
-        // Grab the write lock for the peer metadata
-        let mut peers_and_metadata = self.peers_and_metadata.write();
+        info!(
+            peer = peer_network_id.to_string(),
+            op = "upmm",
+            "pamtrace"
+        );
+        let mut writer = self.peers_and_metadata.write();
+        let peer_metadata_for_network = writer.get_mut(&peer_network_id.network_id()).unwrap();
 
-        // Fetch the peer metadata for the given network
-        let peer_metadata_for_network =
-            get_peer_metadata_for_network(&peer_network_id, &mut peers_and_metadata)?;
-
-        // Update the peer monitoring metadata for the peer
-        if let Some(peer_metadata) = peer_metadata_for_network.get_mut(&peer_network_id.peer_id()) {
+        // Update the peer monitoring metadata for the peer or return a missing metadata error
+        if let Some(peer_metadata) = peer_metadata_for_network
+            .get_mut(&peer_network_id.peer_id())
+        {
             peer_metadata.peer_monitoring_metadata = peer_monitoring_metadata;
+            // Update the cached peers and metadata
+            self.set_cached_peers_and_metadata(writer.clone());
+            Ok(())
         } else {
-            return Err(missing_peer_metadata_error(&peer_network_id));
+            Err(missing_peer_metadata_error(&peer_network_id))
         }
-
-        // Update the cached peers and metadata
-        self.set_cached_peers_and_metadata(peers_and_metadata.clone());
-
-        Ok(())
     }
 
     /// Updates the cached peers and metadata using the given map
@@ -302,17 +344,8 @@ impl PeersAndMetadata {
             .store(Arc::new(cached_peers_and_metadata));
     }
 
-    /// Returns a clone of the trusted peer set for the given network ID
-    pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<PeerSet, Error> {
-        let trusted_peers = self.get_trusted_peer_set_for_network(network_id)?;
-        Ok(trusted_peers.load().clone().deref().clone())
-    }
-
     /// Returns the trusted peer set for the given network ID
-    fn get_trusted_peer_set_for_network(
-        &self,
-        network_id: &NetworkId,
-    ) -> Result<Arc<ArcSwap<PeerSet>>, Error> {
+    pub fn get_trusted_peers(&self, network_id: &NetworkId) -> Result<Arc<RwLock<PeerSet>>, Error> {
         self.trusted_peers.get(network_id).cloned().ok_or_else(|| {
             Error::UnexpectedError(format!(
                 "No trusted peers were found for the given network id: {:?}",
@@ -326,12 +359,15 @@ impl PeersAndMetadata {
         &self,
         peer_network_id: &PeerNetworkId,
     ) -> Result<Option<Peer>, Error> {
-        let trusted_peers = self.get_trusted_peer_set_for_network(&peer_network_id.network_id())?;
-        let trusted_peer_state = trusted_peers
-            .load()
-            .get(&peer_network_id.peer_id())
-            .cloned();
-        Ok(trusted_peer_state)
+        let network_id = peer_network_id.network_id();
+        match self.trusted_peers.get(&network_id) {
+            None => {
+                Ok(None)
+            }
+            Some(wat) => {
+                Ok(wat.read().get(&peer_network_id.peer_id()).cloned())
+            }
+        }
     }
 
     /// Updates the trusted peer set for the given network ID
@@ -340,13 +376,57 @@ impl PeersAndMetadata {
         network_id: &NetworkId,
         trusted_peer_set: PeerSet,
     ) -> Result<(), Error> {
-        let trusted_peers = self.get_trusted_peer_set_for_network(network_id)?;
-        trusted_peers.store(Arc::new(trusted_peer_set));
+        let trusted_peers = self.trusted_peers.get(network_id).ok_or_else(|| Error::UnexpectedError(format!("unknown network: {:?}", network_id)))?;
+        let mut ps = trusted_peers.write();
+        ps.clear();
+        ps.clone_from(&trusted_peer_set);
         Ok(())
     }
 
+    fn broadcast(&self, event: ConnectionNotification) {
+        let mut listeners = self.subscribers.write();
+        let mut to_del = vec![];
+        for i in 0..listeners.len() {
+            let dest = listeners.get_mut(i).unwrap();
+            match dest.try_send(event.clone()) {
+                Ok(_) => {}
+                Err(err) => match err {
+                    TrySendError::Full(_) => {
+                        // meh, drop message, maybe counter?
+                    }
+                    TrySendError::Closed(_) => {
+                        to_del.push(i);
+                    }
+                }
+            }
+        }
+        for evict in to_del.into_iter() {
+            let llast = listeners.len() - 1;
+            if evict != llast {
+                listeners.swap(evict, llast);
+            }
+            listeners.pop();
+        }
+    }
+
+    pub fn subscribe(&self) -> tokio::sync::mpsc::Receiver<ConnectionNotification> {
+        let (sender, receiver) = tokio::sync::mpsc::channel(10); // TODO configure or name the constant or something
+        let mut listeners = self.subscribers.write();
+        listeners.push(sender);
+        receiver
+    }
+
     #[cfg(test)]
+    pub fn close_subscribers(&self) {
+        let mut listeners = self.subscribers.write();
+        // drop all the senders to close them
+        listeners.clear();
+    }
+
+    #[cfg(test)]
+    #[cfg(disabled)]
     /// Returns all internal maps (for testing purposes only)
+    /// TODO: unused?
     pub(crate) fn get_all_internal_maps(
         &self,
     ) -> (
@@ -362,21 +442,6 @@ impl PeersAndMetadata {
     }
 }
 
-/// Returns the peer metadata for the given network
-fn get_peer_metadata_for_network<'a>(
-    peer_network_id: &'a PeerNetworkId,
-    peers_and_metadata: &'a mut RwLockWriteGuard<
-        HashMap<NetworkId, HashMap<AccountAddress, PeerMetadata>>,
-    >,
-) -> Result<&'a mut HashMap<AccountAddress, PeerMetadata>, Error> {
-    match peers_and_metadata.get_mut(&peer_network_id.network_id()) {
-        Some(peer_metadata_for_network) => Ok(peer_metadata_for_network),
-        None => Err(missing_network_metadata_error(
-            &peer_network_id.network_id(),
-        )),
-    }
-}
-
 /// A simple helper for returning a missing network metadata error
 fn missing_network_metadata_error(network_id: &NetworkId) -> Error {
     Error::UnexpectedError(format!(
@@ -385,11 +450,66 @@ fn missing_network_metadata_error(network_id: &NetworkId) -> Error {
     ))
 }
 
-/// A simple helper for returning a missing peer metadata error
+/// A simple helper for returning a missing metadata error
 /// for the specified peer.
 fn missing_peer_metadata_error(peer_network_id: &PeerNetworkId) -> Error {
     Error::UnexpectedError(format!(
         "No metadata was found for the given peer: {:?}",
         peer_network_id
     ))
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum DisconnectReason {
+    Requested,
+    ConnectionLost,
+}
+
+impl fmt::Display for DisconnectReason {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            DisconnectReason::Requested => "Requested",
+            DisconnectReason::ConnectionLost => "ConnectionLost",
+        };
+        write!(f, "{}", s)
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Serialize)]
+pub enum ConnectionNotification {
+    /// Connection with a new peer has been established.
+    NewPeer(ConnectionMetadata, NetworkContext),
+    /// Connection to a peer has been terminated. This could have been triggered from either end.
+    LostPeer(ConnectionMetadata, NetworkContext, DisconnectReason),
+}
+
+impl fmt::Debug for ConnectionNotification {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
+impl fmt::Display for ConnectionNotification {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConnectionNotification::NewPeer(metadata, context) => {
+                write!(f, "[{},{}]", metadata, context)
+            },
+            ConnectionNotification::LostPeer(metadata, context, reason) => {
+                write!(f, "[{},{},{}]", metadata, context, reason)
+            },
+        }
+    }
+}
+
+pub fn peer_role_to_role_type(role: PeerRole) -> RoleType {
+    match role {
+        PeerRole::Validator => {RoleType::Validator}
+        PeerRole::PreferredUpstream => {RoleType::Validator}
+        PeerRole::Upstream => {RoleType::Validator}
+        PeerRole::ValidatorFullNode => {RoleType::FullNode}
+        PeerRole::Downstream => {RoleType::FullNode}
+        PeerRole::Known => {RoleType::FullNode}
+        PeerRole::Unknown => {RoleType::FullNode}
+    }
 }

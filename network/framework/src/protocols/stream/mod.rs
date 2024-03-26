@@ -1,11 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::protocols::wire::messaging::v1::{MultiplexMessage, NetworkMessage};
-use anyhow::{bail, ensure};
-use aptos_channels::Sender;
-use aptos_id_generator::{IdGenerator, U32IdGenerator};
-use futures_util::SinkExt;
+use crate::protocols::wire::messaging::v1::NetworkMessage;
+// use anyhow::{bail, ensure};
 #[cfg(any(test, feature = "fuzzing"))]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
@@ -17,6 +14,28 @@ pub enum StreamMessage {
     Header(StreamHeader),
     Fragment(StreamFragment),
 }
+
+impl StreamMessage {
+    pub fn data_len(&self) -> usize {
+        match self {
+            StreamMessage::Header(head) => {head.message.data_len()}
+            StreamMessage::Fragment(frag) => {frag.raw_data.len()}
+        }
+    }
+    pub fn header_len(&self) -> usize {
+        match self {
+            StreamMessage::Header(head) => {
+                // 5 bytes for {request_id: u32, num_fragments: u8} in StreamMessage::Header(StreamHeader{...})
+                head.message.header_len() + 5
+            }
+            StreamMessage::Fragment(_frag) => {
+                // 5 bytes for {request_id: u32, frament_id: u8} in StreamMessage::Fragment(StreamFragment{...})
+                5
+            }
+        }
+    }
+}
+
 
 #[derive(Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
@@ -58,11 +77,13 @@ impl Debug for StreamFragment {
     }
 }
 
+#[cfg(obsolete)]
 pub struct InboundStreamBuffer {
     stream: Option<InboundStream>,
     max_fragments: usize,
 }
 
+#[cfg(obsolete)]
 impl InboundStreamBuffer {
     pub fn new(max_fragments: usize) -> Self {
         Self {
@@ -99,6 +120,7 @@ impl InboundStreamBuffer {
     }
 }
 
+#[cfg(obsolete)]
 pub struct InboundStream {
     request_id: u32,
     num_fragments: u8,
@@ -106,6 +128,7 @@ pub struct InboundStream {
     message: NetworkMessage,
 }
 
+#[cfg(obsolete)]
 impl InboundStream {
     fn new(header: StreamHeader, max_fragments: usize) -> anyhow::Result<Self> {
         ensure!(
@@ -144,93 +167,5 @@ impl InboundStream {
             NetworkMessage::DirectSendMsg(message) => message.raw_msg.append(raw_data),
         }
         Ok(self.current_fragment_id == self.num_fragments)
-    }
-}
-
-pub struct OutboundStream {
-    request_id_gen: U32IdGenerator,
-    max_frame_size: usize,
-    max_message_size: usize,
-    stream_tx: Sender<MultiplexMessage>,
-}
-
-impl OutboundStream {
-    pub fn new(
-        max_frame_size: usize,
-        max_message_size: usize,
-        stream_tx: Sender<MultiplexMessage>,
-    ) -> Self {
-        // some buffer for headers
-        let max_frame_size = max_frame_size - 64;
-        assert!(
-            max_frame_size * u8::MAX as usize >= max_message_size,
-            "Stream only supports maximum 255 chunks, frame size {}, message size {}",
-            max_frame_size,
-            max_message_size
-        );
-        Self {
-            request_id_gen: U32IdGenerator::new(),
-            max_frame_size,
-            max_message_size,
-            stream_tx,
-        }
-    }
-
-    pub fn should_stream(&self, message: &NetworkMessage) -> bool {
-        message.data_len() > self.max_frame_size
-    }
-
-    pub async fn stream_message(&mut self, mut message: NetworkMessage) -> anyhow::Result<()> {
-        ensure!(
-            message.data_len() <= self.max_message_size,
-            "Message length {} exceed size limit {}",
-            message.data_len(),
-            self.max_message_size,
-        );
-        ensure!(
-            message.data_len() >= self.max_frame_size,
-            "Message length {} is smaller than frame size {}, should not go through stream",
-            message.data_len(),
-            self.max_frame_size,
-        );
-        let request_id = self.request_id_gen.next();
-        let rest = match &mut message {
-            NetworkMessage::Error(_) => {
-                unreachable!("NetworkMessage::Error should always fit in a single frame")
-            },
-            NetworkMessage::RpcRequest(request) => {
-                request.raw_request.split_off(self.max_frame_size)
-            },
-            NetworkMessage::RpcResponse(response) => {
-                response.raw_response.split_off(self.max_frame_size)
-            },
-            NetworkMessage::DirectSendMsg(message) => {
-                message.raw_msg.split_off(self.max_frame_size)
-            },
-        };
-        let chunks = rest.chunks(self.max_frame_size);
-        ensure!(
-            chunks.len() <= u8::MAX as usize,
-            "Number of fragments overflowed"
-        );
-        let header = StreamMessage::Header(StreamHeader {
-            request_id,
-            num_fragments: chunks.len() as u8,
-            message,
-        });
-        self.stream_tx
-            .send(MultiplexMessage::Stream(header))
-            .await?;
-        for (index, chunk) in chunks.enumerate() {
-            let message = StreamMessage::Fragment(StreamFragment {
-                request_id,
-                fragment_id: index as u8 + 1,
-                raw_data: Vec::from(chunk),
-            });
-            self.stream_tx
-                .send(MultiplexMessage::Stream(message))
-                .await?;
-        }
-        Ok(())
     }
 }

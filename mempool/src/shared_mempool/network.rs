@@ -22,7 +22,7 @@ use aptos_config::{
 use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::prelude::*;
 use aptos_netcore::transport::ConnectionOrigin;
-use aptos_network::{
+use aptos_network2::{
     application::{error::Error, interface::NetworkClientInterface, metadata::PeerMetadata},
     transport::ConnectionMetadata,
 };
