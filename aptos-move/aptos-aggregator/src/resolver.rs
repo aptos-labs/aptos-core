@@ -203,7 +203,7 @@ pub trait TDelayedFieldView {
         &self,
         delayed_write_set_ids: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError>;
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>>;
 }
 
 pub trait DelayedFieldResolver:
@@ -275,7 +275,7 @@ where
         &self,
         _delayed_write_set_ids: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
-    ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
         unimplemented!("get_group_reads_needing_exchange not implemented")
     }
 }
