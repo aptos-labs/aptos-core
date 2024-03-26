@@ -71,4 +71,4 @@ jobs:
         with:
           NETWORK: custom
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
