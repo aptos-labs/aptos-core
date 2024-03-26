@@ -125,37 +125,17 @@ impl<V: Send + Sync + 'static> Drop for Inner<V> {
         // Drop the root in a different thread, because that's the slowest part.
         SUBTREE_DROPPER.schedule_drop(self.root.take());
 
-        // To prevent recursively locking the family, buffer all descendants outside.
-        let mut processed_descendants = Vec::new();
-
-        {
-            let mut stack = self.drain_children_for_drop();
-
-            while let Some(descendant) = stack.pop() {
-                if Arc::strong_count(&descendant) == 1 {
-                    // The only ref is the one we are now holding, and there's no weak ref that can
-                    // upgrade because the only `Weak<Inner<V>>`s are held by `BranchTracker`s and
-                    // they try to upgrade only when under the protection of the family lock. So the
-                    // descendant will be dropped after we free the `Arc`, which results in a chain
-                    // of such structures being dropped recursively and that might trigger a stack
-                    // overflow. To prevent that we follow the chain further to disconnect things
-                    // beforehand.
-                    stack.extend(descendant.drain_children_for_drop());
-                    // Note: After the above call, there is not even weak refs to `descendant`
-                    // because all relevant `BranchTrackers` now point their heads to one of the
-                    // children.
-                }
-                // All descendants process must be pushed, because they can become droppable after
-                // the ref count check above, since the family lock doesn't protect de-refs to the
-                // SMTs. -- all drops must NOT be recursive because we will be trying to lock the
-                // family again.
-                processed_descendants.push(descendant);
+        let mut stack = self.drain_children_for_drop();
+        while let Some(descendant) = stack.pop() {
+            if Arc::strong_count(&descendant) == 1 {
+                // The only ref is the one we are now holding, so the
+                // descendant will be dropped after we free the `Arc`, which results in a chain
+                // of such structures being dropped recursively and that might trigger a stack
+                // overflow. To prevent that we follow the chain further to disconnect things
+                // beforehand.
+                stack.extend(descendant.drain_children_for_drop());
             }
-        };
-        // Now that the lock is released, those in `processed_descendants` can be dropped if
-        // applicable.
-        drop(processed_descendants);
-
+        }
         self.log_generation("drop");
     }
 }
