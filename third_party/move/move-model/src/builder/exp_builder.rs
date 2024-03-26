@@ -1878,7 +1878,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     self,
                     self.type_variance(),
                     WideningOrder::RightToLeft,
-                    &result_type,
+                    result_type,
                     &inst.result_type,
                 )
                 .map_err(|_| ok = false);
@@ -1908,11 +1908,17 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ExpData::Call(borrow_id, Operation::Borrow(ref_kind), vec![arg]).into_exp(),
             );
         }
-        // Inject freeze operation if needed
-        if receiver_param_type.is_reference() {
-            let arg = args.remove(0);
-            let arg_type = self.get_node_type(arg.node_id());
-            args.insert(0, self.try_freeze(&receiver_param_type, &arg_type, arg));
+        // Inject freeze operations if needed
+        if inst.arg_types.len() == args.len() {
+            for (i, expected_type) in inst.arg_types.iter().enumerate() {
+                let arg = &args[i];
+                let arg_type = self.get_node_type(arg.node_id());
+                if expected_type.is_reference() && &arg_type != expected_type {
+                    args[i] = self.try_freeze(expected_type, &arg_type, arg.clone());
+                }
+            }
+        } else {
+            // Error reported
         }
         // Construct result
         RewriteResult::RewrittenAndDescend(
