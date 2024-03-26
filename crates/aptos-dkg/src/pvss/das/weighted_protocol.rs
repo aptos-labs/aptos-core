@@ -544,6 +544,7 @@ mod tests {
     use crate::pvss::{
         das::{weighted_protocol::Transcript, PublicParameters},
         dealt_secret_key::g1::DealtSecretKey,
+        dealt_secret_key_share::g1::DealtSecretKeyShare,
         encryption_dlog,
         input_secret::InputSecret,
         traits,
@@ -559,12 +560,15 @@ mod tests {
     use std::ops::AddAssign;
 
     #[test]
-    fn basic() {
+    fn deal_aggregate_verify_decrypt_reconstruct() {
+        // Setup.
         let mut rng = thread_rng();
+        let num_validators = 7;
         let weighted_config = WeightedConfig::new(3, vec![0, 1, 0, 2, 0, 3, 0]).unwrap();
         let pp = PublicParameters::default_with_bls_base();
-        let private_keys: Vec<PrivateKey> =
-            (0..7).map(|_| PrivateKey::generate(&mut rng)).collect();
+        let private_keys: Vec<PrivateKey> = (0..num_validators)
+            .map(|_| PrivateKey::generate(&mut rng))
+            .collect();
         let public_keys: Vec<PublicKey> = private_keys.iter().map(PublicKey::from).collect();
         let enc_pks: Vec<encryption_dlog::g1::EncryptPubKey> = public_keys
             .iter()
@@ -578,9 +582,12 @@ mod tests {
                 encryption_dlog::g1::DecryptPrivKey::try_from(bytes.as_slice()).unwrap()
             })
             .collect();
-        let input_secrets: Vec<InputSecret> =
-            (0..7).map(|_| InputSecret::generate(&mut rng)).collect();
-        let auxs: Vec<u64> = (0..7).collect();
+
+        // Every validator deals.
+        let input_secrets: Vec<InputSecret> = (0..num_validators)
+            .map(|_| InputSecret::generate(&mut rng))
+            .collect();
+        let auxs: Vec<u64> = (0..num_validators).collect();
         let transcripts: Vec<Transcript> = (0..7)
             .map(|i| {
                 let trx = <Transcript as traits::Transcript>::deal(
@@ -605,6 +612,8 @@ mod tests {
                 trx
             })
             .collect();
+
+        // Aggregate transcripts from validators 3 and 0.
         let trx_agg = <Transcript as traits::Transcript>::aggregate(&weighted_config, vec![
             transcripts[3].clone(),
             transcripts[0].clone(),
@@ -628,34 +637,26 @@ mod tests {
             vec![Player { id: 3 }, Player { id: 0 }]
         );
 
-        // Reconstruct with players 0, 1, 5.
-        let (secret_key_shares_1, _public_key_shares_1) =
-            <Transcript as traits::Transcript>::decrypt_own_share(
-                &trx_agg,
-                &weighted_config,
-                &Player { id: 1 },
-                &dec_sks[1],
-            );
-        let (secret_key_shares_5, _public_key_shares_5) =
-            <Transcript as traits::Transcript>::decrypt_own_share(
-                &trx_agg,
-                &weighted_config,
-                &Player { id: 5 },
-                &dec_sks[5],
-            );
-        let (secret_key_shares_0, _public_key_shares_0) =
-            <Transcript as traits::Transcript>::decrypt_own_share(
-                &trx_agg,
-                &weighted_config,
-                &Player { id: 0 },
-                &dec_sks[0],
-            );
+        // Every validator decrypts its key shares from the aggregated transcript.
+        let secret_key_share_vecs: Vec<Vec<DealtSecretKeyShare>> = (0..7)
+            .map(|i| {
+                let (secret_key_shares, _public_key_shares) =
+                    <Transcript as traits::Transcript>::decrypt_own_share(
+                        &trx_agg,
+                        &weighted_config,
+                        &Player { id: i },
+                        &dec_sks[i],
+                    );
+                secret_key_shares
+            })
+            .collect();
 
-        let reconstructed_secret = DealtSecretKey::reconstruct(&weighted_config, &vec![
-            (Player { id: 0 }, secret_key_shares_0),
-            (Player { id: 1 }, secret_key_shares_1),
-            (Player { id: 5 }, secret_key_shares_5),
+        // Players 0, 1, 5 reconstruct the dealt secret.
+        let dealt_secret_from_reconstruct = DealtSecretKey::reconstruct(&weighted_config, &vec![
+            (Player { id: 0 }, secret_key_share_vecs[0].clone()),
+            (Player { id: 1 }, secret_key_share_vecs[1].clone()),
+            (Player { id: 5 }, secret_key_share_vecs[5].clone()),
         ]);
-        assert_eq!(dealt_secret_from_input, reconstructed_secret);
+        assert_eq!(dealt_secret_from_input, dealt_secret_from_reconstruct);
     }
 }
