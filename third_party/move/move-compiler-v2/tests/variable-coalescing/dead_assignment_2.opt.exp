@@ -14,14 +14,11 @@ fun m::dead($t0: u64): u64 {
 fun m::dead($t0: u64): u64 {
      var $t1: u64
      # live vars: $t0
-     # events: b:$t0
-  0: $t0 := move($t0)
-     # live vars: $t0
-     # events: e:$t0, b:$t1
-  1: $t1 := move($t0)
+     # events: b:$t0, e:$t0, b:$t1
+  0: $t1 := move($t0)
      # live vars: $t1
      # events: e:$t1
-  2: return $t1
+  1: return $t1
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -30,8 +27,7 @@ fun m::dead($t0: u64): u64 {
 fun m::dead($t0: u64): u64 {
      var $t1: u64 [unused]
   0: $t0 := move($t0)
-  1: $t0 := move($t0)
-  2: return $t0
+  1: return $t0
 }
 
 

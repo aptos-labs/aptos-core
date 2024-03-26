@@ -348,7 +348,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exp_suffix: None,
             options: opts
                 .clone()
-                // Turn off simplifcation
+                // Turn off simplification
                 .set_experiment(Experiment::AST_SIMPLIFY, false)
                 // For testing
                 .set_experiment(Experiment::VARIABLE_COALESCING_ANNOTATE, true),

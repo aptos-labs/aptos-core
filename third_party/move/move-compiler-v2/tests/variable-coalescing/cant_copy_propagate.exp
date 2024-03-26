@@ -33,16 +33,12 @@ fun m::test($t0: u64, $t1: bool) {
  14: return ()
 }
 
-============ after VariableCoalescingAnnotator: ================
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 fun m::consume($t0: u64) {
-     var $t1: u64
-     # live vars: $t0
-     # events: b:$t0, e:$t0
-  0: $t1 := move($t0)
-     # live vars:
-  1: return ()
+     var $t1: u64 [unused]
+  0: return ()
 }
 
 
@@ -50,7 +46,40 @@ fun m::consume($t0: u64) {
 fun m::test($t0: u64, $t1: bool) {
      var $t2: u64
      var $t3: u64
-     var $t4: u64
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := move($t0)
+  1: $t2 := move($t3)
+  2: if ($t1) goto 3 else goto 6
+  3: label L0
+  4: m::consume($t2)
+  5: goto 10
+  6: label L1
+  7: $t5 := move($t2)
+  8: $t7 := 1
+  9: $t6 := +($t5, $t7)
+ 10: label L2
+ 11: return ()
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+     var $t1: u64 [unused]
+     # live vars: $t0
+     # events: b:$t0, e:$t0
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::test($t0: u64, $t1: bool) {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
      var $t5: u64
      var $t6: u64
      var $t7: u64
@@ -68,40 +97,30 @@ fun m::test($t0: u64, $t1: bool) {
      # live vars: $t2
   4: m::consume($t2)
      # live vars:
-  5: goto 13
+  5: goto 10
      # live vars: $t2
   6: label L1
      # live vars: $t2
-     # events: b:$t4
-  7: $t4 := 99
-     # live vars: $t2, $t4
-     # events: e:$t4
-  8: $t0 := move($t4)
-     # live vars: $t2
      # events: e:$t2, b:$t5
-  9: $t5 := move($t2)
+  7: $t5 := move($t2)
      # live vars: $t5
      # events: b:$t7
- 10: $t7 := 1
+  8: $t7 := 1
      # live vars: $t5, $t7
-     # events: e:$t5, e:$t7, b:$t6
- 11: $t6 := +($t5, $t7)
-     # live vars: $t6
-     # events: e:$t6
- 12: $t5 := move($t6)
+     # events: e:$t5, e:$t6, e:$t7, b:$t6
+  9: $t6 := +($t5, $t7)
      # live vars:
- 13: label L2
+ 10: label L2
      # live vars:
- 14: return ()
+ 11: return ()
 }
 
 ============ after VariableCoalescingTransformer: ================
 
 [variant baseline]
 fun m::consume($t0: u64) {
-     var $t1: u64
-  0: $t1 := move($t0)
-  1: return ()
+     var $t1: u64 [unused]
+  0: return ()
 }
 
 
@@ -109,25 +128,22 @@ fun m::consume($t0: u64) {
 fun m::test($t0: u64, $t1: bool) {
      var $t2: u64 [unused]
      var $t3: u64 [unused]
-     var $t4: u64
+     var $t4: u64 [unused]
      var $t5: u64 [unused]
      var $t6: u64 [unused]
-     var $t7: u64 [unused]
+     var $t7: u64
   0: $t0 := move($t0)
   1: $t0 := move($t0)
   2: if ($t1) goto 3 else goto 6
   3: label L0
   4: m::consume($t0)
-  5: goto 13
+  5: goto 10
   6: label L1
-  7: $t4 := 99
-  8: $t0 := move($t4)
-  9: $t0 := move($t0)
- 10: $t4 := 1
- 11: $t0 := +($t0, $t4)
- 12: $t0 := move($t0)
- 13: label L2
- 14: return ()
+  7: $t0 := move($t0)
+  8: $t7 := 1
+  9: $t0 := +($t0, $t7)
+ 10: label L2
+ 11: return ()
 }
 
 ============ after DeadStoreElimination: ================
@@ -143,21 +159,19 @@ fun m::consume($t0: u64) {
 fun m::test($t0: u64, $t1: bool) {
      var $t2: u64 [unused]
      var $t3: u64 [unused]
-     var $t4: u64
+     var $t4: u64 [unused]
      var $t5: u64 [unused]
      var $t6: u64 [unused]
-     var $t7: u64 [unused]
+     var $t7: u64
   0: if ($t1) goto 1 else goto 4
   1: label L0
   2: m::consume($t0)
-  3: goto 9
+  3: goto 7
   4: label L1
-  5: $t4 := 99
-  6: $t0 := move($t4)
-  7: $t4 := 1
-  8: $t0 := +($t0, $t4)
-  9: label L2
- 10: return ()
+  5: $t7 := 1
+  6: $t0 := +($t0, $t7)
+  7: label L2
+  8: return ()
 }
 
 
@@ -178,17 +192,15 @@ B0:
 B1:
 	2: MoveLoc[0](Arg0: u64)
 	3: Call consume(u64)
-	4: Branch(13)
+	4: Branch(11)
 B2:
-	5: LdU64(99)
-	6: StLoc[0](Arg0: u64)
-	7: LdU64(1)
-	8: StLoc[2](loc0: u64)
-	9: MoveLoc[0](Arg0: u64)
-	10: MoveLoc[2](loc0: u64)
-	11: Add
-	12: Pop
+	5: LdU64(1)
+	6: StLoc[2](loc0: u64)
+	7: MoveLoc[0](Arg0: u64)
+	8: MoveLoc[2](loc0: u64)
+	9: Add
+	10: Pop
 B3:
-	13: Ret
+	11: Ret
 }
 }

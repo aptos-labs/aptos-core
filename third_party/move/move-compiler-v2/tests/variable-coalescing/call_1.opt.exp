@@ -50,32 +50,29 @@ fun m::id($t0: u64): u64 {
 [variant baseline]
 fun m::test($t0: u64): u64 {
      var $t1: u64
-     var $t2: u64
+     var $t2: u64 [unused]
      var $t3: u64
      var $t4: u64
      var $t5: u64
      var $t6: u64
      # live vars: $t0
-     # events: b:$t0
-  0: $t2 := copy($t0)
-     # live vars: $t0
-     # events: e:$t0, b:$t3
-  1: $t3 := move($t0)
+     # events: b:$t0, e:$t0, b:$t3
+  0: $t3 := move($t0)
      # live vars: $t3
      # events: e:$t3, b:$t4
-  2: $t4 := move($t3)
+  1: $t4 := move($t3)
      # live vars: $t4
      # events: e:$t4, b:$t6
-  3: $t6 := m::id($t4)
+  2: $t6 := m::id($t4)
      # live vars: $t6
      # events: e:$t6, b:$t5
-  4: $t5 := m::id($t6)
+  3: $t5 := m::id($t6)
      # live vars: $t5
      # events: e:$t5, b:$t1
-  5: $t1 := m::id($t5)
+  4: $t1 := m::id($t5)
      # live vars: $t1
      # events: e:$t1
-  6: return $t1
+  5: return $t1
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -91,18 +88,17 @@ fun m::id($t0: u64): u64 {
 [variant baseline]
 fun m::test($t0: u64): u64 {
      var $t1: u64 [unused]
-     var $t2: u64
+     var $t2: u64 [unused]
      var $t3: u64 [unused]
      var $t4: u64 [unused]
      var $t5: u64 [unused]
      var $t6: u64 [unused]
-  0: $t2 := copy($t0)
+  0: $t0 := move($t0)
   1: $t0 := move($t0)
-  2: $t0 := move($t0)
+  2: $t0 := m::id($t0)
   3: $t0 := m::id($t0)
   4: $t0 := m::id($t0)
-  5: $t0 := m::id($t0)
-  6: return $t0
+  5: return $t0
 }
 
 

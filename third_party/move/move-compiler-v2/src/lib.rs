@@ -424,6 +424,8 @@ pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
         pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
         pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
+        pipeline.add_processor(Box::new(DeadStoreElimination {}));
     }
 
     if options.experiment_on(Experiment::VARIABLE_COALESCING) {

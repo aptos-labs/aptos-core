@@ -22,6 +22,27 @@ public fun m::test($t0: bool): u32 {
  13: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test($t0: bool): u32 {
+     var $t1: u32
+     var $t2: u32
+     var $t3: u32
+     var $t4: u32
+  0: $t3 := 1
+  1: $t2 := move($t3)
+  2: $t4 := move($t2)
+  3: if ($t0) goto 4 else goto 7
+  4: label L0
+  5: $t1 := move($t4)
+  6: goto 9
+  7: label L1
+  8: $t1 := 9
+  9: label L2
+ 10: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -41,30 +62,24 @@ public fun m::test($t0: bool): u32 {
   2: $t4 := move($t2)
      # live vars: $t0, $t4
      # events: e:$t0
-  3: if ($t0) goto 4 else goto 9
+  3: if ($t0) goto 4 else goto 7
      # live vars: $t4
   4: label L0
      # live vars: $t4
-  5: $t4 := move($t4)
-     # live vars: $t4
-  6: $t4 := move($t4)
-     # live vars: $t4
      # events: b:$t1
-  7: $t1 := move($t4)
+  5: $t1 := move($t4)
      # live vars: $t1
-  8: goto 12
-     # live vars: $t4
-  9: label L1
+  6: goto 9
      # live vars: $t4
      # events: e:$t4
- 10: $t4 := move($t4)
+  7: label L1
      # live vars:
- 11: $t1 := 9
+  8: $t1 := 9
      # live vars: $t1
- 12: label L2
+  9: label L2
      # live vars: $t1
      # events: e:$t1
- 13: return $t1
+ 10: return $t1
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -78,17 +93,14 @@ public fun m::test($t0: bool): u32 {
   0: $t3 := 1
   1: $t3 := move($t3)
   2: $t3 := move($t3)
-  3: if ($t0) goto 4 else goto 9
+  3: if ($t0) goto 4 else goto 7
   4: label L0
-  5: $t3 := move($t3)
-  6: $t3 := move($t3)
-  7: $t1 := move($t3)
-  8: goto 12
-  9: label L1
- 10: $t3 := move($t3)
- 11: $t1 := 9
- 12: label L2
- 13: return $t1
+  5: $t1 := move($t3)
+  6: goto 9
+  7: label L1
+  8: $t1 := 9
+  9: label L2
+ 10: return $t1
 }
 
 ============ after DeadStoreElimination: ================
