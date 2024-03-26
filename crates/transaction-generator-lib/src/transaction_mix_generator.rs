@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};

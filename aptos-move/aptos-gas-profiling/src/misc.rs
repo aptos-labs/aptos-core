@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 pub fn strip_trailing_zeros_and_decimal_point(mut s: &str) -> &str {

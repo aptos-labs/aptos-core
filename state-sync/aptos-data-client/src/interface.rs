@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{error, error::Error, global_summary::GlobalDataSummary};

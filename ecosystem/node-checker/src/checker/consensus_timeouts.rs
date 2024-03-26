@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 //! This Checker is only valuable in certain contexts. For example, this is

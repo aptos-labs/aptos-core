@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 /// Like `pop_arg!` but for safe natives that return `SafeNativeResult<T>`. Will return a

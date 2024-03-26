@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
 // Persistent checking is a mechanism to increase tolerancy to eventual consistency issues. In our

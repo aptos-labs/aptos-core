@@ -1,4 +1,4 @@
-// Copyright © Aptos Foundation
+// Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{RemoteKVRequest, RemoteKVResponse};
 use aptos_secure_net::network_controller::{Message, NetworkController};
