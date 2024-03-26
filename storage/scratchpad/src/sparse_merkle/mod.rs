@@ -109,27 +109,13 @@ type NodePosition = bitvec::vec::BitVec<u8, bitvec::order::Msb0>;
 const BITS_IN_NIBBLE: usize = 4;
 const BITS_IN_BYTE: usize = 8;
 
-/// Keeps track of references of children and the branch tracker of the current branch.
-#[derive(Debug)]
-struct InnerLinks<V: Send + Sync + 'static> {
-    children: Vec<Arc<Inner<V>>>,
-}
-
-impl<V: Send + Sync + 'static> InnerLinks<V> {
-    fn new() -> Mutex<Self> {
-        Mutex::new(Self {
-            children: Vec::new(),
-        })
-    }
-}
-
 /// The inner content of a sparse merkle tree, we have this so that even if a tree is dropped, the
 /// INNER of it can still live if referenced by a previous version.
 #[derive(Debug)]
 struct Inner<V: Send + Sync + 'static> {
     root: Option<SubTree<V>>,
     usage: StateStorageUsage,
-    links: Mutex<InnerLinks<V>>,
+    children: Mutex<Vec<Arc<Inner<V>>>>,
     family: HashValue,
     generation: u64,
 }
@@ -180,7 +166,7 @@ impl<V: Send + Sync + 'static> Inner<V> {
         let me = Arc::new(Self {
             root: Some(root),
             usage,
-            links: InnerLinks::new(),
+            children: Mutex::new(Vec::new()),
             family,
             generation: 0,
         });
@@ -193,31 +179,25 @@ impl<V: Send + Sync + 'static> Inner<V> {
         self.root.as_ref().expect("Root must exist.")
     }
 
-    fn spawn_impl(&self, child_root: SubTree<V>, child_usage: StateStorageUsage) -> Arc<Self> {
-        Arc::new(Self {
-            root: Some(child_root),
-            usage: child_usage,
-            links: InnerLinks::new(),
-            family: self.family,
-            generation: self.generation + 1,
-        })
-    }
-
     fn spawn(
         self: &Arc<Self>,
         child_root: SubTree<V>,
         child_usage: StateStorageUsage,
     ) -> Arc<Self> {
-        let mut links_locked = self.links.lock();
-
-        let child = self.spawn_impl(child_root, child_usage);
-        links_locked.children.push(child.clone());
+        let child = Arc::new(Self {
+            root: Some(child_root),
+            usage: child_usage,
+            children: Mutex::new(Vec::new()),
+            family: self.family,
+            generation: self.generation + 1,
+        });
+        self.children.lock().push(child.clone());
 
         child
     }
 
     fn drain_children_for_drop(&self) -> Vec<Arc<Self>> {
-        self.links.lock().children.drain(..).collect()
+        self.children.lock().drain(..).collect()
     }
 
     fn log_generation(&self, name: &'static str) {
