@@ -538,3 +538,124 @@ impl Transcript {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::pvss::{
+        das::{weighted_protocol::Transcript, PublicParameters},
+        dealt_secret_key::g1::DealtSecretKey,
+        encryption_dlog,
+        input_secret::InputSecret,
+        traits,
+        traits::{Convert, Reconstructable},
+        Player, WeightedConfig,
+    };
+    use aptos_crypto::{
+        bls12381::{PrivateKey, PublicKey},
+        Uniform,
+    };
+    use num_traits::Zero;
+    use rand::thread_rng;
+    use std::ops::AddAssign;
+
+    #[test]
+    fn basic() {
+        let mut rng = thread_rng();
+        let weighted_config = WeightedConfig::new(3, vec![0, 1, 0, 2, 0, 3, 0]).unwrap();
+        let pp = PublicParameters::default_with_bls_base();
+        let private_keys: Vec<PrivateKey> =
+            (0..7).map(|_| PrivateKey::generate(&mut rng)).collect();
+        let public_keys: Vec<PublicKey> = private_keys.iter().map(PublicKey::from).collect();
+        let enc_pks: Vec<encryption_dlog::g1::EncryptPubKey> = public_keys
+            .iter()
+            .map(|pk| pk.to_bytes().as_slice().try_into().unwrap())
+            .collect();
+        let dec_sks: Vec<encryption_dlog::g1::DecryptPrivKey> = private_keys
+            .iter()
+            .map(|sk| {
+                let mut bytes = sk.to_bytes(); // in big-endian
+                bytes.reverse();
+                encryption_dlog::g1::DecryptPrivKey::try_from(bytes.as_slice()).unwrap()
+            })
+            .collect();
+        let input_secrets: Vec<InputSecret> =
+            (0..7).map(|_| InputSecret::generate(&mut rng)).collect();
+        let auxs: Vec<u64> = (0..7).collect();
+        let transcripts: Vec<Transcript> = (0..7)
+            .map(|i| {
+                let trx = <Transcript as traits::Transcript>::deal(
+                    &weighted_config,
+                    &pp,
+                    &private_keys[i],
+                    &enc_pks,
+                    &input_secrets[i],
+                    &auxs[i],
+                    &Player { id: i },
+                    &mut rng,
+                );
+                let verify_result = <Transcript as traits::Transcript>::verify(
+                    &trx,
+                    &weighted_config,
+                    &pp,
+                    &vec![public_keys[i].clone()],
+                    &enc_pks,
+                    &vec![auxs[i]],
+                );
+                assert!(verify_result.is_ok());
+                trx
+            })
+            .collect();
+        let trx_agg = <Transcript as traits::Transcript>::aggregate(&weighted_config, vec![
+            transcripts[3].clone(),
+            transcripts[0].clone(),
+        ])
+        .unwrap();
+        let mut input_secret_agg = InputSecret::zero();
+        input_secret_agg.add_assign(&input_secrets[3]);
+        input_secret_agg.add_assign(&input_secrets[0]);
+        let dealt_secret_from_input: DealtSecretKey = input_secret_agg.to(&pp);
+        let verify_result = <Transcript as traits::Transcript>::verify(
+            &trx_agg,
+            &weighted_config,
+            &pp,
+            &vec![public_keys[3].clone(), public_keys[0].clone()],
+            &enc_pks,
+            &vec![auxs[3], auxs[0]],
+        );
+        assert!(verify_result.is_ok());
+        assert_eq!(
+            <Transcript as traits::Transcript>::get_dealers(&trx_agg),
+            vec![Player { id: 3 }, Player { id: 0 }]
+        );
+
+        // Reconstruct with players 0, 1, 5.
+        let (secret_key_shares_1, _public_key_shares_1) =
+            <Transcript as traits::Transcript>::decrypt_own_share(
+                &trx_agg,
+                &weighted_config,
+                &Player { id: 1 },
+                &dec_sks[1],
+            );
+        let (secret_key_shares_5, _public_key_shares_5) =
+            <Transcript as traits::Transcript>::decrypt_own_share(
+                &trx_agg,
+                &weighted_config,
+                &Player { id: 5 },
+                &dec_sks[5],
+            );
+        let (secret_key_shares_0, _public_key_shares_0) =
+            <Transcript as traits::Transcript>::decrypt_own_share(
+                &trx_agg,
+                &weighted_config,
+                &Player { id: 0 },
+                &dec_sks[0],
+            );
+
+        let reconstructed_secret = DealtSecretKey::reconstruct(&weighted_config, &vec![
+            (Player { id: 0 }, secret_key_shares_0),
+            (Player { id: 1 }, secret_key_shares_1),
+            (Player { id: 5 }, secret_key_shares_5),
+        ]);
+        assert_eq!(dealt_secret_from_input, reconstructed_secret);
+    }
+}
