@@ -52,8 +52,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
-  GCP_DOCKER_ARTIFACT_REPO_US: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO_US }}
   AWS_ECR_ACCOUNT_NUM: ${{ secrets.ENV_ECR_AWS_ACCOUNT_NUM }}
   # In case of pull_request events by default github actions merges main into the PR branch and then runs the tests etc
   # on the prospective merge result instead of only on the tip of the PR.

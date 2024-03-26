@@ -33,9 +33,9 @@ jobs:
     runs-on: high-perf-docker
     env:
       # spin up the local testnet using the latest devnet image
-      VALIDATOR_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/validator
-      FAUCET_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/faucet
-      INDEXER_GRPC_IMAGE_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}/indexer-grpc
+      VALIDATOR_IMAGE_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/validator
+      FAUCET_IMAGE_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/faucet
+      INDEXER_GRPC_IMAGE_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}/indexer-grpc
       IMAGE_TAG: devnet
 
     steps:
