@@ -605,7 +605,7 @@ fn get_land_blocking_test(
 ) -> Option<ForgeConfig> {
     let test = match test_name {
         "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+        "realistic_env_max_load" => pfn_performance(duration, true, true, false),
         "compat" => compat(),
         "framework_upgrade" => framework_upgrade(),
         _ => return None, // The test name does not match a land-blocking test
@@ -2448,11 +2448,17 @@ fn pfn_performance(
 
     // Create the forge config
     ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(7).unwrap())
-        .with_initial_fullnode_count(7)
-        .add_network_test(PFNPerformance::new(7, add_cpu_chaos, add_network_emulation))
+        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
+        .with_initial_fullnode_count(20)
+        .add_network_test(PFNPerformance::new(1, add_cpu_chaos, add_network_emulation))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             helm_values["chain"]["epoch_duration_secs"] = epoch_duration_secs.into();
+        }))
+        .with_fullnode_override_node_config_fn(Arc::new(|config, _| {
+            config.mempool.default_failovers = 20;
+            for network in &mut config.full_node_networks {
+                network.max_outbound_connections = 20;
+            }
         }))
         .with_success_criteria(
             SuccessCriteria::new(min_expected_tps)
