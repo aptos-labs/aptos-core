@@ -182,3 +182,40 @@ fn compiler_exp_var() -> Vec<String> {
     });
     (*EXP_VAR).clone()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_options_ref_cell_clone() {
+        let test_key = "foo".to_owned();
+        let options1 = Options::default();
+
+        options1
+            .experiment_cache
+            .borrow_mut()
+            .insert(test_key.clone(), false);
+
+        let options2 = options1.clone();
+
+        options1
+            .experiment_cache
+            .borrow_mut()
+            .insert(test_key.clone(), true);
+
+        let x1 = *(options1
+            .experiment_cache
+            .borrow()
+            .get(&test_key)
+            .expect("we just set foo"));
+        assert!(x1);
+
+        let x2 = *(options2
+            .experiment_cache
+            .borrow()
+            .get(&test_key)
+            .expect("we just set foo"));
+        assert!(!x2);
+    }
+}

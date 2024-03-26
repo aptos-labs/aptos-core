@@ -5,6 +5,7 @@ module 42.operators {
 
 
 arithm(Arg0: u64, Arg1: u64): u64 /* def_idx: 0 */ {
+L2:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: CopyLoc[1](Arg1: u64)
@@ -26,6 +27,7 @@ B0:
 	17: Ret
 }
 bits(Arg0: u64, Arg1: u8): u64 /* def_idx: 1 */ {
+L2:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: CopyLoc[1](Arg1: u8)
@@ -45,6 +47,7 @@ B0:
 	15: Ret
 }
 bools(Arg0: bool, Arg1: bool): bool /* def_idx: 2 */ {
+L2:	loc0: bool
 B0:
 	0: CopyLoc[0](Arg0: bool)
 	1: BrFalse(5)
@@ -129,6 +132,7 @@ B0:
 	3: Ret
 }
 order(Arg0: u64, Arg1: u64): bool /* def_idx: 5 */ {
+L2:	loc0: bool
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: CopyLoc[1](Arg1: u64)
