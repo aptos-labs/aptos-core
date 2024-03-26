@@ -231,6 +231,7 @@ fn unit_test_extensions_hook(exts: &mut NativeContextExtensions) {
         vec![1],
         vec![1],
         ChainId::test().id(),
+        None,
     ));
     exts.add(NativeAggregatorContext::new(
         [0; 32],

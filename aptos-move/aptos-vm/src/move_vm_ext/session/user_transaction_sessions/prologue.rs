@@ -29,7 +29,13 @@ impl<'r, 'l> PrologueSession<'r, 'l> {
         resolver: &'r impl AptosMoveResolver,
     ) -> Result<Self, VMStatus> {
         let session_id = SessionId::prologue_meta(txn_meta);
-        let session = RespawnedSession::spawn(vm, session_id, resolver, VMChangeSet::empty())?;
+        let session = RespawnedSession::spawn(
+            vm,
+            session_id,
+            resolver,
+            VMChangeSet::empty(),
+            Some(txn_meta.as_user_transaction_context()),
+        )?;
 
         Ok(Self { session })
     }

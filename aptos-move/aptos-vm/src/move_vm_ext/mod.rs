@@ -14,6 +14,7 @@ pub use crate::move_vm_ext::{
     session::SessionExt,
     vm::{get_max_binary_format_version, get_max_identifier_size, verifier_config, MoveVmExt},
 };
+pub use aptos_types::transaction::user_transaction_context::UserTransactionContext;
 use aptos_types::{access_path::AccessPath, state_store::state_key::StateKey};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{

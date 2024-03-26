@@ -15,7 +15,10 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
-use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
+use aptos_types::{
+    on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures},
+    transaction::user_transaction_context::UserTransactionContext,
+};
 use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::VMResult,
@@ -190,6 +193,7 @@ impl MoveVmExt {
         &self,
         resolver: &'r S,
         session_id: SessionId,
+        user_transaction_context_opt: Option<UserTransactionContext>,
     ) -> SessionExt<'r, '_> {
         let mut extensions = NativeContextExtensions::default();
         let txn_hash: [u8; 32] = session_id
@@ -207,6 +211,7 @@ impl MoveVmExt {
             txn_hash.to_vec(),
             session_id.into_script_hash(),
             self.chain_id,
+            user_transaction_context_opt,
         ));
         extensions.add(NativeCodeContext::default());
         extensions.add(NativeStateStorageContext::new(resolver));
