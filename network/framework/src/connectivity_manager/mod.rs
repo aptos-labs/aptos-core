@@ -1173,12 +1173,6 @@ where
             },
         }
     }
-
-    // #[cfg(test)]
-    // /// Returns the set of connected peers (for test purposes)
-    // fn get_connected_peers(&self) -> HashMap<PeerId, ConnectionMetadata> {
-    //     self.connected.clone()
-    // }
 }
 
 fn log_dial_result(
