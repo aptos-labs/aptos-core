@@ -20,7 +20,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 pub fn acquires_checker(env: &GlobalEnv) {
     for module in env.get_modules() {
         if module.is_target() {
-            let analyzer = AccessControlAnalyzer::new(module.clone());
+            let analyzer = AcquireChecker::new(module.clone());
             let acquires = analyzer.analyze();
             for (fun_id, acquires) in acquires.into_iter() {
                 let fun_env = module.get_function(fun_id);
@@ -127,11 +127,11 @@ impl AcquiredResources {
     }
 }
 
-struct AccessControlAnalyzer<'a> {
+struct AcquireChecker<'a> {
     mod_env: ModuleEnv<'a>,
 }
 
-impl<'a> AccessControlAnalyzer<'a> {
+impl<'a> AcquireChecker<'a> {
     pub fn new(mod_env: ModuleEnv<'a>) -> Self {
         Self { mod_env }
     }
