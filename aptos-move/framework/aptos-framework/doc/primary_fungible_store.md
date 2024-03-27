@@ -185,9 +185,12 @@ Create a primary store object to hold fungible asset for the given address.
 ): Object&lt;FungibleStore&gt; <b>acquires</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a> {
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
     <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(metadata_addr);
-    <b>let</b> derive_ref = &<b>borrow_global</b>&lt;<a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a>&gt;(metadata_addr).metadata_derive_ref;
-    <b>let</b> constructor_ref = &<a href="object.md#0x1_object_create_user_derived_object">object::create_user_derived_object</a>(owner_addr, derive_ref);
-
+    <b>let</b> constructor_ref = <b>if</b> (metadata_addr == @aptos_fungible_asset) {
+        &<a href="object.md#0x1_object_create_sticky_object_at_address">object::create_sticky_object_at_address</a>(owner_addr, owner_addr)
+    } <b>else</b> {
+        <b>let</b> derive_ref = &<b>borrow_global</b>&lt;<a href="primary_fungible_store.md#0x1_primary_fungible_store_DeriveRefPod">DeriveRefPod</a>&gt;(metadata_addr).metadata_derive_ref;
+        &<a href="object.md#0x1_object_create_user_derived_object">object::create_user_derived_object</a>(owner_addr, derive_ref)
+    };
     // Disable ungated transfer <b>as</b> deterministic stores shouldn't be transferrable.
     <b>let</b> transfer_ref = &<a href="object.md#0x1_object_generate_transfer_ref">object::generate_transfer_ref</a>(constructor_ref);
     <a href="object.md#0x1_object_disable_ungated_transfer">object::disable_ungated_transfer</a>(transfer_ref);
@@ -219,7 +222,15 @@ Get the address of the primary store for the given account.
 
 <pre><code><b>public</b> <b>fun</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_store_address</a>&lt;T: key&gt;(owner: <b>address</b>, metadata: Object&lt;T&gt;): <b>address</b> {
     <b>let</b> metadata_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&metadata);
+<<<<<<< HEAD
     <a href="transaction_context.md#0x1_transaction_context_create_user_derived_object_address">transaction_context::create_user_derived_object_address</a>(owner, metadata_addr)
+=======
+    <b>if</b> (metadata_addr == @aptos_fungible_asset) {
+        owner
+    } <b>else</b> {
+        <a href="object.md#0x1_object_create_user_derived_object_address">object::create_user_derived_object_address</a>(owner, metadata_addr)
+    }
+>>>>>>> a640a2e544 ([not for review] test after fa migration, apt on owner address)
 }
 </code></pre>
 
