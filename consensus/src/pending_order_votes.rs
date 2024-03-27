@@ -2,24 +2,13 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    counters, pending_votes::VoteReceptionResult, qc_aggregator::{create_qc_aggregator, QcAggregator},
-};
+use crate::pending_votes::VoteReceptionResult;
 use aptos_consensus_types::{
     common::Author,
-    delayed_qc_msg::DelayedQcMsg,
-    quorum_cert::QuorumCert,
     order_vote::OrderVote,
 };
-use aptos_types::{
-    aggregate_signature::PartialSignatures,
-    ledger_info::LedgerInfoWithPartialSignatures,
-    validator_verifier::{ValidatorVerifier, VerifyError},
-};
-use std::{
-    collections::HashMap,
-    fmt,
-};
+use aptos_types::validator_verifier::ValidatorVerifier;
+use std::collections::HashMap;
 
 /// A PendingVotes structure keep track of votes
 pub struct PendingOrderVotes {
@@ -36,6 +25,7 @@ impl PendingOrderVotes {
     }
 
     /// Add a vote to the pending votes
+    // TODO: Finish this
     pub fn insert_order_vote(
         &mut self,
         order_vote: OrderVote,
@@ -49,12 +39,12 @@ impl PendingOrderVotes {
         if let Some(previously_seen_vote) = self.author_to_order_vote.get(&author)
         {
             // we have seen a different vote for the same round
-            error!(
-                SecurityEvent::ConsensusEquivocatingVote,
-                remote_peer = order_vote.author(),
-                vote = order_vote,
-                previous_vote = previously_seen_vote
-            );
+            // error!(
+            //     SecurityEvent::ConsensusEquivocatingVote,
+            //     remote_peer = order_vote.author(),
+            //     vote = order_vote,
+            //     previous_vote = previously_seen_vote
+            // );
             return VoteReceptionResult::EquivocateVote;
         }
 
@@ -63,6 +53,7 @@ impl PendingOrderVotes {
         //
         self.author_to_order_vote
             .insert(order_vote.author(), order_vote.clone());
+        VoteReceptionResult::VoteAdded(0)
 
     }
 
@@ -70,10 +61,3 @@ impl PendingOrderVotes {
         self.author_to_order_vote.drain().values().collect()
     }
 }
-
-impl fmt::Display for PendingOrderVotes {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PendingOrderVotes: [round: {}]", self.round)
-    }
-}
-

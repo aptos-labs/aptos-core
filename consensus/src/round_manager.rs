@@ -30,32 +30,19 @@ use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block,
-    block_data::BlockType,
-    common::{Author, Round},
-    delayed_qc_msg::DelayedQcMsg,
-    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
-    proposal_msg::ProposalMsg,
-    quorum_cert::QuorumCert,
-    sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutCertificate,
-    vote::Vote,
-    vote_msg::VoteMsg,
-    order_vote_msg::OrderVoteMsg,
+    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, order_vote_msg::OrderVoteMsg, proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
 };
+use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
-    epoch_state::EpochState,
-    on_chain_config::{
+    epoch_state::EpochState, ledger_info::LedgerInfo, on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
-    },
-    validator_verifier::ValidatorVerifier,
-    PeerId,
+    }, validator_verifier::ValidatorVerifier, PeerId
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
@@ -984,16 +971,17 @@ impl RoundManager {
             .await
     }
 
-    async fn process_order_vote_msg(&mut self, order_vote: &OrderVoteMsg) -> anyhow::Result<()> {
+    // TODO: Finish this
+    async fn process_order_vote_msg(&mut self, order_vote: OrderVoteMsg) -> anyhow::Result<()> {
         let order_vote = order_vote.vote();
         let round = order_vote.ledger_info().round();
         let block_id = order_vote.ledger_info().consensus_block_id();
-        
-        let vote_reception_result = self
-            .round_state
-            .insert_order_vote(order_vote, &self.epoch_state.verifier);
-        self.process_vote_reception_result(order_vote, vote_reception_result)
-            .await
+        Ok(())
+        // let vote_reception_result = self
+        //     .round_state
+        //     .insert_order_vote(order_vote, &self.epoch_state.verifier);
+        // self.process_vote_reception_result(order_vote, vote_reception_result)
+        //     .await
     }
 
     async fn process_vote_reception_result(
@@ -1010,14 +998,18 @@ impl RoundManager {
                         BlockStage::QC_AGGREGATED,
                     );
                 }                
-                let result = self.new_qc_aggregated(qc, vote.author()).await;
+                let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
                 if result.is_ok() {
-                    let order_vote = self
-                        .safety_rules
-                        .lock()
-                        .construct_and_sign_order_vote(qc.certified_block().id());
-                    info!(self.new_log(LogEvent::OrderVote), "{}", vote);
-                    self.network.broadcast_vote(vote_msg).await;
+                    // TODO: Is this the correct way to compute consensus_data_hash in ledger_info?
+                    let ledger_info = LedgerInfo::new(qc.vote_data().proposed().clone(), qc.vote_data().hash());
+                    if let Ok(order_vote) = self
+                                                        .safety_rules
+                                                        .lock()
+                                                        .construct_and_sign_order_vote(ledger_info, qc) {
+                        info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
+                        // TODO: Add to pending order votes
+                        self.network.broadcast_order_vote(OrderVoteMsg::new(order_vote)).await;        
+                    }
                 }
                 result
             },
@@ -1184,7 +1176,7 @@ impl RoundManager {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
                         },
-                        VerifiedEvent:OrderVoteMsg(order_vote_msg) => {
+                        VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
                             monitor!(
                                 "order_vote_msg",
                                 self.process_order_vote_msg(*order_vote_msg).await

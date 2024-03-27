@@ -7,6 +7,7 @@ use aptos_types::validator_verifier::ValidatorVerifier;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
+// TODO: Do we even need OrderVoteMsg? Is it better to just use OrderVote?
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct OrderVoteMsg {
     /// The container for the vote (VoteData, LedgerInfo, Signature)

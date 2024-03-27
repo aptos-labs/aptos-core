@@ -18,7 +18,8 @@ use aptos_consensus_types::{
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
-    vote_msg::{OrderVoteMsg, VoteMsg},
+    vote_msg::VoteMsg,
+    order_vote_msg::OrderVoteMsg,
 };
 use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface},

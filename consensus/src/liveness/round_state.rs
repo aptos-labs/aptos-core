@@ -214,7 +214,7 @@ impl RoundState {
             qc_aggregator_type.clone(),
         );
 
-        let pending_order_votes = PendingOrderVotes::new(0);
+        let pending_order_votes = PendingOrderVotes::new();
         Self {
             time_interval,
             highest_committed_round: 0,
@@ -330,7 +330,7 @@ impl RoundState {
             self.pending_order_votes.insert_order_vote(order_vote, verifier)
         } else {
             VoteReceptionResult::UnexpectedRound(
-                order_vote.vote_data().proposed().round(),
+                order_vote.round(),
                 self.current_round - 1,
             )
         }

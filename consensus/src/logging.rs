@@ -52,6 +52,7 @@ pub enum LogEvent {
     ReceiveAugData,
     BroadcastCertifiedAugData,
     ReceiveCertifiedAugData,
+    SendOrderVote,
 }
 
 impl LogSchema {

@@ -43,6 +43,7 @@ impl<'a> SafetyLogSchema<'a> {
 pub enum LogEntry {
     ConsensusState,
     ConstructAndSignVoteTwoChain,
+    ConstructAndSignOrderVote,
     Epoch,
     Initialize,
     KeyReconciliation,
@@ -61,6 +62,7 @@ impl LogEntry {
         match self {
             LogEntry::ConsensusState => "consensus_state",
             LogEntry::ConstructAndSignVoteTwoChain => "construct_and_sign_vote_2chain",
+            LogEntry::ConstructAndSignOrderVote => "construct_and_sign_order_vote",
             LogEntry::Epoch => "epoch",
             LogEntry::Initialize => "initialize",
             LogEntry::LastVotedRound => "last_voted_round",
