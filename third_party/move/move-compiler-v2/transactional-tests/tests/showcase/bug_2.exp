@@ -1,7 +1,6 @@
-comparison between v1 and v2 failed:
-= processed 2 tasks
-= 
-= task 1 'run'. lines 11-11:
-- return values: 5
-+ return values: 1
-= 
+processed 2 tasks
+
+task 1 'run'. lines 11-11:
+return values: 5
+
+==> Compiler v2 delivered same results!
