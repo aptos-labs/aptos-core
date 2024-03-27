@@ -13,8 +13,6 @@ module aptos_framework::gas_schedule {
     use aptos_framework::storage_gas::StorageGasConfig;
     use aptos_framework::storage_gas;
     #[test_only]
-    use std::bcs;
-    #[test_only]
     use std::bcs::to_bytes;
 
     friend aptos_framework::genesis;
@@ -80,6 +78,8 @@ module aptos_framework::gas_schedule {
     }
 
     /// Set the gas schedule for the next epoch, typically called by on-chain governance.
+    /// Abort if the version of the given schedule is lower than the current version.
+    ///
     /// Example usage:
     /// ```
     /// aptos_framework::gas_schedule::set_for_next_epoch(&framework_signer, some_gas_schedule_blob);
