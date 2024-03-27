@@ -87,7 +87,11 @@ module aptos_framework::primary_fungible_store {
     /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        object::create_user_derived_object_address(owner, metadata_addr)
+        if (metadata_addr == @aptos_fungible_asset) {
+            owner
+        } else {
+            object::create_user_derived_object_address(owner, metadata_addr)
+        }
     }
 
     #[view]
