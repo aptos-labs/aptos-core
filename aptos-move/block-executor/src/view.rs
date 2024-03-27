@@ -636,12 +636,14 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                     match wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
                         Err(e) => {
                             error!("Error {:?} in wait for dependency", e);
+                            self.captured_reads.borrow_mut().mark_incorrect_use();
                             return ReadResult::HaltSpeculativeExecution(format!(
                                 "Error {:?} in wait for dependency",
                                 e
                             ));
                         },
                         Ok(false) => {
+                            self.captured_reads.borrow_mut().mark_failure();
                             return ReadResult::HaltSpeculativeExecution(
                                 "Interrupted as block execution was halted".to_string(),
                             );
@@ -1275,7 +1277,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 }
                                 Ok(GroupReadResult::Uninitialized) => {
                                     Some(Err(code_invariant_error(format!(
-                                        "Sequential Cannot find metadata op size for the group read {:?}",
+                                        "Sequential cannot find metadata op size for the group read {:?}",
                                         key
                                     ))))
                                 },
@@ -1283,7 +1285,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                                 //       we want to propagate this error? This is somewhat an invariant
                                 //       violation so PanicError is also ok?
                                 Err(e) => Some(Err(code_invariant_error(format!(
-                                    "Sequential Cannot compute metadata op size for the group read {:?}, error: {:?}",
+                                    "Sequential cannot compute metadata op size for the group read {:?}, error: {:?}",
                                     key, e
                                 ))))
                             }

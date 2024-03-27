@@ -260,6 +260,12 @@ where
         unimplemented!()
     }
 
+    // get_reads_needing_exchange is local (looks at in-MVHashMap information only)
+    // and all failures are code invariant failures - so we return PanicError.
+    // get_group_reads_needing_exchange needs to additionally get the metadata of the
+    // whole group, which can additionally fail with speculative / storage errors,
+    // so we return PartialVMResult, to be able to distinguish/propagate those errors.
+
     fn get_reads_needing_exchange(
         &self,
         _delayed_write_set_ids: &HashSet<Self::Identifier>,
