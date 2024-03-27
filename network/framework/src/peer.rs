@@ -494,7 +494,7 @@ async fn complete_rpc(
 ) {
     if let NetworkMessage::RpcResponse(response) = nmsg {
         let blob = response.raw_response;
-        let now = time_service.now(); //tokio::time::Instant::now(); // TODO: use a TimeService
+        let now = time_service.now();
         let dt = now.duration_since(rpc_state.started);
         let data_len = blob.len() as u64;
         match rpc_state.sender.send(Ok((blob.into(), rx_time))) {
@@ -577,12 +577,11 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
     async fn forward(&self, protocol_id: ProtocolId, nmsg: NetworkMessage) {
         match self.apps.get(&protocol_id) {
             None => {
-                // TODO: counter
+                // counter? drop connection?
                 error!(
                     "read_thread got rpc req for protocol {:?} we don't handle",
                     protocol_id
                 );
-                // TODO: drop connection
             },
             Some(app) => {
                 if app.protocol_id != protocol_id {
@@ -633,7 +632,6 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
         );
         match &nmsg {
             NetworkMessage::Error(errm) => {
-                // TODO: counter
                 warn!("read_thread got error message: {:?}", errm)
             },
             NetworkMessage::RpcRequest(request) => {
