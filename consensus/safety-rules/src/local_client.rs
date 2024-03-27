@@ -62,7 +62,7 @@ impl TSafetyRules for LocalClient {
 
     fn construct_and_sign_order_vote(
         &mut self,
-        ledger_info: LedgerInfo,
+        ledger_info: &LedgerInfo,
         quorum_cert: Arc<QuorumCert>,
     ) -> Result<OrderVote, Error> {
         self.internal

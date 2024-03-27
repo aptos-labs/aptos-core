@@ -64,7 +64,7 @@ impl SerializerService {
             },
             SafetyRulesInput::ConstructAndSignOrderVote(ledger_info, quorum_cert) => {
                 serde_json::to_vec(&self.internal.construct_and_sign_order_vote(
-                    *ledger_info,
+                    &ledger_info,
                     quorum_cert,
                 ))
             }
@@ -147,12 +147,12 @@ impl TSafetyRules for SerializerClient {
 
     fn construct_and_sign_order_vote(
             &mut self,
-            ledger_info: LedgerInfo,
+            ledger_info: &LedgerInfo,
             quorum_cert: Arc<QuorumCert>,
         ) -> Result<OrderVote, Error> {
         let _timer = counters::start_timer("external", LogEntry::ConstructAndSignOrderVote.as_str());
         let response = self.request(SafetyRulesInput::ConstructAndSignOrderVote(
-            Box::new(ledger_info),
+            Box::new(ledger_info.clone()),
             quorum_cert.clone(),
         ))?;
         serde_json::from_slice(&response)?

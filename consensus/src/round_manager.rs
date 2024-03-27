@@ -6,31 +6,18 @@ use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
-    },
-    counters,
-    counters::{PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
-    error::{error_kind, VerifyError},
-    liveness::{
+    }, counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT}, error::{error_kind, VerifyError}, liveness::{
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,
-    },
-    logging::{LogEvent, LogSchema},
-    metrics_safety_rules::MetricsSafetyRules,
-    monitor,
-    network::NetworkSender,
-    network_interface::ConsensusMsg,
-    pending_votes::VoteReceptionResult,
-    persistent_liveness_storage::PersistentLivenessStorage,
-    quorum_store::types::BatchMsg,
-    util::is_vtxn_expected,
+    }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_order_votes::OrderVoteReceptionResult, pending_votes::VoteReceptionResult, persistent_liveness_storage::PersistentLivenessStorage, quorum_store::types::BatchMsg, util::is_vtxn_expected
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, order_vote_msg::OrderVoteMsg, proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
+    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::{checked, Mutex};
@@ -58,7 +45,7 @@ use tokio::{
 pub enum UnverifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VoteMsg(Box<VoteMsg>),
-    OrderVoteMsg(Box<OrderVoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     SyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -178,7 +165,7 @@ pub enum VerifiedEvent {
     ProposalMsg(Box<ProposalMsg>),
     VerifiedProposalMsg(Box<Block>),
     VoteMsg(Box<VoteMsg>),
-    OrderVoteMsg(Box<OrderVoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
     SignedBatchInfo(Box<SignedBatchInfoMsg>),
@@ -972,16 +959,12 @@ impl RoundManager {
     }
 
     // TODO: Finish this
-    async fn process_order_vote_msg(&mut self, order_vote: OrderVoteMsg) -> anyhow::Result<()> {
-        let order_vote = order_vote.vote();
-        let round = order_vote.ledger_info().round();
-        let block_id = order_vote.ledger_info().consensus_block_id();
-        Ok(())
-        // let vote_reception_result = self
-        //     .round_state
-        //     .insert_order_vote(order_vote, &self.epoch_state.verifier);
-        // self.process_vote_reception_result(order_vote, vote_reception_result)
-        //     .await
+    async fn process_order_vote_msg(&mut self, order_vote: OrderVote) -> anyhow::Result<()> {
+        let vote_reception_result = self
+            .round_state
+            .insert_order_vote(&order_vote, &self.epoch_state.verifier);
+        self.process_order_vote_reception_result(&order_vote, vote_reception_result)
+            .await
     }
 
     async fn process_vote_reception_result(
@@ -1005,10 +988,10 @@ impl RoundManager {
                     if let Ok(order_vote) = self
                                                         .safety_rules
                                                         .lock()
-                                                        .construct_and_sign_order_vote(ledger_info, qc) {
+                                                        .construct_and_sign_order_vote(&ledger_info, qc) {
                         info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
                         // TODO: Add to pending order votes
-                        self.network.broadcast_order_vote(OrderVoteMsg::new(order_vote)).await;        
+                        self.network.broadcast_order_vote(order_vote.clone()).await;
                     }
                 }
                 result
@@ -1023,6 +1006,21 @@ impl RoundManager {
             | VoteReceptionResult::VoteAddedQCDelayed(_)
             | VoteReceptionResult::EchoTimeout(_)
             | VoteReceptionResult::DuplicateVote => Ok(()),
+            e => Err(anyhow::anyhow!("{:?}", e)),
+        }
+    }
+
+    async fn process_order_vote_reception_result(
+        &mut self,
+        _order_vote: &OrderVote,
+        result: OrderVoteReceptionResult,
+    ) -> anyhow::Result<()> {
+        match result {
+            OrderVoteReceptionResult::NewQuorumCertificate => {
+                // TODO: Execute the block
+                Ok(())
+            },
+            OrderVoteReceptionResult::VoteAdded(_) => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),
         }
     }
@@ -1176,10 +1174,10 @@ impl RoundManager {
                         VerifiedEvent::VoteMsg(vote_msg) => {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
                         },
-                        VerifiedEvent::OrderVoteMsg(order_vote_msg) => {
+                        VerifiedEvent::OrderVoteMsg(order_vote) => {
                             monitor!(
                                 "order_vote_msg",
-                                self.process_order_vote_msg(*order_vote_msg).await
+                                self.process_order_vote_msg(*order_vote).await
                             )
                         },
                         VerifiedEvent::UnverifiedSyncInfo(sync_info) => {

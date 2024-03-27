@@ -27,7 +27,7 @@ use aptos_consensus_types::{
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
-    order_vote_msg::OrderVoteMsg,
+    order_vote::OrderVote,
 };
 use aptos_logger::prelude::*;
 use aptos_network::{
@@ -416,7 +416,7 @@ impl NetworkSender {
         self.broadcast(msg).await
     }
 
-    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVoteMsg) {
+    pub async fn broadcast_order_vote(&self, order_vote_msg: OrderVote) {
         fail_point!("consensus::send::order_vote", |_| ());
         let msg = ConsensusMsg::OrderVoteMsg(Box::new(order_vote_msg));
         self.broadcast(msg).await

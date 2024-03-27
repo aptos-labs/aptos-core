@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters,
-    pending_votes::{PendingVotes, VoteReceptionResult},
-    pending_order_votes::PendingOrderVotes,
-    util::time_service::{SendTask, TimeService},
+    counters, pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes}, pending_votes::{PendingVotes, VoteReceptionResult}, util::time_service::{SendTask, TimeService}
 };
 use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
@@ -323,13 +320,14 @@ impl RoundState {
 
     pub fn insert_order_vote(
         &mut self,
-        order_vote: OrderVote,
+        order_vote: &OrderVote,
         verifier: &ValidatorVerifier,
-    ) -> VoteReceptionResult {
+    ) -> OrderVoteReceptionResult {
+        // TODO: Is this an appropriate check?
         if order_vote.round() == self.current_round - 1 {
             self.pending_order_votes.insert_order_vote(order_vote, verifier)
         } else {
-            VoteReceptionResult::UnexpectedRound(
+            OrderVoteReceptionResult::UnexpectedRound(
                 order_vote.round(),
                 self.current_round - 1,
             )

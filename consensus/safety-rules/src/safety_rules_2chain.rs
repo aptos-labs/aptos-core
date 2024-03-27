@@ -90,7 +90,7 @@ impl SafetyRules {
     // TODO: Are these safety rules exhaustive?
     pub(crate) fn guarded_construct_and_sign_order_vote(
         &mut self,
-        ledger_info: LedgerInfo,
+        ledger_info: &LedgerInfo,
         quorum_cert: Arc<QuorumCert>
     ) -> Result<OrderVote, Error> {
         // Exit early if we cannot sign
@@ -103,8 +103,8 @@ impl SafetyRules {
         }
 
         let author = self.signer()?.author();
-        let signature = self.sign(&ledger_info)?;
-        let order_vote = OrderVote::new(author, ledger_info, signature);
+        let signature = self.sign(ledger_info)?;
+        let order_vote = OrderVote::new(author, ledger_info.clone(), signature);
         Ok(order_vote)
     }
 

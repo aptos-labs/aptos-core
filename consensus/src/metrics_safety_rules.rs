@@ -122,13 +122,13 @@ impl TSafetyRules for MetricsSafetyRules {
 
     fn construct_and_sign_order_vote(
             &mut self,
-            ledger_info: LedgerInfo,
+            ledger_info: &LedgerInfo,
             quorum_cert: Arc<QuorumCert>,
         ) -> Result<OrderVote, Error> {
             self.retry(|inner| {
                 monitor!(
                     "safety_rules",
-                    inner.construct_and_sign_order_vote(ledger_info, quorum_cert)
+                    inner.construct_and_sign_order_vote(ledger_info, quorum_cert.clone())
                 )
             })
     }
@@ -237,8 +237,8 @@ mod tests {
 
         fn construct_and_sign_order_vote(
                 &mut self,
-                ledger_info: LedgerInfo,
-                quorum_cert: Arc<QuorumCert>,
+                _: &LedgerInfo,
+                _: Arc<QuorumCert>,
             ) -> Result<OrderVote, Error> {
                 unimplemented!()
         }

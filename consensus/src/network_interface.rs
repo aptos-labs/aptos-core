@@ -19,7 +19,7 @@ use aptos_consensus_types::{
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
-    order_vote_msg::OrderVoteMsg,
+    order_vote::OrderVote,
 };
 use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface},
@@ -52,7 +52,7 @@ pub enum ConsensusMsg {
     VoteMsg(Box<VoteMsg>),
     /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
     /// on a block.
-    OrderVoteMsg(Box<OrderVoteMsg>),
+    OrderVoteMsg(Box<OrderVote>),
     /// CommitProposal is the struct that is sent by the validator after execution to propose
     /// on the committed state hash root.
     CommitVoteMsg(Box<CommitVote>),

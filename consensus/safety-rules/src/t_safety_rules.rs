@@ -46,7 +46,7 @@ pub trait TSafetyRules {
     /// Attempts to create an order vote for a block given the quroum certificate for the block.
     fn construct_and_sign_order_vote(
         &mut self,
-        ledger_info: LedgerInfo,
+        ledger_info: &LedgerInfo,
         quorum_cert: Arc<QuorumCert>,
     ) -> Result<OrderVote, Error>;
 

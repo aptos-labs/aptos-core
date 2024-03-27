@@ -41,6 +41,9 @@ pub enum SecurityEvent {
     /// Consensus received an equivocating vote
     ConsensusEquivocatingVote,
 
+    /// Consensus received an equivocating order vote
+    ConsensusEquivocatingOrderVote,
+
     /// Consensus received an invalid proposal
     InvalidConsensusProposal,
 
