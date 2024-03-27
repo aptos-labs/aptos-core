@@ -3,12 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters, pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes}, pending_votes::{PendingVotes, VoteReceptionResult}, util::time_service::{SendTask, TimeService}
+    counters,
+    pending_order_votes::{OrderVoteReceptionResult, PendingOrderVotes},
+    pending_votes::{PendingVotes, VoteReceptionResult},
+    util::time_service::{SendTask, TimeService},
 };
 use aptos_config::config::QcAggregatorType;
 use aptos_consensus_types::{
-    common::Round, delayed_qc_msg::DelayedQcMsg, sync_info::SyncInfo,
-    timeout_2chain::TwoChainTimeoutWithPartialSignatures, vote::Vote, order_vote::OrderVote,
+    common::Round, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutWithPartialSignatures, vote::Vote,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Schema};
@@ -325,12 +328,10 @@ impl RoundState {
     ) -> OrderVoteReceptionResult {
         // TODO: Is this an appropriate check?
         if order_vote.round() == self.current_round - 1 {
-            self.pending_order_votes.insert_order_vote(order_vote, verifier)
+            self.pending_order_votes
+                .insert_order_vote(order_vote, verifier)
         } else {
-            OrderVoteReceptionResult::UnexpectedRound(
-                order_vote.round(),
-                self.current_round - 1,
-            )
+            OrderVoteReceptionResult::UnexpectedRound(order_vote.round(), self.current_round - 1)
         }
     }
 

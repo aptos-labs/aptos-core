@@ -29,8 +29,8 @@ mod network;
 #[cfg(test)]
 mod network_tests;
 mod payload_client;
-mod pending_votes;
 mod pending_order_votes;
+mod pending_votes;
 pub mod persistent_liveness_storage;
 mod pipeline;
 pub mod quorum_store;

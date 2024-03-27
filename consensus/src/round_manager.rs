@@ -6,18 +6,42 @@ use crate::{
     block_storage::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
-    }, counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT}, error::{error_kind, VerifyError}, liveness::{
+    },
+    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
+    error::{error_kind, VerifyError},
+    liveness::{
         proposal_generator::ProposalGenerator,
         proposer_election::ProposerElection,
         round_state::{NewRoundEvent, NewRoundReason, RoundState, RoundStateLogSchema},
         unequivocal_proposer_election::UnequivocalProposerElection,
-    }, logging::{LogEvent, LogSchema}, metrics_safety_rules::MetricsSafetyRules, monitor, network::NetworkSender, network_interface::ConsensusMsg, pending_order_votes::OrderVoteReceptionResult, pending_votes::VoteReceptionResult, persistent_liveness_storage::PersistentLivenessStorage, quorum_store::types::BatchMsg, util::is_vtxn_expected
+    },
+    logging::{LogEvent, LogSchema},
+    metrics_safety_rules::MetricsSafetyRules,
+    monitor,
+    network::NetworkSender,
+    network_interface::ConsensusMsg,
+    pending_order_votes::OrderVoteReceptionResult,
+    pending_votes::VoteReceptionResult,
+    persistent_liveness_storage::PersistentLivenessStorage,
+    quorum_store::types::BatchMsg,
+    util::is_vtxn_expected,
 };
 use anyhow::{bail, ensure, Context};
 use aptos_channels::aptos_channel;
 use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{
-    block::Block, block_data::BlockType, common::{Author, Round}, delayed_qc_msg::DelayedQcMsg, order_vote::OrderVote, proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg}, proposal_msg::ProposalMsg, quorum_cert::QuorumCert, sync_info::SyncInfo, timeout_2chain::TwoChainTimeoutCertificate, vote::Vote, vote_msg::VoteMsg
+    block::Block,
+    block_data::BlockType,
+    common::{Author, Round},
+    delayed_qc_msg::DelayedQcMsg,
+    order_vote::OrderVote,
+    proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
+    proposal_msg::ProposalMsg,
+    quorum_cert::QuorumCert,
+    sync_info::SyncInfo,
+    timeout_2chain::TwoChainTimeoutCertificate,
+    vote::Vote,
+    vote_msg::VoteMsg,
 };
 use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::{checked, Mutex};
@@ -26,10 +50,14 @@ use aptos_logger::prelude::*;
 use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
-    epoch_state::EpochState, ledger_info::LedgerInfo, on_chain_config::{
+    epoch_state::EpochState,
+    ledger_info::LedgerInfo,
+    on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
-    }, validator_verifier::ValidatorVerifier, PeerId
+    },
+    validator_verifier::ValidatorVerifier,
+    PeerId,
 };
 use fail::fail_point;
 use futures::{channel::oneshot, FutureExt, StreamExt};
@@ -980,18 +1008,20 @@ impl RoundManager {
                         qc.certified_block().timestamp_usecs(),
                         BlockStage::QC_AGGREGATED,
                     );
-                }                
+                }
                 let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
                 if result.is_ok() {
                     // TODO: Is this the correct way to compute consensus_data_hash in ledger_info?
-                    let ledger_info = LedgerInfo::new(qc.vote_data().proposed().clone(), qc.vote_data().hash());
+                    let ledger_info =
+                        LedgerInfo::new(qc.vote_data().proposed().clone(), qc.vote_data().hash());
                     if let Ok(order_vote) = self
-                                                        .safety_rules
-                                                        .lock()
-                                                        .construct_and_sign_order_vote(&ledger_info, qc) {
+                        .safety_rules
+                        .lock()
+                        .construct_and_sign_order_vote(&ledger_info, qc.as_ref())
+                    {
                         info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
                         // TODO: Add to pending order votes
-                        self.network.broadcast_order_vote(order_vote.clone()).await;
+                        // self.network.broadcast_order_vote(order_vote.clone()).await;
                     }
                 }
                 result

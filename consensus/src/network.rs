@@ -22,12 +22,12 @@ use aptos_config::network_id::NetworkId;
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     common::Author,
+    order_vote::OrderVote,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
-    order_vote::OrderVote,
 };
 use aptos_logger::prelude::*;
 use aptos_network::{

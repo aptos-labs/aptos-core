@@ -14,12 +14,12 @@ use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
     block_retrieval::{BlockRetrievalRequest, BlockRetrievalResponse},
     epoch_retrieval::EpochRetrievalRequest,
+    order_vote::OrderVote,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     sync_info::SyncInfo,
     vote_msg::VoteMsg,
-    order_vote::OrderVote,
 };
 use aptos_network::{
     application::{error::Error, interface::NetworkClientInterface},

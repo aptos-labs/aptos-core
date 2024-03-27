@@ -7,7 +7,12 @@ use crate::{
     pipeline::signing_phase::CommitSignerProvider,
 };
 use aptos_consensus_types::{
-    block_data::BlockData, order_vote::OrderVote, quorum_cert::QuorumCert, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate}, vote::Vote, vote_proposal::VoteProposal
+    block_data::BlockData,
+    order_vote::OrderVote,
+    quorum_cert::QuorumCert,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote::Vote,
+    vote_proposal::VoteProposal,
 };
 use aptos_crypto::bls12381;
 use aptos_infallible::Mutex;
@@ -121,16 +126,16 @@ impl TSafetyRules for MetricsSafetyRules {
     }
 
     fn construct_and_sign_order_vote(
-            &mut self,
-            ledger_info: &LedgerInfo,
-            quorum_cert: Arc<QuorumCert>,
-        ) -> Result<OrderVote, Error> {
-            self.retry(|inner| {
-                monitor!(
-                    "safety_rules",
-                    inner.construct_and_sign_order_vote(ledger_info, quorum_cert.clone())
-                )
-            })
+        &mut self,
+        ledger_info: &LedgerInfo,
+        quorum_cert: &QuorumCert,
+    ) -> Result<OrderVote, Error> {
+        self.retry(|inner| {
+            monitor!(
+                "safety_rules",
+                inner.construct_and_sign_order_vote(ledger_info, quorum_cert)
+            )
+        })
     }
 
     fn sign_commit_vote(
@@ -161,7 +166,12 @@ impl CommitSignerProvider for Mutex<MetricsSafetyRules> {
 mod tests {
     use crate::{metrics_safety_rules::MetricsSafetyRules, test_utils::EmptyStorage};
     use aptos_consensus_types::{
-        block_data::BlockData, order_vote::OrderVote, quorum_cert::QuorumCert, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate}, vote::Vote, vote_proposal::VoteProposal
+        block_data::BlockData,
+        order_vote::OrderVote,
+        quorum_cert::QuorumCert,
+        timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+        vote::Vote,
+        vote_proposal::VoteProposal,
     };
     use aptos_crypto::bls12381;
     use aptos_safety_rules::{ConsensusState, Error, TSafetyRules};
@@ -170,7 +180,6 @@ mod tests {
         ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     };
     use claims::{assert_matches, assert_ok};
-    use std::sync::Arc;
 
     pub struct MockSafetyRules {
         // number of initialize() calls
@@ -236,11 +245,11 @@ mod tests {
         }
 
         fn construct_and_sign_order_vote(
-                &mut self,
-                _: &LedgerInfo,
-                _: Arc<QuorumCert>,
-            ) -> Result<OrderVote, Error> {
-                unimplemented!()
+            &mut self,
+            _: &LedgerInfo,
+            _: &QuorumCert,
+        ) -> Result<OrderVote, Error> {
+            unimplemented!()
         }
 
         fn sign_commit_vote(

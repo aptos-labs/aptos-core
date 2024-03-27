@@ -2,10 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_consensus_types::{
-    common::Author,
-    order_vote::OrderVote,
-};
+use aptos_consensus_types::{common::Author, order_vote::OrderVote};
 use aptos_logger::prelude::*;
 use aptos_types::validator_verifier::{ValidatorVerifier, VerifyError};
 use std::collections::HashMap;
@@ -49,10 +46,9 @@ impl PendingOrderVotes {
         validator_verifier: &ValidatorVerifier,
     ) -> OrderVoteReceptionResult {
         let author = order_vote.author();
-        let round = order_vote.round();
-        
-        if let Some(previously_seen_vote) = self.author_to_order_vote.get(&author)
-        {
+        // TODO: Need to make sure the order vote is for the previous round.
+
+        if let Some(previously_seen_vote) = self.author_to_order_vote.get(&author) {
             // we have seen a different vote for the same round
             error!(
                 SecurityEvent::ConsensusEquivocatingOrderVote,
@@ -70,9 +66,12 @@ impl PendingOrderVotes {
             .get_voting_power(&order_vote.author())
             .unwrap_or(0);
         if validator_voting_power == 0 {
-            warn!("Received vote with no voting power, from {}", order_vote.author());
+            warn!(
+                "Received vote with no voting power, from {}",
+                order_vote.author()
+            );
         }
-        
+
         // check if we have enough signatures to create a QC
         let voting_power =
             match validator_verifier.check_voting_power(self.author_to_order_vote.keys(), true) {

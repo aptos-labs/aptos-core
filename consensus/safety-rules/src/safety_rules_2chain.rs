@@ -4,11 +4,16 @@
 
 use crate::{error::Error, safety_rules::next_round, SafetyRules};
 use aptos_consensus_types::{
-    block::Block, order_vote::OrderVote, quorum_cert::QuorumCert, safety_data::SafetyData, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate}, vote::Vote, vote_proposal::VoteProposal
+    block::Block,
+    order_vote::OrderVote,
+    quorum_cert::QuorumCert,
+    safety_data::SafetyData,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote::Vote,
+    vote_proposal::VoteProposal,
 };
 use aptos_crypto::{bls12381, hash::CryptoHash, HashValue};
 use aptos_types::{block_info::BlockInfo, ledger_info::LedgerInfo};
-use std::sync::Arc;
 
 /// 2-chain safety rules implementation
 impl SafetyRules {
@@ -91,15 +96,17 @@ impl SafetyRules {
     pub(crate) fn guarded_construct_and_sign_order_vote(
         &mut self,
         ledger_info: &LedgerInfo,
-        quorum_cert: Arc<QuorumCert>
+        quorum_cert: &QuorumCert,
     ) -> Result<OrderVote, Error> {
         // Exit early if we cannot sign
         self.signer()?;
         let safety_data = self.persistent_storage.safety_data()?;
         self.verify_epoch(ledger_info.epoch(), &safety_data)?;
-        self.verify_qc(&quorum_cert)?;
+        self.verify_qc(quorum_cert)?;
         if quorum_cert.vote_data().proposed().round() != ledger_info.round() {
-            return Err(Error::InvalidQuorumCertificate("QC round does not match LedgerInfo round".to_string()));
+            return Err(Error::InvalidQuorumCertificate(
+                "QC round does not match LedgerInfo round".to_string(),
+            ));
         }
 
         let author = self.signer()?.author();

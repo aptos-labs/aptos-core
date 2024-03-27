@@ -4,14 +4,18 @@
 
 use crate::{ConsensusState, Error};
 use aptos_consensus_types::{
-    block_data::BlockData, order_vote::OrderVote, quorum_cert::QuorumCert, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate}, vote::Vote, vote_proposal::VoteProposal
+    block_data::BlockData,
+    order_vote::OrderVote,
+    quorum_cert::QuorumCert,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote::Vote,
+    vote_proposal::VoteProposal,
 };
 use aptos_crypto::bls12381;
 use aptos_types::{
     epoch_change::EpochChangeProof,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
 };
-use std::sync::Arc;
 
 /// Interface for SafetyRules
 pub trait TSafetyRules {
@@ -47,7 +51,7 @@ pub trait TSafetyRules {
     fn construct_and_sign_order_vote(
         &mut self,
         ledger_info: &LedgerInfo,
-        quorum_cert: Arc<QuorumCert>,
+        quorum_cert: &QuorumCert,
     ) -> Result<OrderVote, Error>;
 
     /// As the holder of the private key, SafetyRules also signs a commit vote.

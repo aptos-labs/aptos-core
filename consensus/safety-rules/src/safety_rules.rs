@@ -11,7 +11,15 @@ use crate::{
     t_safety_rules::TSafetyRules,
 };
 use aptos_consensus_types::{
-    block_data::BlockData, common::{Author, Round}, order_vote::OrderVote, quorum_cert::QuorumCert, safety_data::SafetyData, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate}, vote::Vote, vote_data::VoteData, vote_proposal::VoteProposal
+    block_data::BlockData,
+    common::{Author, Round},
+    order_vote::OrderVote,
+    quorum_cert::QuorumCert,
+    safety_data::SafetyData,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote::Vote,
+    vote_data::VoteData,
+    vote_proposal::VoteProposal,
 };
 use aptos_crypto::{bls12381, hash::CryptoHash};
 use aptos_logger::prelude::*;
@@ -23,8 +31,7 @@ use aptos_types::{
     waypoint::Waypoint,
 };
 use serde::Serialize;
-use std::{cmp::Ordering, sync::Arc};
-
+use std::cmp::Ordering;
 
 pub(crate) fn next_round(round: Round) -> Result<Round, Error> {
     u64::checked_add(round, 1).ok_or(Error::IncorrectRound(round))
@@ -403,7 +410,7 @@ impl TSafetyRules for SafetyRules {
     fn construct_and_sign_order_vote(
         &mut self,
         ledger_info: &LedgerInfo,
-        quorum_cert: Arc<QuorumCert>,
+        quorum_cert: &QuorumCert,
     ) -> Result<OrderVote, Error> {
         let cb = || self.guarded_construct_and_sign_order_vote(ledger_info, quorum_cert);
         run_and_log(cb, |log| log, LogEntry::ConstructAndSignOrderVote)

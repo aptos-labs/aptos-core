@@ -4,7 +4,12 @@
 
 use crate::{counters, logging::LogEntry, ConsensusState, Error, SafetyRules, TSafetyRules};
 use aptos_consensus_types::{
-    block_data::BlockData, order_vote::OrderVote, quorum_cert::QuorumCert, timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate}, vote::Vote, vote_proposal::VoteProposal
+    block_data::BlockData,
+    order_vote::OrderVote,
+    quorum_cert::QuorumCert,
+    timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
+    vote::Vote,
+    vote_proposal::VoteProposal,
 };
 use aptos_crypto::bls12381;
 use aptos_infallible::RwLock;
@@ -25,7 +30,7 @@ pub enum SafetyRulesInput {
         Box<Option<TwoChainTimeoutCertificate>>,
     ),
     ConstructAndSignVoteTwoChain(Box<VoteProposal>, Box<Option<TwoChainTimeoutCertificate>>),
-    ConstructAndSignOrderVote(Box<LedgerInfo>, Arc<QuorumCert>),
+    ConstructAndSignOrderVote(Box<LedgerInfo>, Box<QuorumCert>),
     SignCommitVote(Box<LedgerInfoWithSignatures>, Box<LedgerInfo>),
 }
 
@@ -63,11 +68,12 @@ impl SerializerService {
                 )
             },
             SafetyRulesInput::ConstructAndSignOrderVote(ledger_info, quorum_cert) => {
-                serde_json::to_vec(&self.internal.construct_and_sign_order_vote(
-                    &ledger_info,
-                    quorum_cert,
-                ))
-            }
+                serde_json::to_vec(
+                    &self
+                        .internal
+                        .construct_and_sign_order_vote(&ledger_info, &quorum_cert),
+                )
+            },
             SafetyRulesInput::SignCommitVote(ledger_info, new_ledger_info) => serde_json::to_vec(
                 &self
                     .internal
@@ -146,14 +152,15 @@ impl TSafetyRules for SerializerClient {
     }
 
     fn construct_and_sign_order_vote(
-            &mut self,
-            ledger_info: &LedgerInfo,
-            quorum_cert: Arc<QuorumCert>,
-        ) -> Result<OrderVote, Error> {
-        let _timer = counters::start_timer("external", LogEntry::ConstructAndSignOrderVote.as_str());
+        &mut self,
+        ledger_info: &LedgerInfo,
+        quorum_cert: &QuorumCert,
+    ) -> Result<OrderVote, Error> {
+        let _timer =
+            counters::start_timer("external", LogEntry::ConstructAndSignOrderVote.as_str());
         let response = self.request(SafetyRulesInput::ConstructAndSignOrderVote(
             Box::new(ledger_info.clone()),
-            quorum_cert.clone(),
+            Box::new(quorum_cert.clone()),
         ))?;
         serde_json::from_slice(&response)?
     }

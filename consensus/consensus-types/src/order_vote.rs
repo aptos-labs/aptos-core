@@ -1,4 +1,3 @@
-
 // Copyright © Aptos Foundation
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
@@ -7,10 +6,7 @@ use crate::common::Author;
 use anyhow::Context;
 use aptos_crypto::bls12381;
 use aptos_short_hex_str::AsShortHexStr;
-use aptos_types::{
-    ledger_info::LedgerInfo,
-    validator_verifier::ValidatorVerifier,
-};
+use aptos_types::{ledger_info::LedgerInfo, validator_verifier::ValidatorVerifier};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display, Formatter};
 
