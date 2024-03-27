@@ -1014,15 +1014,17 @@ impl RoundManager {
                     // TODO: Is this the correct way to compute consensus_data_hash in ledger_info?
                     let ledger_info =
                         LedgerInfo::new(qc.vote_data().proposed().clone(), qc.vote_data().hash());
-                    if let Ok(order_vote) = self
+                    let order_vote_result = self
                         .safety_rules
                         .lock()
-                        .construct_and_sign_order_vote(&ledger_info, qc.as_ref())
-                    {
-                        info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
-                        // TODO: Add to pending order votes
-                        // self.network.broadcast_order_vote(order_vote.clone()).await;
-                    }
+                        .construct_and_sign_order_vote(&ledger_info, qc.as_ref());
+                    let order_vote = order_vote_result.context(format!(
+                        "[RoundManager] SafetyRules Rejected {} to prepare order vote",
+                        qc
+                    ))?;
+                    info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
+                    // TODO: Add to pending order votes
+                    self.network.broadcast_order_vote(order_vote.clone()).await;
                 }
                 result
             },
