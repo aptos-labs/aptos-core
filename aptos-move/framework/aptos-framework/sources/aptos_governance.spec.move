@@ -151,7 +151,7 @@ spec aptos_framework::aptos_governance {
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
-        requires exists<features::Features>(@aptos_framework);
+        requires exists<features::Features>(@std);
         include staking_config::StakingRewardsConfigRequirement;
     }
 
