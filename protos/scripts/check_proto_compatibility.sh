@@ -13,4 +13,4 @@ cd "$(git rev-parse --show-toplevel)/protos"
 APTOS_CORE_VERSION="${1:?missing commit or tag to compare against}"
 
 repo_url="https://github.com/aptos-labs/aptos-core.git#tag=$APTOS_CORE_VERSION,subdir=protos/proto"
-buf breaking --against "$repo_url"
+buf breaking --against "$repo_url" --verbose
