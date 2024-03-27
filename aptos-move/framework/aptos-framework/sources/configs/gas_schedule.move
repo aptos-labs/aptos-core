@@ -81,10 +81,15 @@ module aptos_framework::gas_schedule {
     /// aptos_framework::gas_schedule::set_for_next_epoch(&framework_signer, some_gas_schedule_blob);
     /// aptos_framework::aptos_governance::reconfigure(&framework_signer);
     /// ```
-    public fun set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
+    public fun set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) acquires GasScheduleV2 {
         system_addresses::assert_aptos_framework(aptos_framework);
         assert!(!vector::is_empty(&gas_schedule_blob), error::invalid_argument(EINVALID_GAS_SCHEDULE));
         let new_gas_schedule: GasScheduleV2 = from_bytes(gas_schedule_blob);
+        let cur_gas_schedule = borrow_global<GasScheduleV2>(@aptos_framework);
+        assert!(
+            new_gas_schedule.feature_version >= cur_gas_schedule.feature_version,
+            error::invalid_argument(EINVALID_GAS_FEATURE_VERSION)
+        );
         config_buffer::upsert(new_gas_schedule);
     }
 
