@@ -538,9 +538,8 @@ impl WorkflowTxnGeneratorCreator {
                 pool_per_stage.push(Pool::AccountPool(deposit_coins_pool));
                 if flow_type == EconiaFlowType::Real {
                     pool_per_stage.push(Pool::AccountWithHistoryPool(deposit_coins_pool_with_added_history));
-                } else if !reuse_accounts_for_orders {
-                    pool_per_stage.push(Pool::AccountPool(place_orders_pool));
                 }
+                pool_per_stage.push(Pool::AccountPool(place_orders_pool));
                 // let pool_per_stage = if create_accounts {
                 //     vec![
                 //         created_pool,
