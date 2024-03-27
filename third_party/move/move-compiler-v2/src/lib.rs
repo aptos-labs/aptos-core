@@ -470,10 +470,13 @@ pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<Stri
 }
 
 /// Run the bytecode verifier on the given compiled units and add any diagnostics to the global env.
-pub fn run_bytecode_verifier(units: &[AnnotatedCompiledUnit], env: &mut GlobalEnv) {
+pub fn run_bytecode_verifier(units: &[AnnotatedCompiledUnit], env: &mut GlobalEnv) -> bool {
     let diags = verify_units(units);
     if !diags.is_empty() {
         add_move_lang_diagnostics(env, diags);
+        false
+    } else {
+        true
     }
 }
 
