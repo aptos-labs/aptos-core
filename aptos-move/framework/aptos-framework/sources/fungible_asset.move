@@ -57,6 +57,8 @@ module aptos_framework::fungible_asset {
     const ESUPPLY_NOT_FOUND: u64 = 21;
     /// Flag for Concurrent Supply not enabled
     const ECONCURRENT_SUPPLY_NOT_ENABLED: u64 = 22;
+    /// Flag for Concurrent Supply not enabled
+    const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 23;
 
     //
     // Constants
@@ -167,12 +169,16 @@ module aptos_framework::fungible_asset {
         features::concurrent_fungible_assets_enabled()
     }
 
-    inline fun default_to_concurrent_fungible_balance(): bool {
+    inline fun allow_upgrade_to_concurrent_fungible_balance(): bool {
         features::concurrent_fungible_assets_enabled()
     }
 
+    inline fun default_to_concurrent_fungible_balance(): bool {
+        features::migrate_to_concurrent_fungible_balance_enabled()
+    }
+
     inline fun auto_upgrade_to_concurrent_fungible_balance(): bool {
-        features::concurrent_fungible_assets_enabled()
+        features::migrate_to_concurrent_fungible_balance_enabled()
     }
 
     /// Make an existing object fungible by adding the Metadata resource.
@@ -584,8 +590,11 @@ module aptos_framework::fungible_asset {
         assert!(metadata == store_metadata, error::invalid_argument(EFUNGIBLE_ASSET_AND_STORE_MISMATCH));
         let store_addr = object::object_address(&store);
 
-        if (auto_upgrade_to_concurrent_fungible_balance() || concurrent_fungible_balance_exists(store_addr)) {
+        if (auto_upgrade_to_concurrent_fungible_balance()) {
             ensure_store_upgraded_to_concurrent_internal(store_addr);
+        };
+
+        if (concurrent_fungible_balance_exists(store_addr)) {
             let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
             aggregator_v2::add(&mut balance_resource.balance, amount);
         } else {
@@ -603,8 +612,11 @@ module aptos_framework::fungible_asset {
     ): FungibleAsset acquires FungibleStore, ConcurrentFungibleBalance {
         assert!(amount != 0, error::invalid_argument(EAMOUNT_CANNOT_BE_ZERO));
 
-        if (auto_upgrade_to_concurrent_fungible_balance() || concurrent_fungible_balance_exists(store_addr)) {
+        if (auto_upgrade_to_concurrent_fungible_balance()) {
             ensure_store_upgraded_to_concurrent_internal(store_addr);
+        };
+
+        if (concurrent_fungible_balance_exists(store_addr)) {
             let balance_resource = borrow_global_mut<ConcurrentFungibleBalance>(store_addr);
             assert!(
                 aggregator_v2::try_sub(&mut balance_resource.balance, amount),
@@ -718,10 +730,20 @@ module aptos_framework::fungible_asset {
         move_to(&metadata_object_signer, supply);
     }
 
+    public fun upgrade_store_to_concurrent<T: key>(
+        owner: &signer,
+        store: Object<T>,
+    ) acquires FungibleStore {
+        assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
+        assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
+        assert!(features::concurrent_fungible_assets_enabled(), error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED));
+        ensure_store_upgraded_to_concurrent_internal(object::object_address(&store));
+    }
+
     /// Ensure a known `FungibleStore` has `ConcurrentFungibleBalance`.
     inline fun ensure_store_upgraded_to_concurrent_internal(
         fungible_store_address: address,
-    ) {
+    ) acquires FungibleStore {
         if (!exists<ConcurrentFungibleBalance>(fungible_store_address)) {
             let store = borrow_global_mut<FungibleStore>(fungible_store_address);
             let balance = aggregator_v2::create_unbounded_aggregator();

@@ -106,6 +106,7 @@ pub enum FeatureFlag {
     MaxObjectNestingCheck,
     KeylessAccountsWithPasskeys,
     MultisigV2Enhancement,
+    MigrateToConcurrentFungibleBalance,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -266,6 +267,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS
             },
             FeatureFlag::MultisigV2Enhancement => AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT,
+            FeatureFlag::MigrateToConcurrentFungibleBalance => {
+                AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE
+            },
         }
     }
 }
@@ -355,6 +359,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::KeylessAccountsWithPasskeys
             },
             AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT => FeatureFlag::MultisigV2Enhancement,
+            AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE => {
+                FeatureFlag::MigrateToConcurrentFungibleBalance
+            },
         }
     }
 }
