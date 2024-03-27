@@ -12,6 +12,10 @@ module aptos_framework::gas_schedule {
     use aptos_framework::util::from_bytes;
     use aptos_framework::storage_gas::StorageGasConfig;
     use aptos_framework::storage_gas;
+    #[test_only]
+    use std::bcs;
+    #[test_only]
+    use std::bcs::to_bytes;
 
     friend aptos_framework::genesis;
     friend aptos_framework::reconfiguration_with_dkg;
@@ -111,5 +115,24 @@ module aptos_framework::gas_schedule {
 
     public fun set_storage_gas_config_for_next_epoch(aptos_framework: &signer, config: StorageGasConfig) {
         storage_gas::set_config(aptos_framework, config);
+    }
+
+    #[test(fx = @0x1)]
+    #[expected_failure(abort_code=0x010002, location = Self)]
+    fun set_for_next_epoch_should_abort_if_gas_version_is_too_old(fx: signer) acquires GasScheduleV2 {
+        // Setup.
+        let old_gas_schedule = GasScheduleV2 {
+            feature_version: 1000,
+            entries: vector[],
+        };
+        move_to(&fx, old_gas_schedule);
+
+        // Setting an older version should not work.
+        let new_gas_schedule = GasScheduleV2 {
+            feature_version: 999,
+            entries: vector[],
+        };
+        let new_bytes = to_bytes(&new_gas_schedule);
+        set_for_next_epoch(&fx, new_bytes);
     }
 }
