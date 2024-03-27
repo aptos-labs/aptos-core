@@ -428,6 +428,7 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        has_randomness_annotation: bool,
     ) -> (VMStatus, VMOutput) {
         if self.gas_feature_version >= 12 {
             // Check if the gas meter's internal counters are consistent.
@@ -473,6 +474,7 @@ impl AptosVM {
                     status,
                     log_context,
                     change_set_configs,
+                    has_randomness_annotation,
                 ) {
                     Ok((change_set, fee_statement, status)) => VMOutput::new(
                         change_set,
@@ -521,6 +523,7 @@ impl AptosVM {
         status: ExecutionStatus,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        has_randomness_annotation: bool,
     ) -> Result<(VMChangeSet, FeeStatement, ExecutionStatus), VMStatus> {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
@@ -609,6 +612,7 @@ impl AptosVM {
                     self.features(),
                     txn_data,
                     log_context,
+                    has_randomness_annotation,
                 )
             })?;
             epilogue_session
@@ -635,6 +639,7 @@ impl AptosVM {
                     self.features(),
                     txn_data,
                     log_context,
+                    has_randomness_annotation,
                 )
             })?;
             epilogue_session
@@ -650,6 +655,7 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
+        has_randomness_annotation: bool,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         if self.gas_feature_version >= 12 {
             // Check if the gas meter's internal counters are consistent.
@@ -679,6 +685,7 @@ impl AptosVM {
                 self.features(),
                 txn_data,
                 log_context,
+                has_randomness_annotation,
             )
         })?;
         let change_set = epilogue_session.finish(change_set_configs)?;
@@ -735,12 +742,12 @@ impl AptosVM {
 
     fn validate_and_execute_entry_function(
         &self,
-        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
+        has_randomness_annotation: bool,
     ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
@@ -761,7 +768,7 @@ impl AptosVM {
             entry_fn.ty_args(),
         )?;
 
-        if is_friend_or_private && has_randomness_attribute(resolver, session, entry_fn)? {
+        if is_friend_or_private && has_randomness_annotation {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();
@@ -798,6 +805,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
+        has_randomness_annotation: bool,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
@@ -824,12 +832,12 @@ impl AptosVM {
             TransactionPayload::EntryFunction(entry_fn) => {
                 session.execute(|session| {
                     self.validate_and_execute_entry_function(
-                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
                         txn_data.senders(),
                         entry_fn,
+                        has_randomness_annotation,
                     )
                 })?;
             },
@@ -862,6 +870,7 @@ impl AptosVM {
             txn_data,
             log_context,
             change_set_configs,
+            has_randomness_annotation,
         )
     }
 
@@ -921,6 +930,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
+        has_randomness_annotation: bool,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         match &payload.transaction_payload {
             None => Err(VMStatus::error(StatusCode::MISSING_DATA, None)),
@@ -930,13 +940,13 @@ impl AptosVM {
                         aptos_try!({
                             return_on_failure!(session.execute(|session| self
                                 .execute_multisig_entry_function(
-                                    resolver,
                                     session,
                                     gas_meter,
                                     traversal_context,
                                     payload.multisig_address,
                                     entry_function,
                                     new_published_modules_loaded,
+                                    has_randomness_annotation,
                                 )));
                             // TODO: Deduplicate this against execute_multisig_transaction
                             // A bit tricky since we need to skip success/failure cleanups,
@@ -956,6 +966,7 @@ impl AptosVM {
                                 txn_data,
                                 log_context,
                                 change_set_configs,
+                                has_randomness_annotation,
                             )
                         })
                     },
@@ -983,6 +994,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
+        has_randomness_annotation: bool,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
             Err(VMStatus::error(
@@ -1052,13 +1064,13 @@ impl AptosVM {
             MultisigTransactionPayload::EntryFunction(entry_function) => {
                 session.execute(|session| {
                     self.execute_multisig_entry_function(
-                        resolver,
                         session,
                         gas_meter,
                         traversal_context,
                         txn_payload.multisig_address,
                         &entry_function,
                         new_published_modules_loaded,
+                        has_randomness_annotation,
                     )
                 })
             },
@@ -1107,6 +1119,7 @@ impl AptosVM {
             txn_data,
             log_context,
             change_set_configs,
+            has_randomness_annotation,
         )
     }
 
@@ -1122,6 +1135,7 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
+        has_randomness_annotation: bool,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         if self.is_simulation {
             self.simulate_multisig_transaction(
@@ -1134,6 +1148,7 @@ impl AptosVM {
                 log_context,
                 new_published_modules_loaded,
                 change_set_configs,
+                has_randomness_annotation,
             )
         } else {
             self.execute_multisig_transaction(
@@ -1147,29 +1162,30 @@ impl AptosVM {
                 log_context,
                 new_published_modules_loaded,
                 change_set_configs,
+                has_randomness_annotation,
             )
         }
     }
 
     fn execute_multisig_entry_function(
         &self,
-        resolver: &impl AptosMoveResolver,
         session: &mut SessionExt,
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext,
         multisig_address: AccountAddress,
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
+        has_randomness_annotation: bool,
     ) -> Result<(), VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
         self.validate_and_execute_entry_function(
-            resolver,
             session,
             gas_meter,
             traversal_context,
             vec![multisig_address],
             payload,
+            has_randomness_annotation,
         )?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
@@ -1542,6 +1558,7 @@ impl AptosVM {
         transaction: &SignedTransaction,
         transaction_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
+        has_randomness_annotation: bool,
     ) -> Result<(), VMStatus> {
         // Check transaction format.
         if transaction.contains_duplicate_signers() {
@@ -1572,6 +1589,7 @@ impl AptosVM {
             transaction.payload(),
             transaction_data,
             log_context,
+            has_randomness_annotation,
         )
     }
 
@@ -1587,6 +1605,7 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         new_published_modules_loaded: bool,
+        has_randomness_annotation: bool,
     ) -> (VMStatus, VMOutput) {
         // Invalidate the loader cache in case there was a new module loaded from a module
         // publish request that failed.
@@ -1605,6 +1624,7 @@ impl AptosVM {
             resolver,
             log_context,
             change_set_configs,
+            has_randomness_annotation,
         )
     }
 
@@ -1621,15 +1641,19 @@ impl AptosVM {
         // Revalidate the transaction.
         let mut prologue_session =
             unwrap_or_discard!(PrologueSession::new(self, &txn_data, resolver));
-        unwrap_or_discard!(
-            prologue_session.execute(|session| self.validate_signed_transaction(
+        let mut has_randomness_annotation = false;
+        unwrap_or_discard!(prologue_session.execute(|session| {
+            has_randomness_annotation =
+                check_randomness_annotation(session, resolver, txn.payload());
+            self.validate_signed_transaction(
                 session,
                 resolver,
                 txn,
                 &txn_data,
-                log_context
-            ))
-        );
+                log_context,
+                has_randomness_annotation,
+            )
+        }));
 
         let storage_gas_params = unwrap_or_discard!(get_or_vm_startup_failure(
             &self.storage_gas_params,
@@ -1675,6 +1699,7 @@ impl AptosVM {
                     log_context,
                     &mut new_published_modules_loaded,
                     change_set_configs,
+                    has_randomness_annotation,
                 ),
             TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
                 resolver,
@@ -1687,6 +1712,7 @@ impl AptosVM {
                 log_context,
                 &mut new_published_modules_loaded,
                 change_set_configs,
+                has_randomness_annotation,
             ),
 
             // Deprecated. We cannot make this `unreachable!` because a malicious
@@ -1712,6 +1738,7 @@ impl AptosVM {
                 gas_meter,
                 change_set_configs,
                 new_published_modules_loaded,
+                has_randomness_annotation,
             )
         })
     }
@@ -2126,6 +2153,7 @@ impl AptosVM {
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
+        has_randomness_annotation: bool,
     ) -> Result<(), VMStatus> {
         check_gas(
             get_or_vm_startup_failure(&self.gas_params, log_context)?,
@@ -2138,13 +2166,23 @@ impl AptosVM {
 
         match payload {
             TransactionPayload::Script(_) | TransactionPayload::EntryFunction(_) => {
-                transaction_validation::run_script_prologue(session, txn_data, log_context)
+                transaction_validation::run_script_prologue(
+                    session,
+                    txn_data,
+                    log_context,
+                    has_randomness_annotation,
+                )
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 // Still run script prologue for multisig transaction to ensure the same tx
                 // validations are still run for this multisig execution tx, which is submitted by
                 // one of the owners.
-                transaction_validation::run_script_prologue(session, txn_data, log_context)?;
+                transaction_validation::run_script_prologue(
+                    session,
+                    txn_data,
+                    log_context,
+                    has_randomness_annotation,
+                )?;
                 // Skip validation if this is part of tx simulation.
                 // This allows simulating multisig txs without having to first create the multisig
                 // tx.
@@ -2437,12 +2475,15 @@ impl VMValidator for AptosVM {
         let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data));
 
         // Increment the counter for transactions verified.
+        let has_randomness_annotation =
+            check_randomness_annotation(&mut session, &resolver, txn.payload());
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
             &resolver,
             &txn,
             &txn_data,
             &log_context,
+            has_randomness_annotation,
         ) {
             Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (
                 "failure",
@@ -2540,6 +2581,21 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
                         .finish(Location::Undefined)
                 })?,
     )
+}
+
+fn check_randomness_annotation(
+    session: &mut SessionExt,
+    resolver: &impl AptosMoveResolver,
+    payload: &TransactionPayload,
+) -> bool {
+    match payload {
+        TransactionPayload::Script(_)
+        | TransactionPayload::ModuleBundle(_)
+        | TransactionPayload::Multisig(_) => false,
+        TransactionPayload::EntryFunction(entry_func) => {
+            has_randomness_attribute(resolver, session, entry_func).unwrap_or(false)
+        },
+    }
 }
 
 #[test]

@@ -23,6 +23,7 @@ use aptos_build_info::build_information;
 use aptos_config::config::{
     merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
 };
+use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
@@ -574,6 +575,11 @@ where
         })))
         .with_randomize_first_validator_ports(random_ports);
     let (root_key, _genesis, genesis_waypoint, mut validators) = builder.build(rng)?;
+    let sk_bytes = root_key.to_bytes();
+    let pk = Ed25519PublicKey::from(&root_key);
+    let pk_bytes = pk.to_bytes();
+    println!("root_sk_hex={}", hex::encode(sk_bytes));
+    println!("root_pk_hex={}", hex::encode(pk_bytes));
 
     // Write the mint key to disk
     let serialized_keys = bcs::to_bytes(&root_key)?;

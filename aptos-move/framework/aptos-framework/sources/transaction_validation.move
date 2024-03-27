@@ -80,6 +80,30 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
+        prologue_common_v2(
+            sender,
+            gas_payer,
+            txn_sequence_number,
+            txn_authentication_key,
+            txn_gas_price,
+            txn_max_gas_units,
+            txn_expiration_time,
+            chain_id,
+            false,
+        )
+    }
+
+    fun prologue_common_v2(
+        sender: signer,
+        gas_payer: address,
+        txn_sequence_number: u64,
+        txn_authentication_key: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        has_randomness_annotation: bool,
+    ) {
         assert!(
             timestamp::now_seconds() < txn_expiration_time,
             error::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED),
@@ -136,6 +160,10 @@ module aptos_framework::transaction_validation {
         );
         let balance = coin::balance<AptosCoin>(gas_payer);
         assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+
+        if (has_randomness_annotation) {
+            transaction_fee::burn_fee(gas_payer, max_transaction_fee);
+        }
     }
 
     fun script_prologue(
@@ -146,10 +174,44 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
+        script_hash: vector<u8>,
+    ) {
+        script_prologue_v2(
+            sender,
+            txn_sequence_number,
+            txn_public_key,
+            txn_gas_price,
+            txn_max_gas_units,
+            txn_expiration_time,
+            chain_id,
+            script_hash,
+            false,
+        )
+    }
+
+    fun script_prologue_v2(
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_public_key: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
         _script_hash: vector<u8>,
+        has_randomness_annotation: bool,
     ) {
         let gas_payer = signer::address_of(&sender);
-        prologue_common(sender, gas_payer, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
+        prologue_common_v2(
+            sender,
+            gas_payer,
+            txn_sequence_number,
+            txn_public_key,
+            txn_gas_price,
+            txn_max_gas_units,
+            txn_expiration_time,
+            chain_id,
+            has_randomness_annotation,
+        )
     }
 
     fun multi_agent_script_prologue(
@@ -223,8 +285,38 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
+        fee_payer_script_prologue_v2(
+            sender,
+            txn_sequence_number,
+            txn_sender_public_key,
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+            fee_payer_address,
+            fee_payer_public_key_hash,
+            txn_gas_price,
+            txn_max_gas_units,
+            txn_expiration_time,
+            chain_id,
+            false,
+        )
+    }
+
+    fun fee_payer_script_prologue_v2(
+        sender: signer,
+        txn_sequence_number: u64,
+        txn_sender_public_key: vector<u8>,
+        secondary_signer_addresses: vector<address>,
+        secondary_signer_public_key_hashes: vector<vector<u8>>,
+        fee_payer_address: address,
+        fee_payer_public_key_hash: vector<u8>,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        has_randomness_annotation: bool,
+    ) {
         assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
-        prologue_common(
+        prologue_common_v2(
             sender,
             fee_payer_address,
             txn_sequence_number,
@@ -233,6 +325,7 @@ module aptos_framework::transaction_validation {
             txn_max_gas_units,
             txn_expiration_time,
             chain_id,
+            has_randomness_annotation,
         );
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes);
         assert!(
@@ -254,6 +347,22 @@ module aptos_framework::transaction_validation {
         epilogue_gas_payer(account, addr, storage_fee_refunded, txn_gas_price, txn_max_gas_units, gas_units_remaining);
     }
 
+    /// Epilogue function is run after a transaction is successfully executed.
+    /// Called by the Adapter
+    fun epilogue_v2(
+        account: signer,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64,
+        has_randomness_annotation: bool,
+    ) {
+        let addr = signer::address_of(&account);
+        epilogue_gas_payer_v2(account, addr, storage_fee_refunded, txn_gas_price, txn_max_gas_units, gas_units_remaining,
+            has_randomness_annotation
+        );
+    }
+
     /// Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
     /// Called by the Adapter
     fun epilogue_gas_payer(
@@ -263,6 +372,26 @@ module aptos_framework::transaction_validation {
         txn_gas_price: u64,
         txn_max_gas_units: u64,
         gas_units_remaining: u64
+    ) {
+        epilogue_gas_payer_v2(
+            account,
+            gas_payer,
+            storage_fee_refunded,
+            txn_gas_price,
+            txn_max_gas_units,
+            gas_units_remaining,
+            false,
+        )
+    }
+
+    fun epilogue_gas_payer_v2(
+        account: signer,
+        gas_payer: address,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64,
+        is_randomnexx_txn: bool,
     ) {
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
@@ -294,11 +423,15 @@ module aptos_framework::transaction_validation {
             transaction_fee_amount
         };
 
-        if (amount_to_burn > storage_fee_refunded) {
-            let burn_amount = amount_to_burn - storage_fee_refunded;
+        let refund = storage_fee_refunded;
+        if (is_randomnexx_txn) {
+            refund = refund + txn_gas_price * txn_max_gas_units;
+        };
+        if (amount_to_burn > refund) {
+            let burn_amount = amount_to_burn - refund;
             transaction_fee::burn_fee(gas_payer, burn_amount);
-        } else if (amount_to_burn < storage_fee_refunded) {
-            let mint_amount = storage_fee_refunded - amount_to_burn;
+        } else if (amount_to_burn < refund) {
+            let mint_amount = refund - amount_to_burn;
             transaction_fee::mint_and_refund(gas_payer, mint_amount)
         };
 

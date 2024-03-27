@@ -90,6 +90,7 @@ impl AptosVM {
             &resolver,
             &log_context,
             change_set_configs,
+            false,
         )
     }
 }

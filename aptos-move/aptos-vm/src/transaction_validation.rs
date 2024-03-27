@@ -36,10 +36,14 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         module_addr: CORE_CODE_ADDRESS,
         module_name: Identifier::new("transaction_validation").unwrap(),
         fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
+        fee_payer_prologue_v2_name: Identifier::new("fee_payer_script_prologue_v2").unwrap(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
+        script_prologue_v2_name: Identifier::new("script_prologue_v2").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
+        user_epilogue_v2_name: Identifier::new("epilogue_v2").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
+        user_epilogue_gas_payer_v2_name: Identifier::new("epilogue_gas_payer_v2").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -48,10 +52,14 @@ pub struct TransactionValidation {
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
     pub fee_payer_prologue_name: Identifier,
+    pub fee_payer_prologue_v2_name: Identifier,
     pub script_prologue_name: Identifier,
+    pub script_prologue_v2_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
+    pub user_epilogue_v2_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
+    pub user_epilogue_gas_payer_v2_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -73,6 +81,7 @@ pub(crate) fn run_script_prologue(
     session: &mut SessionExt,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
+    has_randomness_annotation: bool,
 ) -> Result<(), VMStatus> {
     let txn_sequence_number = txn_data.sequence_number();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
@@ -86,12 +95,11 @@ pub(crate) fn run_script_prologue(
         .iter()
         .map(|auth_key| MoveValue::vector_u8(auth_key.to_vec()))
         .collect();
-
     let (prologue_function_name, args) = if let (Some(fee_payer), Some(fee_payer_auth_key)) = (
         txn_data.fee_payer(),
         txn_data.fee_payer_authentication_key.as_ref(),
     ) {
-        let args = vec![
+        let mut args = vec![
             MoveValue::Signer(txn_data.sender),
             MoveValue::U64(txn_sequence_number),
             MoveValue::vector_u8(txn_authentication_key),
@@ -104,7 +112,15 @@ pub(crate) fn run_script_prologue(
             MoveValue::U64(txn_expiration_timestamp_secs),
             MoveValue::U8(chain_id.id()),
         ];
-        (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
+        if has_randomness_annotation {
+            args.push(MoveValue::Bool(true));
+            (
+                &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_v2_name,
+                args,
+            )
+        } else {
+            (&APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_name, args)
+        }
     } else if txn_data.is_multi_agent() {
         let args = vec![
             MoveValue::Signer(txn_data.sender),
@@ -122,7 +138,7 @@ pub(crate) fn run_script_prologue(
             args,
         )
     } else {
-        let args = vec![
+        let mut args = vec![
             MoveValue::Signer(txn_data.sender),
             MoveValue::U64(txn_sequence_number),
             MoveValue::vector_u8(txn_authentication_key),
@@ -132,7 +148,12 @@ pub(crate) fn run_script_prologue(
             MoveValue::U8(chain_id.id()),
             MoveValue::vector_u8(txn_data.script_hash.clone()),
         ];
-        (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
+        if has_randomness_annotation {
+            args.push(MoveValue::Bool(true));
+            (&APTOS_TRANSACTION_VALIDATION.script_prologue_v2_name, args)
+        } else {
+            (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
+        }
     };
     session
         .execute_function_bypass_visibility(
@@ -189,6 +210,7 @@ fn run_epilogue(
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
     features: &Features,
+    has_randomness_annotation: bool,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -196,33 +218,57 @@ fn run_epilogue(
     // We can unconditionally do this as this condition can only be true if the prologue
     // accepted it, in which case the gas payer feature is enabled.
     if let Some(fee_payer) = txn_data.fee_payer() {
-        session.execute_function_bypass_visibility(
-            &APTOS_TRANSACTION_VALIDATION.module_id(),
-            &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
-            vec![],
-            serialize_values(&vec![
+        let (func_name, args) = {
+            let mut args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::Address(fee_payer),
                 MoveValue::U64(fee_statement.storage_fee_refund()),
                 MoveValue::U64(txn_gas_price.into()),
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
-            ]),
+            ];
+            if has_randomness_annotation {
+                args.push(MoveValue::Bool(true));
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_v2_name,
+                    args,
+                )
+            } else {
+                (
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_name,
+                    args,
+                )
+            }
+        };
+        session.execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            func_name,
+            vec![],
+            serialize_values(&args),
             &mut UnmeteredGasMeter,
         )
     } else {
         // Regular tx, run the normal epilogue
-        session.execute_function_bypass_visibility(
-            &APTOS_TRANSACTION_VALIDATION.module_id(),
-            &APTOS_TRANSACTION_VALIDATION.user_epilogue_name,
-            vec![],
-            serialize_values(&vec![
+        let (func_name, args) = {
+            let mut args = vec![
                 MoveValue::Signer(txn_data.sender),
                 MoveValue::U64(fee_statement.storage_fee_refund()),
                 MoveValue::U64(txn_gas_price.into()),
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
-            ]),
+            ];
+            if has_randomness_annotation {
+                args.push(MoveValue::Bool(true));
+                (&APTOS_TRANSACTION_VALIDATION.user_epilogue_v2_name, args)
+            } else {
+                (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
+            }
+        };
+        session.execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            func_name,
+            vec![],
+            serialize_values(&args),
             &mut UnmeteredGasMeter,
         )
     }
@@ -260,6 +306,7 @@ pub(crate) fn run_success_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
+    has_randomness_annotation: bool,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
         Err(VMStatus::error(
@@ -268,8 +315,15 @@ pub(crate) fn run_success_epilogue(
         ))
     });
 
-    run_epilogue(session, gas_remaining, fee_statement, txn_data, features)
-        .or_else(|err| convert_epilogue_error(err, log_context))
+    run_epilogue(
+        session,
+        gas_remaining,
+        fee_statement,
+        txn_data,
+        features,
+        has_randomness_annotation,
+    )
+    .or_else(|err| convert_epilogue_error(err, log_context))
 }
 
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
@@ -281,8 +335,17 @@ pub(crate) fn run_failure_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
+    has_randomness_annotation: bool,
 ) -> Result<(), VMStatus> {
-    run_epilogue(session, gas_remaining, fee_statement, txn_data, features).or_else(|e| {
+    run_epilogue(
+        session,
+        gas_remaining,
+        fee_statement,
+        txn_data,
+        features,
+        has_randomness_annotation,
+    )
+    .or_else(|e| {
         expect_only_successful_execution(
             e,
             APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),
