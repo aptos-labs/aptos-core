@@ -36,7 +36,7 @@ module 0xc0ffee::m {
         let x = W { x: 42 };
         let y = copy x;
         test3(x);
-        test4(y);    
+        test4(y);
     }
 }
 

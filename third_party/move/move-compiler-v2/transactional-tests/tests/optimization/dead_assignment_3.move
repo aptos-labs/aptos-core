@@ -17,4 +17,3 @@ module 0xc0ffee::m {
 //# run 0xc0ffee::m::test --args true
 
 //# run 0xc0ffee::m::test --args false
-

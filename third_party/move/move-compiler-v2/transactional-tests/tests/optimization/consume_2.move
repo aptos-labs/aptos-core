@@ -19,7 +19,7 @@ module 0xc0ffee::m {
         consume_(y);
         consume_(y);
     }
-    
+
     public fun main() {
         test1(42);
         test2(W{ x: 42 });
