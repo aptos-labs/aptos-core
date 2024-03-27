@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::{format_err, Result};
+use anyhow::{bail, format_err, Result};
 use aptos_gas_meter::{StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
@@ -62,19 +62,28 @@ impl AptosDebugger {
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> =
             txns.into_iter().map(|x| x.into()).collect::<Vec<_>>();
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
-        for i in 0..repeat_execution_times {
-            let result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
+
+        let result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
+            .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
+
+        for i in 1..repeat_execution_times {
+            let repeat_result = AptosVM::execute_block_no_limit(&sig_verified_txns, &state_view)
                 .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
-            if i == repeat_execution_times - 1 {
-                return Ok(result);
-            }
             println!(
-                "Finished round {} with {} transactions",
+                "Finished execution round {}/{} with {} transactions",
                 i,
+                repeat_execution_times,
                 sig_verified_txns.len()
             );
+            if !Self::ensure_output_matches(&repeat_result, &result, version) {
+                bail!(
+                    "Execution result mismatched in round {}/{}",
+                    i,
+                    repeat_execution_times
+                );
+            }
         }
-        unreachable!();
+        Ok(result)
     }
 
     pub fn execute_transaction_at_version_with_gas_profiler(
@@ -178,6 +187,27 @@ impl AptosDebugger {
                 .ensure_match_transaction_info(version, txn_info, None, None)
                 .unwrap_or_else(|err| println!("{}", err))
         }
+    }
+
+    fn ensure_output_matches(
+        txn_outputs: &[TransactionOutput],
+        expected_txn_outputs: &[TransactionOutput],
+        first_version: Version,
+    ) -> bool {
+        let mut all_match = true;
+        for idx in 0..txn_outputs.len() {
+            let txn_output = &txn_outputs[idx];
+            let expected_output = &expected_txn_outputs[idx];
+            let version = first_version + idx as Version;
+            if txn_output != expected_output {
+                println!(
+                    "Mismatch at version {:?}:\nExpected: {:#?}\nActual: {:#?}",
+                    version, expected_output, txn_output
+                );
+                all_match = false;
+            }
+        }
+        all_match
     }
 
     pub async fn execute_transactions_by_epoch(
