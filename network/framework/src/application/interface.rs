@@ -106,14 +106,12 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
         rpc_protocols_and_preferences: Vec<ProtocolId>,
         network_senders: HashMap<NetworkId, NetworkSender<Message>>,
         peers_and_metadata: Arc<PeersAndMetadata>,
-        // open_outbound_rpc: OutboundRpcMatcher,
     ) -> Self {
         Self {
             direct_send_protocols_and_preferences,
             rpc_protocols_and_preferences,
             network_senders,
             peers_and_metadata,
-            // open_outbound_rpc,
         }
     }
 
@@ -132,7 +130,6 @@ impl<Message: NetworkMessageTrait + Clone> NetworkClient<Message> {
 
     /// Identify the supported protocols from the specified peer's connection
     fn get_supported_protocols(&self, peer: &PeerNetworkId) -> Result<ProtocolIdSet, Error> {
-        //let peers_and_metadata = self.get_peers_and_metadata();
         self.peers_and_metadata
             .get_metadata_for_peer(*peer)
             .map(|peer_metadata| peer_metadata.get_supported_protocols())
@@ -400,22 +397,36 @@ impl Default for OutboundRpcMatcher {
 }
 
 pub fn protocol_is_high_priority(protocol_id: ProtocolId) -> bool {
+    // Consensus and StorageService are high priority, everything else can wait
     match protocol_id {
         ProtocolId::ConsensusRpcBcs => true,
         ProtocolId::ConsensusDirectSendBcs => true,
-        // ProtocolId::MempoolDirectSend => {}
+        ProtocolId::MempoolDirectSend => false,
         ProtocolId::StateSyncDirectSend => true,
-        // ProtocolId::DiscoveryDirectSend => {}
-        // ProtocolId::HealthCheckerRpc => {}
+        ProtocolId::DiscoveryDirectSend => false,
+        ProtocolId::HealthCheckerRpc => false,
         ProtocolId::ConsensusDirectSendJson => true,
         ProtocolId::ConsensusRpcJson => true,
         ProtocolId::StorageServiceRpc => true,
-        // ProtocolId::MempoolRpc => {}
-        // ProtocolId::PeerMonitoringServiceRpc => {}
+        ProtocolId::MempoolRpc => false,
+        ProtocolId::PeerMonitoringServiceRpc => false,
         ProtocolId::ConsensusRpcCompressed => true,
         ProtocolId::ConsensusDirectSendCompressed => true,
-        // ProtocolId::NetbenchDirectSend => {}
-        // ProtocolId::NetbenchRpc => {}
-        _ => false,
-    }
+        ProtocolId::NetbenchDirectSend => false,
+        ProtocolId::NetbenchRpc => false,
+        ProtocolId::DKGDirectSendCompressed => false,
+        ProtocolId::DKGDirectSendBcs => false,
+        ProtocolId::DKGDirectSendJson => false,
+        ProtocolId::DKGRpcCompressed => false,
+        ProtocolId::DKGRpcBcs => false,
+        ProtocolId::DKGRpcJson => false,
+        ProtocolId::JWKConsensusDirectSendCompressed => true,
+        ProtocolId::JWKConsensusDirectSendBcs => true,
+        ProtocolId::JWKConsensusDirectSendJson => true,
+        ProtocolId::JWKConsensusRpcCompressed => true,
+        ProtocolId::JWKConsensusRpcBcs => true,
+        ProtocolId::JWKConsensusRpcJson => true,
+        // maybe we want `_ => false`
+        // maybe we want the compiler to notice missing cases and force an explicit decision on new protocols
+     }
 }

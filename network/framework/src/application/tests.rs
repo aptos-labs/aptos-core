@@ -46,7 +46,7 @@ struct DummyMessage {
 }
 
 impl DummyMessage {
-    #[cfg(obsolete)]
+    #[cfg(unused)]
     pub fn new(message_contents: u64) -> Self {
         Self {
             message_contents: Some(message_contents),
@@ -149,8 +149,6 @@ fn test_application_collector_simple() {
     assert_eq!(prots, prots_expected);
 }
 
-// TODO: maybe obsolete? 2023-11 bolson
-#[cfg(obsolete)]
 #[test]
 fn test_peers_and_metadata_simple_interface() {
     // Create the peers and metadata container
@@ -368,7 +366,6 @@ fn test_peers_and_metadata_trusted_peers() {
     assert!(trusted_peers.read().is_empty());
 }
 
-#[cfg(obsolete)] // bolson 2023-11
 #[test]
 fn test_network_client_available_peers() {
     // Create the peers and metadata container
@@ -787,14 +784,12 @@ fn check_registered_networks(
 }
 
 /// Verifies that all returned peers are correct
-#[cfg(obsolete)]
 fn check_all_peers(peers_and_metadata: &Arc<PeersAndMetadata>, expected_peers: Vec<PeerNetworkId>) {
     let all_peers = peers_and_metadata.get_all_peers();
     compare_vectors_ignore_order(all_peers, expected_peers);
 }
 
 /// Verifies that the connected peers and metadata are correct
-#[cfg(obsolete)]
 fn check_connected_peers_and_metadata(
     peers_and_metadata: &Arc<PeersAndMetadata>,
     expected_peers: Vec<PeerNetworkId>,
@@ -809,7 +804,6 @@ fn check_connected_peers_and_metadata(
 }
 
 /// Verifies that the connected and supported peers are correct
-#[cfg(obsolete)]
 fn check_connected_supported_peers(
     peers_and_metadata: &Arc<PeersAndMetadata>,
     protocol_ids: &[ProtocolId],
@@ -908,7 +902,6 @@ fn create_peer_and_connection(
 }
 
 /// Marks the specified peer as disconnected
-#[cfg(obsolete)]
 fn disconnect_peer(peers_and_metadata: &Arc<PeersAndMetadata>, peer_network_id: PeerNetworkId) {
     peers_and_metadata
         .update_connection_state(peer_network_id, ConnectionState::Disconnected)
@@ -916,7 +909,6 @@ fn disconnect_peer(peers_and_metadata: &Arc<PeersAndMetadata>, peer_network_id: 
 }
 
 /// Marks the specified peer as connected
-#[cfg(obsolete)]
 fn connect_peer(peers_and_metadata: &Arc<PeersAndMetadata>, peer_network_id: PeerNetworkId) {
     peers_and_metadata
         .update_connection_state(peer_network_id, ConnectionState::Connected)
@@ -924,7 +916,6 @@ fn connect_peer(peers_and_metadata: &Arc<PeersAndMetadata>, peer_network_id: Pee
 }
 
 /// Marks the specified peer as disconnecting
-#[cfg(obsolete)]
 fn mark_peer_disconnecting(
     peers_and_metadata: &Arc<PeersAndMetadata>,
     peer_network_id: PeerNetworkId,
@@ -944,7 +935,6 @@ fn remove_peer_metadata(
 }
 
 /// Updates the connection metadata for the specified peer
-#[cfg(obsolete)]
 fn update_connection_metadata(
     peers_and_metadata: &Arc<PeersAndMetadata>,
     peer_network_id_3: PeerNetworkId,
@@ -955,9 +945,9 @@ fn update_connection_metadata(
         .unwrap();
 }
 
+#[cfg(obsolete)]
 /// Waits for a network event on the expected channels and
 /// verifies the message contents.
-#[cfg(obsolete)]
 async fn wait_for_network_event(
     expected_peer_network_id: PeerNetworkId,
     outbound_request_receivers: &mut HashMap<

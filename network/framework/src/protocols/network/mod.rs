@@ -19,7 +19,7 @@ use aptos_config::{
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
 use aptos_logger::prelude::*;
-use aptos_types::{network_address::NetworkAddress, PeerId};
+use aptos_types::PeerId;
 use bytes::Bytes;
 use futures::{
     channel::oneshot,
@@ -43,6 +43,7 @@ use std::{
 };
 use tokio::{runtime::Handle, sync::mpsc::error::TrySendError};
 use tokio_stream::wrappers::ReceiverStream;
+use crate::protocols::wire::messaging::v1::ErrorCode;
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -797,6 +798,7 @@ impl<TMessage> Clone for NetworkSender<TMessage> {
 }
 
 impl<TMessage> NetworkSender<TMessage> {
+    #[cfg(unused)]
     /// Request that a given Peer be dialed at the provided `NetworkAddress` and
     /// synchronously wait for the request to be performed.
     pub async fn dial_peer(
@@ -811,10 +813,35 @@ impl<TMessage> NetworkSender<TMessage> {
 
     /// Request that a given Peer be disconnected and synchronously wait for the request to be
     /// performed.
-    pub async fn disconnect_peer(&self, _peer: PeerId) -> Result<(), NetworkError> {
-        // dead network-1 code we might want to bring back...
-        unreachable!("NetworkSender.disconnect_peer unimplemented (and unused)");
-        // Ok(())
+    pub async fn disconnect_peer(&self, peer: PeerId) -> Result<(), NetworkError> {
+        match self.peers.read() {
+            Ok(peers) => {
+                let peer_network_id = PeerNetworkId::new(self.network_id, peer);
+                match peers.get(&peer_network_id) {
+                    None => {
+                        // probably already gone, okay
+                    }
+                    Some(peer_stub) => {
+                        let msg = NetworkMessage::Error(ErrorCode::DisconnectCommand);
+                        let enqueue_micros = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_micros() as u64;
+                        if peer_stub.sender_high_prio.try_send((msg.clone(),enqueue_micros)).is_ok() {
+                            info!(peer = peer_network_id, reason = "app request", "peerclose");
+                        } else if peer_stub.sender.try_send((msg,enqueue_micros)).is_ok() {
+                            info!(peer = peer_network_id, reason = "app request", "peerclose");
+                        } else {
+                            return Err(NetworkError::PeerFullCondition);
+                        }
+                    }
+                }
+            }
+            _ => {
+                // trying to take the lock failed? wat?
+            }
+        }
+        Ok(())
     }
 
     fn update_peers(&self) {
