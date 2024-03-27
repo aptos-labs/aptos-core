@@ -402,9 +402,9 @@ impl UserModuleTransactionGenerator for EconiaMarketOrderTransactionGenerator {
         let num_prev_transactions = self.num_prev_transactions.clone();
         Arc::new(move |account, package, publisher, txn_factory, rng, txn_counter, _prev_orders, _market_maker| {
             let market_id = account.address().into_bytes()[0] as u64 % *num_markets + 1;
-            if txn_counter <= (*num_prev_transactions) + (*num_markets)*200 {
-                let bid_size = rng.gen_range(100000, 500000);
-                let ask_size = rng.gen_range(100000, 500000);
+            if txn_counter <= (*num_prev_transactions) + (*num_markets)*600 {
+                let bid_size = rng.gen_range(400000, 500000);
+                let ask_size = rng.gen_range(400000, 500000);
                 if rng.gen_range(0,2) == 0 {
                     let bid_price = rng.gen_range(13000, 13500);
                     let bid_builder = txn_factory.payload(place_bid_limit_order(package.get_module_id("txn_generator_utils"), bid_size, bid_price, market_id, publisher.address()));
