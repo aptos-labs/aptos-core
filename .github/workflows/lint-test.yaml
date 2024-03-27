@@ -136,6 +136,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
       - name: Run aptos cached packages build test
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         run: scripts/cargo_build_aptos_cached_packages.sh --check
