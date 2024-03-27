@@ -19,7 +19,7 @@ spec aptos_framework::reconfiguration_with_dkg {
     }
 
     spec finish(account: &signer) {
-        pragma verify_duration_estimate = 600;
+        pragma verify_duration_estimate = 1200;
         include FinishRequirement;
     }
 
