@@ -10,7 +10,7 @@ use crate::{
     counters,
     error::NetworkError,
     protocols::wire::messaging::v1::{
-        DirectSendMsg, NetworkMessage, RequestId, RpcRequest, RpcResponse,
+        DirectSendMsg, ErrorCode, NetworkMessage, RequestId, RpcRequest, RpcResponse,
     },
     ProtocolId,
 };
@@ -19,6 +19,7 @@ use aptos_config::{
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
 use aptos_logger::prelude::*;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::PeerId;
 use bytes::Bytes;
 use futures::{
@@ -43,8 +44,6 @@ use std::{
 };
 use tokio::{runtime::Handle, sync::mpsc::error::TrySendError};
 use tokio_stream::wrappers::ReceiverStream;
-use aptos_time_service::{TimeService, TimeServiceTrait};
-use crate::protocols::wire::messaging::v1::ErrorCode;
 
 pub trait Message: DeserializeOwned + Serialize {}
 impl<T: DeserializeOwned + Serialize> Message for T {}
@@ -826,26 +825,30 @@ impl<TMessage> NetworkSender<TMessage> {
                 match peers.get(&peer_network_id) {
                     None => {
                         // probably already gone, okay
-                    }
+                    },
                     Some(peer_stub) => {
                         let msg = NetworkMessage::Error(ErrorCode::DisconnectCommand);
                         let enqueue_micros = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap()
                             .as_micros() as u64;
-                        if peer_stub.sender_high_prio.try_send((msg.clone(),enqueue_micros)).is_ok() {
+                        if peer_stub
+                            .sender_high_prio
+                            .try_send((msg.clone(), enqueue_micros))
+                            .is_ok()
+                        {
                             info!(peer = peer_network_id, reason = "app request", "peerclose");
-                        } else if peer_stub.sender.try_send((msg,enqueue_micros)).is_ok() {
+                        } else if peer_stub.sender.try_send((msg, enqueue_micros)).is_ok() {
                             info!(peer = peer_network_id, reason = "app request", "peerclose");
                         } else {
                             return Err(NetworkError::PeerFullCondition);
                         }
-                    }
+                    },
                 }
-            }
+            },
             _ => {
                 // trying to take the lock failed? wat?
-            }
+            },
         }
         Ok(())
     }
@@ -1259,8 +1262,8 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
                         let data_len = bytes.len() as u64;
                         let endtime = self.time_service.now();
                         // time message spent waiting in queue
-                        let delay_micros = (self.time_service.now_unix_time().as_micros() as u64)
-                            - rx_time;
+                        let delay_micros =
+                            (self.time_service.now_unix_time().as_micros() as u64) - rx_time;
                         // time since this send_rpc() started
                         let rpc_micros = endtime.duration_since(now).as_micros() as u64;
                         counters::inbound_queue_delay(

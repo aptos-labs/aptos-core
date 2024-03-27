@@ -24,6 +24,7 @@ use aptos_config::{
 };
 use aptos_logger::{error, info, warn};
 use aptos_metrics_core::{register_int_counter_vec, IntCounter, IntCounterVec};
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use futures::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite},
     stream::Fuse,
@@ -35,7 +36,6 @@ use tokio::{
     runtime::Handle,
     sync::mpsc::{error::TryRecvError, Receiver},
 };
-use aptos_time_service::{TimeService,TimeServiceTrait};
 
 pub fn start_peer<TSocket>(
     config: &NetworkConfig,
@@ -486,7 +486,12 @@ async fn writer_task(
     info!("peer writer exited")
 }
 
-async fn complete_rpc(rpc_state: OpenRpcRequestState, nmsg: NetworkMessage, rx_time: u64, time_service: TimeService) {
+async fn complete_rpc(
+    rpc_state: OpenRpcRequestState,
+    nmsg: NetworkMessage,
+    rx_time: u64,
+    time_service: TimeService,
+) {
     if let NetworkMessage::RpcResponse(response) = nmsg {
         let blob = response.raw_response;
         let now = time_service.now(); //tokio::time::Instant::now(); // TODO: use a TimeService
@@ -665,7 +670,12 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                         //     .duration_since(std::time::UNIX_EPOCH)
                         //     .unwrap()
                         //     .as_micros() as u64;
-                        self.handle.spawn(complete_rpc(rpc_state, nmsg, rx_time, self.time_service.clone()));
+                        self.handle.spawn(complete_rpc(
+                            rpc_state,
+                            nmsg,
+                            rx_time,
+                            self.time_service.clone(),
+                        ));
                     },
                 }
             },

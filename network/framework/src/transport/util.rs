@@ -140,12 +140,17 @@ pub struct MockTransportDial {
 }
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
-pub fn new_mock_transport(time_service: TimeService) -> (
+pub fn new_mock_transport(
+    time_service: TimeService,
+) -> (
     AptosNetTransportActual,
     tokio::sync::mpsc::Receiver<MockTransportEvent>,
 ) {
     let (tx, rx) = tokio::sync::mpsc::channel(10);
-    let mt = MockTransport { call: tx, time_service };
+    let mt = MockTransport {
+        call: tx,
+        time_service,
+    };
     (AptosNetTransportActual::Mock(mt), rx)
 }
 

@@ -17,6 +17,7 @@ use aptos_config::{
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_logger::{prelude::*, sample, sample::SampleRate};
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use aptos_types::network_address::NetworkAddress;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -28,7 +29,6 @@ use std::{
     sync::{Arc, RwLock},
     time::Duration,
 };
-use aptos_time_service::{TimeService,TimeServiceTrait};
 
 /// A simple definition to handle all the trait bounds for messages.
 // TODO: we should remove the duplication across the different files
@@ -431,5 +431,5 @@ pub fn protocol_is_high_priority(protocol_id: ProtocolId) -> bool {
         ProtocolId::JWKConsensusRpcJson => true,
         // maybe we want `_ => false`
         // maybe we want the compiler to notice missing cases and force an explicit decision on new protocols
-     }
+    }
 }
