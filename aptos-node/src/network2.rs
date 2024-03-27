@@ -47,11 +47,12 @@ impl<T: MessageTrait> ApplicationNetworkInterfaces<T> {
         peer_senders: Arc<OutboundPeerConnections>,
         label: &str,
         contexts: Arc<BTreeMap<NetworkId, NetworkContext>>,
+        time_service: TimeService,
     ) -> Self {
         let mut network_senders = HashMap::new();
         for network_id in network_ids.into_iter() {
             let role_type = contexts.get(&network_id).unwrap().role();
-            network_senders.insert(network_id, NetworkSender::new(network_id, peer_senders.clone(), role_type));
+            network_senders.insert(network_id, NetworkSender::new(network_id, peer_senders.clone(), role_type, time_service.clone()));
         }
         let network_client = NetworkClient::new(
             direct_send_protocols_and_preferences,
@@ -87,6 +88,7 @@ pub struct AppSetupContext {
     pub peers_and_metadata: Arc<PeersAndMetadata>,
     pub peer_senders: Arc<OutboundPeerConnections>,
     pub contexts: Arc<BTreeMap<NetworkId, NetworkContext>>,
+    pub time_service: TimeService,
 }
 
 fn build_network_connections<T: MessageTrait>(
@@ -129,6 +131,7 @@ fn build_network_connections<T: MessageTrait>(
         setup.peer_senders.clone(),
         counter_label,
         setup.contexts.clone(),
+        setup.time_service.clone(),
     )
 }
 

@@ -28,6 +28,7 @@ use std::{
     sync::{Arc, RwLock},
     time::Duration,
 };
+use aptos_time_service::{TimeService,TimeServiceTrait};
 
 /// A simple definition to handle all the trait bounds for messages.
 // TODO: we should remove the duplication across the different files
@@ -297,8 +298,8 @@ pub struct OpenRpcRequestState {
     // send on this to deliver a reply back to an open NetworkSender.send_rpc()
     pub sender: oneshot::Sender<Result<(Bytes, u64), RpcError>>,
     pub protocol_id: ProtocolId,
-    pub started: tokio::time::Instant, // for metrics
-    pub deadline: tokio::time::Instant,
+    pub started: std::time::Instant, // for metrics
+    pub deadline: std::time::Instant,
     pub network_id: NetworkId, // for metrics
     pub role_type: RoleType,   // for metrics
 }
@@ -307,12 +308,14 @@ pub struct OpenRpcRequestState {
 #[derive(Clone, Debug)]
 pub struct OutboundRpcMatcher {
     open_outbound_rpc: Arc<RwLock<BTreeMap<RequestId, OpenRpcRequestState>>>,
+    time_service: TimeService,
 }
 
 impl OutboundRpcMatcher {
-    pub fn new() -> Self {
+    pub fn new(time_service: TimeService) -> Self {
         Self {
             open_outbound_rpc: Arc::new(RwLock::new(BTreeMap::new())),
+            time_service,
         }
     }
 
@@ -327,8 +330,8 @@ impl OutboundRpcMatcher {
         request_id: RequestId,
         sender: oneshot::Sender<Result<(Bytes, u64), RpcError>>,
         protocol_id: ProtocolId,
-        started: tokio::time::Instant,
-        deadline: tokio::time::Instant,
+        started: std::time::Instant,
+        deadline: std::time::Instant,
         network_id: NetworkId,
         role_type: RoleType,
     ) {
@@ -362,7 +365,7 @@ impl OutboundRpcMatcher {
     fn cleanup_internal(&self) {
         let mut they = self.open_outbound_rpc.write().unwrap();
         let mut to_delete = vec![];
-        let now = tokio::time::Instant::now();
+        let now = self.time_service.now();
         {
             for (k, v) in they.iter() {
                 if now > v.deadline {
@@ -392,7 +395,7 @@ impl OutboundRpcMatcher {
 
 impl Default for OutboundRpcMatcher {
     fn default() -> Self {
-        Self::new()
+        Self::new(TimeService::real())
     }
 }
 

@@ -35,6 +35,7 @@ use tokio::{
     runtime::Handle,
     sync::mpsc::{error::TryRecvError, Receiver},
 };
+use aptos_time_service::{TimeService,TimeServiceTrait};
 
 pub fn start_peer<TSocket>(
     config: &NetworkConfig,
@@ -46,6 +47,7 @@ pub fn start_peer<TSocket>(
     peers_and_metadata: Arc<PeersAndMetadata>,
     peer_senders: Arc<OutboundPeerConnections>,
     network_context: NetworkContext,
+    time_service: TimeService,
 ) where
     TSocket: crate::transport::TSocket,
 {
@@ -54,7 +56,7 @@ pub fn start_peer<TSocket>(
         tokio::sync::mpsc::channel::<(NetworkMessage, u64)>(config.network_channel_size);
     let (sender_high_prio, to_send_high_prio) =
         tokio::sync::mpsc::channel::<(NetworkMessage, u64)>(config.network_channel_size);
-    let open_outbound_rpc = OutboundRpcMatcher::new();
+    let open_outbound_rpc = OutboundRpcMatcher::new(time_service.clone());
     let max_frame_size = config.max_frame_size;
     let (read_socket, write_socket) = socket.split();
     let reader = MultiplexMessageStream::new(read_socket, max_frame_size).fuse();
@@ -82,6 +84,7 @@ pub fn start_peer<TSocket>(
         handle.clone(),
         closed.clone(),
         role_type,
+        time_service,
     ));
     let stub = PeerStub::new(sender, sender_high_prio, open_outbound_rpc, closed.clone());
     if let Err(err) = peers_and_metadata
@@ -285,7 +288,6 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
                     queue_micros,
                 );
                 if estimate_serialized_length(&msg) > self.max_frame_size {
-                    // TODO: FIXME, serialize msg to find out if it is bigger than max_frame_size?
                     // finish prior large message before starting a new large message
                     if self.large_message.is_some() {
                         self.next_large_msg = Some(msg);
@@ -398,12 +400,11 @@ impl<WriteThing: AsyncWrite + Unpin + Send> WriterContext<WriteThing> {
             tokio::select! {
                 send_result = self.writer.send(&mm) => match send_result {
                     Ok(_) => {
-                        // info!("writer_thread ok sent {:?} bytes", data_len);
                         peer_message_frames_written(&self.peer_network_id.network_id()).inc();
                         peer_message_bytes_written(&self.peer_network_id.network_id()).inc_by(data_len as u64);
                     }
                     Err(err) => {
-                        // TODO: counter net write err
+                        // maybe add counter for network write errors?
                         close_reason = "send error";
                         warn!("writer_thread error sending [{:?}]message to peer: {:?} mm={:?}", data_len, err, mm);
                         break;
@@ -485,10 +486,10 @@ async fn writer_task(
     info!("peer writer exited")
 }
 
-async fn complete_rpc(rpc_state: OpenRpcRequestState, nmsg: NetworkMessage, rx_time: u64) {
+async fn complete_rpc(rpc_state: OpenRpcRequestState, nmsg: NetworkMessage, rx_time: u64, time_service: TimeService) {
     if let NetworkMessage::RpcResponse(response) = nmsg {
         let blob = response.raw_response;
-        let now = tokio::time::Instant::now(); // TODO: use a TimeService
+        let now = time_service.now(); //tokio::time::Instant::now(); // TODO: use a TimeService
         let dt = now.duration_since(rpc_state.started);
         let data_len = blob.len() as u64;
         match rpc_state.sender.send(Ok((blob.into(), rx_time))) {
@@ -533,6 +534,7 @@ struct ReaderContext<ReadThing: AsyncRead + Unpin + Send> {
     open_outbound_rpc: OutboundRpcMatcher,
     handle: Handle,
     role_type: RoleType, // for metrics
+    time_service: TimeService,
 
     // defragment context
     current_stream_id: u32,
@@ -549,6 +551,7 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
         open_outbound_rpc: OutboundRpcMatcher,
         handle: Handle,
         role_type: RoleType,
+        time_service: TimeService,
     ) -> Self {
         Self {
             reader,
@@ -557,6 +560,7 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
             open_outbound_rpc,
             handle,
             role_type,
+            time_service,
 
             current_stream_id: 0,
             large_message: None,
@@ -656,11 +660,12 @@ impl<ReadThing: AsyncRead + Unpin + Send> ReaderContext<ReadThing> {
                         );
                     },
                     Some(rpc_state) => {
-                        let rx_time = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_micros() as u64;
-                        self.handle.spawn(complete_rpc(rpc_state, nmsg, rx_time));
+                        let rx_time = self.time_service.now_unix_time().as_micros() as u64;
+                        // let rx_time = std::time::SystemTime::now()
+                        //     .duration_since(std::time::UNIX_EPOCH)
+                        //     .unwrap()
+                        //     .as_micros() as u64;
+                        self.handle.spawn(complete_rpc(rpc_state, nmsg, rx_time, self.time_service.clone()));
                     },
                 }
             },
@@ -829,6 +834,7 @@ async fn reader_task(
     handle: Handle,
     closed: Closer,
     role_type: RoleType,
+    time_service: TimeService,
 ) {
     let rc = ReaderContext::new(
         reader,
@@ -837,6 +843,7 @@ async fn reader_task(
         open_outbound_rpc,
         handle,
         role_type,
+        time_service,
     );
     rc.run(closed).await;
     info!("peer {} reader finished", remote_peer_network_id);
@@ -881,6 +888,7 @@ mod tests {
     #[tokio::test]
     pub async fn test_stream_multiplexing() {
         aptos_logger::Logger::init_for_testing();
+        let time_service = TimeService::mock();
         // much borrowed from start_peer()
         let config = NetworkConfig::default();
         let max_frame_size = 128; // smaller than real to force fragmentation of many messages to test fragmentation
@@ -907,7 +915,7 @@ mod tests {
         apps.add(app_con);
         let apps = Arc::new(apps);
         let remote_peer_network_id = PeerNetworkId::new(network_id, AccountAddress::random());
-        let open_outbound_rpc = OutboundRpcMatcher::new();
+        let open_outbound_rpc = OutboundRpcMatcher::new(time_service.clone());
 
         let handle = Handle::current();
         handle.spawn(writer_task(
@@ -927,6 +935,7 @@ mod tests {
             handle.clone(),
             closed.clone(),
             role_type,
+            time_service.clone(),
         ));
 
         let max_data_len = max_frame_size * 13;

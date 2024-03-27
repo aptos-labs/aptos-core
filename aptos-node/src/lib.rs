@@ -49,6 +49,7 @@ use std::{
 use std::collections::BTreeMap;
 use tokio::runtime::Runtime;
 use aptos_network2::protocols::network::OutboundPeerConnections;
+use aptos_time_service::TimeService;
 use crate::network2::AppSetupContext;
 
 const EPOCH_LENGTH_SECS: u64 = 60;
@@ -630,6 +631,7 @@ pub fn setup_environment_and_start_node(
         peers_and_metadata: peers_and_metadata.clone(),
         peer_senders,
         contexts,
+        time_service: TimeService::real(),
     };
 
     let health_checker_network_interfaces = network2::health_checker_network_connections(&mut apps, &app_setup);

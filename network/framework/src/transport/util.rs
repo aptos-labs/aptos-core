@@ -21,6 +21,8 @@ use aptos_logger::{info, warn};
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 use aptos_netcore::transport::memory::MemoryTransport;
 use aptos_netcore::transport::{tcp::TcpTransport, ConnectionOrigin, Transport};
+#[cfg(any(test, feature = "testing", feature = "fuzzing"))]
+use aptos_time_service::TimeService;
 use aptos_time_service::TimeServiceTrait;
 use aptos_types::network_address::NetworkAddress;
 use futures::AsyncWriteExt;
@@ -105,7 +107,7 @@ impl AptosNetTransportActual {
                     let stub = PeerStub::new(
                         sender,
                         sender_high_prio,
-                        OutboundRpcMatcher::new(),
+                        OutboundRpcMatcher::new(mt.time_service.clone()),
                         Closer::new(),
                     );
                     peer_senders.insert(remote_peer_network_id, stub);
@@ -119,8 +121,9 @@ impl AptosNetTransportActual {
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
 #[derive(Clone)]
 pub struct MockTransport {
-    // TODO: this will becom a channel of enum of struct if we have to support more than dial()
+    // TODO: this will become a channel of enum of struct if we have to support more than dial()
     pub call: tokio::sync::mpsc::Sender<MockTransportEvent>,
+    pub time_service: TimeService,
 }
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
@@ -137,12 +140,12 @@ pub struct MockTransportDial {
 }
 
 #[cfg(any(test, feature = "testing", feature = "fuzzing"))]
-pub fn new_mock_transport() -> (
+pub fn new_mock_transport(time_service: TimeService) -> (
     AptosNetTransportActual,
     tokio::sync::mpsc::Receiver<MockTransportEvent>,
 ) {
     let (tx, rx) = tokio::sync::mpsc::channel(10);
-    let mt = MockTransport { call: tx };
+    let mt = MockTransport { call: tx, time_service };
     (AptosNetTransportActual::Mock(mt), rx)
 }
 
@@ -229,6 +232,7 @@ where
         peers_and_metadata,
         peer_senders,
         network_context,
+        transport.time_service.clone(),
     );
     Ok(())
 }

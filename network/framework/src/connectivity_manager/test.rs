@@ -108,7 +108,7 @@ impl TestHarness {
         // let chain_id = ChainId::new(4);
         // let key = PrivateKey::generate_for_testing();
         // let protos = ProtocolIdSet::all_known();
-        let (transport, mock_transport_events) = new_mock_transport();
+        let (transport, mock_transport_events) = new_mock_transport(time_service.clone());
         // let ant = AptosNetTransport::<MemoryTransport>::new(
         //     MemoryTransport,
         //     network_context,

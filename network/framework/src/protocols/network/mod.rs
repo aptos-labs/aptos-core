@@ -43,6 +43,7 @@ use std::{
 };
 use tokio::{runtime::Handle, sync::mpsc::error::TrySendError};
 use tokio_stream::wrappers::ReceiverStream;
+use aptos_time_service::{TimeService, TimeServiceTrait};
 use crate::protocols::wire::messaging::v1::ErrorCode;
 
 pub trait Message: DeserializeOwned + Serialize {}
@@ -752,6 +753,7 @@ pub struct NetworkSender<TMessage> {
     peers: RwLock<HashMap<PeerNetworkId, PeerStub>>,
     peers_generation: AtomicU32,
     role_type: RoleType, // for metrics
+    time_service: TimeService,
     _marker: PhantomData<TMessage>,
 }
 
@@ -761,6 +763,7 @@ pub trait NewNetworkSender {
         network_id: NetworkId,
         peer_senders: Arc<OutboundPeerConnections>,
         role_type: RoleType,
+        time_service: TimeService,
     ) -> Self;
 }
 
@@ -769,6 +772,7 @@ impl<TMessage> NewNetworkSender for NetworkSender<TMessage> {
         network_id: NetworkId,
         peer_senders: Arc<OutboundPeerConnections>,
         role_type: RoleType,
+        time_service: TimeService,
     ) -> Self {
         Self {
             network_id,
@@ -776,6 +780,7 @@ impl<TMessage> NewNetworkSender for NetworkSender<TMessage> {
             peers: RwLock::new(HashMap::new()),
             peers_generation: AtomicU32::new(0),
             role_type,
+            time_service,
             _marker: PhantomData,
         }
     }
@@ -792,6 +797,7 @@ impl<TMessage> Clone for NetworkSender<TMessage> {
             peers: RwLock::new(peers),
             peers_generation: AtomicU32::new(peers_generation),
             role_type: self.role_type,
+            time_service: self.time_service.clone(),
             _marker: PhantomData,
         }
     }
@@ -1105,8 +1111,7 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
         high_prio: bool,
     ) -> Result<TMessage, RpcError> {
         // Don't use `?` error return so that we can put a counter on every error condition
-        // TODO: plumb through a TimeService to here
-        let now = tokio::time::Instant::now();
+        let now = self.time_service.now();
         let deadline = now.add(timeout);
         let peer_network_id = PeerNetworkId::new(self.network_id, recipient);
         self.update_peers();
@@ -1231,7 +1236,7 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
                 return Err(RpcError::TimedOut); // TODO: better error for lock fail?
             },
         };
-        let sub_timeout = match deadline.checked_duration_since(tokio::time::Instant::now()) {
+        let sub_timeout = match deadline.checked_duration_since(self.time_service.now()) {
             None => {
                 // we are already past deadline, just sending was too slow?
                 counters::rpc_messages(
@@ -1252,12 +1257,9 @@ impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
                 Ok(content_result) => match content_result {
                     Ok((bytes, rx_time)) => {
                         let data_len = bytes.len() as u64;
-                        let endtime = tokio::time::Instant::now();
+                        let endtime = self.time_service.now();
                         // time message spent waiting in queue
-                        let delay_micros = (std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap()
-                            .as_micros() as u64)
+                        let delay_micros = (self.time_service.now_unix_time().as_micros() as u64)
                             - rx_time;
                         // time since this send_rpc() started
                         let rpc_micros = endtime.duration_since(now).as_micros() as u64;

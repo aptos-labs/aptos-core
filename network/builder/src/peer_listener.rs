@@ -126,6 +126,7 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
                         self.peers_and_metadata.clone(),
                         self.peer_senders.clone(),
                         self.network_context,
+                        self.time_service.clone(),
                     );
                 }
                 Err(err) => {
