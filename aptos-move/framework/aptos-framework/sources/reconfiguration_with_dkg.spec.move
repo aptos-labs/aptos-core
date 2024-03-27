@@ -19,7 +19,7 @@ spec aptos_framework::reconfiguration_with_dkg {
     }
 
     spec finish(account: &signer) {
-        pragma verify_duration_estimate = 1200;
+        pragma verify_duration_estimate = 600;
         include FinishRequirement;
     }
 
@@ -58,7 +58,7 @@ spec aptos_framework::reconfiguration_with_dkg {
 
     spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
         use aptos_framework::dkg;
-        pragma verify_duration_estimate = 1200; // TODO: set because of timeout (property proved).
+        pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved).
         include FinishRequirement;
         requires dkg::has_incomplete_session();
         aborts_if false;
