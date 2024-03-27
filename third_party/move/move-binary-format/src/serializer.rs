@@ -55,6 +55,10 @@ impl CompiledScript {
 
         ser.serialize_main(&mut binary_data, self)?;
 
+        let compiler_ver = self.compiler_id.clone();
+        ser.common
+            .serialize_compiler_id(&mut binary_data, compiler_ver)?;
+
         *binary = binary_data.into_inner();
         Ok(())
     }
@@ -142,6 +146,10 @@ fn serialize_table_size(binary: &mut BinaryData, size: u32) -> Result<()> {
 
 fn serialize_constant_pool_index(binary: &mut BinaryData, idx: &ConstantPoolIndex) -> Result<()> {
     write_as_uleb128(binary, idx.0, CONSTANT_INDEX_MAX)
+}
+
+fn serialize_compiler_id_count(binary: &mut BinaryData, id_len: usize) -> Result<()> {
+    write_as_uleb128(binary, id_len as u64, COMPILER_ID_LEN_MAX)
 }
 
 fn serialize_bytecode_count(binary: &mut BinaryData, len: usize) -> Result<()> {
@@ -262,6 +270,10 @@ impl CompiledModule {
         binary_data.extend(temp.as_inner())?;
 
         serialize_module_handle_index(&mut binary_data, &self.self_module_handle_idx)?;
+
+        let compiler_ver = self.compiler_id.clone();
+        ser.common
+            .serialize_compiler_id(&mut binary_data, compiler_ver)?;
 
         *binary = binary_data.into_inner();
         Ok(())
@@ -1110,6 +1122,15 @@ impl CommonSerializer {
     fn serialize_header(&mut self, binary: &mut BinaryData) -> Result<()> {
         serialize_magic(binary)?;
         write_u32(binary, self.major_version)?;
+        Ok(())
+    }
+
+    fn serialize_compiler_id(
+        &mut self,
+        binary: &mut BinaryData,
+        compiler_id: String,
+    ) -> Result<()> {
+        serialize_byte_blob(binary, serialize_compiler_id_count, compiler_id.as_bytes())?;
         Ok(())
     }
 

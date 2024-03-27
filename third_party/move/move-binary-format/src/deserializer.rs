@@ -352,6 +352,16 @@ fn load_local_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
     read_uleb_internal(cursor, LOCAL_INDEX_MAX)
 }
 
+fn load_compiler_id_size(cursor: &mut VersionedCursor) -> BinaryLoaderResult<usize> {
+    read_uleb_internal(cursor, COMPILER_ID_LEN_MAX)
+}
+
+fn load_compiler_id(cursor: &mut VersionedCursor) -> BinaryLoaderResult<String> {
+    let data = load_byte_blob(cursor, load_compiler_id_size)?;
+    let compiler_id = String::from_utf8(data).unwrap_or_default();
+    Ok(compiler_id)
+}
+
 /// Module internal function that manages deserialization of transactions.
 fn deserialize_compiled_script(
     binary: &[u8],
@@ -387,6 +397,13 @@ fn deserialize_compiled_script(
     };
 
     build_compiled_script(&mut script, &table_contents, &tables)?;
+
+    if cursor.version() < VERSION_DEFAULT {
+        script.compiler_id = MOVE_COMPILER.to_string();
+    } else {
+        script.compiler_id = load_compiler_id(&mut cursor)?;
+    }
+
     Ok(script)
 }
 
@@ -420,6 +437,12 @@ fn deserialize_compiled_module(
     };
 
     build_compiled_module(&mut module, &table_contents, &tables)?;
+
+    if cursor.version() < VERSION_DEFAULT {
+        module.compiler_id = MOVE_COMPILER.to_string();
+    } else {
+        module.compiler_id = load_compiler_id(&mut cursor)?;
+    }
 
     Ok(module)
 }
