@@ -16,6 +16,7 @@ use anyhow::{bail, Result};
 use std::{
     io::{Cursor, Read},
     mem::size_of,
+    string::ToString,
 };
 
 /// Constant values for the binary format header.
@@ -79,6 +80,8 @@ pub const TYPE_PARAMETER_INDEX_MAX: u64 = 65536;
 pub const ACCESS_SPECIFIER_COUNT_MAX: u64 = 64;
 
 pub const SIGNATURE_TOKEN_DEPTH_MAX: usize = 256;
+
+pub const COMPILER_ID_LEN_MAX: u64 = 255;
 
 /// Constants for table types in the binary.
 ///
@@ -499,6 +502,10 @@ pub const VERSION_NEXT: u32 = VERSION_8;
 // Mark which oldest version is supported.
 // TODO(#145): finish v4 compatibility; as of now, only metadata is implemented
 pub const VERSION_MIN: u32 = VERSION_5;
+
+pub const MOVE_ON_APTOS_COMPILER: &str = "Move on Aptos Compiler v1.0";
+
+pub const MOVE_COMPILER: &str = "";
 
 pub(crate) mod versioned_data {
     use crate::{errors::*, file_format_common::*};
