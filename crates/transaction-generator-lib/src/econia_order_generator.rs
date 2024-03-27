@@ -406,11 +406,11 @@ impl UserModuleTransactionGenerator for EconiaMarketOrderTransactionGenerator {
                 let bid_size = rng.gen_range(400000, 500000);
                 let ask_size = rng.gen_range(400000, 500000);
                 if rng.gen_range(0,2) == 0 {
-                    let bid_price = rng.gen_range(13000, 13500);
+                    let bid_price = rng.gen_range(1000, 1500);
                     let bid_builder = txn_factory.payload(place_bid_limit_order(package.get_module_id("txn_generator_utils"), bid_size, bid_price, market_id, publisher.address()));
                     return vec![account.sign_with_transaction_builder(bid_builder)];
                 } else {
-                    let ask_price = rng.gen_range(13501, 14000);
+                    let ask_price = rng.gen_range(1501, 2000);
                     let ask_builder = txn_factory.payload(place_ask_limit_order(package.get_module_id("txn_generator_utils"), ask_size, ask_price, market_id, publisher.address()));
                     return vec![account.sign_with_transaction_builder(ask_builder)];
                 }
