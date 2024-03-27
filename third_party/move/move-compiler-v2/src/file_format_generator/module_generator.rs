@@ -96,7 +96,7 @@ impl ModuleGenerator {
         module_env: &ModuleEnv,
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
         let module = move_binary_format::CompiledModule {
-            version: file_format_common::VERSION_DEFAULT,
+            version: file_format_common::VERSION_MAX,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
             compiler_id: file_format_common::MOVE_ON_APTOS_COMPILER.to_string(),
             ..Default::default()
