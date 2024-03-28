@@ -13,7 +13,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
 aptos-types = { workspace = true }
@@ -21,7 +20,6 @@ ark-bls12-381 = { workspace = true }
 ark-serialize = { workspace = true }
 bcs = { workspace = true }
 hex = { workspace = true }
-rand = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

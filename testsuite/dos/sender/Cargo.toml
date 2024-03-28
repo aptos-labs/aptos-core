@@ -16,5 +16,4 @@ rust-version = { workspace = true }
 bytes = { workspace = true }
 clap = { workspace = true }
 event-listener = { workspace = true }
-quanta = { workspace = true }
 tokio = { workspace = true }

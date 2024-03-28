@@ -16,7 +16,6 @@ rust-version = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-protos = { workspace = true }
-aptos-retrier = { workspace = true }
 bcs = { workspace = true }
 crossbeam-channel = { workspace = true }
 once_cell = { workspace = true }

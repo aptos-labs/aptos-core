@@ -41,8 +41,6 @@ aptos-storage-interface = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true }
-aptos-vm-genesis = { workspace = true }
-async-trait = { workspace = true }
 bcs = { workspace = true }
 diesel = { workspace = true, features = [
     "chrono",
@@ -55,8 +53,6 @@ digest = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
 move-core-types = { workspace = true }
-num-traits = { workspace = true }
-proptest = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

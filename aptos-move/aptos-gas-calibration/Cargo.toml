@@ -6,26 +6,18 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
-aptos = { workspace = true }
 aptos-abstract-gas-usage = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-gas-algebra = { workspace = true }
-aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
-aptos-move-stdlib = { workspace = true }
-aptos-native-interface = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm-types = { workspace = true }
 bcs = { workspace = true }
 clap = { workspace = true }
 float-cmp = { workspace = true }
 move-binary-format = { workspace = true }
-move-bytecode-source-map = { workspace = true }
 move-core-types = { workspace = true }
 move-ir-compiler = { workspace = true }
-move-vm-runtime = { workspace = true }
-move-vm-test-utils = { workspace = true }
 nalgebra = { workspace = true }
 walkdir = { workspace = true }

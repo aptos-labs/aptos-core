@@ -10,7 +10,6 @@ license = "Apache-2.0"
 anyhow = "1.0.52"
 move-binary-format = { path = "../move-binary-format" }
 move-bytecode-source-map = { path = "../move-ir-compiler/move-bytecode-source-map" }
-move-bytecode-verifier = { path = "../move-bytecode-verifier" }
 move-command-line-common = { path = "../move-command-line-common" }
 # diem dependencies
 move-compiler = { path = "../move-compiler" }
@@ -30,9 +29,6 @@ num-traits = "0.2.15"
 once_cell = "1.7.2"
 regex = "1.5.5"
 serde = { version = "1.0.124", features = ["derive"] }
-
-# DNS
-trace = "0.1.7"
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

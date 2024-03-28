@@ -12,8 +12,7 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-anyhow = { workspace = true }
-aptos-gas-schedule = { workspace = true } 
+aptos-gas-schedule = { workspace = true }
 aptos-native-interface = { workspace = true }
 better_any = { workspace = true }
 bytes = { workspace = true }
@@ -24,7 +23,4 @@ move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-table-extension = { workspace = true }
 move-vm-runtime = { workspace = true }
-move-vm-test-utils = { workspace = true }
 move-vm-types = { workspace = true }
-
-aptos-types = { workspace = true }

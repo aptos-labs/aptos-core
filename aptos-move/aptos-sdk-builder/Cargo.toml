@@ -20,7 +20,6 @@ clap = { workspace = true }
 heck = { workspace = true }
 move-core-types = { workspace = true }
 once_cell = { workspace = true }
-regex = { workspace = true }
 serde-generate = { workspace = true }
 serde-reflection = { workspace = true }
 serde_yaml = { workspace = true }

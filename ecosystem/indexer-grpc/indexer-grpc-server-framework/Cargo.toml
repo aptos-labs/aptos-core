@@ -15,11 +15,9 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-metrics-core = { workspace = true }
-aptos-runtimes = { workspace = true }
 async-trait = { workspace = true }
 backtrace = { workspace = true }
 clap = { workspace = true }
-futures = { workspace = true }
 prometheus = { workspace = true }
 serde = { workspace = true }
 serde_yaml = { workspace = true }

@@ -25,11 +25,8 @@ aptos-logger = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
-futures = { workspace = true }
 hex = { workspace = true }
-move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
-poem-openapi = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

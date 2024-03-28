@@ -13,32 +13,22 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-aptos-block-executor = { workspace = true }
 aptos-cached-packages = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-framework = { workspace = true }
 aptos-gas-algebra = { workspace = true }
-aptos-gas-meter = { workspace = true }
 aptos-gas-schedule = { workspace = true, features = ["testing"] }
-aptos-keygen = { workspace = true }
 aptos-language-e2e-tests = { workspace = true }
 aptos-logger = { workspace = true }
-aptos-memory-usage-tracker = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm = { workspace = true, features = ['failpoints'] }
 aptos-vm-genesis = { workspace = true }
-aptos-vm-logging = { workspace = true }
-aptos-vm-types = { workspace = true }
-bcs = { workspace = true }
 claims = { workspace = true }
 fail = { workspace = true, features = ['failpoints'] }
-itertools = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-ir-compiler = { workspace = true }
 proptest = { workspace = true }
-serde = { workspace = true }
 
 [features]
 default = [

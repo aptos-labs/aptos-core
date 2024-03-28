@@ -11,25 +11,14 @@ publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]
-either = { workspace = true }
-aptos-gas-schedule = { workspace = true } 
+aptos-gas-schedule = { workspace = true }
 aptos-native-interface = { workspace = true }
-anyhow = "1.0.52"
-hex = "0.4.3"
-log = "0.4.14"
-move-binary-format = { path = "../../../third_party/move/move-binary-format" }
-move-command-line-common = { path = "../../../third_party/move/move-command-line-common" }
-move-compiler = { path = "../../../third_party/move/move-compiler" }
 move-core-types = { path = "../../../third_party/move/move-core/types" }
-move-docgen = { path = "../../../third_party/move/move-prover/move-docgen" }
-move-errmapgen = { path = "../../../third_party/move/move-prover/move-errmapgen" }
-move-prover = { path = "../../../third_party/move/move-prover" }
 move-vm-runtime = { path = "../../../third_party/move/move-vm/runtime" }
 move-vm-types = { path = "../../../third_party/move/move-vm/types" }
 sha2 = "0.9.3"
 sha3 = "0.9.1"
 smallvec = "1.6.1"
-walkdir = "2.3.1"
 
 [dev-dependencies]
 dir-diff = "0.3.2"
