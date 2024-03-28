@@ -2022,6 +2022,16 @@ name = "aptos-id-generator"
 version = "0.1.0"
 
 [[package]]
+name = "aptos-in-memory-cache"
+version = "0.1.0"
+dependencies = [
+ "dashmap",
+ "parking_lot 0.12.1",
+ "quick_cache",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-indexer"
 version = "0.0.1"
 dependencies = [
@@ -13594,6 +13604,18 @@ checksum = "eff6510e86862b57b210fd8cbe8ed3f0d7d600b9c2863cd4549a2e033c66e956"
 dependencies = [
  "memchr",
  "serde",
+]
+
+[[package]]
+name = "quick_cache"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "58c20af3800cee5134b79a3bd4a3d4b583c16ccfa5f53338f46400851a5b3819"
+dependencies = [
+ "ahash 0.8.8",
+ "equivalent",
+ "hashbrown 0.14.3",
+ "parking_lot 0.12.1",
 ]
 
 [[package]]

@@ -70,6 +70,7 @@ members = [
     "crates/aptos-genesis",
     "crates/aptos-github-client",
     "crates/aptos-id-generator",
+    "crates/aptos-in-memory-cache",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
     "crates/aptos-jwk-consensus",
@@ -339,6 +340,7 @@ aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
+aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
@@ -627,6 +629,7 @@ proptest-derive = "0.4.0"
 prost = { version = "0.12.3", features = ["no-recursion-limit"] }
 prost-types = "0.12.3"
 quanta = "0.10.1"
+quick_cache = "0.4.1"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
