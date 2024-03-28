@@ -45,7 +45,6 @@ spec aptos_framework::reconfiguration_with_dkg {
         include staking_config::StakingRewardsConfigRequirement;
         requires exists<stake::ValidatorFees>(@aptos_framework);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        requires exists<features::Features>(@std);
         include config_buffer::OnNewEpochRequirement<version::Version>;
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;
         include config_buffer::OnNewEpochRequirement<execution_config::ExecutionConfig>;
@@ -53,7 +52,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
         include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
-        aborts_if false;
+        aborts_if !exists<features::Features>(@aptos_framework);
     }
 
     spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
@@ -61,6 +60,5 @@ spec aptos_framework::reconfiguration_with_dkg {
         pragma verify_duration_estimate = 1200; // TODO: set because of timeout (property proved).
         include FinishRequirement;
         requires dkg::has_incomplete_session();
-        aborts_if false;
     }
 }
