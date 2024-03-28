@@ -40,10 +40,16 @@ else
   export IMAGE_TAG_PREFIX=""
 fi
 
-if [ -n "$FEATURES" ]; then
-  export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}${NORMALIZED_FEATURES_LIST}_"
+# New logic for IMAGE_TAG
+if [ -n "$IMAGE_TAG" ]; then
+  export IMAGE_TAG_PREFIX="${IMAGE_TAG}_"
 else
-  export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}"
+  # Existing logic for IMAGE_TAG_PREFIX based on FEATURES and PROFILE
+  if [ -n "$FEATURES" ]; then
+    export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}${NORMALIZED_FEATURES_LIST}_"
+  else
+    export IMAGE_TAG_PREFIX="${IMAGE_TAG_PREFIX}${profile_prefix}"
+  fi
 fi
 
 BUILD_TARGET="${1:-all}"
