@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: missing acquries annotation for Box
+   ┌─ tests/acquires-checker/conditional_global_operations.move:14:9
+   │
+14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
+   │         ^^
+15 │         move_to(s, Box<R> { f: R {} });
+16 │         borrow_global<Box<T>>(a1);
+   │         ------------------------- acquired here
+
+error: missing acquries annotation for Pair
+   ┌─ tests/acquires-checker/conditional_global_operations.move:14:9
+   │
+14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
+   │         ^^
+   ·
+18 │         Pair { f1: _, f2: _ } = move_from<Pair<S, R>>(a1);
+   │                                 ------------------------- acquired here
+
+error: access specifier not enabled. Only plain `acquires R` is enabled.
+   ┌─ tests/acquires-checker/conditional_global_operations.move:14:49
+   │
+14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
+   │                                                 ^^^^^^
+
+error: access specifier not enabled. Only plain `acquires R` is enabled.
+   ┌─ tests/acquires-checker/conditional_global_operations.move:14:57
+   │
+14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
+   │                                                         ^^^^^^
+
+error: access specifier not enabled. Only plain `acquires R` is enabled.
+   ┌─ tests/acquires-checker/conditional_global_operations.move:14:65
+   │
+14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
+   │                                                                 ^^^^^^^^^^^
