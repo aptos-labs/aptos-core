@@ -21,12 +21,12 @@ spec aptos_framework::reconfiguration_with_dkg {
     spec finish(account: &signer) {
         pragma verify_duration_estimate = 1200;
         include FinishRequirement;
+        aborts_if !exists<features::Features>(@aptos_framework);
     }
 
     spec schema FinishRequirement {
         use aptos_framework::chain_status;
         use std::signer;
-        use std::features;
         use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
@@ -52,7 +52,6 @@ spec aptos_framework::reconfiguration_with_dkg {
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
         include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
-        aborts_if !exists<features::Features>(@aptos_framework);
     }
 
     spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
@@ -60,5 +59,6 @@ spec aptos_framework::reconfiguration_with_dkg {
         pragma verify_duration_estimate = 1200; // TODO: set because of timeout (property proved).
         include FinishRequirement;
         requires dkg::has_incomplete_session();
+        aborts_if !exists<features::Features>(@aptos_framework);
     }
 }
