@@ -9,7 +9,7 @@ use move_binary_format::{
         empty_module, AbilitySet, CompiledModule, FunctionHandle, IdentifierIndex, Signature,
         SignatureIndex, SignatureToken,
     },
-    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
+    file_format_common::{IDENTIFIER_SIZE_MAX, MOVE_ON_APTOS_COMPILER, VERSION_MAX},
 };
 use move_core_types::identifier::Identifier;
 use proptest::prelude::*;
@@ -73,6 +73,7 @@ fn simple_generic_module_round_trip() {
         type_parameters: vec![AbilitySet::EMPTY],
         access_specifiers: None,
     });
+    m.compiler_id = MOVE_ON_APTOS_COMPILER.to_string();
 
     let mut serialized = Vec::with_capacity(2048);
     m.serialize_for_version(Some(VERSION_MAX), &mut serialized)

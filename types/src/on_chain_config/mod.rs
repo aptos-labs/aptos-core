@@ -24,6 +24,7 @@ mod aptos_features;
 mod aptos_version;
 mod chain_id;
 mod commit_history;
+mod compiler_id_config;
 mod consensus_config;
 mod execution_config;
 mod gas_schedule;
@@ -41,6 +42,7 @@ pub use self::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
     commit_history::CommitHistoryResource,
+    compiler_id_config::DisallowList,
     consensus_config::{
         AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
         LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,

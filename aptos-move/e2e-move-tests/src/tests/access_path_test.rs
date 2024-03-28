@@ -30,6 +30,7 @@ fn access_path_panic() {
 
     let cm = CompiledModule {
         version: 6,
+        compiler_id: String::new(),
         self_module_handle_idx: ModuleHandleIndex(0),
         module_handles: vec![ModuleHandle {
             address: AddressIdentifierIndex(0),

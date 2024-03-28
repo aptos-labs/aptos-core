@@ -13,6 +13,7 @@ fn mk_module(vis: u8) -> normalized::Module {
     };
     let m = CompiledModule {
         version: crate::file_format_common::VERSION_4,
+        compiler_id: String::new(),
         module_handles: vec![
             // only self module
             ModuleHandle {
