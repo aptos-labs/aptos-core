@@ -31,13 +31,12 @@ use crate::pipeline::{
 };
 use abstract_domain_derive::AbstractDomain;
 use codespan_reporting::diagnostic::Severity;
-use move_binary_format::file_format::{Ability, AbilitySet, CodeOffset};
+use move_binary_format::file_format::{Ability, CodeOffset};
 use move_model::{
     ast::TempIndex,
     exp_generator::ExpGenerator,
-    model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, StructId, TypeParameterKind},
-    ty,
-    ty::{gen_get_ty_param_kinds, Type},
+    model::{FunctionEnv, GlobalEnv, Loc},
+    ty::Type,
 };
 use move_stackless_bytecode::{
     dataflow_analysis::{DataflowAnalysis, TransferFunctions},
@@ -48,7 +47,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{AssignKind, AttrId, Bytecode, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
-use std::{collections::BTreeMap, iter};
+use std::collections::BTreeMap;
 
 // =================================================================================================
 // Processor
@@ -297,8 +296,7 @@ impl<'a> Transformer<'a> {
             Call(id, dests, op, srcs, ai) => {
                 use Operation::*;
                 match &op {
-                    Function(mod_id, fun_id, insts) => {
-                        self.check_fun_inst(id, *mod_id, *fun_id, insts);
+                    Function(..) => {
                         let new_srcs = self.copy_args_if_needed(code_offset, id, srcs);
                         self.check_and_emit_bytecode(code_offset, Call(id, dests, op, new_srcs, ai))
                     },
@@ -318,18 +316,6 @@ impl<'a> Transformer<'a> {
             Call(id, _, op, srcs, _) => {
                 use Operation::*;
                 match &op {
-                    Function(mod_id, fun_id, insts) => {
-                        self.check_fun_inst(*id, *mod_id, *fun_id, insts);
-                    },
-                    Unpack(mod_id, struct_id, insts) | Pack(mod_id, struct_id, insts) => {
-                        self.check_struct_inst(*id, *mod_id, *struct_id, insts);
-                    },
-                    BorrowGlobal(mod_id, struct_id, insts)
-                    | Exists(mod_id, struct_id, insts)
-                    | MoveFrom(mod_id, struct_id, insts)
-                    | MoveTo(mod_id, struct_id, insts) => {
-                        self.check_key_for_struct(*id, *mod_id, *struct_id, insts)
-                    },
                     Drop => self.check_drop(*id, srcs[0], || {
                         ("explicitly dropped here".to_string(), vec![])
                     }),
@@ -510,98 +496,6 @@ impl<'a> Transformer<'a> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
-// Abilities in Types
-
-// TODO(#12036): this functionality should be moved to the frontend
-
-impl<'a> Transformer<'a> {
-    /// Check whether a function has a valid type instantiation.
-    fn check_fun_inst(&self, id: AttrId, mid: ModuleId, fid: FunId, inst: &[Type]) {
-        let ty_params = self.builder.fun_env.get_type_parameters();
-        let fun_env = self.env().get_function(mid.qualified(fid));
-        let err_handler = |loc: &Loc, ty: &Type, msg: &str| {
-            self.error(
-                loc,
-                format!("type `{}` is {}", self.display_ty(ty), msg),
-                format!(
-                    "in instantiation of function `{}` here",
-                    fun_env.get_full_name_str()
-                ),
-            )
-        };
-        let loc = self.loc(id);
-        for (param, ty) in fun_env.get_type_parameters().iter().zip(inst.iter()) {
-            let required_abilities = param.1.abilities;
-            let given_abilities = ty::infer_and_check_abilities(
-                ty,
-                gen_get_ty_param_kinds(&ty_params),
-                self.gen_get_struct_sig(),
-                &loc,
-                err_handler,
-            );
-            ty::check_type_arg_abilities(
-                ty::gen_get_ty_param_kinds(&ty_params),
-                ty,
-                required_abilities,
-                false,
-                given_abilities,
-                &loc,
-                err_handler,
-            )
-        }
-    }
-
-    /// Check whether a struct has a valid type instantiation.
-    fn check_struct_inst(
-        &self,
-        id: AttrId,
-        mid: ModuleId,
-        sid: StructId,
-        inst: &[Type],
-    ) -> AbilitySet {
-        let ty_params = self.builder.fun_env.get_type_parameters();
-        let struct_env = self.env().get_struct(mid.qualified(sid));
-        ty::check_struct_inst(
-            mid,
-            sid,
-            inst,
-            ty::gen_get_ty_param_kinds(&ty_params),
-            self.gen_get_struct_sig(),
-            Some((&self.loc(id), |loc: &Loc, ty: &Type, msg: &str| {
-                self.error(
-                    loc,
-                    format!("type `{}` is {}", self.display_ty(ty), msg),
-                    format!(
-                        "in instantiation of struct `{}` here",
-                        struct_env.get_full_name_str()
-                    ),
-                )
-            })),
-        )
-    }
-
-    /// Check whether a struct has a valid type instantiation and has the `key` ability.
-    fn check_key_for_struct(&self, id: AttrId, mid: ModuleId, sid: StructId, inst: &[Type]) {
-        self.check_struct_inst(id, mid, sid, inst);
-        let ty = mid.qualified_inst(sid, inst.to_vec()).to_type();
-        self.check_ability_for_type(id, None, &ty, Ability::Key, || {
-            (
-                "required because of storage operation here".to_string(),
-                vec![],
-            )
-        })
-    }
-
-    /// Generates a function that given module id and struct id, returns the struct signature
-    /// as it is expected by the ability functions in `ty`.
-    fn gen_get_struct_sig(
-        &'a self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + 'a {
-        self.env().gen_get_struct_sig()
-    }
-}
-
-// ---------------------------------------------------------------------------------------------------------
 // Helpers
 
 /// A description for an error. The 1st string is used as the secondary message (the one printed
@@ -679,11 +573,6 @@ impl<'a> Transformer<'a> {
             primary.as_ref(),
             hints.collect(),
         )
-    }
-
-    /// Shortcut if hints are empty
-    fn error(&self, loc: impl AsRef<Loc>, msg: impl AsRef<str>, primary: impl AsRef<str>) {
-        self.error_with_hints(loc, msg, primary, iter::empty())
     }
 
     /// Create a display string for temps. If the temp is printable, this will be 'local `x`'. Otherwise

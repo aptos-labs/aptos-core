@@ -1,6 +1,6 @@
 module 0x42::globals {
 
-    struct R has store { f: u64 }
+    struct R has store, key { f: u64 }
 
     fun publish(s: &signer) {
         move_to(s, R{f: 1});

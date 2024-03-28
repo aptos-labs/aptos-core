@@ -1,37 +1,42 @@
 
 Diagnostics:
-error: type `T` does not have expected ability `key`
-  ┌─ tests/checking/abilities/missing_key.move:4:9
-  │
-4 │         move_from<T>(addr);
-  │         ^^^^^^^^^^^^^^^^^^
-
-error: type `S<Impotent>` does not have expected ability `key`
+error: type `Impotent` is missing required ability `store`
    ┌─ tests/checking/abilities/missing_key.move:15:9
    │
 15 │         move_from<S<Impotent>>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T` of function `move_from`
 
-error: type `Impotent` does not have expected ability `key`
+error: type `Impotent` is missing required ability `key`
    ┌─ tests/checking/abilities/missing_key.move:16:9
    │
 16 │         borrow_global_mut<Impotent>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `borrow_global_mut`
 
-error: type `Impotent` does not have expected ability `key`
+error: type `Impotent` is missing required ability `key`
    ┌─ tests/checking/abilities/missing_key.move:17:9
    │
 17 │         borrow_global<Impotent>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `borrow_global`
 
-error: type `Impotent` does not have expected ability `key`
+error: type `Impotent` is missing required ability `key`
    ┌─ tests/checking/abilities/missing_key.move:18:9
    │
 18 │         exists<Impotent>(addr);
    │         ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `exists`
 
-error: type `Impotent` does not have expected ability `key`
+error: type `Impotent` is missing required ability `key` (type was inferred)
    ┌─ tests/checking/abilities/missing_key.move:22:25
    │
 22 │         move_to(signer, Impotent {})
    │                         ^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of function `move_to`

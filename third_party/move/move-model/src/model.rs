@@ -30,8 +30,8 @@ use crate::{
     },
     symbol::{Symbol, SymbolPool},
     ty::{
-        gen_get_ty_param_kinds, infer_abilities, NoUnificationContext, PrimitiveType,
-        ReferenceKind, Type, TypeDisplayContext, TypeUnificationAdapter, Variance,
+        AbilityInference, AbilityInferer, NoUnificationContext, PrimitiveType, ReferenceKind, Type,
+        TypeDisplayContext, TypeUnificationAdapter, Variance,
     },
     well_known,
 };
@@ -879,25 +879,12 @@ impl GlobalEnv {
 
     /// Adds a diagnostic of given severity to this environment.
     pub fn diag(&self, severity: Severity, loc: &Loc, msg: &str) {
-        let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
-        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
-        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
-        let diag = Diagnostic::new(severity)
-            .with_message(new_msg)
-            .with_labels(labels);
-        self.add_diag(diag);
+        self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], vec![])
     }
 
     /// Adds a diagnostic of given severity to this environment, with notes.
     pub fn diag_with_notes(&self, severity: Severity, loc: &Loc, msg: &str, notes: Vec<String>) {
-        let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
-        let mut labels = vec![Label::primary(loc.file_id, loc.span)];
-        GlobalEnv::add_inlined_from_labels(&mut labels, &loc.inlined_from_loc);
-        let diag = Diagnostic::new(severity)
-            .with_message(new_msg)
-            .with_labels(labels);
-        let diag = diag.with_notes(notes);
-        self.add_diag(diag);
+        self.diag_with_primary_notes_and_labels(severity, loc, msg, "", notes, vec![])
     }
 
     /// Adds a diagnostic of given severity to this environment, with labels.
@@ -908,7 +895,7 @@ impl GlobalEnv {
         msg: &str,
         labels: Vec<(Loc, String)>,
     ) {
-        self.diag_with_primary_and_labels(severity, loc, msg, "", labels);
+        self.diag_with_primary_notes_and_labels(severity, loc, msg, "", vec![], labels)
     }
 
     /// Adds a diagnostic of given severity to this environment, with primary and primary labels.
@@ -920,14 +907,27 @@ impl GlobalEnv {
         primary: &str,
         labels: Vec<(Loc, String)>,
     ) {
+        self.diag_with_primary_notes_and_labels(severity, loc, msg, primary, vec![], labels)
+    }
+
+    /// Adds a diagnostic of given severity to this environment, with notes and labels.
+    pub fn diag_with_primary_notes_and_labels(
+        &self,
+        severity: Severity,
+        loc: &Loc,
+        msg: &str,
+        primary: &str,
+        notes: Vec<String>,
+        labels: Vec<(Loc, String)>,
+    ) {
         let new_msg = Self::add_backtrace(msg, severity == Severity::Bug);
 
-        // primary
-        let diag = Diagnostic::new(severity).with_message(new_msg);
-        // if primary loc is inlined, add qualifiers
-        let mut primary_labels = vec![Label::primary(loc.file_id, loc.span).with_message(primary)];
+        let mut primary_label = Label::primary(loc.file_id, loc.span);
+        if !primary.is_empty() {
+            primary_label = primary_label.with_message(primary)
+        }
+        let mut primary_labels = vec![primary_label];
         GlobalEnv::add_inlined_from_labels(&mut primary_labels, &loc.inlined_from_loc);
-        let diag = diag.with_labels(primary_labels);
 
         // add "inlined from" qualifiers to secondary labels as needed
         let labels = labels
@@ -939,8 +939,14 @@ impl GlobalEnv {
                 expanded_labels
             })
             .concat();
-        let diag = diag.with_labels(labels);
-        self.add_diag(diag);
+
+        self.add_diag(
+            Diagnostic::new(severity)
+                .with_message(new_msg)
+                .with_labels(primary_labels)
+                .with_labels(labels)
+                .with_notes(notes),
+        )
     }
 
     /// Checks whether any of the diagnostics contains string.
@@ -1337,11 +1343,7 @@ impl GlobalEnv {
 
     /// Computes the abilities associated with the given type.
     pub fn type_abilities(&self, ty: &Type, ty_params: &[TypeParameter]) -> AbilitySet {
-        infer_abilities(
-            ty,
-            gen_get_ty_param_kinds(ty_params),
-            self.gen_get_struct_sig(),
-        )
+        AbilityInferer::new(self, ty_params).infer_abilities(ty).1
     }
 
     /// Returns associated intrinsics.
@@ -1843,29 +1845,8 @@ impl GlobalEnv {
     }
 
     /// Return the `StructEnv` for `str`
-    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv<'_> {
+    pub fn get_struct(&self, str: QualifiedId<StructId>) -> StructEnv {
         self.get_module(str.module_id).into_struct(str.id)
-    }
-
-    /// Generates a function that given module id, struct id,
-    /// returns the struct signature
-    pub fn gen_get_struct_sig(
-        &self,
-    ) -> impl Fn(ModuleId, StructId) -> (Vec<TypeParameterKind>, AbilitySet) + Copy + '_ {
-        |mid, sid| {
-            let qid = QualifiedId {
-                module_id: mid,
-                id: sid,
-            };
-            let struct_env = self.get_struct(qid);
-            let struct_abilities = struct_env.get_abilities();
-            let ty_param_kinds = struct_env
-                .get_type_parameters()
-                .iter()
-                .map(|tp| tp.1.clone())
-                .collect_vec();
-            (ty_param_kinds, struct_abilities)
-        }
     }
 
     // Gets the number of modules in this environment.
