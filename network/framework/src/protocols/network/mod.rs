@@ -260,7 +260,7 @@ impl<TMessage: Message + Unpin> NewNetworkEvents for NetworkEvents<TMessage> {
 
 fn process_received_message<TMessage: Message + Unpin + Send>(
     wmsg: ReceivedMessage,
-    label: String,
+    label: String, // for logging
     sender_source: Arc<std::sync::Mutex<PeerSenderCache>>,
     contexts: Arc<BTreeMap<NetworkId, NetworkContext>>,
 ) -> Option<Event<TMessage>> {
@@ -276,27 +276,20 @@ fn process_received_message<TMessage: Message + Unpin + Send>(
     );
     match wmsg.message {
         NetworkMessage::Error(err) => {
-            // We just drop error responses! TODO: never send them
-            // fall through, maybe get another
+            // drop message. fall through, maybe get another
             info!("app_int err msg discarded: {:?}", err);
             None
         },
         NetworkMessage::RpcRequest(request) => {
-            // let role_type = mself.contexts.get(&msg.sender.network_id()).unwrap().role();
             let role_type = "unk";
-            // info!("app_int rpc_req {} id={}, {}b", request.protocol_id, request.request_id, request.raw_request.len());
             let request_received_start = tokio::time::Instant::now();
             let data_len = request.raw_request.len();
-            // Multi-core decoding protocol_id.from_bytes() is left as an exercise to the application code.
-            // The easiest approach is pipelining and introducing a short queue of decoded items inside the app, a thread continuously reads from this Stream and stores decoded objects in the app queue, this disconnects decoding from handling, allowing the app to do request handling work while a decode is happening in another thread.
-            // See network_event_prefetch below.
             let app_msg = match request
                 .protocol_id
                 .from_bytes(request.raw_request.as_slice())
             {
                 Ok(x) => x,
                 Err(err) => {
-                    // mself.done = true;
                     warn!(
                         "app_int rpc_req {} id={}; err {}, {} {} -> {}",
                         request.protocol_id,
@@ -315,7 +308,7 @@ fn process_received_message<TMessage: Message + Unpin + Send>(
                         "err",
                         data_len as u64,
                     );
-                    // TODO: BSC failed. log error, count error, close peer connection
+                    // maybe close peer connection because they sent us garbage on incompatible protocol?
                     return None;
                 },
             };
@@ -343,7 +336,6 @@ fn process_received_message<TMessage: Message + Unpin + Send>(
                 Some(x) => x,
             };
             // when this spawned task reads from the response oneshot channel it will send it to the network peer
-            // let network_context = mself.contexts.get(&msg.sender.network_id()).unwrap();
             let network_context = contexts.get(&wmsg.sender.network_id()).unwrap();
             counters::pending_rpc_requests(request.protocol_id.as_str()).inc();
             Handle::current().spawn(rpc_response_sender(
@@ -370,9 +362,6 @@ fn process_received_message<TMessage: Message + Unpin + Send>(
             unreachable!("NetworkMessage::RpcResponse should not arrive in NetworkEvents because it is handled by Peer and reconnected with oneshot there");
         },
         NetworkMessage::DirectSendMsg(message) => {
-            // Multi-core decoding protocol_id.from_bytes() is left as an exercise to the application code.
-            // The easiest approach is pipelining and introducing a short queue of decoded items inside the app, a thread continuously reads from this Stream and stores decoded objects in the app queue, this disconnects decoding from handling, allowing the app to do request handling work while a decode is happening in another thread.
-            // See network_event_prefetch below.
             match message.protocol_id.from_bytes(message.raw_msg.as_slice()) {
                 Ok(app_msg) => Some(Event::Message(wmsg.sender, app_msg)),
                 Err(_) => {
@@ -546,7 +535,7 @@ async fn rpc_response_sender(
 impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
     type Item = Event<TMessage>;
 
-    // TODO: reunify with process_received_message() above
+    // TODO: reunify with process_received_message() above?
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // this is the stream of events from all peers to the application.
         // It should never return Poll::Ready(None) which signals that the stream is closed.
@@ -558,8 +547,8 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
             return Poll::Ready(None);
         }
         let mself = self.get_mut();
-        // throw away up to 10 messages while looking for one to return
-        'retries: for _ in 1..10 {
+	// loop until we get a return value or the underlying source returns Poll::Pending
+        'retries: loop {
             let msg = match Pin::new(&mut mself.network_source).poll_next(cx) {
                 Poll::Ready(x) => match x {
                     Some(msg) => msg,
@@ -584,18 +573,13 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
             );
             match msg.message {
                 NetworkMessage::Error(err) => {
-                    // We just drop error responses! TODO: never send them
-                    // fall through, maybe get another
+		    // drop message. fall through, maybe get another
                     info!("app_int err msg discarded: {:?}", err);
                 },
                 NetworkMessage::RpcRequest(request) => {
                     let role_type = mself.contexts.get(&msg.sender.network_id()).unwrap().role();
-                    // info!("app_int rpc_req {} id={}, {}b", request.protocol_id, request.request_id, request.raw_request.len());
                     let request_received_start = tokio::time::Instant::now();
                     let data_len = request.raw_request.len();
-                    // Multi-core decoding protocol_id.from_bytes() is left as an exercise to the application code.
-                    // The easiest approach is pipelining and introducing a short queue of decoded items inside the app, a thread continuously reads from this Stream and stores decoded objects in the app queue, this disconnects decoding from handling, allowing the app to do request handling work while a decode is happening in another thread.
-                    // See network_event_prefetch below.
                     let app_msg = match request
                         .protocol_id
                         .from_bytes(request.raw_request.as_slice())
@@ -622,7 +606,7 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
                                 "err",
                                 data_len as u64,
                             );
-                            // TODO: BSC failed. log error, count error, close peer connection
+			    // maybe close peer connection because they sent us garbage on incompatible protocol?
                             continue 'retries;
                         },
                     };
@@ -681,9 +665,6 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
                     unreachable!("NetworkMessage::RpcResponse should not arrive in NetworkEvents because it is handled by Peer and reconnected with oneshot there");
                 },
                 NetworkMessage::DirectSendMsg(message) => {
-                    // Multi-core decoding protocol_id.from_bytes() is left as an exercise to the application code.
-                    // The easiest approach is pipelining and introducing a short queue of decoded items inside the app, a thread continuously reads from this Stream and stores decoded objects in the app queue, this disconnects decoding from handling, allowing the app to do request handling work while a decode is happening in another thread.
-                    // See network_event_prefetch below.
                     match message.protocol_id.from_bytes(message.raw_msg.as_slice()) {
                         Ok(app_msg) => {
                             return Poll::Ready(Some(Event::Message(msg.sender, app_msg)));
@@ -697,7 +678,6 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
                 },
             }
         }
-        Poll::Pending
     }
 }
 
