@@ -139,10 +139,8 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
-        pragma verify_duration_estimate = 600;
-        pragma aborts_if_is_partial = true;
+        pragma verify_duration_estimate = 1200;
         let addr = signer::address_of(aptos_framework);
-        aborts_if addr != @aptos_framework;
         include reconfiguration_with_dkg::FinishRequirement {
             account: aptos_framework
         };
@@ -153,6 +151,7 @@ spec aptos_framework::aptos_governance {
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;
+        aborts_if false;
     }
 
     spec get_voting_duration_secs(): u64 {
