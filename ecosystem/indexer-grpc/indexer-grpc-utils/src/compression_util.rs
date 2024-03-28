@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::default_file_storage_format;
 use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};

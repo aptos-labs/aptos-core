@@ -6,11 +6,9 @@ fun M::tborrow() {
      var $t1: &u64
      var $t2: M::S
      var $t3: &M::S
-     var $t4: &M::S
   0: $t1 := borrow_local($t0)
-  1: $t4 := borrow_local($t2)
-  2: $t3 := infer($t4)
-  3: return ()
+  1: $t3 := borrow_local($t2)
+  2: return ()
 }
 
 
@@ -21,12 +19,10 @@ fun M::tcopy() {
      var $t2: u64
      var $t3: M::S
      var $t4: M::S
-     var $t5: M::S
   0: $t2 := 1
   1: $t1 := +($t0, $t2)
-  2: $t5 := copy($t3)
-  3: $t4 := infer($t5)
-  4: return ()
+  2: $t4 := copy($t3)
+  3: return ()
 }
 
 
@@ -54,10 +50,10 @@ error: use of unassigned local `x`
   │                 ^^^^^^
 
 error: use of unassigned local `s`
-  ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:9:13
+  ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:9:19
   │
 9 │         let _s2 = s;
-  │             ^^^
+  │                   ^
 
 error: use of unassigned local `x`
    ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:14:17
@@ -91,15 +87,12 @@ fun M::tborrow() {
      var $t1: &u64
      var $t2: M::S
      var $t3: &M::S
-     var $t4: &M::S
-     # before: { no: $t0, $t1, $t2, $t3, $t4 }, after: { no: $t0, $t2, $t3, $t4 }
+     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t2, $t3 }
   0: $t1 := borrow_local($t0)
-     # before: { no: $t0, $t2, $t3, $t4 }, after: { no: $t0, $t2, $t3 }
-  1: $t4 := borrow_local($t2)
      # before: { no: $t0, $t2, $t3 }, after: { no: $t0, $t2 }
-  2: $t3 := infer($t4)
+  1: $t3 := borrow_local($t2)
      # before: { no: $t0, $t2 }, after: { no: $t0, $t2 }
-  3: return ()
+  2: return ()
 }
 
 
@@ -110,17 +103,14 @@ fun M::tcopy() {
      var $t2: u64
      var $t3: M::S
      var $t4: M::S
-     var $t5: M::S
-     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5 }, after: { no: $t0, $t1, $t3, $t4, $t5 }
+     # before: { no: $t0, $t1, $t2, $t3, $t4 }, after: { no: $t0, $t1, $t3, $t4 }
   0: $t2 := 1
-     # before: { no: $t0, $t1, $t3, $t4, $t5 }, after: { no: $t0, $t3, $t4, $t5 }
+     # before: { no: $t0, $t1, $t3, $t4 }, after: { no: $t0, $t3, $t4 }
   1: $t1 := +($t0, $t2)
-     # before: { no: $t0, $t3, $t4, $t5 }, after: { no: $t0, $t3, $t4 }
-  2: $t5 := copy($t3)
      # before: { no: $t0, $t3, $t4 }, after: { no: $t0, $t3 }
-  3: $t4 := infer($t5)
+  2: $t4 := copy($t3)
      # before: { no: $t0, $t3 }, after: { no: $t0, $t3 }
-  4: return ()
+  3: return ()
 }
 
 

@@ -22,4 +22,4 @@ error: cannot move local `x` since it is still in use
 4 │         let y = move x;
   │                 ^^^^^^ attempted to move here
 5 │         let _z = x;
-  │             -- used here
+  │                  - used here

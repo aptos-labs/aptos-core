@@ -16,15 +16,11 @@ fun m::consume_($t0: m::W) {
 public fun m::test($t0: u32) {
      var $t1: u32
      var $t2: u32
-     var $t3: u32
-     var $t4: u32
-  0: $t2 := copy($t0)
-  1: $t1 := infer($t2)
-  2: $t4 := move($t1)
-  3: $t3 := infer($t4)
-  4: m::consume($t3)
-  5: m::consume($t0)
-  6: return ()
+  0: $t1 := copy($t0)
+  1: $t2 := move($t1)
+  2: m::consume($t2)
+  3: m::consume($t0)
+  4: return ()
 }
 
 
@@ -32,15 +28,11 @@ public fun m::test($t0: u32) {
 public fun m::test_struct($t0: m::W) {
      var $t1: m::W
      var $t2: m::W
-     var $t3: m::W
-     var $t4: m::W
-  0: $t2 := copy($t0)
-  1: $t1 := infer($t2)
-  2: $t4 := move($t1)
-  3: $t3 := infer($t4)
-  4: m::consume_($t3)
-  5: m::consume_($t0)
-  6: return ()
+  0: $t1 := copy($t0)
+  1: $t2 := move($t1)
+  2: m::consume_($t2)
+  3: m::consume_($t0)
+  4: return ()
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -65,28 +57,20 @@ fun m::consume_($t0: m::W) {
 public fun m::test($t0: u32) {
      var $t1: u32
      var $t2: u32
-     var $t3: u32
-     var $t4: u32
      # live vars: $t0
-     # events: b:$t0, b:$t2
-  0: $t2 := copy($t0)
-     # live vars: $t0, $t2
-     # events: e:$t2, b:$t1
-  1: $t1 := move($t2)
+     # events: b:$t0, b:$t1
+  0: $t1 := copy($t0)
      # live vars: $t0, $t1
-     # events: e:$t1, b:$t4
-  2: $t4 := move($t1)
-     # live vars: $t0, $t4
-     # events: e:$t4, b:$t3
-  3: $t3 := move($t4)
-     # live vars: $t0, $t3
-     # events: e:$t3
-  4: m::consume($t3)
+     # events: e:$t1, b:$t2
+  1: $t2 := move($t1)
+     # live vars: $t0, $t2
+     # events: e:$t2
+  2: m::consume($t2)
      # live vars: $t0
      # events: e:$t0
-  5: m::consume($t0)
+  3: m::consume($t0)
      # live vars:
-  6: return ()
+  4: return ()
 }
 
 
@@ -94,28 +78,20 @@ public fun m::test($t0: u32) {
 public fun m::test_struct($t0: m::W) {
      var $t1: m::W
      var $t2: m::W
-     var $t3: m::W
-     var $t4: m::W
      # live vars: $t0
-     # events: b:$t0, b:$t2
-  0: $t2 := copy($t0)
-     # live vars: $t0, $t2
-     # events: e:$t2, b:$t1
-  1: $t1 := move($t2)
+     # events: b:$t0, b:$t1
+  0: $t1 := copy($t0)
      # live vars: $t0, $t1
-     # events: e:$t1, b:$t4
-  2: $t4 := move($t1)
-     # live vars: $t0, $t4
-     # events: e:$t4, b:$t3
-  3: $t3 := move($t4)
-     # live vars: $t0, $t3
-     # events: e:$t3
-  4: m::consume_($t3)
+     # events: e:$t1, b:$t2
+  1: $t2 := move($t1)
+     # live vars: $t0, $t2
+     # events: e:$t2
+  2: m::consume_($t2)
      # live vars: $t0
      # events: e:$t0
-  5: m::consume_($t0)
+  3: m::consume_($t0)
      # live vars:
-  6: return ()
+  4: return ()
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -134,33 +110,25 @@ fun m::consume_($t0: m::W) {
 
 [variant baseline]
 public fun m::test($t0: u32) {
-     var $t1: u32 [unused]
-     var $t2: u32
-     var $t3: u32 [unused]
-     var $t4: u32 [unused]
-  0: $t2 := copy($t0)
-  1: $t2 := move($t2)
-  2: $t2 := move($t2)
-  3: $t2 := move($t2)
-  4: m::consume($t2)
-  5: m::consume($t0)
-  6: return ()
+     var $t1: u32
+     var $t2: u32 [unused]
+  0: $t1 := copy($t0)
+  1: $t1 := move($t1)
+  2: m::consume($t1)
+  3: m::consume($t0)
+  4: return ()
 }
 
 
 [variant baseline]
 public fun m::test_struct($t0: m::W) {
-     var $t1: m::W [unused]
-     var $t2: m::W
-     var $t3: m::W [unused]
-     var $t4: m::W [unused]
-  0: $t2 := copy($t0)
-  1: $t2 := move($t2)
-  2: $t2 := move($t2)
-  3: $t2 := move($t2)
-  4: m::consume_($t2)
-  5: m::consume_($t0)
-  6: return ()
+     var $t1: m::W
+     var $t2: m::W [unused]
+  0: $t1 := copy($t0)
+  1: $t1 := move($t1)
+  2: m::consume_($t1)
+  3: m::consume_($t0)
+  4: return ()
 }
 
 
@@ -202,3 +170,4 @@ B0:
 	6: Ret
 }
 }
+============ bytecode verification succeeded ========

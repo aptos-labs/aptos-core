@@ -2716,10 +2716,12 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-network",
+ "aptos-peer-monitoring-service-types",
  "aptos-proptest-helpers",
  "aptos-runtimes",
  "aptos-short-hex-str",
  "aptos-storage-interface",
+ "aptos-time-service",
  "aptos-types",
  "aptos-vm-validator",
  "async-trait",
@@ -2814,6 +2816,7 @@ name = "aptos-move-e2e-benchmark"
 version = "0.1.0"
 dependencies = [
  "aptos-language-e2e-tests",
+ "aptos-logger",
  "aptos-transaction-generator-lib",
  "aptos-types",
  "rand 0.7.3",

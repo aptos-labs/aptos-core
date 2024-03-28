@@ -9,7 +9,7 @@ use crate::shared::{
 use move_command_line_common::files::FileHash;
 use move_ir_types::location::*;
 use move_symbol_pool::Symbol;
-use std::{fmt, hash::Hash};
+use std::{fmt, fmt::Formatter, hash::Hash};
 
 macro_rules! new_name {
     ($n:ident) => {
@@ -586,6 +586,16 @@ pub enum QuantKind_ {
 }
 pub type QuantKind = Spanned<QuantKind_>;
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum CallKind {
+    /// Regular function call.
+    Regular,
+    /// Macro style call (e.g. `assert!(c, x)`)
+    Macro,
+    /// Receiver style call (e.g. `x.f(y)`)
+    Receiver,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum Exp_ {
@@ -599,7 +609,13 @@ pub enum Exp_ {
 
     // f(earg,*)
     // f!(earg,*)
-    Call(NameAccessChain, bool, Option<Vec<Type>>, Spanned<Vec<Exp>>),
+    // earg.f(*)
+    Call(
+        NameAccessChain,
+        CallKind,
+        Option<Vec<Type>>,
+        Spanned<Vec<Exp>>,
+    ),
 
     // tn {f1: e1, ... , f_n: e_n }
     Pack(NameAccessChain, Option<Vec<Type>>, Vec<(Field, Exp)>),
@@ -989,6 +1005,15 @@ impl fmt::Display for Ability_ {
     }
 }
 
+impl fmt::Display for CallKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            CallKind::Regular => "",
+            CallKind::Macro => "!",
+            CallKind::Receiver => ".",
+        })
+    }
+}
 //**************************************************************************************************
 // Debug
 //**************************************************************************************************
@@ -1723,11 +1748,9 @@ impl AstDebug for Exp_ {
                     w.write(">");
                 }
             },
-            E::Call(ma, is_macro, tys_opt, sp!(_, rhs)) => {
+            E::Call(ma, kind, tys_opt, sp!(_, rhs)) => {
                 ma.ast_debug(w);
-                if *is_macro {
-                    w.write("!");
-                }
+                w.write(kind.to_string());
                 if let Some(ss) = tys_opt {
                     w.write("<");
                     ss.ast_debug(w);

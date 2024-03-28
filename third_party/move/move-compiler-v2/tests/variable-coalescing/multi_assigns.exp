@@ -5,13 +5,11 @@ fun m::test(): u64 {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-     var $t3: u64
-  0: $t2 := 1
-  1: $t1 := infer($t2)
-  2: $t3 := 2
-  3: $t1 := infer($t3)
-  4: $t0 := infer($t1)
-  5: return $t0
+  0: $t1 := 1
+  1: $t2 := 2
+  2: $t1 := infer($t2)
+  3: $t0 := infer($t1)
+  4: return $t0
 }
 
 ============ after DeadStoreElimination: ================
@@ -20,10 +18,9 @@ fun m::test(): u64 {
 fun m::test(): u64 {
      var $t0: u64
      var $t1: u64
-     var $t2: u64 [unused]
-     var $t3: u64
-  0: $t3 := 2
-  1: $t1 := move($t3)
+     var $t2: u64
+  0: $t2 := 2
+  1: $t1 := move($t2)
   2: $t0 := move($t1)
   3: return $t0
 }
@@ -34,14 +31,13 @@ fun m::test(): u64 {
 fun m::test(): u64 {
      var $t0: u64
      var $t1: u64
-     var $t2: u64 [unused]
-     var $t3: u64
+     var $t2: u64
      # live vars:
-     # events: b:$t3
-  0: $t3 := 2
-     # live vars: $t3
-     # events: e:$t3, b:$t1
-  1: $t1 := move($t3)
+     # events: b:$t2
+  0: $t2 := 2
+     # live vars: $t2
+     # events: e:$t2, b:$t1
+  1: $t1 := move($t2)
      # live vars: $t1
      # events: e:$t1, b:$t0
   2: $t0 := move($t1)
@@ -56,12 +52,11 @@ fun m::test(): u64 {
 fun m::test(): u64 {
      var $t0: u64 [unused]
      var $t1: u64 [unused]
-     var $t2: u64 [unused]
-     var $t3: u64
-  0: $t3 := 2
-  1: $t3 := move($t3)
-  2: $t3 := move($t3)
-  3: return $t3
+     var $t2: u64
+  0: $t2 := 2
+  1: $t2 := move($t2)
+  2: $t2 := move($t2)
+  3: return $t2
 }
 
 ============ after DeadStoreElimination: ================
@@ -70,10 +65,9 @@ fun m::test(): u64 {
 fun m::test(): u64 {
      var $t0: u64 [unused]
      var $t1: u64 [unused]
-     var $t2: u64 [unused]
-     var $t3: u64
-  0: $t3 := 2
-  1: return $t3
+     var $t2: u64
+  0: $t2 := 2
+  1: return $t2
 }
 
 
@@ -88,3 +82,4 @@ B0:
 	1: Ret
 }
 }
+============ bytecode verification succeeded ========

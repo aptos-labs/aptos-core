@@ -15,24 +15,20 @@ fun m::consume_($t0: m::W) {
 [variant baseline]
 public fun m::test1($t0: u64) {
      var $t1: u64
-     var $t2: u64
-  0: $t2 := move($t0)
-  1: $t1 := infer($t2)
+  0: $t1 := move($t0)
+  1: m::consume($t1)
   2: m::consume($t1)
-  3: m::consume($t1)
-  4: return ()
+  3: return ()
 }
 
 
 [variant baseline]
 public fun m::test2($t0: m::W) {
      var $t1: m::W
-     var $t2: m::W
-  0: $t2 := move($t0)
-  1: $t1 := infer($t2)
+  0: $t1 := move($t0)
+  1: m::consume_($t1)
   2: m::consume_($t1)
-  3: m::consume_($t1)
-  4: return ()
+  3: return ()
 }
 
 ============ after DeadStoreElimination: ================
@@ -52,12 +48,10 @@ fun m::consume_($t0: m::W) {
 [variant baseline]
 public fun m::test1($t0: u64) {
      var $t1: u64
-     var $t2: u64
-  0: $t2 := move($t0)
-  1: $t1 := move($t2)
+  0: $t1 := move($t0)
+  1: m::consume($t1)
   2: m::consume($t1)
-  3: m::consume($t1)
-  4: return ()
+  3: return ()
 }
 
 
@@ -65,13 +59,11 @@ public fun m::test1($t0: u64) {
 public fun m::test2($t0: m::W) {
      var $t1: m::W
      var $t2: m::W
-     var $t3: m::W
-  0: $t2 := move($t0)
-  1: $t1 := move($t2)
-  2: $t3 := copy($t1)
-  3: m::consume_($t3)
-  4: m::consume_($t1)
-  5: return ()
+  0: $t1 := move($t0)
+  1: $t2 := copy($t1)
+  2: m::consume_($t2)
+  3: m::consume_($t1)
+  4: return ()
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -95,20 +87,16 @@ fun m::consume_($t0: m::W) {
 [variant baseline]
 public fun m::test1($t0: u64) {
      var $t1: u64
-     var $t2: u64
      # live vars: $t0
-     # events: b:$t0, e:$t0, b:$t2
-  0: $t2 := move($t0)
-     # live vars: $t2
-     # events: e:$t2, b:$t1
-  1: $t1 := move($t2)
+     # events: b:$t0, e:$t0, b:$t1
+  0: $t1 := move($t0)
      # live vars: $t1
-  2: m::consume($t1)
+  1: m::consume($t1)
      # live vars: $t1
      # events: e:$t1
-  3: m::consume($t1)
+  2: m::consume($t1)
      # live vars:
-  4: return ()
+  3: return ()
 }
 
 
@@ -116,24 +104,20 @@ public fun m::test1($t0: u64) {
 public fun m::test2($t0: m::W) {
      var $t1: m::W
      var $t2: m::W
-     var $t3: m::W
      # live vars: $t0
-     # events: b:$t0, e:$t0, b:$t2
-  0: $t2 := move($t0)
-     # live vars: $t2
-     # events: e:$t2, b:$t1
-  1: $t1 := move($t2)
+     # events: b:$t0, e:$t0, b:$t1
+  0: $t1 := move($t0)
      # live vars: $t1
-     # events: b:$t3
-  2: $t3 := copy($t1)
-     # live vars: $t1, $t3
-     # events: e:$t3
-  3: m::consume_($t3)
+     # events: b:$t2
+  1: $t2 := copy($t1)
+     # live vars: $t1, $t2
+     # events: e:$t2
+  2: m::consume_($t2)
      # live vars: $t1
      # events: e:$t1
-  4: m::consume_($t1)
+  3: m::consume_($t1)
      # live vars:
-  5: return ()
+  4: return ()
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -153,26 +137,22 @@ fun m::consume_($t0: m::W) {
 [variant baseline]
 public fun m::test1($t0: u64) {
      var $t1: u64 [unused]
-     var $t2: u64 [unused]
   0: $t0 := move($t0)
-  1: $t0 := move($t0)
+  1: m::consume($t0)
   2: m::consume($t0)
-  3: m::consume($t0)
-  4: return ()
+  3: return ()
 }
 
 
 [variant baseline]
 public fun m::test2($t0: m::W) {
      var $t1: m::W [unused]
-     var $t2: m::W [unused]
-     var $t3: m::W
+     var $t2: m::W
   0: $t0 := move($t0)
-  1: $t0 := move($t0)
-  2: $t3 := copy($t0)
-  3: m::consume_($t3)
-  4: m::consume_($t0)
-  5: return ()
+  1: $t2 := copy($t0)
+  2: m::consume_($t2)
+  3: m::consume_($t0)
+  4: return ()
 }
 
 ============ after DeadStoreElimination: ================
@@ -192,7 +172,6 @@ fun m::consume_($t0: m::W) {
 [variant baseline]
 public fun m::test1($t0: u64) {
      var $t1: u64 [unused]
-     var $t2: u64 [unused]
   0: m::consume($t0)
   1: m::consume($t0)
   2: return ()
@@ -202,10 +181,9 @@ public fun m::test1($t0: u64) {
 [variant baseline]
 public fun m::test2($t0: m::W) {
      var $t1: m::W [unused]
-     var $t2: m::W [unused]
-     var $t3: m::W
-  0: $t3 := copy($t0)
-  1: m::consume_($t3)
+     var $t2: m::W
+  0: $t2 := copy($t0)
+  1: m::consume_($t2)
   2: m::consume_($t0)
   3: return ()
 }
@@ -246,3 +224,4 @@ B0:
 	6: Ret
 }
 }
+============ bytecode verification succeeded ========
