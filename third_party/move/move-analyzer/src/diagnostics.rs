@@ -1,4 +1,4 @@
-// Copyright (c) The Move Contributors
+// Copyright (c) The BitsLab.MoveBit Contributors
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::get_loc;
@@ -91,10 +91,10 @@ pub fn lsp_empty_diagnostics(
 /// language server.
 fn severity(s: Severity) -> DiagnosticSeverity {
     match s {
-        Severity::Bug => DiagnosticSeverity::Error,
-        Severity::Error => DiagnosticSeverity::Error,
-        Severity::Warning => DiagnosticSeverity::Warning,
-        Severity::Note => DiagnosticSeverity::Information,
-        Severity::Help => DiagnosticSeverity::Hint,
+        Severity::Bug => DiagnosticSeverity::ERROR,
+        Severity::Error => DiagnosticSeverity::ERROR,
+        Severity::Warning => DiagnosticSeverity::WARNING,
+        Severity::Note => DiagnosticSeverity::INFORMATION,
+        Severity::Help => DiagnosticSeverity::HINT,
     }
 }

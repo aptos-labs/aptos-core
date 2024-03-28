@@ -1,11 +1,11 @@
 {
-	"name": "move-analyzer",
-	"displayName": "move-analyzer",
+	"name": "aptos-move-analyzer",
+	"displayName": "aptos-move-analyzer",
 	"description": "A language server and basic grammar for the Move programming language.",
-	"publisher": "move",
+	"publisher": "MoveBit",
 	"icon": "images/move.png",
 	"license": "Apache-2.0",
-	"version": "0.0.10",
+	"version": "0.1.4",
 	"preview": true,
 	"homepage": "https://github.com/move-language/move",
 	"repository": {
@@ -16,7 +16,7 @@
 		"url": "https://github.com/move-language/move/issues"
 	},
 	"engines": {
-		"vscode": "^1.58.2"
+		"vscode": "^1.67.1"
 	},
 	"categories": [
 		"Programming Languages"
@@ -32,21 +32,76 @@
 	"contributes": {
 		"commands": [
 			{
-				"command": "move-analyzer.serverVersion",
+				"command": "aptos-move-analyzer.serverVersion",
 				"title": "Show Server Version",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.create_project",
+				"title": "Create aptos project",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.move.compile",
+				"title": "aptos move compile",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.move.coverage",
+				"title": "aptos move coverage",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.move.test",
+				"title": "aptos move test",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.move.prove",
+				"title": "aptos move prove",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.key.generate",
+				"title": "aptos key generate",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.key.extract-peer",
+				"title": "aptos key extract-peer",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.reset.working.space",
+				"title": "aptos reset working space",
+				"category": "Aptos Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.move.generate.spec.file",
+				"title": "Generate Move Spec File",
+				"category": "Move Analyzer"
+			},
+			{
+				"command": "aptos-move-analyzer.move.generate.spec.sel",
+				"title": "Generate Move Spec",
 				"category": "Move Analyzer"
 			}
 		],
 		"configuration": {
 			"type": "object",
-			"title": "Move Analyzer",
+			"title": "Aptos Move Analyzer",
 			"properties": {
-				"move-analyzer.server.path": {
+				"aptos-move-analyzer.server.path": {
 					"type": "string",
-					"default": "move-analyzer",
-					"markdownDescription": "Path and filename of the move-analyzer executable, e.g. `/usr/bin/move-analyzer`."
+					"default": "aptos-move-analyzer",
+					"markdownDescription": "Path and filename of the aptos-move-analyzer executable, e.g. `/usr/bin/aptos-move-analyzer`."
 				},
-				"move-analyzer.trace.server": {
+				"aptos-move-analyzer.inlay.hints.enable": {
+					"type": "boolean",
+					"default": true,
+					"markdownDescription": "inlay hints is enabled."
+				},
+				"aptos-move-analyzer.trace.server": {
 					"type": "string",
 					"scope": "window",
 					"enum": [
@@ -60,7 +115,7 @@
 						"Log each message and its contents."
 					],
 					"default": "off",
-					"description": "Traces the communication between the move-analyzer language server and Visual Studio Code. Note that this log can be very verbose, and so not recommended for anyone besides people working on or debugging move-analyzer itself."
+					"description": "Traces the communication between the aptos-move-analyzer language server and Visual Studio Code. Note that this log can be very verbose, and so not recommended for anyone besides people working on or debugging aptos-move-analyzer itself."
 				}
 			}
 		},
@@ -80,26 +135,38 @@
 		"menus": {
 			"commandPalette": [
 				{
-					"command": "move-analyzer.serverVersion"
+					"command": "aptos-move-analyzer.serverVersion"
+				}
+			],
+			"editor/context": [
+				{
+					"when": "resourceLangId == move",
+					"command": "aptos-move-analyzer.move.generate.spec.file",
+					"group": "5_cutcopypaste"
+				},
+				{
+					"when": "resourceLangId == move",
+					"command": "aptos-move-analyzer.move.generate.spec.sel",
+					"group": "5_cutcopypaste"
 				}
 			]
 		}
 	},
 	"scripts": {
-		"compile": "tsc -p ./ && cd ../../ && cargo build",
+		"compile": "tsc -p ./ && cd ../../ && cargo build --bin aptos-move-analyzer",
 		"watch": "tsc -watch -p ./",
-		"lint": "eslint . --ext ts --max-warnings 0",
+		"lint": "eslint . --ext ts --max-warnings 100",
 		"fix": "eslint . --ext ts --fix",
 		"copy-tests-files": "copyfiles \"tests/**/*.move\" \"tests/**/*.exp\" \"tests/**/*.toml\" \"tests/**/*.code-workspace\" out",
 		"pretest": "npm run compile && npm run lint && npm run copy-tests-files",
 		"test": "node ./out/tests/runTests.js",
 		"dev": "npm run pretest && cross-env mode=dev node ./out/tests/runTests.js",
 		"vscode:prepublish": "npm run pretest",
-		"package": "npm run pretest && vsce package -o move-analyzer.vsix",
-		"publish": "npm run pretest && npm run test && vsce publish"
+		"package": "npm run pretest && vsce package -o aptos-move-analyzer.vsix",
+		"publish": "vsce publish"
 	},
 	"extensionDependencies": [
-		"damirka.move-syntax"
+		"movebit.move-msl-syx"
 	],
 	"dependencies": {
 		"command-exists": "^1.2.9",

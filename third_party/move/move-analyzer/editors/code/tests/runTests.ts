@@ -46,7 +46,7 @@ async function runVSCodeTest(vscodeVersion: string): Promise<void> {
         const vscodeExecutablePath = await downloadAndUnzipVSCode(vscodeVersion);
         const [cli, ...args] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
         const newCli = cli ?? 'code';
-        cp.spawnSync(newCli, [...args, '--install-extension', 'damirka.move-syntax', '--force'], {
+        cp.spawnSync(newCli, [...args, '--install-extension', 'movebit.move-msl-syx', '--force'], {
             encoding: 'utf-8',
             stdio: 'inherit',
         });
@@ -73,8 +73,7 @@ async function runVSCodeTest(vscodeVersion: string): Promise<void> {
 }
 
 async function main(): Promise<void> {
-    await runVSCodeTest('1.64.0'); // Test with vscode v1.64.0
-    await runVSCodeTest('1.69.2'); // Test with vscode v1.69.2
+    await runVSCodeTest('1.79.2'); // Test with vscode v1.79.2
 }
 
 void main();

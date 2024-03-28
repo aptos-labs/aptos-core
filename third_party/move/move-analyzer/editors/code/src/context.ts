@@ -29,7 +29,7 @@ export class Context {
             return new Error(
                 `language server executable '${configuration.serverPath}' could not be found, so ` +
                 'most extension features will be unavailable to you. Follow the instructions in ' +
-                'the move-analyzer Visual Studio Code extension README to install the language ' +
+                'the aptos-move-analyzer Visual Studio Code extension README to install the language ' +
                 'server.',
             );
         }
@@ -48,7 +48,7 @@ export class Context {
         command: (context: Readonly<Context>, ...args: Array<any>) => any,
     ): void {
         const disposable = vscode.commands.registerCommand(
-            `move-analyzer.${name}`,
+            `aptos-move-analyzer.${name}`,
             async (...args: Array<any>) : Promise<any> => {
                 const ret = await command(this, ...args);
                 return ret;
@@ -91,8 +91,8 @@ export class Context {
      * Configures and starts the client that interacts with the language server.
      *
      * The "client" is an object that sends messages to the language server, which in Move's case is
-     * the `move-analyzer` executable. Unlike registered extension commands such as
-     * `move-analyzer.serverVersion`, which are manually executed by a VS Code user via the command
+     * the `aptos-move-analyzer` executable. Unlike registered extension commands such as
+     * `aptos-move-analyzer.serverVersion`, which are manually executed by a VS Code user via the command
      * palette or menu, this client sends many of its messages on its own (for example, when it
      * starts, it sends the "initialize" request).
      *
@@ -105,6 +105,7 @@ export class Context {
     async startClient(): Promise<void> {
         const executable: lc.Executable = {
             command: this.configuration.serverPath,
+            options: { shell: true },
         };
         const serverOptions: lc.ServerOptions = {
             run: executable,
@@ -126,7 +127,7 @@ export class Context {
         };
 
         const client = new lc.LanguageClient(
-            'move-analyzer',
+            'aptos-move-analyzer',
             'Move Language Server',
             serverOptions,
             clientOptions,
