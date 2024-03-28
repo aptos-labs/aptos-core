@@ -21,12 +21,12 @@ spec aptos_framework::reconfiguration_with_dkg {
     spec finish(account: &signer) {
         pragma verify_duration_estimate = 1200;
         include FinishRequirement;
-        aborts_if !exists<features::Features>(@aptos_framework);
     }
 
     spec schema FinishRequirement {
         use aptos_framework::chain_status;
         use std::signer;
+        use std::features;
         use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
@@ -44,6 +44,7 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;
         requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<features::Features>(@aptos_framework);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include config_buffer::OnNewEpochRequirement<version::Version>;
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;
@@ -59,6 +60,6 @@ spec aptos_framework::reconfiguration_with_dkg {
         pragma verify_duration_estimate = 1200; // TODO: set because of timeout (property proved).
         include FinishRequirement;
         requires dkg::has_incomplete_session();
-        aborts_if !exists<features::Features>(@aptos_framework);
+        aborts_if false;
     }
 }
