@@ -232,12 +232,13 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
         // Check read values & delta writes.
         izip!(
+            (0..committed),
             results.iter().take(committed),
             self.read_values.iter(),
             self.resolved_deltas.iter(),
             self.group_reads.iter(),
         )
-        .for_each(|(output, reads, resolved_deltas, group_reads)| {
+        .for_each(|(idx, output, reads, resolved_deltas, group_reads)| {
             // Compute group read results.
             let group_read_results: Vec<Option<Bytes>> = group_reads
                 .as_ref()
@@ -266,12 +267,14 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
 
             for (group_key, size) in output.read_group_sizes.iter() {
                 let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+                let baseline_size = group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
+                    .unwrap()
+                    .get();
 
                 assert_eq!(
-                    group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
-                        .unwrap()
-                        .get(),
-                    *size
+                    baseline_size, *size,
+                    "ERR: idx = {} group_key {:?}, baseline size {} != output_size {}",
+                    idx, group_key, baseline_size, *size
                 );
             }
 

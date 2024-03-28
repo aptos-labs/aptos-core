@@ -898,6 +898,10 @@ where
                             .get_resource_from_group(key, tag, None)
                             .unwrap()
                             .is_some();
+                        assert!(
+                            *tag != RESERVED_TAG || exists,
+                            "RESERVED_TAG must always be present in groups in tests"
+                        );
 
                         // inner op is either deletion or creation.
                         assert!(!inner_op.is_modification());
@@ -905,11 +909,6 @@ where
                             // insert the provided inner op.
                             new_inner_ops.insert(*tag, inner_op.clone());
                         }
-
-                        assert!(
-                            *tag != RESERVED_TAG || exists,
-                            "RESERVED_TAG must always be present in groups in tests"
-                        );
 
                         if exists && inner_op.is_creation() {
                             // Adjust the type, otherwise executor will assert.

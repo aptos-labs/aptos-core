@@ -124,8 +124,11 @@ where
 
         let mut read_set = sync_view.take_parallel_reads();
 
-        // For tracking whether the recent execution wrote outside of the previous write/delta set.
-        let mut updates_outside = false;
+        // For tracking whether it's required to (re-)validate the suffix of transactions in the block.
+        // May happen, for instance, when the recent execution wrote outside of the previous write/delta
+        // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
+        // (since those resource group validations use rely on estimates).
+        let mut needs_suffix_validation = false;
         let mut apply_updates = |output: &E::Output| -> Result<
             Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
             PanicError,
@@ -135,25 +138,24 @@ where
             {
                 if prev_modified_keys.remove(&group_key).is_none() {
                     // Previously no write to the group at all.
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
 
-                versioned_cache.data().write(
+                if versioned_cache.data().write_metadata(
                     group_key.clone(),
                     idx_to_execute,
                     incarnation,
-                    // Group metadata op needs no layout (individual resources in groups do).
-                    Arc::new(group_metadata_op),
-                    None,
-                );
+                    group_metadata_op,
+                ) {
+                    needs_suffix_validation = true;
+                }
                 if versioned_cache.group_data().write(
                     group_key,
                     idx_to_execute,
                     incarnation,
                     group_ops.into_iter(),
                 ) {
-                    // Should return true if writes outside.
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
             }
 
@@ -167,7 +169,7 @@ where
                     .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
             ) {
                 if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
                 versioned_cache
                     .data()
@@ -176,7 +178,7 @@ where
 
             for (k, v) in output.module_write_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
                 versioned_cache.modules().write(k, idx_to_execute, v);
             }
@@ -184,7 +186,7 @@ where
             // Then, apply deltas.
             for (k, d) in output.aggregator_v1_delta_set().into_iter() {
                 if prev_modified_keys.remove(&k).is_none() {
-                    updates_outside = true;
+                    needs_suffix_validation = true;
                 }
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
@@ -208,7 +210,7 @@ where
 
                 let entry = change.into_entry_no_additional_history();
 
-                // TODO[agg_v2](optimize): figure out if it is useful for change to update updates_outside
+                // TODO[agg_v2](optimize): figure out if it is useful for change to update needs_suffix_validation
                 if let Err(e) =
                     versioned_cache
                         .delayed_fields()
@@ -279,6 +281,8 @@ where
                 Resource => versioned_cache.data().remove(&k, idx_to_execute),
                 Module => versioned_cache.modules().remove(&k, idx_to_execute),
                 Group => {
+                    needs_suffix_validation = true;
+
                     versioned_cache.data().remove(&k, idx_to_execute);
                     versioned_cache.group_data().remove(&k, idx_to_execute);
                 },
@@ -297,7 +301,7 @@ where
                 ParallelBlockExecutionError::ModulePathReadWriteError,
             ));
         }
-        Ok(updates_outside)
+        Ok(needs_suffix_validation)
     }
 
     fn validate(
@@ -348,9 +352,14 @@ where
                     Resource => versioned_cache.data().mark_estimate(&k, txn_idx),
                     Module => versioned_cache.modules().mark_estimate(&k, txn_idx),
                     Group => {
-                        // we are not marking metadata change as estimate
-                        // (we could check if metadata changed, and only then mark as estiamte)
+                        // Validation for both group size and metadata is based on values.
+                        // Execution may wait for estimates.
                         versioned_cache.group_data().mark_estimate(&k, txn_idx);
+
+                        // We are not marking metadata change as estimate, but after
+                        // a transaction execution changes metadata, suffix validation
+                        // is guaranteed to be triggered. Estimation affecting execution
+                        // behavior is left to size, which uses a heuristic approach.
                     },
                 };
             }
@@ -452,8 +461,8 @@ where
                 // We are going to skip reducing validation index here, as we
                 // are executing immediately, and will reduce it unconditionally
                 // after execution, inside finish_execution_during_commit.
-                // Because of that, we can also ignore _updates_outside result.
-                let _updates_outside = Self::execute(
+                // Because of that, we can also ignore _needs_suffix_validation result.
+                let _needs_suffix_validation = Self::execute(
                     txn_idx,
                     incarnation + 1,
                     block,
@@ -796,7 +805,7 @@ where
                     incarnation,
                     ExecutionTaskType::Execution,
                 ) => {
-                    let updates_outside = Self::execute(
+                    let needs_suffix_validation = Self::execute(
                         txn_idx,
                         incarnation,
                         block,
@@ -811,7 +820,7 @@ where
                             shared_counter,
                         ),
                     )?;
-                    scheduler.finish_execution(txn_idx, incarnation, updates_outside)?
+                    scheduler.finish_execution(txn_idx, incarnation, needs_suffix_validation)?
                 },
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     {
