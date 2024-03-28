@@ -22,7 +22,6 @@ execution:
   genesis_file_location: "/opt/aptos/genesis/genesis.blob"
 
 validator_network:
-  discovery_method: "onchain"
   mutual_authentication: true
   identity:
     type: "from_file"

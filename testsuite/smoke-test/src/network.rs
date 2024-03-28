@@ -41,7 +41,6 @@ async fn test_connection_limiting() {
     let discovery_file = create_discovery_file(peer_set.clone());
     let mut full_node_config = NodeConfig::get_default_vfn_config();
     modify_network_config(&mut full_node_config, &NetworkId::Public, |network| {
-        network.discovery_method = DiscoveryMethod::None;
         network.discovery_methods = vec![
             DiscoveryMethod::Onchain,
             DiscoveryMethod::File(FileDiscovery {
@@ -154,10 +153,10 @@ async fn test_rest_discovery() {
     };
     let mut full_node_config = NodeConfig::get_default_pfn_config();
     let network_config = full_node_config.full_node_networks.first_mut().unwrap();
-    network_config.discovery_method = DiscoveryMethod::Rest(RestDiscovery {
+    network_config.discovery_methods = vec![DiscoveryMethod::Rest(RestDiscovery {
         url: rest_endpoint,
         interval_secs: 1,
-    });
+    })];
 
     // Start a new node that should connect to the previous node only via REST
     // The startup wait time should check if it connects successfully
@@ -185,7 +184,6 @@ async fn test_file_discovery() {
         .with_init_config(Arc::new(move |_, config, _| {
             let discovery_file_for_closure2 = discovery_file_for_closure.clone();
             modify_network_config(config, &NetworkId::Validator, move |network| {
-                network.discovery_method = DiscoveryMethod::None;
                 network.discovery_methods = vec![
                     DiscoveryMethod::Onchain,
                     DiscoveryMethod::File(FileDiscovery {
