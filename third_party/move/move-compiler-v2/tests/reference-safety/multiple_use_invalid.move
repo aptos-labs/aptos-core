@@ -1,5 +1,5 @@
 module 0x8675309::M {
-    struct S { x: u64, y: u64 }
+    struct S has drop { x: u64, y: u64 }
 
     fun f1(s: S) {
         s(&mut s.x, &mut s.x)

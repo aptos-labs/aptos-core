@@ -64,6 +64,10 @@ impl LedgerInfo {
         }
     }
 
+    pub fn is_dummy(&self) -> bool {
+        self.commit_info.is_empty() && self.consensus_data_hash == HashValue::zero()
+    }
+
     /// Constructs a `LedgerInfo` object based on the given commit info and vote data hash.
     pub fn new(commit_info: BlockInfo, consensus_data_hash: HashValue) -> Self {
         Self {

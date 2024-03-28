@@ -11,6 +11,7 @@ struct T has key {
 }
 
 f(Arg0: signer) /* def_idx: 0 */ {
+L1:	loc0: &mut T
 B0:
 	0: ImmBorrowLoc[0](Arg0: signer)
 	1: Call signer::address_of(&signer): address

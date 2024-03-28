@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{components::get_signer_arg, utils::generate_governance_proposal};
 use move_model::{code_writer::CodeWriter, emitln, model::Loc};

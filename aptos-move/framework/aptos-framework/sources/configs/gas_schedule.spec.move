@@ -93,10 +93,16 @@ spec aptos_framework::gas_schedule {
     }
 
     spec set_for_next_epoch(aptos_framework: &signer, gas_schedule_blob: vector<u8>) {
+        use aptos_framework::util;
+
+        include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
         include config_buffer::SetForNextEpochAbortsIf {
             account: aptos_framework,
             config: gas_schedule_blob
         };
+        let new_gas_schedule = util::spec_from_bytes<GasScheduleV2>(gas_schedule_blob);
+        let cur_gas_schedule = global<GasScheduleV2>(@aptos_framework);
+        aborts_if exists<GasScheduleV2>(@aptos_framework) && new_gas_schedule.feature_version < cur_gas_schedule.feature_version;
     }
 
     spec on_new_epoch() {

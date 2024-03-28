@@ -5,8 +5,8 @@ use crate::rand::rand_gen::{
     network_messages::RandMessage,
     rand_store::RandStore,
     types::{
-        AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig, RandShare,
-        RequestShare, TAugmentedData, TShare,
+        AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, PathType, RandConfig,
+        RandShare, RequestShare, TAugmentedData, TShare,
     },
 };
 use anyhow::ensure;
@@ -134,7 +134,7 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
         );
         share.verify(&self.rand_config)?;
         let mut store = self.rand_store.lock();
-        let aggregated = if store.add_share(share)? {
+        let aggregated = if store.add_share(share, PathType::Slow)? {
             Some(())
         } else {
             None

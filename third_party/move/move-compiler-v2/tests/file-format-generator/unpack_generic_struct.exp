@@ -29,10 +29,11 @@ B3:
 	9: Ret
 }
 public foo<Ty0: drop + store>(Arg0: E<Ty0>, Arg1: &mut Ty0) /* def_idx: 1 */ {
-L0:	loc2: E<Ty0>
-L1:	loc3: E<Ty0>
-L2:	loc4: E<Ty0>
-L3:	loc5: u64
+L2:	loc0: E<Ty0>
+L3:	loc1: Ty0
+L4:	loc2: E<Ty0>
+L5:	loc3: E<Ty0>
+L6:	loc4: u64
 B0:
 	0: MoveLoc[0](Arg0: E<Ty0>)
 	1: StLoc[2](loc0: E<Ty0>)
@@ -45,14 +46,12 @@ B0:
 	8: MoveLoc[4](loc2: E<Ty0>)
 	9: StLoc[5](loc3: E<Ty0>)
 	10: MoveLoc[5](loc3: E<Ty0>)
-	11: StLoc[6](loc4: E<Ty0>)
-	12: MoveLoc[6](loc4: E<Ty0>)
-	13: UnpackGeneric[1](E<Ty0>)
-	14: LdU64(3)
-	15: StLoc[7](loc5: u64)
-	16: MoveLoc[1](Arg1: &mut Ty0)
-	17: WriteRef
-	18: Ret
+	11: UnpackGeneric[1](E<Ty0>)
+	12: LdU64(3)
+	13: StLoc[6](loc4: u64)
+	14: MoveLoc[1](Arg1: &mut Ty0)
+	15: WriteRef
+	16: Ret
 }
 public is_none<Ty0>(Arg0: &Option<Ty0>): bool /* def_idx: 2 */ {
 B0:
@@ -62,3 +61,4 @@ B0:
 	3: Ret
 }
 }
+============ bytecode verification succeeded ========

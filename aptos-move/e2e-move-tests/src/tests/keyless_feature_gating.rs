@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, build_package, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;

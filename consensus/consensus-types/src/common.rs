@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use crate::proof_of_store::{BatchInfo, ProofCache, ProofOfStore};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -386,34 +386,44 @@ impl Payload {
         }
     }
 
+    fn verify_with_cache(
+        proofs: &[ProofOfStore],
+        validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
+    ) -> anyhow::Result<()> {
+        let unverified: Vec<_> = proofs
+            .iter()
+            .filter(|proof| {
+                proof_cache.get(proof.info()).map_or(true, |cached_proof| {
+                    cached_proof != *proof.multi_signature()
+                })
+            })
+            .collect();
+        unverified
+            .par_iter()
+            .with_min_len(2)
+            .try_for_each(|proof| proof.verify(validator, proof_cache))?;
+        Ok(())
+    }
+
     pub fn verify(
         &self,
         validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
             (false, Payload::DirectMempool(_)) => Ok(()),
             (true, Payload::InQuorumStore(proof_with_status)) => {
-                proof_with_status
-                    .proofs
-                    .par_iter()
-                    .with_min_len(4)
-                    .try_for_each(|proof| proof.verify(validator))?;
-                Ok(())
+                Self::verify_with_cache(&proof_with_status.proofs, validator, proof_cache)
             },
-            (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => {
-                proof_with_status
-                    .proof_with_data
-                    .proofs
-                    .par_iter()
-                    .with_min_len(4)
-                    .try_for_each(|proof| proof.verify(validator))?;
-                Ok(())
-            },
+            (true, Payload::InQuorumStoreWithLimit(proof_with_status)) => Self::verify_with_cache(
+                &proof_with_status.proof_with_data.proofs,
+                validator,
+                proof_cache,
+            ),
             (true, Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)) => {
-                for proof in proof_with_data.proofs.iter() {
-                    proof.verify(validator)?;
-                }
+                Self::verify_with_cache(&proof_with_data.proofs, validator, proof_cache)?;
                 for (batch, payload) in inline_batches.iter() {
                     // TODO: Can cloning be avoided here?
                     if BatchPayload::new(batch.author(), payload.clone()).hash() != *batch.digest()

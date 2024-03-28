@@ -1264,8 +1264,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             et.set_fun_name(full_name.clone());
             et.set_translate_move_fun();
             let loc = et.to_loc(&body.loc);
-            for (pos, TypeParameter(name, _, loc)) in type_params.iter().enumerate() {
-                et.define_type_param(loc, *name, Type::new_param(pos), false);
+            for (pos, TypeParameter(name, kind, loc)) in type_params.iter().enumerate() {
+                et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
             }
             et.enter_scope();
             for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
@@ -1581,11 +1581,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(
                         loc,
                         *name,
                         Type::new_param(pos),
+                        kind.clone(),
                         false, /*report_errors*/
                     );
                 }
@@ -1620,8 +1621,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos), false);
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
+                    et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
                 }
 
                 et.enter_scope();
@@ -1667,8 +1668,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos), false);
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
+                    et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
                 }
 
                 et.enter_scope();

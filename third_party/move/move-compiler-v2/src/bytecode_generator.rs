@@ -373,7 +373,15 @@ impl<'env> Generator<'env> {
                 }
                 // If there is a binding, assign the pattern
                 if let Some(binding) = opt_binding {
-                    self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
+                    if let Pattern::Var(var_id, sym) = pat {
+                        // For the common case `let x = binding; ...` avoid introducing a
+                        // temporary for `binding` and directly pass the temp for `x` into
+                        // translation.
+                        let local = self.find_local_for_pattern(*var_id, *sym, Some(&scope));
+                        self.without_reference_mode(|s| s.gen(vec![local], binding))
+                    } else {
+                        self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
+                    }
                 }
                 // Compile the body
                 self.scopes.push(scope);

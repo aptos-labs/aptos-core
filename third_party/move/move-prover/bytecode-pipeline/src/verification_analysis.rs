@@ -593,7 +593,7 @@ impl VerificationAnalysisProcessor {
                     let adapter =
                         TypeUnificationAdapter::new_vec(&fun_mem.inst, &inv_mem.inst, true, true);
                     let rel = adapter.unify(
-                        &NoUnificationContext,
+                        &mut NoUnificationContext,
                         Variance::SpecVariance,
                         /* shallow_subst */ false,
                     );

@@ -54,13 +54,13 @@ error: unable to infer instantiation of type `G2<_>` (consider providing type ar
 28 │         G2{} != G2{};
    │         ^^^^
 
-error: the operator takes 2 arguments but 3 were provided
+error: the operator takes 3 arguments but 2 were provided
    ┌─ tests/checking/typing/neq_invalid.move:34:22
    │
 34 │         (1, 2, 3) != (0, 1);
    │                      ^^^^^^
 
-error: the operator takes 3 arguments but 2 were provided
+error: the operator takes 2 arguments but 3 were provided
    ┌─ tests/checking/typing/neq_invalid.move:35:19
    │
 35 │         (0, 1) != (1, 2, 3);

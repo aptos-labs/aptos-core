@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};
 use aptos_language_e2e_tests::{

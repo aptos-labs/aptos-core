@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_rest_client::Client;
 use aptos_types::on_chain_config::OnChainConsensusConfig;

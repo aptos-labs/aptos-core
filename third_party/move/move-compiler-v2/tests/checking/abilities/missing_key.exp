@@ -1,5 +1,17 @@
 
 Diagnostics:
+error: type `T` does not have expected ability `key`
+  ┌─ tests/checking/abilities/missing_key.move:4:9
+  │
+4 │         move_from<T>(addr);
+  │         ^^^^^^^^^^^^^^^^^^
+
+error: type `S<Impotent>` does not have expected ability `key`
+   ┌─ tests/checking/abilities/missing_key.move:15:9
+   │
+15 │         move_from<S<Impotent>>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 error: type `Impotent` does not have expected ability `key`
    ┌─ tests/checking/abilities/missing_key.move:16:9
    │

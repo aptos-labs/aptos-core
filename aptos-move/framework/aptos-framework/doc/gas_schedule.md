@@ -244,6 +244,8 @@ TODO: update all the tests that reference this function, then disable this funct
 ## Function `set_for_next_epoch`
 
 Set the gas schedule for the next epoch, typically called by on-chain governance.
+Abort if the version of the given schedule is lower than the current version.
+
 Example usage:
 ```
 aptos_framework::gas_schedule::set_for_next_epoch(&framework_signer, some_gas_schedule_blob);
@@ -260,10 +262,17 @@ aptos_framework::aptos_governance::reconfigure(&framework_signer);
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_for_next_epoch">set_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) {
+<pre><code><b>public</b> <b>fun</b> <a href="gas_schedule.md#0x1_gas_schedule_set_for_next_epoch">set_for_next_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_schedule_blob: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>assert</b>!(!<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_is_empty">vector::is_empty</a>(&gas_schedule_blob), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_SCHEDULE">EINVALID_GAS_SCHEDULE</a>));
     <b>let</b> new_gas_schedule: <a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a> = from_bytes(gas_schedule_blob);
+    <b>if</b> (<b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework)) {
+        <b>let</b> cur_gas_schedule = <b>borrow_global</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework);
+        <b>assert</b>!(
+            new_gas_schedule.feature_version &gt;= cur_gas_schedule.feature_version,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="gas_schedule.md#0x1_gas_schedule_EINVALID_GAS_FEATURE_VERSION">EINVALID_GAS_FEATURE_VERSION</a>)
+        );
+    };
     <a href="config_buffer.md#0x1_config_buffer_upsert">config_buffer::upsert</a>(new_gas_schedule);
 }
 </code></pre>
@@ -479,10 +488,14 @@ Only used in reconfigurations to apply the pending <code><a href="gas_schedule.m
 
 
 
-<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_SetForNextEpochAbortsIf">config_buffer::SetForNextEpochAbortsIf</a> {
+<pre><code><b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">system_addresses::AbortsIfNotAptosFramework</a>{ <a href="account.md#0x1_account">account</a>: aptos_framework };
+<b>include</b> <a href="config_buffer.md#0x1_config_buffer_SetForNextEpochAbortsIf">config_buffer::SetForNextEpochAbortsIf</a> {
     <a href="account.md#0x1_account">account</a>: aptos_framework,
     config: gas_schedule_blob
 };
+<b>let</b> new_gas_schedule = <a href="util.md#0x1_util_spec_from_bytes">util::spec_from_bytes</a>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(gas_schedule_blob);
+<b>let</b> cur_gas_schedule = <b>global</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="gas_schedule.md#0x1_gas_schedule_GasScheduleV2">GasScheduleV2</a>&gt;(@aptos_framework) && new_gas_schedule.feature_version &lt; cur_gas_schedule.feature_version;
 </code></pre>
 
 

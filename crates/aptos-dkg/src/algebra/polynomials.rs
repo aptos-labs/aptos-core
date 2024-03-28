@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     algebra::{
@@ -15,6 +16,10 @@ use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 
 /// Returns $\[1, \tau, \tau^2, \tau^3, \ldots, \tau^{n-1}\]$.
 pub fn get_powers_of_tau(tau: &Scalar, n: usize) -> Vec<Scalar> {
+    if n == 0 {
+        return vec![];
+    }
+
     let mut taus = Vec::with_capacity(n);
 
     taus.push(Scalar::ONE);

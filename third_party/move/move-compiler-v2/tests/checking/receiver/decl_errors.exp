@@ -1,0 +1,66 @@
+
+Diagnostics:
+warning: parameter name `self` indicates a receiver function but the type `n::T` is declared outside of this module and new receiver functions cannot be added. Consider using a different name.
+   ┌─ tests/checking/receiver/decl_errors.move:11:9
+   │
+11 │     fun receiver_for_external_type(self: T) {}
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: parameter name `self` indicates a receiver function but the type `u64` is not suitable for receiver functions. Only structs and vectors can have receiver functions. Consider using a different name.
+   ┌─ tests/checking/receiver/decl_errors.move:14:9
+   │
+14 │     fun receiver_for_primitive(self: &u64) {}
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: parameter name `self` indicates a receiver function but the type `vector<u64>` is associated with the standard vector module and new receiver functions cannot be added. Consider using a different name.
+   ┌─ tests/checking/receiver/decl_errors.move:17:9
+   │
+17 │     fun receiver_for_external_vector(self: vector<u64>) {}
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: parameter name `self` indicates a receiver function but the type `m::G<u64, T>` must only use type parameters but instead uses `u64`. Consider using a different name.
+   ┌─ tests/checking/receiver/decl_errors.move:20:9
+   │
+20 │     fun receiver_partial_instantiated<T>(self: G<u64, T>) {}
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: parameter name `self` indicates a receiver function but the type `m::G<T, T>` cannot use type parameter `T` more than once. Consider using a different name.
+   ┌─ tests/checking/receiver/decl_errors.move:23:9
+   │
+23 │     fun receiver_non_linear_instantiated<T>(self: G<T, T>) {}
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+// -- Model dump before bytecode pipeline
+module 0x42::n {
+    struct T {
+        x: u64,
+    }
+} // end 0x42::n
+module 0x42::m {
+    use 0x42::n::{T}; // resolved as: 0x42::n
+    struct G {
+        x: #0,
+        y: #1,
+    }
+    struct S {
+        x: u64,
+    }
+    private fun receiver(self: m::S) {
+        Tuple()
+    }
+    private fun receiver_for_external_type(self: n::T) {
+        Tuple()
+    }
+    private fun receiver_for_external_vector(self: vector<u64>) {
+        Tuple()
+    }
+    private fun receiver_for_primitive(self: &u64) {
+        Tuple()
+    }
+    private fun receiver_non_linear_instantiated<T>(self: m::G<#0, #0>) {
+        Tuple()
+    }
+    private fun receiver_partial_instantiated<T>(self: m::G<u64, #0>) {
+        Tuple()
+    }
+} // end 0x42::m

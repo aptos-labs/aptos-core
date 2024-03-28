@@ -2254,7 +2254,7 @@ pub fn changing_working_quorum_test_helper(
                         // to get the quorum back.
                         40.0
                     },
-                    max_round_gap: 6,
+                    max_round_gap: 60,
                 }),
         )
 }

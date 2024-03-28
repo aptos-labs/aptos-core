@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::pvss::{
     traits::{transcript::Transcript, Convert, HasEncryptionPublicParams, SecretSharingConfig},
@@ -163,6 +164,9 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfig> {
 
     // 50-out-of-100, weights [11, 13, 9, 10, 12, 8, 7, 14, 10, 6]
     wcs.push(WeightedConfig::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
+
+    // 7-out-of-15, weights [0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]
+    wcs.push(WeightedConfig::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap());
 
     wcs
 }

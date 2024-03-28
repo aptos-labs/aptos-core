@@ -51,6 +51,9 @@ pub enum LogEvent {
     ReceiveAugData,
     BroadcastCertifiedAugData,
     ReceiveCertifiedAugData,
+    // randomness fast path
+    BroadcastRandShareFastPath,
+    ReceiveRandShareFastPath,
 }
 
 impl LogSchema {

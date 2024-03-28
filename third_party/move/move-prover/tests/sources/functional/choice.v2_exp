@@ -45,8 +45,9 @@ error: post-condition does not hold
    =     at tests/sources/functional/choice.move:76: test_not_using_min_incorrect
    =         v = <redacted>
    =     at tests/sources/functional/choice.move:77: test_not_using_min_incorrect
-   =         v_ref = <redacted>
    =     at tests/sources/functional/choice.move:78: test_not_using_min_incorrect
+   =         <redacted> = <redacted>
+   =         v_ref = <redacted>
    =         <redacted> = <redacted>
    =     at tests/sources/functional/choice.move:79: test_not_using_min_incorrect
    =         <redacted> = <redacted>
@@ -145,9 +146,8 @@ error: post-condition does not hold
     =     at tests/sources/functional/choice.move:275: new_ballot_id
     =         result = <redacted>
     =     at tests/sources/functional/choice.move:278: new_ballot_id
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/choice.move:287: create_ballot
-    =         ballot_id = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/choice.move:282: create_ballot
     =         result = <redacted>
     =     at tests/sources/functional/choice.move:288: create_ballot

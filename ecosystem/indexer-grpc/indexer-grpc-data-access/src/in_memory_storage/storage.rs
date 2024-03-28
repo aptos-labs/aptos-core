@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{access_trait::AccessMetadata, REDIS_CHAIN_ID, REDIS_ENDING_VERSION_EXCLUSIVE_KEY};
 use anyhow::Context;

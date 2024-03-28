@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 //^ This file stores the details associated with a sample ZK proof. The constants are outputted by
 //^ `input_gen.py` in the `keyless-circuit` repo (or can be derived implicitly from that code).

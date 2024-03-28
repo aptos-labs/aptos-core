@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::response_dispatcher::{GrpcResponseDispatcher, ResponseDispatcher};
 use aptos_indexer_grpc_data_access::StorageClient;

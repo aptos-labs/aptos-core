@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::transaction_bench_state::TransactionBenchState;
 use aptos_language_e2e_tests::account_universe::{AUTransactionGen, AccountPickStyle};

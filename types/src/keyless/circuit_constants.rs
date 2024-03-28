@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 //! These constants are from commit 125522b4b226f8ece3e3162cecfefe915d13bc30 of keyless-circuit.
 

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{components::get_signer_arg, utils::generate_governance_proposal};
 use aptos_types::on_chain_config::OnChainRandomnessConfig;

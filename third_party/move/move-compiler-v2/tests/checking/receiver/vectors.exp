@@ -1,0 +1,18 @@
+// -- Model dump before bytecode pipeline
+module 0x1::vector {
+    private fun receiver<T>(self: vector<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref<T>(self: &vector<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun receiver_ref_mut<T>(self: &mut vector<#0>,_y: #0) {
+        Tuple()
+    }
+    private fun test_call_styles(s: vector<u64>,x: u64) {
+        vector::receiver<u64>(s, x);
+        vector::receiver_ref<u64>(Borrow(Immutable)(s), x);
+        vector::receiver_ref_mut<u64>(Borrow(Mutable)(s), x);
+        Tuple()
+    }
+} // end 0x1::vector

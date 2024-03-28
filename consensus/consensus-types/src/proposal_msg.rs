@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block::Block, common::Author, sync_info::SyncInfo};
+use crate::{block::Block, common::Author, proof_of_store::ProofCache, sync_info::SyncInfo};
 use anyhow::{anyhow, ensure, format_err, Context, Result};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::validator_verifier::ValidatorVerifier;
@@ -80,10 +80,15 @@ impl ProposalMsg {
         Ok(())
     }
 
-    pub fn verify(&self, validator: &ValidatorVerifier, quorum_store_enabled: bool) -> Result<()> {
-        self.proposal()
-            .payload()
-            .map_or(Ok(()), |p| p.verify(validator, quorum_store_enabled))?;
+    pub fn verify(
+        &self,
+        validator: &ValidatorVerifier,
+        proof_cache: &ProofCache,
+        quorum_store_enabled: bool,
+    ) -> Result<()> {
+        self.proposal().payload().map_or(Ok(()), |p| {
+            p.verify(validator, proof_cache, quorum_store_enabled)
+        })?;
 
         self.proposal()
             .validate_signature(validator)

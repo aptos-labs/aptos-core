@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share},
