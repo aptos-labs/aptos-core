@@ -459,7 +459,7 @@ impl<'a> FunctionGenerator<'a> {
                     },
                     // FreezeRef transforms a mutable reference to an immutable one so just
                     // treat it as an assignment.
-                    FreezeRef => {
+                    FreezeRef(_) => {
                         print_loc();
                         self.assign(ctx, target, dest[0], local(&srcs[0]))
                     },

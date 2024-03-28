@@ -1,11 +1,11 @@
 // -- Model dump before bytecode pipeline
 module 0x42::m {
     private fun mut_ref_to_mut_ref(x: u64,y: u64) {
-        Eq<u64>(Freeze(Borrow(Mutable)(x)), Freeze(Borrow(Mutable)(y)));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(x)), Freeze(false)(Borrow(Mutable)(y)));
         Tuple()
     }
     private fun mut_ref_to_ref(x: u64,y: u64) {
-        Eq<u64>(Freeze(Borrow(Mutable)(x)), Borrow(Immutable)(y));
+        Eq<u64>(Freeze(false)(Borrow(Mutable)(x)), Borrow(Immutable)(y));
         Tuple()
     }
     private fun ref_to_ref(x: u64,y: u64) {

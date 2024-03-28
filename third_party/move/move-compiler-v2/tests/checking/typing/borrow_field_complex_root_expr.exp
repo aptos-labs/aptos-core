@@ -10,14 +10,14 @@ module 0x8675309::M {
           s
         }));
         Borrow(Immutable)(select M::S.f<&M::S>(if cond {
-          Freeze(s_mut)
+          Freeze(false)(s_mut)
         } else {
           s
         }));
         Borrow(Immutable)(select M::S.f<&M::S>(if cond {
           s
         } else {
-          Freeze(s_mut)
+          Freeze(false)(s_mut)
         }));
         Borrow(Immutable)(select M::S.f<&mut M::S>(if cond {
           s_mut

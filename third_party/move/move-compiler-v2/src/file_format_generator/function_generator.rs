@@ -507,7 +507,7 @@ impl<'a> FunctionGenerator<'a> {
                     self.gen_builtin(ctx, dest, FF::Bytecode::Pop, source)
                 }
             },
-            Operation::FreezeRef => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
+            Operation::FreezeRef(_) => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
             Operation::CastU8 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU8, source),
             Operation::CastU16 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU16, source),
             Operation::CastU32 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU32, source),

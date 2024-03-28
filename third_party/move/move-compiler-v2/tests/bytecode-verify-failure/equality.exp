@@ -1,13 +1,17 @@
-============ initial bytecode ================
 
-[variant baseline]
-fun m::equality<#0>($t0: #0, $t1: #0): bool {
-     var $t2: bool
-  0: $t2 := ==($t0, $t1)
-  1: return $t2
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+equality<Ty0>(Arg0: Ty0, Arg1: Ty0): bool /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: Ty0)
+	1: MoveLoc[1](Arg1: Ty0)
+	2: Eq
+	3: Ret
 }
-
-
+}
 ============ bytecode verification failed ========
 
 Diagnostics:
