@@ -173,7 +173,7 @@ impl<R> Clone for Ref<R> {
     }
 }
 
-pub(crate) type NodeHandle<V> = Ref<Node<V>>;
+pub type NodeHandle<V> = Ref<Node<V>>;
 
 #[derive(Clone, Debug)]
 pub(crate) enum SubTree<V: Send + Sync + 'static> {

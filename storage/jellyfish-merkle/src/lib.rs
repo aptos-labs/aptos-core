@@ -718,6 +718,7 @@ where
         // We limit the number of loops here deliberately to avoid potential cyclic graph bugs
         // in the tree structure.
         for nibble_depth in 0..=ROOT_NIBBLE_HEIGHT {
+            // Nodes are written to DB in the order of NodeKey, so we can always get the next node
             let next_node = self
                 .reader
                 .get_node_with_tag(&next_node_key, "get_proof")

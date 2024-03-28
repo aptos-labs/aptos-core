@@ -197,7 +197,7 @@ impl Benches {
     fn rng() -> StdRng {
         let seed: &[_] = &[1, 2, 3, 4];
         let mut actual_seed = [0u8; 32];
-        actual_seed[..seed.len()].copy_from_slice(&seed);
+        actual_seed[..seed.len()].copy_from_slice(seed);
 
         StdRng::from_seed(actual_seed)
     }

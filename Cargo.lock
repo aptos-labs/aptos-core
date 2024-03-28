@@ -1561,6 +1561,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-active-state-set"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-crypto",
+ "aptos-crypto-derive",
+ "aptos-db",
+ "aptos-experimental-runtimes",
+ "aptos-infallible",
+ "aptos-jellyfish-merkle",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-schemadb",
+ "aptos-scratchpad",
+ "aptos-storage-interface",
+ "aptos-types",
+ "bcs 0.1.4",
+ "bytes",
+ "dashmap",
+ "fail 0.5.1",
+ "once_cell",
+ "rand 0.7.3",
+ "rayon",
+ "serde",
+ "tempfile",
+]
+
+[[package]]
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [

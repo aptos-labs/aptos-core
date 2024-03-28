@@ -259,7 +259,7 @@ where
         self.inner.root().hash()
     }
 
-    fn generation(&self) -> u64 {
+    pub fn generation(&self) -> u64 {
         self.inner.generation
     }
 
