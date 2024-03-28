@@ -1,5 +1,5 @@
 script {
-    use aptos_framework::keyless;
+    use aptos_framework::keyless_account;
     use aptos_framework::aptos_governance;
     use std::option;
     use std::vector;
@@ -7,7 +7,7 @@ script {
     fun main(core_resources: &signer) {
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
 
-        let new_config = keyless::new_configuration(
+        let new_config = keyless_account::new_configuration(
                 vector[b"test.recovery.aud"],
                 3,
                 10000000, // ~1160 days
@@ -17,6 +17,6 @@ script {
                 350,
                 300,
             );
-        keyless::update_configuration(&framework_signer, new_config);
+        keyless_account::update_configuration(&framework_signer, new_config);
     }
 }
