@@ -385,6 +385,12 @@ Get the currently effective randomness configuration object.
 ## Specification
 
 
+
+<pre><code><b>invariant</b> [suspendable] <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>() ==&gt; <b>exists</b>&lt;<a href="randomness_config.md#0x1_randomness_config_RandomnessConfig">RandomnessConfig</a>&gt;(@aptos_framework);
+</code></pre>
+
+
+
 <a id="@Specification_1_current"></a>
 
 ### Function `current`
