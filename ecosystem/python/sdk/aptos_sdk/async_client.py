@@ -28,6 +28,7 @@ U64_MAX = 18446744073709551615
 
 class ClientConfig:
     """Common configuration for clients, particularly for submitting transactions"""
+
     def __init__(self, api_key: str = None):
         self.expiration_ttl: int = 600
         self.gas_unit_price: int = 100
@@ -35,6 +36,7 @@ class ClientConfig:
         self.transaction_wait_in_seconds: int = 20
         self.http2: bool = False
         self.api_key: str = api_key
+
 
 class RestClient:
     """A wrapper around the Aptos-core Rest API"""
@@ -61,7 +63,7 @@ class RestClient:
         )
         self.client_config = client_config
         self._chain_id = None
-        if client_config.api_key is not None: 
+        if client_config.api_key is not None:
             self.client.headers["Authorization"] = f"Bearer {client_config.api_key}"
 
     async def close(self):
