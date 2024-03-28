@@ -40,6 +40,7 @@ members = [
     "aptos-move/move-examples",
     "aptos-move/mvhashmap",
     "aptos-move/package-builder",
+    "aptos-move/scripts/calc-dep-sizes",
     "aptos-move/vm-genesis",
     "aptos-move/writeset-transaction-generator",
     "aptos-node",
