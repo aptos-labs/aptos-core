@@ -177,10 +177,7 @@ impl WriteOp {
                 //   shouldn't change due to the squash.
                 // And because the deposit or refund happens after all squashing is finished, it's
                 // not a concern of fairness.
-                *op = Modification {
-                    data,
-                    metadata: metadata.clone(),
-                }
+                panic!("Squashing Deletion with Creation");
             },
             (Creation { metadata: old_meta, .. }, Deletion { metadata }) => {
                 Self::ensure_metadata_compatible(old_meta, &metadata)?;
