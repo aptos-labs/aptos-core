@@ -67,6 +67,7 @@ pub enum FeatureFlag {
     MAX_OBJECT_NESTING_CHECK = 53,
     KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
     MULTISIG_V2_ENHANCEMENT = 55,
+    ENABLE_COMPILER_ID_CHECK= 56,
 }
 
 impl FeatureFlag {
@@ -120,7 +121,7 @@ impl FeatureFlag {
             FeatureFlag::MAX_OBJECT_NESTING_CHECK,
             FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
-            FeatureFlag::VM_BINARY_FORMAT_V7,
+            FeatureFlag::ENABLE_COMPILER_ID_CHECK,
         ]
     }
 }
