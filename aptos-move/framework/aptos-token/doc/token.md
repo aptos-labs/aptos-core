@@ -564,7 +564,7 @@ This config specifies which fields in the Collection are mutable
 <code>maximum: bool</code>
 </dt>
 <dd>
- control if collection maxium is mutable
+ control if collection maximum is mutable
 </dd>
 </dl>
 
@@ -2361,7 +2361,7 @@ Mutate the token_properties of one token.
     <b>assert</b>!(<a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(all_token_data, token_id.token_data_id), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="token.md#0x3_token_ETOKEN_DATA_NOT_PUBLISHED">ETOKEN_DATA_NOT_PUBLISHED</a>));
     <b>let</b> token_data = <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table_borrow_mut">table::borrow_mut</a>(all_token_data, token_id.token_data_id);
 
-    // <b>if</b> default property is mutatable, <a href="token.md#0x3_token">token</a> property is alwasy mutable
+    // <b>if</b> default property is mutatable, <a href="token.md#0x3_token">token</a> property is always mutable
     // we only need <b>to</b> check <a href="token.md#0x3_token_TOKEN_PROPERTY_MUTABLE">TOKEN_PROPERTY_MUTABLE</a> when default property is immutable
     <b>if</b> (!token_data.mutability_config.properties) {
         <b>assert</b>!(
@@ -2398,11 +2398,11 @@ Mutate the token_properties of one token.
         );
 
         token_data.largest_property_version = cur_property_version;
-        // burn the orignial property_version 0 <a href="token.md#0x3_token">token</a> after mutation
+        // burn the original property_version 0 <a href="token.md#0x3_token">token</a> after mutation
         <b>let</b> <a href="token.md#0x3_token_Token">Token</a> { id: _, amount: _, token_properties: _ } = <a href="token.md#0x3_token">token</a>;
         new_token_id
     } <b>else</b> {
-        // only 1 <b>copy</b> for the <a href="token.md#0x3_token">token</a> <b>with</b> property verion bigger than 0
+        // only 1 <b>copy</b> for the <a href="token.md#0x3_token">token</a> <b>with</b> property version bigger than 0
         <a href="token.md#0x3_token_update_token_property_internal">update_token_property_internal</a>(token_owner, token_id, keys, values, types);
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="token.md#0x3_token_MutateTokenPropertyMapEvent">MutateTokenPropertyMapEvent</a>&gt;(
             &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="token.md#0x3_token_TokenStore">TokenStore</a>&gt;(token_owner).mutate_token_property_events,
@@ -4926,8 +4926,8 @@ The uri of Collection is mutable.
 
 
 Cannot change maximum from 0 and cannot change maximum to 0.
-The maximum should more than suply.
-The maxium of Collection is mutable.
+The maximum should more than supply.
+The maximum of Collection is mutable.
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(creator);
@@ -4957,7 +4957,7 @@ The maxium of Collection is mutable.
 
 
 Cannot change maximum from 0 and cannot change maximum to 0.
-The maximum should more than suply.
+The maximum should more than supply.
 The token maximum is mutable
 
 
