@@ -1561,6 +1561,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-experimental-layered-map"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+ "aptos-drop-helper",
+ "aptos-experimental-runtimes",
+ "aptos-infallible",
+ "aptos-logger",
+ "aptos-metrics-core",
+ "aptos-types",
+ "bitvec 1.0.1",
+ "criterion",
+ "itertools 0.12.1",
+ "jemallocator",
+ "once_cell",
+ "proptest",
+ "rayon",
+ "thiserror",
+]
+
+[[package]]
 name = "aptos-experimental-ptx-executor"
 version = "0.1.0"
 dependencies = [
