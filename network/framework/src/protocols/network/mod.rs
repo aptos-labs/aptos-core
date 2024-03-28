@@ -42,8 +42,10 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{runtime::Handle, sync::mpsc::error::TrySendError};
-use tokio::sync::mpsc::Sender;
+use tokio::{
+    runtime::Handle,
+    sync::mpsc::{error::TrySendError, Sender},
+};
 use tokio_stream::wrappers::ReceiverStream;
 
 pub trait Message: DeserializeOwned + Serialize {}
@@ -358,7 +360,12 @@ fn process_received_message<TMessage: Message + Unpin + Send, TPS: PeerSenderSou
                 "delivered",
                 data_len as u64,
             );
-            Some(Event::RpcRequest(wmsg.sender, app_msg, request.protocol_id, responder))
+            Some(Event::RpcRequest(
+                wmsg.sender,
+                app_msg,
+                request.protocol_id,
+                responder,
+            ))
         },
         NetworkMessage::RpcResponse(_) => {
             unreachable!("NetworkMessage::RpcResponse should not arrive in NetworkEvents because it is handled by Peer and reconnected with oneshot there");
@@ -376,7 +383,10 @@ fn process_received_message<TMessage: Message + Unpin + Send, TPS: PeerSenderSou
 }
 
 trait PeerSenderSource {
-    fn sender_for_peer(&mut self, peer_network_id: &PeerNetworkId) -> Option<tokio::sync::mpsc::Sender<(NetworkMessage, u64)>>;
+    fn sender_for_peer(
+        &mut self,
+        peer_network_id: &PeerNetworkId,
+    ) -> Option<tokio::sync::mpsc::Sender<(NetworkMessage, u64)>>;
 }
 
 #[derive(Clone)]
@@ -387,7 +397,9 @@ pub struct PeerSenderCache {
 impl PeerSenderCache {
     pub fn new(peer_senders: Arc<OutboundPeerConnections>) -> Self {
         Self {
-            peer_senders: Arc::new(std::sync::Mutex::new(PeerSenderCacheInner::new(peer_senders)))
+            peer_senders: Arc::new(std::sync::Mutex::new(PeerSenderCacheInner::new(
+                peer_senders,
+            ))),
         }
     }
 }
@@ -397,7 +409,10 @@ impl PeerSenderSource for PeerSenderCache {
         &mut self,
         peer_network_id: &PeerNetworkId,
     ) -> Option<tokio::sync::mpsc::Sender<(NetworkMessage, u64)>> {
-        self.peer_senders.lock().unwrap().sender_for_peer(peer_network_id)
+        self.peer_senders
+            .lock()
+            .unwrap()
+            .sender_for_peer(peer_network_id)
     }
 }
 
@@ -561,7 +576,10 @@ async fn rpc_response_sender(
 }
 
 impl<TMessage: Message + Unpin + Send> PeerSenderSource for NetworkEvents<TMessage> {
-    fn sender_for_peer(&mut self, peer_network_id: &PeerNetworkId) -> Option<Sender<(NetworkMessage, u64)>> {
+    fn sender_for_peer(
+        &mut self,
+        peer_network_id: &PeerNetworkId,
+    ) -> Option<Sender<(NetworkMessage, u64)>> {
         self.update_peers();
         self.peers.get(peer_network_id).map(|ps| ps.sender.clone())
     }
@@ -581,7 +599,7 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
             return Poll::Ready(None);
         }
         let mself = self.get_mut();
-    	// loop until we get a return value or the underlying source returns Poll::Pending
+        // loop until we get a return value or the underlying source returns Poll::Pending
         loop {
             let msg = match Pin::new(&mut mself.network_source).poll_next(cx) {
                 Poll::Ready(x) => match x {
@@ -595,9 +613,20 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
                 },
                 Poll::Pending => return Poll::Pending,
             };
-	        let role_type = mself.contexts.get(&msg.sender.network_id()).unwrap().role().as_str();
-	        if let Some(event) = process_received_message(msg, mself.label.clone(), mself, mself.contexts.clone(), role_type) {
-                return Poll::Ready(Some(event))
+            let role_type = mself
+                .contexts
+                .get(&msg.sender.network_id())
+                .unwrap()
+                .role()
+                .as_str();
+            if let Some(event) = process_received_message(
+                msg,
+                mself.label.clone(),
+                mself,
+                mself.contexts.clone(),
+                role_type,
+            ) {
+                return Poll::Ready(Some(event));
             }
         }
     }
