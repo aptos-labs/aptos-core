@@ -2381,6 +2381,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "itertools 0.12.1",
+ "lazy_static",
  "once_cell",
  "prometheus",
  "prost 0.12.3",
