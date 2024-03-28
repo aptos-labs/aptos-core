@@ -9,9 +9,9 @@ use crate::{
         },
         zkp_sig::ZKP,
     },
-    transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
+    transaction::authenticator::EphemeralSignature,
 };
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use aptos_crypto::CryptoMaterialError;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use ark_bn254::{Bn254, Fr};
@@ -50,11 +50,26 @@ pub struct ZeroKnowledgeSig {
 /// This struct is used to wrap together the Groth16 ZKP and the statement it proves so that the
 /// prover service can sign them together. It is only used during signature verification & never
 /// sent over the network.
-#[derive(Debug, CryptoHasher, BCSCryptoHash, PartialEq, Eq)]
+#[derive(Clone, Debug, CryptoHasher, BCSCryptoHash, Hash, PartialEq, Eq)]
 pub struct Groth16ProofAndStatement {
     pub proof: Groth16Proof,
     // TODO(keyless): implement Serialize/Deserialize for Fr and use Fr here directly
     pub public_inputs_hash: [u8; 32],
+}
+
+impl Groth16ProofAndStatement {
+    pub fn new(proof: Groth16Proof, public_inputs_hash: Fr) -> Self {
+        let public_inputs_hash: [u8; 32] = public_inputs_hash
+            .into_bigint()
+            .to_bytes_le()
+            .try_into()
+            .expect("expected 32-byte public inputs hash");
+
+        Groth16ProofAndStatement {
+            proof,
+            public_inputs_hash,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Groth16ProofAndStatement {
@@ -140,32 +155,6 @@ impl Serialize for Groth16ProofAndStatement {
 }
 
 impl ZeroKnowledgeSig {
-    pub fn verify_training_wheels_sig(
-        &self,
-        pub_key: &EphemeralPublicKey,
-        public_inputs_hash: &Fr,
-    ) -> anyhow::Result<()> {
-        if let Some(training_wheels_signature) = &self.training_wheels_signature {
-            let public_inputs_hash: [u8; 32] = public_inputs_hash
-                .into_bigint()
-                .to_bytes_le()
-                .try_into()
-                .map_err(|_| anyhow!("expected 32-byte public inputs hash"))?;
-
-            // TODO(keyless): unnecessary cloning here; requires refactoring of our CryptoHasher trait which requires Deserialize to be implemented
-            let proof_and_statement = Groth16ProofAndStatement {
-                proof: match self.proof {
-                    ZKP::Groth16(proof) => proof,
-                },
-                public_inputs_hash,
-            };
-
-            training_wheels_signature.verify(&proof_and_statement, pub_key)
-        } else {
-            bail!("No training_wheels_signature found")
-        }
-    }
-
     pub fn verify_groth16_proof(
         &self,
         public_inputs_hash: Fr,
@@ -217,13 +206,18 @@ impl Groth16Proof {
         public_inputs_hash: Fr,
         pvk: &PreparedVerifyingKey<Bn254>,
     ) -> anyhow::Result<()> {
+        // let start = std::time::Instant::now();
         let proof: Proof<Bn254> = Proof {
             a: self.a.deserialize_into_affine()?,
-            b: self.b.as_affine()?,
+            b: self.b.deserialize_into_affine()?,
             c: self.c.deserialize_into_affine()?,
         };
-        let result = Groth16::<Bn254>::verify_proof(pvk, &proof, &[public_inputs_hash])?;
-        if !result {
+        // println!("Deserialization time: {:?}", start.elapsed());
+
+        // let start = std::time::Instant::now();
+        let verified = Groth16::<Bn254>::verify_proof(pvk, &proof, &[public_inputs_hash])?;
+        // println!("Proof verification time: {:?}", start.elapsed());
+        if !verified {
             bail!("groth16 proof verification failed")
         }
         Ok(())

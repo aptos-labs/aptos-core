@@ -5,10 +5,47 @@ use crate::keyless::{
     bn254_circom::get_public_inputs_hash,
     circuit_testcases::*,
     test_utils::{get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk},
-    Configuration, EphemeralCertificate, DEVNET_VERIFICATION_KEY,
+    Configuration, EphemeralCertificate, KeylessPublicKey, KeylessSignature,
+    DEVNET_VERIFICATION_KEY,
 };
 use aptos_crypto::poseidon_bn254::fr_to_bytes_le;
 use std::ops::{AddAssign, Deref};
+
+/// Outputs:
+/// KeylessSignature BCS size: 318
+/// KeylessPublicKey BCS size: 61
+///
+/// Signature size would have been 294 if the extra_field was set to None.
+#[test]
+#[ignore]
+fn test_keyless_groth16_sizes() {
+    let (sig, pk) = get_sample_groth16_sig_and_pk();
+    print_keyless_sizes("Groth16 sizes", sig, pk)
+}
+
+/// Outputs:
+/// KeylessSignature BCS size: 1033
+/// KeylessPublicKey BCS size: 61
+#[test]
+#[ignore]
+fn test_keyless_openid_sizes() {
+    let (sig, pk) = get_sample_openid_sig_and_pk();
+
+    print_keyless_sizes("OpenID sizes", sig, pk)
+}
+
+fn print_keyless_sizes(ty: &str, sig: KeylessSignature, pk: KeylessPublicKey) {
+    println!("{}", ty);
+    println!("--------------");
+    println!(
+        "KeylessSignature BCS size: {} bytes",
+        bcs::to_bytes(&sig).unwrap().len()
+    );
+    println!(
+        "KeylessPublicKey BCS size: {} bytes",
+        bcs::to_bytes(&pk).unwrap().len()
+    );
+}
 
 // TODO(keyless): Add instructions on how to produce this test case.
 #[test]

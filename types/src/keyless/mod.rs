@@ -99,7 +99,7 @@ pub struct KeylessSignature {
     /// A short lived public key used to verify the `ephemeral_signature`.
     pub ephemeral_pubkey: EphemeralPublicKey,
 
-    /// A signature ove the transaction and, if present, the ZKP, under `ephemeral_pubkey`.
+    /// A signature over the transaction and, if present, the ZKP, under `ephemeral_pubkey`.
     /// The ZKP is included in this signature to prevent malleability attacks.
     pub ephemeral_signature: EphemeralSignature,
 }

@@ -37,7 +37,7 @@ pub fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine>
 
 /// This will do the proper subgroup membership checks.
 pub fn g2_projective_str_to_affine(x: [&str; 2], y: [&str; 2]) -> anyhow::Result<G2Affine> {
-    let g2_affine = G2Bytes::new_unchecked(x, y)?.as_affine()?;
+    let g2_affine = G2Bytes::new_unchecked(x, y)?.deserialize_into_affine()?;
     Ok(g2_affine)
 }
 
@@ -171,7 +171,7 @@ impl G2Bytes {
         }
     }
 
-    pub fn as_affine(&self) -> Result<G2Affine, CryptoMaterialError> {
+    pub fn deserialize_into_affine(&self) -> Result<G2Affine, CryptoMaterialError> {
         self.try_into()
     }
 }

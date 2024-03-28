@@ -8,8 +8,8 @@ use aptos_types::{
     invalid_signature,
     jwks::{jwk::JWK, PatchedJWKs},
     keyless::{
-        get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16VerificationKey,
-        KeylessPublicKey, KeylessSignature, ZKP,
+        get_public_inputs_hash, Configuration, EphemeralCertificate, Groth16ProofAndStatement,
+        Groth16VerificationKey, KeylessPublicKey, KeylessSignature, ZKP,
     },
     on_chain_config::{CurrentTimeMicroseconds, Features, OnChainConfig},
     transaction::authenticator::{EphemeralPublicKey, EphemeralSignature},
@@ -17,7 +17,11 @@ use aptos_types::{
 };
 use move_binary_format::errors::Location;
 use move_core_types::{language_storage::CORE_CODE_ADDRESS, move_resource::MoveStructType};
+use once_cell::sync::Lazy;
+use quick_cache::sync::Cache;
 use serde::Deserialize;
+use aptos_crypto::hash;
+use aptos_crypto::hash::CryptoHash;
 
 macro_rules! value_deserialization_error {
     ($message:expr) => {{
@@ -26,6 +30,22 @@ macro_rules! value_deserialization_error {
             Some($message.to_owned()),
         )
     }};
+}
+
+/// Keeps track of successfully-verified (Groth16, statement, VK) pairs.
+/// TODO(keyless): Comments say Cache should be wrapped in an Arc if used from multiple threads, but do I even need one if it's in a sync::Lazy?
+pub(crate) static ZKP_CACHE: Lazy<Cache<(Groth16ProofAndStatement, hash::HashValue), bool>> =
+    Lazy::new(|| Cache::new(1_000_000));
+
+#[cfg(any(test, feature = "testing"))]
+pub fn zkp_cache_num_hits() -> usize {
+    ZKP_CACHE.hits() as usize
+}
+
+/// Returns the # of cached ZKPs.
+#[cfg(any(test, feature = "testing"))]
+pub fn zkp_cache_size() -> usize {
+    ZKP_CACHE.len()
 }
 
 fn get_resource_on_chain<T: MoveStructType + for<'a> Deserialize<'a>>(
@@ -118,6 +138,8 @@ fn get_jwk_for_authenticator(
 }
 
 /// Ensures that **all** keyless authenticators in the transaction are valid.
+///
+/// WARNING: This function is NOT re-entrant.
 pub(crate) fn validate_authenticators(
     authenticators: &Vec<(KeylessPublicKey, KeylessSignature)>,
     features: &Features,
@@ -155,10 +177,14 @@ pub(crate) fn validate_authenticators(
             .map_err(|_| invalid_signature!("The ephemeral keypair has expired"))?;
     }
 
-    let patched_jwks = get_jwks_onchain(resolver)?;
-    let pvk = &get_groth16_vk_onchain(resolver)?
-        .try_into()
+    // If the VK has changed, the cache will be invalidated.
+    let vk = get_groth16_vk_onchain(resolver)?;
+    // let start = std::time::Instant::now();
+    let pvk = (&vk).try_into()
         .map_err(|_| invalid_signature!("Could not deserialize on-chain Groth16 VK"))?;
+    // println!("Groth16 VK deserialization time: {:?}", start.elapsed());
+    let vk_hash = vk.hash();
+    let patched_jwks = get_jwks_onchain(resolver)?;
 
     let training_wheels_pk = match &config.training_wheels_pubkey {
         None => None,
@@ -185,30 +211,54 @@ pub(crate) fn validate_authenticators(
                         config.is_allowed_override_aud(zksig.override_aud_val.as_ref().unwrap())?;
                     }
 
-                    match zksig.proof {
-                        ZKP::Groth16(_) => {
+                    match &zksig.proof {
+                        ZKP::Groth16(groth16proof) => {
+                            // let start = std::time::Instant::now();
                             let public_inputs_hash =
                                 get_public_inputs_hash(sig, pk, &rsa_jwk, config).map_err(
                                     |_| invalid_signature!("Could not compute public inputs hash"),
                                 )?;
+                            // println!("Public inputs hash time: {:?}", start.elapsed());
+
+                            let groth16_and_stmt =
+                                Groth16ProofAndStatement::new(*groth16proof, public_inputs_hash);
 
                             // The training wheels signature is only checked if a training wheels PK is set on chain
                             if training_wheels_pk.is_some() {
-                                zksig
-                                    .verify_training_wheels_sig(
-                                        training_wheels_pk.as_ref().unwrap(),
-                                        &public_inputs_hash,
-                                    )
-                                    .map_err(|_| {
-                                        invalid_signature!(
-                                            "Could not verify training wheels signature"
-                                        )
-                                    })?;
+                                match &zksig.training_wheels_signature {
+                                    Some(training_wheels_sig) => {
+                                        training_wheels_sig
+                                            .verify(
+                                                &groth16_and_stmt,
+                                                training_wheels_pk.as_ref().unwrap(),
+                                            )
+                                            .map_err(|_| {
+                                                invalid_signature!(
+                                                    "Could not verify training wheels signature"
+                                                )
+                                            })?;
+                                    },
+                                    None => {
+                                        return Err(invalid_signature!(
+                                            "Training wheels signature expected but it is missing"
+                                        ))
+                                    },
+                                }
                             }
 
-                            zksig
-                                .verify_groth16_proof(public_inputs_hash, pvk)
-                                .map_err(|_| invalid_signature!("Proof verification failed"))?;
+                            // If the ZKP has not successfully verified over this statment in the past,
+                            // manually verify it & cache it. Otherwise, skip.
+                            let entry = (groth16_and_stmt, vk_hash);
+                            if matches!(ZKP_CACHE.get(&entry), None | Some(false)) {
+                                let result = zksig.verify_groth16_proof(public_inputs_hash, &pvk);
+
+                                if result.is_ok() {
+                                    ZKP_CACHE.insert(entry, true);
+                                }
+
+                                result
+                                    .map_err(|_| invalid_signature!("Proof verification failed"))?;
+                            }
                         },
                     }
                 },
