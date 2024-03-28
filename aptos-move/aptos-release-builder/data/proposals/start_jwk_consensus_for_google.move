@@ -15,5 +15,6 @@ script {
             b"https://accounts.google.com",
             b"https://accounts.google.com/.well-known/openid-configuration"
         );
+        aptos_governance::reconfigure(&framework_signer);
     }
 }

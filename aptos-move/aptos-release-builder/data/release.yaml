@@ -51,16 +51,17 @@ proposals:
       - FeatureFlag:
           enabled:
             - object_code_deployment
-  - name: step_6_enable_aggregator_v2_api
+  - name: step_6_enable_concurrent_digital_assets
     metadata:
-      title: "AIP-47: Enable Aggregator v2 API"
-      description: "AIP-47: This AIP revamps and expands upon the current concept of Aggregators. Enabling their usage for control flow, and storing their values elsewhere. This step only enables new APIs."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/226"
+      title: "AIP-43: Enable Concurrent Digital Assets (Token V2) and Aggregator V2 API"
+      description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
+      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
             - aggregator_v2_api
+            - concurrent_token_v2
   - name: step_7_enable_aggregator_v2_parallelism
     metadata:
       title: "AIP-47: Enable Aggregator v2 parallelism"
@@ -131,13 +132,3 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
-  - name: step_12_enable_concurrent_digital_assets
-    metadata:
-      title: "AIP-43: Enable Concurrent Digital Assets (Token V2)"
-      description: "AIP-43: This AIP proposes a solution to speedup minting and burning of Digital Assets (Token v2), by parallelizing them"
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/209"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - concurrent_token_v2
