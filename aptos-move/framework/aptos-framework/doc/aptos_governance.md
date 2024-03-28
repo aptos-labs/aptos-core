@@ -2683,6 +2683,7 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 
 
 <pre><code><b>pragma</b> verify_duration_estimate = 1200;
+<b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
     <a href="account.md#0x1_account">account</a>: aptos_framework
 };
