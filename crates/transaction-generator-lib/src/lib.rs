@@ -33,8 +33,10 @@ mod entry_points;
 mod p2p_transaction_generator;
 pub mod publish_modules;
 pub mod publishing;
+mod tournament_generator;
 mod transaction_mix_generator;
 mod workflow_delegator;
+
 use self::{
     account_generator::AccountGeneratorCreator,
     call_custom_modules::CustomModulesDelegationGeneratorCreator,
@@ -88,7 +90,14 @@ pub enum TransactionType {
 
 #[derive(Debug, Copy, Clone)]
 pub enum WorkflowKind {
-    CreateMintBurn { count: usize, creation_balance: u64 },
+    CreateMintBurn {
+        count: usize,
+        creation_balance: u64,
+    },
+    Tournament {
+        num_players: usize,
+        join_batch: usize,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]

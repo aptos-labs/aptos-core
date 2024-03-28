@@ -242,6 +242,10 @@ pub enum EntryPoints {
         length: u64,
         num_points_per_txn: usize,
     },
+    TournamentSetup,
+    TournamentSetupPlayer,
+    TournamentGamePlay,
+    TournamentGameReveal,
 }
 
 impl EntryPoints {
@@ -291,6 +295,10 @@ impl EntryPoints {
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
             | EntryPoints::SmartTablePicture { .. } => "complex",
+            EntryPoints::TournamentSetup
+            | EntryPoints::TournamentSetupPlayer
+            | EntryPoints::TournamentGamePlay
+            | EntryPoints::TournamentGameReveal => "aptos_tournament",
         }
     }
 
@@ -342,6 +350,10 @@ impl EntryPoints {
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
+            EntryPoints::TournamentSetup
+            | EntryPoints::TournamentSetupPlayer
+            | EntryPoints::TournamentGamePlay
+            | EntryPoints::TournamentGameReveal => "rps_utils",
         }
     }
 
@@ -623,6 +635,34 @@ impl EntryPoints {
                     bcs::to_bytes(&colors).unwrap(),  // colors
                 ])
             },
+            EntryPoints::TournamentSetup => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(module_id, ident_str!("setup_tournament").to_owned(), vec![
+                    bcs::to_bytes(&rand_string(rng, 30)).unwrap(), // tournament name
+                ])
+            },
+            EntryPoints::TournamentSetupPlayer => {
+                get_payload(module_id, ident_str!("setup_player").to_owned(), vec![
+                    bcs::to_bytes(other.expect("Must provide other")).unwrap(),
+                ])
+            },
+            EntryPoints::TournamentGamePlay => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let options = ["Rock", "Paper", "Scissors"];
+                get_payload(module_id, ident_str!("game_play").to_owned(), vec![
+                    bcs::to_bytes(other.expect("Must provide other")).unwrap(),
+                    bcs::to_bytes(&false).unwrap(), // allow_unmatched
+                    bcs::to_bytes(&options.choose(rng).unwrap()).unwrap(), // action
+                ])
+            },
+            EntryPoints::TournamentGameReveal => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let options = ["Rock", "Paper", "Scissors"];
+                get_payload(module_id, ident_str!("game_reveal").to_owned(), vec![
+                    bcs::to_bytes(other.expect("Must provide other")).unwrap(),
+                    bcs::to_bytes(&false).unwrap(), // allow_unmatched
+                ])
+            },
         }
     }
 
@@ -640,6 +680,7 @@ impl EntryPoints {
                 Some(EntryPoints::InitializeVectorPicture { length: *length })
             },
             EntryPoints::SmartTablePicture { .. } => Some(EntryPoints::InitializeSmartTablePicture),
+            EntryPoints::TournamentSetupPlayer => Some(EntryPoints::TournamentSetup),
             _ => None,
         }
     }
@@ -707,6 +748,10 @@ impl EntryPoints {
             },
             EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
             EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
+            EntryPoints::TournamentSetup
+            | EntryPoints::TournamentSetupPlayer
+            | EntryPoints::TournamentGamePlay
+            | EntryPoints::TournamentGameReveal => AutomaticArgs::None, // TODO check
         }
     }
 }

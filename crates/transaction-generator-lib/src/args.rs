@@ -64,6 +64,15 @@ pub enum TransactionTypeArg {
     SmartTablePicture1MWith256Change,
     SmartTablePicture1BWith256Change,
     SmartTablePicture1MWith1KChangeExceedsLimit,
+    Tournament10,
+    Tournament10kBy1k,
+    Tournament100kBy1k,
+    Tournament1mBy10k,
+    Tournament10kBy100WhenDone,
+    Tournament100kBy300WhenDone,
+    Tournament100kBy100WhenDone,
+    Tournament1mBy300WhenDone,
+    Tournament1mBy100WhenDone,
 }
 
 impl TransactionTypeArg {
@@ -407,6 +416,97 @@ impl TransactionTypeArg {
                     num_modules: module_working_set_size,
                     use_account_pool: sender_use_account_pool,
                 }
+            },
+            TransactionTypeArg::Tournament10 => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 10,
+                    join_batch: 3,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::MoveByPhases,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament10kBy1k => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 10000,
+                    join_batch: 1000,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::MoveByPhases,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament100kBy1k => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 100000,
+                    join_batch: 1000,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::MoveByPhases,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament1mBy10k => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 1000000,
+                    join_batch: 10000,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::MoveByPhases,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament10kBy100WhenDone => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 10000,
+                    join_batch: 100,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 20,
+                },
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament100kBy300WhenDone => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 100000,
+                    join_batch: 300,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 10,
+                },
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament100kBy100WhenDone => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 100000,
+                    join_batch: 100,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 10,
+                },
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament1mBy300WhenDone => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 1000000,
+                    join_batch: 300,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 10,
+                },
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::Tournament1mBy100WhenDone => TransactionType::Workflow {
+                workflow_kind: WorkflowKind::Tournament {
+                    num_players: 1000000,
+                    join_batch: 100,
+                },
+                num_modules: module_working_set_size,
+                progress_type: WorkflowProgress::WhenDone {
+                    delay_between_stages_s: 10,
+                },
+                use_account_pool: sender_use_account_pool,
             },
         }
     }
