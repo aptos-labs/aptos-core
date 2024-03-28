@@ -610,6 +610,10 @@ module aptos_framework::account {
 
         // Set `OriginatingAddress[new_auth_key] = originating_address`.
         let new_auth_key = from_bcs::to_address(new_auth_key_vector);
+        // If new_auth_key was mapped to address new_auth_key (self map), remove the entry from table to enable  rotate
+        if (table::contains(address_map, new_auth_key) && *table::borrow(address_map, new_auth_key) == new_auth_key) {
+            table::remove(address_map, new_auth_key);
+        };
         table::add(address_map, new_auth_key, originating_addr);
 
         event::emit<KeyRotation>(KeyRotation {
