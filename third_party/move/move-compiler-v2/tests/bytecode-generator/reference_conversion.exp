@@ -9,7 +9,7 @@ module 0x42::reference_conversion {
           {
             let r: &mut u64 = Borrow(Mutable)(x);
             r = 43;
-            reference_conversion::deref(Freeze(r))
+            reference_conversion::deref(Freeze(false)(r))
           }
         }
     }
@@ -36,7 +36,7 @@ fun reference_conversion::use_it(): u64 {
   1: $t2 := borrow_local($t1)
   2: $t3 := 43
   3: write_ref($t2, $t3)
-  4: $t4 := freeze_ref($t2)
+  4: $t4 := freeze_ref(implicit)($t2)
   5: $t0 := reference_conversion::deref($t4)
   6: return $t0
 }

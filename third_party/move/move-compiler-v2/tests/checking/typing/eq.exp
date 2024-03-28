@@ -19,16 +19,16 @@ module 0x8675309::M {
         false;
         false;
         Eq<M::S>(Borrow(Immutable)(s), s_ref);
-        Eq<M::S>(Freeze(Borrow(Mutable)(s)), s_ref);
-        Eq<M::S>(Freeze(Borrow(Mutable)(s)), Freeze(s_mut));
-        Eq<M::S>(Borrow(Immutable)(s), Freeze(s_mut));
-        Eq<M::S>(s_ref, Freeze(s_mut));
-        Eq<M::S>(Freeze(s_mut), Freeze(s_mut));
+        Eq<M::S>(Freeze(false)(Borrow(Mutable)(s)), s_ref);
+        Eq<M::S>(Freeze(false)(Borrow(Mutable)(s)), Freeze(false)(s_mut));
+        Eq<M::S>(Borrow(Immutable)(s), Freeze(false)(s_mut));
+        Eq<M::S>(s_ref, Freeze(false)(s_mut));
+        Eq<M::S>(Freeze(false)(s_mut), Freeze(false)(s_mut));
         Eq<M::S>(pack M::S(0), s);
         Eq<M::R>(r, r);
-        Eq<M::R>(Freeze(r_mut), Freeze(r_mut));
-        Eq<M::R>(r, Freeze(r_mut));
-        Eq<M::R>(Freeze(r_mut), r);
+        Eq<M::R>(Freeze(false)(r_mut), Freeze(false)(r_mut));
+        Eq<M::R>(r, Freeze(false)(r_mut));
+        Eq<M::R>(Freeze(false)(r_mut), r);
         Eq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(1));
         Eq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(1));
         Tuple()

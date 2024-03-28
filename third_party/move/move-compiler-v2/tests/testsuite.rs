@@ -82,8 +82,8 @@ enum StopAfter {
 
 /// Names for 'virtual' processors in the pipeline. This can be used for
 /// filtering via the `config.dump_bytecode_filter` option.
-const INITIAL_BYTECODE_STAGE: &str = "FILE_FORMAT";
-const FILE_FORMAT_STAGE: &str = "INITIAL_BYTECODE";
+const INITIAL_BYTECODE_STAGE: &str = "INITIAL_BYTECODE";
+const FILE_FORMAT_STAGE: &str = "FILE_FORMAT";
 
 /// Active test configurations. A test configuration is selected by
 /// matching the include/exclude path specifications with the test file's path.
@@ -237,6 +237,13 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
+            // For debugging:
+            // Some(vec![
+            //   INITIAL_BYTECODE_STAGE,
+            //   "ReferenceSafetyProcessor",
+            //   "DeadStoreElimination",
+            //   FILE_FORMAT_STAGE,
+            //]),
         },
         // Reference safety tests (without optimizations on)
         TestConfig {

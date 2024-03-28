@@ -11,7 +11,7 @@ module 0x8675309::M {
           {
             let x_ref: &mut u64 = Borrow(Mutable)(x);
             {
-              let x_ref: &u64 = Freeze(x_ref);
+              let x_ref: &u64 = Freeze(false)(x_ref);
               x_ref = 0;
               Tuple()
             }

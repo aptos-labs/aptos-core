@@ -4,8 +4,8 @@ module 0x8675309::M {
         Abort(0)
     }
     private fun foo(x: &mut u64) {
-        Freeze<u64>(x);
-        Freeze<vector<bool>>(Borrow(Mutable)(M::any<vector<bool>>()));
+        Freeze(true)<u64>(x);
+        Freeze(true)<vector<bool>>(Borrow(Mutable)(M::any<vector<bool>>()));
         if false {
           Tuple()
         } else {
