@@ -35,6 +35,7 @@ use std::{
     time::Duration,
 };
 use url::Url;
+use rayon::prelude::*;
 
 pub mod consensus_config;
 pub mod execution_config;
@@ -584,7 +585,7 @@ impl ReleaseConfig {
 
         // If we are generating multi-step proposal files, we generate the files in reverse order,
         // since we need to pass in the hash of the next file to the previous file.
-        for proposal in &self.proposals {
+        self.proposals.par_iter().map(|proposal| {
             let mut proposal_dir = base_path.to_path_buf();
             proposal_dir.push("sources");
             proposal_dir.push(&self.name);
@@ -633,7 +634,9 @@ impl ReleaseConfig {
                 serde_json::to_string_pretty(&proposal.metadata)?,
             )
             .map_err(|err| anyhow!("Failed to write to file: {:?}", err))?;
-        }
+
+            Ok(())
+        }).collect::<Result<_>>()?;
 
         Ok(())
     }
