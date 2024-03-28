@@ -1,4 +1,4 @@
-/// This module implements the the food tokens (fungible token). When the module initializes,
+/// This module implements the food tokens (fungible token). When the module initializes,
 /// it creates the collection and two fungible tokens such as Corn and Meat.
 module knight::food {
     use aptos_framework::fungible_asset::{Self, Metadata};

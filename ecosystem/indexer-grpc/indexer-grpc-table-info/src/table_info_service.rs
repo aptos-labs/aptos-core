@@ -126,7 +126,7 @@ impl TableInfoService {
                 // retry sequentially to ensure parsing is complete
                 //
                 // Risk of this sequential approach is that it could be slow when the txns to process contain extremely
-                // nested table items, but the risk is bounded by the the configuration of the number of txns to process and number of threads
+                // nested table items, but the risk is bounded by the configuration of the number of txns to process and number of threads
                 if !self.indexer_async_v2.is_indexer_async_v2_pending_on_empty() {
                     let retry_batch = TransactionBatchInfo {
                         start_version: self.current_version,

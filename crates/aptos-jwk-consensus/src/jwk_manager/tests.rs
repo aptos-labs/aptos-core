@@ -302,7 +302,7 @@ async fn test_jwk_manager_state_transition() {
     }
     assert_eq!(expected_states, jwk_manager.states_by_issuer);
 
-    // For issuer Carl, in state `InProgress`, when receiving a quorum-certified update from the the aggregator:
+    // For issuer Carl, in state `InProgress`, when receiving a quorum-certified update from the aggregator:
     // the state should be switched to `Finished`;
     // Carl's update should be available in validator txn pool.
     let qc_jwks_for_carl = expected_states
