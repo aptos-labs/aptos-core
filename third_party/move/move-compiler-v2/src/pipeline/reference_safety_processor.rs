@@ -523,6 +523,17 @@ impl LifetimeState {
         self.node(label).children.is_empty()
     }
 
+    /// Returns true of this edge leads to a mutable leaf. A mutable edge
+    /// can lead to an immutable leaf via a freeze edge, that is why
+    /// a transitive check is necessary.
+    fn is_mut_path(&self, edge: &BorrowEdge) -> bool {
+        if self.is_leaf(&edge.target) {
+            edge.kind.is_mut()
+        } else {
+            self.children(&edge.target).any(|e| self.is_mut_path(e))
+        }
+    }
+
     /// Gets the label associated with a local, if it has children.
     fn label_for_temp_with_children(&self, temp: TempIndex) -> Option<&LifetimeLabel> {
         self.label_for_temp(temp).filter(|l| !self.is_leaf(l))
@@ -762,16 +773,13 @@ impl LifetimeState {
         let get_children =
             |label: &LifetimeLabel| self.node(label).children.iter().map(|e| e.target);
         let mut result = BTreeSet::new();
+        result.insert(*label);
         let mut todo = get_children(label).collect::<Vec<_>>();
-        if todo.is_empty() {
-            result.insert(*label);
-        } else {
-            while let Some(l) = todo.pop() {
-                if !result.insert(l) {
-                    continue;
-                }
-                todo.extend(get_children(&l));
+        while let Some(l) = todo.pop() {
+            if !result.insert(l) {
+                continue;
             }
+            todo.extend(get_children(&l));
         }
         result
     }
@@ -1468,14 +1476,124 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     }
 
     /// Process a FreezeRef instruction.
-    fn freeze_ref(&mut self, code_offset: CodeOffset, dest: TempIndex, src: TempIndex) {
+    ///
+    /// Freezes have specific conditions in the v1 borrow semantics as also implemented
+    /// by the bytecode verifier which require some ad-hoc treatment. (In a new borrow
+    /// semantics we may want to investigate to relax them, because they appear unnecessary
+    /// strict).
+    ///
+    /// When a reference is frozen, there must not exist any other mutable reference
+    /// pointing to the same location. It is, however, ok if the currently
+    /// frozen reference is used later again. This seems to be over-restrictive
+    /// since it shouldn't matter whether copies of the mutable reference exist
+    /// as long as they aren't passed at the same time as an argument to a function,
+    /// i.e. as long as they do not create aliasing.
+    ///
+    /// The above condition can be violated in two situations:
+    ///
+    /// a. The frozen reference has siblings which also mutably borrow the same parent.
+    /// b. There exists a mutable reference, alive after this program point, which
+    ///    borrows the same location but is not derived from the reference we are
+    ///    freezing.
+    fn freeze_ref(
+        &mut self,
+        code_offset: CodeOffset,
+        explicit: bool,
+        dest: TempIndex,
+        src: TempIndex,
+    ) {
         let label = *self.state.label_for_temp(src).expect("label for reference");
         let target = self.state.replace_ref(dest, code_offset, 0);
         self.state.add_edge(label, BorrowEdge {
             kind: BorrowEdgeKind::Freeze,
             loc: self.cur_loc(),
             target,
-        })
+        });
+        if let Some(label) = self.state.label_for_temp(src) {
+            // Handle case (a): search for any siblings which mutably borrow the same
+            // parent.
+            let qualifier = if explicit { "" } else { "implicitly " };
+            for (parent, edge) in self.state.parent_edges(label) {
+                for sibling_edge in self.state.children(&parent) {
+                    if &sibling_edge.target == label {
+                        continue;
+                    }
+                    if self.state.is_mut_path(sibling_edge) {
+                        self.error_with_hints(
+                            self.cur_loc(),
+                            format!(
+                                "cannot {}freeze {}  since multiple mutable references exist",
+                                qualifier,
+                                self.display(src)
+                            ),
+                            format!("{}frozen here", qualifier),
+                            vec![
+                                self.borrow_edge_info("originating ", edge),
+                                self.borrow_edge_info("conflicting ", sibling_edge),
+                            ]
+                            .into_iter(),
+                        )
+                    }
+                }
+            }
+            // Handle case (b): check whether there is any alive mutable reference
+            // which overlaps with the frozen reference.
+            for (temp, other_label) in self.state.temp_to_label_map.iter() {
+                if temp == &src || !self.ty(*temp).is_mutable_reference() {
+                    continue;
+                }
+                if other_label == label {
+                    // Compute all visible usages at leaves to show the conflict.
+                    // It is not enough to just show the usage of `temp`, because the
+                    // actual usage might be something derived from it, and `temp`
+                    // is not longer used.
+                    let leaves = self.state.leaves();
+                    let mut show: BTreeSet<(bool, Loc)> = BTreeSet::new();
+                    let mut todo = vec![*other_label];
+                    while let Some(l) = todo.pop() {
+                        if let Some(temps) = leaves.get(&l) {
+                            show.extend(
+                                temps
+                                    .iter()
+                                    .map(|t| {
+                                        self.alive
+                                            .after
+                                            .get(t)
+                                            .map(|i| {
+                                                i.usage_locations()
+                                                    .iter()
+                                                    .map(|l| (true, l.clone()))
+                                                    .collect::<BTreeSet<_>>()
+                                            })
+                                            .unwrap_or_default()
+                                    })
+                                    .concat(),
+                            )
+                        } else {
+                            for e in self.state.children(&l) {
+                                show.insert((false, e.loc.clone()));
+                                todo.push(e.target)
+                            }
+                        }
+                    }
+                    self.error_with_hints(
+                        self.cur_loc(),
+                        format!(
+                            "cannot {}freeze {} since other mutable usages for this reference exist",
+                            qualifier,
+                            self.display(src),
+                        ),
+                        format!("{}frozen here", qualifier),
+                        show.into_iter().map(|(is_leaf, loc)| {
+                            (
+                                loc,
+                                if is_leaf { "used here" } else { "derived here" }.to_string(),
+                            )
+                        }),
+                    )
+                }
+            }
+        }
     }
 
     /// Process a MoveFrom instruction.
@@ -1647,7 +1765,9 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                     },
                     ReadRef => step.read_ref(dests[0], srcs[0]),
                     WriteRef => step.write_ref(srcs[0], srcs[1]),
-                    FreezeRef => step.freeze_ref(code_offset, dests[0], srcs[0]),
+                    FreezeRef(explicit) => {
+                        step.freeze_ref(code_offset, *explicit, dests[0], srcs[0])
+                    },
                     MoveFrom(mid, sid, inst) => {
                         step.move_from(dests[0], &mid.qualified_inst(*sid, inst.clone()), srcs[0])
                     },

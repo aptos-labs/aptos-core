@@ -1,5 +1,13 @@
 
 Diagnostics:
+error: cannot freeze value since other mutable usages for this reference exist
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:31:30
+   │
+31 │         let c; if (cond) c = freeze(copy inner) else c = &other.s1;
+   │                              ^^^^^^^^^^^^^^^^^^ frozen here
+32 │         let f1 = &inner.f1;
+   │                  --------- used here
+
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:34:9
    │
@@ -26,6 +34,14 @@ error: mutable reference in local `inner` requires exclusive access but is borro
    │         ^^^^^^ requirement enforced here
 37 │         *c;
    │         -- conflicting reference `c` used here
+
+error: cannot freeze value since other mutable usages for this reference exist
+   ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:40:33
+   │
+40 │         let c; if (cond) c = id(freeze(copy inner)) else c = &other.s1; // error in v2
+   │                                 ^^^^^^^^^^^^^^^^^^ frozen here
+41 │         let f1 = &inner.f1;
+   │                  --------- used here
 
 error: mutable reference in local `inner` requires exclusive access but is borrowed
    ┌─ tests/reference-safety/v1-tests/borrow_field_combo.move:43:9

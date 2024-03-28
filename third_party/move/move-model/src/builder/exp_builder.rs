@@ -3366,7 +3366,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             let exp_id = exp.node_id();
             let new_id =
                 self.new_node_id_with_type_loc(expected_ty, &self.env().get_node_loc(exp_id));
-            ExpData::Call(new_id, Operation::Freeze, vec![exp]).into_exp()
+            ExpData::Call(new_id, Operation::Freeze(false), vec![exp]).into_exp()
         } else {
             exp
         }
