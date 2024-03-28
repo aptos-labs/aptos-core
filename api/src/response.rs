@@ -60,7 +60,7 @@ pub trait AptosErrorResponse {
     fn inner_mut(&mut self) -> &mut AptosError;
 }
 
-/// This macro defines traits for all of the given status codes. In eahc trait
+/// This macro defines traits for all of the given status codes. In each trait
 /// there is a function that defines a helper for building an instance of the
 /// error type using that code. These traits are helpful for defining what
 /// error types an internal function can return. For example, the failpoint

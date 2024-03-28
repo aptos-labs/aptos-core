@@ -944,7 +944,7 @@ impl MoveHarness {
 
 impl BlockSplit {
     pub fn arbitrary(len: usize) -> BoxedStrategy<BlockSplit> {
-        // skip last choice if lenght is not big enough for it.
+        // skip last choice if length is not big enough for it.
         (0..(if len > 1 { 3 } else { 2 }))
             .prop_flat_map(move |enum_type| {
                 // making running a test with a full block likely
@@ -1042,7 +1042,7 @@ macro_rules! assert_out_of_gas {
 #[macro_export]
 macro_rules! assert_abort {
     // identity needs to be before pattern (both with and without message),
-    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overridden.
     // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
     // would fail
     ($s:expr, $c:ident $(,)?) => {{
@@ -1092,7 +1092,7 @@ macro_rules! assert_abort {
 #[macro_export]
 macro_rules! assert_abort_ref {
     // identity needs to be before pattern (both with and without message),
-    // as if we pass variable - it matches the pattern arm, but value is not used, but overriden.
+    // as if we pass variable - it matches the pattern arm, but value is not used, but overridden.
     // Opposite order and test_asserts_variable_used / test_asserts_variable_used_with_message tests
     // would fail
     ($s:expr, $c:ident $(,)?) => {{
