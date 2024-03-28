@@ -20,7 +20,7 @@ typing-extensions = "^4.4.0"
 
 [tool.poetry.dev-dependencies]
 autoflake = "2.2.0"
-black = "23.7.0"
+black = "24.3.0"
 coverage = "^7.2.4"
 flake8 = "6.0.0"
 isort = "^5.10.1"
