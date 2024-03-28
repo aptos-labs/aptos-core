@@ -28,7 +28,7 @@ bug: BYTECODE VERIFICATION FAILED
     offsets: [
         (
             FunctionDefinitionIndex(0),
-            7,
+            4,
         ),
     ],
 }
