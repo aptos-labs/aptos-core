@@ -498,6 +498,31 @@ impl<'a> ExtendedChecker<'a> {
                 self.env
                     .error(&fun.get_id_loc(), "view function must return values")
             }
+
+            fun.get_parameter_types()
+                .iter()
+                .for_each(|parameter_type| match parameter_type {
+                    Type::Primitive(inner) => {
+                        if inner == &PrimitiveType::Signer {
+                            self.env.error(
+                                &fun.get_id_loc(),
+                                "view function cannot use the signer paremter",
+                            )
+                        }
+                    },
+                    Type::Reference(_, inner) => {
+                        if let Type::Primitive(inner) = inner.as_ref() {
+                            if inner == &PrimitiveType::Signer {
+                                self.env.error(
+                                    &fun.get_id_loc(),
+                                    "view function cannot use the & signer paremter",
+                                )
+                            }
+                        }
+                    },
+                    _ => (),
+                });
+
             // Remember the runtime info that this is a view function
             let module_id = self.get_runtime_module_id(module);
             self.output
