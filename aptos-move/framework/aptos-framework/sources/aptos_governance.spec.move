@@ -140,8 +140,6 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
         pragma verify_duration_estimate = 600;
-        let addr = signer::address_of(aptos_framework);
-        aborts_if addr != @aptos_framework;
         include reconfiguration_with_dkg::FinishRequirement {
             account: aptos_framework
         };
