@@ -149,7 +149,6 @@ pub(crate) fn run_script_prologue(
             MoveValue::vector_u8(txn_data.script_hash.clone()),
         ];
         if has_randomness_annotation {
-            args.push(MoveValue::Bool(true));
             (&APTOS_TRANSACTION_VALIDATION.script_prologue_v2_name, args)
         } else {
             (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
