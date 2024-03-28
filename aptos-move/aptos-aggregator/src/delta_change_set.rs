@@ -557,7 +557,7 @@ mod test {
             &self,
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
-        ) -> Result<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>, PanicError> {
+        ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
             unimplemented!("Irrelevant for the test")
         }
     }
