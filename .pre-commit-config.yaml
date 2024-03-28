@@ -24,5 +24,26 @@ repos:
           - devtools/assets/license_header.txt
           - --license-filepath
           - devtools/assets/shared_license_header.txt
+          - --license-filepath
+          - devtools/assets/license_header_utf8.txt
+          - --license-filepath
+          - devtools/assets/shared_license_header_utf8.txt
+          - --comment-style
+          - //
+      - id: insert-license
+        files: ^(?=third_party/).*\.rs$
+        args:
+          - --license-filepath
+          - devtools/assets/license_header.txt
+          - --license-filepath
+          - devtools/assets/shared_license_header.txt
+          - --license-filepath
+          - devtools/assets/third_party_license_header.txt
+          - --license-filepath
+          - devtools/assets/third_party_license_header_2.txt
+          - --license-filepath
+          - devtools/assets/license_header_utf8.txt
+          - --license-filepath
+          - devtools/assets/shared_license_header_utf8.txt
           - --comment-style
           - //
