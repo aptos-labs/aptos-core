@@ -55,6 +55,7 @@ mod types;
 pub use self::error::PeerManagerError;
 use crate::{
     application::{error::Error, storage::PeersAndMetadata},
+    peer::DisconnectReason,
     peer_manager::transport::{TransportHandler, TransportRequest},
     protocols::network::SerializedRequest,
 };
@@ -297,7 +298,11 @@ where
                     if connection_id == lost_conn_metadata.connection_id {
                         // We lost an active connection.
                         entry.remove();
-                        self.remove_peer_from_metadata(peer_id, connection_id);
+                        self.remove_peer_from_metadata(
+                            peer_id,
+                            connection_id,
+                            DisconnectReason::ConnectionLost,
+                        );
                     }
                 }
                 self.update_connected_peers_metrics();
@@ -410,11 +415,16 @@ where
         self.update_connected_peers_metrics();
     }
 
-    fn remove_peer_from_metadata(&mut self, peer_id: AccountAddress, connection_id: ConnectionId) {
+    fn remove_peer_from_metadata(
+        &mut self,
+        peer_id: AccountAddress,
+        connection_id: ConnectionId,
+        reason: DisconnectReason,
+    ) {
         let peer_network_id = PeerNetworkId::new(self.network_context.network_id(), peer_id);
-        if let Err(error) = self
-            .peers_and_metadata
-            .remove_peer_metadata(peer_network_id, connection_id)
+        if let Err(error) =
+            self.peers_and_metadata
+                .remove_peer_metadata(peer_network_id, connection_id, reason)
         {
             warn!(
                 NetworkSchema::new(&self.network_context),
@@ -468,7 +478,11 @@ where
                 // PeerRequest channel.
                 if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
                     let connection_id = conn_metadata.connection_id;
-                    self.remove_peer_from_metadata(conn_metadata.remote_peer_id, connection_id);
+                    self.remove_peer_from_metadata(
+                        conn_metadata.remote_peer_id,
+                        connection_id,
+                        DisconnectReason::Requested,
+                    );
 
                     // This triggers a disconnect.
                     drop(sender);

@@ -473,7 +473,11 @@ async fn test_peers_and_metadata_subscriptions() {
     }
 
     peers_and_metadata
-        .remove_peer_metadata(peer_network_id_1, connection_1.connection_id)
+        .remove_peer_metadata(
+            peer_network_id_1,
+            connection_1.connection_id,
+            DisconnectReason::Requested,
+        )
         .unwrap();
     match connection_events.try_recv() {
         Ok(notif) => match notif {
@@ -1079,7 +1083,11 @@ fn remove_peer_metadata(
     peer_network_id: PeerNetworkId,
     connection_id: u32,
 ) -> Result<PeerMetadata, Error> {
-    peers_and_metadata.remove_peer_metadata(peer_network_id, connection_id.into())
+    peers_and_metadata.remove_peer_metadata(
+        peer_network_id,
+        connection_id.into(),
+        DisconnectReason::Requested,
+    )
 }
 
 /// Updates the connection metadata for the specified peer

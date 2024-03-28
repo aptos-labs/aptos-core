@@ -12,6 +12,7 @@ use aptos_config::{
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::metadata::ConnectionState,
+    peer::DisconnectReason,
     protocols::wire::handshake::v1::{MessagingProtocolVersion, ProtocolIdSet},
     transport::{ConnectionId, ConnectionMetadata},
 };
@@ -286,7 +287,11 @@ async fn test_request_moderator_peer_garbage_collect() {
 
     // Disconnect the second peer
     peers_and_metadata
-        .remove_peer_metadata(peer_network_ids[1], ConnectionId::from(1))
+        .remove_peer_metadata(
+            peer_network_ids[1],
+            ConnectionId::from(1),
+            DisconnectReason::Requested,
+        )
         .unwrap();
 
     // Elapse enough time for the peer monitor loop to garbage collect the peer
@@ -337,7 +342,11 @@ async fn test_request_moderator_peer_garbage_collect() {
 
     // Disconnect the third peer
     peers_and_metadata
-        .remove_peer_metadata(peer_network_ids[2], ConnectionId::from(2))
+        .remove_peer_metadata(
+            peer_network_ids[2],
+            ConnectionId::from(2),
+            DisconnectReason::Requested,
+        )
         .unwrap();
 
     // Elapse enough time for the peer monitor loop to garbage collect the peer

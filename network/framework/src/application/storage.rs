@@ -26,6 +26,10 @@ use std::{
 };
 use tokio::sync::mpsc::error::TrySendError;
 
+// notification_backlog is how many ConnectionNotification items can be queued waiting for an app to receive them.
+// Beyond this, new messages will be dropped if the app is not handling them fast enough.
+const NOTIFICATION_BACKLOG: usize = 100;
+
 /// A simple container that tracks all peers and peer metadata for the node.
 /// This container is updated by both the networking code (e.g., for new
 /// peer connections and lost peer connections), as well as individual
@@ -55,8 +59,8 @@ impl PeersAndMetadata {
             peers_and_metadata: RwLock::new(HashMap::new()),
             trusted_peers: HashMap::new(),
             cached_peers_and_metadata: Arc::new(ArcSwap::from(Arc::new(HashMap::new()))),
-	    subscribers: RwLock::new(vec![]),
-	    contexts: Arc::new(ArcSwap::new(Arc::new(BTreeMap::new()))),
+            subscribers: RwLock::new(vec![]),
+            contexts: Arc::new(ArcSwap::new(Arc::new(BTreeMap::new()))),
         };
 
         // Initialize each network mapping and trusted peer set
@@ -229,6 +233,7 @@ impl PeersAndMetadata {
         &self,
         peer_network_id: PeerNetworkId,
         connection_id: ConnectionId,
+        reason: DisconnectReason,
     ) -> Result<PeerMetadata, Error> {
         // Grab the write lock for the peer metadata
         let mut peers_and_metadata = self.peers_and_metadata.write();
@@ -252,7 +257,7 @@ impl PeersAndMetadata {
                 let event = ConnectionNotification::LostPeer(
                     peer_metadata.connection_metadata.clone(),
                     nc,
-                    DisconnectReason::Requested,
+                    reason,
                 );
                 self.broadcast(event);
                 peer_metadata
@@ -385,29 +390,25 @@ impl PeersAndMetadata {
         let mut to_del = vec![];
         for i in 0..listeners.len() {
             let dest = listeners.get_mut(i).unwrap();
-            match dest.try_send(event.clone()) {
-                Ok(_) => {},
-                Err(err) => match err {
+            if let Err(err) = dest.try_send(event.clone()) {
+                match err {
                     TrySendError::Full(_) => {
-                        // meh, drop message, maybe counter?
+                        // Tried to send to an app, but the app isn't handling its messages fast enough.
+                        // Drop message. Maybe increment a metrics counter?
                     },
                     TrySendError::Closed(_) => {
                         to_del.push(i);
                     },
-                },
+                }
             }
         }
         for evict in to_del.into_iter() {
-            let llast = listeners.len() - 1;
-            if evict != llast {
-                listeners.swap(evict, llast);
-            }
-            listeners.pop();
+            listeners.swap_remove(evict);
         }
     }
 
     pub fn subscribe(&self) -> tokio::sync::mpsc::Receiver<ConnectionNotification> {
-        let (sender, receiver) = tokio::sync::mpsc::channel(10); // TODO configure or name the constant or something
+        let (sender, receiver) = tokio::sync::mpsc::channel(NOTIFICATION_BACKLOG);
         let mut listeners = self.subscribers.write();
         listeners.push(sender);
         receiver
