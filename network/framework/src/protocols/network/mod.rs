@@ -563,11 +563,7 @@ async fn rpc_response_sender(
 impl<TMessage: Message + Unpin + Send> PeerSenderSource for NetworkEvents<TMessage> {
     fn sender_for_peer(&mut self, peer_network_id: &PeerNetworkId) -> Option<Sender<(NetworkMessage, u64)>> {
         self.update_peers();
-        if let Some(stub) = self.peers.get(peer_network_id) {
-            Some(stub.sender.clone())
-        } else {
-            None
-        }
+        self.peers.get(peer_network_id).map(|ps| ps.sender.clone())
     }
 }
 
@@ -586,7 +582,7 @@ impl<TMessage: Message + Unpin + Send> Stream for NetworkEvents<TMessage> {
         }
         let mself = self.get_mut();
     	// loop until we get a return value or the underlying source returns Poll::Pending
-        'retries: loop {
+        loop {
             let msg = match Pin::new(&mut mself.network_source).poll_next(cx) {
                 Poll::Ready(x) => match x {
                     Some(msg) => msg,
