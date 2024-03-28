@@ -1,9 +1,5 @@
 lockfileVersion: '6.0'
 
-settings:
-  autoInstallPeers: true
-  excludeLinksFromLockfile: false
-
 dependencies:
   '@actions/core':
     specifier: ^1.10.1
@@ -45,7 +41,7 @@ packages:
     resolution: {integrity: sha512-q+epW0trjVUUHboliPb4UF9g2msf+w61b32tAkFEwL/IwP0DQWgbCMM0Hbe3e3WXSKz5VcUXbzJQgy8Hkra/Lg==}
     dependencies:
       tunnel: 0.0.6
-      undici: 5.28.2
+      undici: 5.28.3
     dev: false
 
   /@ampproject/remapping@2.2.1:
@@ -2543,8 +2539,8 @@ packages:
     hasBin: true
     dev: true
 
-  /undici@5.28.2:
-    resolution: {integrity: sha512-wh1pHJHnUeQV5Xa8/kyQhO7WFa8M34l026L5P/+2TYiakvGy5Rdc8jWZVyG7ieht/0WgJLEd3kcU5gKx+6GC8w==}
+  /undici@5.28.3:
+    resolution: {integrity: sha512-3ItfzbrhDlINjaP0duwnNsKpDQk3acHI3gVJ1z4fmwMK31k5G9OVIAMLSIaP6w4FaGkaAkN6zaQO9LUvZ1t7VA==}
     engines: {node: '>=14.0'}
     dependencies:
       '@fastify/busboy': 2.1.0
@@ -2689,3 +2685,7 @@ packages:
       which: 2.0.2
       yaml: 2.1.3
     dev: true
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
