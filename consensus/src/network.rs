@@ -844,9 +844,6 @@ impl NetworkTask {
                         warn!(error = ?e, "aptos channel closed");
                     };
                 },
-                _ => {
-                    // Ignore `NewPeer` and `LostPeer` events
-                },
             });
         }
     }

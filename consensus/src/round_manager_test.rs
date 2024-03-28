@@ -402,7 +402,6 @@ impl NodeSetup {
                     self.identity_desc()
                 )
             },
-            _ => panic!("Unexpected Network Event"),
         }
     }
 
@@ -413,7 +412,6 @@ impl NodeSetup {
                 msg,
                 self.identity_desc()
             ),
-            Some(_) => panic!("Unexpected Network Event"),
             None => {},
         }
     }
@@ -476,7 +474,6 @@ impl NodeSetup {
                 msg,
                 self.identity_desc()
             ),
-            Some(_) => panic!("Unexpected Network Event"),
             None => None,
         }
     }

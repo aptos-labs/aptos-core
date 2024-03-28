@@ -23,6 +23,7 @@ use crate::{
     constants::NETWORK_CHANNEL_SIZE,
     counters,
     logging::NetworkSchema,
+    peer_manager::ConnectionNotification,
     protocols::{
         health_checker::interface::HealthCheckNetworkInterface,
         network::{
@@ -143,6 +144,10 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         let ticker = self.time_service.interval(self.ping_interval);
         tokio::pin!(ticker);
 
+        let connection_events = self.network_interface.get_peers_and_metadata().subscribe();
+        let mut connection_events =
+            tokio_stream::wrappers::ReceiverStream::new(connection_events).fuse();
+
         loop {
             futures::select! {
                 maybe_event = self.network_interface.next() => {
@@ -154,16 +159,6 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                     };
 
                     match event {
-                        Event::NewPeer(metadata) => {
-                            self.network_interface.create_peer_and_health_data(
-                                metadata.remote_peer_id, self.round
-                            );
-                        }
-                        Event::LostPeer(metadata) => {
-                            self.network_interface.remove_peer_and_health_data(
-                                &metadata.remote_peer_id
-                            );
-                        }
                         Event::RpcRequest(peer_id, msg, protocol, res_tx) => {
                             match msg {
                                 HealthCheckerMsg::Ping(ping) => self.handle_ping_request(peer_id, ping, protocol, res_tx),
@@ -190,6 +185,20 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                                 msg,
                             );
                             debug_assert!(false, "Unexpected network event");
+                        }
+                    }
+                }
+                conn_event = connection_events.select_next_some() => {
+                    match conn_event {
+                        ConnectionNotification::NewPeer(metadata, _network_context) => {
+                            self.network_interface.create_peer_and_health_data(
+                                metadata.remote_peer_id, self.round
+                            );
+                        }
+                        ConnectionNotification::LostPeer(metadata, _network_context, _reason) => {
+                            self.network_interface.remove_peer_and_health_data(
+                                &metadata.remote_peer_id
+                            );
                         }
                     }
                 }

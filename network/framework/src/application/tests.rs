@@ -1217,7 +1217,6 @@ async fn wait_for_network_event(
                 assert_eq!(dummy_message, expected_dummy_message);
                 assert_eq!(Some(protocol_id), expected_rpc_protocol_id);
             },
-            _ => panic!("Invalid dummy event found: {:?}", dummy_event),
         },
         Err(elapsed) => panic!(
             "Timed out while waiting to receive a message on the network events receiver. Elapsed: {:?}",

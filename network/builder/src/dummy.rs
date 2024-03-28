@@ -14,15 +14,15 @@ use aptos_crypto::{test_utils::TEST_SEED, x25519, Uniform};
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_network::{
     application::{interface::NetworkClient, storage::PeersAndMetadata},
-    peer_manager::builder::AuthenticationMode,
+    peer_manager::{builder::AuthenticationMode, ConnectionNotification},
     protocols::network::{
-        Event, NetworkApplicationConfig, NetworkClientConfig, NetworkEvents, NetworkServiceConfig,
+        NetworkApplicationConfig, NetworkClientConfig, NetworkEvents, NetworkServiceConfig,
     },
     ProtocolId,
 };
 use aptos_time_service::TimeService;
 use aptos_types::{chain_id::ChainId, network_address::NetworkAddress, PeerId};
-use futures::{executor::block_on, StreamExt};
+use futures::executor::block_on;
 use maplit::hashmap;
 use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -110,7 +110,7 @@ pub fn setup_network() -> DummyNetwork {
         peers_and_metadata.clone(),
     );
 
-    let (listener_sender, mut listener_events) = network_builder
+    let (listener_sender, listener_events) = network_builder
         .add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config(), None);
     network_builder.build(runtime.handle().clone()).start();
     let listener_network_client = NetworkClient::new(
@@ -143,7 +143,9 @@ pub fn setup_network() -> DummyNetwork {
         peers_and_metadata.clone(),
     );
 
-    let (dialer_sender, mut dialer_events) = network_builder
+    let mut connection_events = peers_and_metadata.subscribe();
+
+    let (dialer_sender, dialer_events) = network_builder
         .add_client_and_service::<_, DummyNetworkEvents>(&dummy_network_config(), None);
     network_builder.build(runtime.handle().clone()).start();
     let dialer_network_client = NetworkClient::new(
@@ -154,8 +156,8 @@ pub fn setup_network() -> DummyNetwork {
     );
 
     // Wait for establishing connection
-    let first_dialer_event = block_on(dialer_events.next()).unwrap();
-    if let Event::NewPeer(metadata) = first_dialer_event {
+    let first_dialer_event = block_on(connection_events.recv()).unwrap();
+    if let ConnectionNotification::NewPeer(metadata, _network_context) = first_dialer_event {
         assert_eq!(metadata.remote_peer_id, listener_peer.peer_id());
         assert_eq!(metadata.origin, ConnectionOrigin::Outbound);
         assert_eq!(metadata.role, PeerRole::Validator);
@@ -166,8 +168,8 @@ pub fn setup_network() -> DummyNetwork {
         );
     }
 
-    let first_listener_event = block_on(listener_events.next()).unwrap();
-    if let Event::NewPeer(metadata) = first_listener_event {
+    let first_listener_event = block_on(connection_events.recv()).unwrap();
+    if let ConnectionNotification::NewPeer(metadata, _network_context) = first_listener_event {
         assert_eq!(metadata.remote_peer_id, dialer_peer.peer_id());
         assert_eq!(metadata.origin, ConnectionOrigin::Inbound);
         assert_eq!(metadata.role, PeerRole::Validator);
