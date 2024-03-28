@@ -34,7 +34,7 @@ impl<'a> CoinClient<'a> {
 
     pub async fn transfer(
         &self,
-        from_account: &mut LocalAccount,
+        from_account: &LocalAccount,
         to_account: AccountAddress,
         amount: u64,
         options: Option<TransferOptions<'_>>,

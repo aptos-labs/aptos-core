@@ -154,7 +154,7 @@ async fn check_account_data(
 async fn transfer_coins(
     client: &Client,
     coin_client: &CoinClient<'_>,
-    account: &mut LocalAccount,
+    account: &LocalAccount,
     receiver: AccountAddress,
 ) -> Result<u64, TestFailure> {
     // create transaction
