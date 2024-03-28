@@ -18,8 +18,8 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{
-        ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2, OnChainConfig,
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
+        DisallowList, ExecutionConfigV1, FeatureFlag as AptosFeatureFlag, GasScheduleV2,
+        OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig, OnChainJWKConsensusConfig,
         OnChainRandomnessConfig, RandomnessConfigMoveStruct, TransactionShufflerType, Version,
     },
 };
@@ -37,6 +37,7 @@ use std::{
 };
 use url::Url;
 
+pub mod compiler_id_config;
 pub mod consensus_config;
 pub mod execution_config;
 pub mod feature_flags;
@@ -82,6 +83,7 @@ impl Proposal {
                 | ReleaseEntry::Execution(_)
                 | ReleaseEntry::JwkConsensus(_)
                 | ReleaseEntry::Randomness(_)
+                | ReleaseEntry::CompilerIdDisallowList(_)
                 | ReleaseEntry::RawScript(_) => ret.push(entry.clone()),
                 // Deprecated by `JwkConsensus`.
                 ReleaseEntry::OidcProviderOps(_) => {},
@@ -145,6 +147,7 @@ pub enum ReleaseEntry {
     OidcProviderOps(Vec<OidcProviderOp>),
     JwkConsensus(OnChainJWKConsensusConfig),
     Randomness(ReleaseFriendlyRandomnessConfig),
+    CompilerIdDisallowList(Vec<String>),
 }
 
 impl ReleaseEntry {
@@ -400,6 +403,19 @@ impl ReleaseEntry {
                     )?,
                 );
             },
+            ReleaseEntry::CompilerIdDisallowList(disallow_list) => {
+                result.append(
+                    &mut compiler_id_config::generate_set_disallow_list_proposal(
+                        disallow_list,
+                        is_testnet,
+                        if is_multi_step {
+                            get_execution_hash(result)
+                        } else {
+                            "".to_owned().into_bytes()
+                        },
+                    )?,
+                );
+            },
         }
         Ok(())
     }
@@ -505,6 +521,20 @@ impl ReleaseEntry {
                     RandomnessConfigMoveStruct::from(OnChainRandomnessConfig::from(config.clone()));
                 if !wait_until_equals(client_opt, &expected_on_chain, *MAX_ASYNC_RECONFIG_TIME) {
                     bail!("randomness config mismatch: Expected {:?}", config);
+                }
+            },
+            ReleaseEntry::CompilerIdDisallowList(compiler_ids) => {
+                let mut disallow_list: Vec<Vec<u8>> = vec![];
+                for id in compiler_ids {
+                    let bytes = id.as_bytes().to_vec();
+                    disallow_list.push(bytes);
+                }
+                if !wait_until_equals(
+                    client_opt,
+                    &DisallowList { disallow_list },
+                    *MAX_ASYNC_RECONFIG_TIME,
+                ) {
+                    bail!("compiler id config mismatch: Expected {:?}", compiler_ids);
                 }
             },
         }

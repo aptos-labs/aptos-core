@@ -285,6 +285,11 @@ pub enum EntryFunctionCall {
         coin_type: TypeTag,
     },
 
+    /// Used in on-chain governances to update the disallow list.
+    CompilerIdConfigSetDisallowList {
+        disallow_list: Vec<Vec<u8>>,
+    },
+
     /// Add `amount` of coins to the delegation pool `pool_address`.
     DelegationPoolAddStake {
         pool_address: AccountAddress,
@@ -1110,6 +1115,9 @@ impl EntryFunctionCall {
                 amount,
             } => coin_transfer(coin_type, to, amount),
             CoinUpgradeSupply { coin_type } => coin_upgrade_supply(coin_type),
+            CompilerIdConfigSetDisallowList { disallow_list } => {
+                compiler_id_config_set_disallow_list(disallow_list)
+            },
             DelegationPoolAddStake {
                 pool_address,
                 amount,
@@ -2216,6 +2224,22 @@ pub fn coin_upgrade_supply(coin_type: TypeTag) -> TransactionPayload {
         ident_str!("upgrade_supply").to_owned(),
         vec![coin_type],
         vec![],
+    ))
+}
+
+/// Used in on-chain governances to update the disallow list.
+pub fn compiler_id_config_set_disallow_list(disallow_list: Vec<Vec<u8>>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("compiler_id_config").to_owned(),
+        ),
+        ident_str!("set_disallow_list").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&disallow_list).unwrap()],
     ))
 }
 
@@ -4700,6 +4724,18 @@ mod decoder {
         }
     }
 
+    pub fn compiler_id_config_set_disallow_list(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::CompilerIdConfigSetDisallowList {
+                disallow_list: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_add_stake(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::DelegationPoolAddStake {
@@ -6070,6 +6106,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "coin_upgrade_supply".to_string(),
             Box::new(decoder::coin_upgrade_supply),
+        );
+        map.insert(
+            "compiler_id_config_set_disallow_list".to_string(),
+            Box::new(decoder::compiler_id_config_set_disallow_list),
         );
         map.insert(
             "delegation_pool_add_stake".to_string(),

@@ -130,6 +130,7 @@ module aptos_framework::genesis {
         block::initialize(&aptos_framework_account, epoch_interval_microsecs);
         state_storage::initialize(&aptos_framework_account);
         timestamp::set_time_has_started(&aptos_framework_account);
+        compiler_id_config::initialize(&aptos_framework_account);
     }
 
     /// Genesis step 2: Initialize Aptos coin.
@@ -381,6 +382,7 @@ module aptos_framework::genesis {
 
     #[verify_only]
     use std::features;
+    use aptos_framework::compiler_id_config;
 
     #[verify_only]
     fun initialize_for_verification(
