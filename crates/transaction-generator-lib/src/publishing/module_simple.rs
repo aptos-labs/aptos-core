@@ -228,6 +228,8 @@ pub enum EntryPoints {
     /// Burn an NFT token, only works with numbered=false tokens.
     TokenV2AmbassadorBurn,
 
+    TokenMinterMint,
+
     InitializeVectorPicture {
         length: u64,
     },
@@ -286,6 +288,7 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
+            EntryPoints::TokenMinterMint => "minter",
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
@@ -339,6 +342,10 @@ impl EntryPoints {
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. } => "vector_picture",
+            EntryPoints::TokenMinterMint => "token_minter",
+            EntryPoints::InitializeVectorPicture { .. } | EntryPoints::VectorPicture { .. } => {
+                "vector_picture"
+            },
             EntryPoints::InitializeSmartTablePicture | EntryPoints::SmartTablePicture { .. } => {
                 "smart_table_picture"
             },
@@ -576,6 +583,37 @@ impl EntryPoints {
                 ident_str!("burn_named_by_user").to_owned(),
                 vec![],
             ),
+            EntryPoints::TokenMinterMint => {
+                // Set this to an address with a deployed `token_minter`
+                let module_id = ModuleId::new(
+                    AccountAddress::from_hex_literal("0x0fbcdf3888f673c2860b9b7a6e68deb6606a950e7b4865d905d6886f0890e222").unwrap(),
+                    Identifier::new("token_minter").unwrap()
+                );
+                // Set this to a Object<TokenMinter>
+                let token_minter_addr = "0xc9245297280bfc1118448e72d277bcaa50aa8dcdf2eafcfc2f538bf61299744c";
+
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let random_addr_string = format!("0x{:0>64}", format!("{:x}", rng.gen_range(0u64, 2147483646u64)));
+                let property_keys: Vec<Vec<String>> = vec![vec!["foo".to_string()]];
+                let property_types: Vec<Vec<String>> = vec![vec!["0x1::string::String".to_string()]];
+                let property_values: Vec<Vec<Vec<u8>>> = vec![vec![bcs::to_bytes(&"bar").unwrap()]];
+                let recipient_addrs = vec![AccountAddress::from_hex_literal(&random_addr_string).unwrap()];
+                get_payload(
+                        module_id,
+                    ident_str!("mint_tokens").to_owned(),
+                    vec![
+                        bcs::to_bytes(&AccountAddress::from_hex_literal(token_minter_addr).unwrap()).unwrap(),
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // name
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                        bcs::to_bytes(&1u64).unwrap(),                  // amount
+                        bcs::to_bytes(&property_keys).unwrap(),         // property_keys
+                        bcs::to_bytes(&property_types).unwrap(),        // property_types
+                        bcs::to_bytes(&property_values).unwrap(),       // property_values
+                        bcs::to_bytes(&recipient_addrs).unwrap(),       // recipient
+                    ],
+                )
+            },
             EntryPoints::InitializeVectorPicture { length } => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![
                     bcs::to_bytes(&length).unwrap(), // length
@@ -701,6 +739,7 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 AutomaticArgs::SignerAndMultiSig
             },
+            EntryPoints::TokenMinterMint => AutomaticArgs::Signer,
             EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
             EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
                 AutomaticArgs::None

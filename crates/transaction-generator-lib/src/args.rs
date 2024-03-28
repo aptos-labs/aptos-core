@@ -55,6 +55,7 @@ pub enum TransactionTypeArg {
     TokenV2AmbassadorMint,
     TokenV2AmbassadorMintAndBurn1M,
     VectorPictureCreate30k,
+    TokenMinterMint,
     VectorPicture30k,
     VectorPictureRead30k,
     VectorPictureCreate40,
@@ -340,6 +341,11 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::VectorPictureCreate30k => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::InitializeVectorPicture { length: 30 * 1024 },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::TokenMinterMint => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::TokenMinterMint,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
