@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@aptos-labs/ts-sdk": "^1.0.0",
+    "@aptos-labs/ts-sdk": "^1.7.0",
     "@aptos-labs/wallet-adapter-ant-design": "^0.1.0",
     "@aptos-labs/wallet-adapter-react": "^2.1.2",
     "@testing-library/jest-dom": "^5.16.5",
