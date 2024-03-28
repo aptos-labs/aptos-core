@@ -7,5 +7,6 @@
 
 mod intern_table;
 pub mod runtime_types;
+mod tuple_helper;
 
 pub use intern_table::IndexMap;

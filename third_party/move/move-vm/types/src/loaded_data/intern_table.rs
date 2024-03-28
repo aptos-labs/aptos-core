@@ -4,11 +4,11 @@
 
 use boxcar::Vec as CVec;
 use dashmap::{mapref::entry::Entry, DashMap};
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, borrow::Borrow};
 
 #[derive(Debug)]
 pub struct IndexMap<K: Debug + Hash + Eq> {
-    map: DashMap<K, usize>,
+    pub(crate) map: DashMap<K, usize>,
     entries: CVec<K>,
 }
 
@@ -33,6 +33,14 @@ impl<K: Eq + Hash + Clone + Debug> IndexMap<K> {
 
     pub fn get_by_index(&self, index: usize) -> &K {
         &self.entries[index]
+    }
+
+    pub fn get<Q>(&self, key: &Q) -> Option<usize>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq + ?Sized,
+    {
+        self.map.get(key).map(|idx| *idx)
     }
 }
 

@@ -5,6 +5,8 @@
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
 use crate::loaded_data::IndexMap;
+use super::tuple_helper::KeyPair;
+use dashmap::DashMap;
 use derivative::Derivative;
 use move_binary_format::{
     binary_views::BinaryIndexedView,
@@ -209,6 +211,7 @@ pub struct TypeContext {
     identifier_cache: IndexMap<StructIdentifier>,
     instantiation_map: IndexMap<(StructNameIndex, Vec<Type>)>,
     type_id_map: IndexMap<Type>,
+    type_inst: DashMap<(StructInstantiationIndex, Vec<Type>), StructInstantiationIndex>,
 }
 
 pub struct TypePreorderTraversalIter<'a> {
@@ -314,6 +317,7 @@ impl TypeContext {
             identifier_cache: IndexMap::new(),
             instantiation_map: IndexMap::new(),
             type_id_map: IndexMap::new(),
+            type_inst: DashMap::new(),
         }
     }
 
@@ -461,14 +465,19 @@ impl TypeContext {
         depth: usize,
     ) -> PartialVMResult<StructInstantiationIndex> {
         let (struct_name, ty_inst) = self.instantiation_map.get_by_index(idx.0);
+        if let Some(result) = self.type_inst.get(&(&idx, ty_args) as &dyn KeyPair) {
+            return Ok(*result);
+        }
         let substituted_tys = ty_inst
             .iter()
             .map(|ty| self.subst_impl(ty, ty_args, depth))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        Ok(StructInstantiationIndex(
+        let idx = StructInstantiationIndex(
             self.instantiation_map
                 .get_or_insert((*struct_name, substituted_tys)),
-        ))
+        );
+        self.type_inst.insert((idx, ty_args.to_vec()), idx);
+        Ok(idx)
     }
 
     pub fn from_const_signature(
