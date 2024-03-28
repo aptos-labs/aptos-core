@@ -76,7 +76,6 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
     }
 
     async fn listener_thread(mut self, mut sockets: <TTransport>::Listener, executor: Handle) {
-        // TODO: leave some connection that can close and shutdown this listener?
         info!("listener_thread start");
         loop {
             let (conn_fut, remote_addr) = match sockets.next().await {
@@ -141,7 +140,6 @@ impl<TTransport, TSocket> PeerListener<TTransport, TSocket>
     fn check_new_inbound_connection(&mut self, conn: &Connection<TSocket>) -> bool {
         // Everything below here is meant for unknown peers only. The role comes from
         // the Noise handshake and if it's not `Unknown` then it is trusted.
-        // TODO: do more checking for 'trusted' peers
         if conn.metadata.role != PeerRole::Unknown {
             return true;
         }
