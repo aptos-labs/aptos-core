@@ -19,7 +19,7 @@ fn missing_gas_parameter() {
     });
 
     // Load the code
-    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xbeef").unwrap());
+    let acc = h.new_account_with_balance_at(AccountAddress::from_hex_literal("0xbeef").unwrap(), 0);
     let txn_status = h.publish_package(&acc, &common::test_dir_path("common.data/do_nothing"));
     assert!(matches!(
         txn_status,

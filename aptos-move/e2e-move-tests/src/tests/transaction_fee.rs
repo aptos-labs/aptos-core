@@ -131,7 +131,7 @@ impl TestUniverse {
     }
 
     /// Returns the total supply of AptosCoin in the universe.
-    pub fn read_total_supply(&self) -> u128 {
+    pub fn read_total_supply(&mut self) -> u128 {
         self.harness.executor.read_coin_supply().unwrap()
     }
 }

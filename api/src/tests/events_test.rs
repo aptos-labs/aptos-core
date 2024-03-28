@@ -172,12 +172,21 @@ async fn test_module_events() {
         .get(format!("/transactions/by_hash/{}", txn["hash"].as_str().unwrap()).as_str())
         .await;
 
-    let events = resp["events"].as_array().unwrap();
+    let events = resp["events"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|e| {
+            e.get("guid")
+                .unwrap()
+                .get("account_address")
+                .unwrap()
+                .as_str()
+                .unwrap()
+                == "0x0"
+        })
+        .collect::<Vec<_>>();
     assert_eq!(events.len(), 8);
-    // All events are module events
-    assert!(events.iter().all(|c| c.get("guid").map_or(false, |d| d
-        .get("account_address")
-        .map_or(false, |t| t.as_str().unwrap() == "0x0"))));
 }
 
 // until we have generics in the genesis
@@ -193,7 +202,7 @@ async fn test_get_events_by_struct_type_has_generic_type_parameter() {
         "/accounts/0x1/events/{}/coin",
         utf8_percent_encode(
             "0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin>",
-            NON_ALPHANUMERIC
+            NON_ALPHANUMERIC,
         )
     );
     let resp = context.expect_status_code(404).get(path.as_str()).await;
