@@ -53,6 +53,7 @@ fn compile_and_run_samples(
     for dir_path in dir_paths {
         // configure and build Move package
         let build_options = BuildOptions {
+            dev: true,
             with_srcs: true,
             with_abis: true,
             with_source_maps: true,

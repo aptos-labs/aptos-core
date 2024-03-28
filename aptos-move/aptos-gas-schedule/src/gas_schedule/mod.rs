@@ -27,7 +27,9 @@ pub mod gas_params {
 
     pub mod natives {
         use super::*;
-        pub use aptos_framework::gas_params as aptos_framework;
+        pub mod aptos_framework {
+            pub use super::super::aptos_framework::{dummy_gas_params::*, gas_params::*};
+        }
         pub use move_stdlib::gas_params as move_stdlib;
         pub use table::gas_params as table;
     }
