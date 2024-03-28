@@ -17,7 +17,7 @@ kubernetes = "^26.1.0"
 kubernetes-stubs = "^22.6.0.post1"
 
 [tool.poetry.group.dev.dependencies]
-black = "^23.3.0"
+black = "^24.3.0"
 pyright = "^1.1.309"
 isort = "^5.12.0"
 
