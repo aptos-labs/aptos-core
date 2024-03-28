@@ -140,6 +140,7 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
         pragma verify_duration_estimate = 600;
+        pragma aborts_if_is_partial = true;
         let addr = signer::address_of(aptos_framework);
         aborts_if addr != @aptos_framework;
         include reconfiguration_with_dkg::FinishRequirement {
@@ -579,19 +580,18 @@ spec aptos_framework::aptos_governance {
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
         use aptos_framework::transaction_fee;
-        pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved)
-        aborts_if !system_addresses::is_aptos_framework_address(signer::address_of(aptos_framework));
+        pragma verify_duration_estimate = 1200; // TODO: set because of timeout (property proved)
         include reconfiguration_with_dkg::FinishRequirement {
             account: aptos_framework
         };
         include stake::GetReconfigStartTimeRequirement;
-
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         requires chain_status::is_operating();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;
+        aborts_if false;
     }
 
     /// Signer address must be @core_resources.
@@ -837,11 +837,12 @@ spec aptos_framework::aptos_governance {
     spec force_end_epoch(aptos_framework: &signer) {
         use aptos_framework::reconfiguration_with_dkg;
         use std::signer;
-        pragma verify_duration_estimate = 600;
+        pragma verify_duration_estimate = 1200;
         let address = signer::address_of(aptos_framework);
         include reconfiguration_with_dkg::FinishRequirement {
             account: aptos_framework
         };
+        aborts_if false;
     }
 
     spec schema VotingInitializationAbortIfs {

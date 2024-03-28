@@ -51,7 +51,6 @@ spec aptos_framework::reconfiguration_state {
         use aptos_std::type_info;
         use std::bcs;
         aborts_if false;
-        requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let state = Any {
             type_name: type_info::type_name<StateActive>(),
             data: bcs::serialize(StateActive {
@@ -67,6 +66,10 @@ spec aptos_framework::reconfiguration_state {
             == b"0x1::reconfiguration_state::StateInactive") ==> post_state.variant == state;
         ensures (exists<State>(@aptos_framework) && copyable_any::type_name(pre_state.variant).bytes
             == b"0x1::reconfiguration_state::StateInactive") ==> from_bcs::deserializable<StateActive>(post_state.variant.data);
+    }
+
+    spec on_reconfig_finish  {
+        aborts_if false;
     }
 
     spec start_time_secs(): u64 {
@@ -105,5 +108,4 @@ spec aptos_framework::reconfiguration_state {
         aborts_if copyable_any::type_name(global<State>(@aptos_framework).variant).bytes
             != b"0x1::reconfiguration_state::StateActive";
     }
-
 }

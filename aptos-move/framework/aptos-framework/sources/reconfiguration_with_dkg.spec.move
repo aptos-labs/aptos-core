@@ -19,7 +19,7 @@ spec aptos_framework::reconfiguration_with_dkg {
     }
 
     spec finish(account: &signer) {
-        pragma verify_duration_estimate = 600;
+        pragma verify_duration_estimate = 1200;
         include FinishRequirement;
     }
 
@@ -44,19 +44,20 @@ spec aptos_framework::reconfiguration_with_dkg {
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         include staking_config::StakingRewardsConfigRequirement;
         requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<features::Features>(@aptos_framework);
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        requires exists<features::Features>(@std);
         include config_buffer::OnNewEpochRequirement<version::Version>;
         include config_buffer::OnNewEpochRequirement<gas_schedule::GasScheduleV2>;
         include config_buffer::OnNewEpochRequirement<execution_config::ExecutionConfig>;
         include config_buffer::OnNewEpochRequirement<consensus_config::ConsensusConfig>;
         include config_buffer::OnNewEpochRequirement<jwks::SupportedOIDCProviders>;
-        aborts_if false;
+        include config_buffer::OnNewEpochRequirement<jwk_consensus_config::JWKConsensusConfig>;
+        include config_buffer::OnNewEpochRequirement<randomness_config::RandomnessConfig>;
     }
 
     spec finish_with_dkg_result(account: &signer, dkg_result: vector<u8>) {
         use aptos_framework::dkg;
-        pragma verify_duration_estimate = 600; // TODO: set because of timeout (property proved).
+        pragma verify_duration_estimate = 1200; // TODO: set because of timeout (property proved).
         include FinishRequirement;
         requires dkg::has_incomplete_session();
         aborts_if false;

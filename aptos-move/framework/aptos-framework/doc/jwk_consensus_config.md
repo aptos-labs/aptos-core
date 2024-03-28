@@ -17,6 +17,8 @@ Structs and functions related to JWK consensus configurations.
 -  [Function `new_off`](#0x1_jwk_consensus_config_new_off)
 -  [Function `new_v1`](#0x1_jwk_consensus_config_new_v1)
 -  [Function `new_oidc_provider`](#0x1_jwk_consensus_config_new_oidc_provider)
+-  [Specification](#@Specification_1)
+    -  [Function `on_new_epoch`](#@Specification_1_on_new_epoch)
 
 
 <pre><code><b>use</b> <a href="config_buffer.md#0x1_config_buffer">0x1::config_buffer</a>;
@@ -344,6 +346,25 @@ Construct an <code><a href="jwk_consensus_config.md#0x1_jwk_consensus_config_OID
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_on_new_epoch"></a>
+
+### Function `on_new_epoch`
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="jwk_consensus_config.md#0x1_jwk_consensus_config_on_new_epoch">on_new_epoch</a>()
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="config_buffer.md#0x1_config_buffer_OnNewEpochAbortsIf">config_buffer::OnNewEpochAbortsIf</a>&lt;<a href="jwk_consensus_config.md#0x1_jwk_consensus_config_JWKConsensusConfig">JWKConsensusConfig</a>&gt;;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

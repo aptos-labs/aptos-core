@@ -64,6 +64,7 @@ spec aptos_framework::gas_schedule {
 
         /// [high-level-req-2]
         include system_addresses::AbortsIfNotAptosFramework{ account: aptos_framework };
+        aborts_if chain_status::is_operating();
         /// [high-level-req-3.2]
         aborts_if len(gas_schedule_blob) == 0;
         let new_gas_schedule = util::spec_from_bytes<GasScheduleV2>(gas_schedule_blob);

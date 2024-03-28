@@ -97,8 +97,6 @@ module aptos_framework::reconfiguration_state {
             let variant_type_name = *string::bytes(copyable_any::type_name(&state.variant));
             if (variant_type_name == b"0x1::reconfiguration_state::StateActive") {
                 state.variant = copyable_any::pack(StateInactive {});
-            } else {
-                abort(error::invalid_state(ERECONFIG_NOT_IN_PROGRESS))
             }
         }
     }
