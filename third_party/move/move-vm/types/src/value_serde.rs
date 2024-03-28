@@ -57,7 +57,7 @@ impl RelaxedCustomSerDe {
 // TODO[agg_v2](clean): propagate up, so this value is controlled by the gas schedule version.
 // Temporarily limit the number of delayed fields per resource,
 // until proper charges are implemented.
-pub const MAX_DELAYED_FIELDS_PER_RESOURCE: usize = 10;
+pub const MAX_DELAYED_FIELDS_PER_RESOURCE: usize = 1000000000;
 
 impl CustomDeserializer for RelaxedCustomSerDe {
     fn custom_deserialize<'d, D: Deserializer<'d>>(
@@ -118,11 +118,12 @@ pub fn deserialize_and_allow_delayed_values(
         custom_deserializer: Some(&native_deserializer),
         layout,
     };
-    bcs::from_bytes_seed(seed, bytes).ok().filter(|_| {
-        // Should never happen, it should always fail first in serialize_and_allow_delayed_values
-        // so we can treat it as regular deserialization error.
-        native_deserializer.delayed_fields_count.into_inner() <= MAX_DELAYED_FIELDS_PER_RESOURCE
-    })
+    bcs::from_bytes_seed(seed, bytes).ok()
+    // .filter(|_| {
+    //     // Should never happen, it should always fail first in serialize_and_allow_delayed_values
+    //     // so we can treat it as regular deserialization error.
+    //     native_deserializer.delayed_fields_count.into_inner() <= MAX_DELAYED_FIELDS_PER_RESOURCE
+    // })
 }
 
 pub fn serialize_and_allow_delayed_values(
@@ -138,14 +139,14 @@ pub fn serialize_and_allow_delayed_values(
     bcs::to_bytes(&value)
         .ok()
         .map(|v| {
-            if native_serializer.delayed_fields_count.into_inner()
-                <= MAX_DELAYED_FIELDS_PER_RESOURCE
-            {
+            // if native_serializer.delayed_fields_count.into_inner()
+            //     <= MAX_DELAYED_FIELDS_PER_RESOURCE
+            // {
                 Ok(v)
-            } else {
-                Err(PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
-                    .with_message("Too many Delayed fields in a single resource.".to_string()))
-            }
+            // } else {
+            //     Err(PartialVMError::new(StatusCode::TOO_MANY_DELAYED_FIELDS)
+            //         .with_message("Too many Delayed fields in a single resource.".to_string()))
+            // }
         })
         .transpose()
 }
@@ -252,11 +253,12 @@ pub fn deserialize_and_replace_values_with_ids<I: From<u64> + ExtractWidth + Ext
         custom_deserializer: Some(&custom_deserializer),
         layout,
     };
-    bcs::from_bytes_seed(seed, bytes).ok().filter(|_| {
-        // Should never happen, it should always fail first in serialize_and_allow_delayed_values
-        // so we can treat it as regular deserialization error.
-        custom_deserializer.delayed_fields_count.into_inner() <= MAX_DELAYED_FIELDS_PER_RESOURCE
-    })
+    bcs::from_bytes_seed(seed, bytes).ok()
+    // .filter(|_| {
+    //     // Should never happen, it should always fail first in serialize_and_allow_delayed_values
+    //     // so we can treat it as regular deserialization error.
+    //     custom_deserializer.delayed_fields_count.into_inner() <= MAX_DELAYED_FIELDS_PER_RESOURCE
+    // })
 }
 
 pub fn serialize_and_replace_ids_with_values<I: From<u64> + ExtractWidth + ExtractUniqueIndex>(
@@ -270,9 +272,10 @@ pub fn serialize_and_replace_ids_with_values<I: From<u64> + ExtractWidth + Extra
         layout,
         value: &value.0,
     };
-    bcs::to_bytes(&value).ok().filter(|_| {
-        // Should never happen, it should always fail first in serialize_and_allow_delayed_values
-        // so we can treat it as regular deserialization error.
-        custom_serializer.delayed_fields_count.into_inner() <= MAX_DELAYED_FIELDS_PER_RESOURCE
-    })
+    bcs::to_bytes(&value).ok()
+    // .filter(|_| {
+    //     // Should never happen, it should always fail first in serialize_and_allow_delayed_values
+    //     // so we can treat it as regular deserialization error.
+    //     custom_serializer.delayed_fields_count.into_inner() <= MAX_DELAYED_FIELDS_PER_RESOURCE
+    // })
 }

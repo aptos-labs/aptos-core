@@ -913,6 +913,7 @@ where
 
         counters::update_state_counters(versioned_cache.stats(), true);
 
+        // drop((last_input_output, scheduler, versioned_cache));
         // Explicit async drops.
         DEFAULT_DROPPER.schedule_drop((last_input_output, scheduler, versioned_cache));
 

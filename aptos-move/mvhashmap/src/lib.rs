@@ -20,6 +20,7 @@ pub mod versioned_data;
 pub mod versioned_delayed_fields;
 pub mod versioned_group_data;
 pub mod versioned_modules;
+mod size_test;
 
 #[cfg(test)]
 mod unit_tests;
@@ -61,6 +62,8 @@ impl<
     }
 
     pub fn stats(&self) -> BlockStateStats {
+        self.data.print_memory_details();
+        self.delayed_fields.print_memory_details();
         BlockStateStats {
             num_resources: self.data.num_keys(),
             num_resource_groups: self.group_data.num_keys(),

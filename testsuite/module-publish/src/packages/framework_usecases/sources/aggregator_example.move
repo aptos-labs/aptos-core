@@ -3,7 +3,9 @@
 module 0xABCD::aggregator_example {
     use std::error;
     use std::signer;
-    use aptos_framework::aggregator_v2::{Self, Aggregator};
+    use std::string::String;
+    use std::vector;
+    use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
 
     // Resource being modified doesn't exist
     const ECOUNTER_RESOURCE_NOT_PRESENT: u64 = 1;
@@ -19,6 +21,8 @@ module 0xABCD::aggregator_example {
 
     const ENOT_AUTHORIZED: u64 = 5;
 
+    const ENOT_INITIALIZED: u64 = 6;
+
     struct Counter has key {
         count: u64,
     }
@@ -29,6 +33,14 @@ module 0xABCD::aggregator_example {
 
     struct BoundedAggV2 has key {
         count: Aggregator<u64>,
+    }
+
+    struct StringVector has key {
+        vec: vector<DerivedStringSnapshot>,
+    }
+
+    struct SnapshotVector has key {
+        vec: vector<AggregatorSnapshot<u64>>,
     }
 
     // Create the global `Counter`.
@@ -73,5 +85,53 @@ module 0xABCD::aggregator_example {
         } else {
             aggregator_v2::try_sub(&mut bounded.count, delta);
         }
+    }
+
+    public entry fun populate_or_read_string(user: &signer, length: u64, value: String) acquires StringVector {
+        let user_address = signer::address_of(user);
+
+        if (exists<StringVector>(user_address)) {
+            let _vec = borrow_global_mut<StringVector>(user_address);
+        } else {
+            // Build vec and palette.
+            let vec = vector::empty();
+            let i = 0;
+            while (i < length) {
+                vector::push_back(&mut vec, aggregator_v2::create_derived_string(value));
+                i = i + 1;
+            };
+            move_to<StringVector>(user, StringVector { vec });
+        }
+    }
+
+    public entry fun read_string(user: &signer) acquires StringVector {
+        let user_address = signer::address_of(user);
+
+        assert!(exists<StringVector>(user_address), error::invalid_argument(ENOT_INITIALIZED));
+        let _vec = borrow_global<StringVector>(user_address);
+    }
+
+    public entry fun populate_or_read_u64_snapshot(user: &signer, length: u64) acquires SnapshotVector {
+        let user_address = signer::address_of(user);
+
+        if (exists<SnapshotVector>(user_address)) {
+            let _vec = borrow_global_mut<SnapshotVector>(user_address);
+        } else {
+            // Build vec and palette.
+            let vec = vector::empty();
+            let i = 0;
+            while (i < length) {
+                vector::push_back(&mut vec, aggregator_v2::create_snapshot(17));
+                i = i + 1;
+            };
+            move_to<SnapshotVector>(user, SnapshotVector { vec });
+        }
+    }
+
+    public entry fun read_u64_snapshot(user: &signer) acquires SnapshotVector {
+        let user_address = signer::address_of(user);
+
+        assert!(exists<SnapshotVector>(user_address), error::invalid_argument(ENOT_INITIALIZED));
+        let _vec = borrow_global<SnapshotVector>(user_address);
     }
 }

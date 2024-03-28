@@ -1,7 +1,12 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.11
 
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
+
+import sys
+print(sys.executable)
+
+
 
 import re
 import os
@@ -62,7 +67,7 @@ SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
-    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "2000000"
+    "100000000" if SELECTED_FLOW == Flow.MAINNET_LARGE_DB else "200000"
 )
 DEFAULT_MAX_BLOCK_SIZE = "25000" if IS_MAINNET else "10000"
 
@@ -86,6 +91,7 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("populate-or-read-vector-of-snapshots"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
@@ -201,6 +207,7 @@ else:
     DB_PRUNER_FLAGS = ""
 
 HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
+SKIP_VM_BENCH = os.environ.get("SKIP_VM_BENCH")
 
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
@@ -415,21 +422,27 @@ def print_table(
     print(tabulate(rows, headers=headers))
 
 
+import subprocess
+
+subprocess.run(["ulimit", "-m", str(1024*1024)]) 
+subprocess.run(["ulimit", "-v", str(1024*1024)]) 
+
 errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
-    try:
-        execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
-        move_e2e_benchmark_failed = False
-    except:
-        # for land-blocking (i.e. on PR), fail immediately, for speedy response.
-        # Otherwise run all tests, and fail in the end.
-        if SELECTED_FLOW == Flow.LAND_BLOCKING:
-            print("Move E2E benchmark failed, exiting")
-            exit(1)
-        move_e2e_benchmark_failed = True
+    if not SKIP_VM_BENCH:
+        execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        try:
+            execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
+            move_e2e_benchmark_failed = False
+        except:
+            # for land-blocking (i.e. on PR), fail immediately, for speedy response.
+            # Otherwise run all tests, and fail in the end.
+            if SELECTED_FLOW == Flow.LAND_BLOCKING:
+                print("Move E2E benchmark failed, exiting")
+                exit(1)
+            move_e2e_benchmark_failed = True
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")

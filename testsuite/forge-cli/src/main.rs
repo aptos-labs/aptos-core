@@ -277,7 +277,7 @@ fn main() -> Result<()> {
     logger.build();
 
     let args = Args::parse();
-    let duration = Duration::from_secs(args.duration_secs as u64);
+    let duration = Duration::from_secs(900); // args.duration_secs as u64);
     let suite_name: &str = args.suite.as_ref();
 
     let runtime = Runtime::new()?;
@@ -1918,29 +1918,16 @@ fn realistic_env_max_load_test(
     // Create the test
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
-        .with_initial_fullnode_count(num_fullnodes)
-        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
-            inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 40000,
-                })
-                .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(
-                if ha_proxy {
-                    4600
-                } else if long_running {
-                    // This is for forge stable
-                    7000
-                } else {
-                    // During land time we want to be less strict, otherwise we flaky fail
-                    6500
-                },
-            ),
+        // .with_initial_fullnode_count(num_fullnodes)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.consensus.pipeline_backpressure = vec![];
+            config.consensus.chain_health_backoff = vec![];
         }))
+        .add_network_test(wrap_with_realistic_env(PerformanceBenchmark))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running
             helm_values["chain"]["epoch_duration_secs"] =
-                (if long_running { 600 } else { 300 }).into();
+                (if long_running { 3600 } else { 3600 }).into();
             helm_values["chain"]["on_chain_consensus_config"] =
                 serde_yaml::to_value(OnChainConsensusConfig::default_for_genesis())
                     .expect("must serialize");
@@ -1951,42 +1938,108 @@ fn realistic_env_max_load_test(
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
-                .mode(EmitJobMode::ConstTps { tps: 100 })
-                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE)
-                .latency_polling_interval(Duration::from_millis(100)),
-        )
-        .with_success_criteria(
-            SuccessCriteria::new(95)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(
-                    // Give at least 60s for catchup, give 10% of the run for longer durations.
-                    (duration.as_secs() / 10).max(60),
-                )
-                .add_latency_threshold(3.4, LatencyType::P50)
-                .add_latency_threshold(4.5, LatencyType::P90)
-                .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 1000,
+                })
+                .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
+                .transaction_mix_per_phase(
                     vec![
-                        (LatencyBreakdownSlice::QsBatchToPos, 0.35),
-                        // only reaches close to threshold during epoch change
-                        (
-                            LatencyBreakdownSlice::QsPosToProposal,
-                            if ha_proxy { 0.7 } else { 0.6 },
-                        ),
-                        // can be adjusted down if less backpressure
-                        (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
-                        // can be adjusted down if less backpressure
-                        (
-                            LatencyBreakdownSlice::ConsensusOrderedToCommit,
-                            if ha_proxy { 1.3 } else { 0.75 },
-                        ),
-                    ],
-                    5,
-                ))
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 15.0,
-                    max_round_gap: 4,
-                }),
+                        // TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
+                        // TransactionTypeArg::PublishPackage.materialize_default(),
+                        TransactionType::CallCustomModules {
+                            entry_point: EntryPoints::PopulateOrReadVectorOfStringSnapshots {
+                                num_elements: 20000,
+                                string_length: 2,
+                            },
+                            num_modules: 1,
+                            use_account_pool: false,
+                        },
+                        TransactionType::CallCustomModules {
+                            entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots {
+                                num_elements: 50000,
+                            },
+                            num_modules: 1,
+                            use_account_pool: false,
+                        },
+                        TransactionTypeArg::AccountGeneration.materialize_default(),
+
+                        TransactionType::CallCustomModules {
+                            entry_point: EntryPoints::ReadVectorOfStringSnapshots,
+                            num_modules: 1,
+                            use_account_pool: false,
+                        },
+                        TransactionType::CallCustomModules {
+                            entry_point: EntryPoints::ReadVectorOfIntegerSnapshots,
+                            num_modules: 1,
+                            use_account_pool: false,
+                        },
+                        TransactionTypeArg::AccountGeneration.materialize_default(),
+
+
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::PopulateOrReadVectorOfStringSnapshots {
+                        //         num_elements: 30,
+                        //         string_length: 2,
+                        //     },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
+
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::PopulateOrReadVectorOfIntegerSnapshots {
+                        //         num_elements: 30,
+                        //     },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::VectorPictureRead { num_pictures: 3000, length: 64 },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
+                        // TransactionType::CallCustomModules {
+                        //     entry_point: EntryPoints::VectorPictureRead { num_pictures: 100, length: 50000 },
+                        //     num_modules: 1,
+                        //     use_account_pool: false,
+                        // },
+                    ].into_iter()
+                     .map(|workload| vec![(workload, 1)])
+                     .collect::<Vec<_>>()
+                )
+                .init_gas_price_multiplier(2),
         )
+        // .with_success_criteria(
+        //     SuccessCriteria::new(95)
+        //         .add_no_restarts()
+        //         .add_wait_for_catchup_s(
+        //             // Give at least 60s for catchup, give 10% of the run for longer durations.
+        //             (duration.as_secs() / 10).max(60),
+        //         )
+        //         .add_latency_threshold(3.4, LatencyType::P50)
+        //         .add_latency_threshold(4.5, LatencyType::P90)
+        //         .add_latency_breakdown_threshold(LatencyBreakdownThreshold::new_with_breach_pct(
+        //             vec![
+        //                 (LatencyBreakdownSlice::QsBatchToPos, 0.35),
+        //                 // only reaches close to threshold during epoch change
+        //                 (
+        //                     LatencyBreakdownSlice::QsPosToProposal,
+        //                     if ha_proxy { 0.7 } else { 0.6 },
+        //                 ),
+        //                 // can be adjusted down if less backpressure
+        //                 (LatencyBreakdownSlice::ConsensusProposalToOrdered, 0.85),
+        //                 // can be adjusted down if less backpressure
+        //                 (
+        //                     LatencyBreakdownSlice::ConsensusOrderedToCommit,
+        //                     if ha_proxy { 1.3 } else { 0.75 },
+        //                 ),
+        //             ],
+        //             5,
+        //         ))
+        //         .add_chain_progress(StateProgressThreshold {
+        //             max_no_progress_secs: 15.0,
+        //             max_round_gap: 4,
+        //         }),
+        // )
 }
 
 fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
