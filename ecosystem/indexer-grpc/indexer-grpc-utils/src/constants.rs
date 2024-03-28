@@ -17,9 +17,8 @@ pub const MESSAGE_SIZE_LIMIT: usize = 1024 * 1024 * 15;
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct IndexerGrpcRequestMetadata {
     pub processor_name: String,
-    pub request_email: String,
-    pub request_user_classification: String,
-    pub request_api_key_name: String,
+    /// See `REQUEST_HEADER_APTOS_IDENTIFIER` for more information.
+    pub request_identifier: String,
     pub request_connection_id: String,
     // Token is no longer needed behind api gateway.
     #[deprecated]
