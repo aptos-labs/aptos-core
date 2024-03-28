@@ -66,7 +66,7 @@ use aptos_types::{
     },
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use aptos_utils::{aptos_try, return_on_failure};
+use aptos_utils::return_on_failure;
 use aptos_vm_logging::{log_schema::AdapterLogSchema, speculative_error, speculative_log};
 use aptos_vm_types::{
     abstract_write_op::AbstractResourceWriteOp,
@@ -906,60 +906,6 @@ impl AptosVM {
         EpilogueSession::new(self, txn_data, resolver, change_set, storage_refund)
     }
 
-    fn simulate_multisig_transaction<'a, 'r, 'l>(
-        &'l self,
-        resolver: &'r impl AptosMoveResolver,
-        mut session: UserSession<'r, 'l>,
-        gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        txn_data: &TransactionMetadata,
-        payload: &'a Multisig,
-        log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        match &payload.transaction_payload {
-            None => Err(VMStatus::error(StatusCode::MISSING_DATA, None)),
-            Some(multisig_payload) => {
-                match multisig_payload {
-                    MultisigTransactionPayload::EntryFunction(entry_function) => {
-                        aptos_try!({
-                            return_on_failure!(session.execute(|session| self
-                                .execute_multisig_entry_function(
-                                    resolver,
-                                    session,
-                                    gas_meter,
-                                    traversal_context,
-                                    payload.multisig_address,
-                                    entry_function,
-                                    new_published_modules_loaded,
-                                )));
-                            // TODO: Deduplicate this against execute_multisig_transaction
-                            // A bit tricky since we need to skip success/failure cleanups,
-                            // which is in the middle. Introducing a boolean would make the code
-                            // messier.
-                            let epilogue_session = self.charge_change_set_and_respawn_session(
-                                session,
-                                resolver,
-                                gas_meter,
-                                change_set_configs,
-                                txn_data,
-                            )?;
-
-                            self.success_transaction_cleanup(
-                                epilogue_session,
-                                gas_meter,
-                                txn_data,
-                                log_context,
-                                change_set_configs,
-                            )
-                        })
-                    },
-                }
-            },
-        }
-    }
-
     // Execute a multisig transaction:
     // 1. Obtain the payload of the transaction to execute. This could have been stored on chain
     // when the multisig transaction was created.
@@ -1104,47 +1050,6 @@ impl AptosVM {
             log_context,
             change_set_configs,
         )
-    }
-
-    fn execute_or_simulate_multisig_transaction<'a, 'r, 'l>(
-        &'l self,
-        resolver: &'r impl AptosMoveResolver,
-        session: UserSession<'r, 'l>,
-        proglogue_change_set: &VMChangeSet,
-        gas_meter: &mut impl AptosGasMeter,
-        traversal_context: &mut TraversalContext<'a>,
-        txn_data: &TransactionMetadata,
-        payload: &'a Multisig,
-        log_context: &AdapterLogSchema,
-        new_published_modules_loaded: &mut bool,
-        change_set_configs: &ChangeSetConfigs,
-    ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if self.is_simulation {
-            self.simulate_multisig_transaction(
-                resolver,
-                session,
-                gas_meter,
-                traversal_context,
-                txn_data,
-                payload,
-                log_context,
-                new_published_modules_loaded,
-                change_set_configs,
-            )
-        } else {
-            self.execute_multisig_transaction(
-                resolver,
-                session,
-                proglogue_change_set,
-                gas_meter,
-                traversal_context,
-                txn_data,
-                payload,
-                log_context,
-                new_published_modules_loaded,
-                change_set_configs,
-            )
-        }
     }
 
     fn execute_multisig_entry_function(
@@ -1646,7 +1551,7 @@ impl AptosVM {
                     &mut new_published_modules_loaded,
                     change_set_configs,
                 ),
-            TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
+            TransactionPayload::Multisig(payload) => self.execute_multisig_transaction(
                 resolver,
                 user_session,
                 &prologue_change_set,
