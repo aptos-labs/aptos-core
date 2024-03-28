@@ -7,22 +7,24 @@ use crate::{
         error::Error,
         metadata::{ConnectionState, PeerMetadata},
     },
+    peer_manager::ConnectionNotification,
     transport::{ConnectionId, ConnectionMetadata},
-    ProtocolId,
+    DisconnectReason, ProtocolId,
 };
 use aptos_config::{
-    config::{Peer, PeerSet},
-    network_id::{NetworkId, PeerNetworkId},
+    config::{Peer, PeerSet, RoleType},
+    network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use arc_swap::ArcSwap;
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
     ops::Deref,
     sync::{Arc, RwLockWriteGuard},
 };
+use tokio::sync::mpsc::error::TrySendError;
 
 /// A simple container that tracks all peers and peer metadata for the node.
 /// This container is updated by both the networking code (e.g., for new
@@ -39,6 +41,11 @@ pub struct PeersAndMetadata {
     //
     // TODO: should we remove this when generational versioning is supported?
     cached_peers_and_metadata: Arc<ArcSwap<HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>>>,
+
+    subscribers: RwLock<Vec<tokio::sync::mpsc::Sender<ConnectionNotification>>>,
+
+    // NetworkContext when we only know the NetworkId
+    contexts: Arc<ArcSwap<BTreeMap<NetworkId, NetworkContext>>>,
 }
 
 impl PeersAndMetadata {
@@ -48,6 +55,8 @@ impl PeersAndMetadata {
             peers_and_metadata: RwLock::new(HashMap::new()),
             trusted_peers: HashMap::new(),
             cached_peers_and_metadata: Arc::new(ArcSwap::from(Arc::new(HashMap::new()))),
+	    subscribers: RwLock::new(vec![]),
+	    contexts: Arc::new(ArcSwap::new(Arc::new(BTreeMap::new()))),
         };
 
         // Initialize each network mapping and trusted peer set
@@ -188,12 +197,29 @@ impl PeersAndMetadata {
             .and_modify(|peer_metadata| {
                 peer_metadata.connection_metadata = connection_metadata.clone()
             })
-            .or_insert_with(|| PeerMetadata::new(connection_metadata));
+            .or_insert_with(|| PeerMetadata::new(connection_metadata.clone()));
 
         // Update the cached peers and metadata
         self.set_cached_peers_and_metadata(peers_and_metadata.clone());
 
+        let net_context = self.get_network_context(&peer_network_id.network_id());
+        let event = ConnectionNotification::NewPeer(connection_metadata, net_context);
+        self.broadcast(event);
+
         Ok(())
+    }
+
+    pub fn set_network_contexts(&self, contexts: BTreeMap<NetworkId, NetworkContext>) {
+        self.contexts.store(Arc::new(contexts));
+    }
+
+    // Return NetworkContext for a NetworkId, or fake-up something best effort because it's just for logging.
+    fn get_network_context(&self, network_id: &NetworkId) -> NetworkContext {
+        self.contexts
+            .load()
+            .get(network_id)
+            .cloned()
+            .unwrap_or_else(|| NetworkContext::new(RoleType::Validator, *network_id, PeerId::ZERO))
     }
 
     /// Removes the peer metadata from the container. If the peer
@@ -220,7 +246,16 @@ impl PeersAndMetadata {
             // have multiple connections for a peer
             let active_connection_id = entry.get().connection_metadata.connection_id;
             if active_connection_id == connection_id {
-                entry.remove()
+                let peer_metadata = entry.remove();
+                let nc = self.get_network_context(&peer_network_id.network_id());
+                // TODO: get some actual DisconnectReason in here?
+                let event = ConnectionNotification::LostPeer(
+                    peer_metadata.connection_metadata.clone(),
+                    nc,
+                    DisconnectReason::Requested,
+                );
+                self.broadcast(event);
+                peer_metadata
             } else {
                 return Err(Error::UnexpectedError(format!(
                     "The peer connection id did not match! Given: {:?}, found: {:?}.",
@@ -343,6 +378,46 @@ impl PeersAndMetadata {
         let trusted_peers = self.get_trusted_peer_set_for_network(network_id)?;
         trusted_peers.store(Arc::new(trusted_peer_set));
         Ok(())
+    }
+
+    fn broadcast(&self, event: ConnectionNotification) {
+        let mut listeners = self.subscribers.write();
+        let mut to_del = vec![];
+        for i in 0..listeners.len() {
+            let dest = listeners.get_mut(i).unwrap();
+            match dest.try_send(event.clone()) {
+                Ok(_) => {},
+                Err(err) => match err {
+                    TrySendError::Full(_) => {
+                        // meh, drop message, maybe counter?
+                    },
+                    TrySendError::Closed(_) => {
+                        to_del.push(i);
+                    },
+                },
+            }
+        }
+        for evict in to_del.into_iter() {
+            let llast = listeners.len() - 1;
+            if evict != llast {
+                listeners.swap(evict, llast);
+            }
+            listeners.pop();
+        }
+    }
+
+    pub fn subscribe(&self) -> tokio::sync::mpsc::Receiver<ConnectionNotification> {
+        let (sender, receiver) = tokio::sync::mpsc::channel(10); // TODO configure or name the constant or something
+        let mut listeners = self.subscribers.write();
+        listeners.push(sender);
+        receiver
+    }
+
+    #[cfg(test)]
+    pub fn close_subscribers(&self) {
+        let mut listeners = self.subscribers.write();
+        // drop all the senders to close them
+        listeners.clear();
     }
 
     #[cfg(test)]
