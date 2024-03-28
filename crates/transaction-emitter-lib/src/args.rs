@@ -70,8 +70,9 @@ pub struct ClusterArgs {
     #[clap(long, conflicts_with = "targets")]
     pub targets_file: Option<String>,
 
-    #[clap(long, default_value_t = ChainId::test())]
-    pub chain_id: ChainId,
+    // If the chain_id is not provided, it is derived from the targets.
+    #[clap(long)]
+    pub chain_id: Option<ChainId>,
 
     #[clap(flatten)]
     pub coin_source_args: CoinSourceArgs,
@@ -165,6 +166,9 @@ pub struct EmitArgs {
     pub max_gas_per_txn: Option<u64>,
 
     #[clap(long)]
+    pub init_max_gas_per_txn: Option<u64>,
+
+    #[clap(long)]
     pub init_gas_price_multiplier: Option<u64>,
 
     #[clap(long)]
@@ -174,7 +178,20 @@ pub struct EmitArgs {
     pub expected_gas_per_txn: Option<u64>,
 
     #[clap(long)]
+    pub expected_gas_per_transfer: Option<u64>,
+
+    #[clap(long)]
+    pub expected_gas_per_account_create: Option<u64>,
+
+    #[clap(long, conflicts_with = "num_accounts")]
     pub max_transactions_per_account: Option<usize>,
+
+    #[clap(long, conflicts_with = "max_transactions_per_account")]
+    pub num_accounts: Option<usize>,
+
+    #[clap(long, default_value = "false")]
+    /// Skip minting account during initialization
+    pub skip_minting_accounts: bool,
 
     #[clap(long)]
     pub latency_polling_interval_s: Option<f32>,

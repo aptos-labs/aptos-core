@@ -22,9 +22,9 @@ use aptos_types::{
 };
 use lru::LruCache;
 use move_binary_format::file_format::CompiledModule;
+use move_core_types::language_storage::ModuleId;
 use std::{
     collections::HashMap,
-    ops::DerefMut,
     sync::{Arc, Mutex},
 };
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -34,6 +34,7 @@ pub struct FilterCondition {
     pub skip_failed_txns: bool,
     pub skip_publish_txns: bool,
     pub check_source_code: bool,
+    pub target_account: Option<AccountAddress>,
 }
 
 // TODO(skedia) Clean up this interfact to remove account specific logic and move to state store
@@ -63,6 +64,14 @@ pub trait AptosValidatorInterface: Sync {
         start: Version,
         limit: u64,
         filter_condition: FilterCondition,
+        package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
     ) -> Result<
         Vec<(
             u64,
@@ -151,7 +160,6 @@ pub struct DebuggerStateView {
         )>,
     >,
     version: Version,
-    data_read_state_keys: Option<Arc<Mutex<HashMap<StateKey, StateValue>>>>,
 }
 
 async fn handler_thread<'a>(
@@ -201,20 +209,6 @@ impl DebuggerStateView {
         Self {
             query_sender: Mutex::new(query_sender),
             version,
-            data_read_state_keys: None,
-        }
-    }
-
-    pub fn new_with_data_reads(
-        db: Arc<dyn AptosValidatorInterface + Send>,
-        version: Version,
-    ) -> Self {
-        let (fake_query_sender, thread_receiver) = unbounded_channel();
-        tokio::spawn(async move { handler_thread(db, thread_receiver).await });
-        Self {
-            query_sender: Mutex::new(fake_query_sender),
-            version,
-            data_read_state_keys: Some(Arc::new(Mutex::new(HashMap::new()))),
         }
     }
 
@@ -228,28 +222,7 @@ impl DebuggerStateView {
         query_handler_locked
             .send((state_key.clone(), version, tx))
             .unwrap();
-        let ret = rx.recv()?;
-        if let Some(reads) = &self.data_read_state_keys {
-            if !reads.lock().unwrap().contains_key(state_key) && ret.is_ok() {
-                let val = ret?.clone();
-                if val.is_some() {
-                    reads
-                        .lock()
-                        .unwrap()
-                        .deref_mut()
-                        .insert(state_key.clone(), val.clone().unwrap());
-                }
-                Ok(val)
-            } else {
-                ret
-            }
-        } else {
-            ret
-        }
-    }
-
-    pub fn get_state_keys(self) -> Arc<Mutex<HashMap<StateKey, StateValue>>> {
-        self.data_read_state_keys.unwrap()
+        rx.recv()?
     }
 }
 

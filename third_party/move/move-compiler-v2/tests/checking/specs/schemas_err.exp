@@ -1,10 +1,18 @@
 
 Diagnostics:
-error: undeclared `M::x`
+error: undeclared `x`
   ┌─ tests/checking/specs/schemas_err.move:4:17
   │
 4 │         ensures x > 0;
   │                 ^
+
+note: unused schema M::UndeclaredVar
+  ┌─ tests/checking/specs/schemas_err.move:3:5
+  │
+3 │ ╭     spec schema UndeclaredVar {
+4 │ │         ensures x > 0;
+5 │ │     }
+  │ ╰─────^
 
 error: schema `M::Undeclared` undeclared
   ┌─ tests/checking/specs/schemas_err.move:8:17
@@ -12,11 +20,27 @@ error: schema `M::Undeclared` undeclared
 8 │         include Undeclared;
   │                 ^^^^^^^^^^
 
+note: unused schema M::UndeclaredSchema
+  ┌─ tests/checking/specs/schemas_err.move:7:5
+  │
+7 │ ╭     spec schema UndeclaredSchema {
+8 │ │         include Undeclared;
+9 │ │     }
+  │ ╰─────^
+
 error: wrong number of type arguments (expected 1, got 2)
    ┌─ tests/checking/specs/schemas_err.move:12:17
    │
 12 │         include WrongTypeArgsIncluded<num, num>;
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: unused schema M::WrongTypeArgs
+   ┌─ tests/checking/specs/schemas_err.move:11:5
+   │
+11 │ ╭     spec schema WrongTypeArgs {
+12 │ │         include WrongTypeArgsIncluded<num, num>;
+13 │ │     }
+   │ ╰─────^
 
 error: `wrong` not declared in schema
    ┌─ tests/checking/specs/schemas_err.move:19:44
@@ -24,29 +48,72 @@ error: `wrong` not declared in schema
 19 │         include WrongTypeArgsIncluded<num>{wrong: 1};
    │                                            ^^^^^
 
-error: expected `num` but found `bool`
+note: unused schema M::WrongRenaming
+   ┌─ tests/checking/specs/schemas_err.move:18:5
+   │
+18 │ ╭     spec schema WrongRenaming {
+19 │ │         include WrongTypeArgsIncluded<num>{wrong: 1};
+20 │ │     }
+   │ ╰─────^
+
+error: expected `num` but found a value of type `bool`
    ┌─ tests/checking/specs/schemas_err.move:24:47
    │
 24 │         include WrongTypeArgsIncluded<num>{x: y};
    │                                               ^
 
-error: expected `bool` but found `num`
+note: unused schema M::WrongTypeAfterRenaming
+   ┌─ tests/checking/specs/schemas_err.move:22:5
+   │
+22 │ ╭     spec schema WrongTypeAfterRenaming {
+23 │ │         y: bool;
+24 │ │         include WrongTypeArgsIncluded<num>{x: y};
+25 │ │     }
+   │ ╰─────^
+
+error: expected `bool` but found a value of type `num`
    ┌─ tests/checking/specs/schemas_err.move:28:48
    │
 28 │         include WrongTypeArgsIncluded<bool>{x: 1 + 2};
    │                                                ^^^^^
 
-error: expected `bool` but found `num` (for `x` included from schema)
+note: unused schema M::WrongTypeAfterRenamingExp
+   ┌─ tests/checking/specs/schemas_err.move:27:5
+   │
+27 │ ╭     spec schema WrongTypeAfterRenamingExp {
+28 │ │         include WrongTypeArgsIncluded<bool>{x: 1 + 2};
+29 │ │     }
+   │ ╰─────^
+
+error: variable `x` bound by schema inclusion expected to have type `bool` but provided was `num`
    ┌─ tests/checking/specs/schemas_err.move:33:17
    │
 33 │         include WronglyTypedVarIncluded;
    │                 ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `bool` but found `num` (for `x` included from schema)
+note: unused schema M::WronglyTypedVar
+   ┌─ tests/checking/specs/schemas_err.move:31:5
+   │
+31 │ ╭     spec schema WronglyTypedVar {
+32 │ │         x: bool;
+33 │ │         include WronglyTypedVarIncluded;
+34 │ │     }
+   │ ╰─────^
+
+error: variable `x` bound by schema inclusion expected to have type `bool` but provided was `num`
    ┌─ tests/checking/specs/schemas_err.move:41:17
    │
 41 │         include WronglyTypedInstantiationIncluded<num>;
    │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: unused schema M::WronglyTypedInstantiation
+   ┌─ tests/checking/specs/schemas_err.move:39:5
+   │
+39 │ ╭     spec schema WronglyTypedInstantiation {
+40 │ │         x: bool;
+41 │ │         include WronglyTypedInstantiationIncluded<num>;
+42 │ │     }
+   │ ╰─────^
 
 error: `y` cannot be matched to an existing name in inclusion context
    ┌─ tests/checking/specs/schemas_err.move:52:17
@@ -66,7 +133,7 @@ error: cyclic schema dependency: Cycle1 -> Cycle2 -> Cycle3 -> Cycle1
 80 │         include Cycle1;
    │                 ^^^^^^
 
-error: expected `bool` but found `u256`
+error: expected `bool` but found a value of type `u256`
    ┌─ tests/checking/specs/schemas_err.move:84:17
    │
 84 │         include 22 ==> Condition;
@@ -83,3 +150,13 @@ error: expression construct not supported for schemas
    │
 86 │         include Condition || Condition;
    │                 ^^^^^^^^^^^^^^^^^^^^^^
+
+note: unused schema M::SchemaExp
+   ┌─ tests/checking/specs/schemas_err.move:83:5
+   │
+83 │ ╭     spec schema SchemaExp {
+84 │ │         include 22 ==> Condition;
+85 │ │         include true ==> 23;
+86 │ │         include Condition || Condition;
+87 │ │     }
+   │ ╰─────^

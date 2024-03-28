@@ -17,7 +17,8 @@ use serde::Serialize;
 use signature::Verifier;
 use std::{cmp::Ordering, fmt};
 
-/// A Secp256r1 ECDSA signature
+/// A secp256r1 ECDSA signature.
+/// NOTE: The max size on this struct is enforced in its `TryFrom<u8>` trait implementation.
 #[derive(DeserializeKey, Clone, SerializeKey)]
 #[key_name("Secp256r1EcdsaSignature")]
 pub struct Signature(pub(crate) p256::ecdsa::Signature);
@@ -29,7 +30,7 @@ impl Signature {
     /// Serialize an Signature. Uses the SEC1 serialization format.
     pub fn to_bytes(&self) -> [u8; SIGNATURE_LENGTH] {
         // The RustCrypto P256 `to_bytes` call here should never return a byte array of the wrong length
-        self.0.to_bytes().try_into().unwrap()
+        self.0.to_bytes().into()
     }
 
     /// Deserialize an P256Signature, without checking for malleability

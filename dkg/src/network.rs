@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     network_interface::{DKGNetworkClient, RPC},
@@ -7,6 +8,7 @@ use crate::{
 use anyhow::bail;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::network_id::NetworkId;
+use aptos_infallible::RwLock;
 use aptos_logger::warn;
 use aptos_network::{
     application::interface::{NetworkClient, NetworkServiceEvents},
@@ -22,7 +24,7 @@ use futures::{
 };
 use futures_channel::oneshot;
 use move_core_types::account_address::AccountAddress;
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
 
 pub struct IncomingRpcRequest {
@@ -181,7 +183,20 @@ impl RpcResponseSender for RealRpcResponseSender {
     }
 }
 
-#[cfg(test)]
 pub struct DummyRpcResponseSender {
-    //TODO
+    pub rpc_response_collector: Arc<RwLock<Vec<anyhow::Result<DKGMessage>>>>,
+}
+
+impl DummyRpcResponseSender {
+    pub fn new(rpc_response_collector: Arc<RwLock<Vec<anyhow::Result<DKGMessage>>>>) -> Self {
+        Self {
+            rpc_response_collector,
+        }
+    }
+}
+
+impl RpcResponseSender for DummyRpcResponseSender {
+    fn send(&mut self, response: anyhow::Result<DKGMessage>) {
+        self.rpc_response_collector.write().push(response);
+    }
 }

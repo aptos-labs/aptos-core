@@ -1,20 +1,23 @@
 variable "region" {
   description = "AWS region"
+  type        = string
 }
 
 variable "workspace_name_override" {
   description = "If specified, overrides the usage of Terraform workspace for naming purposes"
+  type        = string
   default     = ""
 }
 
 variable "iam_path" {
-  default     = "/"
   description = "Path to use when naming IAM objects"
+  type        = string
+  default     = "/"
 }
 
 variable "permissions_boundary_policy" {
-  default     = ""
   description = "ARN of IAM policy to set as permissions boundary on created roles"
+  type        = string
 }
 
 variable "admin_sources_ipv4" {
@@ -40,31 +43,38 @@ variable "k8s_admins" {
 }
 
 variable "num_fullnodes" {
-  default = 1
+  description = "Number of fullnodes."
+  type        = number
+  default     = 1
 }
 
 variable "image_tag" {
   description = "Docker image tag for aptos components. Overrides ecr_repo method."
+  type        = string
   default     = ""
 }
 
 variable "ecr_repo" {
   description = "Name of an ECR repo to resolve 'stable' tag to a specific revision"
+  type        = string
   default     = ""
 }
 
 variable "era" {
   description = "Chain era, used to start a clean chain"
+  type        = number
   default     = 15
 }
 
 variable "chain_id" {
-  description = "aptos chain ID"
+  description = "Aptos chain ID"
+  type        = string
   default     = "DEVNET"
 }
 
 variable "chain_name" {
   description = "Aptos chain name"
+  type        = string
   default     = "devnet"
 }
 
@@ -93,6 +103,7 @@ variable "fullnode_helm_values_list" {
 
 variable "zone_id" {
   description = "Route53 Zone ID to create records in"
+  type        = string
   default     = ""
 }
 
@@ -104,66 +115,71 @@ variable "tls_sans" {
 
 variable "workspace_dns" {
   description = "Include Terraform workspace name in DNS records"
+  type        = bool
   default     = true
 }
 
 variable "dns_prefix_name" {
   description = "DNS prefix for fullnode url"
+  type        = string
   default     = "fullnode"
-}
-
-variable "enable_pfn_logger" {
-  description = "Enable separate public fullnode logger pod"
-  default     = false
-}
-
-variable "pfn_logger_helm_values" {
-  description = "Map of values to pass to public fullnode logger Helm"
-  type        = any
-  default     = {}
 }
 
 variable "utility_instance_type" {
   description = "Instance type used for utilities"
+  type        = string
   default     = "t3.medium"
 }
 
 variable "fullnode_instance_type" {
   description = "Instance type used for validator and fullnodes"
+  type        = string
   default     = "c6i.8xlarge"
 }
 
 variable "num_extra_instance" {
-  default     = 0
   description = "Number of extra instances to add into node pool"
+  type        = number
+  default     = 0
 }
 
 variable "enable_backup" {
-  description = "enable data backup from fullnode"
+  description = "Enable data backup from fullnode"
+  type        = bool
   default     = false
 }
 
 variable "enable_public_backup" {
-  description = "provide data backups to the public"
+  description = "Provide data backups to the public"
+  type        = bool
   default     = false
 }
 
 variable "backup_fullnode_index" {
-  description = "index of fullnode to backup data from"
+  description = "Index of fullnode to backup data from"
+  type        = number
   default     = 0
 }
 
 variable "fullnode_storage_class" {
   description = "Which storage class to use for the validator and fullnode"
+  type        = string
   default     = "io1"
   validation {
-    condition     = contains(["gp3", "gp2", "io1", "io2"], var.fullnode_storage_class)
-    error_message = "Supported storage classes are gp3, io1, io2"
+    condition     = contains(["gp2", "gp3", "io1", "io2"], var.fullnode_storage_class)
+    error_message = "Supported storage classes are gp2, gp3, io1, io2"
   }
+}
+
+variable "fullnode_storage_size" {
+  description = "Disk size for fullnodes"
+  type        = string
+  default     = "2000Gi"
 }
 
 variable "enable_monitoring" {
   description = "Enable monitoring helm chart"
+  type        = bool
   default     = false
 }
 
@@ -175,15 +191,18 @@ variable "monitoring_helm_values" {
 
 variable "enable_prometheus_node_exporter" {
   description = "Enable prometheus-node-exporter within monitoring helm chart"
+  type        = bool
   default     = false
 }
 
 variable "enable_kube_state_metrics" {
   description = "Enable kube-state-metrics within monitoring helm chart"
+  type        = bool
   default     = false
 }
 
 variable "manage_via_tf" {
   description = "Whether to manage the aptos-node k8s workload via Terraform. If set to false, the helm_release resource will still be created and updated when values change, but it may not be updated on every apply"
+  type        = bool
   default     = true
 }

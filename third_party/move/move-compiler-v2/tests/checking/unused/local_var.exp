@@ -1,0 +1,6 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    public fun test(): u64 {
+        5
+    }
+} // end 0xc0ffee::m

@@ -1,0 +1,267 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t2 := true
+  1: if ($t2) goto 2 else goto 11
+  2: label L0
+  3: $t3 := 1
+  4: $t0 := infer($t3)
+  5: $t4 := move($t0)
+  6: $t1 := infer($t4)
+  7: $t5 := 5
+  8: $t0 := infer($t5)
+  9: $t6 := infer($t1)
+ 10: goto 14
+ 11: label L1
+ 12: $t7 := 0
+ 13: $t0 := infer($t7)
+ 14: label L2
+ 15: $t9 := copy($t0)
+ 16: $t10 := 5
+ 17: $t8 := ==($t9, $t10)
+ 18: if ($t8) goto 19 else goto 21
+ 19: label L3
+ 20: goto 24
+ 21: label L4
+ 22: $t11 := 42
+ 23: abort($t11)
+ 24: label L5
+ 25: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64
+     var $t1: u64 [unused]
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t2 := true
+  1: if ($t2) goto 2 else goto 6
+  2: label L0
+  3: $t5 := 5
+  4: $t0 := move($t5)
+  5: goto 9
+  6: label L1
+  7: $t7 := 0
+  8: $t0 := move($t7)
+  9: label L2
+ 10: $t9 := copy($t0)
+ 11: $t10 := 5
+ 12: $t8 := ==($t9, $t10)
+ 13: if ($t8) goto 14 else goto 16
+ 14: label L3
+ 15: goto 19
+ 16: label L4
+ 17: $t11 := 42
+ 18: abort($t11)
+ 19: label L5
+ 20: return ()
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64
+     var $t1: u64 [unused]
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     # live vars:
+     # events: b:$t2
+  0: $t2 := true
+     # live vars: $t2
+     # events: e:$t2
+  1: if ($t2) goto 2 else goto 6
+     # live vars:
+  2: label L0
+     # live vars:
+     # events: b:$t5
+  3: $t5 := 5
+     # live vars: $t5
+     # events: e:$t5, b:$t0
+  4: $t0 := move($t5)
+     # live vars: $t0
+  5: goto 9
+     # live vars:
+  6: label L1
+     # live vars:
+     # events: b:$t7
+  7: $t7 := 0
+     # live vars: $t7
+     # events: e:$t7
+  8: $t0 := move($t7)
+     # live vars: $t0
+  9: label L2
+     # live vars: $t0
+     # events: e:$t0, b:$t9
+ 10: $t9 := copy($t0)
+     # live vars: $t9
+     # events: b:$t10
+ 11: $t10 := 5
+     # live vars: $t9, $t10
+     # events: e:$t9, e:$t10, b:$t8
+ 12: $t8 := ==($t9, $t10)
+     # live vars: $t8
+     # events: e:$t8
+ 13: if ($t8) goto 14 else goto 16
+     # live vars:
+ 14: label L3
+     # live vars:
+ 15: goto 19
+     # live vars:
+ 16: label L4
+     # live vars:
+     # events: b:$t11
+ 17: $t11 := 42
+     # live vars: $t11
+     # events: e:$t11
+ 18: abort($t11)
+     # live vars:
+ 19: label L5
+     # live vars:
+ 20: return ()
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+  0: $t2 := true
+  1: if ($t2) goto 2 else goto 6
+  2: label L0
+  3: $t5 := 5
+  4: $t5 := move($t5)
+  5: goto 9
+  6: label L1
+  7: $t7 := 0
+  8: $t5 := move($t7)
+  9: label L2
+ 10: $t5 := copy($t5)
+ 11: $t7 := 5
+ 12: $t2 := ==($t5, $t7)
+ 13: if ($t2) goto 14 else goto 16
+ 14: label L3
+ 15: goto 19
+ 16: label L4
+ 17: $t5 := 42
+ 18: abort($t5)
+ 19: label L5
+ 20: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+  0: $t2 := true
+  1: if ($t2) goto 2 else goto 5
+  2: label L0
+  3: $t5 := 5
+  4: goto 8
+  5: label L1
+  6: $t7 := 0
+  7: $t5 := move($t7)
+  8: label L2
+  9: $t7 := 5
+ 10: $t2 := ==($t5, $t7)
+ 11: if ($t2) goto 12 else goto 14
+ 12: label L3
+ 13: goto 17
+ 14: label L4
+ 15: $t5 := 42
+ 16: abort($t5)
+ 17: label L5
+ 18: return ()
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+script {
+
+
+main() /* def_idx: 0 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: LdTrue
+	1: BrFalse(5)
+B1:
+	2: LdU64(5)
+	3: StLoc[0](loc0: u64)
+	4: Branch(7)
+B2:
+	5: LdU64(0)
+	6: StLoc[0](loc0: u64)
+B3:
+	7: LdU64(5)
+	8: StLoc[1](loc1: u64)
+	9: MoveLoc[0](loc0: u64)
+	10: MoveLoc[1](loc1: u64)
+	11: Eq
+	12: BrFalse(14)
+B4:
+	13: Branch(16)
+B5:
+	14: LdU64(42)
+	15: Abort
+B6:
+	16: Ret
+}
+}
+============ bytecode verification succeeded ========

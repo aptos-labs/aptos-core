@@ -371,7 +371,7 @@ impl<'a> LiveVarAnalysis<'a> {
                 new_bytecodes.push(Bytecode::Call(
                     self.new_attr_id(),
                     vec![],
-                    Operation::Destroy,
+                    Operation::Drop,
                     vec![idx],
                     None,
                 ));
@@ -429,7 +429,7 @@ impl<'a> TransferFunctions for LiveVarAnalysis<'a> {
                 state.insert(&[*src]);
             },
             Prop(_, _, exp) => {
-                for (idx, _) in exp.used_temporaries(self.func_target.global_env()) {
+                for (idx, _) in exp.used_temporaries_with_types(self.func_target.global_env()) {
                     state.insert(&[idx]);
                 }
             },

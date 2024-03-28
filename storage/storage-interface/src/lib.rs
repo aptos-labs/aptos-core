@@ -30,8 +30,9 @@ use aptos_types::{
         ShardedStateUpdates,
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutputListWithProof, TransactionToCommit,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -52,6 +53,7 @@ pub mod state_view;
 
 use crate::state_delta::StateDelta;
 use aptos_scratchpad::SparseMerkleTree;
+pub use aptos_types::block_info::BlockHeight;
 pub use errors::AptosDbError;
 pub use executed_trees::ExecutedTrees;
 
@@ -169,15 +171,20 @@ pub trait DbReader: Send + Sync {
             fetch_events: bool,
         ) -> Result<TransactionWithProof>;
 
+        fn get_transaction_auxiliary_data_by_version(
+            &self,
+            version: Version,
+        ) -> Result<TransactionAuxiliaryData>;
+
         /// See [AptosDB::get_first_txn_version].
         ///
         /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
         fn get_first_txn_version(&self) -> Result<Option<Version>>;
 
-        /// See [AptosDB::get_first_viable_txn_version].
+        /// See [AptosDB::get_first_viable_block].
         ///
-        /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
-        fn get_first_viable_txn_version(&self) -> Result<Version>;
+        /// [AptosDB::get_first_viable_block]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_block
+        fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)>;
 
         /// See [AptosDB::get_first_write_set_version].
         ///
@@ -241,9 +248,7 @@ pub trait DbReader: Send + Sync {
         /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
         fn get_block_timestamp(&self, version: Version) -> Result<u64>;
 
-        fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)>;
-
-        /// See [AptosDB::get_latest_block_events].
+        /// See `AptosDB::get_latest_block_events`.
         fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>>;
 
         /// Returns the start_version, end_version and NewBlockEvent of the block containing the input
@@ -450,16 +455,6 @@ pub trait DbReader: Send + Sync {
         /// Returns whether the internal indexer DB has been enabled or not
         fn indexer_enabled(&self) -> bool;
 
-        /// Returns whether the internal indexer async v2 DB has been enabled or not
-        fn indexer_async_v2_enabled(&self) -> bool;
-
-        /// Returns the next version which internal indexer async v2 DB should parse
-        fn get_indexer_async_v2_next_version(&self) -> Result<Version>;
-
-        /// Returns boolean whether indexer async v2 pending on items are empty
-        /// if so, the whole batches are processed completely, if not, need to retry
-        fn is_indexer_async_v2_pending_on_empty(&self) -> Result<bool>;
-
         /// Returns state storage usage at the end of an epoch.
         fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage>;
     ); // end delegated
@@ -575,28 +570,6 @@ pub trait DbWriter: Send + Sync {
         state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
         sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Index table info mapping for the indexer async v2 rocksdb.
-    /// Called by the table info service when its constantly parsing the table info.
-    fn index_table_info(
-        &self,
-        db_reader: Arc<dyn DbReader>,
-        first_version: Version,
-        write_sets: &[&WriteSet],
-        end_early_if_pending_on_empty: bool,
-    ) -> Result<()> {
-        unimplemented!()
-    }
-
-    /// Clean up pending on items in the indexer async v2 rocksdb.
-    /// Called by the table info service when all threads finish processing.
-    fn cleanup_pending_on_items(&self) -> Result<()> {
-        unimplemented!()
-    }
-
-    fn update_next_version(&self, end_version: u64) -> Result<()> {
         unimplemented!()
     }
 }

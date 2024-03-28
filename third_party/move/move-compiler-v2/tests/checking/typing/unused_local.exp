@@ -1,0 +1,106 @@
+
+Diagnostics:
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/checking/typing/unused_local.move:5:13
+  │
+5 │         let x: u64;
+  │             ^
+
+warning: Unused local variable `x`. Consider removing or prefixing with an underscore: `_x`
+  ┌─ tests/checking/typing/unused_local.move:9:14
+  │
+9 │         let (x, y): (u64, u64);
+  │              ^
+
+warning: Unused local variable `y`. Consider removing or prefixing with an underscore: `_y`
+  ┌─ tests/checking/typing/unused_local.move:9:17
+  │
+9 │         let (x, y): (u64, u64);
+  │                 ^
+
+warning: Unused local variable `f`. Consider removing or prefixing with an underscore: `_f`
+   ┌─ tests/checking/typing/unused_local.move:13:16
+   │
+13 │         let S{ f, g }: S;
+   │                ^
+
+warning: Unused local variable `g`. Consider removing or prefixing with an underscore: `_g`
+   ┌─ tests/checking/typing/unused_local.move:13:19
+   │
+13 │         let S{ f, g }: S;
+   │                   ^
+
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/checking/typing/unused_local.move:25:22
+   │
+25 │     fun unused_param(x: u64) {
+   │                      ^
+
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/checking/typing/unused_local.move:28:20
+   │
+28 │     fun two_unused(x: u64, y: bool) {
+   │                    ^
+
+warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/checking/typing/unused_local.move:28:28
+   │
+28 │     fun two_unused(x: u64, y: bool) {
+   │                            ^
+
+warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
+   ┌─ tests/checking/typing/unused_local.move:31:35
+   │
+31 │     fun unused_param1_used_param2(x: u64, y: bool): bool {
+   │                                   ^
+
+warning: Unused parameter `y`. Consider removing or prefixing with an underscore: `_y`
+   ┌─ tests/checking/typing/unused_local.move:35:43
+   │
+35 │     fun unused_param2_used_param1(x: u64, y: bool): u64 {
+   │                                           ^
+
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct S {
+        f: u64,
+        g: bool,
+    }
+    private fun t0() {
+        Tuple()
+    }
+    private fun t1() {
+        Tuple()
+    }
+    private fun t2() {
+        {
+          let M::S{ f: f: u64, g: g: bool }: M::S;
+          Tuple()
+        }
+    }
+    private fun two_unused(x: u64,y: bool) {
+        Tuple()
+    }
+    private fun unused_local_suppressed1() {
+        Tuple()
+    }
+    private fun unused_local_suppressed2() {
+        Tuple()
+    }
+    private native fun unused_native_ok(x: u64,y: bool);
+    private fun unused_param(x: u64) {
+        Tuple()
+    }
+    private fun unused_param1_used_param2(x: u64,y: bool): bool {
+        y
+    }
+    private fun unused_param2_used_param1(x: u64,y: bool): u64 {
+        x
+    }
+    private fun unused_param_suppressed1(_: u64) {
+        Tuple()
+    }
+    private fun unused_param_suppressed2(_x: u64) {
+        Tuple()
+    }
+} // end 0x8675309::M

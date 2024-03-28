@@ -5,6 +5,7 @@ mod event_store_pruner;
 mod ledger_metadata_pruner;
 pub(crate) mod ledger_pruner_manager;
 mod transaction_accumulator_pruner;
+mod transaction_auxiliary_data_pruner;
 mod transaction_info_pruner;
 mod transaction_pruner;
 mod write_set_pruner;
@@ -18,6 +19,7 @@ use crate::{
         ledger_pruner::{
             event_store_pruner::EventStorePruner, ledger_metadata_pruner::LedgerMetadataPruner,
             transaction_accumulator_pruner::TransactionAccumulatorPruner,
+            transaction_auxiliary_data_pruner::TransactionAuxiliaryDataPruner,
             transaction_info_pruner::TransactionInfoPruner, transaction_pruner::TransactionPruner,
             write_set_pruner::WriteSetPruner,
         },
@@ -132,13 +134,17 @@ impl LedgerPruner {
             metadata_progress,
         )?);
         let transaction_accumulator_pruner = Box::new(TransactionAccumulatorPruner::new(
-            Arc::clone(&transaction_store),
-            ledger_db.transaction_accumulator_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
+
+        let transaction_auxiliary_data_pruner = Box::new(TransactionAuxiliaryDataPruner::new(
+            Arc::clone(&ledger_db),
+            metadata_progress,
+        )?);
+
         let transaction_info_pruner = Box::new(TransactionInfoPruner::new(
-            Arc::clone(&transaction_store),
-            ledger_db.transaction_info_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
         let transaction_pruner = Box::new(TransactionPruner::new(
@@ -147,8 +153,7 @@ impl LedgerPruner {
             metadata_progress,
         )?);
         let write_set_pruner = Box::new(WriteSetPruner::new(
-            Arc::clone(&transaction_store),
-            ledger_db.write_set_db_arc(),
+            Arc::clone(&ledger_db),
             metadata_progress,
         )?);
 
@@ -159,6 +164,7 @@ impl LedgerPruner {
             sub_pruners: vec![
                 event_store_pruner,
                 transaction_accumulator_pruner,
+                transaction_auxiliary_data_pruner,
                 transaction_info_pruner,
                 transaction_pruner,
                 write_set_pruner,

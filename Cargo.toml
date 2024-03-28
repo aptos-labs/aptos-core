@@ -30,6 +30,7 @@ members = [
     "aptos-move/aptos-vm-profiling",
     "aptos-move/aptos-vm-types",
     "aptos-move/block-executor",
+    "aptos-move/e2e-benchmark",
     "aptos-move/e2e-move-tests",
     "aptos-move/e2e-tests",
     "aptos-move/e2e-testsuite",
@@ -54,10 +55,12 @@ members = [
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
     "crates/aptos-build-info",
+    "crates/aptos-collections",
     "crates/aptos-compression",
     "crates/aptos-crypto",
     "crates/aptos-crypto-derive",
     "crates/aptos-debugger",
+    "crates/aptos-dkg",
     "crates/aptos-drop-helper",
     "crates/aptos-enum-conversion-derive",
     "crates/aptos-faucet/cli",
@@ -129,6 +132,7 @@ members = [
     "execution/executor-types",
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
+    "keyless/pepper/common", "keyless/pepper/example-client-rust", "keyless/pepper/service",
     "mempool",
     "network/benchmark",
     "network/builder",
@@ -166,8 +170,6 @@ members = [
     "storage/schemadb",
     "storage/scratchpad",
     "storage/storage-interface",
-    "testsuite/aptos-fuzzer",
-    "testsuite/aptos-fuzzer/fuzz",
     "testsuite/dos/http_test",
     "testsuite/dos/listener",
     "testsuite/dos/sender",
@@ -179,7 +181,6 @@ members = [
     "testsuite/module-publish",
     "testsuite/smoke-test",
     "testsuite/testcases",
-
     # third_party/move
     "third_party/move/extensions/async/move-async-vm",
     "third_party/move/extensions/move-table-extension",
@@ -199,6 +200,7 @@ members = [
     "third_party/move/move-compiler-v2/transactional-tests",
     "third_party/move/move-compiler/transactional-tests",
     "third_party/move/move-core/types",
+    "third_party/move/move-examples",
     "third_party/move/move-ir-compiler",
     "third_party/move/move-ir-compiler/move-bytecode-source-map",
     "third_party/move/move-ir-compiler/move-ir-to-bytecode",
@@ -268,7 +270,7 @@ homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
 repository = "https://github.com/aptos-labs/aptos-core"
-rust-version = "1.74.1"
+rust-version = "1.75.0"
 
 [workspace.dependencies]
 # Internal crate dependencies.
@@ -290,6 +292,7 @@ aptos-build-info = { path = "crates/aptos-build-info" }
 aptos-cached-packages = { path = "aptos-move/framework/cached-packages" }
 aptos-channels = { path = "crates/channel" }
 aptos-cli-common = { path = "crates/aptos-cli-common" }
+aptos-collections = { path = "crates/aptos-collections" }
 aptos-compression = { path = "crates/aptos-compression" }
 aptos-consensus = { path = "consensus" }
 aptos-consensus-notifications = { path = "state-sync/inter-component/consensus-notifications" }
@@ -304,6 +307,7 @@ aptos-db = { path = "storage/aptosdb" }
 aptos-db-indexer = { path = "storage/indexer" }
 aptos-db-tool = { path = "storage/db-tool" }
 aptos-debugger = { path = "crates/aptos-debugger" }
+aptos-dkg = { path = "crates/aptos-dkg" }
 aptos-dkg-runtime = { path = "dkg" }
 aptos-drop-helper = { path = "crates/aptos-drop-helper" }
 aptos-event-notifications = { path = "state-sync/inter-component/event-notifications" }
@@ -323,7 +327,6 @@ aptos-faucet-metrics-server = { path = "crates/aptos-faucet/metrics-server" }
 aptos-fallible = { path = "crates/fallible" }
 aptos-forge = { path = "testsuite/forge" }
 aptos-framework = { path = "aptos-move/framework" }
-aptos-fuzzer = { path = "testsuite/aptos-fuzzer" }
 fuzzer = { path = "testsuite/fuzzer" }
 aptos-abstract-gas-usage = { path = "aptos-move/aptos-abstract-gas-usage" }
 aptos-gas-meter = { path = "aptos-move/aptos-gas-meter" }
@@ -361,6 +364,7 @@ aptos-memsocket = { path = "network/memsocket" }
 aptos-metrics-core = { path = "crates/aptos-metrics-core" }
 aptos-move-debugger = { path = "aptos-move/aptos-debugger" }
 aptos-move-examples = { path = "aptos-move/move-examples" }
+aptos-move-e2e-benchmark = { path = "aptos-move/e2e-benchmark" }
 aptos-mvhashmap = { path = "aptos-move/mvhashmap" }
 aptos-native-interface = { path = "aptos-move/aptos-native-interface" }
 aptos-netcore = { path = "network/netcore" }
@@ -380,6 +384,8 @@ aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
+aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
+aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
 aptos-profiler = { path = "crates/aptos-profiler" }
 aptos-proptest-helpers = { path = "crates/aptos-proptest-helpers" }
 aptos-protos = { path = "protos/rust" }
@@ -446,6 +452,7 @@ ark-bls12-381 = "0.4.0"
 ark-bn254 = "0.4.0"
 ark-ec = "0.4.0"
 ark-ff = "0.4.0"
+ark-groth16 = "0.4.0"
 ark-serialize = "0.4.0"
 ark-std = { version = "0.4.0", features = ["getrandom"] }
 aptos-moving-average = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "4801acae7aea30d7e96bbfbe5ec5b04056dfa4cf" }
@@ -463,12 +470,15 @@ backoff = { version = "0.4.0", features = ["tokio"] }
 backtrace = "0.3.58"
 bcs = { git = "https://github.com/aptos-labs/bcs.git", rev = "d31fab9d81748e2594be5cd5cdf845786a30562d" }
 better_any = "0.1.1"
+bellman = { version = "0.13.1", default-features = false }
 bigdecimal = { version = "0.4.0", features = ["serde"] }
 version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
-blst = "0.3.7"
+blst = "0.3.11"
+# The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
+blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
 bollard = "0.15"
 bulletproofs = { version = "4.0.0" }
 byteorder = "1.4.3"
@@ -481,7 +491,10 @@ claims = "0.7"
 clap = { version = "4.3.9", features = ["derive", "unstable-styles"] }
 clap-verbosity-flag = "2.1.1"
 clap_complete = "4.4.1"
-cloud-storage = { version = "0.11.1", features = ["global-client", "rustls-tls"], default-features = false }
+cloud-storage = { version = "0.11.1", features = [
+    "global-client",
+    "rustls-tls",
+], default-features = false }
 codespan-reporting = "0.11.1"
 concurrent-queue = "2.2.0"
 console-subscriber = "0.1.8"
@@ -495,13 +508,16 @@ crossbeam-channel = "0.5.4"
 csv = "1.2.1"
 curve25519-dalek = "3"
 curve25519-dalek-ng = "4"
-dashmap = "5.2.0"
+dashmap = { version = "5.5.3", features = ["inline"] }
 datatest-stable = "0.1.1"
 debug-ignore = { version = "1.0.3", features = ["serde"] }
 derivative = "2.2.0"
 determinator = "0.12.0"
+derive_more = "0.99.11"
 diesel = "2.1"
-diesel-async = { version = "0.4", features = ["postgres", "tokio"] }
+# Use the crate version once this feature gets released on crates.io:
+# https://github.com/weiznich/diesel_async/commit/e165e8c96a6c540ebde2d6d7c52df5c5620a4bf1
+diesel-async = { git = "https://github.com/weiznich/diesel_async.git", rev = "d02798c67065d763154d7272dd0c09b39757d0f2", features = ["async-connection-wrapper", "postgres", "bb8", "tokio"] }
 diesel_migrations = { version = "2.1.0", features = ["postgres"] }
 digest = "0.9.0"
 dir-diff = "0.3.2"
@@ -515,7 +531,9 @@ env_logger = "0.10.0"
 erased-serde = "0.3.13"
 event-listener = "2.5.3"
 fail = "0.5.0"
+ff = "0.13"
 field_count = "0.1.1"
+fixed = "1.25.1"
 flate2 = "1.0.24"
 futures = "0.3.29"
 futures-channel = "0.3.29"
@@ -527,10 +545,11 @@ git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.5.2"
 google-cloud-storage = "0.13.0"
-guppy = "0.17.0"
+group = "0.13"
+guppy = "0.17.5"
 handlebars = "4.2.2"
 heck = "0.4.1"
-hex = "0.4.3"
+hex = { version = "0.4.3", features = ["serde"] }
 hkdf = "0.10.0"
 hostname = "0.3.1"
 http = "0.2.9"
@@ -543,7 +562,7 @@ indicatif = "0.15.0"
 indoc = "1.0.6"
 inferno = "0.11.14"
 ipnet = "2.5.0"
-itertools = "0.10.3"
+itertools = "0.12"
 jemallocator = { version = "0.5.0", features = [
     "profiling",
     "unprefixed_malloc_on_supported_platforms",
@@ -551,6 +570,7 @@ jemallocator = { version = "0.5.0", features = [
 jemalloc-sys = "0.5.4"
 json-patch = "0.2.6"
 jsonwebtoken = "8.1"
+jwt = "0.16.0"
 lazy_static = "1.4.0"
 libc = "0.2.147"
 libfuzzer-sys = "0.4.6"
@@ -567,7 +587,7 @@ mockall = "0.11.4"
 more-asserts = "0.3.0"
 native-tls = "0.2.10"
 ntest = "0.9.0"
-num-bigint = { version = "0.4.4", features = ["rand"] }
+num-bigint = { version = "0.3.2", features = ["rand"] }
 num_cpus = "1.13.1"
 num-derive = "0.3.3"
 num-integer = "0.1.42"
@@ -580,8 +600,10 @@ owo-colors = "3.5.0"
 p256 = { version = "0.13.2" }
 signature = "2.1.0"
 sec1 = "0.7.0"
+pairing = "0.23"
 parking_lot = "0.12.0"
 paste = "1.0.7"
+pathsearch = "0.2.0"
 passkey-authenticator = { version = "0.2.0", features = ["testable"] }
 passkey-client = { version = "0.2.0" }
 passkey-types = { version = "0.2.0" }
@@ -602,15 +624,19 @@ prometheus-http-query = "0.5.2"
 prometheus-parse = "0.2.4"
 proptest = "1.4.0"
 proptest-derive = "0.4.0"
-prost = "0.12.1"
-prost-types = "0.12.1"
+prost = { version = "0.12.3", features = ["no-recursion-limit"] }
+prost-types = "0.12.3"
 quanta = "0.10.1"
 quote = "1.0.18"
 rand = "0.7.3"
 rand_core = "0.5.1"
 random_word = "0.3.0"
 rayon = "1.5.2"
-redis = { version = "0.22.3", features = ["tokio-comp", "script", "connection-manager"] }
+redis = { version = "0.22.3", features = [
+    "tokio-comp",
+    "script",
+    "connection-manager",
+] }
 redis-test = { version = "0.1.1", features = ["aio"] }
 regex = "1.9.3"
 reqwest = { version = "0.11.11", features = [
@@ -624,7 +650,8 @@ reqwest-retry = "0.2.1"
 ring = { version = "0.16.20", features = ["std"] }
 ripemd = "0.1.1"
 rocksdb = { version = "0.21.0", features = ["lz4"] }
-rstack-self =  { version = "0.3.0", features = ["dw"], default_features = false }
+rsa = { version = "0.9.6" }
+rstack-self = { version = "0.3.0", features = ["dw"], default_features = false }
 rstest = "0.15.0"
 rusty-fork = "0.3.0"
 rustversion = "1.0.14"
@@ -636,8 +663,12 @@ sha2_0_10_6 = { package = "sha2", version = "0.10.6" }
 sha3 = "0.9.1"
 siphasher = "0.3.10"
 serde = { version = "1.0.193", features = ["derive", "rc"] }
+serde-big-array = "0.5.1"
 serde_bytes = "0.11.6"
-serde_json = { version = "1.0.81", features = ["preserve_order", "arbitrary_precision"] } # Note: arbitrary_precision is required to parse u256 in JSON
+serde_json = { version = "1.0.81", features = [
+    "preserve_order",
+    "arbitrary_precision",
+] } # Note: arbitrary_precision is required to parse u256 in JSON
 serde_repr = "0.1"
 serde_merge = "0.1.3"
 serde-name = "0.1.1"
@@ -654,6 +685,7 @@ strum = "0.24.1"
 strum_macros = "0.24.2"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
+tar = "0.4.40"
 tempfile = "3.3.0"
 termcolor = "1.1.2"
 test-case = "3.1.0"
@@ -667,23 +699,24 @@ tiny-keccak = { version = "2.0.2", features = ["keccak", "sha3"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 trybuild = "1.0.80"
-tokio = { version = "1.21.0", features = ["full"] }
+tokio = { version = "1.35.1", features = ["full"] }
 tokio-io-timeout = "1.2.0"
-tokio-metrics = "0.1.0"
+tokio-metrics = "0.3.1"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
 tokio-stream = { version = "0.1.14", features = ["fs"] }
 tokio-test = "0.4.1"
 tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
 toml = "0.7.4"
-tonic = { version = "0.10.2", features = [
+tonic = { version = "0.11.0", features = [
     "tls-roots",
     "transport",
     "prost",
     "gzip",
     "codegen",
+    "zstd",
 ] }
-tonic-reflection = "0.10.2"
+tonic-reflection = "0.11.0"
 ureq = { version = "1.5.4", features = [
     "json",
     "native-tls",
@@ -759,7 +792,7 @@ codegen-units = 1
 
 [profile.ci]
 inherits = "release"
-debug = true
+debug = "line-tables-only"
 overflow-checks = true
 debug-assertions = true
 

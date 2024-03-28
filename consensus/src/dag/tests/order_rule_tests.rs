@@ -4,7 +4,7 @@
 use crate::dag::{
     adapter::OrderedNotifier,
     anchor_election::RoundRobinAnchorElection,
-    dag_store::Dag,
+    dag_store::{DagStore, InMemDag},
     order_rule::OrderRule,
     tests::{
         dag_test::MockStorage,
@@ -14,7 +14,7 @@ use crate::dag::{
     CertifiedNode,
 };
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::{Mutex, RwLock};
+use aptos_infallible::Mutex;
 use aptos_types::{epoch_state::EpochState, validator_verifier::random_validator_verifier};
 use async_trait::async_trait;
 use futures_channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
@@ -93,7 +93,7 @@ impl OrderedNotifier for TestNotifier {
 
 fn create_order_rule(
     epoch_state: Arc<EpochState>,
-    dag: Arc<RwLock<Dag>>,
+    dag: Arc<DagStore>,
 ) -> (OrderRule, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) {
     let anchor_election = Arc::new(RoundRobinAnchorElection::new(
         epoch_state.verifier.get_ordered_account_addresses(),
@@ -106,8 +106,8 @@ fn create_order_rule(
             dag,
             anchor_election,
             Arc::new(TestNotifier { tx }),
-            Arc::new(MockStorage::new()),
             TEST_DAG_WINDOW as Round,
+            None,
         ),
         rx,
     )
@@ -134,10 +134,10 @@ proptest! {
             epoch: 1,
             verifier: validator_verifier,
         });
-        let mut dag = Dag::new(epoch_state.clone(), Arc::new(MockStorage::new()), Arc::new(MockPayloadManager{}), 0, TEST_DAG_WINDOW);
+        let mut dag = InMemDag::new_empty(epoch_state.clone(), 0, TEST_DAG_WINDOW);
         for round_nodes in &nodes {
             for node in round_nodes.iter().flatten() {
-                dag.add_node(node.clone()).unwrap();
+                dag.add_node_for_test(node.clone()).unwrap();
             }
         }
         let flatten_nodes: Vec<_> = nodes.into_iter().flatten().flatten().collect();
@@ -145,7 +145,7 @@ proptest! {
         rayon::scope(|s| {
             for seq in sequences {
                 s.spawn(|_| {
-                    let dag = Arc::new(RwLock::new(dag.clone()));
+                    let dag = Arc::new(DagStore::new_for_test(dag.clone(),Arc::new(MockStorage::new()), Arc::new(MockPayloadManager {})));
                     let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
                     for idx in seq {
                         order_rule.process_new_node(flatten_nodes[idx].metadata());
@@ -159,7 +159,7 @@ proptest! {
             }
         });
         // order produced by process_all
-        let dag = Arc::new(RwLock::new(dag.clone()));
+        let dag = Arc::new(DagStore::new_for_test(dag.clone(),Arc::new(MockStorage::new()), Arc::new(MockPayloadManager {})));
         let (mut order_rule, mut receiver) = create_order_rule(epoch_state.clone(), dag);
         order_rule.process_all();
         let mut ordered = vec![];
@@ -221,21 +221,20 @@ fn test_order_rule_basic() {
         epoch: 1,
         verifier: validator_verifier,
     });
-    let mut dag = Dag::new(
-        epoch_state.clone(),
-        Arc::new(MockStorage::new()),
-        Arc::new(MockPayloadManager {}),
-        0,
-        TEST_DAG_WINDOW,
-    );
+    let mut dag = InMemDag::new_empty(epoch_state.clone(), 0, TEST_DAG_WINDOW);
     for round_nodes in &nodes {
         for node in round_nodes.iter().flatten() {
-            dag.add_node(node.clone()).unwrap();
+            dag.add_node_for_test(node.clone()).unwrap();
         }
     }
     let display = |node: &NodeMetadata| (node.round(), *author_indexes.get(node.author()).unwrap());
-    let dag = Arc::new(RwLock::new(dag.clone()));
-    let (mut order_rule, mut receiver) = create_order_rule(epoch_state, dag);
+    let dag = Arc::new(DagStore::new_for_test(
+        dag.clone(),
+        Arc::new(MockStorage::new()),
+        Arc::new(MockPayloadManager {}),
+    ));
+    let (mut order_rule, mut receiver): (OrderRule, UnboundedReceiver<Vec<Arc<CertifiedNode>>>) =
+        create_order_rule(epoch_state, dag);
     for node in nodes.iter().flatten().flatten() {
         order_rule.process_new_node(node.metadata());
     }

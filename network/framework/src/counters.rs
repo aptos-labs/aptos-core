@@ -31,6 +31,10 @@ pub const FAILED_LABEL: &str = "failed";
 pub const INBOUND_LABEL: &str = "inbound";
 pub const OUTBOUND_LABEL: &str = "outbound";
 
+// Peer ping labels
+const CONNECTED_LABEL: &str = "connected";
+const PRE_DIAL_LABEL: &str = "pre_dial";
+
 // Serialization labels
 pub const SERIALIZATION_LABEL: &str = "serialization";
 pub const DESERIALIZATION_LABEL: &str = "deserialization";
@@ -596,4 +600,31 @@ pub fn start_serialization_timer(protocol_id: ProtocolId, operation: &str) -> Hi
     NETWORK_APPLICATION_SERIALIZATION_METRIC
         .with_label_values(&[protocol_id.as_str(), operation])
         .start_timer()
+}
+
+/// Counters related to peer ping times (before and after dialing)
+pub static NETWORK_PEER_PING_TIMES: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_network_peer_ping_times",
+        "Counters related to peer ping times (before and after dialing)",
+        &["network_id", "label"],
+    )
+    .unwrap()
+});
+
+/// Observes the ping time for a connected peer
+pub fn observe_connected_ping_time(network_context: &NetworkContext, ping_latency_secs: f64) {
+    observe_ping_time(network_context, ping_latency_secs, CONNECTED_LABEL);
+}
+
+/// Observes the ping time for a peer before dialing
+pub fn observe_pre_dial_ping_time(network_context: &NetworkContext, ping_latency_secs: f64) {
+    observe_ping_time(network_context, ping_latency_secs, PRE_DIAL_LABEL);
+}
+
+/// Observes the ping time for the given label
+fn observe_ping_time(network_context: &NetworkContext, ping_latency_secs: f64, label: &str) {
+    NETWORK_PEER_PING_TIMES
+        .with_label_values(&[network_context.network_id().as_str(), label])
+        .observe(ping_latency_secs);
 }

@@ -1,0 +1,226 @@
+
+Diagnostics:
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+  ┌─ tests/uninit-use-checker/struct_use_before_assign.move:8:13
+  │
+8 │         let z = y;
+  │             ^
+
+warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
+  ┌─ tests/uninit-use-checker/struct_use_before_assign.move:9:13
+  │
+9 │         let q = x;
+  │             ^
+
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:17:13
+   │
+17 │         let z = y;
+   │             ^
+
+warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:18:13
+   │
+18 │         let q = x;
+   │             ^
+
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:24:13
+   │
+24 │         let z = y;
+   │             ^
+
+warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:25:13
+   │
+25 │         let q = x;
+   │             ^
+
+warning: Unused local variable `z`. Consider removing or prefixing with an underscore: `_z`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:30:13
+   │
+30 │         let z = y;
+   │             ^
+
+warning: Unused local variable `q`. Consider removing or prefixing with an underscore: `_q`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:31:13
+   │
+31 │         let q = x;
+   │             ^
+
+============ initial bytecode ================
+
+[variant baseline]
+fun M::main() {
+     var $t0: u64
+     var $t1: M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := 3
+  1: $t1 := pack M::R($t2, $t0)
+  2: ($t3, $t4) := unpack M::R($t1)
+  3: $t5 := infer($t4)
+  4: $t6 := infer($t3)
+  5: return ()
+}
+
+
+[variant baseline]
+fun M::main2() {
+     var $t0: u64
+     var $t1: M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := 0
+  1: $t1 := pack M::R($t2, $t0)
+  2: ($t3, $t4) := unpack M::R($t1)
+  3: $t5 := infer($t4)
+  4: $t6 := infer($t3)
+  5: return ()
+}
+
+
+[variant baseline]
+fun M::main3() {
+     var $t0: M::R
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: ($t1, $t2) := unpack M::R($t0)
+  1: $t3 := infer($t2)
+  2: $t4 := infer($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+fun M::main4() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t1)
+  1: $t3 := infer($t0)
+  2: return ()
+}
+
+
+Diagnostics:
+error: use of unassigned local `g`
+  ┌─ tests/uninit-use-checker/struct_use_before_assign.move:6:17
+  │
+6 │         let r = R { f: 3, g };
+  │                 ^^^^^^^^^^^^^
+
+error: use of unassigned local `y0`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:15:17
+   │
+15 │         let r = R { f: x0, g: y0 };
+   │                 ^^^^^^^^^^^^^^^^^^
+
+error: use of unassigned local `r`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:23:13
+   │
+23 │         let R { f: x, g: y } = r;
+   │             ^^^^^^^^^^^^^^^^
+
+error: use of unassigned local `y`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:30:17
+   │
+30 │         let z = y;
+   │                 ^
+
+error: use of unassigned local `x`
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:31:17
+   │
+31 │         let q = x;
+   │                 ^
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun M::main() {
+     var $t0: u64
+     var $t1: M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t1, $t3, $t4, $t5, $t6 }
+  0: $t2 := 3
+     # before: { no: $t0, $t1, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t3, $t4, $t5, $t6 }
+  1: $t1 := pack M::R($t2, $t0)
+     # before: { no: $t0, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t5, $t6 }
+  2: ($t3, $t4) := unpack M::R($t1)
+     # before: { no: $t0, $t5, $t6 }, after: { no: $t0, $t6 }
+  3: $t5 := infer($t4)
+     # before: { no: $t0, $t6 }, after: { no: $t0 }
+  4: $t6 := infer($t3)
+     # before: { no: $t0 }, after: { no: $t0 }
+  5: return ()
+}
+
+
+[variant baseline]
+fun M::main2() {
+     var $t0: u64
+     var $t1: M::R
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t1, $t3, $t4, $t5, $t6 }
+  0: $t2 := 0
+     # before: { no: $t0, $t1, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t3, $t4, $t5, $t6 }
+  1: $t1 := pack M::R($t2, $t0)
+     # before: { no: $t0, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t5, $t6 }
+  2: ($t3, $t4) := unpack M::R($t1)
+     # before: { no: $t0, $t5, $t6 }, after: { no: $t0, $t6 }
+  3: $t5 := infer($t4)
+     # before: { no: $t0, $t6 }, after: { no: $t0 }
+  4: $t6 := infer($t3)
+     # before: { no: $t0 }, after: { no: $t0 }
+  5: return ()
+}
+
+
+[variant baseline]
+fun M::main3() {
+     var $t0: M::R
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # before: { no: $t0, $t1, $t2, $t3, $t4 }, after: { no: $t0, $t3, $t4 }
+  0: ($t1, $t2) := unpack M::R($t0)
+     # before: { no: $t0, $t3, $t4 }, after: { no: $t0, $t4 }
+  1: $t3 := infer($t2)
+     # before: { no: $t0, $t4 }, after: { no: $t0 }
+  2: $t4 := infer($t1)
+     # before: { no: $t0 }, after: { no: $t0 }
+  3: return ()
+}
+
+
+[variant baseline]
+fun M::main4() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t1, $t3 }
+  0: $t2 := infer($t1)
+     # before: { no: $t0, $t1, $t3 }, after: { no: $t0, $t1 }
+  1: $t3 := infer($t0)
+     # before: { no: $t0, $t1 }, after: { no: $t0, $t1 }
+  2: return ()
+}

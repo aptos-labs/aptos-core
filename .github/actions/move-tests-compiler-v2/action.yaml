@@ -1,0 +1,36 @@
+name: Aptos Move Test for Compiler V2
+description: Runs Aptos Move tests with compiler V2
+inputs:
+  GIT_CREDENTIALS:
+    description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
+    required: false
+
+runs:
+  using: composite
+  steps:
+    # Checkout the repository and setup the rust toolchain
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+    - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+      with:
+        GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
+
+    # Install nextest
+    - uses: taiki-e/install-action@v1.5.6
+      with:
+        tool: nextest
+
+    # Run Aptos Move tests with compiler V2
+    - name: Run Aptos Move tests with compiler V2
+      run: cargo nextest run --release --profile ci --locked -p e2e-move-tests -p aptos-framework --no-fail-fast
+      shell: bash
+      env:
+        MOVE_COMPILER_V2: true
+        RUST_MIN_STACK: 4297152
+        MVP_TEST_ON_CI: true
+        SOLC_EXE: /home/runner/bin/solc
+        Z3_EXE: /home/runner/bin/z3
+        CVC5_EXE: /home/runner/bin/cvc5
+        DOTNET_ROOT: /home/runner/.dotnet
+        BOOGIE_EXE: /home/runner/.dotnet/tools/boogie

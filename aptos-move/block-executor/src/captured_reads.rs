@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::types::InputOutputKey;
+use crate::{types::InputOutputKey, value_exchange::filter_value_for_exchange};
 use anyhow::bail;
 use aptos_aggregator::{
     delta_math::DeltaHistory,
@@ -20,7 +20,7 @@ use aptos_mvhashmap::{
     versioned_group_data::VersionedGroupData,
 };
 use aptos_types::{
-    aggregator::PanicError, state_store::state_value::StateValueMetadata,
+    delayed_fields::PanicError, state_store::state_value::StateValueMetadata,
     transaction::BlockExecutableTransaction as Transaction, write_set::TransactionWrite,
 };
 use aptos_vm_types::resolver::ResourceGroupSize;
@@ -32,7 +32,7 @@ use std::{
             Entry,
             Entry::{Occupied, Vacant},
         },
-        HashMap, HashSet,
+        BTreeMap, HashMap, HashSet,
     },
     sync::Arc,
 };
@@ -61,7 +61,7 @@ pub(crate) enum DataRead<V> {
         // (version implies value equality, but not vice versa). TODO: when
         // comparing the instances of V is cheaper, compare those instead.
         #[derivative(PartialEq = "ignore", Debug = "ignore")] Arc<V>,
-        Option<Arc<MoveTypeLayout>>,
+        #[derivative(PartialEq = "ignore", Debug = "ignore")] Option<Arc<MoveTypeLayout>>,
     ),
     Metadata(Option<StateValueMetadata>),
     Exists(bool),
@@ -327,10 +327,23 @@ impl<T: Transaction> CapturedReads<T> {
     // Return an iterator over the captured reads.
     pub(crate) fn get_read_values_with_delayed_fields(
         &self,
-    ) -> impl Iterator<Item = (&T::Key, &DataRead<T::Value>)> {
+        delayed_write_set_ids: &HashSet<T::Identifier>,
+        skip: &HashSet<T::Key>,
+    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>, PanicError> {
         self.data_reads
             .iter()
-            .filter(|(_, v)| matches!(v, DataRead::Versioned(_, _, Some(_))))
+            .filter_map(|(key, data_read)| {
+                if skip.contains(key) {
+                    return None;
+                }
+
+                if let DataRead::Versioned(_version, value, Some(layout)) = data_read {
+                    filter_value_for_exchange::<T>(value, layout, delayed_write_set_ids, key)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     // Return an iterator over the captured group reads that contain a delayed field
@@ -743,9 +756,9 @@ impl<T: Transaction> UnsyncReadSet<T> {
 mod test {
     use super::*;
     use crate::proptest_types::types::{raw_metadata, KeyType, MockEvent, ValueType};
-    use aptos_aggregator::types::DelayedFieldID;
     use aptos_mvhashmap::types::StorageVersion;
     use claims::{assert_err, assert_gt, assert_matches, assert_none, assert_ok, assert_some_eq};
+    use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use test_case::test_case;
 
     #[test]

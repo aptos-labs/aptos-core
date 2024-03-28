@@ -16,7 +16,10 @@ use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
     hash::Hash,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
@@ -52,6 +55,7 @@ struct VersionedValue<V> {
 /// Maps each key (access path) to an internal versioned value representation.
 pub struct VersionedData<K, V> {
     values: DashMap<K, VersionedValue<V>>,
+    total_base_value_size: AtomicU64,
 }
 
 impl<V> Entry<V> {
@@ -213,7 +217,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
+            total_base_value_size: AtomicU64::new(0),
         }
+    }
+
+    pub(crate) fn num_keys(&self) -> usize {
+        self.values.len()
+    }
+
+    pub(crate) fn total_base_value_size(&self) -> u64 {
+        self.total_base_value_size.load(Ordering::Relaxed)
     }
 
     pub fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {
@@ -256,6 +269,20 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
             .unwrap_or(Err(MVDataError::Uninitialized))
     }
 
+    pub fn fetch_exchanged_data(
+        &self,
+        key: &K,
+        txn_idx: TxnIndex,
+    ) -> Option<(Arc<V>, Arc<MoveTypeLayout>)> {
+        if let Ok(MVDataOutput::Versioned(_, ValueWithLayout::Exchanged(value, Some(layout)))) =
+            self.fetch_data(key, txn_idx)
+        {
+            Some((value, layout))
+        } else {
+            None
+        }
+    }
+
     pub fn set_base_value(&self, key: K, value: ValueWithLayout<V>) {
         let mut v = self.values.entry(key).or_default();
         // For base value, incarnation is irrelevant, and is always set to 0.
@@ -264,6 +291,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         use ValueWithLayout::*;
         match v.versioned_map.entry(ShiftedTxnIndex::zero_idx()) {
             Vacant(v) => {
+                if let Some(base_size) = value.bytes_len() {
+                    self.total_base_value_size
+                        .fetch_add(base_size as u64, Ordering::Relaxed);
+                }
                 v.insert(CachePadded::new(Entry::new_write_from(0, value)));
             },
             Occupied(mut o) => {
@@ -308,14 +339,15 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         key: K,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        data: (V, Option<Arc<MoveTypeLayout>>),
+        data: Arc<V>,
+        maybe_layout: Option<Arc<MoveTypeLayout>>,
     ) {
         let mut v = self.values.entry(key).or_default();
         let prev_entry = v.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
             CachePadded::new(Entry::new_write_from(
                 incarnation,
-                ValueWithLayout::Exchanged(Arc::new(data.0), data.1),
+                ValueWithLayout::Exchanged(data, maybe_layout),
             )),
         );
 

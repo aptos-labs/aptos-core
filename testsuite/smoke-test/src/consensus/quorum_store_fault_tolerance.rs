@@ -17,7 +17,6 @@ use aptos_types::{
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
     PeerId,
 };
-use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use std::{fs, sync::Arc, time::Duration};
 
 const MAX_WAIT_SECS: u64 = 60;
@@ -36,7 +35,7 @@ async fn generate_traffic_and_assert_committed(
         .await
         .unwrap();
 
-    let txn_stat = generate_traffic(swarm, nodes, duration, 1, vec![vec![
+    let txn_stat = generate_traffic(swarm, nodes, duration, 100, vec![vec![
         (
             TransactionType::CoinTransfer {
                 invalid_transaction_ratio: 0,
@@ -61,20 +60,6 @@ async fn generate_traffic_and_assert_committed(
     assert!(txn_stat.committed > 30);
 }
 
-async fn get_current_consensus_config(rest_client: &Client) -> OnChainConsensusConfig {
-    bcs::from_bytes(
-        &rest_client
-            .get_account_resource_bcs::<Vec<u8>>(
-                CORE_CODE_ADDRESS,
-                "0x1::consensus_config::ConsensusConfig",
-            )
-            .await
-            .unwrap()
-            .into_inner(),
-    )
-    .unwrap()
-}
-
 async fn update_consensus_config(
     cli: &CliTestFramework,
     root_cli_index: usize,
@@ -88,7 +73,8 @@ async fn update_consensus_config(
         fun main(core_resources: &signer) {{
             let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
             let config_bytes = {};
-            consensus_config::set(&framework_signer, config_bytes);
+            consensus_config::set_for_next_epoch(&framework_signer, config_bytes);
+            aptos_governance::force_end_epoch(&framework_signer);
         }}
     }}
     "#,
@@ -128,7 +114,8 @@ async fn test_onchain_config_quorum_store_enabled_and_disabled() {
         );
         let rest_client = swarm.validators().next().unwrap().rest_client();
 
-        let current_consensus_config = get_current_consensus_config(&rest_client).await;
+        let current_consensus_config =
+            crate::utils::get_current_consensus_config(&rest_client).await;
         let inner = match current_consensus_config {
             OnChainConsensusConfig::V1(inner) => inner,
             OnChainConsensusConfig::V2(_) => panic!("Unexpected V2 config"),
@@ -150,7 +137,8 @@ async fn test_onchain_config_quorum_store_enabled_and_disabled() {
             .await
             .unwrap();
 
-        let current_consensus_config = get_current_consensus_config(&rest_client).await;
+        let current_consensus_config =
+            crate::utils::get_current_consensus_config(&rest_client).await;
         let inner = match current_consensus_config {
             OnChainConsensusConfig::V1(_) => panic!("Unexpected V1 config"),
             OnChainConsensusConfig::V2(inner) => inner,

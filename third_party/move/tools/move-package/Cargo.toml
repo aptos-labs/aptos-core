@@ -27,6 +27,7 @@ walkdir = "2.3.1"
 bcs = { workspace = true }
 evm-exec-utils = { path = "../../evm/exec-utils", optional = true }
 hex = { version = "0.4.3", optional = true }
+log = "0.4.20"
 move-abigen = { path = "../../move-prover/move-abigen" }
 
 move-binary-format = { path = "../../move-binary-format" }

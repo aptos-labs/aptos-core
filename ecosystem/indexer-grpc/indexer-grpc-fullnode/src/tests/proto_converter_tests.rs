@@ -221,7 +221,7 @@ async fn test_table_item_parsing_works() {
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
     let module = build_test_module(account.address()).await;
 
-    ctx.api_publish_module(account, module.try_into().unwrap())
+    ctx.api_publish_module(account, module.into())
         .await;
     ctx.api_execute_entry_function(
         account,

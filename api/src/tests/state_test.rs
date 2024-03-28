@@ -9,7 +9,7 @@ use move_core_types::account_address::AccountAddress;
 use move_package::BuildConfig;
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::{convert::TryInto, path::PathBuf};
+use std::path::PathBuf;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_get_account_resource() {
@@ -125,6 +125,7 @@ async fn test_get_account_module_not_found() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_merkle_leaves_with_nft_transfer() {
     let mut context = new_test_context(current_function_name!());
+    let num_block_resource = 1;
 
     let ctx = &mut context;
     let creator = &mut ctx.gen_account();
@@ -192,7 +193,7 @@ async fn test_merkle_leaves_with_nft_transfer() {
         .unwrap();
     assert_eq!(
         num_leaves_after_transfer_nft,
-        num_leaves_at_beginning + 2 /* 1 token store + 1 token*/
+        num_leaves_at_beginning + 2  /* 1 token store + 1 token*/ + num_block_resource
     );
 
     let transfer_to_creator_txn = owner.sign_multi_agent_with_transaction_builder(
@@ -212,7 +213,10 @@ async fn test_merkle_leaves_with_nft_transfer() {
         .get_state_leaf_count(ctx.db.get_latest_version().unwrap())
         .unwrap();
 
-    assert_eq!(num_leaves_after_return_nft, num_leaves_at_beginning + 1);
+    assert_eq!(
+        num_leaves_after_return_nft,
+        num_leaves_at_beginning + 1 + num_block_resource * 2
+    );
 }
 
 #[ignore] // TODO: deactivate because of module-bundle publish not longer there; reactivate.
@@ -320,8 +324,7 @@ fn get_table_item(handle: AccountAddress) -> String {
 async fn make_test_tables(ctx: &mut TestContext, account: &mut LocalAccount) {
     let module = build_test_module(account.address()).await;
 
-    ctx.api_publish_module(account, module.try_into().unwrap())
-        .await;
+    ctx.api_publish_module(account, module.into()).await;
     ctx.api_execute_entry_function(account, "make_test_tables", json!([]), json!([]))
         .await
 }

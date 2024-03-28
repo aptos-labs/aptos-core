@@ -16,7 +16,7 @@ use crate::{
 use aptos_consensus_types::{
     block::{block_test_utils::certificate_for_genesis, Block},
     common::Payload,
-    executed_block::ExecutedBlock,
+    pipelined_block::PipelinedBlock,
     quorum_cert::QuorumCert,
 };
 use aptos_crypto::HashValue;
@@ -78,7 +78,7 @@ fn add_execution_phase_test_cases(
     let genesis_qc = certificate_for_genesis();
     let (signers, _validators) = random_validator_verifier(1, None, false);
     let block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc,
@@ -90,7 +90,7 @@ fn add_execution_phase_test_cases(
     // happy path
     phase_tester.add_test_case(
         ExecutionRequest {
-            ordered_blocks: vec![ExecutedBlock::new(
+            ordered_blocks: vec![PipelinedBlock::new(
                 block,
                 vec![],
                 StateComputeResult::new_dummy(),
@@ -119,11 +119,18 @@ fn add_execution_phase_test_cases(
         &LedgerInfo::mock_genesis(None),
         random_hash_value,
     );
-    let bad_block =
-        Block::new_proposal(Payload::empty(false), 1, 1, bad_qc, &signers[0], Vec::new()).unwrap();
+    let bad_block = Block::new_proposal(
+        Payload::empty(false, true),
+        1,
+        1,
+        bad_qc,
+        &signers[0],
+        Vec::new(),
+    )
+    .unwrap();
     phase_tester.add_test_case(
         ExecutionRequest {
-            ordered_blocks: vec![ExecutedBlock::new(
+            ordered_blocks: vec![PipelinedBlock::new(
                 bad_block,
                 vec![],
                 StateComputeResult::new_dummy(),

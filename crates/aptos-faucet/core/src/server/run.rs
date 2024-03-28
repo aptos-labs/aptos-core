@@ -689,7 +689,7 @@ mod test {
         // Create it on chain using the prod devnet faucet. We fund it with
         // exactly the minimum funds set in the config.
         let account_address =
-            AuthenticationKey::ed25519(&private_key.public_key()).derived_address();
+            AuthenticationKey::ed25519(&private_key.public_key()).account_address();
         unwrap_reqwest_result(
             reqwest::Client::new()
                 .post("https://faucet.devnet.aptoslabs.com/fund")

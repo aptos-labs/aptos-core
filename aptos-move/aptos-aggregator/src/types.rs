@@ -1,19 +1,24 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    bounded_math::SignedU128,
-    utils::{bytes_to_string, is_string_layout, string_to_bytes},
-};
+use crate::bounded_math::SignedU128;
 use aptos_logger::error;
-// TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
-pub use aptos_types::aggregator::{DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue};
+use aptos_types::delayed_fields::PanicError;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::values::{Struct, Value};
+use move_vm_types::{
+    delayed_values::{
+        delayed_field_id::{DelayedFieldID, TryFromMoveValue},
+        derived_string_snapshot::{
+            bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
+            is_derived_string_struct_layout,
+        },
+    },
+    values::{Struct, Value},
+};
 
 // Wrapping another error, to add a variant that represents
 // something that should never happen - i.e. a code invariant error,
@@ -36,7 +41,7 @@ impl<T: std::fmt::Debug> PanicOr<T> {
 
 pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
     let msg = format!(
-        "Delayed logic code invariant broken (there is a bug in the code), {:?}",
+        "Delayed materialization code invariant broken (there is a bug in the code), {:?}",
         message
     );
     error!("{}", msg);
@@ -72,7 +77,9 @@ impl From<DelayedFieldsSpeculativeError> for PartialVMError {
 impl<T: std::fmt::Debug> From<&PanicOr<T>> for StatusCode {
     fn from(err: &PanicOr<T>) -> Self {
         match err {
-            PanicOr::CodeInvariantError(_) => StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+            PanicOr::CodeInvariantError(_) => {
+                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+            },
             PanicOr::Or(_) => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
         }
     }
@@ -82,7 +89,7 @@ impl<T: std::fmt::Debug> From<PanicOr<T>> for PartialVMError {
     fn from(err: PanicOr<T>) -> Self {
         match err {
             PanicOr::CodeInvariantError(msg) => {
-                PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
+                PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
                     .with_message(msg)
             },
             PanicOr::Or(err) => PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
@@ -200,19 +207,33 @@ impl DelayedFieldValue {
             )),
         }
     }
-}
 
-impl TryIntoMoveValue for DelayedFieldValue {
-    type Error = PartialVMError;
-
-    fn try_into_move_value(self, layout: &MoveTypeLayout) -> Result<Value, Self::Error> {
+    pub fn try_into_move_value(
+        self,
+        layout: &MoveTypeLayout,
+        width: u32,
+    ) -> Result<Value, PartialVMError> {
         use DelayedFieldValue::*;
         use MoveTypeLayout::*;
 
         Ok(match (self, layout) {
-            (Aggregator(v) | Snapshot(v), U64) => Value::u64(v as u64),
-            (Aggregator(v) | Snapshot(v), U128) => Value::u128(v),
-            (Derived(bytes), layout) if is_string_layout(layout) => bytes_to_string(bytes),
+            (Aggregator(v) | Snapshot(v), U64) => {
+                if width != 8 {
+                    return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                        .with_message(format!("Expected width 8 for U64, got {}", width)));
+                }
+                Value::u64(v as u64)
+            },
+            (Aggregator(v) | Snapshot(v), U128) => {
+                if width != 16 {
+                    return Err(PartialVMError::new(StatusCode::VM_EXTENSION_ERROR)
+                        .with_message(format!("Expected width 16 for U128, got {}", width)));
+                }
+                Value::u128(v)
+            },
+            (Derived(bytes), layout) if is_derived_string_struct_layout(layout) => {
+                bytes_and_width_to_derived_string_struct(bytes, width as usize)?
+            },
             (value, layout) => {
                 return Err(
                     PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
@@ -222,6 +243,17 @@ impl TryIntoMoveValue for DelayedFieldValue {
                 )
             },
         })
+    }
+
+    /// Approximate memory consumption of current DelayedFieldValue
+    pub fn get_approximate_memory_size(&self) -> usize {
+        // 32 + len
+        std::mem::size_of::<DelayedFieldValue>()
+            + match &self {
+                DelayedFieldValue::Aggregator(_) | DelayedFieldValue::Snapshot(_) => 0,
+                // additional allocated memory for the data:
+                DelayedFieldValue::Derived(v) => v.len(),
+            }
     }
 }
 
@@ -236,19 +268,20 @@ impl TryFromMoveValue for DelayedFieldValue {
         layout: &MoveTypeLayout,
         value: Value,
         hint: &Self::Hint,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<(Self, u32), Self::Error> {
         use DelayedFieldValue::*;
         use IdentifierMappingKind as K;
         use MoveTypeLayout as L;
 
         Ok(match (hint, layout) {
-            (K::Aggregator, L::U64) => Aggregator(value.value_as::<u64>()? as u128),
-            (K::Aggregator, L::U128) => Aggregator(value.value_as::<u128>()?),
-            (K::Snapshot, L::U64) => Snapshot(value.value_as::<u64>()? as u128),
-            (K::Snapshot, L::U128) => Snapshot(value.value_as::<u128>()?),
-            (K::Snapshot, layout) if is_string_layout(layout) => {
-                let bytes = string_to_bytes(value.value_as::<Struct>()?)?;
-                Derived(bytes)
+            (K::Aggregator, L::U64) => (Aggregator(value.value_as::<u64>()? as u128), 8),
+            (K::Aggregator, L::U128) => (Aggregator(value.value_as::<u128>()?), 16),
+            (K::Snapshot, L::U64) => (Snapshot(value.value_as::<u64>()? as u128), 8),
+            (K::Snapshot, L::U128) => (Snapshot(value.value_as::<u128>()?), 16),
+            (K::DerivedString, layout) if is_derived_string_struct_layout(layout) => {
+                let (bytes, width) =
+                    derived_string_struct_to_bytes_and_length(value.value_as::<Struct>()?)?;
+                (Derived(bytes), width)
             },
             _ => {
                 return Err(
@@ -259,69 +292,6 @@ impl TryFromMoveValue for DelayedFieldValue {
                 )
             },
         })
-    }
-}
-
-// TODO[agg_v2](cleanup) see if we need both AggregatorValue and SnapshotValue.
-// Or alternatively, maybe they should be nested (i.e. DelayedFieldValue::Snapshot(SnapshotValue))
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SnapshotValue {
-    Integer(u128),
-    String(Vec<u8>),
-}
-
-impl SnapshotValue {
-    pub fn into_aggregator_value(self) -> Result<u128, PanicError> {
-        match self {
-            SnapshotValue::Integer(value) => Ok(value),
-            SnapshotValue::String(_) => Err(code_invariant_error(
-                "Tried calling into_aggregator_value on String SnapshotValue",
-            )),
-        }
-    }
-}
-
-impl TryFrom<DelayedFieldValue> for SnapshotValue {
-    type Error = PanicError;
-
-    fn try_from(value: DelayedFieldValue) -> Result<SnapshotValue, PanicError> {
-        match value {
-            DelayedFieldValue::Aggregator(_) => Err(code_invariant_error(
-                "Tried calling SnapshotValue::try_from on AggregatorValue(Aggregator)",
-            )),
-            DelayedFieldValue::Snapshot(v) => Ok(SnapshotValue::Integer(v)),
-            DelayedFieldValue::Derived(v) => Ok(SnapshotValue::String(v)),
-        }
-    }
-}
-
-impl From<SnapshotValue> for DelayedFieldValue {
-    fn from(value: SnapshotValue) -> DelayedFieldValue {
-        match value {
-            SnapshotValue::Integer(v) => DelayedFieldValue::Snapshot(v),
-            SnapshotValue::String(v) => DelayedFieldValue::Derived(v),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum SnapshotToStringFormula {
-    Concat { prefix: Vec<u8>, suffix: Vec<u8> },
-}
-
-impl SnapshotToStringFormula {
-    pub fn apply_to(&self, base: u128) -> Vec<u8> {
-        match self {
-            SnapshotToStringFormula::Concat { prefix, suffix } => {
-                let middle_string = base.to_string();
-                let middle = middle_string.as_bytes();
-                let mut result = Vec::with_capacity(prefix.len() + middle.len() + suffix.len());
-                result.extend(prefix);
-                result.extend(middle);
-                result.extend(suffix);
-                result
-            },
-        }
     }
 }
 

@@ -29,8 +29,8 @@ use aptos_types::{
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, BlockOutput, ChangeSet,
         ExecutionStatus, RawTransaction, Script, SignedTransaction, Transaction,
-        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
-        WriteSetPayload,
+        TransactionArgument, TransactionAuxiliaryData, TransactionOutput, TransactionPayload,
+        TransactionStatus, WriteSetPayload,
     },
     vm_status::{StatusCode, VMStatus},
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -94,6 +94,7 @@ impl VMExecutor for MockVM {
                     vec![],
                     0,
                     KEEP_STATUS.clone(),
+                    TransactionAuxiliaryData::default(),
                 ));
                 continue;
             }
@@ -120,6 +121,7 @@ impl VMExecutor for MockVM {
                     )],
                     0,
                     KEEP_STATUS.clone(),
+                    TransactionAuxiliaryData::default(),
                 ));
                 continue;
             }
@@ -141,6 +143,7 @@ impl VMExecutor for MockVM {
                         events,
                         0,
                         KEEP_STATUS.clone(),
+                        TransactionAuxiliaryData::default(),
                     ));
                 },
                 MockVMTransaction::Payment {
@@ -156,6 +159,7 @@ impl VMExecutor for MockVM {
                             vec![],
                             0,
                             DISCARD_STATUS.clone(),
+                            TransactionAuxiliaryData::default(),
                         ));
                         continue;
                     }
@@ -182,6 +186,7 @@ impl VMExecutor for MockVM {
                         events,
                         0,
                         TransactionStatus::Keep(ExecutionStatus::Success),
+                        TransactionAuxiliaryData::default(),
                     ));
                 },
             }
@@ -411,9 +416,9 @@ fn decode_transaction(txn: &SignedTransaction) -> MockVMTransaction {
         TransactionPayload::Multisig(_) => {
             unimplemented!("MockVM does not support multisig transaction payload.")
         },
-        // Deprecated. Will be removed in the future.
+        // Deprecated.
         TransactionPayload::ModuleBundle(_) => {
-            unimplemented!("MockVM does not support Module transaction payload.")
+            unreachable!("Module bundle payload has been removed")
         },
     }
 }

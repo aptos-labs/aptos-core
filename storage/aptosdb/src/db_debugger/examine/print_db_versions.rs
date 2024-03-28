@@ -109,7 +109,7 @@ impl Cmd {
         println!(
             "Max TransactionInfo version: {:?}",
             Self::get_latest_version_for_schema::<TransactionInfoSchema>(
-                ledger_db.transaction_info_db()
+                ledger_db.transaction_info_db_raw()
             )?,
         );
 
@@ -127,12 +127,12 @@ impl Cmd {
 
         println!(
             "Max WriteSet version: {:?}",
-            Self::get_latest_version_for_schema::<WriteSetSchema>(ledger_db.write_set_db())?,
+            Self::get_latest_version_for_schema::<WriteSetSchema>(ledger_db.write_set_db_raw())?,
         );
 
         {
             let mut iter = ledger_db
-                .transaction_accumulator_db()
+                .transaction_accumulator_db_raw()
                 .iter::<TransactionAccumulatorSchema>(ReadOptions::default())?;
             iter.seek_to_last();
             let position = iter.next().transpose()?.map(|kv| kv.0);

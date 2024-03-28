@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x2::M {
     private entry fun f1() {
         Tuple()
@@ -7,15 +7,6 @@ module 0x2::M {
         Tuple()
     }
     friend entry fun f3() {
-        Tuple()
-    }
-    spec fun $f1() {
-        Tuple()
-    }
-    spec fun $f2() {
-        Tuple()
-    }
-    spec fun $f3() {
         Tuple()
     }
 } // end 0x2::M

@@ -8,6 +8,7 @@ on:
       - mainnet
       # preview branches
       - preview
+      - preview-networking
       # aptos-indexer-grpc network-specific release branches
       - aptos-indexer-grpc-devnet
       - aptos-indexer-grpc-testnet

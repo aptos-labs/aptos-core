@@ -1,10 +1,19 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_bitvec::BitVec;
 use aptos_consensus_types::common::Round;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use thiserror::Error as ThisError;
+
+#[derive(Clone, ThisError, Debug, Serialize, Deserialize)]
+pub enum DagFetchError {
+    #[error("fetch failed")]
+    Failed,
+    #[error("already exists")]
+    AlreadyExists,
+}
 
 #[derive(Clone, ThisError, Debug, Serialize, Deserialize)]
 pub enum NodeBroadcastHandleError {
@@ -14,6 +23,8 @@ pub enum NodeBroadcastHandleError {
     MissingParents,
     #[error("stale round number")]
     StaleRound(Round),
+    #[error("refused to vote")]
+    VoteRefused,
 }
 
 #[derive(Clone, Debug, ThisError, Serialize, Deserialize)]

@@ -1,14 +1,16 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     dag::{
         adapter::TLedgerInfoProvider,
-        anchor_election::{RoundRobinAnchorElection, TChainHealthBackoff},
+        anchor_election::RoundRobinAnchorElection,
         dag_driver::DagDriver,
         dag_fetcher::TFetchRequester,
         dag_network::{RpcWithFallback, TDAGNetworkSender},
-        dag_store::Dag,
+        dag_store::DagStore,
         errors::DagDriverError,
+        health::{HealthBackoff, NoChainHealth, NoPipelineBackpressure},
         order_rule::OrderRule,
         round_state::{OptimisticResponsive, RoundState},
         tests::{
@@ -24,7 +26,7 @@ use crate::{
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::config::DagPayloadConfig;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
+use aptos_infallible::Mutex;
 use aptos_reliable_broadcast::{RBNetworkSender, ReliableBroadcast};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -96,18 +98,6 @@ impl TLedgerInfoProvider for MockLedgerInfoProvider {
     }
 }
 
-struct MockChainHealthBackoff {}
-
-impl TChainHealthBackoff for MockChainHealthBackoff {
-    fn get_round_backoff(&self, _round: Round) -> (f64, Option<Duration>) {
-        (1.0, None)
-    }
-
-    fn get_round_payload_limits(&self, _round: Round) -> (f64, Option<(u64, u64)>) {
-        (1.0, None)
-    }
-}
-
 struct MockFetchRequester {}
 
 impl TFetchRequester for MockFetchRequester {
@@ -132,14 +122,17 @@ fn setup(
 
     let mock_ledger_info = LedgerInfo::mock_genesis(None);
     let mock_ledger_info = generate_ledger_info_with_sig(signers, mock_ledger_info);
-    let storage = Arc::new(MockStorage::new_with_ledger_info(mock_ledger_info.clone()));
-    let dag = Arc::new(RwLock::new(Dag::new(
+    let storage = Arc::new(MockStorage::new_with_ledger_info(
+        mock_ledger_info.clone(),
+        epoch_state.clone(),
+    ));
+    let dag = Arc::new(DagStore::new(
         epoch_state.clone(),
         storage.clone(),
         Arc::new(MockPayloadManager {}),
         0,
         TEST_DAG_WINDOW,
-    )));
+    ));
 
     let rb = Arc::new(ReliableBroadcast::new(
         signers.iter().map(|s| s.author()).collect(),
@@ -152,22 +145,22 @@ fn setup(
     let time_service = TimeService::mock();
     let validators = signers.iter().map(|vs| vs.author()).collect();
     let (tx, _) = unbounded();
-    let order_rule = OrderRule::new(
+    let order_rule = Arc::new(Mutex::new(OrderRule::new(
         epoch_state.clone(),
         1,
         dag.clone(),
         Arc::new(RoundRobinAnchorElection::new(validators)),
         Arc::new(TestNotifier { tx }),
-        storage.clone(),
         TEST_DAG_WINDOW as Round,
-    );
+        None,
+    )));
 
     let fetch_requester = Arc::new(MockFetchRequester {});
 
     let ledger_info_provider = Arc::new(MockLedgerInfoProvider {
         latest_ledger_info: mock_ledger_info,
     });
-    let (round_tx, _round_rx) = tokio::sync::mpsc::channel(10);
+    let (round_tx, _round_rx) = tokio::sync::mpsc::unbounded_channel();
     let round_state = RoundState::new(
         round_tx.clone(),
         Box::new(OptimisticResponsive::new(round_tx)),
@@ -175,7 +168,7 @@ fn setup(
 
     DagDriver::new(
         signers[0].author(),
-        epoch_state,
+        epoch_state.clone(),
         dag,
         Arc::new(MockPayloadClient::new(None)),
         rb,
@@ -187,8 +180,13 @@ fn setup(
         round_state,
         TEST_DAG_WINDOW as Round,
         DagPayloadConfig::default(),
-        Arc::new(MockChainHealthBackoff {}),
+        HealthBackoff::new(
+            epoch_state,
+            NoChainHealth::new(),
+            NoPipelineBackpressure::new(),
+        ),
         false,
+        true,
     )
 }
 
@@ -198,7 +196,7 @@ async fn test_certified_node_handler() {
     let network_sender = Arc::new(MockNetworkSender {
         _drop_notifier: None,
     });
-    let mut driver = setup(&signers, validator_verifier, network_sender);
+    let driver = setup(&signers, validator_verifier, network_sender);
 
     let first_round_node = new_certified_node(1, signers[0].author(), vec![]);
     // expect an ack for a valid message
@@ -223,7 +221,7 @@ async fn test_dag_driver_drop() {
     let network_sender = Arc::new(MockNetworkSender {
         _drop_notifier: Some(tx),
     });
-    let mut driver = setup(&signers, validator_verifier, network_sender);
+    let driver = setup(&signers, validator_verifier, network_sender);
 
     driver.enter_new_round(1).await;
 

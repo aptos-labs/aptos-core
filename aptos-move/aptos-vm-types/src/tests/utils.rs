@@ -10,7 +10,6 @@ use crate::{
 use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, DeltaOp},
-    types::DelayedFieldID,
 };
 use aptos_types::{
     account_address::AccountAddress,
@@ -18,7 +17,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    transaction::{ExecutionStatus, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
     write_set::WriteOp,
 };
 use move_core_types::{
@@ -26,6 +25,7 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     value::MoveTypeLayout,
 };
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{collections::BTreeMap, sync::Arc};
 
 pub(crate) struct MockChangeSetChecker;
@@ -263,6 +263,7 @@ pub(crate) fn build_vm_output(
             .build(),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
+        TransactionAuxiliaryData::default(),
     )
 }
 
@@ -273,8 +274,9 @@ pub(crate) struct ExpandedVMChangeSetBuilder {
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-    reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-    group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
+    reads_needing_delayed_field_exchange:
+        BTreeMap<StateKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+    group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
@@ -355,7 +357,7 @@ impl ExpandedVMChangeSetBuilder {
     pub(crate) fn with_reads_needing_delayed_field_exchange(
         mut self,
         reads_needing_delayed_field_exchange: impl IntoIterator<
-            Item = (StateKey, (WriteOp, Arc<MoveTypeLayout>)),
+            Item = (StateKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)),
         >,
     ) -> Self {
         assert!(self.reads_needing_delayed_field_exchange.is_empty());
@@ -366,7 +368,9 @@ impl ExpandedVMChangeSetBuilder {
 
     pub(crate) fn with_group_reads_needing_delayed_field_exchange(
         mut self,
-        group_reads_needing_delayed_field_exchange: impl IntoIterator<Item = (StateKey, (WriteOp, u64))>,
+        group_reads_needing_delayed_field_exchange: impl IntoIterator<
+            Item = (StateKey, (StateValueMetadata, u64)),
+        >,
     ) -> Self {
         assert!(self.group_reads_needing_delayed_field_exchange.is_empty());
         self.group_reads_needing_delayed_field_exchange

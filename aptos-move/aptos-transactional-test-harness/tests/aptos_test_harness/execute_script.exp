@@ -1,9 +1,5 @@
 processed 3 tasks
 
-task 1 'run'. lines 5-13:
-mutable inputs after call: local#0: 0
-return values: 0
-
 task 2 'view'. lines 15-15:
 key 0x1::coin::CoinStore<0x1::aptos_coin::AptosCoin> {
     coin: store 0x1::coin::Coin<0x1::aptos_coin::AptosCoin> {

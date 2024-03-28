@@ -1,153 +1,3 @@
-============ initial bytecode ================
-
-[variant baseline]
-fun pack_unpack::pack1($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-  0: $t3 := pack pack_unpack::S($t0, $t1, $t2)
-  1: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-     var $t5: u8
-  0: $t4 := infer($t0)
-  1: $t5 := infer($t1)
-  2: $t3 := pack pack_unpack::S($t4, $t2, $t5)
-  3: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack3($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-  0: $t4 := infer($t0)
-  1: $t3 := pack pack_unpack::S($t1, $t4, $t2)
-  2: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack4($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-     var $t5: u8
-  0: $t4 := infer($t0)
-  1: $t5 := infer($t1)
-  2: $t3 := pack pack_unpack::S($t2, $t4, $t5)
-  3: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack5($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-  0: $t4 := infer($t0)
-  1: $t3 := pack pack_unpack::S($t1, $t2, $t4)
-  2: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-     var $t5: u8
-  0: $t4 := infer($t0)
-  1: $t5 := infer($t1)
-  2: $t3 := pack pack_unpack::S($t2, $t5, $t4)
-  3: return $t3
-}
-
-============ after LiveVarAnalysisProcessor: ================
-
-[variant baseline]
-fun pack_unpack::pack1($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     # live vars: $t0, $t1, $t2
-  0: $t3 := pack pack_unpack::S($t0, $t1, $t2)
-     # live vars: $t3
-  1: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack2($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-     var $t5: u8
-     # live vars: $t0, $t1, $t2
-  0: $t4 := copy($t0)
-     # live vars: $t1, $t2, $t4
-  1: $t5 := copy($t1)
-     # live vars: $t2, $t4, $t5
-  2: $t3 := pack pack_unpack::S($t4, $t2, $t5)
-     # live vars: $t3
-  3: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack3($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-     # live vars: $t0, $t1, $t2
-  0: $t4 := copy($t0)
-     # live vars: $t1, $t2, $t4
-  1: $t3 := pack pack_unpack::S($t1, $t4, $t2)
-     # live vars: $t3
-  2: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack4($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-     var $t5: u8
-     # live vars: $t0, $t1, $t2
-  0: $t4 := copy($t0)
-     # live vars: $t1, $t2, $t4
-  1: $t5 := copy($t1)
-     # live vars: $t2, $t4, $t5
-  2: $t3 := pack pack_unpack::S($t2, $t4, $t5)
-     # live vars: $t3
-  3: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack5($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-     # live vars: $t0, $t1, $t2
-  0: $t4 := copy($t0)
-     # live vars: $t1, $t2, $t4
-  1: $t3 := pack pack_unpack::S($t1, $t2, $t4)
-     # live vars: $t3
-  2: return $t3
-}
-
-
-[variant baseline]
-fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): pack_unpack::S {
-     var $t3: pack_unpack::S
-     var $t4: u8
-     var $t5: u8
-     # live vars: $t0, $t1, $t2
-  0: $t4 := copy($t0)
-     # live vars: $t1, $t2, $t4
-  1: $t5 := copy($t1)
-     # live vars: $t2, $t4, $t5
-  2: $t3 := pack pack_unpack::S($t2, $t5, $t4)
-     # live vars: $t3
-  3: return $t3
-}
-
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -167,10 +17,12 @@ B0:
 	4: Ret
 }
 pack2(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 1 */ {
+L3:	loc0: u8
+L4:	loc1: u8
 B0:
-	0: CopyLoc[0](Arg0: u8)
+	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
-	2: CopyLoc[1](Arg1: u8)
+	2: MoveLoc[1](Arg1: u8)
 	3: StLoc[4](loc1: u8)
 	4: MoveLoc[3](loc0: u8)
 	5: MoveLoc[2](Arg2: u8)
@@ -179,8 +31,9 @@ B0:
 	8: Ret
 }
 pack3(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 2 */ {
+L3:	loc0: u8
 B0:
-	0: CopyLoc[0](Arg0: u8)
+	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
 	2: MoveLoc[1](Arg1: u8)
 	3: MoveLoc[3](loc0: u8)
@@ -189,10 +42,12 @@ B0:
 	6: Ret
 }
 pack4(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 3 */ {
+L3:	loc0: u8
+L4:	loc1: u8
 B0:
-	0: CopyLoc[0](Arg0: u8)
+	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
-	2: CopyLoc[1](Arg1: u8)
+	2: MoveLoc[1](Arg1: u8)
 	3: StLoc[4](loc1: u8)
 	4: MoveLoc[2](Arg2: u8)
 	5: MoveLoc[3](loc0: u8)
@@ -201,8 +56,9 @@ B0:
 	8: Ret
 }
 pack5(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 4 */ {
+L3:	loc0: u8
 B0:
-	0: CopyLoc[0](Arg0: u8)
+	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
 	2: MoveLoc[1](Arg1: u8)
 	3: MoveLoc[2](Arg2: u8)
@@ -211,10 +67,12 @@ B0:
 	6: Ret
 }
 pack6(Arg0: u8, Arg1: u8, Arg2: u8): S /* def_idx: 5 */ {
+L3:	loc0: u8
+L4:	loc1: u8
 B0:
-	0: CopyLoc[0](Arg0: u8)
+	0: MoveLoc[0](Arg0: u8)
 	1: StLoc[3](loc0: u8)
-	2: CopyLoc[1](Arg1: u8)
+	2: MoveLoc[1](Arg1: u8)
 	3: StLoc[4](loc1: u8)
 	4: MoveLoc[2](Arg2: u8)
 	5: MoveLoc[4](loc1: u8)
@@ -223,3 +81,4 @@ B0:
 	8: Ret
 }
 }
+============ bytecode verification succeeded ========

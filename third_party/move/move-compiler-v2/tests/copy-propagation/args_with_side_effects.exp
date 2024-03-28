@@ -24,67 +24,6 @@ public fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
-============ after AvailableCopiesAnalysisProcessor: ================
-
-[variant baseline]
-fun m::add($t0: u64, $t1: u64): u64 {
-     var $t2: u64
-     # before: {}, after: {}
-  0: $t2 := +($t0, $t1)
-     # before: {}, after: {}
-  1: return $t2
-}
-
-
-[variant baseline]
-public fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     # before: {}, after: {$t2 := $t0}
-  0: $t2 := infer($t0)
-     # before: {$t2 := $t0}, after: {$t2 := $t0}
-  1: $t5 := 1
-     # before: {$t2 := $t0}, after: {$t2 := $t0}
-  2: $t4 := +($t0, $t5)
-     # before: {$t2 := $t0}, after: {$t0 := $t4}
-  3: $t0 := infer($t4)
-     # before: {$t0 := $t4}, after: {$t0 := $t4, $t3 := $t0}
-  4: $t3 := infer($t0)
-     # before: {$t0 := $t4, $t3 := $t0}, after: {$t0 := $t4, $t3 := $t0}
-  5: $t1 := m::add($t2, $t3)
-     # before: {$t0 := $t4, $t3 := $t0}, after: {$t0 := $t4, $t3 := $t0}
-  6: return $t1
-}
-
-============ after CopyPropagation: ================
-
-[variant baseline]
-fun m::add($t0: u64, $t1: u64): u64 {
-     var $t2: u64
-  0: $t2 := +($t0, $t1)
-  1: return $t2
-}
-
-
-[variant baseline]
-public fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-  0: $t2 := infer($t0)
-  1: $t5 := 1
-  2: $t4 := +($t0, $t5)
-  3: $t0 := infer($t4)
-  4: $t3 := infer($t4)
-  5: $t1 := m::add($t2, $t4)
-  6: return $t1
-}
-
 ============ after DeadStoreElimination: ================
 
 [variant baseline]
@@ -102,9 +41,11 @@ public fun m::test($t0: u64): u64 {
      var $t3: u64
      var $t4: u64
      var $t5: u64
-  0: $t2 := infer($t0)
+  0: $t2 := copy($t0)
   1: $t5 := 1
   2: $t4 := +($t0, $t5)
-  3: $t1 := m::add($t2, $t4)
-  4: return $t1
+  3: $t0 := move($t4)
+  4: $t3 := move($t0)
+  5: $t1 := m::add($t2, $t3)
+  6: return $t1
 }

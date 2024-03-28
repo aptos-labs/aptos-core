@@ -1,0 +1,37 @@
+
+Diagnostics:
+error: type `T` does not have expected ability `key`
+  ┌─ tests/checking/abilities/missing_key.move:4:9
+  │
+4 │         move_from<T>(addr);
+  │         ^^^^^^^^^^^^^^^^^^
+
+error: type `S<Impotent>` does not have expected ability `key`
+   ┌─ tests/checking/abilities/missing_key.move:15:9
+   │
+15 │         move_from<S<Impotent>>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: type `Impotent` does not have expected ability `key`
+   ┌─ tests/checking/abilities/missing_key.move:16:9
+   │
+16 │         borrow_global_mut<Impotent>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: type `Impotent` does not have expected ability `key`
+   ┌─ tests/checking/abilities/missing_key.move:17:9
+   │
+17 │         borrow_global<Impotent>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: type `Impotent` does not have expected ability `key`
+   ┌─ tests/checking/abilities/missing_key.move:18:9
+   │
+18 │         exists<Impotent>(addr);
+   │         ^^^^^^^^^^^^^^^^^^^^^^
+
+error: type `Impotent` does not have expected ability `key`
+   ┌─ tests/checking/abilities/missing_key.move:22:25
+   │
+22 │         move_to(signer, Impotent {})
+   │                         ^^^^^^^^^^^

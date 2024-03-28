@@ -44,6 +44,7 @@ url = { workspace = true }
 [dev-dependencies]
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
+tempfile = { workspace = true }
 
 [features]
 default = []

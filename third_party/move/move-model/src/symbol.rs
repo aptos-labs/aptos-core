@@ -23,6 +23,12 @@ impl Symbol {
     }
 }
 
+impl AsRef<Symbol> for Symbol {
+    fn as_ref(&self) -> &Symbol {
+        self
+    }
+}
+
 /// A helper to support symbols in formatting.
 pub struct SymbolDisplay<'a> {
     sym: &'a Symbol,
@@ -82,10 +88,21 @@ impl SymbolPool {
     pub fn string(&self, sym: Symbol) -> Rc<String> {
         self.inner.borrow().strings[sym.0].clone()
     }
+
+    pub fn symbol_starts_with_underscore(&self, sym: Symbol) -> bool {
+        self.string(sym).starts_with('_')
+    }
 }
 
 impl Default for SymbolPool {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+impl Symbol {
+    pub fn new(val: usize) -> Symbol {
+        Symbol(val)
     }
 }

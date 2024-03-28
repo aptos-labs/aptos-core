@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{
     register_int_counter, register_int_counter_vec, IntCounter, IntCounterVec,
@@ -30,6 +31,15 @@ pub static PARSER_FAIL_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
         "nft_metadata_crawler_parser_fail_count",
         "Number of times the parser has failed",
+    )
+    .unwrap()
+});
+
+/// Number of times the NFT Metadata Crawler Parser has received a URI marked as not to parse
+pub static DO_NOT_PARSE_COUNT: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "nft_metadata_crawler_parser_do_not_parse_count",
+        "Number of times the parser received a URI marked as not to parse",
     )
     .unwrap()
 });

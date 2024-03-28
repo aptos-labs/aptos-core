@@ -11,9 +11,12 @@ use aptos_crypto::{
 };
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{
+    account_config::NEW_EPOCH_EVENT_MOVE_TYPE_TAG,
     block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     contract_event::ContractEvent,
+    dkg::DKG_START_EVENT_MOVE_TYPE_TAG,
     epoch_state::EpochState,
+    jwks::OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG,
     ledger_info::LedgerInfoWithSignatures,
     proof::{AccumulatorExtensionProof, SparseMerkleProofExt},
     state_store::{state_key::StateKey, state_value::StateValue},
@@ -32,6 +35,7 @@ use std::{
     cmp::max,
     collections::{BTreeSet, HashMap},
     fmt::Debug,
+    ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -526,10 +530,19 @@ impl ProofRead for ProofReader {
 
 /// Used in both state sync and consensus to filter the txn events that should be subscribable by node components.
 pub fn should_forward_to_subscription_service(event: &ContractEvent) -> bool {
+    let type_tag = event.type_tag();
+    type_tag == OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG.deref()
+        || type_tag == DKG_START_EVENT_MOVE_TYPE_TAG.deref()
+        || type_tag == NEW_EPOCH_EVENT_MOVE_TYPE_TAG.deref()
+}
+
+#[cfg(feature = "bench")]
+pub fn should_forward_to_subscription_service_old(event: &ContractEvent) -> bool {
     matches!(
         event.type_tag().to_string().as_str(),
         "0x1::reconfiguration::NewEpochEvent"
             | "0x1::dkg::DKGStartEvent"
-            | "0x1::jwks::OnChainJWKMapUpdated"
+            | "\
+            0x1::jwks::ObservedJWKsUpdated"
     )
 }

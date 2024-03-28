@@ -1,13 +1,5 @@
 
 Diagnostics:
-error: Invalid type for constant
-  ┌─ tests/checking/typing/constant_non_base_type.move:3:22
-  │
-3 │     const C1: &u64 = &0;
-  │     -----------------^^-
-  │     │
-  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
-
 error: Not a valid constant expression.
   ┌─ tests/checking/typing/constant_non_base_type.move:3:22
   │
@@ -17,10 +9,10 @@ error: Not a valid constant expression.
   │                      Invalid call or operation in constant
 
 error: Invalid type for constant
-  ┌─ tests/checking/typing/constant_non_base_type.move:4:26
+  ┌─ tests/checking/typing/constant_non_base_type.move:3:22
   │
-4 │     const C2: &mut u64 = &0;
-  │     ---------------------^^-
+3 │     const C1: &u64 = &0;
+  │     -----------------^^-
   │     │
   │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
 
@@ -32,7 +24,15 @@ error: Not a valid constant expression.
   │                          │
   │                          Invalid call or operation in constant
 
-error: mutability mismatch (&mut != &)
+error: Invalid type for constant
+  ┌─ tests/checking/typing/constant_non_base_type.move:4:26
+  │
+4 │     const C2: &mut u64 = &0;
+  │     ---------------------^^-
+  │     │
+  │     Expected one of `u8`, `u16, `u32`, `u64`, `u128`, `u256`, `bool`, `address`, or `vector<_>` with valid element type.
+
+error: expected `&mut` but `&` was provided
   ┌─ tests/checking/typing/constant_non_base_type.move:4:26
   │
 4 │     const C2: &mut u64 = &0;

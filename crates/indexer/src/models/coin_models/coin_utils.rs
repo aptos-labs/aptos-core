@@ -37,7 +37,7 @@ impl CoinInfoResource {
 
     /// Getting the table item location of the supply aggregator
     pub fn get_aggregator_metadata(&self) -> Option<AggregatorResource> {
-        if let Some(inner) = self.supply.vec.get(0) {
+        if let Some(inner) = self.supply.vec.first() {
             inner.aggregator.get_aggregator_metadata()
         } else {
             None
@@ -64,7 +64,7 @@ pub struct AggregatorWrapperResource {
 impl AggregatorWrapperResource {
     /// In case we do want to track supply
     pub fn get_aggregator_metadata(&self) -> Option<AggregatorResource> {
-        self.vec.get(0).cloned()
+        self.vec.first().cloned()
     }
 }
 
@@ -76,7 +76,7 @@ pub struct IntegerWrapperResource {
 impl IntegerWrapperResource {
     /// In case we do want to track supply
     pub fn get_supply(&self) -> Option<BigDecimal> {
-        self.vec.get(0).map(|inner| inner.value.clone())
+        self.vec.first().map(|inner| inner.value.clone())
     }
 }
 

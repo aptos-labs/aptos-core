@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+mod agg_trx_producer;
 mod counters;
 mod dkg_manager;
 pub mod epoch_manager;
@@ -12,20 +13,19 @@ pub mod types;
 use crate::{
     epoch_manager::EpochManager, network::NetworkTask, network_interface::DKGNetworkClient,
 };
-use aptos_config::config::IdentityBlob;
 use aptos_event_notifications::{
     DbBackedOnChainConfig, EventNotificationListener, ReconfigNotificationListener,
 };
 use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents};
+use aptos_types::dkg::{DKGTrait, DefaultDKG};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
-use std::sync::Arc;
 use tokio::runtime::Runtime;
 pub use types::DKGMessage;
 
 pub fn start_dkg_runtime(
     my_addr: AccountAddress,
-    identity_blob: Arc<IdentityBlob>,
+    dkg_dealer_sk: <DefaultDKG as DKGTrait>::DealerPrivateKey,
     network_client: NetworkClient<DKGMessage>,
     network_service_events: NetworkServiceEvents<DKGMessage>,
     reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
@@ -38,7 +38,7 @@ pub fn start_dkg_runtime(
 
     let dkg_epoch_manager = EpochManager::new(
         my_addr,
-        identity_blob.clone(),
+        dkg_dealer_sk,
         reconfig_events,
         dkg_start_events,
         self_sender,
@@ -50,6 +50,3 @@ pub fn start_dkg_runtime(
     runtime.spawn(dkg_epoch_manager.start(network_receiver));
     runtime
 }
-
-//TODO(zjma): make this test-only after real dkg.
-pub(crate) mod dummy_dkg;

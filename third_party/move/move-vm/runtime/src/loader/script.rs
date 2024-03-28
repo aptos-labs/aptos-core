@@ -12,7 +12,10 @@ use move_binary_format::{
     file_format::{Bytecode, CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex},
 };
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::loaded_data::runtime_types::{StructIdentifier, Type};
+use move_vm_types::loaded_data::{
+    runtime_access_specifier::AccessSpecifier,
+    runtime_types::{StructIdentifier, Type},
+};
 use std::{collections::BTreeMap, sync::Arc};
 
 // A Script is very similar to a `CompiledScript` but data is "transformed" to a representation
@@ -22,7 +25,7 @@ use std::{collections::BTreeMap, sync::Arc};
 #[derive(Clone, Debug)]
 pub(crate) struct Script {
     // primitive pools
-    pub(crate) script: CompiledScript,
+    pub(crate) script: Arc<CompiledScript>,
 
     // functions as indexes into the Loader function list
     pub(crate) function_refs: Vec<FunctionHandle>,
@@ -44,7 +47,7 @@ pub(crate) struct Script {
 
 impl Script {
     pub(crate) fn new(
-        script: CompiledScript,
+        script: Arc<CompiledScript>,
         script_hash: &ScriptHash,
         cache: &ModuleStorageAdapter,
         name_cache: &StructNameCache,
@@ -145,6 +148,7 @@ impl Script {
             return_types: return_tys.clone(),
             local_types: local_tys,
             parameter_types: parameter_tys.clone(),
+            access_specifier: AccessSpecifier::Any,
         });
 
         let mut single_signature_token_map = BTreeMap::new();
@@ -159,7 +163,7 @@ impl Script {
                 | Bytecode::VecUnpack(si, _)
                 | Bytecode::VecSwap(si) => {
                     if !single_signature_token_map.contains_key(si) {
-                        let ty = match script.signature_at(*si).0.get(0) {
+                        let ty = match script.signature_at(*si).0.first() {
                             None => {
                                 return Err(PartialVMError::new(
                                     StatusCode::VERIFIER_INVARIANT_VIOLATION,

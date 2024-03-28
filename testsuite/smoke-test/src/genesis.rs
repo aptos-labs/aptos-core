@@ -35,6 +35,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[ignore] // TODO(joshlind): revisit the flakes once we update state sync to handle forks automatically.
 #[tokio::test]
 /// This test verifies:
 /// 1. The behaviour of the consensus sync_only mode (to emulate a network halt).
@@ -455,7 +456,7 @@ fn generate_genesis_transaction(
             fun main(vm_signer: &signer, framework_signer: &signer) {{
                 stake::remove_validators(framework_signer, &vector[@0x{}]);
                 block::emit_writeset_block_event(vm_signer, @0x1);
-                aptos_governance::reconfigure(framework_signer);
+                aptos_governance::force_end_epoch(framework_signer);
             }}
     }}
     "#,

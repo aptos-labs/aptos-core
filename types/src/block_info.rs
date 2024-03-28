@@ -74,6 +74,10 @@ impl BlockInfo {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        *self == Self::empty()
+    }
+
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn random(round: Round) -> Self {
         Self {
@@ -227,3 +231,6 @@ impl Display for BlockInfo {
         )
     }
 }
+
+/// A continuously increasing sequence number for committed blocks.
+pub type BlockHeight = u64;

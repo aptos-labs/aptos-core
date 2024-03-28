@@ -1,0 +1,100 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: &u64
+     var $t1: bool
+     var $t2: &u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: u64
+  0: $t1 := true
+  1: if ($t1) goto 2 else goto 7
+  2: label L0
+  3: $t3 := 5
+  4: $t2 := borrow_local($t3)
+  5: $t0 := infer($t2)
+  6: goto 8
+  7: label L1
+  8: label L2
+  9: $t6 := move($t0)
+ 10: $t5 := read_ref($t6)
+ 11: $t7 := 5
+ 12: $t4 := ==($t5, $t7)
+ 13: if ($t4) goto 14 else goto 16
+ 14: label L3
+ 15: goto 19
+ 16: label L4
+ 17: $t8 := 42
+ 18: abort($t8)
+ 19: label L5
+ 20: return ()
+}
+
+
+Diagnostics:
+error: use of possibly unassigned local `ref`
+  ┌─ tests/uninit-use-checker/v1-borrow-tests/borrow_if.move:8:14
+  │
+8 │     assert!(*move ref == 5, 42);
+  │              ^^^^^^^^
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: &u64
+     var $t1: bool
+     var $t2: &u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: u64
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }
+  0: $t1 := true
+     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }
+  1: if ($t1) goto 2 else goto 7
+     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }
+  2: label L0
+     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t0, $t2, $t4, $t5, $t6, $t7, $t8 }
+  3: $t3 := 5
+     # before: { no: $t0, $t2, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t0, $t4, $t5, $t6, $t7, $t8 }
+  4: $t2 := borrow_local($t3)
+     # before: { no: $t0, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t4, $t5, $t6, $t7, $t8 }
+  5: $t0 := infer($t2)
+     # before: { no: $t4, $t5, $t6, $t7, $t8 }, after: { no: $t4, $t5, $t6, $t7, $t8 }
+  6: goto 8
+     # before: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }, after: { no: $t0, $t2, $t3, $t4, $t5, $t6, $t7, $t8 }
+  7: label L1
+     # before: { no: $t4, $t5, $t6, $t7, $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t4, $t5, $t6, $t7, $t8 }{ maybe: $t0, $t2, $t3 }
+  8: label L2
+     # before: { no: $t4, $t5, $t6, $t7, $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t4, $t5, $t7, $t8 }{ maybe: $t0, $t2, $t3 }
+  9: $t6 := move($t0)
+     # before: { no: $t4, $t5, $t7, $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t4, $t7, $t8 }{ maybe: $t0, $t2, $t3 }
+ 10: $t5 := read_ref($t6)
+     # before: { no: $t4, $t7, $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t4, $t8 }{ maybe: $t0, $t2, $t3 }
+ 11: $t7 := 5
+     # before: { no: $t4, $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t8 }{ maybe: $t0, $t2, $t3 }
+ 12: $t4 := ==($t5, $t7)
+     # before: { no: $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t8 }{ maybe: $t0, $t2, $t3 }
+ 13: if ($t4) goto 14 else goto 16
+     # before: { no: $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t8 }{ maybe: $t0, $t2, $t3 }
+ 14: label L3
+     # before: { no: $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t8 }{ maybe: $t0, $t2, $t3 }
+ 15: goto 19
+     # before: { no: $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t8 }{ maybe: $t0, $t2, $t3 }
+ 16: label L4
+     # before: { no: $t8 }{ maybe: $t0, $t2, $t3 }, after: { maybe: $t0, $t2, $t3 }
+ 17: $t8 := 42
+     # before: { maybe: $t0, $t2, $t3 }, after: { maybe: $t0, $t2, $t3 }
+ 18: abort($t8)
+     # before: { no: $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t8 }{ maybe: $t0, $t2, $t3 }
+ 19: label L5
+     # before: { no: $t8 }{ maybe: $t0, $t2, $t3 }, after: { no: $t8 }{ maybe: $t0, $t2, $t3 }
+ 20: return ()
+}

@@ -1,0 +1,135 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun M::tborrow() {
+     var $t0: u64
+     var $t1: &u64
+     var $t2: M::S
+     var $t3: &M::S
+  0: $t1 := borrow_local($t0)
+  1: $t3 := borrow_local($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun M::tcopy() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: M::S
+     var $t4: M::S
+  0: $t2 := 1
+  1: $t1 := +($t0, $t2)
+  2: $t4 := copy($t3)
+  3: return ()
+}
+
+
+[variant baseline]
+fun M::tmove() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: M::S
+     var $t5: M::S
+  0: $t2 := move($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: $t5 := infer($t4)
+  4: return ()
+}
+
+
+Diagnostics:
+error: use of unassigned local `x`
+  ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:6:17
+  │
+6 │         let _ = move x + 1;
+  │                 ^^^^^^
+
+error: use of unassigned local `s`
+  ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:9:19
+  │
+9 │         let _s2 = s;
+  │                   ^
+
+error: use of unassigned local `x`
+   ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:14:17
+   │
+14 │         let _ = x + 1;
+   │                 ^^^^^
+
+error: use of unassigned local `s`
+   ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:17:19
+   │
+17 │         let _s3 = copy s;
+   │                   ^^^^^^
+
+error: use of unassigned local `x`
+   ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:22:17
+   │
+22 │         let _ = &x;
+   │                 ^^
+
+error: use of unassigned local `s`
+   ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_simple.move:25:19
+   │
+25 │         let _s2 = &s;
+   │                   ^^
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun M::tborrow() {
+     var $t0: u64
+     var $t1: &u64
+     var $t2: M::S
+     var $t3: &M::S
+     # before: { no: $t0, $t1, $t2, $t3 }, after: { no: $t0, $t2, $t3 }
+  0: $t1 := borrow_local($t0)
+     # before: { no: $t0, $t2, $t3 }, after: { no: $t0, $t2 }
+  1: $t3 := borrow_local($t2)
+     # before: { no: $t0, $t2 }, after: { no: $t0, $t2 }
+  2: return ()
+}
+
+
+[variant baseline]
+fun M::tcopy() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: M::S
+     var $t4: M::S
+     # before: { no: $t0, $t1, $t2, $t3, $t4 }, after: { no: $t0, $t1, $t3, $t4 }
+  0: $t2 := 1
+     # before: { no: $t0, $t1, $t3, $t4 }, after: { no: $t0, $t3, $t4 }
+  1: $t1 := +($t0, $t2)
+     # before: { no: $t0, $t3, $t4 }, after: { no: $t0, $t3 }
+  2: $t4 := copy($t3)
+     # before: { no: $t0, $t3 }, after: { no: $t0, $t3 }
+  3: return ()
+}
+
+
+[variant baseline]
+fun M::tmove() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: M::S
+     var $t5: M::S
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5 }, after: { no: $t0, $t1, $t3, $t4, $t5 }
+  0: $t2 := move($t0)
+     # before: { no: $t0, $t1, $t3, $t4, $t5 }, after: { no: $t0, $t1, $t4, $t5 }
+  1: $t3 := 1
+     # before: { no: $t0, $t1, $t4, $t5 }, after: { no: $t0, $t4, $t5 }
+  2: $t1 := +($t2, $t3)
+     # before: { no: $t0, $t4, $t5 }, after: { no: $t0, $t4 }
+  3: $t5 := infer($t4)
+     # before: { no: $t0, $t4 }, after: { no: $t0, $t4 }
+  4: return ()
+}

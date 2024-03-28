@@ -25,7 +25,9 @@ When the test suite is complete, it will tell you which tests passed and which f
 
 import argparse
 import logging
+import os
 import pathlib
+import platform
 import shutil
 import sys
 
@@ -192,6 +194,16 @@ def main():
     # Create the dir the test CLI will run from.
     shutil.rmtree(args.working_directory, ignore_errors=True)
     pathlib.Path(args.working_directory).mkdir(parents=True, exist_ok=True)
+
+    # If we're on Mac and DOCKER_DEFAULT_PLATFORM is not already set, set it to
+    # linux/amd64 since we only publish images for that platform.
+    if platform.system().lower() == "darwin" and platform.processor().lower().startswith("arm"):
+        if not os.environ.get("DOCKER_DEFAULT_PLATFORM"):
+            os.environ["DOCKER_DEFAULT_PLATFORM"] = "linux/amd64"
+            LOG.info(
+                "Detected ARM Mac and DOCKER_DEFAULT_PLATFORM was not set, setting it "
+                "to linux/amd64"
+            )
 
     # Run a node + faucet and wait for them to start up.
     container_name = run_node(

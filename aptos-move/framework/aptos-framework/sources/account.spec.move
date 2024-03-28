@@ -203,6 +203,16 @@ spec aptos_framework::account {
         ensures account_resource.authentication_key == new_auth_key;
     }
 
+    spec rotate_authentication_key_call(account: &signer, new_auth_key: vector<u8>) {
+        let addr = signer::address_of(account);
+        /// [high-level-req-10]
+        let post account_resource = global<Account>(addr);
+        aborts_if !exists<Account>(addr);
+        aborts_if vector::length(new_auth_key) != 32;
+        modifies global<Account>(addr);
+        ensures account_resource.authentication_key == new_auth_key;
+    }
+
     spec fun spec_assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: RotationProofChallenge): vector<u8>;
 
     spec assert_valid_rotation_proof_signature_and_get_auth_key(scheme: u8, public_key_bytes: vector<u8>, signature: vector<u8>, challenge: &RotationProofChallenge): vector<u8> {

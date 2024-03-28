@@ -28,6 +28,17 @@ module aptos_std::math128 {
         }
     }
 
+    /// Return greatest common divisor of `a` & `b`, via the Euclidean algorithm.
+    public inline fun gcd(a: u128, b: u128): u128 {
+        let (large, small) = if (a > b) (a, b) else (b, a);
+        while (small != 0) {
+            let tmp = small;
+            small = large % small;
+            large = tmp;
+        };
+        large
+    }
+
     /// Returns a * b / c going through u256 to prevent intermediate overflow
     public inline fun mul_div(a: u128, b: u128, c: u128): u128 {
         // Inline functions cannot take constants, as then every module using it needs the constant
@@ -161,6 +172,27 @@ module aptos_std::math128 {
         // No overflow
         assert!(ceil_div((((1u256<<128) - 9) as u128), 11) == 30934760629176223951215873402888019223, 0);
     }
+
+    #[test]
+    fun test_gcd() {
+        assert!(gcd(20, 8) == 4, 0);
+        assert!(gcd(8, 20) == 4, 0);
+        assert!(gcd(1, 100) == 1, 0);
+        assert!(gcd(100, 1) == 1, 0);
+        assert!(gcd(210, 45) == 15, 0);
+        assert!(gcd(45, 210) == 15, 0);
+        assert!(gcd(0, 0) == 0, 0);
+        assert!(gcd(1, 0) == 1, 0);
+        assert!(gcd(50, 0) == 50, 0);
+        assert!(gcd(0, 1) == 1, 0);
+        assert!(gcd(0, 50) == 50, 0);
+        assert!(gcd(54, 24) == 6, 0);
+        assert!(gcd(24, 54) == 6, 0);
+        assert!(gcd(10, 10) == 10, 0);
+        assert!(gcd(1071, 462) == 21, 0);
+        assert!(gcd(462, 1071) == 21, 0);
+    }
+
     #[test]
     public entry fun test_max() {
         let result = max(3u128, 6u128);

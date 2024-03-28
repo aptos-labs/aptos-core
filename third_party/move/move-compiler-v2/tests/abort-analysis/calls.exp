@@ -1,0 +1,53 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun test::nothing() {
+  0: return ()
+}
+
+
+[variant baseline]
+fun test::test0() {
+  0: test::nothing()
+  1: return ()
+  2: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun test::nothing() {
+     # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  0: return ()
+}
+
+
+[variant baseline]
+fun test::test0() {
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  0: test::nothing()
+     # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  1: return ()
+     # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  2: return ()
+}

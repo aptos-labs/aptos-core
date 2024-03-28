@@ -1038,7 +1038,7 @@ module aptos_framework::vesting {
             };
         });
 
-        std::features::change_feature_flags(aptos_framework, vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE], vector[]);
+        std::features::change_feature_flags_for_testing(aptos_framework, vector[MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE], vector[]);
     }
 
     #[test_only]

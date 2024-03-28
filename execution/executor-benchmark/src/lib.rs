@@ -39,8 +39,8 @@ use aptos_metrics_core::Histogram;
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
-    TransactionType::NonConflictingCoinTransfer,
+    create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
+    TransactionType::{self, NonConflictingCoinTransfer},
 };
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
@@ -66,7 +66,6 @@ where
             false,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
-            false,
         )
         .expect("DB should open."),
     );
@@ -124,6 +123,7 @@ pub fn run_benchmark<V>(
     config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
 
     let (db, executor) = init_db_and_executor::<V>(&config);
+    let mut root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let transaction_generators = transaction_mix.clone().map(|transaction_mix| {
         let num_existing_accounts = TransactionGenerator::read_meta(&source_dir);
         let num_accounts_to_be_loaded = std::cmp::min(
@@ -149,8 +149,9 @@ pub fn run_benchmark<V>(
         let (main_signer_accounts, burner_accounts) =
             accounts_cache.split(num_main_signer_accounts);
 
-        let transaction_generator_creator = init_workload::<V>(
+        let (transaction_generator_creator, phase) = init_workload::<V>(
             transaction_mix,
+            &mut root_account,
             main_signer_accounts,
             burner_accounts,
             db.clone(),
@@ -159,7 +160,7 @@ pub fn run_benchmark<V>(
             &PipelineConfig::default(),
         );
         // need to initialize all workers and finish with all transactions before we start the timer:
-        (0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>()
+        ((0..pipeline_config.num_generator_workers).map(|_| transaction_generator_creator.create_transaction_generator()).collect::<Vec<_>>(), phase)
     });
 
     let version = db.reader.get_latest_version().unwrap();
@@ -186,7 +187,7 @@ pub fn run_benchmark<V>(
     }
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
-        genesis_key,
+        root_account,
         block_sender,
         source_dir,
         Some(num_accounts_to_load),
@@ -195,13 +196,14 @@ pub fn run_benchmark<V>(
 
     let mut overall_measuring = OverallMeasuring::start();
 
-    if let Some(transaction_generators) = transaction_generators {
+    let num_blocks_created = if let Some((transaction_generators, phase)) = transaction_generators {
         generator.run_workload(
             block_size,
             num_blocks,
             transaction_generators,
+            phase,
             transactions_per_sender,
-        );
+        )
     } else {
         generator.run_transfer(
             block_size,
@@ -210,8 +212,8 @@ pub fn run_benchmark<V>(
             connected_tx_grps,
             shuffle_connected_txns,
             hotspot_probability,
-        );
-    }
+        )
+    };
     if pipeline_config.delay_execution_start {
         overall_measuring.start_time = Instant::now();
     }
@@ -228,7 +230,7 @@ pub fn run_benchmark<V>(
         }
     );
 
-    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks as u64;
+    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks_created as u64;
     overall_measuring.print_end("Overall", num_txns);
 
     if verify_sequence_numbers {
@@ -239,11 +241,12 @@ pub fn run_benchmark<V>(
 
 fn init_workload<V>(
     transaction_mix: Vec<(TransactionType, usize)>,
+    root_account: &mut LocalAccount,
     mut main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
     pipeline_config: &PipelineConfig,
-) -> Box<dyn TransactionGeneratorCreator>
+) -> (Box<dyn TransactionGeneratorCreator>, Arc<AtomicUsize>)
 where
     V: TransactionBlockExecutor + 'static,
 {
@@ -257,10 +260,9 @@ where
 
     let runtime = Runtime::new().unwrap();
     let transaction_factory = TransactionGenerator::create_transaction_factory();
-
+    let phase = Arc::new(AtomicUsize::new(0));
+    let phase_clone = phase.clone();
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
-        let phase = Arc::new(AtomicUsize::new(0));
-
         let db_gen_init_transaction_executor = DbReliableTransactionSubmitter {
             db: db.clone(),
             block_sender,
@@ -268,19 +270,20 @@ where
 
         create_txn_generator_creator(
             &[transaction_mix],
+            AlwaysApproveRootAccountHandle { root_account },
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
             &transaction_factory,
             &transaction_factory,
-            phase,
+            phase_clone,
         )
         .await
     });
 
     pipeline.join();
 
-    txn_generator_creator
+    (txn_generator_creator, phase)
 }
 
 pub fn add_accounts<V>(
@@ -345,7 +348,7 @@ fn add_accounts_impl<V>(
 
     let mut generator = TransactionGenerator::new_with_existing_db(
         db.clone(),
-        genesis_key,
+        TransactionGenerator::read_root_account(genesis_key, &db),
         block_sender,
         &source_dir,
         None,
@@ -411,6 +414,8 @@ struct GasMeasurement {
     pub approx_block_output: f64,
 
     pub gas_count: u64,
+
+    pub speculative_abort_count: u64,
 }
 
 impl GasMeasurement {
@@ -449,6 +454,8 @@ impl GasMeasurement {
                 .with_label_values(&[block_executor_counters::Mode::PARALLEL])
                 .get_sample_sum();
 
+        let speculative_abort_count = block_executor_counters::SPECULATIVE_ABORT_COUNT.get();
+
         Self {
             gas,
             effective_block_gas,
@@ -456,6 +463,7 @@ impl GasMeasurement {
             execution_gas,
             approx_block_output,
             gas_count,
+            speculative_abort_count,
         }
     }
 
@@ -469,6 +477,7 @@ impl GasMeasurement {
             execution_gas: end.execution_gas - self.execution_gas,
             approx_block_output: end.approx_block_output - self.approx_block_output,
             gas_count: end.gas_count - self.gas_count,
+            speculative_abort_count: end.speculative_abort_count - self.speculative_abort_count,
         }
     }
 }
@@ -592,9 +601,18 @@ impl OverallMeasuring {
         );
         info!("{} GPS: {} gas/s", prefix, delta_gas.gas / elapsed);
         info!(
-            "{} effectiveGPS: {} gas/s",
+            "{} effectiveGPS: {} gas/s ({} effective block gas, in {} s)",
             prefix,
-            delta_gas.effective_block_gas / elapsed
+            delta_gas.effective_block_gas / elapsed,
+            delta_gas.effective_block_gas,
+            elapsed
+        );
+        info!(
+            "{} speculative aborts: {} aborts/txn ({} aborts over {} txns)",
+            prefix,
+            delta_gas.speculative_abort_count as f64 / num_txns,
+            delta_gas.speculative_abort_count,
+            num_txns
         );
         info!("{} ioGPS: {} gas/s", prefix, delta_gas.io_gas / elapsed);
         info!(
@@ -667,13 +685,19 @@ impl OverallMeasuring {
     }
 }
 
+fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
+    let total_supply =
+        DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
+    info!("total supply is {:?} octas", total_supply)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{native_executor::NativeExecutor, pipeline::PipelineConfig};
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
-    use aptos_transaction_generator_lib::args::TransactionTypeArg;
+    use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
     use aptos_vm::AptosVM;
 
     fn test_generic_benchmark<E>(
@@ -704,9 +728,10 @@ mod tests {
         println!("run_benchmark");
 
         super::run_benchmark::<E>(
-            6, /* block_size */
-            5, /* num_blocks */
-            transaction_type.map(|t| vec![(t.materialize(2, false), 1)]),
+            10, /* block_size */
+            30, /* num_blocks */
+            transaction_type
+                .map(|t| vec![(t.materialize(1, true, WorkflowProgress::MoveByPhases), 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
@@ -734,7 +759,7 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ModifyGlobalResourceAggV2),
+            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
             true,
         );
     }
@@ -744,10 +769,4 @@ mod tests {
         // correct execution not yet implemented, so cannot be checked for validity
         test_generic_benchmark::<NativeExecutor>(None, false);
     }
-}
-
-fn log_total_supply(db_reader: &Arc<dyn DbReader>) {
-    let total_supply =
-        DbAccessUtil::get_total_supply(&db_reader.latest_state_checkpoint_view().unwrap()).unwrap();
-    info!("total supply is {:?} octas", total_supply)
 }

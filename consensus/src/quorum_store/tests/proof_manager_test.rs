@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::quorum_store::proof_manager::ProofManager;
+use crate::quorum_store::{
+    proof_manager::ProofManager, tests::batch_store_test::batch_store_for_test,
+};
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
     proof_of_store::{BatchId, BatchInfo, ProofOfStore},
@@ -13,7 +15,8 @@ use futures::channel::oneshot;
 use std::collections::HashSet;
 
 fn create_proof_manager() -> ProofManager {
-    ProofManager::new(PeerId::random(), 10, 10)
+    let batch_store = batch_store_for_test(5 * 1024 * 1024);
+    ProofManager::new(PeerId::random(), 10, 10, batch_store, true)
 }
 
 fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
@@ -43,31 +46,69 @@ fn create_proof_with_gas(
     )
 }
 
-async fn get_proposal_and_assert(
+async fn get_proposal(
     proof_manager: &mut ProofManager,
     max_txns: u64,
     filter: &[BatchInfo],
-    expected: &[ProofOfStore],
-) {
+) -> Payload {
     let (callback_tx, callback_rx) = oneshot::channel();
     let filter_set = HashSet::from_iter(filter.iter().cloned());
     let req = GetPayloadCommand::GetPayloadRequest(
         max_txns,
         1000000,
+        max_txns / 2,
+        100000,
         true,
         PayloadFilter::InQuorumStore(filter_set),
         callback_tx,
     );
     proof_manager.handle_proposal_request(req);
     let GetPayloadResponse::GetPayloadResponse(payload) = callback_rx.await.unwrap().unwrap();
-    if let Payload::InQuorumStore(proofs) = payload {
-        assert_eq!(proofs.proofs.len(), expected.len());
-        for proof in proofs.proofs {
-            assert!(expected.contains(&proof));
-        }
-    } else {
-        panic!("Unexpected variant")
+    payload
+}
+
+fn assert_payload_response(
+    payload: Payload,
+    expected: &[ProofOfStore],
+    max_txns_from_block_to_execute: Option<usize>,
+) {
+    match payload {
+        Payload::InQuorumStore(proofs) => {
+            assert_eq!(proofs.proofs.len(), expected.len());
+            for proof in proofs.proofs {
+                assert!(expected.contains(&proof));
+            }
+        },
+        Payload::InQuorumStoreWithLimit(proofs) => {
+            assert_eq!(proofs.proof_with_data.proofs.len(), expected.len());
+            for proof in proofs.proof_with_data.proofs {
+                assert!(expected.contains(&proof));
+            }
+            assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
+        },
+        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
+            assert_eq!(proofs.proofs.len(), expected.len());
+            for proof in proofs.proofs {
+                assert!(expected.contains(&proof));
+            }
+            assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
+        },
+        // TODO: Check how to update this for Payload::QuorumStoreInlineHybrid
+        _ => panic!("Unexpected variant"),
     }
+}
+
+async fn get_proposal_and_assert(
+    proof_manager: &mut ProofManager,
+    max_txns: u64,
+    filter: &[BatchInfo],
+    expected: &[ProofOfStore],
+) {
+    assert_payload_response(
+        get_proposal(proof_manager, max_txns, filter).await,
+        expected,
+        None,
+    );
 }
 
 #[tokio::test]
@@ -77,7 +118,24 @@ async fn test_block_request() {
     let proof = create_proof(PeerId::random(), 10, 1);
     proof_manager.receive_proofs(vec![proof.clone()]);
 
-    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof.clone()]).await;
+    get_proposal_and_assert(&mut proof_manager, 100, &[], &vec![proof]).await;
+}
+
+#[tokio::test]
+async fn test_max_txns_from_block_to_execute() {
+    let mut proof_manager = create_proof_manager();
+
+    let proof = create_proof(PeerId::random(), 10, 1);
+    proof_manager.receive_proofs(vec![proof.clone()]);
+
+    let payload = get_proposal(&mut proof_manager, 100, &[]).await;
+    // convert payload to v2 format and assert
+    let max_txns_from_block_to_execute = 10;
+    assert_payload_response(
+        payload.transform_to_quorum_store_v2(Some(max_txns_from_block_to_execute)),
+        &vec![proof],
+        Some(max_txns_from_block_to_execute),
+    );
 }
 
 #[tokio::test]

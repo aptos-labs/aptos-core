@@ -9,7 +9,8 @@ use crate::{
         ErrorNotificationListener, MempoolNotificationHandler, StorageServiceNotificationHandler,
     },
     storage_synchronizer::{
-        StorageSynchronizer, StorageSynchronizerHandles, StorageSynchronizerInterface,
+        NotificationMetadata, StorageSynchronizer, StorageSynchronizerHandles,
+        StorageSynchronizerInterface,
     },
     tests::{
         mocks::{
@@ -92,7 +93,7 @@ async fn test_apply_outputs() {
     // Attempt to apply a chunk of outputs
     storage_synchronizer
         .apply_transaction_outputs(
-            0,
+            NotificationMetadata::new_for_test(0),
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -132,7 +133,7 @@ async fn test_apply_outputs_error() {
     let notification_id = 100;
     storage_synchronizer
         .apply_transaction_outputs(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -166,7 +167,7 @@ async fn test_apply_outputs_send_error() {
     let notification_id = 101;
     storage_synchronizer
         .apply_transaction_outputs(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -199,7 +200,7 @@ async fn test_apply_outputs_update_error() {
     let notification_id = 101;
     storage_synchronizer
         .apply_transaction_outputs(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -234,7 +235,7 @@ async fn test_apply_outputs_update_send_error() {
     let notification_id = 101;
     storage_synchronizer
         .apply_transaction_outputs(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -268,7 +269,7 @@ async fn test_apply_outputs_commit_error() {
     let notification_id = 101;
     storage_synchronizer
         .apply_transaction_outputs(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -320,7 +321,7 @@ async fn test_apply_outputs_commit_send_error() {
     let notification_id = 555;
     storage_synchronizer
         .apply_transaction_outputs(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_output_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -380,7 +381,7 @@ async fn test_execute_transactions() {
     // Attempt to execute a chunk of transactions
     storage_synchronizer
         .execute_transactions(
-            0,
+            NotificationMetadata::new_for_test(0),
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -420,7 +421,7 @@ async fn test_execute_transactions_error() {
     let notification_id = 100;
     storage_synchronizer
         .execute_transactions(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -454,7 +455,7 @@ async fn test_execute_transactions_send_error() {
     let notification_id = 101;
     storage_synchronizer
         .execute_transactions(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -487,7 +488,7 @@ async fn test_execute_transactions_update_error() {
     let notification_id = 100;
     storage_synchronizer
         .execute_transactions(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -522,7 +523,7 @@ async fn test_execute_transactions_update_send_error() {
     let notification_id = 100;
     storage_synchronizer
         .execute_transactions(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -556,7 +557,7 @@ async fn test_execute_transactions_commit_error() {
     let notification_id = 100;
     storage_synchronizer
         .execute_transactions(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -608,7 +609,7 @@ async fn test_execute_transactions_commit_send_error() {
     let notification_id = 700;
     storage_synchronizer
         .execute_transactions(
-            notification_id,
+            NotificationMetadata::new_for_test(notification_id),
             create_transaction_list_with_proof(),
             create_epoch_ending_ledger_info(),
             None,
@@ -749,9 +750,11 @@ async fn test_save_states_completion() {
     // Save multiple state chunks (including the last chunk)
     storage_synchronizer
         .save_state_values(0, create_state_value_chunk_with_proof(false))
+        .await
         .unwrap();
     storage_synchronizer
         .save_state_values(1, create_state_value_chunk_with_proof(true))
+        .await
         .unwrap();
 
     // Verify we get a commit notification
@@ -807,6 +810,7 @@ async fn test_save_states_dropped_error_listener() {
     let notification_id = 0;
     storage_synchronizer
         .save_state_values(notification_id, create_state_value_chunk_with_proof(true))
+        .await
         .unwrap();
 
     // The handler should panic as the commit listener was dropped
@@ -848,13 +852,14 @@ async fn test_save_states_invalid_chunk() {
     let notification_id = 0;
     storage_synchronizer
         .save_state_values(notification_id, create_state_value_chunk_with_proof(false))
+        .await
         .unwrap();
     verify_error_notification(&mut error_listener, notification_id).await;
 }
 
-#[test]
+#[tokio::test]
 #[should_panic]
-fn test_save_states_without_initialize() {
+async fn test_save_states_without_initialize() {
     // Create the storage synchronizer
     let (_, _, _, _, _, mut storage_synchronizer, _) = create_storage_synchronizer(
         create_mock_executor(),
@@ -863,7 +868,10 @@ fn test_save_states_without_initialize() {
 
     // Attempting to save the states should panic as the state
     // synchronizer was not initialized!
-    let _ = storage_synchronizer.save_state_values(0, create_state_value_chunk_with_proof(false));
+    storage_synchronizer
+        .save_state_values(0, create_state_value_chunk_with_proof(false))
+        .await
+        .unwrap();
 }
 
 /// Creates a storage synchronizer for testing

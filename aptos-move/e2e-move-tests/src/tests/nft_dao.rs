@@ -169,7 +169,7 @@ fn test_nft_dao_txn_arguments() {
         ],
     ];
 
-    // propose to tranfer two NFTs to voter
+    // propose to transfer two NFTs to voter
     h.run_entry_function(
         &acc,
         str::parse("0xcafe::nft_dao::create_proposal").unwrap(),

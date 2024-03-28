@@ -3,7 +3,6 @@
 
 use crate::{assert_abort, assert_success, tests::common, MoveHarness};
 use aptos_cached_packages::aptos_stdlib;
-use aptos_crypto::HashValue;
 use aptos_language_e2e_tests::{
     account::{Account, TransactionBuilder},
     transaction_status_eq,
@@ -12,10 +11,12 @@ use aptos_types::{
     account_address::AccountAddress,
     account_config::CoinStoreResource,
     move_utils::MemberId,
-    on_chain_config::{ApprovedExecutionHashes, FeatureFlag, OnChainConfig},
+    on_chain_config::FeatureFlag,
     transaction::{EntryFunction, ExecutionStatus, Script, TransactionPayload, TransactionStatus},
 };
+use aptos_vm_types::storage::StorageGasParameters;
 use move_core_types::{move_resource::MoveStructType, vm_status::StatusCode};
+use once_cell::sync::Lazy;
 
 // Fee payer has several modes and requires several tests to validate:
 // Account exists:
@@ -50,7 +51,7 @@ fn test_existing_account_with_fee_payer() {
         .fee_payer(bob.clone())
         .payload(payload)
         .sequence_number(h.sequence_number(alice.address()))
-        .max_gas_amount(1_000_000)
+        .max_gas_amount(PRICING.new_account_upfront(1) - 100)
         .gas_unit_price(1)
         .sign_fee_payer();
 
@@ -85,7 +86,7 @@ fn test_existing_account_with_fee_payer_aborts() {
         .fee_payer(bob.clone())
         .payload(payload)
         .sequence_number(h.sequence_number(alice.address()))
-        .max_gas_amount(1_000_000)
+        .max_gas_amount(PRICING.new_account_upfront(1) - 100)
         .gas_unit_price(1)
         .sign_fee_payer();
 
@@ -123,7 +124,7 @@ fn test_account_not_exist_with_fee_payer() {
         .fee_payer(bob.clone())
         .payload(payload)
         .sequence_number(0)
-        .max_gas_amount(1_000_000)
+        .max_gas_amount(PRICING.new_account_upfront(1))
         .gas_unit_price(1)
         .sign_fee_payer();
 
@@ -161,7 +162,7 @@ fn test_account_not_exist_with_fee_payer_insufficient_gas() {
         .fee_payer(bob.clone())
         .payload(payload)
         .sequence_number(0)
-        .max_gas_amount(99_999) // This is not enough to execute this transaction
+        .max_gas_amount(PRICING.new_account_upfront(1) - 1) // This is not enough to execute this transaction
         .gas_unit_price(1)
         .sign_fee_payer();
 
@@ -206,13 +207,15 @@ fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
             .unwrap();
     let script = Script::new(data, vec![], vec![]);
 
-    // Offered max fee is 10000 + gas_units * 10, the minimum to execute this transaction
+    const GAS_UNIT_PRICE: u64 = 2;
+    // Offered max fee is storage fee for a new account ( 2 * 50000 / gas_unit_price) + 10 gas_units,
+    //     about the minimum to execute this transaction
     let transaction = TransactionBuilder::new(alice.clone())
         .fee_payer(bob.clone())
         .script(script)
         .sequence_number(0)
-        .max_gas_amount(50_010)
-        .gas_unit_price(2)
+        .max_gas_amount(PRICING.new_account_upfront(GAS_UNIT_PRICE))
+        .gas_unit_price(GAS_UNIT_PRICE)
         .sign_fee_payer();
 
     let output = h.run_raw(transaction);
@@ -221,8 +224,8 @@ fn test_account_not_exist_and_move_abort_with_fee_payer_create_account() {
         TransactionStatus::Keep(ExecutionStatus::ExecutionFailure { .. })
     ));
     // We need to charge less than or equal to the max and at least more than a storage slot
-    assert!(output.gas_used() * 2 <= 100020);
-    assert!(output.gas_used() * 2 > 50000);
+    assert!(output.gas_used() <= PRICING.new_account_upfront(GAS_UNIT_PRICE));
+    assert!(output.gas_used() > PRICING.new_account_min_abort(GAS_UNIT_PRICE));
 
     let alice_after =
         h.read_resource::<CoinStoreResource>(alice.address(), CoinStoreResource::struct_tag());
@@ -262,7 +265,7 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
         .fee_payer(beef.clone())
         .payload(payload)
         .sequence_number(0)
-        .max_gas_amount(100_010) // This is the minimum to execute this transaction
+        .max_gas_amount(PRICING.new_account_upfront(1)) // This is the minimum to execute this transaction
         .gas_unit_price(1)
         .sign_fee_payer();
     let result = h.run_raw(transaction);
@@ -270,14 +273,13 @@ fn test_account_not_exist_out_of_gas_with_fee_payer() {
     assert_eq!(
         result.status(),
         &TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
-            aptos_types::vm_status::StatusCode::EXECUTION_LIMIT_REACHED
+            StatusCode::EXECUTION_LIMIT_REACHED
         ))),
     );
 }
 
 #[test]
 fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
-    // Very large transaction to trigger the out of gas error aborted seqno 0 sponsored transactions
     let mut h = MoveHarness::new_with_features(
         vec![
             FeatureFlag::GAS_PAYER_ENABLED,
@@ -287,42 +289,41 @@ fn test_account_not_exist_move_abort_with_fee_payer_out_of_gas() {
     );
 
     let alice = Account::new();
-    let bob = h.new_account_at(AccountAddress::from_hex_literal("0xb0b").unwrap());
+    let cafe = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
-    let root = h.aptos_framework_account();
+    assert_success!(h.publish_package_cache_building(
+        &cafe,
+        &common::test_dir_path("storage_refund.data/pack"),
+    ));
 
-    let data = vec![0; 1000 * 1024];
-    let entries = ApprovedExecutionHashes {
-        entries: vec![(0, HashValue::sha3_256_of(&data).to_vec())],
-    };
+    // This function allocates plenty of storage slots and will go out of gas if max_gas_amount isn't huge
+    let MemberId {
+        module_id,
+        member_id,
+    } = str::parse("0xcafe::test::init_collection_of_1000").unwrap();
 
-    let script = Script::new(data, vec![], vec![]);
-
-    h.set_resource(
-        *root.address(),
-        ApprovedExecutionHashes::struct_tag(),
-        &entries,
-    );
+    let payload =
+        TransactionPayload::EntryFunction(EntryFunction::new(module_id, member_id, vec![], vec![]));
     let transaction = TransactionBuilder::new(alice.clone())
-        .fee_payer(bob.clone())
-        .script(script.clone())
+        .fee_payer(cafe.clone())
+        .payload(payload.clone())
         .sequence_number(0)
-        .max_gas_amount(100_010) // This is the minimum to execute this transaction
+        .max_gas_amount(PRICING.new_account_upfront(1)) // This is the minimum to execute this transaction
         .gas_unit_price(1)
         .sign_fee_payer();
     let result = h.run_raw(transaction);
-    assert_eq!(result.gas_used(), 100_010);
+    assert_eq!(result.gas_used(), PRICING.new_account_upfront(1));
 
     let new_alice = Account::new();
     let transaction = TransactionBuilder::new(new_alice.clone())
-        .fee_payer(bob.clone())
-        .script(script.clone())
+        .fee_payer(cafe.clone())
+        .payload(payload)
         .sequence_number(0)
-        .max_gas_amount(100_011) // Bump by one to ensure more gas can be used
+        .max_gas_amount(PRICING.new_account_upfront(1) + 1)
         .gas_unit_price(1)
         .sign_fee_payer();
     let result = h.run_raw(transaction);
-    assert_eq!(result.gas_used(), 100_011);
+    assert_eq!(result.gas_used(), PRICING.new_account_upfront(1) + 1);
 }
 
 #[test]
@@ -382,3 +383,35 @@ fn test_normal_tx_with_fee_payer_insufficient_funds() {
         &TransactionStatus::Discard(StatusCode::INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE)
     ));
 }
+
+struct FeePayerPricingInfo {
+    estimated_per_new_account_fee_octas: u64,
+    new_account_min_abort_octas: u64,
+}
+
+impl FeePayerPricingInfo {
+    pub fn new_account_upfront(&self, gas_unit_price: u64) -> u64 {
+        self.estimated_per_new_account_fee_octas / gas_unit_price * 2 + gas_unit_price * 10
+    }
+
+    pub fn new_account_min_abort(&self, gas_unit_price: u64) -> u64 {
+        self.new_account_min_abort_octas / gas_unit_price
+    }
+}
+
+static PRICING: Lazy<FeePayerPricingInfo> = Lazy::new(|| {
+    let h = MoveHarness::new();
+
+    let (_feature_version, params) = h.get_gas_params();
+    let params = params.vm.txn;
+    let pricing = StorageGasParameters::latest().space_pricing;
+
+    FeePayerPricingInfo {
+        estimated_per_new_account_fee_octas: u64::from(
+            pricing.hack_estimated_fee_for_account_creation(&params),
+        ),
+        new_account_min_abort_octas: u64::from(
+            pricing.hack_account_creation_fee_lower_bound(&params),
+        ),
+    }
+});

@@ -1,8 +1,7 @@
 locals {
-  autoscaling_helm_chart_path         = "${path.module}/../../helm/autoscaling"
-  chaos_mesh_helm_chart_path          = "${path.module}/../../helm/chaos"
-  testnet_addons_helm_chart_path      = "${path.module}/../../helm/testnet-addons"
-  node_health_checker_helm_chart_path = "${path.module}/../../helm/node-health-checker"
+  autoscaling_helm_chart_path    = "${path.module}/../../helm/autoscaling"
+  chaos_mesh_helm_chart_path     = "${path.module}/../../helm/chaos"
+  testnet_addons_helm_chart_path = "${path.module}/../../helm/testnet-addons"
 }
 
 resource "helm_release" "autoscaling" {
@@ -31,10 +30,6 @@ resource "helm_release" "autoscaling" {
       autoscaler = {
         enabled     = true
         clusterName = module.validator.aws_eks_cluster.name
-        image = {
-          # EKS does not report patch version
-          tag = "v${module.validator.aws_eks_cluster.version}.0"
-        }
         serviceAccount = {
           annotations = {
             "eks.amazonaws.com/role-arn" = aws_iam_role.cluster-autoscaler.arn
@@ -127,18 +122,19 @@ resource "aws_iam_role_policy" "cluster-autoscaler" {
 }
 
 resource "kubernetes_namespace" "chaos-mesh" {
+  count = var.enable_forge ? 1 : 0
   metadata {
     annotations = {
       name = "chaos-mesh"
     }
-
     name = "chaos-mesh"
   }
 }
 
 resource "helm_release" "chaos-mesh" {
+  count     = var.enable_forge ? 1 : 0
   name      = "chaos-mesh"
-  namespace = kubernetes_namespace.chaos-mesh.metadata[0].name
+  namespace = kubernetes_namespace.chaos-mesh[0].metadata[0].name
 
   chart       = local.chaos_mesh_helm_chart_path
   max_history = 5
@@ -255,12 +251,6 @@ resource "helm_release" "testnet-addons" {
         acm_certificate          = length(aws_acm_certificate.ingress) > 0 ? aws_acm_certificate.ingress[0].arn : null
         loadBalancerSourceRanges = var.client_sources_ipv4
       }
-      load_test = {
-        fullnodeGroups = try(var.aptos_node_helm_values.fullnode.groups, [])
-        config = {
-          numFullnodeGroups = var.num_fullnode_groups
-        }
-      }
     }),
     jsonencode(var.testnet_addons_helm_values)
   ]
@@ -271,32 +261,5 @@ resource "helm_release" "testnet-addons" {
       name  = "chart_sha1"
       value = sha1(join("", [for f in fileset(local.testnet_addons_helm_chart_path, "**") : filesha1("${local.testnet_addons_helm_chart_path}/${f}")]))
     }
-  }
-}
-
-resource "helm_release" "node-health-checker" {
-  count       = var.enable_node_health_checker ? 1 : 0
-  name        = "node-health-checker"
-  chart       = local.node_health_checker_helm_chart_path
-  max_history = 5
-  wait        = false
-
-  values = [
-    jsonencode({
-      imageTag = var.image_tag
-      # borrow the serviceaccount for the rest of the testnet addon components
-      # TODO: just create a service account for the node-health-checker
-      serviceAccount = {
-        create = false
-        name   = "testnet-addons"
-      }
-    }),
-    jsonencode(var.node_health_checker_helm_values)
-  ]
-
-  # inspired by https://stackoverflow.com/a/66501021 to trigger redeployment whenever any of the charts file contents change.
-  set {
-    name  = "chart_sha1"
-    value = sha1(join("", [for f in fileset(local.node_health_checker_helm_chart_path, "**") : filesha1("${local.node_health_checker_helm_chart_path}/${f}")]))
   }
 }

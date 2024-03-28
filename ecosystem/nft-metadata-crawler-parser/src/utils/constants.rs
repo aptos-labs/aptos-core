@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 /// Maximum retry time for exponential backoff (2 sec = 3-4 retries)
 pub const MAX_RETRY_TIME_SECONDS: u64 = 2;
@@ -12,12 +13,17 @@ pub const MAX_JSON_REQUEST_RETRY_SECONDS: u64 = 30;
 /// Allocate 90 seconds for downloading large image files
 pub const MAX_IMAGE_REQUEST_RETRY_SECONDS: u64 = 90;
 
-/// Skip URIs that contain the following strings
-pub const URI_SKIP_LIST: [&str; 6] = [
-    "aptoslabs.com/nft_images/aptos-zero",
-    "svg.souffl3.com",
-    "api.apt.store",
-    "aptosnames.com",
-    "aptos.dev",
-    "aptpp.com",
-];
+/// Max number of retries for a given asset_uri
+pub const DEFAULT_MAX_NUM_PARSE_RETRIES: i32 = 3;
+
+/// Default 15 MB maximum file size for files to be downloaded
+pub const DEFAULT_MAX_FILE_SIZE_BYTES: u32 = 15_000_000;
+
+/// Default 100% image quality for image optimization
+pub const DEFAULT_IMAGE_QUALITY: u8 = 100;
+
+/// Default 4096 maximum image dimensions for image optimization
+pub const DEFAULT_MAX_IMAGE_DIMENSIONS: u32 = 4_096;
+
+/// Default IPFS gateway auth param key
+pub const IPFS_AUTH_KEY: &str = "pinataGatewayToken";

@@ -10,6 +10,7 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_config::config::{ApiConfig, NodeConfig};
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_storage_interface::DbReader;
@@ -34,21 +35,23 @@ pub fn bootstrap(
     chain_id: ChainId,
     db: Arc<dyn DbReader>,
     mp_sender: MempoolClientSender,
+    table_info_reader: Option<Arc<dyn TableInfoReader>>,
 ) -> anyhow::Result<Runtime> {
     let max_runtime_workers = get_max_runtime_workers(&config.api);
     let runtime = aptos_runtimes::spawn_named_runtime("api".into(), Some(max_runtime_workers));
 
-    let context = Context::new(chain_id, db, mp_sender, config.clone());
+    let context = Context::new(chain_id, db, mp_sender, config.clone(), table_info_reader);
 
     attach_poem_to_runtime(runtime.handle(), context.clone(), config, false)
         .context("Failed to attach poem to runtime")?;
 
+    let context_cloned = context.clone();
     if let Some(period_ms) = config.api.periodic_gas_estimation_ms {
         runtime.spawn(async move {
             let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(period_ms));
             loop {
                 interval.tick().await;
-                let context_cloned = context.clone();
+                let context_cloned = context_cloned.clone();
                 tokio::task::spawn_blocking(move || {
                     if let Ok(latest_ledger_info) =
                         context_cloned.get_latest_ledger_info::<crate::response::BasicError>()
@@ -59,6 +62,23 @@ pub fn bootstrap(
                             TransactionsApi::log_gas_estimation(&gas_estimation);
                         }
                     }
+                })
+                .await
+                .unwrap_or(());
+            }
+        });
+    }
+
+    let context_cloned = context.clone();
+    if let Some(period_sec) = config.api.periodic_function_stats_sec {
+        runtime.spawn(async move {
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(period_sec));
+            loop {
+                interval.tick().await;
+                let context_cloned = context_cloned.clone();
+                tokio::task::spawn_blocking(move || {
+                    context_cloned.view_function_stats().log_and_clear();
+                    context_cloned.simulate_txn_stats().log_and_clear();
                 })
                 .await
                 .unwrap_or(());
@@ -321,6 +341,7 @@ mod tests {
             ChainId::test(),
             context.db.clone(),
             context.mempool.ac_client.clone(),
+            None,
         );
         assert!(ret.is_ok());
 

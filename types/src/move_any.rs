@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
+use crate::move_utils::as_move_value::AsMoveValue;
 use anyhow::bail;
+use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Rust representation of the Move Any type
@@ -27,6 +30,15 @@ impl Any {
         } else {
             bail!("type mismatch")
         }
+    }
+}
+
+impl AsMoveValue for Any {
+    fn as_move_value(&self) -> MoveValue {
+        MoveValue::Struct(MoveStruct::Runtime(vec![
+            self.type_name.as_move_value(),
+            self.data.as_move_value(),
+        ]))
     }
 }
 

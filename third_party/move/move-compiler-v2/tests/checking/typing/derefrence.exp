@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         f: u64,
@@ -11,16 +11,15 @@ module 0x8675309::M {
         Deref(x);
         Deref(x_mut);
         Deref(s);
-        Deref(Borrow(Immutable)(select M::S.f(s)));
-        select M::S.f(s);
-        Deref(Borrow(Immutable)(select M::S.x(s)));
+        Deref(Borrow(Immutable)(select M::S.f<&M::S>(s)));
+        select M::S.f<&M::S>(s);
+        Deref(Borrow(Immutable)(select M::S.x<&M::S>(s)));
         Deref(s_mut);
-        Deref(Borrow(Immutable)(select M::S.f(s_mut)));
-        Deref(Borrow(Mutable)(select M::S.f(s_mut)));
-        select M::S.f(s_mut);
-        Deref(Borrow(Immutable)(select M::S.x(s_mut)));
-        Deref(Borrow(Mutable)(select M::S.x(s_mut)));
+        Deref(Borrow(Immutable)(select M::S.f<&mut M::S>(s_mut)));
+        Deref(Borrow(Mutable)(select M::S.f<&mut M::S>(s_mut)));
+        select M::S.f<&mut M::S>(s_mut);
+        Deref(Borrow(Immutable)(select M::S.x<&mut M::S>(s_mut)));
+        Deref(Borrow(Mutable)(select M::S.x<&mut M::S>(s_mut)));
         Tuple()
     }
-    spec fun $t0(x: &u64,x_mut: &mut u64,s: &M::S,s_mut: &mut M::S);
 } // end 0x8675309::M

@@ -3,11 +3,9 @@
 
 use crate::{
     delta_change_set::{DeltaOp, DeltaWithMax},
-    types::{
-        code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr,
-        SnapshotToStringFormula,
-    },
+    types::{code_invariant_error, DelayedFieldValue, DelayedFieldsSpeculativeError, PanicOr},
 };
+use aptos_types::delayed_fields::SnapshotToStringFormula;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DelayedApplyChange<I: Clone> {
@@ -253,8 +251,9 @@ impl<I: Copy + Clone> DelayedApplyEntry<I> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{bounded_math::SignedU128, types::DelayedFieldID};
+    use crate::bounded_math::SignedU128;
     use claims::{assert_err, assert_ok};
+    use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use DelayedApplyChange::*;
     use DelayedChange::*;
     use DelayedFieldValue::*;
@@ -400,7 +399,7 @@ mod test {
             delta: DeltaWithMax::new(SignedU128::Positive(3), 100),
         });
         let snapshot_change_2 = Apply(SnapshotDelta {
-            base_aggregator: DelayedFieldID::new(1),
+            base_aggregator: DelayedFieldID::new_for_test_for_u64(1),
             delta: DeltaWithMax::new(SignedU128::Positive(2), 100),
         });
 
@@ -411,7 +410,7 @@ mod test {
         assert_eq!(
             result.unwrap(),
             Apply(SnapshotDelta {
-                base_aggregator: DelayedFieldID::new(1),
+                base_aggregator: DelayedFieldID::new_for_test_for_u64(1),
                 delta: DeltaWithMax::new(SignedU128::Positive(5), 100)
             })
         );

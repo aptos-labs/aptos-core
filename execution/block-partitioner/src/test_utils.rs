@@ -80,7 +80,7 @@ pub fn create_signed_p2p_transaction(
     receivers: Vec<&TestAccount>,
 ) -> Vec<AnalyzedTransaction> {
     let mut transactions = Vec::new();
-    for (_, receiver) in receivers.iter().enumerate() {
+    for receiver in receivers.iter() {
         let transaction_payload = TransactionPayload::EntryFunction(EntryFunction::new(
             ModuleId::new(AccountAddress::ONE, Identifier::new("coin").unwrap()),
             Identifier::new("transfer").unwrap(),

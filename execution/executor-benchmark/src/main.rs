@@ -22,7 +22,7 @@ use aptos_experimental_runtimes::thread_manager::{ThreadConfigStrategy, ThreadMa
 use aptos_metrics_core::{register_int_gauge, IntGauge};
 use aptos_profiler::{ProfilerConfig, ProfilerHandler};
 use aptos_push_metrics::MetricsPusher;
-use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
 use aptos_vm::AptosVM;
 use clap::{ArgGroup, Parser, Subcommand};
 use once_cell::sync::Lazy;
@@ -313,6 +313,9 @@ enum Command {
         #[clap(long, default_value_t = 1)]
         module_working_set_size: usize,
 
+        #[clap(long)]
+        use_sender_account_pool: bool,
+
         #[clap(long, value_parser)]
         data_dir: PathBuf,
 
@@ -362,6 +365,7 @@ where
             transaction_type,
             transaction_weights,
             module_working_set_size,
+            use_sender_account_pool,
             data_dir,
             checkpoint_dir,
         } => {
@@ -373,7 +377,8 @@ where
                     &transaction_weights,
                     &[],
                     module_working_set_size,
-                    false,
+                    use_sender_account_pool,
+                    WorkflowProgress::MoveByPhases,
                 );
                 assert!(mix_per_phase.len() == 1);
                 Some(mix_per_phase[0].clone())
