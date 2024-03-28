@@ -240,6 +240,9 @@ pub fn new<K: Eq + Hash + Clone, M>(
 ) -> (Sender<K, M>, Receiver<K, M>) {
     let max_queue_size_per_key =
         NonZeroUsize!(max_queue_size_per_key, "aptos_channel cannot be of size 0");
+    if let Some(counters) = counters {
+        counters.reset();
+    }
     let shared_state = Arc::new(Mutex::new(SharedState {
         internal_queue: PerKeyQueue::new(queue_style, max_queue_size_per_key, counters),
         waker: None,
