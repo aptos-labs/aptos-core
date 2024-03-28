@@ -29,7 +29,7 @@ use move_vm_types::{
     gas::{GasMeter, SimpleInstruction},
     loaded_data::{
         runtime_access_specifier::{AccessInstance, AccessSpecifierEnv, AddressSpecifierFunction},
-        runtime_types::Type,
+        runtime_types::{Type, TypeBuilder},
     },
     natives::function::NativeResult,
     values::{
@@ -149,7 +149,7 @@ impl Interpreter {
         loop {
             let resolver = current_frame.resolver(loader, module_store);
             let exit_code =
-                current_frame //self
+                current_frame
                     .execute_code(&resolver, &mut self, data_store, module_store, gas_meter)
                     .map_err(|err| self.attach_state_if_invariant_violation(err, &current_frame))?;
             match exit_code {
@@ -241,7 +241,7 @@ impl Interpreter {
                         let err = set_err_info!(frame, err);
                         self.attach_state_if_invariant_violation(err, &frame)
                     })?;
-                    // Note: the caller will find the the callee's return values at the top of the shared operand stack
+                    // Note: the caller will find the callee's return values at the top of the shared operand stack
                     current_frame = frame;
                 },
                 ExitCode::CallGeneric(idx) => {
@@ -1043,7 +1043,7 @@ impl Stack {
         Ok(self.value[(self.value.len() - n)..].iter())
     }
 
-    /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
+    /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
     fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
@@ -1054,14 +1054,14 @@ impl Stack {
         }
     }
 
-    /// Pop a `Value` off the stack or abort execution if the stack is empty.
+    /// Pop a type off the stack or abort execution if the stack is empty.
     fn pop_ty(&mut self) -> PartialVMResult<Type> {
         self.types
             .pop()
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
     }
 
-    /// Pop n values off the stack.
+    /// Pop n types off the stack.
     fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self
             .types
@@ -1085,7 +1085,6 @@ impl Stack {
 }
 
 /// A call stack.
-// #[derive(Debug)]
 struct CallStack(Vec<Frame>);
 
 impl CallStack {
@@ -1095,7 +1094,7 @@ impl CallStack {
     }
 
     /// Push a `Frame` on the call stack.
-    fn push(&mut self, frame: Frame) -> ::std::result::Result<(), Frame> {
+    fn push(&mut self, frame: Frame) -> Result<(), Frame> {
         if self.0.len() < CALL_STACK_SIZE_LIMIT {
             self.0.push(frame);
             Ok(())
@@ -1494,27 +1493,39 @@ impl Frame {
             | Bytecode::Call(_)
             | Bytecode::CallGeneric(_)
             | Bytecode::Abort => {
-                // Invariants hold because all of the instructions above will force VM to break from the interpreter loop and thus not hit this code path.
+                // Invariants hold because all the instructions above will force VM to break from the interpreter loop and thus not hit this code path.
                 unreachable!("control flow instruction encountered during type check")
             },
             Bytecode::Pop => {
                 let ty = interpreter.operand_stack.pop_ty()?;
                 check_ability(ty.abilities()?.has_drop())?;
             },
-            Bytecode::LdU8(_) => interpreter.operand_stack.push_ty(Type::U8)?,
-            Bytecode::LdU16(_) => interpreter.operand_stack.push_ty(Type::U16)?,
-            Bytecode::LdU32(_) => interpreter.operand_stack.push_ty(Type::U32)?,
-            Bytecode::LdU64(_) => interpreter.operand_stack.push_ty(Type::U64)?,
-            Bytecode::LdU128(_) => interpreter.operand_stack.push_ty(Type::U128)?,
-            Bytecode::LdU256(_) => interpreter.operand_stack.push_ty(Type::U256)?,
-            Bytecode::LdTrue | Bytecode::LdFalse => {
-                interpreter.operand_stack.push_ty(Type::Bool)?
-            },
+            Bytecode::LdU8(_) => interpreter
+                .operand_stack
+                .push_ty(TypeBuilder::create_u8_ty())?,
+            Bytecode::LdU16(_) => interpreter
+                .operand_stack
+                .push_ty(TypeBuilder::create_u16_ty())?,
+            Bytecode::LdU32(_) => interpreter
+                .operand_stack
+                .push_ty(TypeBuilder::create_u32_ty())?,
+            Bytecode::LdU64(_) => interpreter
+                .operand_stack
+                .push_ty(TypeBuilder::create_u64_ty())?,
+            Bytecode::LdU128(_) => interpreter
+                .operand_stack
+                .push_ty(TypeBuilder::create_u128_ty())?,
+            Bytecode::LdU256(_) => interpreter
+                .operand_stack
+                .push_ty(TypeBuilder::create_u256_ty())?,
+            Bytecode::LdTrue | Bytecode::LdFalse => interpreter
+                .operand_stack
+                .push_ty(TypeBuilder::create_bool_ty())?,
             Bytecode::LdConst(i) => {
                 let constant = resolver.constant_at(*i);
                 interpreter
                     .operand_stack
-                    .push_ty(Type::from_const_signature(&constant.type_)?)?;
+                    .push_ty(TypeBuilder::create_constant_ty(&constant.type_)?)?;
             },
             Bytecode::CopyLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();
@@ -1526,35 +1537,35 @@ impl Frame {
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::StLoc(_) => (),
-            Bytecode::MutBorrowLoc(idx) => {
-                let ty = local_tys[*idx as usize].clone();
-                interpreter
-                    .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
-            },
             Bytecode::ImmBorrowLoc(idx) => {
                 let ty = local_tys[*idx as usize].clone();
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(ty)?)?;
+            },
+            Bytecode::MutBorrowLoc(idx) => {
+                let ty = local_tys[*idx as usize].clone();
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_mut_reference_ty(ty)?)?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_ref_eq(&expected_ty)?;
+                let field_ty = resolver.get_field_type(*fh_idx)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(resolver.get_field_type(*fh_idx)?)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(field_ty)?)?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
                 let expected_ty = resolver.field_handle_to_struct(*fh_idx)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
                 top_ty.check_eq(&Type::MutableReference(Box::new(expected_ty)))?;
+                let field_ty = resolver.get_field_type(*fh_idx)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(
-                        resolver.get_field_type(*fh_idx)?,
-                    )))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(field_ty)?)?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
@@ -1563,26 +1574,28 @@ impl Frame {
                 top_ty.check_ref_eq(expected_struct_ty)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(expected_field_ty.clone())))?;
+                    .push_ty(TypeBuilder::create_reference_ty(expected_field_ty.clone())?)?;
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
                 let ((expected_field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, resolver, ty_args)?;
                 let top_ty = interpreter.operand_stack.pop_ty()?;
-                top_ty.check_eq(&Type::MutableReference(Box::new(
+                top_ty.check_eq(&TypeBuilder::create_mut_reference_ty(
                     expected_struct_ty.clone(),
-                )))?;
+                )?)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(expected_field_ty.clone())))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(
+                        expected_field_ty.clone(),
+                    )?)?;
             },
             Bytecode::Pack(idx) => {
                 let field_count = resolver.field_count(*idx);
                 let args_ty = resolver.get_struct_fields(*idx)?;
-                let output_ty = resolver.get_struct_type(*idx)?;
+                let output_ty = resolver.get_struct_type(*idx);
                 let ability = output_ty.abilities()?;
 
-                // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
+                // If the struct has a key ability, we expect all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
                     ability
                         .remove(Ability::Key)
@@ -1618,7 +1631,7 @@ impl Frame {
                 let args_ty = ty_cache.get_struct_fields_types(*idx, resolver, ty_args)?;
                 let ability = output_ty.abilities()?;
 
-                // If the struct has a key ability, we expects all of its field to have store ability but not key ability.
+                // If the struct has a key ability, we expect all of its field to have store ability but not key ability.
                 let field_expected_abilities = if ability.has_key() {
                     ability
                         .remove(Ability::Key)
@@ -1650,7 +1663,7 @@ impl Frame {
             },
             Bytecode::Unpack(idx) => {
                 let struct_ty = interpreter.operand_stack.pop_ty()?;
-                struct_ty.check_eq(&resolver.get_struct_type(*idx)?)?;
+                struct_ty.check_eq(&resolver.get_struct_type(*idx))?;
                 let struct_decl = resolver.get_struct_fields(*idx)?;
                 for ty in struct_decl.fields.iter() {
                     interpreter.operand_stack.push_ty(ty.clone())?;
@@ -1710,27 +1723,39 @@ impl Frame {
             },
             Bytecode::CastU8 => {
                 interpreter.operand_stack.pop_ty()?;
-                interpreter.operand_stack.push_ty(Type::U8)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_u8_ty())?;
             },
             Bytecode::CastU16 => {
                 interpreter.operand_stack.pop_ty()?;
-                interpreter.operand_stack.push_ty(Type::U16)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_u16_ty())?;
             },
             Bytecode::CastU32 => {
                 interpreter.operand_stack.pop_ty()?;
-                interpreter.operand_stack.push_ty(Type::U32)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_u32_ty())?;
             },
             Bytecode::CastU64 => {
                 interpreter.operand_stack.pop_ty()?;
-                interpreter.operand_stack.push_ty(Type::U64)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_u64_ty())?;
             },
             Bytecode::CastU128 => {
                 interpreter.operand_stack.pop_ty()?;
-                interpreter.operand_stack.push_ty(Type::U128)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_u128_ty())?;
             },
             Bytecode::CastU256 => {
                 interpreter.operand_stack.pop_ty()?;
-                interpreter.operand_stack.push_ty(Type::U256)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_u256_ty())?;
             },
             Bytecode::Add
             | Bytecode::Sub
@@ -1756,7 +1781,9 @@ impl Frame {
                 let lhs = interpreter.operand_stack.pop_ty()?;
                 let rhs = interpreter.operand_stack.pop_ty()?;
                 lhs.check_eq(&rhs)?;
-                interpreter.operand_stack.push_ty(Type::Bool)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_bool_ty())?;
             },
             Bytecode::Eq | Bytecode::Neq => {
                 let lhs = interpreter.operand_stack.pop_ty()?;
@@ -1771,97 +1798,89 @@ impl Frame {
                     );
                 }
                 check_ability(lhs.abilities()?.has_drop())?;
-                interpreter.operand_stack.push_ty(Type::Bool)?;
+                interpreter
+                    .operand_stack
+                    .push_ty(TypeBuilder::create_bool_ty())?;
             },
             Bytecode::MutBorrowGlobal(idx) => {
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_eq(&Type::Address)?;
-                let ty = resolver.get_struct_type(*idx)?;
+                let address_ty = TypeBuilder::create_address_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&address_ty)?;
+                let ty = resolver.get_struct_type(*idx);
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(ty)?)?;
             },
             Bytecode::ImmBorrowGlobal(idx) => {
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_eq(&Type::Address)?;
-                let ty = resolver.get_struct_type(*idx)?;
+                let address_ty = TypeBuilder::create_address_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&address_ty)?;
+                let ty = resolver.get_struct_type(*idx);
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(ty)?)?;
             },
             Bytecode::MutBorrowGlobalGeneric(idx) => {
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_eq(&Type::Address)?;
+                let address_ty = TypeBuilder::create_address_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&address_ty)?;
                 let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(ty)?)?;
             },
             Bytecode::ImmBorrowGlobalGeneric(idx) => {
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_eq(&Type::Address)?;
+                let address_ty = TypeBuilder::create_address_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&address_ty)?;
                 let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(ty)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(ty)?)?;
             },
             Bytecode::Exists(_) | Bytecode::ExistsGeneric(_) => {
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_eq(&Type::Address)?;
-                interpreter.operand_stack.push_ty(Type::Bool)?;
+                let bool_ty = TypeBuilder::create_bool_ty();
+                let address_ty = TypeBuilder::create_address_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&address_ty)?;
+                interpreter.operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::MoveTo(idx) => {
                 let ty = interpreter.operand_stack.pop_ty()?;
+                let signer_ref_ty = TypeBuilder::create_signer_reference_ty()?;
                 interpreter
                     .operand_stack
                     .pop_ty()?
-                    .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
-                ty.check_eq(&resolver.get_struct_type(*idx)?)?;
+                    .check_eq(&signer_ref_ty)?;
+                ty.check_eq(&resolver.get_struct_type(*idx))?;
                 check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveToGeneric(idx) => {
                 let ty = interpreter.operand_stack.pop_ty()?;
+                let signer_ref_ty = TypeBuilder::create_signer_reference_ty()?;
                 interpreter
                     .operand_stack
                     .pop_ty()?
-                    .check_eq(&Type::Reference(Box::new(Type::Signer)))?;
+                    .check_eq(&signer_ref_ty)?;
                 ty.check_eq(ty_cache.get_struct_type(*idx, resolver, ty_args)?.0)?;
                 check_ability(ty.abilities()?.has_key())?;
             },
             Bytecode::MoveFrom(idx) => {
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_eq(&Type::Address)?;
-                let ty = resolver.get_struct_type(*idx)?;
+                let address_ty = TypeBuilder::create_address_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&address_ty)?;
+                let ty = resolver.get_struct_type(*idx);
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveFromGeneric(idx) => {
-                interpreter
-                    .operand_stack
-                    .pop_ty()?
-                    .check_eq(&Type::Address)?;
+                let address_ty = TypeBuilder::create_address_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&address_ty)?;
                 let ty = ty_cache.get_struct_type(*idx, resolver, ty_args)?.0.clone();
                 check_ability(ty.abilities()?.has_key())?;
                 interpreter.operand_stack.push_ty(ty)?;
             },
             Bytecode::FreezeRef => {
-                match interpreter.operand_stack.pop_ty()? {
+                let ty = interpreter.operand_stack.pop_ty()?;
+                match ty {
                     Type::MutableReference(ty) => {
                         interpreter.operand_stack.push_ty(Type::Reference(ty))?
                     },
@@ -1875,8 +1894,9 @@ impl Frame {
             },
             Bytecode::Nop => (),
             Bytecode::Not => {
-                interpreter.operand_stack.pop_ty()?.check_eq(&Type::Bool)?;
-                interpreter.operand_stack.push_ty(Type::Bool)?;
+                let bool_ty = TypeBuilder::create_bool_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&bool_ty)?;
+                interpreter.operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::VecPack(si, num) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
@@ -1886,37 +1906,40 @@ impl Frame {
                 }
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Vector(triomphe::Arc::new(ty.clone())))?;
+                    .push_ty(TypeBuilder::create_vector_ty(ty.clone())?)?;
             },
             Bytecode::VecLen(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
+                let u64_ty = TypeBuilder::create_u64_ty();
                 interpreter
                     .operand_stack
                     .pop_ty()?
                     .check_vec_ref(ty, false)?;
-                interpreter.operand_stack.push_ty(Type::U64)?;
+                interpreter.operand_stack.push_ty(u64_ty)?;
             },
             Bytecode::VecImmBorrow(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
-                interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
+                let u64_ty = TypeBuilder::create_u64_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&u64_ty)?;
                 let inner_ty = interpreter
                     .operand_stack
                     .pop_ty()?
                     .check_vec_ref(ty, false)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::Reference(Box::new(inner_ty)))?;
+                    .push_ty(TypeBuilder::create_reference_ty(inner_ty)?)?;
             },
             Bytecode::VecMutBorrow(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
-                interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
+                let u64_ty = TypeBuilder::create_u64_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&u64_ty)?;
                 let inner_ty = interpreter
                     .operand_stack
                     .pop_ty()?
                     .check_vec_ref(ty, true)?;
                 interpreter
                     .operand_stack
-                    .push_ty(Type::MutableReference(Box::new(inner_ty)))?;
+                    .push_ty(TypeBuilder::create_mut_reference_ty(inner_ty)?)?;
             },
             Bytecode::VecPushBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
@@ -1954,8 +1977,9 @@ impl Frame {
             },
             Bytecode::VecSwap(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, resolver, ty_args)?;
-                interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
-                interpreter.operand_stack.pop_ty()?.check_eq(&Type::U64)?;
+                let u64_ty = TypeBuilder::create_u64_ty();
+                interpreter.operand_stack.pop_ty()?.check_eq(&u64_ty)?;
+                interpreter.operand_stack.pop_ty()?.check_eq(&u64_ty)?;
                 interpreter
                     .operand_stack
                     .pop_ty()?
@@ -2195,7 +2219,7 @@ impl Frame {
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = resolver.field_count(*sd_idx);
-                        let struct_type = resolver.get_struct_type(*sd_idx)?;
+                        let struct_type = resolver.get_struct_type(*sd_idx);
                         check_depth_of_type(resolver, &struct_type)?;
                         gas_meter.charge_pack(
                             false,
@@ -2438,7 +2462,7 @@ impl Frame {
                     Bytecode::MutBorrowGlobal(sd_idx) | Bytecode::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobal(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx)?;
+                        let ty = resolver.get_struct_type(*sd_idx);
                         interpreter.borrow_global(
                             is_mut,
                             false,
@@ -2471,7 +2495,7 @@ impl Frame {
                     },
                     Bytecode::Exists(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx)?;
+                        let ty = resolver.get_struct_type(*sd_idx);
                         interpreter.exists(
                             false,
                             resolver.loader(),
@@ -2500,7 +2524,7 @@ impl Frame {
                     },
                     Bytecode::MoveFrom(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx)?;
+                        let ty = resolver.get_struct_type(*sd_idx);
                         interpreter.move_from(
                             false,
                             resolver.loader(),
@@ -2535,8 +2559,7 @@ impl Frame {
                             .value_as::<Reference>()?
                             .read_ref()?
                             .value_as::<AccountAddress>()?;
-                        let ty = resolver.get_struct_type(*sd_idx)?;
-                        // REVIEW: Can we simplify Interpreter::move_to?
+                        let ty = resolver.get_struct_type(*sd_idx);
                         interpreter.move_to(
                             false,
                             resolver.loader(),

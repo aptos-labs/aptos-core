@@ -4,64 +4,62 @@
 use move_binary_format::{
     binary_views::BinaryIndexedView, errors::PartialVMResult, file_format::SignatureToken,
 };
-use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructNameIndex, Type};
-use triomphe::Arc as TriompheArc;
+use move_vm_types::loaded_data::runtime_types::{AbilityInfo, StructNameIndex, Type, TypeBuilder};
 
-// `intern_type` converts a signature token into the in memory type representation used by the MoveVM.
-pub fn intern_type(
+/// Converts a signature token into in-memory type representation used by the MoveVM.
+pub fn create_ty_from_sig_token(
     module: BinaryIndexedView,
     tok: &SignatureToken,
     struct_name_table: &[StructNameIndex],
 ) -> PartialVMResult<Type> {
-    let res = match tok {
-        SignatureToken::Bool => Type::Bool,
-        SignatureToken::U8 => Type::U8,
-        SignatureToken::U16 => Type::U16,
-        SignatureToken::U32 => Type::U32,
-        SignatureToken::U64 => Type::U64,
-        SignatureToken::U128 => Type::U128,
-        SignatureToken::U256 => Type::U256,
-        SignatureToken::Address => Type::Address,
-        SignatureToken::Signer => Type::Signer,
-        SignatureToken::TypeParameter(idx) => Type::TyParam(*idx),
-        SignatureToken::Vector(inner_tok) => {
-            let inner_type = intern_type(module, inner_tok, struct_name_table)?;
-            Type::Vector(TriompheArc::new(inner_type))
+    use SignatureToken::*;
+
+    Ok(match tok {
+        Bool => TypeBuilder::create_bool_ty(),
+        U8 => TypeBuilder::create_u8_ty(),
+        U16 => TypeBuilder::create_u16_ty(),
+        U32 => TypeBuilder::create_u32_ty(),
+        U64 => TypeBuilder::create_u64_ty(),
+        U128 => TypeBuilder::create_u128_ty(),
+        U256 => TypeBuilder::create_u256_ty(),
+        Address => TypeBuilder::create_address_ty(),
+        Signer => TypeBuilder::create_signer_ty(),
+        TypeParameter(idx) => Type::TyParam(*idx),
+        Vector(elem_tok) => {
+            let elem_ty = create_ty_from_sig_token(module, elem_tok, struct_name_table)?;
+            TypeBuilder::create_vector_ty(elem_ty)?
         },
-        SignatureToken::Reference(inner_tok) => {
-            let inner_type = intern_type(module, inner_tok, struct_name_table)?;
-            Type::Reference(Box::new(inner_type))
+        Reference(inner_tok) => {
+            let inner_ty = create_ty_from_sig_token(module, inner_tok, struct_name_table)?;
+            TypeBuilder::create_reference_ty(inner_ty)?
         },
-        SignatureToken::MutableReference(inner_tok) => {
-            let inner_type = intern_type(module, inner_tok, struct_name_table)?;
-            Type::MutableReference(Box::new(inner_type))
+        MutableReference(inner_tok) => {
+            let inner_ty = create_ty_from_sig_token(module, inner_tok, struct_name_table)?;
+            TypeBuilder::create_mut_reference_ty(inner_ty)?
         },
-        SignatureToken::Struct(sh_idx) => {
+        Struct(sh_idx) => {
+            let idx = struct_name_table[sh_idx.0 as usize];
             let struct_handle = module.struct_handle_at(*sh_idx);
-            Type::Struct {
-                idx: struct_name_table[sh_idx.0 as usize],
-                ability: AbilityInfo::struct_(struct_handle.abilities),
-            }
+            let ability = AbilityInfo::struct_(struct_handle.abilities);
+            TypeBuilder::create_struct_ty(idx, ability)
         },
-        SignatureToken::StructInstantiation(sh_idx, tys) => {
-            let type_args: Vec<_> = tys
+        StructInstantiation(sh_idx, toks) => {
+            let ty_args: Vec<_> = toks
                 .iter()
-                .map(|tok| intern_type(module, tok, struct_name_table))
+                .map(|tok| create_ty_from_sig_token(module, tok, struct_name_table))
                 .collect::<PartialVMResult<_>>()?;
+
+            let idx = struct_name_table[sh_idx.0 as usize];
             let struct_handle = module.struct_handle_at(*sh_idx);
-            Type::StructInstantiation {
-                idx: struct_name_table[sh_idx.0 as usize],
-                ty_args: TriompheArc::new(type_args),
-                ability: AbilityInfo::generic_struct(
-                    struct_handle.abilities,
-                    struct_handle
-                        .type_parameters
-                        .iter()
-                        .map(|ty| ty.is_phantom)
-                        .collect(),
-                ),
-            }
+            let ability = AbilityInfo::generic_struct(
+                struct_handle.abilities,
+                struct_handle
+                    .type_parameters
+                    .iter()
+                    .map(|ty| ty.is_phantom)
+                    .collect(),
+            );
+            TypeBuilder::create_struct_instantiation_ty(idx, ability, ty_args)?
         },
-    };
-    Ok(res)
+    })
 }

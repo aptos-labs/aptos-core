@@ -13,7 +13,7 @@
 //! ) -> PartialVMResult<NativeResult>;`
 //!
 //! arguments are passed with first argument at position 0 and so forth.
-//! Popping values from `arguments` gives the aguments in reverse order (last first).
+//! Popping values from `arguments` gives the arguments in reverse order (last first).
 //! This module contains the declarations and utilities to implement a native
 //! function.
 
@@ -56,7 +56,7 @@ impl NativeResult {
 
     /// Failed execution. The failure is a runtime failure in the function and not an invariant
     /// failure of the VM which would raise a `PartialVMError` error directly.
-    /// The only thing the funciton can specify is its abort code, as if it had invoked the `Abort`
+    /// The only thing the function can specify is its abort code, as if it had invoked the `Abort`
     /// bytecode instruction
     pub fn err(cost: InternalGas, abort_code: u64) -> Self {
         NativeResult::Abort { cost, abort_code }

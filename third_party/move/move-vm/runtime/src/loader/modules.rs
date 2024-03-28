@@ -6,7 +6,7 @@ use super::StructNameCache;
 use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
-        type_loader::intern_type,
+        type_loader::create_ty_from_sig_token,
         BinaryCache,
     },
     native_functions::NativeFunctions,
@@ -319,7 +319,11 @@ impl Module {
                         .0
                         .iter()
                         .map(|sig| {
-                            intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs)
+                            create_ty_from_sig_token(
+                                BinaryIndexedView::Module(&module),
+                                sig,
+                                &struct_idxs,
+                            )
                         })
                         .collect::<PartialVMResult<Vec<_>>>()?,
                 )
@@ -388,7 +392,7 @@ impl Module {
                                     };
                                     single_signature_token_map.insert(
                                         *si,
-                                        intern_type(
+                                        create_ty_from_sig_token(
                                             BinaryIndexedView::Module(&module),
                                             ty,
                                             &struct_idxs,
@@ -500,7 +504,7 @@ impl Module {
 
         let mut field_tys = vec![];
         for field in fields {
-            let ty = intern_type(
+            let ty = create_ty_from_sig_token(
                 BinaryIndexedView::Module(module),
                 &field.signature.0,
                 struct_name_table,

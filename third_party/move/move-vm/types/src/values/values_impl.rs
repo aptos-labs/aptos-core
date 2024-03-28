@@ -2330,7 +2330,7 @@ impl Vector {
     }
 
     pub fn to_vec_u8(self) -> PartialVMResult<Vec<u8>> {
-        check_elem_layout(&Type::U8, &self.0)?;
+        check_elem_layout(&TypeBuilder::create_u8_ty(), &self.0)?;
         if let Container::VecU8(r) = self.0 {
             Ok(take_unique_ownership(r)?.into_iter().collect())
         } else {
@@ -3820,7 +3820,9 @@ pub mod prop {
     }
 }
 
-use crate::delayed_values::delayed_field_id::DelayedFieldID;
+use crate::{
+    delayed_values::delayed_field_id::DelayedFieldID, loaded_data::runtime_types::TypeBuilder,
+};
 use move_core_types::value::{MoveStruct, MoveValue};
 
 impl ValueImpl {
