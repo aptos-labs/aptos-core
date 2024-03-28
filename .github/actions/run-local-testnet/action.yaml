@@ -37,7 +37,6 @@ runs:
 
       shell: bash
 
-
     # Install node + npm.
     - uses: actions/setup-node@v3
       with:

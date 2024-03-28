@@ -59,7 +59,7 @@ FORGE_TEST_RUNNER_TEMPLATE_PATH = "forge-test-runner-template.yaml"
 
 MULTIREGION_KUBECONFIG_DIR = "/etc/multiregion-kubeconfig"
 MULTIREGION_KUBECONFIG_PATH = f"{MULTIREGION_KUBECONFIG_DIR}/kubeconfig"
-GAR_REPO_NAME = "us-west1-docker.pkg.dev/aptos-global/aptos-internal"
+GAR_REPO_NAME = "us-docker.pkg.dev/aptos-registry/docker"
 
 
 @dataclass
