@@ -1,0 +1,12 @@
+[package]
+name = 'InlineCoverage'
+version = '0.1.0'
+
+[addresses]
+publisher = '_'
+
+[dev-addresses]
+publisher = '0xace'
+
+[dependencies.AptosFramework]
+local = '../../framework/aptos-framework'

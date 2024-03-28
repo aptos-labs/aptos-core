@@ -44,6 +44,12 @@ module aptos_std::math64 {
         (((a as u128) * (b as u128) / (c as u128)) as u64)
     }
 
+    /// Returns a * b / c going through u128 to prevent intermediate overflow, omitting assert to
+    /// enable 100% code coverage in safe scenarios where divisor is known to be nonzero.
+    public inline fun mul_div_unchecked(a: u64, b: u64, c: u64): u64 {
+        (((a as u128) * (b as u128) / (c as u128)) as u64)
+    }
+
     /// Return x clamped to the interval [lower, upper].
     public fun clamp(x: u64, lower: u64, upper: u64): u64 {
         min(upper, max(lower, x))
@@ -216,8 +222,10 @@ module aptos_std::math64 {
     public entry fun test_mul_div() {
         let tmp: u64 = 1<<63;
         assert!(mul_div(tmp,tmp,tmp) == tmp, 0);
+        assert!(mul_div_unchecked(tmp,tmp,tmp) == tmp, 0);
 
         assert!(mul_div(tmp,5,5) == tmp, 0);
+        assert!(mul_div_unchecked(tmp,5,5) == tmp, 0);
         // Note that ordering other way is imprecise.
         assert!((tmp / 5) * 5 != tmp, 0);
     }
