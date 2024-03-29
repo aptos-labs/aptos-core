@@ -242,7 +242,7 @@ impl Processor {
                 };
 
             // update next batch start version
-            batch_start_version = e e + 1;
+            batch_start_version = last_version + 1;
             assert!(
                 batch_start_version % FILE_ENTRY_TRANSACTION_COUNT == 0,
                 "[Filestore] Batch must be multiple of 1000"
