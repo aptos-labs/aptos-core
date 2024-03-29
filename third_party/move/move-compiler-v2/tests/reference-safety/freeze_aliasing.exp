@@ -11,9 +11,9 @@ error: cannot freeze local `y`  since multiple mutable references exist
   │                  ^^^^^^^^^ frozen here
 
 error: cannot implicitly freeze local `r` since other mutable usages for this reference exist
-   ┌─ tests/reference-safety/freeze_aliasing.move:28:48
+   ┌─ tests/reference-safety/freeze_aliasing.move:31:48
    │
-28 │         *vector::borrow_mut(r, *vector::borrow(r, 1)) = 4;
+31 │         *vector::borrow_mut(r, *vector::borrow(r, 1)) = 4;
    │          --------------------------------------^-----
    │          │                                     │
    │          │                                     implicitly frozen here
