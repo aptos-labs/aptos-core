@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: missing acquries annotation for Token
+error: missing acquires annotation for `Token`
    ┌─ tests/acquires-checker/resources_invalid.move:17:16
    │
  8 │         borrow_global<T>(ref.addr)

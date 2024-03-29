@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: missing acquries annotation for R
+error: missing acquires annotation for `R`
    ┌─ tests/acquires-checker/globals.move:13:9
    │
 13 │     fun read(a: address): u64 {
@@ -8,7 +8,7 @@ error: missing acquries annotation for R
 14 │         let r = borrow_global<R>(a);
    │                 ------------------- acquired here
 
-error: missing acquries annotation for R
+error: missing acquires annotation for `R`
    ┌─ tests/acquires-checker/globals.move:18:9
    │
 18 │     fun write(a: address, x: u64): u64 {

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: missing acquries annotation for Box
+error: missing acquires annotation for `Box`
    ┌─ tests/acquires-checker/conditional_global_operations.move:14:9
    │
 14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
@@ -9,7 +9,7 @@ error: missing acquries annotation for Box
 16 │         borrow_global<Box<T>>(a1);
    │         ------------------------- acquired here
 
-error: missing acquries annotation for Pair
+error: missing acquires annotation for `Pair`
    ┌─ tests/acquires-checker/conditional_global_operations.move:14:9
    │
 14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {

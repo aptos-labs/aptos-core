@@ -30,9 +30,16 @@ pub fn acquires_checker(env: &GlobalEnv) {
                         let s_name = module.get_struct(sid).get_name();
                         let note = match acquired {
                             AcquiredAt::Directly(loc) => (loc, "acquired here".to_owned()),
-                            AcquiredAt::Indirectly(loc, _fun_id) => {
-                                (loc, "acquired by call".to_owned())
-                            },
+                            AcquiredAt::Indirectly(loc, callee_id) => (
+                                loc,
+                                format!(
+                                    "acquired by the call to `{}`",
+                                    module
+                                        .get_function(callee_id)
+                                        .get_name()
+                                        .display(module.symbol_pool())
+                                ),
+                            ),
                         };
                         env.error_with_labels(
                             &fun_env.get_id_loc(),
