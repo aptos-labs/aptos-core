@@ -11,6 +11,9 @@ publish.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[[bin]]
+name = "move-mutator"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0"
