@@ -1,22 +1,18 @@
 script {
-    use aptos_framework::keyless_account;
+    use aptos_framework::jwks;
     use aptos_framework::aptos_governance;
-    use std::option;
-    use std::vector;
     use std::string::utf8;
     fun main(core_resources: &signer) {
         let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
-
-        let new_config = keyless_account::new_configuration(
-                vector[utf8(b"test.recovery.aud")],
-                3,
-                10000000, // ~1160 days
-                option::some(x"c9c9c08c2e3fdbf0c818274a34a943263eebd7c6683e8b37b61f21f62af4dea1"),
-                3 * 31,
-                120,
-                350,
-                300,
-            );
-        keyless_account::update_configuration(&framework_signer, new_config);
+        let jwk = jwks::new_rsa_jwk(
+            utf8(b"test-rsa"),
+            utf8(b"RS256"),
+            utf8(b"AQAB"),
+            utf8(b"y5Efs1ZzisLLKCARSvTztgWj5JFP3778dZWt-od78fmOZFxem3a_aYbOXSJToRp862do0PxJ4PDMpmqwV5f7KplFI6NswQV-WPufQH8IaHXZtuPdCjPOcHybcDiLkO12d0dG6iZQUzypjAJf63APcadio-4JDNWlGC5_Ow_XQ9lIY71kTMiT9lkCCd0ZxqEifGtnJe5xSoZoaMRKrvlOw-R6iVjLUtPAk5hyUX95LDKxwAR-oshnj7gmATejga2EvH9ozdn3M8Go11PSDa04OQxPcA25OoDTfxLvT28LRpSXrbmUWZ-O_lGtDl3ZAtjIguYGEobTk4N11eRssC95Cw")
+        );
+        let patches = vector[
+            jwks::new_patch_upsert_jwk(b"test.oidc.provider", jwk),
+        ];
+        jwks::set_patches(&framework_signer, patches);
     }
 }
