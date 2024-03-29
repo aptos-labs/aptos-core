@@ -31,7 +31,7 @@ use aptos_framework::{
     natives::{code::PublishRequest, randomness::RandomnessContext},
     RuntimeModuleMetadataV1,
 };
-use aptos_gas_algebra::{Gas, GasQuantity, GasUnit, NumBytes, Octa};
+use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_schedule::{AptosGasParameters, TransactionGasParameters, VMGasParameters};
 use aptos_logger::{enabled, prelude::*, Level};
@@ -53,6 +53,7 @@ use aptos_types::{
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         new_epoch_event_key, ConfigurationResource, FeatureFlag, Features, OnChainConfig,
+        OnChainConsensusConfig, OnChainRandomnessConfig, RandomnessConfigMoveStruct,
         TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder,
     },
     randomness::Randomness,
@@ -86,7 +87,6 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress,
-    gas_algebra::{InternalGasUnit, ToUnit},
     ident_str,
     identifier::Identifier,
     language_storage::{ModuleId, TypeTag},
@@ -201,6 +201,7 @@ pub struct AptosVM {
     gas_params: Result<AptosGasParameters, String>,
     pub(crate) storage_gas_params: Result<StorageGasParameters, String>,
     timed_features: TimedFeatures,
+    randomness_enabled: bool,
 }
 
 impl AptosVM {
@@ -240,6 +241,12 @@ impl AptosVM {
         let aggregator_v2_type_tagging = override_is_delayed_field_optimization_capable
             && features.is_aggregator_v2_delayed_fields_enabled();
 
+        let consensus_config = OnChainConsensusConfig::fetch_config(resolver).unwrap_or_default();
+        let randomness_config = RandomnessConfigMoveStruct::fetch_config(resolver)
+            .and_then(|x| OnChainRandomnessConfig::try_from(x).ok())
+            .unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
+        let randomness_enabled =
+            consensus_config.is_vtxn_enabled() && randomness_config.randomness_enabled();
         let move_vm = MoveVmExt::new(
             native_gas_params,
             misc_gas_params,
@@ -259,6 +266,7 @@ impl AptosVM {
             gas_params,
             storage_gas_params,
             timed_features,
+            randomness_enabled,
         }
     }
 
@@ -1644,7 +1652,7 @@ impl AptosVM {
             unwrap_or_discard!(PrologueSession::new(self, &txn_data, resolver));
         let mut required_deposit: Option<u64> = None;
         unwrap_or_discard!(prologue_session.execute(|session| {
-            required_deposit = get_required_deposit(
+            required_deposit = self.get_required_deposit(
                 session,
                 resolver,
                 &gas_meter.vm_gas_params().txn,
@@ -1657,7 +1665,7 @@ impl AptosVM {
                 txn,
                 &txn_data,
                 log_context,
-                required_deposit.clone(),
+                required_deposit,
             )
         }));
 
@@ -1705,7 +1713,7 @@ impl AptosVM {
                     log_context,
                     &mut new_published_modules_loaded,
                     change_set_configs,
-                    required_deposit.clone(),
+                    required_deposit,
                 ),
             TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
                 resolver,
@@ -1718,7 +1726,7 @@ impl AptosVM {
                 log_context,
                 &mut new_published_modules_loaded,
                 change_set_configs,
-                required_deposit.clone(),
+                required_deposit,
             ),
 
             // Deprecated. We cannot make this `unreachable!` because a malicious
@@ -1744,7 +1752,7 @@ impl AptosVM {
                 gas_meter,
                 change_set_configs,
                 new_published_modules_loaded,
-                required_deposit.clone(),
+                required_deposit,
             )
         })
     }
@@ -2344,6 +2352,48 @@ impl AptosVM {
             },
         })
     }
+
+    pub fn get_required_deposit(
+        &self,
+        session: &mut SessionExt,
+        resolver: &impl AptosMoveResolver,
+        txn_gas_params: &TransactionGasParameters,
+        txn_metadata: &TransactionMetadata,
+        payload: &TransactionPayload,
+    ) -> Option<u64> {
+        match payload {
+            TransactionPayload::EntryFunction(entry_func) => {
+                let has_randomness_attr =
+                    has_randomness_attribute(resolver, session, entry_func).unwrap_or(false);
+                if self.randomness_enabled && has_randomness_attr {
+                    //TODO: reuse existing constants.
+                    //TODO: handle overflows.
+                    let internal_gas_per_gas = 1000;
+                    let max_execution_io_gas = Gas::from(
+                        (u64::from(txn_gas_params.max_execution_gas + txn_gas_params.max_io_gas)
+                            + internal_gas_per_gas
+                            - 1)
+                            / internal_gas_per_gas,
+                    );
+                    let y0 = u64::from(txn_gas_params.min_price_per_gas_unit);
+                    let y1 = u64::from(txn_gas_params.max_storage_fee);
+                    let max_storage_gas: Gas = Gas::new((y1 + y0 - 1) / y0);
+                    let required_gas_deposit = min(
+                        max_execution_io_gas + max_storage_gas,
+                        txn_gas_params.maximum_number_of_gas_units,
+                    );
+                    let required_fee_deposit =
+                        u64::from(txn_metadata.gas_unit_price * required_gas_deposit);
+                    Some(required_fee_deposit)
+                } else {
+                    None
+                }
+            },
+            TransactionPayload::Script(_)
+            | TransactionPayload::ModuleBundle(_)
+            | TransactionPayload::Multisig(_) => None,
+        }
+    }
 }
 
 // Executor external API
@@ -2489,7 +2539,7 @@ impl VMValidator for AptosVM {
             };
 
         // Increment the counter for transactions verified.
-        let required_deposit = get_required_deposit(
+        let required_deposit = self.get_required_deposit(
             &mut session,
             &resolver,
             &gas_meter.vm_gas_params().txn,
@@ -2600,45 +2650,6 @@ pub(crate) fn is_account_init_for_sponsored_transaction(
                         .finish(Location::Undefined)
                 })?,
     )
-}
-
-fn get_required_deposit(
-    session: &mut SessionExt,
-    resolver: &impl AptosMoveResolver,
-    txn_gas_params: &TransactionGasParameters,
-    txn_metadata: &TransactionMetadata,
-    payload: &TransactionPayload,
-) -> Option<u64> {
-    match payload {
-        TransactionPayload::EntryFunction(entry_func) => {
-            if has_randomness_attribute(resolver, session, entry_func).unwrap_or(false) {
-                //TODO: reuse existing constants.
-                //TODO: handle overflows.
-                let internal_gas_per_gas = 1000;
-                let max_execution_io_gas = Gas::from(
-                    (u64::from(txn_gas_params.max_execution_gas + txn_gas_params.max_io_gas)
-                        + internal_gas_per_gas
-                        - 1)
-                        / internal_gas_per_gas,
-                );
-                let y0 = u64::from(txn_gas_params.min_price_per_gas_unit);
-                let y1 = u64::from(txn_gas_params.max_storage_fee);
-                let max_storage_gas: Gas = Gas::new((y1 + y0 - 1) / y0);
-                let required_gas_deposit = min(
-                    max_execution_io_gas + max_storage_gas,
-                    txn_gas_params.maximum_number_of_gas_units,
-                );
-                let required_fee_deposit =
-                    u64::from(txn_metadata.gas_unit_price * required_gas_deposit);
-                Some(required_fee_deposit)
-            } else {
-                None
-            }
-        },
-        TransactionPayload::Script(_)
-        | TransactionPayload::ModuleBundle(_)
-        | TransactionPayload::Multisig(_) => None,
-    }
 }
 
 #[test]
