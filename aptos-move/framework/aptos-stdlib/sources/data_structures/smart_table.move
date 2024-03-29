@@ -219,43 +219,43 @@ module aptos_std::smart_table {
         Option<u64>,
         Option<u64>,
     ) {
+        let num_buckets = table_ref.num_buckets;
+        let buckets_ref = &table_ref.buckets;
+        assert!(
+            starting_bucket_index == 0 || starting_bucket_index < num_buckets,
+            EINVALID_BUCKET_INDEX
+        );
+        let bucket_ref = table_with_length::borrow(buckets_ref, starting_bucket_index);
+        let bucket_length = vector::length(bucket_ref);
+        assert!(
+            starting_vector_index == 0 || starting_vector_index < bucket_length,
+            EINVALID_VECTOR_INDEX
+        );
         let keys = vector[];
-        if (num_keys_to_get > 0) {
-            let num_buckets = table_ref.num_buckets;
-            let num_keys_checked = 0;
-            let buckets_ref = &table_ref.buckets;
-            assert!(
-                starting_bucket_index == 0 || starting_bucket_index < num_buckets,
-                EINVALID_BUCKET_INDEX
-            );
-            let bucket_ref = table_with_length::borrow(buckets_ref, starting_bucket_index);
-            let bucket_length = vector::length(bucket_ref);
-            assert!(
-                starting_vector_index == 0 || starting_vector_index < bucket_length,
-                EINVALID_VECTOR_INDEX
-            );
-            for (bucket_index in starting_bucket_index..num_buckets) {
-                bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
-                bucket_length = vector::length(bucket_ref);
-                for (vector_index in starting_vector_index..bucket_length) {
-                    vector::push_back(&mut keys, vector::borrow(bucket_ref, vector_index).key);
-                    num_keys_checked = num_keys_checked + 1;
-                    if (num_keys_checked == num_keys_to_get) {
-                        vector_index = vector_index + 1;
-                        return if (vector_index == bucket_length) {
-                            bucket_index = bucket_index + 1;
-                            if (bucket_index < num_buckets) {
-                                (keys, option::some(bucket_index), option::some(0))
-                            } else {
-                                (keys, option::none(), option::none())
-                            }
+        if (num_keys_to_get == 0) return
+            (keys, option::some(starting_bucket_index), option::some(starting_vector_index));
+        let num_keys_checked = 0;
+        for (bucket_index in starting_bucket_index..num_buckets) {
+            bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
+            bucket_length = vector::length(bucket_ref);
+            for (vector_index in starting_vector_index..bucket_length) {
+                vector::push_back(&mut keys, vector::borrow(bucket_ref, vector_index).key);
+                num_keys_checked = num_keys_checked + 1;
+                if (num_keys_checked == num_keys_to_get) {
+                    vector_index = vector_index + 1;
+                    return if (vector_index == bucket_length) {
+                        bucket_index = bucket_index + 1;
+                        if (bucket_index < num_buckets) {
+                            (keys, option::some(bucket_index), option::some(0))
                         } else {
-                            (keys, option::some(bucket_index), option::some(vector_index))
+                            (keys, option::none(), option::none())
                         }
-                    };
+                    } else {
+                        (keys, option::some(bucket_index), option::some(vector_index))
+                    }
                 };
-                starting_vector_index = 0; // Start parsing the next bucket at vector index 0.
             };
+            starting_vector_index = 0; // Start parsing the next bucket at vector index 0.
         };
         (keys, option::none(), option::none())
     }
@@ -637,8 +637,8 @@ module aptos_std::smart_table {
             starting_vector_index,
             0
         );
-        assert!(starting_bucket_index_r == option::none(), 0);
-        assert!(starting_vector_index_r == option::none(), 0);
+        assert!(starting_bucket_index_r == option::some(starting_bucket_index), 0);
+        assert!(starting_vector_index_r == option::some(starting_vector_index), 0);
         assert!(vector::is_empty(&keys), 0);
         while (i < 100) {
             add(&mut table, i, 0);
@@ -691,8 +691,8 @@ module aptos_std::smart_table {
         assert!(starting_vector_index_r == option::none(), 0);
         (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(&table, 0, 0, 0);
         assert!(keys == vector[], 0);
-        assert!(starting_bucket_index_r == option::none(), 0);
-        assert!(starting_vector_index_r == option::none(), 0);
+        assert!(starting_bucket_index_r == option::some(0), 0);
+        assert!(starting_vector_index_r == option::some(0), 0);
         destroy(table);
     }
 
