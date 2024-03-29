@@ -219,46 +219,6 @@ impl BlockStore {
         block_store
     }
 
-    // /// This function will execute the block upon receiving enough order votes on the block.
-    // pub async fn send_for_preemtive_execution(&self, block_id_to_execute: HashValue) -> anyhow::Result<()> {
-    //     let block_to_execute = self
-    //         .get_block(block_id_to_execute)
-    //         .ok_or_else(|| format_err!("Block id not found"))?;
-    //     ensure!(
-    //         block_to_execute.round() > self.ordered_root().round(),
-    //         "Block_to_execute round lower than root"
-    //     );
-    //     let blocks_to_execute = self
-    //         .path_from_ordered_root(block_id_to_execute)
-    //         .unwrap_or_default();
-    //     assert!(!blocks_to_execute.is_empty());
-    //     let block_tree = self.inner.clone();
-    //     let storage = self.storage.clone();
-
-    //     self.execution_client
-    //         .finalize_order(
-    //             &blocks_to_execute,
-    //             block_to_execute.quorum_cert().ledger_info().clone(),
-    //             Box::new(
-    //                 move |committed_blocks: &[Arc<PipelinedBlock>],
-    //                       commit_decision: LedgerInfoWithSignatures| {
-    //                     block_tree.write().commit_callback(
-    //                         storage,
-    //                         committed_blocks,
-    //                         block_to_execute.quorum_cert().clone(),
-    //                         commit_decision,
-    //                     );
-    //                 },
-    //             ),
-    //         )
-    //         .await
-    //         .expect("Failed to persist commit");
-    //     self.inner.write().update_ordered_root(block_to_commit.id());
-    //     update_counters_for_ordered_blocks(&blocks_to_commit);
-
-    //     Ok(())
-    // }
-
     /// Send an ordered block id with the proof for execution, returns () on success or error
     pub async fn send_for_execution(&self, finality_proof: QuorumCert) -> anyhow::Result<()> {
         let block_id_to_commit = finality_proof.commit_info().id();
