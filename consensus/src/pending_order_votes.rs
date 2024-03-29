@@ -81,7 +81,6 @@ impl PendingOrderVotes {
                 return OrderVoteReceptionResult::EquivocateVote;
             }
         }
-        // TODO: Need to make sure the order vote is for the previous round.
 
         self.author_to_order_vote
             .insert(order_vote.author(), (order_vote.clone(), li_digest));

@@ -1008,8 +1008,25 @@ impl RoundManager {
             .await
     }
 
-    // TODO: Finish this
     async fn process_order_vote_msg(&mut self, order_vote: OrderVote) -> anyhow::Result<()> {
+        info!(
+            self.new_log(LogEvent::ReceiveOrderVote)
+                .remote_peer(order_vote.author()),
+            order_vote = %order_vote,
+            order_vote_epoch = order_vote.ledger_info().epoch(),
+            order_vote_round = order_vote.ledger_info().round(),
+            order_vote_id = order_vote.ledger_info().consensus_block_id(),
+        );
+
+        let block_id = order_vote.vote_data().proposed().id();
+        // Check if the block already had a QC
+        if self
+            .block_store
+            .get_quorum_cert_for_block(block_id)
+            .is_some()
+        {
+            return Ok(());
+        }
         let vote_reception_result = self
             .round_state
             .insert_order_vote(&order_vote, &self.epoch_state.verifier);
@@ -1053,13 +1070,13 @@ impl RoundManager {
 
     async fn process_order_vote_reception_result(
         &mut self,
-        _order_vote: &OrderVote,
+        order_vote: &OrderVote,
         result: OrderVoteReceptionResult,
     ) -> anyhow::Result<()> {
         match result {
-            OrderVoteReceptionResult::NewQuorumCertificate(_qc) => {
-                // TODO: Execute the block
-                Ok(())
+            OrderVoteReceptionResult::NewQuorumCertificate(qc) => {
+                self.new_qc_aggregated(qc.clone(), order_vote.author())
+                    .await
             },
             OrderVoteReceptionResult::VoteAdded(_) => Ok(()),
             e => Err(anyhow::anyhow!("{:?}", e)),
@@ -1091,16 +1108,6 @@ impl RoundManager {
         self.process_certificates().await?;
         result
     }
-
-    // async fn new_order_vote_aggregated(&mut self,
-    //     preferred_peer: Author
-    // ) -> anyhow::Result<()> {
-    //     let result = self
-    //         .block_store
-    //         .insert_aggregated_order_vote(&mut self.create_block_retriever(preferred_peer));
-    //     self.process_certificates().await?;
-    //     result
-    // }
 
     /// To jump start new round with the current certificates we have.
     pub async fn init(&mut self, last_vote_sent: Option<Vote>) {
