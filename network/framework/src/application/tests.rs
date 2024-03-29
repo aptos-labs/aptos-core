@@ -985,15 +985,13 @@ fn create_network_sender_and_events(
         let (inbound_request_sender, inbound_request_receiver) = create_aptos_channel();
         let (outbound_request_sender, outbound_request_receiver) = create_aptos_channel();
         let (connection_outbound_sender, _connection_outbound_receiver) = create_aptos_channel();
-        let (_connection_inbound_sender, connection_inbound_receiver) = create_aptos_channel();
 
         // Create the network sender and events
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(outbound_request_sender),
             ConnectionRequestSender::new(connection_outbound_sender),
         );
-        let network_events =
-            NetworkEvents::new(inbound_request_receiver, connection_inbound_receiver, None);
+        let network_events = NetworkEvents::new(inbound_request_receiver, None);
 
         // Save the sender, events and receivers
         network_senders.insert(*network_id, network_sender);

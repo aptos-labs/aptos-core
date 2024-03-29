@@ -4,17 +4,17 @@
 
 use crate::{
     application::{metadata::ConnectionState, storage::PeersAndMetadata},
-    peer_manager::{ConnectionNotification, PeerManagerNotification, PeerManagerRequest},
+    peer_manager::{PeerManagerNotification, PeerManagerRequest},
     protocols::{
         direct_send::Message,
         rpc::{InboundRpcRequest, OutboundRpcRequest},
     },
     transport::ConnectionMetadata,
-    DisconnectReason, ProtocolId,
+    ProtocolId,
 };
 use aptos_config::{
     config::{PeerRole, RoleType},
-    network_id::{NetworkContext, NetworkId, PeerNetworkId},
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_netcore::transport::ConnectionOrigin;
 use aptos_types::PeerId;
@@ -40,8 +40,6 @@ pub type OutboundMessageReceiver =
 pub struct InboundNetworkHandle {
     /// To send new incoming network messages
     pub inbound_message_sender: InboundMessageSender,
-    /// To send new incoming connections or disconnections
-    pub connection_update_sender: ConnectionUpdateSender,
     /// To update the local state (normally done by peer manager)
     pub peers_and_metadata: Arc<PeersAndMetadata>,
 }
@@ -50,7 +48,7 @@ impl InboundNetworkHandle {
     /// Push connection update, and update the local storage
     pub fn connect(
         &self,
-        role: RoleType,
+        _role: RoleType,
         self_peer_network_id: PeerNetworkId,
         conn_metadata: ConnectionMetadata,
     ) {
@@ -63,45 +61,21 @@ impl InboundNetworkHandle {
                 conn_metadata.clone(),
             )
             .unwrap();
-
-        let self_peer_id = self_peer_network_id.peer_id();
-        self.connection_update_sender
-            .push(
-                conn_metadata.remote_peer_id,
-                ConnectionNotification::NewPeer(
-                    conn_metadata,
-                    NetworkContext::new(role, network_id, self_peer_id),
-                ),
-            )
-            .unwrap();
     }
 
     /// Push disconnect update, and update the local storage
     pub fn disconnect(
         &self,
-        role: RoleType,
+        _role: RoleType,
         self_peer_network_id: PeerNetworkId,
         conn_metadata: ConnectionMetadata,
     ) {
-        let self_peer_id = self_peer_network_id.peer_id();
         let network_id = self_peer_network_id.network_id();
 
         // Set the state of the peer as disconnected
         let peer_network_id = PeerNetworkId::new(network_id, conn_metadata.remote_peer_id);
         self.peers_and_metadata
             .update_connection_state(peer_network_id, ConnectionState::Disconnected)
-            .unwrap();
-
-        // Push the notification of the lost peer
-        self.connection_update_sender
-            .push(
-                conn_metadata.remote_peer_id,
-                ConnectionNotification::LostPeer(
-                    conn_metadata,
-                    NetworkContext::new(role, network_id, self_peer_id),
-                    DisconnectReason::ConnectionLost,
-                ),
-            )
             .unwrap();
     }
 }

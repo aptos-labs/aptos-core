@@ -7,10 +7,7 @@
 pub use crate::protocols::rpc::error::RpcError;
 use crate::{
     error::NetworkError,
-    peer_manager::{
-        ConnectionNotification, ConnectionRequestSender, PeerManagerNotification,
-        PeerManagerRequestSender,
-    },
+    peer_manager::{ConnectionRequestSender, PeerManagerNotification, PeerManagerRequestSender},
     ProtocolId,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -157,7 +154,6 @@ pub struct NetworkEvents<TMessage> {
 pub trait NewNetworkEvents {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>,
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> Self;
 }
@@ -165,7 +161,6 @@ pub trait NewNetworkEvents {
 impl<TMessage: Message + Send + 'static> NewNetworkEvents for NetworkEvents<TMessage> {
     fn new(
         peer_mgr_notifs_rx: aptos_channel::Receiver<(PeerId, ProtocolId), PeerManagerNotification>,
-        _connection_notifs_rx: aptos_channel::Receiver<PeerId, ConnectionNotification>, // TODO: remove
         max_parallel_deserialization_tasks: Option<usize>,
     ) -> Self {
         // Create a channel for deserialized messages

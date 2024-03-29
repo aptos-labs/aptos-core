@@ -110,6 +110,8 @@ pub struct HealthChecker<NetworkClient> {
     ping_failures_tolerated: u64,
     /// Counter incremented in each round of health checks
     round: u64,
+
+    connection_events_injection: Option<tokio::sync::mpsc::Receiver<ConnectionNotification>>,
 }
 
 impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChecker<NetworkClient> {
@@ -131,7 +133,16 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
             ping_timeout,
             ping_failures_tolerated,
             round: 0,
+            connection_events_injection: None,
         }
+    }
+
+    #[cfg(test)]
+    pub fn set_connection_source(
+        &mut self,
+        connection_events: tokio::sync::mpsc::Receiver<ConnectionNotification>,
+    ) {
+        self.connection_events_injection = Some(connection_events);
     }
 
     pub async fn start(mut self) {
@@ -144,7 +155,10 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         let ticker = self.time_service.interval(self.ping_interval);
         tokio::pin!(ticker);
 
-        let connection_events = self.network_interface.get_peers_and_metadata().subscribe();
+        let connection_events = self
+            .connection_events_injection
+            .take()
+            .unwrap_or_else(|| self.network_interface.get_peers_and_metadata().subscribe());
         let mut connection_events =
             tokio_stream::wrappers::ReceiverStream::new(connection_events).fuse();
 
