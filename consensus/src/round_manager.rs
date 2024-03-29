@@ -907,11 +907,13 @@ impl RoundManager {
                 "[RoundManager] SafetyRules Rejected {} for order vote",
                 proposed_block.block()
             ))?;
-            if !proposed_block.block().is_nil_block() {
-                observe_block(
-                    proposed_block.block().timestamp_usecs(),
-                    BlockStage::ORDER_VOTED,
-                );
+            if let Some(to_be_order_voted_block) = self.block_store.get_block(order_vote.ledger_info().consensus_block_id()) {
+                if !to_be_order_voted_block.block().is_nil_block() {
+                    observe_block(
+                        to_be_order_voted_block.block().timestamp_usecs(),
+                        BlockStage::ORDER_VOTED,
+                    );
+                }
             }
             self.round_state.record_order_vote(order_vote.clone());
             info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
@@ -1104,6 +1106,10 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         match result {
             OrderVoteReceptionResult::NewQuorumCertificate(qc) => {
+                observe_block(
+                    qc.certified_block().timestamp_usecs(),
+                    BlockStage::QC_AGGREGATED,
+                );
                 let result = self
                     .new_qc_aggregated(qc.clone(), order_vote.author())
                     .await;
