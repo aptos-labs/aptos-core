@@ -236,14 +236,13 @@ module aptos_std::smart_table {
         let keys = vector[];
         if (num_keys_to_get == 0) return
             (keys, option::some(starting_bucket_index), option::some(starting_vector_index));
-        let num_keys_checked = 0;
         for (bucket_index in starting_bucket_index..num_buckets) {
             bucket_ref = table_with_length::borrow(buckets_ref, bucket_index);
             bucket_length = vector::length(bucket_ref);
             for (vector_index in starting_vector_index..bucket_length) {
                 vector::push_back(&mut keys, vector::borrow(bucket_ref, vector_index).key);
-                num_keys_checked = num_keys_checked + 1;
-                if (num_keys_checked == num_keys_to_get) {
+                num_keys_to_get = num_keys_to_get - 1;
+                if (num_keys_to_get == 0) {
                     vector_index = vector_index + 1;
                     return if (vector_index == bucket_length) {
                         bucket_index = bucket_index + 1;
