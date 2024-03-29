@@ -8,7 +8,8 @@ use crate::{
         BlockReader, BlockRetriever, BlockStore,
     },
     counters::{
-        self, EXECUTED_WITH_ORDER_VOTE_QC, ORDER_VOTE_ADDED, PROPOSED_VTXN_BYTES,
+        self, EXECUTED_WITH_ORDER_VOTE_QC, FAILED_ORDER_VOTE_BROADCASTED, ORDER_VOTE_ADDED,
+        ORDER_VOTE_BROADCASTED, ORDER_VOTE_BRODCAST_DIDNT_START, PROPOSED_VTXN_BYTES,
         PROPOSED_VTXN_COUNT, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC,
     },
     error::{error_kind, VerifyError},
@@ -898,6 +899,7 @@ impl RoundManager {
 
     async fn broadcast_order_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
+            info!("BrodcastOrderVoteBlockFound");
             let vote_proposal = proposed_block.vote_proposal();
             let order_vote_result = self
                 .safety_rules
@@ -907,7 +909,10 @@ impl RoundManager {
                 "[RoundManager] SafetyRules Rejected {} for order vote",
                 proposed_block.block()
             ))?;
-            if let Some(to_be_order_voted_block) = self.block_store.get_block(order_vote.ledger_info().consensus_block_id()) {
+            if let Some(to_be_order_voted_block) = self
+                .block_store
+                .get_block(order_vote.ledger_info().consensus_block_id())
+            {
                 if !to_be_order_voted_block.block().is_nil_block() {
                     observe_block(
                         to_be_order_voted_block.block().timestamp_usecs(),
@@ -918,6 +923,10 @@ impl RoundManager {
             self.round_state.record_order_vote(order_vote.clone());
             info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
             self.network.broadcast_order_vote(order_vote).await;
+            ORDER_VOTE_BROADCASTED.inc();
+        } else {
+            info!("BrodcastOrderVoteBlockNotFound");
+            FAILED_ORDER_VOTE_BROADCASTED.inc();
         }
         Ok(())
     }
@@ -1081,7 +1090,11 @@ impl RoundManager {
                 }
                 let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
                 if result.is_ok() {
+                    info!("OrderVoteBrodcast");
                     let _ = self.broadcast_order_vote(vote).await;
+                } else {
+                    info!("OrderVoteBrodcastDidntStart");
+                    ORDER_VOTE_BRODCAST_DIDNT_START.inc();
                 }
                 result
             },
