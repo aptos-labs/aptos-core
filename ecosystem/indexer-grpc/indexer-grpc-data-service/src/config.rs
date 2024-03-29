@@ -134,7 +134,7 @@ impl RunnableConfig for IndexerGrpcDataServiceConfig {
             .map_err(|e| anyhow::anyhow!("Failed to build reflection service: {}", e))?;
 
         let cache_storage_format: StorageFormat = if self.enable_cache_compression {
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         } else {
             StorageFormat::Base64UncompressedProto
         };
