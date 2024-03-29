@@ -1,4 +1,8 @@
-use move_package::{BuildConfig, ModelConfig};
+// Copyright © Eiger
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use move_package::{BuildConfig, CompilerVersion, ModelConfig};
 use std::{path::Path, time::Instant};
 use termcolor::WriteColor;
 
@@ -20,12 +24,14 @@ pub(crate) fn prove<W: WriteColor>(
     prover_conf: &move_prover::cli::Options,
     mut error_writer: &mut W,
 ) -> anyhow::Result<()> {
-    let model = config
-        .clone()
-        .move_model_for_package(package_path, ModelConfig {
+    let mut model = config.clone().move_model_for_package(
+        package_path,
+        ModelConfig {
             all_files_as_targets: true,
             target_filter: None,
-        })?;
+            compiler_version: CompilerVersion::V2,
+        },
+    )?;
 
     let mut prover_conf = prover_conf.clone();
     prover_conf.output_path = package_path
@@ -37,5 +43,5 @@ pub(crate) fn prove<W: WriteColor>(
 
     let now = Instant::now();
 
-    move_prover::run_move_prover_with_model(&model, &mut error_writer, prover_conf, Some(now))
+    move_prover::run_move_prover_with_model(&mut model, &mut error_writer, prover_conf, Some(now))
 }
