@@ -27,7 +27,7 @@ The tool generates a report in a JSON format. The report contains information
 about the number of mutants tested and killed and also the differences between
 the original and modified code.
 
-## Example Usage
+## Setup check
 
 Please build the whole repository first. In the `aptos-core` directory, run:
 ```bash
