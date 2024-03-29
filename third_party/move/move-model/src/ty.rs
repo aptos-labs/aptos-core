@@ -25,7 +25,8 @@ use move_core_types::{
 use num::BigInt;
 use num_traits::identities::Zero;
 use std::{
-    collections::{BTreeMap, BTreeSet, VecDeque},
+    cmp::Ordering,
+    collections::{btree_map::Entry, BTreeMap, BTreeSet, VecDeque},
     fmt,
     fmt::{Debug, Formatter},
     iter,
@@ -307,11 +308,20 @@ impl ConstraintOrigin {
                 "required by declaration of field `{}`",
                 name.display(context.env.symbol_pool()),
             )),
-            TypeParameter(parent, is_struct, item, TP(name, _kind, loc)) => {
+            TypeParameter(parent, is_struct, item, TP(name, kind, loc)) => {
                 let name = name.display(context.env.symbol_pool());
+                let phantom_str = if kind.is_phantom { "phantom " } else { "" };
+                let abilities_str = if kind.abilities.is_empty() {
+                    "".to_string()
+                } else {
+                    format!(":{}", kind.abilities)
+                };
+
                 hints.push(format!(
-                    "required by instantiating type parameter `{}` of {} `{}`",
+                    "required by instantiating type parameter `{}{}{}` of {} `{}`",
+                    phantom_str,
                     name,
+                    abilities_str,
                     if *is_struct { "struct" } else { "function" },
                     item.display(context.env.symbol_pool())
                 ));
@@ -396,11 +406,22 @@ impl Constraint {
         )
     }
 
+    /// Defines an ordering on constraints to determine which one to
+    /// report first on violation. Accumulating constraints are later
+    /// in the order as they represent secondary errors.
+    pub fn compare(&self, other: &Constraint) -> Ordering {
+        if !self.accumulating() && other.accumulating() {
+            Ordering::Less
+        } else {
+            Ordering::Equal
+        }
+    }
+
     /// Some constraint errors lead to unnecessary noise if reported more than once for
     /// the same type.
     pub fn report_only_once(&self) -> bool {
         use Constraint::*;
-        matches!(self, HasAbilities(..))
+        matches!(self, HasAbilities(..) | NoReference | NoPhantom | NoTuple)
     }
 
     /// Joins the two constraints. If they are incompatible, produces a type unification error.
@@ -640,8 +661,8 @@ pub enum TypeUnificationError {
         Constraint,
         Option<ConstraintContext>,
     ),
-    /// The `HasAbilities` constraint failed: `MissingAbilities(ty, missing, ctx)`.
-    MissingAbilities(Type, AbilitySet, Option<ConstraintContext>),
+    /// The `HasAbilities` constraint failed: `MissingAbilities(loc, ty, missing, ctx)`.
+    MissingAbilities(Loc, Type, AbilitySet, Option<ConstraintContext>),
     /// The two constraints are incompatible and cannot be joined.
     ConstraintsIncompatible(Loc, Constraint, Constraint),
     /// A cyclic substitution when trying to unify the given types.
@@ -1499,7 +1520,20 @@ impl Substitution {
         }
         self.constraints.insert(var, current);
         if let Some(ctx) = ctx_opt {
-            self.constraint_contexts.insert(var, ctx);
+            match self.constraint_contexts.entry(var) {
+                Entry::Vacant(e) => {
+                    e.insert(ctx);
+                },
+                Entry::Occupied(e) => {
+                    let curr = e.into_mut();
+                    curr.inferred |= ctx.inferred;
+                    if matches!(ctx.origin, ConstraintOrigin::TypeParameter(..)) {
+                        // Prefer type parameter origin as it leads to
+                        // more precise error messages.
+                        curr.origin = ctx.origin;
+                    }
+                },
+            }
         }
         Ok(())
     }
@@ -1541,6 +1575,8 @@ impl Substitution {
         // Specialize the type before binding, to maximize groundness of type terms.
         let ty = self.specialize(&ty);
         if let Some(mut constrs) = self.constraints.remove(&var) {
+            // Sort constraints to report primary errors first
+            constrs.sort_by(|(_, _, c1), (_, _, c2)| c1.compare(c2).reverse());
             while let Some((loc, o, c)) = constrs.pop() {
                 // The effective order is the one combining the constraint order with the
                 // context order. The result needs to be swapped because the constraint
@@ -1713,6 +1749,7 @@ impl Substitution {
             let missing = required_abilities.setminus(abilities);
             if !missing.is_empty() {
                 Err(TypeUnificationError::MissingAbilities(
+                    loc.clone(),
                     ty.clone(),
                     missing,
                     ctx_opt.clone(),
@@ -1760,7 +1797,7 @@ impl Substitution {
                 for (i, t) in ts.iter().enumerate() {
                     let type_param = &type_params[i];
                     // Pass the requirements on to the type instantiation, except
-                    // phantoms which are exclude from ability requirements
+                    // phantoms which are excluded from ability requirements
                     if !type_param.1.is_phantom {
                         self.eval_ability_constraint(
                             context,
@@ -2664,13 +2701,22 @@ impl TypeUnificationError {
         }
     }
 
-    /// If this error is associated with a specific location, return it.
+    /// If this error is associated with a specific location and the error
+    /// is better reported at that location, return it.
     pub fn specific_loc(&self) -> Option<Loc> {
         match self {
+            TypeUnificationError::ConstraintUnsatisfied(_, _, _, c, _) if !c.accumulating() => {
+                // Non-accumulating constraints like `SomeNumber` or more similar than
+                // regular type errors and are better reported at the expression leading
+                // to the error instead of the location where the constraint stems from
+                None
+            },
             TypeUnificationError::RedirectedError(loc, e) => {
                 Some(e.specific_loc().unwrap_or_else(|| loc.clone()))
             },
-            TypeUnificationError::ConstraintsIncompatible(loc, ..) => Some(loc.clone()),
+            TypeUnificationError::ConstraintsIncompatible(loc, ..)
+            | TypeUnificationError::ConstraintUnsatisfied(loc, ..)
+            | TypeUnificationError::MissingAbilities(loc, ..) => Some(loc.clone()),
             _ => None,
         }
     }
@@ -2719,7 +2765,7 @@ impl TypeUnificationError {
                 vec![],
                 vec![],
             ),
-            TypeUnificationError::MissingAbilities(ty, missing, ctx_opt) => {
+            TypeUnificationError::MissingAbilities(_, ty, missing, ctx_opt) => {
                 let (note, hints, labels) = ctx_opt
                     .as_ref()
                     .map(|ctx| ctx.describe(display_context))

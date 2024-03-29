@@ -9,7 +9,7 @@ error: type `T` is missing required ability `drop`
 12 │     fun test(): U<S<T>> {
    │                     ^
    │
-   = required by instantiating type parameter `Y` of struct `S`
+   = required by instantiating type parameter `Y:drop` of struct `S`
 
 error: type `T` is missing required ability `drop`
    ┌─ tests/checking/abilities/bad_inst.move:13:7
@@ -20,4 +20,4 @@ error: type `T` is missing required ability `drop`
 13 │         U<S<T>> { x: S { x: T { } } }
    │             ^
    │
-   = required by instantiating type parameter `Y` of struct `S`
+   = required by instantiating type parameter `Y:drop` of struct `S`

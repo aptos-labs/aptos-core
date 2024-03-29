@@ -6,10 +6,14 @@ error: cannot return `integer` from a function with result type `bool`
 34 │         f1
    │         ^^
 
-error: type `R` is missing required ability `drop`
-   ┌─ tests/checking/typing/type_variable_join_threaded_unpack_invalid.move:40:47
+error: type `R` is missing required ability `drop` (type was inferred)
+   ┌─ tests/checking/typing/type_variable_join_threaded_unpack_invalid.move:39:31
    │
-40 │         Container::put(&mut v, Box { f1: R{}, f2 });
-   │                                               ^^
+10 │     public fun get<V: drop>(self: &T<V>): V {
+   │                    - declaration of type parameter `V`
+   ·
+39 │         let Box { f1, f2 }  = Container::get(&v);
+   │                               ^^^^^^^^^^^^^^
    │
-   = required by declaration of local `f2`
+   = required by instantiating type parameter `T` of struct `Box`
+   = required by instantiating type parameter `V:drop` of function `get`

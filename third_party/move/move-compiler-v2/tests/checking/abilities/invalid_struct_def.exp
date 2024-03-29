@@ -9,7 +9,7 @@ error: type `u8` is missing required ability `key`
 4 │     struct Bar { x: Foo<u8> }
   │                         ^^
   │
-  = required by instantiating type parameter `T` of struct `Foo`
+  = required by instantiating type parameter `T:key` of struct `Foo`
 
 error: type `T` is missing required ability `key`
   ┌─ tests/checking/abilities/invalid_struct_def.move:6:25
@@ -20,7 +20,7 @@ error: type `T` is missing required ability `key`
 6 │     struct Baz<T> { x: Foo<T> }
   │                            ^
   │
-  = required by instantiating type parameter `T` of struct `Foo`
+  = required by instantiating type parameter `T:key` of struct `Foo`
 
 error: type `HasKey` is missing required ability `store`
    ┌─ tests/checking/abilities/invalid_struct_def.move:15:6
@@ -64,7 +64,7 @@ error: type `T` is missing required ability `key`
 37 │         x: Foo<T>,
    │                ^
    │
-   = required by instantiating type parameter `T` of struct `Foo`
+   = required by instantiating type parameter `T:key` of struct `Foo`
 
 error: phantom type `T` can only be used as an argument for another phantom type parameter
    ┌─ tests/checking/abilities/invalid_struct_def.move:41:6
@@ -82,16 +82,5 @@ error: phantom type `T` can only be used as an argument for another phantom type
    ·
 45 │         x: S<T>
    │              ^
-   │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: phantom type `T` can only be used as an argument for another phantom type parameter
-   ┌─ tests/checking/abilities/invalid_struct_def.move:45:6
-   │
-31 │     struct S<T> has drop {
-   │              - declaration of type parameter `T`
-   ·
-45 │         x: S<T>
-   │            ^^^^
    │
    = required by instantiating type parameter `T` of struct `S`

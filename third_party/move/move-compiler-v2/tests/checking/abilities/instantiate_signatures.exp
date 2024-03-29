@@ -9,7 +9,7 @@ error: type `R` is missing required ability `drop`
 11 │         f1: S<R>,
    │               ^
    │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: reference type `&u64` is not allowed as a type argument
    ┌─ tests/checking/abilities/instantiate_signatures.move:12:15
@@ -20,18 +20,7 @@ error: reference type `&u64` is not allowed as a type argument
 12 │         f2: S<&u64>,
    │               ^^^^
    │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: reference type `&u64` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:12:13
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-12 │         f2: S<&u64>,
-   │             ^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: reference type `&&u64` is not allowed as a field type
    ┌─ tests/checking/abilities/instantiate_signatures.move:13:13
@@ -50,18 +39,7 @@ error: tuple type `(u64, u64)` is not allowed as a type argument
 14 │         f4: S<(u64, u64)>,
    │               ^^^^^^^^^^
    │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: tuple type `(u64, u64)` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:14:13
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-14 │         f4: S<(u64, u64)>,
-   │             ^^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: type `R` is missing required ability `drop`
    ┌─ tests/checking/abilities/instantiate_signatures.move:18:16
@@ -72,7 +50,7 @@ error: type `R` is missing required ability `drop`
 18 │         _f1: S<R>,
    │                ^
    │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: reference type `&u64` is not allowed as a type argument
    ┌─ tests/checking/abilities/instantiate_signatures.move:19:16
@@ -83,7 +61,7 @@ error: reference type `&u64` is not allowed as a type argument
 19 │         _f2: S<&u64>,
    │                ^^^^
    │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: tuple type `(u64, u64)` is not allowed as a type argument
    ┌─ tests/checking/abilities/instantiate_signatures.move:21:16
@@ -94,29 +72,7 @@ error: tuple type `(u64, u64)` is not allowed as a type argument
 21 │         _f4: S<(u64, u64)>,
    │                ^^^^^^^^^^
    │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: reference type `&u64` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:24:11
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-24 │         S<&u64>,
-   │           ^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: tuple type `(u64, u64)` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:26:11
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-26 │         S<(u64, u64)>,
-   │           ^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: type `R` is missing required ability `drop`
    ┌─ tests/checking/abilities/instantiate_signatures.move:32:19
@@ -127,7 +83,7 @@ error: type `R` is missing required ability `drop`
 32 │         let f1: S<R> = abort 0;
    │                   ^
    │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: reference type `&u64` is not allowed as a type argument
    ┌─ tests/checking/abilities/instantiate_signatures.move:33:19
@@ -138,7 +94,7 @@ error: reference type `&u64` is not allowed as a type argument
 33 │         let f2: S<&u64> = abort 0;
    │                   ^^^^
    │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: tuple type `(u64, u64)` is not allowed as a type argument
    ┌─ tests/checking/abilities/instantiate_signatures.move:35:19
@@ -149,104 +105,27 @@ error: tuple type `(u64, u64)` is not allowed as a type argument
 35 │         let f4: S<(u64, u64)> = abort 0;
    │                   ^^^^^^^^^^
    │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: reference type `&u64` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:38:14
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-38 │         id<S<&u64>>(abort 0);
-   │              ^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
 
 error: reference type `&&u64` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:39:9
+   ┌─ tests/checking/abilities/instantiate_signatures.move:39:12
    │
  5 │     fun id<T>(x: T): T { x }
    │            - declaration of type parameter `T`
    ·
 39 │         id<&(&u64)>(abort 0);
-   │         ^^^^^^^^^^^^^^^^^^^^
+   │            ^^^^^^^
    │
    = required by instantiating type parameter `T` of function `id`
 
-error: tuple type `(u64, u64)` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:40:14
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-40 │         id<S<(u64, u64)>>(abort 0);
-   │              ^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
-
 error: type `R` is missing required ability `drop`
-   ┌─ tests/checking/abilities/instantiate_signatures.move:42:9
+   ┌─ tests/checking/abilities/instantiate_signatures.move:42:11
    │
  3 │     struct S<T: drop> has drop { f: T }
    │              - declaration of type parameter `T`
    ·
 42 │         S<S<R>> { f: abort 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^^
+   │           ^^^^
    │
-   = required by instantiating type parameter `T` of struct `S`
-   = required by instantiating type parameter `T` of struct `S`
-
-error: reference type `&u64` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:43:13
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-43 │         S<S<&u64>> { f: abort 0 };
-   │             ^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: reference type `&u64` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:43:9
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-43 │         S<S<&u64>> { f: abort 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: reference type `&&u64` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:44:9
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-44 │         S<&(&u64)> { f: abort 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: tuple type `(u64, u64)` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:45:13
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-45 │         S<S<(u64, u64)>> { f: abort 0 };
-   │             ^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
-
-error: tuple type `(u64, u64)` is not allowed as a type argument
-   ┌─ tests/checking/abilities/instantiate_signatures.move:45:9
-   │
- 3 │     struct S<T: drop> has drop { f: T }
-   │              - declaration of type parameter `T`
-   ·
-45 │         S<S<(u64, u64)>> { f: abort 0 };
-   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = required by instantiating type parameter `T` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`
+   = required by instantiating type parameter `T:drop` of struct `S`

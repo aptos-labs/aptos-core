@@ -1011,13 +1011,30 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 Box::new(self.translate_type(ty)),
             ),
             Fun(args, result) => Type::Fun(
-                Box::new(Type::tuple(self.translate_types(args))),
+                Box::new(Type::tuple(self.translate_types(args.as_ref()))),
                 Box::new(self.translate_type(result)),
             ),
             Unit => Type::Tuple(vec![]),
-            Multiple(vst) => Type::Tuple(self.translate_types(vst)),
+            Multiple(vst) => Type::Tuple(self.translate_types(vst.as_ref())),
             UnresolvedError => Type::Error,
         }
+    }
+
+    /// Translates a type and imposes the type parameter constraint.
+    pub fn translate_type_for_param(
+        &mut self,
+        ty: &EA::Type,
+        is_struct: bool,
+        name: Symbol,
+        param: &TypeParameter,
+    ) -> Type {
+        let loc = self.to_loc(&ty.loc);
+        let ty = self.translate_type(ty);
+        self.add_type_param_constraints(&loc, &ty, is_struct, name, param)
+            .unwrap_or_else(|err| {
+                self.report_unification_error(&loc, err, &ErrorMessageContext::TypeArgument)
+            });
+        ty
     }
 
     /// Translates a slice of single types.
@@ -1179,7 +1196,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 self.translate_name(
                     &self.to_loc(&maccess.loc),
                     &maccess,
-                    None,
+                    &None,
                     &Type::new_prim(PrimitiveType::Address),
                     &ErrorMessageContext::General,
                 );
@@ -1200,7 +1217,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &loc,
                         CallKind::Regular,
                         maccess,
-                        type_args.as_ref().map(|v| v.as_slice()),
+                        type_args,
                         &[&name_exp],
                         &ErrorMessageContext::Argument,
                     )
@@ -1280,7 +1297,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             EA::Exp_::Name(maccess, type_params) => self.translate_name(
                 &self.to_loc(&maccess.loc),
                 maccess,
-                type_params.as_deref(),
+                type_params,
                 expected_type,
                 context,
             ),
@@ -1290,7 +1307,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     .translate_name(
                         &self.to_loc(&fake_access.loc),
                         &fake_access,
-                        None,
+                        &None,
                         expected_type,
                         context,
                     )
@@ -1381,7 +1398,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                         &loc,
                         *kind,
                         maccess,
-                        type_params.as_deref(),
+                        type_params,
                         &args,
                         context,
                     )
@@ -1488,10 +1505,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 } = self.parent.parent.bin_op_symbol(&op.value);
                 self.translate_call(
                     &loc,
+                    &self.to_loc(&op.loc),
                     CallKind::Regular,
                     &Some(module_name),
                     symbol,
-                    None,
+                    &None,
                     &args,
                     expected_type,
                     context,
@@ -1505,10 +1523,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 } = self.parent.parent.unary_op_symbol(&op.value);
                 self.translate_call(
                     &loc,
+                    &self.to_loc(&op.loc),
                     CallKind::Regular,
                     &Some(module_name),
                     symbol,
-                    None,
+                    &None,
                     &args,
                     expected_type,
                     context,
@@ -2375,7 +2394,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         loc: &Loc,
         kind: CallKind,
         maccess: &Spanned<EA::ModuleAccess_>,
-        generics: Option<&[EA::Type]>,
+        generics: &Option<Vec<EA::Type>>,
         args: &[&EA::Exp],
         context: &ErrorMessageContext,
     ) -> ExpData {
@@ -2416,6 +2435,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
         let result = self.translate_call(
             loc,
+            &self.to_loc(&maccess.loc),
             kind,
             &module_name,
             name,
@@ -2437,7 +2457,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         loc: &Loc,
         kind: CallKind,
         maccess: &Spanned<EA::ModuleAccess_>,
-        generics: Option<&[EA::Type]>,
+        generics: &Option<Vec<EA::Type>>,
         args: &[&EA::Exp],
         context: &ErrorMessageContext,
     ) -> Option<ExpData> {
@@ -2719,7 +2739,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         loc: &Loc,
         maccess: &EA::ModuleAccess,
-        type_args: Option<&[EA::Type]>,
+        type_args: &Option<Vec<EA::Type>>,
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
@@ -2760,7 +2780,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         }
 
         if let Some(entry) = self.parent.parent.spec_var_table.get(&global_var_sym) {
-            let type_args = type_args.unwrap_or(&[]);
+            let empty = vec![];
+            let type_args = type_args.as_ref().unwrap_or(&empty);
             if entry.type_params.len() != type_args.len() {
                 self.error(
                     loc,
@@ -2774,7 +2795,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             }
             let ty = entry.type_.clone();
             let module_id = entry.module_id;
-            let instantiation = self.translate_types(type_args);
+            let instantiation = self.translate_types(type_args.as_slice());
             let ty = ty.instantiate(&instantiation);
             let ty = self.check_type(loc, &ty, expected_type, context);
             // Create expression global<GhostMem>(@0).v which backs up the ghost variable.
@@ -2958,7 +2979,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         expected_type: &Type,
         loc: &Loc,
-        generics: Option<&[EA::Type]>,
+        generics: &Option<Vec<EA::Type>>,
         args: &[&EA::Exp],
     ) -> ExpData {
         if generics.is_some() {
@@ -3031,18 +3052,15 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn translate_call(
         &mut self,
         loc: &Loc,
+        name_loc: &Loc,
         kind: CallKind,
         module: &Option<ModuleName>,
         name: Symbol,
-        generics: Option<&[EA::Type]>,
+        generics: &Option<Vec<EA::Type>>,
         args: &[&EA::Exp],
         expected_type: &Type,
         context: &ErrorMessageContext,
     ) -> ExpData {
-        // Translate generic arguments, if any.
-        let generics = generics
-            .as_ref()
-            .map(|ts| self.translate_types_with_loc(ts));
         // Translate arguments.
         let (arg_types, translated_args) = self.translate_exp_list(args);
 
@@ -3125,11 +3143,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
 
             // Process type instantiation
             let instantiation =
-                match self.make_instantiation(loc, false, name, generics.clone(), type_params) {
+                match self.make_instantiation(name_loc, false, name, generics, type_params) {
                     Err(err) => {
                         outruled.push((
                             cand,
-                            None,
+                            err.specific_loc(),
                             err.message_with_hints_and_labels(
                                 self,
                                 &ErrorMessageContext::TypeArgument,
@@ -3145,7 +3163,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             // the type parameter instantiation.
             if let AnyFunEntry::SpecOrBuiltin(sbf) = cand {
                 if let Err(err) =
-                    self.add_constraints(loc, &instantiation, &sbf.type_param_constraints)
+                    self.add_constraints(name_loc, &instantiation, &sbf.type_param_constraints)
                 {
                     outruled.push((
                         cand,
@@ -3187,7 +3205,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     };
                     outruled.push((
                         cand,
-                        arg_loc,
+                        err.specific_loc().or(arg_loc),
                         err.message_with_hints_and_labels(self, context),
                     ));
                     success = false;
@@ -3422,11 +3440,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         &mut self,
         loc: &Loc,
         name: Symbol,
-        generics: Option<(Vec<Loc>, Vec<Type>)>,
+        generics: &Option<Vec<EA::Type>>,
         arg_types: Vec<Type>,
         args: Vec<Exp>,
         expected_type: &Type,
     ) -> ExpData {
+        let generics = generics
+            .as_ref()
+            .map(|tys| self.translate_types_with_loc(tys));
         let receiver_type = arg_types.first().expect("at least one argument");
         self.add_constraint_and_report(
             loc,
@@ -3475,10 +3496,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         loc: &Loc,
         is_struct: bool,
         item: Symbol,
-        generics: Option<(Vec<Loc>, Vec<Type>)>,
+        generics: &Option<Vec<EA::Type>>,
         type_params: &[TypeParameter],
     ) -> Result<Vec<Type>, TypeUnificationError> {
-        if let Some((ty_arg_locs, ty_args)) = generics {
+        if let Some(ty_args) = generics {
             // User as provided generic type arguments
             if type_params.len() != ty_args.len() {
                 return Err(TypeUnificationError::ArityMismatch(
@@ -3487,15 +3508,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     type_params.len(),
                 ));
             }
-            // Impose type parameter constraints on type args.
-            // Only add them if not in spec mode. See also #12656.
-            for ((loc_arg, ty_arg), param) in ty_arg_locs
+            let ty_args = ty_args
                 .iter()
-                .zip(ty_args.iter())
                 .zip(type_params.iter())
-            {
-                self.add_type_param_constraints(loc_arg, ty_arg, is_struct, item, param)?
-            }
+                .map(|(ty, param)| self.translate_type_for_param(ty, is_struct, item, param))
+                .collect();
             Ok(ty_args)
         } else {
             // Create fresh variables from type parameters
@@ -3516,7 +3533,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         is_struct: bool,
         item: Symbol,
         type_params: &[TypeParameter],
-        generics: Option<(Vec<Loc>, Vec<Type>)>,
+        generics: &Option<Vec<EA::Type>>,
     ) -> Option<Vec<Type>> {
         match self.make_instantiation(loc, is_struct, item, generics, type_params) {
             Err(err) => {
@@ -3813,12 +3830,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     )> {
         let struct_name = self.parent.module_access_to_qualified(maccess);
         let struct_name_loc = self.to_loc(&maccess.loc);
-        let generics = generics
-            .as_ref()
-            .map(|ts| self.translate_types_with_loc(ts));
         let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
         let instantiation = self.make_instantiation_or_report(
-            loc,
+            &self.to_loc(&maccess.loc),
             true,
             struct_name.symbol,
             &struct_entry.type_params,
@@ -3886,12 +3900,9 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> Option<(QualifiedInstId<StructId>, Vec<Pattern>)> {
         let struct_name = self.parent.module_access_to_qualified(maccess);
         let struct_name_loc = self.to_loc(&maccess.loc);
-        let generics = generics
-            .as_ref()
-            .map(|ts| self.translate_types_with_loc(ts));
         let struct_entry = self.get_struct_report_undeclared(&struct_name, &struct_name_loc)?;
         let instantiation = self.make_instantiation_or_report(
-            loc,
+            &self.to_loc(&maccess.loc),
             true,
             struct_name.symbol,
             &struct_entry.type_params,
