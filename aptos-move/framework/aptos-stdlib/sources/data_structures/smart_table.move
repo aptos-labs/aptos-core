@@ -34,8 +34,6 @@ module aptos_std::smart_table {
     /// Invalid vector index within a bucket.
     const EINVALID_VECTOR_INDEX: u64 = 9;
 
-    const ALL_KEYS: u64 = 0xffffffffffffffff;
-
     /// SmartTable entry contains both the key and value.
     struct Entry<K, V> has copy, drop, store {
         hash: u64,
@@ -194,7 +192,7 @@ module aptos_std::smart_table {
     public fun keys<K: store + copy + drop, V: store + copy>(
         table_ref: &SmartTable<K, V>
     ): vector<K> {
-        let (keys, _, _) = keys_paginated(table_ref, 0, 0, ALL_KEYS);
+        let (keys, _, _) = keys_paginated(table_ref, 0, 0, length(table_ref));
         keys
     }
 
