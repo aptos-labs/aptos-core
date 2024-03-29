@@ -358,7 +358,6 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT => FeatureFlag::MultisigV2Enhancement,
             AptosFeatureFlag::ENABLE_COMPILER_ID_CHECK => FeatureFlag::EnableCompilerIdCheck,
-
         }
     }
 }

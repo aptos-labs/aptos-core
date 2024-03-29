@@ -19,7 +19,7 @@ use aptos_table_natives::{TableHandle, TableResolver};
 use aptos_types::{
     access_path::AccessPath,
     delayed_fields::PanicError,
-    on_chain_config::{ConfigStorage, Features, OnChainConfig},
+    on_chain_config::{ConfigStorage, DisallowList, Features, OnChainConfig},
     state_store::{
         errors::StateviewError,
         state_key::StateKey,
@@ -104,11 +104,21 @@ impl<'e, E: ExecutorView> StorageAdapter<'e, E> {
         max_identifier_size: u64,
         resource_group_view: ResourceGroupAdapter<'e>,
     ) -> Self {
+        let access_path = DisallowList::access_path().ok().unwrap();
+        let disallow_list = executor_view
+            .get_resource_bytes(&StateKey::access_path(access_path), None)
+            .ok()
+            .unwrap();
+        let list = DisallowList::deserialize_into_config(&disallow_list.unwrap_or_default())
+            .unwrap_or(DisallowList {
+                disallow_list: vec![],
+            });
         Self {
             executor_view,
             deserializer_config: DeserializerConfig::new(
                 max_binary_format_version,
                 max_identifier_size,
+                list.disallow_list,
             ),
             resource_group_view,
             accessed_groups: RefCell::new(HashSet::new()),

@@ -13,7 +13,7 @@ use std::{collections::HashSet, convert::TryInto, io::Read};
 impl CompiledScript {
     /// Deserializes a &[u8] slice into a `CompiledScript` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX, vec![]);
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -30,7 +30,7 @@ impl CompiledScript {
     // exposed as a public function to enable testing the deserializer
     #[doc(hidden)]
     pub fn deserialize_no_check_bounds(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX, vec![]);
         deserialize_compiled_script(binary, &config)
     }
 }
@@ -38,7 +38,7 @@ impl CompiledScript {
 impl CompiledModule {
     /// Deserialize a &[u8] slice into a `CompiledModule` instance.
     pub fn deserialize(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_DEFAULT, IDENTIFIER_SIZE_MAX, vec![]);
         Self::deserialize_with_config(binary, &config)
     }
 
@@ -67,7 +67,7 @@ impl CompiledModule {
     // exposed as a public function to enable testing the deserializer
     #[doc(hidden)]
     pub fn deserialize_no_check_bounds(binary: &[u8]) -> BinaryLoaderResult<Self> {
-        let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX);
+        let config = DeserializerConfig::new(VERSION_MAX, LEGACY_IDENTIFIER_SIZE_MAX, vec![]);
         deserialize_compiled_module(binary, &config)
     }
 }
@@ -76,13 +76,19 @@ impl CompiledModule {
 pub struct DeserializerConfig {
     max_binary_format_version: u32,
     max_identifier_size: u64,
+    pub compiler_ids: Vec<Vec<u8>>,
 }
 
 impl DeserializerConfig {
-    pub fn new(max_binary_format_version: u32, max_identifier_size: u64) -> Self {
+    pub fn new(
+        max_binary_format_version: u32,
+        max_identifier_size: u64,
+        compiler_ids: Vec<Vec<u8>>,
+    ) -> Self {
         Self {
             max_binary_format_version,
             max_identifier_size,
+            compiler_ids,
         }
     }
 }
@@ -404,6 +410,11 @@ fn deserialize_compiled_script(
         script.compiler_id = load_compiler_id(&mut cursor)?;
     }
 
+    let id_bytes = script.compiler_id.as_bytes().to_vec();
+    if config.compiler_ids.contains(&id_bytes) {
+        return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR));
+    }
+
     Ok(script)
 }
 
@@ -442,6 +453,11 @@ fn deserialize_compiled_module(
         module.compiler_id = MOVE_COMPILER.to_string();
     } else {
         module.compiler_id = load_compiler_id(&mut cursor)?;
+    }
+
+    let id_bytes = module.compiler_id.as_bytes().to_vec();
+    if config.compiler_ids.contains(&id_bytes) {
+        return Err(PartialVMError::new(StatusCode::CODE_DESERIALIZATION_ERROR));
     }
 
     Ok(module)

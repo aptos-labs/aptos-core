@@ -58,6 +58,7 @@ fn test_publish_module_with_custom_max_binary_format_version() {
                 deserializer_config: DeserializerConfig::new(
                     VERSION_MAX.checked_sub(1).unwrap(),
                     IDENTIFIER_SIZE_MAX,
+                    vec![],
                 ),
                 ..Default::default()
             },
@@ -125,6 +126,7 @@ fn test_run_script_with_custom_max_binary_format_version() {
                 deserializer_config: DeserializerConfig::new(
                     VERSION_MAX.checked_sub(1).unwrap(),
                     IDENTIFIER_SIZE_MAX,
+                    vec![],
                 ),
                 ..Default::default()
             },

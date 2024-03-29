@@ -23,7 +23,7 @@ proptest! {
 
         let deserialized_module = CompiledModule::deserialize_with_config(
                 &serialized,
-                &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX)
+                &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX, vec![])
         ).expect("deserialization should work");
 
         prop_assert_eq!(module, deserialized_module);
@@ -81,7 +81,7 @@ fn simple_generic_module_round_trip() {
 
     let deserialized_m = CompiledModule::deserialize_with_config(
         &serialized,
-        &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
+        &DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX, vec![]),
     )
     .expect("deserialization should work");
 

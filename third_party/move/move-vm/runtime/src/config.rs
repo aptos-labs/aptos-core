@@ -33,7 +33,7 @@ impl Default for VMConfig {
     fn default() -> Self {
         Self {
             verifier: VerifierConfig::default(),
-            deserializer_config: DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX),
+            deserializer_config: DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX, vec![]),
             paranoid_type_checks: false,
             enable_invariant_violation_check_in_swap_loc: true,
             type_size_limit: false,

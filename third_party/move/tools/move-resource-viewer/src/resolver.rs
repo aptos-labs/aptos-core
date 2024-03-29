@@ -46,7 +46,8 @@ impl<'a, T: ModuleResolver + ?Sized> GetModule for Resolver<'a, T> {
             .get_module(module_id)
             .map_err(|e| anyhow!("Error retrieving module {:?}: {:?}", module_id, e))?
             .ok_or_else(|| anyhow!("Module {:?} can't be found", module_id))?;
-        let config = DeserializerConfig::new(self.max_bytecode_version, IDENTIFIER_SIZE_MAX);
+        let config =
+            DeserializerConfig::new(self.max_bytecode_version, IDENTIFIER_SIZE_MAX, vec![]);
         let compiled_module =
             CompiledModule::deserialize_with_config(&blob, &config).map_err(|status| {
                 anyhow!(

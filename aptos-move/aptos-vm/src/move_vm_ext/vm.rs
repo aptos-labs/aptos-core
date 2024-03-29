@@ -15,7 +15,9 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_table_natives::NativeTableContext;
-use aptos_types::on_chain_config::{FeatureFlag, Features, TimedFeatureFlag, TimedFeatures};
+use aptos_types::on_chain_config::{
+    DisallowList, FeatureFlag, Features, OnChainConfig, TimedFeatureFlag, TimedFeatures,
+};
 use move_binary_format::{
     deserializer::DeserializerConfig,
     errors::VMResult,
@@ -111,6 +113,10 @@ impl MoveVmExt {
             builder.set_gas_hook(hook);
         }
 
+        let disallow_list = DisallowList::fetch_config(resolver).unwrap_or(DisallowList {
+            disallow_list: vec![],
+        });
+
         Ok(Self {
             inner: WarmVmCache::get_warm_vm(
                 builder,
@@ -119,6 +125,7 @@ impl MoveVmExt {
                     deserializer_config: DeserializerConfig::new(
                         max_binary_format_version,
                         max_identifier_size,
+                        disallow_list.disallow_list,
                     ),
                     paranoid_type_checks: crate::AptosVM::get_paranoid_checks(),
                     enable_invariant_violation_check_in_swap_loc,

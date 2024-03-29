@@ -1297,10 +1297,18 @@ impl AptosVM {
     }
 
     /// Deserialize a module bundle.
-    fn deserialize_module_bundle(&self, modules: &ModuleBundle) -> VMResult<Vec<CompiledModule>> {
+    fn deserialize_module_bundle(
+        &self,
+        modules: &ModuleBundle,
+        vm_config_deser_config: &DeserializerConfig,
+    ) -> VMResult<Vec<CompiledModule>> {
         let max_version = get_max_binary_format_version(self.features(), None);
         let max_identifier_size = get_max_identifier_size(self.features());
-        let config = DeserializerConfig::new(max_version, max_identifier_size);
+        let config = DeserializerConfig::new(
+            max_version,
+            max_identifier_size,
+            vm_config_deser_config.compiler_ids.clone(),
+        );
         let mut result = vec![];
         for module_blob in modules.iter() {
             match CompiledModule::deserialize_with_config(module_blob.code(), &config) {
@@ -1336,7 +1344,8 @@ impl AptosVM {
             // `init_module` and verify some deployment conditions, while the VM need to do
             // the deserialization again. Consider adding an API to MoveVM which allows to
             // directly pass CompiledModule.
-            let modules = self.deserialize_module_bundle(&bundle)?;
+            let modules = self
+                .deserialize_module_bundle(&bundle, &session.get_vm_config().deserializer_config)?;
             let modules: &Vec<CompiledModule> =
                 traversal_context.referenced_module_bundles.alloc(modules);
 
