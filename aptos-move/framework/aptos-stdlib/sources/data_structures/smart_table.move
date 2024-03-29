@@ -697,6 +697,59 @@ module aptos_std::smart_table {
         destroy(table);
     }
 
+    #[test]
+    fun test_keys_corner_cases() {
+        let table = new();
+        let expected_keys = vector[];
+        for (i in 0..100) {
+            add(&mut table, i, 0);
+            vector::push_back(&mut expected_keys, i);
+        };
+        let (keys, starting_bucket_index_r, starting_vector_index_r) =
+            keys_paginated(&table, 0, 0, 5); // Both indices 0.
+        assert!(vector::length(&keys) == 5, 0);
+        vector::for_each_ref(&keys, |e_ref| {
+            assert!(vector::contains(&expected_keys, e_ref), 0);
+        });
+        let starting_bucket_index = option::destroy_some(starting_bucket_index_r);
+        let starting_vector_index = option::destroy_some(starting_vector_index_r);
+        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
+            &table,
+            starting_bucket_index,
+            starting_vector_index,
+            0, // Number of keys 0.
+        );
+        assert!(keys == vector[], 0);
+        assert!(starting_bucket_index_r == option::some(starting_bucket_index), 0);
+        assert!(starting_vector_index_r == option::some(starting_vector_index), 0);
+        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
+            &table,
+            starting_bucket_index,
+            0, // Vector index 0.
+            50,
+        );
+        assert!(vector::length(&keys) == 50, 0);
+        vector::for_each_ref(&keys, |e_ref| {
+            assert!(vector::contains(&expected_keys, e_ref), 0);
+        });
+        let starting_bucket_index = option::destroy_some(starting_bucket_index_r);
+        assert!(starting_bucket_index > 0, 0);
+        assert!(option::is_some(&starting_vector_index_r), 0);
+        (keys, starting_bucket_index_r, starting_vector_index_r) = keys_paginated(
+            &table,
+            0, // Bucket index 0.
+            1,
+            50,
+        );
+        assert!(vector::length(&keys) == 50, 0);
+        vector::for_each_ref(&keys, |e_ref| {
+            assert!(vector::contains(&expected_keys, e_ref), 0);
+        });
+        assert!(option::is_some(&starting_bucket_index_r), 0);
+        assert!(option::is_some(&starting_vector_index_r), 0);
+        destroy(table);
+    }
+
     #[test, expected_failure(abort_code = EINVALID_BUCKET_INDEX)]
     fun test_keys_invalid_bucket_index() {
         let table = new();
