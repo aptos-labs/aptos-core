@@ -19,10 +19,10 @@ error: data invariant does not hold
    =     at tests/sources/functional/invariants.move:113: lifetime_invalid_R
    =         r = <redacted>
    =     at tests/sources/functional/invariants.move:114: lifetime_invalid_R
-   =         r_ref = <redacted>
    =     at tests/sources/functional/invariants.move:115: lifetime_invalid_R
-   =         x_ref = <redacted>
    =     at tests/sources/functional/invariants.move:116: lifetime_invalid_R
+   =         <redacted> = <redacted>
+   =         x_ref = <redacted>
    =     at tests/sources/functional/invariants.move:15
 
 error: data invariant does not hold
@@ -50,8 +50,6 @@ error: data invariant does not hold
     =     at tests/sources/functional/invariants.move:158: lifetime_invalid_S_branching
     =         cond = <redacted>
     =         b_ref = <redacted>
-    =     at tests/sources/functional/invariants.move:158: lifetime_invalid_S_branching
-    =         <redacted> = <redacted>
     =     at tests/sources/functional/invariants.move:160: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:163: lifetime_invalid_S_branching
     =     at tests/sources/functional/invariants.move:150

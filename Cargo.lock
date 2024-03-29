@@ -2816,6 +2816,7 @@ name = "aptos-move-e2e-benchmark"
 version = "0.1.0"
 dependencies = [
  "aptos-language-e2e-tests",
+ "aptos-logger",
  "aptos-transaction-generator-lib",
  "aptos-types",
  "rand 0.7.3",

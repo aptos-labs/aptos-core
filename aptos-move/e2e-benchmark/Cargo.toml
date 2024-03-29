@@ -13,6 +13,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 aptos-language-e2e-tests = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-transaction-generator-lib = { workspace = true }
 aptos-types = { workspace = true }
 rand = { workspace = true }
