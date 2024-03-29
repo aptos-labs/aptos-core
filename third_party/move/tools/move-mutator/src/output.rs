@@ -1,3 +1,7 @@
+// Copyright © Eiger
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::{cli, configuration::Configuration};
 use move_package::source_package::layout::SourcePackageLayout;
 use std::{

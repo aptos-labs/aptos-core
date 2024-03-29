@@ -1,3 +1,7 @@
+// Copyright © Eiger
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 extern crate pretty_env_logger;
 #[macro_use]
 extern crate log;
