@@ -18,6 +18,7 @@ use tracing::debug;
 // If the version is ahead of the cache head, retry after a short sleep.
 const AHEAD_OF_CACHE_SLEEP_DURATION_IN_MILLIS: u64 = 100;
 const SERVICE_TYPE: &str = "file_worker";
+const MAX_CONCURRENT_BATCHES: usize = 50;
 
 /// Processor tails the data in cache and stores the data in file store.
 pub struct Processor {
@@ -34,7 +35,7 @@ impl Processor {
         enable_cache_compression: bool,
     ) -> Result<Self> {
         let cache_storage_format = if enable_cache_compression {
-            StorageFormat::GzipCompressedProto
+            StorageFormat::Lz4CompressedProto
         } else {
             StorageFormat::Base64UncompressedProto
         };
@@ -132,6 +133,9 @@ impl Processor {
             while start_version + (FILE_ENTRY_TRANSACTION_COUNT) < cache_worker_latest {
                 batches.push(start_version);
                 start_version += FILE_ENTRY_TRANSACTION_COUNT;
+                if batches.len() >= MAX_CONCURRENT_BATCHES {
+                    break;
+                }
             }
 
             // we're too close to the head
