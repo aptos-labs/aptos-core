@@ -81,7 +81,6 @@ pub(crate) fn run_script_prologue(
     session: &mut SessionExt,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-    required_deposit: Option<u64>,
 ) -> Result<(), VMStatus> {
     let txn_sequence_number = txn_data.sequence_number();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
@@ -112,8 +111,8 @@ pub(crate) fn run_script_prologue(
             MoveValue::U64(txn_expiration_timestamp_secs),
             MoveValue::U8(chain_id.id()),
         ];
-        if required_deposit.is_some() {
-            args.push(required_deposit.as_move_value());
+        if txn_data.required_deposit.is_some() {
+            args.push(txn_data.required_deposit.as_move_value());
             (
                 &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_v2_name,
                 args,
@@ -148,8 +147,8 @@ pub(crate) fn run_script_prologue(
             MoveValue::U8(chain_id.id()),
             MoveValue::vector_u8(txn_data.script_hash.clone()),
         ];
-        if required_deposit.is_some() {
-            args.push(required_deposit.as_move_value());
+        if txn_data.required_deposit.is_some() {
+            args.push(txn_data.required_deposit.as_move_value());
             (&APTOS_TRANSACTION_VALIDATION.script_prologue_v2_name, args)
         } else {
             (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
@@ -210,7 +209,6 @@ fn run_epilogue(
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
     features: &Features,
-    required_deposit: Option<u64>,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -227,8 +225,8 @@ fn run_epilogue(
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
             ];
-            if required_deposit.is_some() {
-                args.push(required_deposit.as_move_value());
+            if txn_data.required_deposit.is_some() {
+                args.push(txn_data.required_deposit.as_move_value());
                 (
                     &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_v2_name,
                     args,
@@ -257,8 +255,8 @@ fn run_epilogue(
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
             ];
-            if required_deposit.is_some() {
-                args.push(required_deposit.as_move_value());
+            if txn_data.required_deposit.is_some() {
+                args.push(txn_data.required_deposit.as_move_value());
                 (&APTOS_TRANSACTION_VALIDATION.user_epilogue_v2_name, args)
             } else {
                 (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
@@ -306,7 +304,6 @@ pub(crate) fn run_success_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-    required_deposit: Option<u64>,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
         Err(VMStatus::error(
@@ -315,15 +312,8 @@ pub(crate) fn run_success_epilogue(
         ))
     });
 
-    run_epilogue(
-        session,
-        gas_remaining,
-        fee_statement,
-        txn_data,
-        features,
-        required_deposit,
-    )
-    .or_else(|err| convert_epilogue_error(err, log_context))
+    run_epilogue(session, gas_remaining, fee_statement, txn_data, features)
+        .or_else(|err| convert_epilogue_error(err, log_context))
 }
 
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
@@ -335,17 +325,8 @@ pub(crate) fn run_failure_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-    required_deposit: Option<u64>,
 ) -> Result<(), VMStatus> {
-    run_epilogue(
-        session,
-        gas_remaining,
-        fee_statement,
-        txn_data,
-        features,
-        required_deposit,
-    )
-    .or_else(|e| {
+    run_epilogue(session, gas_remaining, fee_statement, txn_data, features).or_else(|e| {
         expect_only_successful_execution(
             e,
             APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),

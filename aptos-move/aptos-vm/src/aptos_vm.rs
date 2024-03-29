@@ -437,7 +437,6 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
-        required_deposit: Option<u64>,
     ) -> (VMStatus, VMOutput) {
         if self.gas_feature_version >= 12 {
             // Check if the gas meter's internal counters are consistent.
@@ -483,7 +482,6 @@ impl AptosVM {
                     status,
                     log_context,
                     change_set_configs,
-                    required_deposit,
                 ) {
                     Ok((change_set, fee_statement, status)) => VMOutput::new(
                         change_set,
@@ -532,7 +530,6 @@ impl AptosVM {
         status: ExecutionStatus,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
-        required_deposit: Option<u64>,
     ) -> Result<(VMChangeSet, FeeStatement, ExecutionStatus), VMStatus> {
         // Storage refund is zero since no slots are deleted in aborted transactions.
         const ZERO_STORAGE_REFUND: u64 = 0;
@@ -621,7 +618,6 @@ impl AptosVM {
                     self.features(),
                     txn_data,
                     log_context,
-                    required_deposit,
                 )
             })?;
             epilogue_session
@@ -648,7 +644,6 @@ impl AptosVM {
                     self.features(),
                     txn_data,
                     log_context,
-                    required_deposit,
                 )
             })?;
             epilogue_session
@@ -664,7 +659,6 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
         change_set_configs: &ChangeSetConfigs,
-        required_deposit: Option<u64>,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         if self.gas_feature_version >= 12 {
             // Check if the gas meter's internal counters are consistent.
@@ -694,7 +688,6 @@ impl AptosVM {
                 self.features(),
                 txn_data,
                 log_context,
-                required_deposit,
             )
         })?;
         let change_set = epilogue_session.finish(change_set_configs)?;
@@ -756,7 +749,7 @@ impl AptosVM {
         traversal_context: &mut TraversalContext,
         senders: Vec<AccountAddress>,
         entry_fn: &EntryFunction,
-        required_deposit: Option<u64>,
+        txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         // Note: Feature gating is needed here because the traversal of the dependencies could
         //       result in shallow-loading of the modules and therefore subtle changes in
@@ -777,7 +770,7 @@ impl AptosVM {
             entry_fn.ty_args(),
         )?;
 
-        if is_friend_or_private && required_deposit.is_some() {
+        if is_friend_or_private && txn_data.required_deposit.is_some() {
             let txn_context = session
                 .get_native_extensions()
                 .get_mut::<RandomnessContext>();
@@ -814,7 +807,6 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
-        required_deposit: Option<u64>,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("aptos_vm::execute_script_or_entry_function", |_| {
             Err(VMStatus::Error {
@@ -846,7 +838,7 @@ impl AptosVM {
                         traversal_context,
                         txn_data.senders(),
                         entry_fn,
-                        required_deposit,
+                        txn_data,
                     )
                 })?;
             },
@@ -879,7 +871,6 @@ impl AptosVM {
             txn_data,
             log_context,
             change_set_configs,
-            required_deposit,
         )
     }
 
@@ -939,7 +930,6 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
-        required_deposit: Option<u64>,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         match &payload.transaction_payload {
             None => Err(VMStatus::error(StatusCode::MISSING_DATA, None)),
@@ -955,7 +945,7 @@ impl AptosVM {
                                     payload.multisig_address,
                                     entry_function,
                                     new_published_modules_loaded,
-                                    required_deposit,
+                                    txn_data,
                                 )));
                             // TODO: Deduplicate this against execute_multisig_transaction
                             // A bit tricky since we need to skip success/failure cleanups,
@@ -975,7 +965,6 @@ impl AptosVM {
                                 txn_data,
                                 log_context,
                                 change_set_configs,
-                                required_deposit,
                             )
                         })
                     },
@@ -1003,7 +992,6 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
-        required_deposit: Option<u64>,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         fail_point!("move_adapter::execute_multisig_transaction", |_| {
             Err(VMStatus::error(
@@ -1079,7 +1067,7 @@ impl AptosVM {
                         txn_payload.multisig_address,
                         &entry_function,
                         new_published_modules_loaded,
-                        required_deposit,
+                        txn_data,
                     )
                 })
             },
@@ -1128,7 +1116,6 @@ impl AptosVM {
             txn_data,
             log_context,
             change_set_configs,
-            required_deposit,
         )
     }
 
@@ -1144,7 +1131,6 @@ impl AptosVM {
         log_context: &AdapterLogSchema,
         new_published_modules_loaded: &mut bool,
         change_set_configs: &ChangeSetConfigs,
-        required_deposit: Option<u64>,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
         if self.is_simulation {
             self.simulate_multisig_transaction(
@@ -1157,7 +1143,6 @@ impl AptosVM {
                 log_context,
                 new_published_modules_loaded,
                 change_set_configs,
-                required_deposit,
             )
         } else {
             self.execute_multisig_transaction(
@@ -1171,7 +1156,6 @@ impl AptosVM {
                 log_context,
                 new_published_modules_loaded,
                 change_set_configs,
-                required_deposit,
             )
         }
     }
@@ -1184,7 +1168,7 @@ impl AptosVM {
         multisig_address: AccountAddress,
         payload: &EntryFunction,
         new_published_modules_loaded: &mut bool,
-        required_deposit: Option<u64>,
+        txn_data: &TransactionMetadata,
     ) -> Result<(), VMStatus> {
         // If txn args are not valid, we'd still consider the transaction as executed but
         // failed. This is primarily because it's unrecoverable at this point.
@@ -1194,7 +1178,7 @@ impl AptosVM {
             traversal_context,
             vec![multisig_address],
             payload,
-            required_deposit,
+            txn_data,
         )?;
 
         // Resolve any pending module publishes in case the multisig transaction is deploying
@@ -1567,7 +1551,6 @@ impl AptosVM {
         transaction: &SignedTransaction,
         transaction_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        required_deposit: Option<u64>,
     ) -> Result<(), VMStatus> {
         // Check transaction format.
         if transaction.contains_duplicate_signers() {
@@ -1598,7 +1581,6 @@ impl AptosVM {
             transaction.payload(),
             transaction_data,
             log_context,
-            required_deposit,
         )
     }
 
@@ -1614,7 +1596,6 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         change_set_configs: &ChangeSetConfigs,
         new_published_modules_loaded: bool,
-        required_deposit: Option<u64>,
     ) -> (VMStatus, VMOutput) {
         // Invalidate the loader cache in case there was a new module loaded from a module
         // publish request that failed.
@@ -1633,7 +1614,6 @@ impl AptosVM {
             resolver,
             log_context,
             change_set_configs,
-            required_deposit,
         )
     }
 
@@ -1645,28 +1625,21 @@ impl AptosVM {
         gas_meter: &mut impl AptosGasMeter,
         traversal_context: &mut TraversalContext<'a>,
     ) -> (VMStatus, VMOutput) {
-        let txn_data = TransactionMetadata::new(txn);
+        let mut txn_data = TransactionMetadata::new(txn);
 
         // Revalidate the transaction.
         let mut prologue_session =
             unwrap_or_discard!(PrologueSession::new(self, &txn_data, resolver));
-        let mut required_deposit: Option<u64> = None;
         unwrap_or_discard!(prologue_session.execute(|session| {
-            required_deposit = self.get_required_deposit(
+            let required_deposit = self.get_required_deposit(
                 session,
                 resolver,
                 &gas_meter.vm_gas_params().txn,
                 &txn_data,
                 txn.payload(),
             );
-            self.validate_signed_transaction(
-                session,
-                resolver,
-                txn,
-                &txn_data,
-                log_context,
-                required_deposit,
-            )
+            txn_data.set_required_deposit(required_deposit);
+            self.validate_signed_transaction(session, resolver, txn, &txn_data, log_context)
         }));
 
         let storage_gas_params = unwrap_or_discard!(get_or_vm_startup_failure(
@@ -1713,7 +1686,6 @@ impl AptosVM {
                     log_context,
                     &mut new_published_modules_loaded,
                     change_set_configs,
-                    required_deposit,
                 ),
             TransactionPayload::Multisig(payload) => self.execute_or_simulate_multisig_transaction(
                 resolver,
@@ -1726,7 +1698,6 @@ impl AptosVM {
                 log_context,
                 &mut new_published_modules_loaded,
                 change_set_configs,
-                required_deposit,
             ),
 
             // Deprecated. We cannot make this `unreachable!` because a malicious
@@ -1752,7 +1723,6 @@ impl AptosVM {
                 gas_meter,
                 change_set_configs,
                 new_published_modules_loaded,
-                required_deposit,
             )
         })
     }
@@ -2167,7 +2137,6 @@ impl AptosVM {
         payload: &TransactionPayload,
         txn_data: &TransactionMetadata,
         log_context: &AdapterLogSchema,
-        required_deposit: Option<u64>,
     ) -> Result<(), VMStatus> {
         check_gas(
             get_or_vm_startup_failure(&self.gas_params, log_context)?,
@@ -2180,23 +2149,13 @@ impl AptosVM {
 
         match payload {
             TransactionPayload::Script(_) | TransactionPayload::EntryFunction(_) => {
-                transaction_validation::run_script_prologue(
-                    session,
-                    txn_data,
-                    log_context,
-                    required_deposit,
-                )
+                transaction_validation::run_script_prologue(session, txn_data, log_context)
             },
             TransactionPayload::Multisig(multisig_payload) => {
                 // Still run script prologue for multisig transaction to ensure the same tx
                 // validations are still run for this multisig execution tx, which is submitted by
                 // one of the owners.
-                transaction_validation::run_script_prologue(
-                    session,
-                    txn_data,
-                    log_context,
-                    required_deposit,
-                )?;
+                transaction_validation::run_script_prologue(session, txn_data, log_context)?;
                 // Skip validation if this is part of tx simulation.
                 // This allows simulating multisig txs without having to first create the multisig
                 // tx.
@@ -2525,7 +2484,7 @@ impl VMValidator for AptosVM {
                 return VMValidatorResult::error(StatusCode::INVALID_SIGNATURE);
             },
         };
-        let txn_data = TransactionMetadata::new(&txn);
+        let mut txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
         let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data));
@@ -2546,13 +2505,13 @@ impl VMValidator for AptosVM {
             &txn_data,
             txn.payload(),
         );
+        txn_data.set_required_deposit(required_deposit);
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
             &resolver,
             &txn,
             &txn_data,
             &log_context,
-            required_deposit,
         ) {
             Err(err) if err.status_code() != StatusCode::SEQUENCE_NUMBER_TOO_NEW => (
                 "failure",
