@@ -134,8 +134,10 @@ module aptos_framework::transaction_validation {
             coin::is_account_registered<AptosCoin>(gas_payer),
             error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
-        let balance = coin::balance<AptosCoin>(gas_payer);
-        assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
+        assert!(
+            coin::is_balance_at_least<AptosCoin>(gas_payer, max_transaction_fee),
+            error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
+        );
     }
 
     fun script_prologue(
@@ -275,7 +277,7 @@ module aptos_framework::transaction_validation {
         // it's important to maintain the error code consistent with vm
         // to do failed transaction cleanup.
         assert!(
-            coin::balance<AptosCoin>(gas_payer) >= transaction_fee_amount,
+            coin::is_balance_at_least<AptosCoin>(gas_payer, transaction_fee_amount),
             error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
         );
 
