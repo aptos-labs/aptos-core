@@ -37,7 +37,7 @@ pub fn acquires_checker(env: &GlobalEnv) {
                         env.error_with_labels(
                             &fun_env.get_id_loc(),
                             &format!(
-                                "missing acquries annotation for {}",
+                                "missing acquires annotation for `{}`",
                                 s_name.display(env.symbol_pool())
                             ),
                             vec![note],
