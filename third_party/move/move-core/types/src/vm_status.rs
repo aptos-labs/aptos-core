@@ -208,14 +208,16 @@ impl VMStatus {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
-                    | StatusCode::STORAGE_LIMIT_REACHED,
+                    | StatusCode::STORAGE_LIMIT_REACHED
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
                 ..
             }
             | VMStatus::Error {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
-                    | StatusCode::STORAGE_LIMIT_REACHED,
+                    | StatusCode::STORAGE_LIMIT_REACHED
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
                 ..
             } => Ok(KeptVMStatus::MiscellaneousError),
 
@@ -700,13 +702,15 @@ pub enum StatusCode {
     MAX_FUNCTION_DEFINITIONS_REACHED = 1119,
     MAX_STRUCT_DEFINITIONS_REACHED = 1120,
     MAX_FIELD_DEFINITIONS_REACHED = 1121,
-    // Reserved error code for future use
     TOO_MANY_BACK_EDGES = 1122,
     EVENT_METADATA_VALIDATION_ERROR = 1123,
-    RESERVED_VERIFICATION_ERROR_2 = 1124,
-    RESERVED_VERIFICATION_ERROR_3 = 1125,
-    RESERVED_VERIFICATION_ERROR_4 = 1126,
-    RESERVED_VERIFICATION_ERROR_5 = 1127,
+    DEPENDENCY_LIMIT_REACHED = 1124,
+    // Reserved error code for future use
+    RESERVED_VERIFICATION_ERROR_1 = 1125,
+    RESERVED_VERIFICATION_ERROR_2 = 1126,
+    RESERVED_VERIFICATION_ERROR_3 = 1127,
+    RESERVED_VERIFICATION_ERROR_4 = 1128,
+    RESERVED_VERIFICATION_ERROR_5 = 1129,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
@@ -804,11 +808,19 @@ pub enum StatusCode {
     IO_LIMIT_REACHED = 4031,
     STORAGE_LIMIT_REACHED = 4032,
     TYPE_TAG_LIMIT_EXCEEDED = 4033,
-    // Reserved error code for future use
-    RESERVED_RUNTIME_ERROR_2 = 4034,
-    RESERVED_RUNTIME_ERROR_3 = 4035,
-    RESERVED_RUNTIME_ERROR_4 = 4036,
-    RESERVED_RUNTIME_ERROR_5 = 4037,
+    // A resource was accessed in a way which is not permitted by the active access control
+    // specifier.
+    ACCESS_DENIED = 4034,
+    // The stack of access control specifier has overflowed.
+    ACCESS_STACK_LIMIT_EXCEEDED = 4035,
+    // We tried to create resource with more than currently allowed number of DelayedFields
+    TOO_MANY_DELAYED_FIELDS = 4036,
+
+    // Reserved error code for future use. Always keep this buffer of well-defined new codes.
+    RESERVED_RUNTIME_ERROR_1 = 4037,
+    RESERVED_RUNTIME_ERROR_2 = 4038,
+    RESERVED_RUNTIME_ERROR_3 = 4039,
+    RESERVED_RUNTIME_ERROR_4 = 4040,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

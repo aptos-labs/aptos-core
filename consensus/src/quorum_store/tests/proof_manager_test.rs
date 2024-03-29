@@ -53,6 +53,8 @@ async fn get_proposal(
     let req = GetPayloadCommand::GetPayloadRequest(
         max_txns,
         1000000,
+        max_txns / 2,
+        100000,
         true,
         PayloadFilter::InQuorumStore(filter_set),
         callback_tx,
@@ -81,6 +83,14 @@ fn assert_payload_response(
             }
             assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
         },
+        Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
+            assert_eq!(proofs.proofs.len(), expected.len());
+            for proof in proofs.proofs {
+                assert!(expected.contains(&proof));
+            }
+            assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
+        },
+        // TODO: Check how to update this for Payload::QuorumStoreInlineHybrid
         _ => panic!("Unexpected variant"),
     }
 }

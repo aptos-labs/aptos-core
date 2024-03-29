@@ -76,6 +76,8 @@ impl ProofManager {
             GetPayloadCommand::GetPayloadRequest(
                 max_txns,
                 max_bytes,
+                _max_inline_txns,
+                _max_inline_bytes,
                 return_non_full,
                 filter,
                 callback,
@@ -97,7 +99,7 @@ impl ProofManager {
 
                 let res = GetPayloadResponse::GetPayloadResponse(
                     if proof_block.is_empty() {
-                        Payload::empty(true)
+                        Payload::empty(true, false)
                     } else {
                         trace!(
                             "QS: GetBlockRequest excluded len {}, block len {}",

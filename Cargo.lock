@@ -971,6 +971,7 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-executor-types",
  "aptos-infallible",
+ "aptos-logger",
  "aptos-short-hex-str",
  "aptos-types",
  "bcs 0.1.4",
@@ -3008,7 +3009,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-node"
-version = "1.7.0"
+version = "0.0.0-main"
 dependencies = [
  "anyhow",
  "aptos-admin-service",
@@ -4282,6 +4283,7 @@ dependencies = [
  "dashmap",
  "fail 0.5.1",
  "futures",
+ "hex",
  "jsonwebtoken 8.3.0",
  "move-binary-format",
  "move-bytecode-utils",
@@ -10696,6 +10698,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "ethnum",
+ "hashbrown 0.14.3",
  "hex",
  "num 0.4.1",
  "once_cell",
@@ -11334,6 +11337,7 @@ dependencies = [
  "better_any",
  "bytes",
  "fail 0.4.0",
+ "hashbrown 0.14.3",
  "hex",
  "lazy_static",
  "lru 0.7.8",
@@ -11351,6 +11355,7 @@ dependencies = [
  "smallbitvec",
  "tracing",
  "triomphe",
+ "typed-arena",
 ]
 
 [[package]]
