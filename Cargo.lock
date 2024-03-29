@@ -3458,6 +3458,7 @@ dependencies = [
  "aptos-build-info",
  "aptos-crypto",
  "aptos-framework",
+ "aptos-gas-schedule",
  "aptos-gas-schedule-updator",
  "aptos-genesis",
  "aptos-infallible",
