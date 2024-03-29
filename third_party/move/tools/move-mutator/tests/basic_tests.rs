@@ -1,3 +1,7 @@
+// Copyright © Eiger
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use move_mutator::cli::{CLIOptions, ModuleFilter};
 use move_package::BuildConfig;
 use std::path::{Path, PathBuf};

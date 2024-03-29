@@ -1,3 +1,7 @@
+// Copyright © Eiger
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::report::Mutation;
 use codespan::FileId;
 use std::{
