@@ -5,7 +5,9 @@ module 42.if_else {
 
 
 if_else(Arg0: bool, Arg1: u64): u64 /* def_idx: 0 */ {
-L0:	loc2: u64
+L2:	loc0: u64
+L3:	loc1: u64
+L4:	loc2: u64
 B0:
 	0: MoveLoc[0](Arg0: bool)
 	1: BrFalse(9)
@@ -29,11 +31,13 @@ B3:
 	16: Ret
 }
 if_else_nested(Arg0: bool, Arg1: u64): u64 /* def_idx: 1 */ {
-L0:	loc2: u64
-L1:	loc3: u64
-L2:	loc4: u64
-L3:	loc5: u64
-L4:	loc6: u64
+L2:	loc0: u64
+L3:	loc1: u64
+L4:	loc2: u64
+L5:	loc3: u64
+L6:	loc4: u64
+L7:	loc5: u64
+L8:	loc6: u64
 B0:
 	0: MoveLoc[0](Arg0: bool)
 	1: BrFalse(9)
@@ -79,3 +83,4 @@ B6:
 	35: Ret
 }
 }
+============ bytecode verification succeeded ========

@@ -54,19 +54,17 @@ warning: Unused local variable `q`. Consider removing or prefixing with an under
 fun M::main() {
      var $t0: u64
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
      var $t4: u64
      var $t5: u64
      var $t6: u64
-     var $t7: u64
-  0: $t3 := 3
-  1: $t2 := pack M::R($t3, $t0)
-  2: $t1 := infer($t2)
-  3: ($t4, $t5) := unpack M::R($t1)
-  4: $t6 := infer($t5)
-  5: $t7 := infer($t4)
-  6: return ()
+  0: $t2 := 3
+  1: $t1 := pack M::R($t2, $t0)
+  2: ($t3, $t4) := unpack M::R($t1)
+  3: $t5 := infer($t4)
+  4: $t6 := infer($t3)
+  5: return ()
 }
 
 
@@ -74,19 +72,17 @@ fun M::main() {
 fun M::main2() {
      var $t0: u64
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
      var $t4: u64
      var $t5: u64
      var $t6: u64
-     var $t7: u64
-  0: $t3 := 0
-  1: $t2 := pack M::R($t3, $t0)
-  2: $t1 := infer($t2)
-  3: ($t4, $t5) := unpack M::R($t1)
-  4: $t6 := infer($t5)
-  5: $t7 := infer($t4)
-  6: return ()
+  0: $t2 := 0
+  1: $t1 := pack M::R($t2, $t0)
+  2: ($t3, $t4) := unpack M::R($t1)
+  3: $t5 := infer($t4)
+  4: $t6 := infer($t3)
+  5: return ()
 }
 
 
@@ -136,16 +132,16 @@ error: use of unassigned local `r`
    │             ^^^^^^^^^^^^^^^^
 
 error: use of unassigned local `y`
-   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:30:13
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:30:17
    │
 30 │         let z = y;
-   │             ^
+   │                 ^
 
 error: use of unassigned local `x`
-   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:31:13
+   ┌─ tests/uninit-use-checker/struct_use_before_assign.move:31:17
    │
 31 │         let q = x;
-   │             ^
+   │                 ^
 
 ============ after uninitialized_use_checker: ================
 
@@ -153,26 +149,23 @@ error: use of unassigned local `x`
 fun M::main() {
      var $t0: u64
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
      var $t4: u64
      var $t5: u64
      var $t6: u64
-     var $t7: u64
-     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t1, $t2, $t4, $t5, $t6, $t7 }
-  0: $t3 := 3
-     # before: { no: $t0, $t1, $t2, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t1, $t4, $t5, $t6, $t7 }
-  1: $t2 := pack M::R($t3, $t0)
-     # before: { no: $t0, $t1, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t4, $t5, $t6, $t7 }
-  2: $t1 := infer($t2)
-     # before: { no: $t0, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t6, $t7 }
-  3: ($t4, $t5) := unpack M::R($t1)
-     # before: { no: $t0, $t6, $t7 }, after: { no: $t0, $t7 }
-  4: $t6 := infer($t5)
-     # before: { no: $t0, $t7 }, after: { no: $t0 }
-  5: $t7 := infer($t4)
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t1, $t3, $t4, $t5, $t6 }
+  0: $t2 := 3
+     # before: { no: $t0, $t1, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t3, $t4, $t5, $t6 }
+  1: $t1 := pack M::R($t2, $t0)
+     # before: { no: $t0, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t5, $t6 }
+  2: ($t3, $t4) := unpack M::R($t1)
+     # before: { no: $t0, $t5, $t6 }, after: { no: $t0, $t6 }
+  3: $t5 := infer($t4)
+     # before: { no: $t0, $t6 }, after: { no: $t0 }
+  4: $t6 := infer($t3)
      # before: { no: $t0 }, after: { no: $t0 }
-  6: return ()
+  5: return ()
 }
 
 
@@ -180,26 +173,23 @@ fun M::main() {
 fun M::main2() {
      var $t0: u64
      var $t1: M::R
-     var $t2: M::R
+     var $t2: u64
      var $t3: u64
      var $t4: u64
      var $t5: u64
      var $t6: u64
-     var $t7: u64
-     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t1, $t2, $t4, $t5, $t6, $t7 }
-  0: $t3 := 0
-     # before: { no: $t0, $t1, $t2, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t1, $t4, $t5, $t6, $t7 }
-  1: $t2 := pack M::R($t3, $t0)
-     # before: { no: $t0, $t1, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t4, $t5, $t6, $t7 }
-  2: $t1 := infer($t2)
-     # before: { no: $t0, $t4, $t5, $t6, $t7 }, after: { no: $t0, $t6, $t7 }
-  3: ($t4, $t5) := unpack M::R($t1)
-     # before: { no: $t0, $t6, $t7 }, after: { no: $t0, $t7 }
-  4: $t6 := infer($t5)
-     # before: { no: $t0, $t7 }, after: { no: $t0 }
-  5: $t7 := infer($t4)
+     # before: { no: $t0, $t1, $t2, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t1, $t3, $t4, $t5, $t6 }
+  0: $t2 := 0
+     # before: { no: $t0, $t1, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t3, $t4, $t5, $t6 }
+  1: $t1 := pack M::R($t2, $t0)
+     # before: { no: $t0, $t3, $t4, $t5, $t6 }, after: { no: $t0, $t5, $t6 }
+  2: ($t3, $t4) := unpack M::R($t1)
+     # before: { no: $t0, $t5, $t6 }, after: { no: $t0, $t6 }
+  3: $t5 := infer($t4)
+     # before: { no: $t0, $t6 }, after: { no: $t0 }
+  4: $t6 := infer($t3)
      # before: { no: $t0 }, after: { no: $t0 }
-  6: return ()
+  5: return ()
 }
 
 

@@ -42,13 +42,13 @@ error: unable to infer instantiation of type `G2<_>` (consider providing type ar
 28 │         G2{} == G2{};
    │         ^^^^
 
-error: the operator takes 2 arguments but 3 were provided
+error: the operator takes 3 arguments but 2 were provided
    ┌─ tests/checking/typing/eq_invalid.move:35:22
    │
 35 │         (1, 2, 3) == (0, 1);
    │                      ^^^^^^
 
-error: the operator takes 3 arguments but 2 were provided
+error: the operator takes 2 arguments but 3 were provided
    ┌─ tests/checking/typing/eq_invalid.move:36:19
    │
 36 │         (0, 1) == (1, 2, 3);

@@ -118,6 +118,7 @@ jobs:
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_ANALYTICS_TOKEN }}
       - run: echo "Skipping rust unit tests! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 

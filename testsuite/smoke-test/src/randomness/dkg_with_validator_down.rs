@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     randomness::{decrypt_key_map, verify_dkg_transcript, wait_for_dkg_finish},

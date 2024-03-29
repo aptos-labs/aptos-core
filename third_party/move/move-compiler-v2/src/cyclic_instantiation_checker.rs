@@ -152,10 +152,7 @@ impl<'a> CyclicInstantiationChecker<'a> {
 
     /// Shortcut for getting the node instantiation
     fn get_inst(&self, nid: NodeId) -> Vec<Type> {
-        self.mod_env
-            .env
-            .get_node_instantiation_opt(nid)
-            .expect("instantiation")
+        self.mod_env.env.get_node_instantiation(nid)
     }
 
     /// Returns true if we are sure the function with given id is not recursive

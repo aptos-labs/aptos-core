@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_executor_types::should_forward_to_subscription_service;
 #[cfg(feature = "bench")]

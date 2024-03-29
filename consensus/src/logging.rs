@@ -53,6 +53,9 @@ pub enum LogEvent {
     BroadcastCertifiedAugData,
     ReceiveCertifiedAugData,
     SendOrderVote,
+    // randomness fast path
+    BroadcastRandShareFastPath,
+    ReceiveRandShareFastPath,
 }
 
 impl LogSchema {

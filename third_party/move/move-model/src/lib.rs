@@ -30,7 +30,7 @@ use move_compiler::{
     diagnostics::{codes::Severity, Diagnostics},
     expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
     naming::ast as N,
-    parser::ast::{self as P, ModuleName as ParserModuleName},
+    parser::ast::{self as P, CallKind, ModuleName as ParserModuleName},
     shared::{
         parse_named_address, unique_map::UniqueMap, CompilationEnv, Identifier as IdentifierTrait,
         NumericalAddress, PackagePaths,
@@ -1047,7 +1047,11 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
                 .collect();
             Exp_::Call(
                 sp(name.loc(), access),
-                *is_macro,
+                if *is_macro {
+                    CallKind::Macro
+                } else {
+                    CallKind::Regular
+                },
                 if rewritten_ty_args.is_empty() {
                     None
                 } else {
@@ -1065,7 +1069,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             };
             Exp_::Call(
                 sp(target.loc(), access),
-                false,
+                CallKind::Regular,
                 None,
                 sp(exp.exp.loc, rewritten_arguments),
             )
@@ -1082,7 +1086,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             };
             Exp_::Call(
                 sp(builtin.loc, access),
-                false,
+                CallKind::Regular,
                 None,
                 sp(exp.exp.loc, rewritten_arguments),
             )

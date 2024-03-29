@@ -373,7 +373,15 @@ impl<'env> Generator<'env> {
                 }
                 // If there is a binding, assign the pattern
                 if let Some(binding) = opt_binding {
-                    self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
+                    if let Pattern::Var(var_id, sym) = pat {
+                        // For the common case `let x = binding; ...` avoid introducing a
+                        // temporary for `binding` and directly pass the temp for `x` into
+                        // translation.
+                        let local = self.find_local_for_pattern(*var_id, *sym, Some(&scope));
+                        self.without_reference_mode(|s| s.gen(vec![local], binding))
+                    } else {
+                        self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
+                    }
                 }
                 // Compile the body
                 self.scopes.push(scope);
@@ -386,13 +394,21 @@ impl<'env> Generator<'env> {
                 // appear where references are processed.
                 let rhs_temp = self.gen_arg(rhs, false);
                 let lhs_temp = self.gen_auto_ref_arg(lhs, ReferenceKind::Mutable);
-                if !self.temp_type(lhs_temp).is_mutable_reference() {
+                let lhs_type = self.get_node_type(lhs.node_id());
+
+                // For the case: `fun f(p: &mut S) { *(p :&S) =... },
+                // we need to check whether p (with explicit type annotation) is an immutable ref
+                let source_type = if lhs_type.is_immutable_reference() {
+                    &lhs_type
+                } else {
+                    self.temp_type(lhs_temp)
+                };
+                if !source_type.is_mutable_reference() {
                     self.error(
                         lhs.node_id(),
                         format!(
                             "expected `&mut` but found `{}`",
-                            self.temp_type(lhs_temp)
-                                .display(&self.func_env.get_type_display_ctx()),
+                            source_type.display(&self.func_env.get_type_display_ctx()),
                         ),
                     );
                 }
@@ -691,6 +707,14 @@ impl<'env> Generator<'env> {
             Operation::Borrow(kind) => {
                 let target = self.require_unary_target(id, targets);
                 let arg = self.require_unary_arg(id, args);
+                // When the target of this borrow is of type immutable ref, while kind is mutable ref
+                // we need to change the type of target to mutable ref,
+                // code example:
+                // 1) `let x: &T = &mut y;`
+                // 2) `let x: u64 = 3; *(&mut x: &u64) = 5;`
+                if let Type::Reference(ReferenceKind::Immutable, ty) = self.temp_type(target) {
+                    self.temps[target] = Type::Reference(*kind, ty.clone());
+                }
                 self.gen_borrow(target, id, *kind, &arg)
             },
             Operation::Abort => {
@@ -1097,19 +1121,24 @@ impl<'env> Generator<'env> {
 
         // Compile operand in reference mode, defaulting to immutable mode.
         let oper_temp = self.gen_auto_ref_arg(oper, ReferenceKind::Immutable);
+        let oper_type = self.get_node_type(oper.node_id());
 
         // If we are in reference mode and a &mut is requested, the operand also needs to be
         // &mut.
+        let source_type = if oper_type.is_immutable_reference() {
+            &oper_type // To check the corner case `&mut x...; (x:&T). = ...`, we need this condition
+        } else {
+            self.temp_type(oper_temp)
+        };
         if self.reference_mode()
             && self.reference_mode_kind == ReferenceKind::Mutable
-            && !self.temp_type(oper_temp).is_mutable_reference()
+            && !source_type.is_mutable_reference()
         {
             self.error(
                 oper.node_id(),
                 format!(
                     "expected `&mut` but found `{}`",
-                    self.temp_type(oper_temp)
-                        .display(&self.func_env.get_type_display_ctx())
+                    source_type.display(&self.func_env.get_type_display_ctx())
                 ),
             )
         }

@@ -328,7 +328,7 @@ impl<'a> ExpRewriterFunctions for SpecConverter<'a> {
                     // Reduce to unit
                     Call(*id, Tuple, vec![]).into_exp()
                 },
-                Temporary(id, _) => {
+                Temporary(id, _) | LocalVar(id, _) => {
                     self.reference_strip_exempted.insert(*id);
                     exp
                 },

@@ -11,7 +11,7 @@ use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColo
 use log::{debug, info, warn};
 use move_abigen::Abigen;
 use move_compiler::shared::{known_attributes::KnownAttribute, PackagePaths};
-use move_compiler_v2::env_pipeline::{rewrite_target::RewritingScope, spec_rewriter};
+use move_compiler_v2::{env_pipeline::rewrite_target::RewritingScope, Experiment};
 use move_docgen::Docgen;
 use move_errmapgen::ErrmapGen;
 use move_model::{
@@ -85,6 +85,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         warn_unused: false,
         whole_program: false,
     };
+
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;
     run_move_prover_with_model_v2(&mut env, error_writer, options, now)
 }
@@ -115,14 +116,15 @@ pub fn run_move_prover_with_model<W: WriteColor>(
     debug!("global env before prover run: {}", env.dump_env_all());
 
     // Run the compiler v2 checking and rewriting pipeline
-    let compiler_options = move_compiler_v2::Options::default();
+    let compiler_options = move_compiler_v2::Options::default()
+        .set_experiment(Experiment::OPTIMIZE, false)
+        .set_experiment(Experiment::SPEC_REWRITE, true);
     env.set_extension(compiler_options.clone());
-    let mut pipeline = move_compiler_v2::check_and_rewrite_pipeline(
+    let pipeline = move_compiler_v2::check_and_rewrite_pipeline(
         &compiler_options,
         true,
         RewritingScope::Everything,
     );
-    pipeline.add("specification rewriter", spec_rewriter::run_spec_rewriter);
     pipeline.run(env);
     run_move_prover_with_model_v2(env, error_writer, options, now)
 }

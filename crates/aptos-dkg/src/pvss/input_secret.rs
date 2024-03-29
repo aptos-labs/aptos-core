@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::random::random_scalar;
 use aptos_crypto::Uniform;

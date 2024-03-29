@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, ensure};
 use aptos_keyless_pepper_common::{

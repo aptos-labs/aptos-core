@@ -7,6 +7,7 @@ use crate::{
     diagnostics::Diagnostics,
     parser::{
         ast as P,
+        ast::CallKind,
         filter::{filter_program, FilterContext},
     },
     shared::{known_attributes, CompilationEnv},
@@ -187,7 +188,7 @@ fn create_test_poison(mloc: Loc) -> P::ModuleMember {
     )];
     let nop_call = P::Exp_::Call(
         sp(mloc, P::NameAccessChain_::Three(mod_addr_name, fn_name)),
-        false,
+        CallKind::Regular,
         None,
         sp(mloc, args_),
     );

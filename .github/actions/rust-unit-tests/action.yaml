@@ -4,6 +4,9 @@ inputs:
   GIT_CREDENTIALS:
     description: "Optional credentials to pass to git. Useful if you need to pull private repos for dependencies"
     required: false
+  BUILDKITE_ANALYTICS_TOKEN:
+    description: "The Buildkite API token"
+    required: true
 
 runs:
   using: composite
@@ -28,6 +31,11 @@ runs:
     - uses: taiki-e/install-action@v1.5.6
       with:
         tool: nextest
+    
+    # Install buildkite-test-collector
+    - name: Install buildkite-test-collector
+      run: cargo install buildkite-test-collector
+      shell: bash
 
     # Run a postgres database
     - name: Run postgres database
@@ -36,7 +44,10 @@ runs:
 
     # Run the rust unit tests
     - name: Run all unit tests
-      run: cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast
+      run: |
+        NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast --message-format libtest-json > nextest_output.json
+        buildkite-test-collector < nextest_output.json || echo "Warning: buildkite-test-collector encountered an error"
+        rm nextest_output.json
       shell: bash
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
@@ -47,3 +58,4 @@ runs:
         CVC5_EXE: /home/runner/bin/cvc5
         DOTNET_ROOT: /home/runner/.dotnet
         BOOGIE_EXE: /home/runner/.dotnet/tools/boogie
+        BUILDKITE_ANALYTICS_TOKEN: ${{ inputs.BUILDKITE_ANALYTICS_TOKEN }}

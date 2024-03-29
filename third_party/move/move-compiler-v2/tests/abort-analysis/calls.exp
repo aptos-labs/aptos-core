@@ -18,6 +18,11 @@ fun test::test0() {
 [variant baseline]
 fun test::nothing() {
      # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
   0: return ()
 }
 
@@ -25,9 +30,24 @@ fun test::nothing() {
 [variant baseline]
 fun test::test0() {
      # abort state: {returns,aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
   0: test::nothing()
      # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
   1: return ()
      # abort state: {returns}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
   2: return ()
 }

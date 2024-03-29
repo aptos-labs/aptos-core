@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 //^ This file stores the details associated with a sample ZK proof. The constants are outputted by
 //^ `input_gen.py` in the `keyless-circuit` repo (or can be derived implicitly from that code).
@@ -43,10 +44,13 @@ static SAMPLE_NONCE: Lazy<String> = Lazy::new(|| {
     .unwrap()
 });
 
+pub(crate) const SAMPLE_TEST_ISS_VALUE: &str = "test.oidc.provider";
+
 /// TODO(keyless): Use a multiline format here, for diff-friendliness
 pub(crate) static SAMPLE_JWT_PAYLOAD_JSON: Lazy<String> = Lazy::new(|| {
     format!(
-        r#"{{"iss":"https://accounts.google.com","azp":"407408718192.apps.googleusercontent.com","aud":"407408718192.apps.googleusercontent.com","sub":"113990307082899718775","hd":"aptoslabs.com","email":"michael@aptoslabs.com","email_verified":true,"at_hash":"bxIESuI59IoZb5alCASqBg","name":"Michael Straka","picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c","given_name":"Michael","family_name":"Straka","locale":"en","iat":1700255944,"exp":2700259544,"nonce":"{}"}}"#,
+        r#"{{"iss":"{}","azp":"407408718192.apps.googleusercontent.com","aud":"407408718192.apps.googleusercontent.com","sub":"113990307082899718775","hd":"aptoslabs.com","email":"michael@aptoslabs.com","email_verified":true,"at_hash":"bxIESuI59IoZb5alCASqBg","name":"Michael Straka","picture":"https://lh3.googleusercontent.com/a/ACg8ocJvY4kVUBRtLxe1IqKWL5i7tBDJzFp9YuWVXMzwPpbs=s96-c","given_name":"Michael","family_name":"Straka","locale":"en","iat":1700255944,"exp":2700259544,"nonce":"{}"}}"#,
+        SAMPLE_TEST_ISS_VALUE,
         SAMPLE_NONCE.as_str()
     )
 });
@@ -149,26 +153,21 @@ pub(crate) static SAMPLE_PK: Lazy<KeylessPublicKey> = Lazy::new(|| {
 /// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
 pub(crate) static SAMPLE_PROOF: Lazy<Groth16Proof> = Lazy::new(|| {
     Groth16Proof::new(
-        G1Bytes::new_unchecked(
-            "1267033150320448411211901568481409743819076691060975611650170237062085112271",
-            "8740863746610918527507766521997698403911489949115615498626016046813167813972",
-        )
-        .unwrap(),
-        G2Bytes::new_unchecked(
-            [
-                "16224380021934427514387941096929618872475998899623884448160103486619723199264",
-                "12279015765197145223151309518387134606827509988494574420535420271186872567187",
-            ],
-            [
-                "16559516515833519707946458689803990166458667627998555893874683268065849831850",
-                "18655740917490387600951832966394348192941354047055725417941402265405327519607",
-            ],
-        )
-        .unwrap(),
-        G1Bytes::new_unchecked(
-            "9962972005608211805886517403986821350415966400803168299718241440902533221411",
-            "20072668315945244829556525294962274935287178051981646789124308243130814901907",
-        )
-        .unwrap(),
+        G1Bytes::new_from_vec(hex::decode("bc1b31c0d35d8ea1086640f209dc1fda01d9b57e7aff138687549ece67f45780").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("7104f991a6324f8e8287e2f6e32b225b65b90ed33d02a8105652c889ecf8b50672bbc55caf9ff0fcd07d5c26fbaa6ffd0d24c690aed4ee8ee8cebfdfc51e2d1b").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("246c9d4b5029b41274dfa53491061f6d1358a7a1b02988f9959091e5f871aba2").unwrap()).unwrap(),
+    )
+});
+
+/// A valid Groth16 proof for the JWT under `SAMPLE_JWK`, where the public inputs have:
+///  - uid_key set to `sub`
+///  - no override aud
+///  - no extra field
+/// https://github.com/aptos-labs/devnet-groth16-keys/commit/02e5675f46ce97f8b61a4638e7a0aaeaa4351f76
+pub(crate) static SAMPLE_PROOF_NO_EXTRA_FIELD: Lazy<Groth16Proof> = Lazy::new(|| {
+    Groth16Proof::new(
+        G1Bytes::new_from_vec(hex::decode("8f350299bbbd9d3d9940c893186f0a187d488214f6e2de928afc44ccd314d10d").unwrap()).unwrap(),
+        G2Bytes::new_from_vec(hex::decode("d90534077ba332278b4850218855a1e370aa77aaaf4c7ae35b5ba42d4073e40b9b89a667f74e608558baab4f44758ffeff0b081d46735c8044f7e03f57e0d012").unwrap()).unwrap(),
+        G1Bytes::new_from_vec(hex::decode("96ce90fd67ede76d4b6eb19a116f2a52b9f4e86d82c6d94a18731de8d2794819").unwrap()).unwrap(),
     )
 });

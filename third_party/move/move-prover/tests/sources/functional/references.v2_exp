@@ -9,6 +9,7 @@ error: function does not abort under this condition
    =         b = <redacted>
    =     at tests/sources/functional/references.move:70: mut_ref_incorrect
    =     at tests/sources/functional/references.move:71: mut_ref_incorrect
+   =         b_ref = <redacted>
    =         <redacted> = <redacted>
    =     at tests/sources/functional/references.move:50: mut_b
    =         b = <redacted>

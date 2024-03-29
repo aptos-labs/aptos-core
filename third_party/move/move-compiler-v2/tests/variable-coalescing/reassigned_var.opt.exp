@@ -1,0 +1,77 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t1 := 1
+  1: $t2 := 9
+  2: $t1 := infer($t2)
+  3: $t3 := 2
+  4: $t0 := +($t1, $t3)
+  5: return $t0
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars:
+     # events: b:$t2
+  0: $t2 := 9
+     # live vars: $t2
+     # events: e:$t2, b:$t1
+  1: $t1 := move($t2)
+     # live vars: $t1
+     # events: b:$t3
+  2: $t3 := 2
+     # live vars: $t1, $t3
+     # events: e:$t1, e:$t3, b:$t0
+  3: $t0 := +($t1, $t3)
+     # live vars: $t0
+     # events: e:$t0
+  4: return $t0
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := 9
+  1: $t2 := move($t2)
+  2: $t3 := 2
+  3: $t2 := +($t2, $t3)
+  4: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(): u64 /* def_idx: 0 */ {
+L0:	loc0: u64
+L1:	loc1: u64
+B0:
+	0: LdU64(9)
+	1: LdU64(2)
+	2: StLoc[0](loc0: u64)
+	3: StLoc[1](loc1: u64)
+	4: CopyLoc[1](loc1: u64)
+	5: MoveLoc[0](loc0: u64)
+	6: Add
+	7: Ret
+}
+}
+============ bytecode verification succeeded ========

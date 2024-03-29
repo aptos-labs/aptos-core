@@ -25,6 +25,33 @@ fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::update($t0: &mut u64) {
+     var $t1: u64
+  0: $t1 := 0
+  1: write_ref($t0, $t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: &mut u64
+  0: $t2 := copy($t0)
+  1: $t3 := move($t0)
+  2: $t4 := move($t3)
+  3: $t5 := borrow_local($t2)
+  4: m::update($t5)
+  5: $t1 := move($t4)
+  6: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -136,6 +163,7 @@ B0:
 	3: Ret
 }
 test(Arg0: u64): u64 /* def_idx: 1 */ {
+L1:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: StLoc[1](loc0: u64)
@@ -145,3 +173,4 @@ B0:
 	5: Ret
 }
 }
+============ bytecode verification succeeded ========

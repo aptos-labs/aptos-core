@@ -927,6 +927,7 @@ dependencies = [
  "hex",
  "itertools 0.12.1",
  "maplit",
+ "mini-moka",
  "mirai-annotations",
  "move-core-types",
  "num-derive",
@@ -981,6 +982,7 @@ dependencies = [
  "bcs 0.1.4",
  "futures",
  "itertools 0.12.1",
+ "mini-moka",
  "mirai-annotations",
  "once_cell",
  "proptest",
@@ -2714,10 +2716,12 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-netcore",
  "aptos-network",
+ "aptos-peer-monitoring-service-types",
  "aptos-proptest-helpers",
  "aptos-runtimes",
  "aptos-short-hex-str",
  "aptos-storage-interface",
+ "aptos-time-service",
  "aptos-types",
  "aptos-vm-validator",
  "async-trait",
@@ -2812,6 +2816,7 @@ name = "aptos-move-e2e-benchmark"
 version = "0.1.0"
 dependencies = [
  "aptos-language-e2e-tests",
+ "aptos-logger",
  "aptos-transaction-generator-lib",
  "aptos-types",
  "rand 0.7.3",
@@ -3908,7 +3913,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-bitvec",
- "aptos-bounded-executor",
  "aptos-channels",
  "aptos-config",
  "aptos-crypto",
@@ -10892,6 +10896,7 @@ dependencies = [
  "once_cell",
  "petgraph 0.6.4",
  "serde",
+ "walkdir",
 ]
 
 [[package]]
@@ -10899,10 +10904,12 @@ name = "move-compiler-v2-transactional-tests"
 version = "0.1.0"
 dependencies = [
  "datatest-stable",
+ "itertools 0.10.5",
  "move-command-line-common",
  "move-compiler-v2",
  "move-transactional-test-runner",
  "once_cell",
+ "walkdir",
 ]
 
 [[package]]

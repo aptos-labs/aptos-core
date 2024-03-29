@@ -1730,12 +1730,12 @@ impl FunctionTargetProcessor for ReferenceSafetyProcessor {
             .get_annotations()
             .get::<LiveVarAnnotation>()
             .expect("livevar annotation");
-        let suppress_errors = fun_env
+        let suppress_errors = !fun_env
             .module_env
             .env
             .get_extension::<Options>()
             .unwrap_or_default()
-            .experiment_on(Experiment::NO_SAFETY);
+            .experiment_on(Experiment::REFERENCE_SAFETY);
         let analyzer = LifeTimeAnalysis {
             target: &target,
             live_var_annotation,

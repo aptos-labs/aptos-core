@@ -821,10 +821,13 @@ impl GlobalEnv {
         target_modules
     }
 
-    fn add_backtrace(msg: &str, is_bug: bool) -> String {
+    fn add_backtrace(msg: &str, _is_bug: bool) -> String {
+        // For now, we do not use is_bug, but we could have
+        // another env var MOVE_COMPILER_DEBUG_BUG_ENV_VAR to
+        // only backtrace bugs if the env var is set.
         static DEBUG_COMPILER: Lazy<bool> =
             Lazy::new(|| read_bool_env_var(cli::MOVE_COMPILER_DEBUG_ENV_VAR));
-        if is_bug || *DEBUG_COMPILER {
+        if *DEBUG_COMPILER {
             let bt = Backtrace::capture();
             if BacktraceStatus::Captured == bt.status() {
                 format!("{}\nBacktrace: {:#?}", msg, bt)
@@ -1255,7 +1258,7 @@ impl GlobalEnv {
             }
             assert_eq!(key.inst.len(), memory.inst.len());
             let adapter = TypeUnificationAdapter::new_vec(&memory.inst, &key.inst, true, true);
-            let rel = adapter.unify(&NoUnificationContext, Variance::SpecVariance, true);
+            let rel = adapter.unify(&mut NoUnificationContext, Variance::SpecVariance, true);
             if rel.is_some() {
                 inv_ids.extend(val.clone());
             }

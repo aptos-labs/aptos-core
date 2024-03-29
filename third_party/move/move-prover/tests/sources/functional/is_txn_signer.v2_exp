@@ -57,7 +57,6 @@ error: global memory invariant does not hold
    =     at tests/sources/functional/is_txn_signer.move:61: ADMIN_ADDRESS
    =     at tests/sources/functional/is_txn_signer.move:85: increment_incorrect
    =         _account = <redacted>
-   =         <redacted> = <redacted>
    =     at tests/sources/functional/is_txn_signer.move:83: increment_incorrect
    =     at tests/sources/functional/is_txn_signer.move:85: increment_incorrect
    =     at tests/sources/functional/is_txn_signer.move:90
