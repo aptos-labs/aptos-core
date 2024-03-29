@@ -50,6 +50,7 @@ spec aptos_framework::reconfiguration_state {
         use aptos_std::from_bcs;
         use aptos_std::type_info;
         use std::bcs;
+        requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         aborts_if false;
         let state = Any {
             type_name: type_info::type_name<StateActive>(),
