@@ -1,11 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Performs strict acquire analysis as outlined in the move book, that is:
+//! Performs strict acquires analysis as outlined in the move book, that is:
 //! A Move function `m::f` must be annotated with acquires `T`` if and only if,
 //! - The body of `m::f` contains a `move_from<T>`, `borrow_global_mut<T>`, or `borrow_global<T>` instruction, or
 //! - The body of `m::f` invokes a function `m::g` declared in the same module that is annotated with acquires
-//! Warn if access specifiers other than plain `acquire R` is used.
+//! Warn if access specifiers other than plain `acquires R` is used.
 //! This check is enabled by flag `Experiment::ACQUIRES_CHECK`, and is disabled by default.
 
 use move_binary_format::file_format;
@@ -16,7 +16,7 @@ use move_model::{
 };
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-/// Performs acquire checking
+/// Performs acquires checking
 pub fn acquires_checker(env: &GlobalEnv) {
     for module in env.get_modules() {
         if module.is_target() {
@@ -52,7 +52,7 @@ pub fn acquires_checker(env: &GlobalEnv) {
     }
 }
 
-/// Gets the acquried resources declared by `acquire R`
+/// Gets the acquried resources declared by `acquires R`
 fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
     if let Some(access_specifiers) = fun_env.get_access_specifiers() {
         access_specifiers
