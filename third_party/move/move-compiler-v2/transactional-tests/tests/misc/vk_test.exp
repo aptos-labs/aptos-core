@@ -1,0 +1,82 @@
+comparison between v1 and v2 failed:
+= processed 22 tasks
+= 
+= task 1 'run'. lines 141-141:
+- return values: 9
++ return values: 7
+= 
+= task 2 'run'. lines 143-143:
+- return values: 9
++ return values: 7
+= 
+= task 3 'run'. lines 145-145:
+- return values: 9
++ return values: 7
+= 
+= task 4 'run'. lines 147-147:
+- return values: 9
++ return values: 7
+= 
+= task 5 'run'. lines 149-149:
+= return values: 6
+= 
+= task 6 'run'. lines 151-151:
+- return values: 6
++ return values: 7
+= 
+= task 7 'run'. lines 153-153:
+- return values: 6
++ return values: 8
+= 
+= task 8 'run'. lines 155-155:
+- return values: 6
++ return values: 8
+= 
+= task 9 'run'. lines 157-157:
+- return values: 6
++ return values: 8
+= 
+= task 10 'run'. lines 159-159:
+- return values: 6
++ return values: 8
+= 
+= task 11 'run'. lines 161-161:
+= return values: 6
+= 
+= task 12 'run'. lines 163-163:
+- return values: 6
++ return values: 8
+= 
+= task 13 'run'. lines 165-165:
+- return values: 15
++ return values: 11
+= 
+= task 14 'run'. lines 167-167:
+- return values: 15
++ return values: 11
+= 
+= task 15 'run'. lines 169-169:
+- return values: 49
++ return values: 45
+= 
+= task 16 'run'. lines 171-171:
+- return values: 9
++ return values: 6
+= 
+= task 17 'run'. lines 173-173:
+= return values: 6
+= 
+= task 18 'run'. lines 175-175:
+- return values: [1, 2, 3]
++ return values: [3, 2, 3]
+= 
+= task 19 'run'. lines 177-177:
+- return values: false
++ return values: true
+= 
+= task 20 'run'. lines 179-179:
+= return values: true
+= 
+= task 21 'run'. lines 181-181:
+= return values: false
+= 
