@@ -7,7 +7,10 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockReader, BlockRetriever, BlockStore,
     },
-    counters::{self, PROPOSED_VTXN_BYTES, PROPOSED_VTXN_COUNT},
+    counters::{
+        self, EXECUTED_WITH_ORDER_VOTE_QC, ORDER_VOTE_ADDED, PROPOSED_VTXN_BYTES,
+        PROPOSED_VTXN_COUNT, SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC,
+    },
     error::{error_kind, VerifyError},
     liveness::{
         proposal_generator::ProposalGenerator,
@@ -1101,10 +1104,19 @@ impl RoundManager {
     ) -> anyhow::Result<()> {
         match result {
             OrderVoteReceptionResult::NewQuorumCertificate(qc) => {
-                self.new_qc_aggregated(qc.clone(), order_vote.author())
-                    .await
+                let result = self
+                    .new_qc_aggregated(qc.clone(), order_vote.author())
+                    .await;
+                EXECUTED_WITH_ORDER_VOTE_QC.inc();
+                if result.is_ok() {
+                    SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC.inc();
+                }
+                result
             },
-            OrderVoteReceptionResult::VoteAdded(_) => Ok(()),
+            OrderVoteReceptionResult::VoteAdded(_) => {
+                ORDER_VOTE_ADDED.inc();
+                Ok(())
+            },
             e => Err(anyhow::anyhow!("{:?}", e)),
         }
     }

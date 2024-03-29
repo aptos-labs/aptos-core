@@ -63,6 +63,30 @@ pub static LAST_COMMITTED_VERSION: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_executed_with_order_vote_qc",
+        "Count of the number of blocks executed with order vote QC"
+    )
+    .unwrap()
+});
+
+pub static SUCCESSFUL_EXECUTED_WITH_ORDER_VOTE_QC: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_successful_executed_with_order_vote_qc",
+        "Count of the number of blocks successfully executed with order vote QC"
+    )
+    .unwrap()
+});
+
+pub static ORDER_VOTE_ADDED: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "aptos_consensus_order_vote_added",
+        "Count of the number of order votes added"
+    )
+    .unwrap()
+});
+
 /// Count of the committed failed rounds since last restart.
 pub static COMMITTED_FAILED_ROUNDS_COUNT: Lazy<IntCounter> = Lazy::new(|| {
     register_int_counter!(
