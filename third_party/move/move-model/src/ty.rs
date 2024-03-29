@@ -1813,7 +1813,7 @@ impl Substitution {
                     for ctr in Constraint::for_type_parameter(type_param) {
                         self.eval_constraint(
                             context,
-                            &type_param.2,
+                            loc,
                             t,
                             Variance::NoVariance,
                             WideningOrder::LeftToRight,
