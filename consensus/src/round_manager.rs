@@ -1057,7 +1057,7 @@ impl RoundManager {
         result: OrderVoteReceptionResult,
     ) -> anyhow::Result<()> {
         match result {
-            OrderVoteReceptionResult::NewQuorumCertificate => {
+            OrderVoteReceptionResult::NewQuorumCertificate(_qc) => {
                 // TODO: Execute the block
                 Ok(())
             },
