@@ -28,7 +28,7 @@ async fn compression_mismatch_disabled() {
         ..Default::default()
     };
 
-    // Ensure the properties hold for all peer priorities
+    // Ensure the properties hold for all peer priorities.
     for peer_priority in PeerPriority::get_all_ordered_priorities() {
         // Create the mock network, mock time, client and poller
         let (mut mock_network, mut mock_time, client, poller) =
