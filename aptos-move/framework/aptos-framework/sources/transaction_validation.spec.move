@@ -119,7 +119,7 @@ spec aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        has_randomness_annotation: bool,
+        required_deposit: Option<u64>,
     ) {
         include PrologueCommonAbortsIf;
     }
@@ -149,7 +149,7 @@ spec aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
         _script_hash: vector<u8>,
-        has_randomness_annotation: bool,
+        required_deposit: Option<u64>,
     ) {
         include PrologueCommonAbortsIf {
             gas_payer: signer::address_of(sender),

@@ -14,7 +14,7 @@ use crate::{
 use aptos_gas_algebra::Gas;
 use aptos_types::{
     account_config::constants::CORE_CODE_ADDRESS, fee_statement::FeeStatement,
-    on_chain_config::Features, transaction::Multisig,
+    move_utils::as_move_value::AsMoveValue, on_chain_config::Features, transaction::Multisig,
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
@@ -81,7 +81,7 @@ pub(crate) fn run_script_prologue(
     session: &mut SessionExt,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-    has_randomness_annotation: bool,
+    required_deposit: Option<u64>,
 ) -> Result<(), VMStatus> {
     let txn_sequence_number = txn_data.sequence_number();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
@@ -112,8 +112,8 @@ pub(crate) fn run_script_prologue(
             MoveValue::U64(txn_expiration_timestamp_secs),
             MoveValue::U8(chain_id.id()),
         ];
-        if has_randomness_annotation {
-            args.push(MoveValue::Bool(true));
+        if required_deposit.is_some() {
+            args.push(required_deposit.as_move_value());
             (
                 &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_v2_name,
                 args,
@@ -148,8 +148,8 @@ pub(crate) fn run_script_prologue(
             MoveValue::U8(chain_id.id()),
             MoveValue::vector_u8(txn_data.script_hash.clone()),
         ];
-        if has_randomness_annotation {
-            args.push(MoveValue::Bool(true));
+        if required_deposit.is_some() {
+            args.push(required_deposit.as_move_value());
             (&APTOS_TRANSACTION_VALIDATION.script_prologue_v2_name, args)
         } else {
             (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
@@ -210,7 +210,7 @@ fn run_epilogue(
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
     features: &Features,
-    has_randomness_annotation: bool,
+    required_deposit: Option<u64>,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -227,8 +227,8 @@ fn run_epilogue(
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
             ];
-            if has_randomness_annotation {
-                args.push(MoveValue::Bool(true));
+            if required_deposit.is_some() {
+                args.push(required_deposit.as_move_value());
                 (
                     &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_v2_name,
                     args,
@@ -257,8 +257,8 @@ fn run_epilogue(
                 MoveValue::U64(txn_max_gas_units.into()),
                 MoveValue::U64(gas_remaining.into()),
             ];
-            if has_randomness_annotation {
-                args.push(MoveValue::Bool(true));
+            if required_deposit.is_some() {
+                args.push(required_deposit.as_move_value());
                 (&APTOS_TRANSACTION_VALIDATION.user_epilogue_v2_name, args)
             } else {
                 (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
@@ -306,7 +306,7 @@ pub(crate) fn run_success_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-    has_randomness_annotation: bool,
+    required_deposit: Option<u64>,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
         Err(VMStatus::error(
@@ -321,7 +321,7 @@ pub(crate) fn run_success_epilogue(
         fee_statement,
         txn_data,
         features,
-        has_randomness_annotation,
+        required_deposit,
     )
     .or_else(|err| convert_epilogue_error(err, log_context))
 }
@@ -335,7 +335,7 @@ pub(crate) fn run_failure_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
-    has_randomness_annotation: bool,
+    required_deposit: Option<u64>,
 ) -> Result<(), VMStatus> {
     run_epilogue(
         session,
@@ -343,7 +343,7 @@ pub(crate) fn run_failure_epilogue(
         fee_statement,
         txn_data,
         features,
-        has_randomness_annotation,
+        required_deposit,
     )
     .or_else(|e| {
         expect_only_successful_execution(
