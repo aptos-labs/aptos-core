@@ -221,14 +221,16 @@ module aptos_std::smart_table {
     ) {
         let num_buckets = table_ref.num_buckets;
         let buckets_ref = &table_ref.buckets;
-        assert!(
-            starting_bucket_index == 0 || starting_bucket_index < num_buckets,
-            EINVALID_BUCKET_INDEX
-        );
+        assert!(starting_bucket_index < num_buckets, EINVALID_BUCKET_INDEX);
         let bucket_ref = table_with_length::borrow(buckets_ref, starting_bucket_index);
         let bucket_length = vector::length(bucket_ref);
         assert!(
-            starting_vector_index == 0 || starting_vector_index < bucket_length,
+            // In the general case, starting vector index should never be equal to bucket length
+            // because then iteration will attempt to borrow a vector element that is out of bounds.
+            // However starting vector index can be equal to bucket length in the special case of
+            // starting iteration at the beginning of an empty bucket since buckets are never
+            // destroyed, only emptied.
+            starting_vector_index < bucket_length || starting_vector_index == 0,
             EINVALID_VECTOR_INDEX
         );
         let keys = vector[];
