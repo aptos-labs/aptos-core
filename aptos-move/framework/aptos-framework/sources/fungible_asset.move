@@ -329,6 +329,17 @@ module aptos_framework::fungible_asset {
     }
 
     #[view]
+    /// Check whether the balance of a given store is >= `amount`.
+    public fun is_balance_at_least<T: key>(store: Object<T>, amount: u64): bool acquires FungibleStore {
+        let store_addr = object::object_address(&store);
+        if (store_exists(store_addr)) {
+            borrow_store_resource(&store).balance >= amount
+        } else {
+            amount == 0
+        }
+    }
+
+    #[view]
     /// Return whether a store is frozen.
     ///
     /// If the store has not been created, we default to returning false so deposits can be sent to it.
