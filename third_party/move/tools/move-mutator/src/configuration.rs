@@ -180,17 +180,18 @@ mod tests {
         fs::write("test.toml", toml_content).unwrap();
         let config = Configuration::from_toml_file(Path::new("test.toml")).unwrap();
         fs::remove_file("test.toml").unwrap();
-        assert_eq!(config.project.move_sources, vec![Path::new(
-            "/path/to/move/source"
-        )]);
+        assert_eq!(
+            config.project.move_sources,
+            vec![Path::new("/path/to/move/source")]
+        );
         assert_eq!(
             config.project.mutate_modules,
             ModuleFilter::Selected(vec!["module1".to_owned(), "module2".to_owned()])
         );
-        assert_eq!(config.mutation.unwrap().operators, vec![
-            "operator1",
-            "operator2"
-        ]);
+        assert_eq!(
+            config.mutation.unwrap().operators,
+            vec!["operator1", "operator2"]
+        );
         assert_eq!(config.individual.len(), 1);
         assert_eq!(config.individual[0].file, PathBuf::from("/path/to/file"));
         assert!(config.individual[0].verify_mutants);
@@ -252,9 +253,10 @@ mod tests {
         fs::write("test.json", json_content).unwrap();
         let config = Configuration::from_json_file(Path::new("test.json")).unwrap();
         fs::remove_file("test.json").unwrap();
-        assert_eq!(config.project.move_sources, vec![Path::new(
-            "/path/to/move/source"
-        )]);
+        assert_eq!(
+            config.project.move_sources,
+            vec![Path::new("/path/to/move/source")]
+        );
         assert_eq!(config.project.mutate_modules, ModuleFilter::All);
         assert_eq!(
             config.project.out_mutant_dir,
@@ -268,10 +270,10 @@ mod tests {
             Path::new("/path/to/configuration")
         );
         assert_eq!(config.project_path.unwrap(), Path::new("/path/to/project"));
-        assert_eq!(config.mutation.unwrap().operators, vec![
-            "operator1",
-            "operator2"
-        ]);
+        assert_eq!(
+            config.mutation.unwrap().operators,
+            vec!["operator1", "operator2"]
+        );
     }
 
     #[test]

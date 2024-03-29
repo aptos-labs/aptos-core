@@ -4,14 +4,14 @@
 
 #![forbid(unsafe_code)]
 
-use std::path::PathBuf;
 use clap::Parser;
-use serde::{Deserialize, Serialize};
 use move_mutator::cli::CLIOptions;
 use move_mutator::run_move_mutator;
 use move_package::BuildConfig;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
-#[derive(Parser, Debug, Clone, Deserialize, Serialize)]
+#[derive(Default, Parser, Debug, Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Opts {
     /// The path where to put the output files.
@@ -23,16 +23,6 @@ pub struct Opts {
     /// The build configuration for the Move package.
     #[clap(flatten)]
     pub build_config: BuildConfig,
-}
-
-impl Default for Opts {
-    fn default() -> Self {
-        Self {
-            package_path: None,
-            cli_options: CLIOptions::default(),
-            build_config: BuildConfig::default(),
-        }
-    }
 }
 
 fn main() -> anyhow::Result<()> {
