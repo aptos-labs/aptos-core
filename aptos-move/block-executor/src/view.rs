@@ -1231,11 +1231,11 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, X, T::Identifier>,
         delayed_write_set_ids: &HashSet<T::Identifier>,
         skip: &HashSet<T::Key>,
-    ) -> Result<BTreeMap<T::Key, (StateValueMetadata, u64)>, PanicError> {
+    ) -> PartialVMResult<BTreeMap<T::Key, (StateValueMetadata, u64)>> {
         group_read_set
             .iter()
             .filter(|(key, _tags)| !skip.contains(key))
-            .flat_map(|(key, tags)| {
+            .map(|(key, tags)| -> PartialVMResult<_> {
                 if let Some(value_vec) = unsync_map.fetch_group_data(key) {
                     // TODO[agg_v2](cleanup) - can we use .any() instead?
                     let mut resources_needing_delayed_field_exchange = false;
@@ -1244,65 +1244,48 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                             if let ValueWithLayout::Exchanged(value, Some(layout)) =
                                 value_with_layout
                             {
-                                // TODO[agg_v2](optimize): Is it possible to avoid clones here?
-                                match does_value_need_exchange::<T>(
+                                let needs_exchange = does_value_need_exchange::<T>(
                                     &value,
                                     layout.as_ref(),
                                     delayed_write_set_ids,
-                                ) {
-                                    Ok(needs_exchange) => {
-                                        if needs_exchange {
-                                            resources_needing_delayed_field_exchange = true;
-                                            break;
-                                        }
-                                    },
-                                    Err(e) => {
-                                        return Some(Err(e));
-                                    },
+                                )?;
+                                if needs_exchange {
+                                    resources_needing_delayed_field_exchange = true;
+                                    break;
                                 }
                             }
                         }
                     }
                     if !resources_needing_delayed_field_exchange {
-                        return None;
+                        return Ok(None);
                     }
-                    match self.get_resource_state_value_metadata(key) {
-                        Ok(Some(metadata)) => {
-                            match unsync_map.get_group_size(key) {
-                                Ok(GroupReadResult::Size(group_size)) => {
-                                    Some(Ok((key.clone(), (metadata, group_size.get()))))
-                                },
-                                Ok(GroupReadResult::Value(_, _)) => {
-                                    unreachable!("get_group_size cannot return GroupReadResult::Value type")
-                                }
-                                Ok(GroupReadResult::Uninitialized) => {
-                                    Some(Err(code_invariant_error(format!(
-                                        "Sequential cannot find metadata op size for the group read {:?}",
-                                        key
-                                    ))))
-                                },
-                                // TODO[agg_v2](cleanup): `get_group_size` can fail on group tag serialization. Do
-                                //       we want to propagate this error? This is somewhat an invariant
-                                //       violation so PanicError is also ok?
-                                Err(e) => Some(Err(code_invariant_error(format!(
-                                    "Sequential cannot compute metadata op size for the group read {:?}, error: {:?}",
-                                    key, e
-                                ))))
-                            }
-                        }
-                        Ok(None) => Some(Err(code_invariant_error(format!(
+                    match self.get_resource_state_value_metadata(key)? {
+                        Some(metadata) => match unsync_map.get_group_size(key)? {
+                            GroupReadResult::Size(group_size) => {
+                                Ok(Some((key.clone(), (metadata, group_size.get()))))
+                            },
+                            GroupReadResult::Value(_, _) => {
+                                unreachable!(
+                                    "get_group_size cannot return GroupReadResult::Value type"
+                                )
+                            },
+                            GroupReadResult::Uninitialized => Err(code_invariant_error(format!(
+                                "Sequential cannot find metadata op size for the group read {:?}",
+                                key
+                            ))
+                            .into()),
+                        },
+                        None => Err(code_invariant_error(format!(
                             "Sequential cannot find metadata op for the group read {:?}",
                             key,
-                        )))),
-                        Err(e) => Some(Err(code_invariant_error(format!(
-                            "Sequential cannot compute metadata op for the group read {:?}, error: {:?}",
-                            key, e,
-                        ))))
+                        ))
+                        .into()),
                     }
                 } else {
-                    None
+                    Ok(None)
                 }
             })
+            .flat_map(Result::transpose)
             .collect()
     }
 
@@ -1768,12 +1751,12 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> TDelayedFie
             },
             ViewState::Unsync(state) => {
                 let read_set = state.read_set.borrow();
-                Ok(self.get_group_reads_needing_exchange_sequential(
+                self.get_group_reads_needing_exchange_sequential(
                     &read_set.group_reads,
                     state.unsync_map,
                     delayed_write_set_ids,
                     skip,
-                )?)
+                )
             },
         }
     }
