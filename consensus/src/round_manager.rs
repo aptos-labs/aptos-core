@@ -43,7 +43,6 @@ use aptos_consensus_types::{
     vote::Vote,
     vote_msg::VoteMsg,
 };
-use aptos_crypto::hash::CryptoHash;
 use aptos_infallible::{checked, Mutex};
 use aptos_logger::prelude::*;
 #[cfg(test)]
@@ -51,7 +50,6 @@ use aptos_safety_rules::ConsensusState;
 use aptos_safety_rules::TSafetyRules;
 use aptos_types::{
     epoch_state::EpochState,
-    ledger_info::LedgerInfo,
     on_chain_config::{
         OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
@@ -869,6 +867,30 @@ impl RoundManager {
         Ok(())
     }
 
+    async fn broadcast_order_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
+        if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
+            let vote_proposal = proposed_block.vote_proposal();
+            let order_vote_result = self
+                .safety_rules
+                .lock()
+                .construct_and_sign_order_vote(&vote_proposal);
+            let order_vote = order_vote_result.context(format!(
+                "[RoundManager] SafetyRules Rejected {} for order vote",
+                proposed_block.block()
+            ))?;
+            if !proposed_block.block().is_nil_block() {
+                observe_block(
+                    proposed_block.block().timestamp_usecs(),
+                    BlockStage::ORDER_VOTED,
+                );
+            }
+            self.round_state.record_order_vote(order_vote.clone());
+            info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
+            self.network.broadcast_order_vote(order_vote).await;
+        }
+        Ok(())
+    }
+
     /// The function generates a VoteMsg for a given proposed_block:
     /// * first execute the block and add it to the block store
     /// * then verify the voting rules
@@ -1011,20 +1033,7 @@ impl RoundManager {
                 }
                 let result = self.new_qc_aggregated(qc.clone(), vote.author()).await;
                 if result.is_ok() {
-                    // TODO: Is this the correct way to compute consensus_data_hash in ledger_info?
-                    let ledger_info =
-                        LedgerInfo::new(qc.vote_data().proposed().clone(), qc.vote_data().hash());
-                    let order_vote_result = self
-                        .safety_rules
-                        .lock()
-                        .construct_and_sign_order_vote(&ledger_info, qc.as_ref());
-                    let order_vote = order_vote_result.context(format!(
-                        "[RoundManager] SafetyRules Rejected {} to prepare order vote",
-                        qc
-                    ))?;
-                    info!(self.new_log(LogEvent::SendOrderVote), "{}", order_vote);
-                    // TODO: Add to pending order votes
-                    self.network.broadcast_order_vote(order_vote.clone()).await;
+                    let _ = self.broadcast_order_vote(vote).await;
                 }
                 result
             },
@@ -1082,6 +1091,16 @@ impl RoundManager {
         self.process_certificates().await?;
         result
     }
+
+    // async fn new_order_vote_aggregated(&mut self,
+    //     preferred_peer: Author
+    // ) -> anyhow::Result<()> {
+    //     let result = self
+    //         .block_store
+    //         .insert_aggregated_order_vote(&mut self.create_block_retriever(preferred_peer));
+    //     self.process_certificates().await?;
+    //     result
+    // }
 
     /// To jump start new round with the current certificates we have.
     pub async fn init(&mut self, last_vote_sent: Option<Vote>) {

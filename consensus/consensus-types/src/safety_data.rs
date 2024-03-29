@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::vote::Vote;
+use crate::{order_vote::OrderVote, vote::Vote};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -17,6 +17,7 @@ pub struct SafetyData {
     #[serde(default)]
     pub one_chain_round: u64,
     pub last_vote: Option<Vote>,
+    pub last_order_vote: Option<OrderVote>,
 }
 
 impl SafetyData {
@@ -26,6 +27,7 @@ impl SafetyData {
         preferred_round: u64,
         one_chain_round: u64,
         last_vote: Option<Vote>,
+        last_order_vote: Option<OrderVote>,
     ) -> Self {
         Self {
             epoch,
@@ -33,6 +35,7 @@ impl SafetyData {
             preferred_round,
             one_chain_round,
             last_vote,
+            last_order_vote,
         }
     }
 }

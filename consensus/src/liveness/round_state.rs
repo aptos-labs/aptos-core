@@ -326,17 +326,19 @@ impl RoundState {
         order_vote: &OrderVote,
         verifier: &ValidatorVerifier,
     ) -> OrderVoteReceptionResult {
-        // TODO: Is this an appropriate check?
-        if order_vote.round() == self.current_round - 1 {
+        if order_vote.vote_data().proposed().round() == self.current_round {
             self.pending_order_votes
                 .insert_order_vote(order_vote, verifier)
         } else {
-            OrderVoteReceptionResult::UnexpectedRound(order_vote.round(), self.current_round - 1)
+            OrderVoteReceptionResult::UnexpectedRound(
+                order_vote.vote_data().proposed().round(),
+                self.current_round,
+            )
         }
     }
 
     pub fn record_order_vote(&mut self, order_vote: OrderVote) {
-        if order_vote.round() == self.current_round - 1 {
+        if order_vote.ledger_info().round() == self.current_round - 1 {
             self.order_vote_sent = Some(order_vote);
         }
     }

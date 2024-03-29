@@ -6,7 +6,6 @@ use crate::{counters, logging::LogEntry, ConsensusState, Error, SafetyRules, TSa
 use aptos_consensus_types::{
     block_data::BlockData,
     order_vote::OrderVote,
-    quorum_cert::QuorumCert,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
     vote_proposal::VoteProposal,
@@ -30,7 +29,7 @@ pub enum SafetyRulesInput {
         Box<Option<TwoChainTimeoutCertificate>>,
     ),
     ConstructAndSignVoteTwoChain(Box<VoteProposal>, Box<Option<TwoChainTimeoutCertificate>>),
-    ConstructAndSignOrderVote(Box<LedgerInfo>, Box<QuorumCert>),
+    ConstructAndSignOrderVote(Box<VoteProposal>),
     SignCommitVote(Box<LedgerInfoWithSignatures>, Box<LedgerInfo>),
 }
 
@@ -67,12 +66,8 @@ impl SerializerService {
                     ),
                 )
             },
-            SafetyRulesInput::ConstructAndSignOrderVote(ledger_info, quorum_cert) => {
-                serde_json::to_vec(
-                    &self
-                        .internal
-                        .construct_and_sign_order_vote(&ledger_info, &quorum_cert),
-                )
+            SafetyRulesInput::ConstructAndSignOrderVote(vote_proposal) => {
+                serde_json::to_vec(&self.internal.construct_and_sign_order_vote(&vote_proposal))
             },
             SafetyRulesInput::SignCommitVote(ledger_info, new_ledger_info) => serde_json::to_vec(
                 &self
@@ -153,15 +148,13 @@ impl TSafetyRules for SerializerClient {
 
     fn construct_and_sign_order_vote(
         &mut self,
-        ledger_info: &LedgerInfo,
-        quorum_cert: &QuorumCert,
+        vote_proposal: &VoteProposal,
     ) -> Result<OrderVote, Error> {
         let _timer =
             counters::start_timer("external", LogEntry::ConstructAndSignOrderVote.as_str());
-        let response = self.request(SafetyRulesInput::ConstructAndSignOrderVote(
-            Box::new(ledger_info.clone()),
-            Box::new(quorum_cert.clone()),
-        ))?;
+        let response = self.request(SafetyRulesInput::ConstructAndSignOrderVote(Box::new(
+            vote_proposal.clone(),
+        )))?;
         serde_json::from_slice(&response)?
     }
 

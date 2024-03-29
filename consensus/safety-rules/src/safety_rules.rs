@@ -251,6 +251,7 @@ impl SafetyRules {
                     0,
                     0,
                     None,
+                    None,
                 ))?;
 
                 info!(SafetyLogSchema::new(LogEntry::Epoch, LogEvent::Update)
@@ -409,10 +410,9 @@ impl TSafetyRules for SafetyRules {
 
     fn construct_and_sign_order_vote(
         &mut self,
-        ledger_info: &LedgerInfo,
-        quorum_cert: &QuorumCert,
+        vote_proposal: &VoteProposal,
     ) -> Result<OrderVote, Error> {
-        let cb = || self.guarded_construct_and_sign_order_vote(ledger_info, quorum_cert);
+        let cb = || self.guarded_construct_and_sign_order_vote(vote_proposal);
         run_and_log(cb, |log| log, LogEntry::ConstructAndSignOrderVote)
     }
 

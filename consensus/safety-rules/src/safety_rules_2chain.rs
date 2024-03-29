@@ -6,7 +6,6 @@ use crate::{error::Error, safety_rules::next_round, SafetyRules};
 use aptos_consensus_types::{
     block::Block,
     order_vote::OrderVote,
-    quorum_cert::QuorumCert,
     safety_data::SafetyData,
     timeout_2chain::{TwoChainTimeout, TwoChainTimeoutCertificate},
     vote::Vote,
@@ -95,23 +94,32 @@ impl SafetyRules {
     // TODO: Are these safety rules exhaustive?
     pub(crate) fn guarded_construct_and_sign_order_vote(
         &mut self,
-        ledger_info: &LedgerInfo,
-        quorum_cert: &QuorumCert,
+        vote_proposal: &VoteProposal,
     ) -> Result<OrderVote, Error> {
         // Exit early if we cannot sign
         self.signer()?;
-        let safety_data = self.persistent_storage.safety_data()?;
-        self.verify_epoch(ledger_info.epoch(), &safety_data)?;
-        self.verify_qc(quorum_cert)?;
-        if quorum_cert.vote_data().proposed().round() != ledger_info.round() {
-            return Err(Error::InvalidQuorumCertificate(
-                "QC round does not match LedgerInfo round".to_string(),
-            ));
-        }
+        let vote_data = self.verify_proposal(vote_proposal)?;
+        let proposed_block = vote_proposal.block();
+        let mut safety_data = self.persistent_storage.safety_data()?;
 
+        // if already voted on this round, send back the previous vote
+        if let Some(order_vote) = safety_data.last_order_vote.clone() {
+            if order_vote.ledger_info().round() == proposed_block.round() {
+                return Ok(order_vote);
+            }
+        }
+        self.safe_to_order_vote(proposed_block)?;
+
+        // Construct and sign order vote
         let author = self.signer()?.author();
-        let signature = self.sign(ledger_info)?;
-        let order_vote = OrderVote::new(author, ledger_info.clone(), signature);
+        let ledger_info = self.construct_ledger_info_2chain(proposed_block, vote_data.hash())?;
+        let signature = self.sign(&ledger_info)?;
+        let order_vote =
+            OrderVote::new_with_signature(vote_data, author, ledger_info.clone(), signature);
+
+        safety_data.last_order_vote = Some(order_vote.clone());
+        self.persistent_storage.set_safety_data(safety_data)?;
+
         Ok(order_vote)
     }
 
@@ -159,6 +167,16 @@ impl SafetyRules {
             Ok(())
         } else {
             Err(Error::NotSafeToVote(round, qc_round, tc_round, hqc_round))
+        }
+    }
+
+    fn safe_to_order_vote(&self, block: &Block) -> Result<(), Error> {
+        let round = block.round();
+        let qc_round = block.quorum_cert().certified_block().round();
+        if round == next_round(qc_round)? {
+            Ok(())
+        } else {
+            Err(Error::NotSafeToOrderVote(round, qc_round))
         }
     }
 
