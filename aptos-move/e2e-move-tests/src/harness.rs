@@ -76,7 +76,7 @@ pub struct MoveHarness {
     /// The last counted transaction sequence number, by account address.
     txn_seq_no: BTreeMap<AccountAddress, u64>,
 
-    default_gas_unit_price: u64,
+    pub default_gas_unit_price: u64,
     max_gas_per_txn: u64,
 }
 

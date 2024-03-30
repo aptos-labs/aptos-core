@@ -2322,27 +2322,22 @@ impl AptosVM {
     ) -> Option<u64> {
         match payload {
             TransactionPayload::EntryFunction(entry_func) => {
-                let has_randomness_attr =
-                    has_randomness_attribute(resolver, session, entry_func).unwrap_or(false);
-                if self.randomness_enabled && has_randomness_attr {
-                    let internal_gas_per_gas = u64::from(txn_gas_params.scaling_factor());
-                    let max_execution_gas = Gas::from(
-                        u64::from(txn_gas_params.max_execution_gas).div_ceil(internal_gas_per_gas),
+                if !self.randomness_enabled {
+                    return None;
+                }
+                if has_randomness_attribute(resolver, session, entry_func).unwrap_or(false) {
+                    let max_execution_gas: Gas = txn_gas_params
+                        .max_execution_gas
+                        .to_unit_round_up_with_params(txn_gas_params);
+                    let max_io_gas: Gas = txn_gas_params
+                        .max_io_gas
+                        .to_unit_round_up_with_params(txn_gas_params);
+                    let required_fee_deposit = min(
+                        txn_metadata.gas_unit_price * (max_execution_gas + max_io_gas)
+                            + txn_gas_params.max_storage_fee,
+                        txn_metadata.gas_unit_price * txn_gas_params.maximum_number_of_gas_units,
                     );
-                    let max_io_gas = Gas::from(
-                        u64::from(txn_gas_params.max_io_gas).div_ceil(internal_gas_per_gas),
-                    );
-                    let max_storage_gas = Gas::new(
-                        u64::from(txn_gas_params.max_storage_fee)
-                            .div_ceil(u64::from(txn_gas_params.min_price_per_gas_unit)),
-                    );
-                    let required_gas_deposit = min(
-                        max_execution_gas + max_io_gas + max_storage_gas,
-                        txn_gas_params.maximum_number_of_gas_units,
-                    );
-                    let required_fee_deposit =
-                        u64::from(txn_metadata.gas_unit_price * required_gas_deposit);
-                    Some(required_fee_deposit)
+                    Some(u64::from(required_fee_deposit))
                 } else {
                     None
                 }

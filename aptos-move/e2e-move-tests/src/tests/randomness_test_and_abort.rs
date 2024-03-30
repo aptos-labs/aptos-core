@@ -86,6 +86,7 @@ fn test_unbiasable_annotation() {
         "0x1::test::ok_if_annotated_and_not_using_randomness",
         "0x1::test::ok_if_annotated_and_using_randomness",
     ];
+
     for entry_func in should_succeed {
         let status = run_entry_func(&mut h, "0xa11ce", entry_func);
         assert_success!(status);
@@ -113,6 +114,16 @@ fn test_unbiasable_annotation() {
     } else {
         unreachable!("Non-annotated entry call function should result in Move abort")
     }
+
+    // Insufficient balance for required deposit should lead to discard.
+    let low_balance_account = h.new_account_with_balance_and_sequence_number(1, 789);
+    let status = h.run_entry_function(
+        &low_balance_account,
+        str::parse("0x1::test::ok_if_annotated_and_using_randomness").unwrap(),
+        vec![],
+        vec![],
+    );
+    assert!(status.is_discarded());
 }
 
 fn set_randomness_seed(h: &mut MoveHarness) {

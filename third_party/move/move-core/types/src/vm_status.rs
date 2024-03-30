@@ -588,6 +588,7 @@ pub enum StatusCode {
     RESERVED_VALIDATION_ERROR_3 = 38,
     RESERVED_VALIDATION_ERROR_4 = 39,
     RESERVED_VALIDATION_ERROR_5 = 40,
+    RESERVED_VALIDATION_ERROR_6 = 41,
 
     // When a code module/script is published it is verified. These are the
     // possible errors that can arise from the verification process.
