@@ -1049,14 +1049,10 @@ impl RoundManager {
     }
 
     async fn process_order_vote_msg(&mut self, order_vote: OrderVote) -> anyhow::Result<()> {
-        info!(
-            self.new_log(LogEvent::ReceiveOrderVote)
-                .remote_peer(order_vote.author()),
-            order_vote = %order_vote,
-            order_vote_epoch = order_vote.ledger_info().epoch(),
-            order_vote_round = order_vote.ledger_info().round(),
-            order_vote_id = order_vote.ledger_info().consensus_block_id(),
-        );
+        fail_point!("consensus::process_order_vote_msg", |_| {
+            Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
+        });
+        info!(self.new_log(LogEvent::ReceiveOrderVote), "{}", order_vote);
 
         let block_id = order_vote.vote_data().proposed().id();
         // Check if the block already had a QC
@@ -1290,8 +1286,9 @@ impl RoundManager {
                             monitor!("process_vote", self.process_vote_msg(*vote_msg).await)
                         },
                         VerifiedEvent::OrderVoteMsg(order_vote) => {
+                            info!("OrderVoteReceived");
                             monitor!(
-                                "order_vote_msg",
+                                "process_order_vote",
                                 self.process_order_vote_msg(*order_vote).await
                             )
                         },
