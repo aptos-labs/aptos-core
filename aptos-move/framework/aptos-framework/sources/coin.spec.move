@@ -159,8 +159,10 @@ spec aptos_framework::coin {
         aborts_if exists<CoinConversionMap>(@aptos_framework) && table::spec_contains(
             map,
             type_info::type_of<CoinType>()
-        ) && (!exists<object::ObjectCore>(table::spec_get(map, type_info::type_of<CoinType>()))
-            || !object::spec_exists_at<fungible_asset::Metadata>(table::spec_get(map, type_info::type_of<CoinType>())));
+        ) && (!exists<object::ObjectCore>(object::object_address(table::spec_get(map, type_info::type_of<CoinType>())))
+            || !object::spec_exists_at<fungible_asset::Metadata>(
+            object::object_address(table::spec_get(map, type_info::type_of<CoinType>()))
+        ));
     }
 
     spec fun get_coin_supply_opt<CoinType>(): Option<OptionalAggregator> {
@@ -171,7 +173,7 @@ spec aptos_framework::coin {
         if (exists<CoinConversionMap>(@aptos_framework)) {
             let map = global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
             if (table::spec_contains(map, type_info::type_of<CoinType>())) {
-                let metadata = object::address_to_object(table::spec_get(map, type_info::type_of<CoinType>()));
+                let metadata = table::spec_get(map, type_info::type_of<CoinType>());
                 option::spec_some(metadata)
             } else {
                 option::spec_none()

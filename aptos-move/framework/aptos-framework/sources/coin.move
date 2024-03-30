@@ -202,7 +202,7 @@ module aptos_framework::coin {
 
     /// The mapping between coin and fungible asset.
     struct CoinConversionMap has key {
-        coin_to_fungible_asset_map: Table<TypeInfo, address>,
+        coin_to_fungible_asset_map: Table<TypeInfo, Object<Metadata>>,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -250,7 +250,7 @@ module aptos_framework::coin {
             let map = &borrow_global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
             let type = type_info::type_of<CoinType>();
             if (table::contains(map, type)) {
-                return option::some(object::address_to_object(*table::borrow(map, type)))
+                return option::some(*table::borrow(map, type))
             }
         };
         option::none()
@@ -278,8 +278,8 @@ module aptos_framework::coin {
             );
             let metadata_object_signer = &object::generate_signer(&metadata_object_cref);
             move_to(metadata_object_signer, PairedCoinType { type });
-            let metadata_addr = object::address_from_constructor_ref(&metadata_object_cref);
-            table::add(&mut map.coin_to_fungible_asset_map, type, metadata_addr);
+            let metadata_obj = object::object_from_constructor_ref(&metadata_object_cref);
+            table::add(&mut map.coin_to_fungible_asset_map, type, metadata_obj);
 
             // Generates all three refs
             let mint_ref = fungible_asset::generate_mint_ref(&metadata_object_cref);
@@ -294,7 +294,7 @@ module aptos_framework::coin {
             );
 
         };
-        object::address_to_object(*table::borrow(&map.coin_to_fungible_asset_map, type))
+        *table::borrow(&map.coin_to_fungible_asset_map, type)
     }
 
     #[view]
