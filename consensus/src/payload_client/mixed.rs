@@ -11,14 +11,13 @@ use crate::{
 };
 use aptos_consensus_types::common::{Payload, PayloadFilter};
 use aptos_logger::debug;
-use aptos_types::{
-    dkg::{DKGTranscript, DKGTranscriptMetadata},
-    on_chain_config::ValidatorTxnConfig,
-    validator_txn::ValidatorTransaction,
-};
+#[cfg(feature = "failpoints")]
+use aptos_types::dkg::{DKGTranscript, DKGTranscriptMetadata};
+use aptos_types::{on_chain_config::ValidatorTxnConfig, validator_txn::ValidatorTransaction};
 use aptos_validator_transaction_pool as vtxn_pool;
 use fail::fail_point;
 use futures::future::BoxFuture;
+#[cfg(feature = "failpoints")]
 use move_core_types::account_address::AccountAddress;
 #[cfg(test)]
 use std::collections::HashSet;

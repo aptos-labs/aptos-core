@@ -20,6 +20,7 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::aptos_channel;
+use aptos_config::config::ReliableBroadcastConfig;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, spawn_named, warn};
@@ -78,16 +79,17 @@ impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
         network_sender: Arc<NetworkSender>,
         db: Arc<dyn RandStorage<D>>,
         bounded_executor: BoundedExecutor,
+        rb_config: &ReliableBroadcastConfig,
     ) -> Self {
-        let rb_backoff_policy = ExponentialBackoff::from_millis(2)
-            .factor(100)
-            .max_delay(Duration::from_secs(10));
+        let rb_backoff_policy = ExponentialBackoff::from_millis(rb_config.backoff_policy_base_ms)
+            .factor(rb_config.backoff_policy_factor)
+            .max_delay(Duration::from_millis(rb_config.backoff_policy_max_delay_ms));
         let reliable_broadcast = Arc::new(ReliableBroadcast::new(
             epoch_state.verifier.get_ordered_account_addresses(),
             network_sender.clone(),
             rb_backoff_policy,
             TimeService::real(),
-            Duration::from_secs(10),
+            Duration::from_millis(rb_config.rpc_timeout_ms),
             bounded_executor,
         ));
         let (decision_tx, decision_rx) = unbounded();
