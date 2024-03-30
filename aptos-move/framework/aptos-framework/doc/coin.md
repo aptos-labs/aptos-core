@@ -29,7 +29,6 @@ This module provides the foundation for typesafe Coins.
 -  [Resource `Ghost$supply`](#0x1_coin_Ghost$supply)
 -  [Resource `Ghost$aggregate_supply`](#0x1_coin_Ghost$aggregate_supply)
 -  [Constants](#@Constants_0)
--  [Function `borrow_conversion_map_mut`](#0x1_coin_borrow_conversion_map_mut)
 -  [Function `paired_metadata`](#0x1_coin_paired_metadata)
 -  [Function `ensure_paired_metadata`](#0x1_coin_ensure_paired_metadata)
 -  [Function `paired_coin`](#0x1_coin_paired_coin)
@@ -45,6 +44,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `paired_burn_ref_exists`](#0x1_coin_paired_burn_ref_exists)
 -  [Function `get_paired_burn_ref`](#0x1_coin_get_paired_burn_ref)
 -  [Function `return_paired_burn_ref`](#0x1_coin_return_paired_burn_ref)
+-  [Function `borrow_paired_burn_ref`](#0x1_coin_borrow_paired_burn_ref)
 -  [Function `initialize_supply_config`](#0x1_coin_initialize_supply_config)
 -  [Function `allow_supply_upgrades`](#0x1_coin_allow_supply_upgrades)
 -  [Function `initialize_aggregatable_coin`](#0x1_coin_initialize_aggregatable_coin)
@@ -641,7 +641,7 @@ The mapping between coin and fungible asset.
 
 <dl>
 <dt>
-<code>coin_to_fungible_asset_map: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>, <b>address</b>&gt;</code>
+<code>coin_to_fungible_asset_map: <a href="../../aptos-stdlib/doc/table.md#0x1_table_Table">table::Table</a>&lt;<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_TypeInfo">type_info::TypeInfo</a>, <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;&gt;</code>
 </dt>
 <dd>
 
@@ -1044,6 +1044,16 @@ CoinStore is frozen. Coins cannot be deposited or withdrawn
 
 
 
+<a id="0x1_coin_EMIGRATION_NOT_ENABLED"></a>
+
+The migration from coin to fungible asset is not enabled yet.
+
+
+<pre><code><b>const</b> <a href="coin.md#0x1_coin_EMIGRATION_NOT_ENABLED">EMIGRATION_NOT_ENABLED</a>: u64 = 26;
+</code></pre>
+
+
+
 <a id="0x1_coin_EMINT_REF_NOT_FOUND"></a>
 
 The MintRef does not exist.
@@ -1132,36 +1142,6 @@ The TransferRefReceipt does not match the TransferRef to be returned.
 
 
 
-<a id="0x1_coin_borrow_conversion_map_mut"></a>
-
-## Function `borrow_conversion_map_mut`
-
-
-
-<pre><code><b>fun</b> <a href="coin.md#0x1_coin_borrow_conversion_map_mut">borrow_conversion_map_mut</a>(): &<b>mut</b> <a href="coin.md#0x1_coin_CoinConversionMap">coin::CoinConversionMap</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_borrow_conversion_map_mut">borrow_conversion_map_mut</a>(): &<b>mut</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
-    <b>if</b> (!<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework) && <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>(
-    )) {
-        <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(@aptos_framework), <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
-            coin_to_fungible_asset_map: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
-        })
-    };
-    <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework)
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x1_coin_paired_metadata"></a>
 
 ## Function `paired_metadata`
@@ -1184,7 +1164,7 @@ Get the paired fungible asset metadata object of a coin type. If not exist, retu
         <b>let</b> map = &<b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework).coin_to_fungible_asset_map;
         <b>let</b> type = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;();
         <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(map, type)) {
-            <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="object.md#0x1_object_address_to_object">object::address_to_object</a>(*<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(map, type)))
+            <b>return</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(map, type))
         }
     };
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -1212,7 +1192,16 @@ Get the paired fungible asset metadata object of a coin type, create if not exis
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_ensure_paired_metadata">ensure_paired_metadata</a>&lt;CoinType&gt;(): Object&lt;Metadata&gt; <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a> {
-    <b>let</b> map = <a href="coin.md#0x1_coin_borrow_conversion_map_mut">borrow_conversion_map_mut</a>();
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_coin_to_fungible_asset_migration_feature_enabled">features::coin_to_fungible_asset_migration_feature_enabled</a>(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="coin.md#0x1_coin_EMIGRATION_NOT_ENABLED">EMIGRATION_NOT_ENABLED</a>)
+    );
+    <b>if</b> (!<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework)) {
+        <b>move_to</b>(&<a href="create_signer.md#0x1_create_signer_create_signer">create_signer::create_signer</a>(@aptos_framework), <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
+            coin_to_fungible_asset_map: <a href="../../aptos-stdlib/doc/table.md#0x1_table_new">table::new</a>(),
+        })
+    };
+    <b>let</b> map = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework);
     <b>let</b> type = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;();
     <b>if</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_contains">table::contains</a>(&map.coin_to_fungible_asset_map, type)) {
         <b>let</b> metadata_object_cref =
@@ -1232,8 +1221,8 @@ Get the paired fungible asset metadata object of a coin type, create if not exis
         );
         <b>let</b> metadata_object_signer = &<a href="object.md#0x1_object_generate_signer">object::generate_signer</a>(&metadata_object_cref);
         <b>move_to</b>(metadata_object_signer, <a href="coin.md#0x1_coin_PairedCoinType">PairedCoinType</a> { type });
-        <b>let</b> metadata_addr = <a href="object.md#0x1_object_address_from_constructor_ref">object::address_from_constructor_ref</a>(&metadata_object_cref);
-        <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(&<b>mut</b> map.coin_to_fungible_asset_map, type, metadata_addr);
+        <b>let</b> metadata_obj = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>(&metadata_object_cref);
+        <a href="../../aptos-stdlib/doc/table.md#0x1_table_add">table::add</a>(&<b>mut</b> map.coin_to_fungible_asset_map, type, metadata_obj);
 
         // Generates all three refs
         <b>let</b> mint_ref = <a href="fungible_asset.md#0x1_fungible_asset_generate_mint_ref">fungible_asset::generate_mint_ref</a>(&metadata_object_cref);
@@ -1248,7 +1237,7 @@ Get the paired fungible asset metadata object of a coin type, create if not exis
         );
 
     };
-    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>(*<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&map.coin_to_fungible_asset_map, type))
+    *<a href="../../aptos-stdlib/doc/table.md#0x1_table_borrow">table::borrow</a>(&map.coin_to_fungible_asset_map, type)
 }
 </code></pre>
 
@@ -1665,6 +1654,37 @@ Return the <code>BurnRef</code> with the hot potato receipt.
 
 </details>
 
+<a id="0x1_coin_borrow_paired_burn_ref"></a>
+
+## Function `borrow_paired_burn_ref`
+
+
+
+<pre><code><b>fun</b> <a href="coin.md#0x1_coin_borrow_paired_burn_ref">borrow_paired_burn_ref</a>&lt;CoinType&gt;(_: &<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;): &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>inline <b>fun</b> <a href="coin.md#0x1_coin_borrow_paired_burn_ref">borrow_paired_burn_ref</a>&lt;CoinType&gt;(
+    _: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;
+): &BurnRef <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a> {
+    <b>let</b> metadata = <a href="coin.md#0x1_coin_assert_paired_metadata_exists">assert_paired_metadata_exists</a>&lt;CoinType&gt;();
+    <b>let</b> metadata_addr = object_address(&metadata);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a>&gt;(metadata_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_internal">error::internal</a>(<a href="coin.md#0x1_coin_EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND">EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND</a>));
+    <b>let</b> burn_ref_opt = &<b>mut</b> <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a>&gt;(metadata_addr).burn_ref_opt;
+    <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(burn_ref_opt), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="coin.md#0x1_coin_EBURN_REF_NOT_FOUND">EBURN_REF_NOT_FOUND</a>));
+    <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(burn_ref_opt)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_coin_initialize_supply_config"></a>
 
 ## Function `initialize_supply_config`
@@ -1972,8 +1992,8 @@ Collects a specified amount of coin form an account into aggregatable coin.
                 deleted_withdraw_event_handle_creation_number: <a href="guid.md#0x1_guid_creation_num">guid::creation_num</a>(<a href="event.md#0x1_event_guid">event::guid</a>(&withdraw_events))
             }
         );
-        <a href="event.md#0x1_event_destory_handle">event::destory_handle</a>(deposit_events);
-        <a href="event.md#0x1_event_destory_handle">event::destory_handle</a>(withdraw_events);
+        <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(deposit_events);
+        <a href="event.md#0x1_event_destroy_handle">event::destroy_handle</a>(withdraw_events);
         <a href="fungible_asset.md#0x1_fungible_asset_deposit">fungible_asset::deposit</a>(store, <a href="coin.md#0x1_coin_coin_to_fungible_asset">coin_to_fungible_asset</a>(<a href="coin.md#0x1_coin">coin</a>));
         // Note:
         // It is possible the primary fungible store may already exist before this function call.
@@ -2392,7 +2412,7 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
     account_addr: <b>address</b>,
     amount: u64,
     burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;,
-) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a> {
+) <b>acquires</b> <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a> {
     // Skip burning <b>if</b> amount is zero. This shouldn't <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a> out <b>as</b> it's called <b>as</b> part of transaction fee burning.
     <b>if</b> (amount == 0) {
         <b>return</b>
@@ -2408,12 +2428,11 @@ Note: This bypasses CoinStore::frozen -- coins within a frozen CoinStore can be 
         <a href="coin.md#0x1_coin_burn">burn</a>(coin_to_burn, burn_cap);
     };
     <b>if</b> (fa_amount_to_burn &gt; 0) {
-        <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(
-            account_addr,
-            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;())
+        <a href="fungible_asset.md#0x1_fungible_asset_burn_from">fungible_asset::burn_from</a>(
+            <a href="coin.md#0x1_coin_borrow_paired_burn_ref">borrow_paired_burn_ref</a>(burn_cap),
+            <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store">primary_fungible_store::primary_store</a>(account_addr, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;())),
+            fa_amount_to_burn
         );
-        <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_withdraw_internal">fungible_asset::withdraw_internal</a>(store_addr, fa_amount_to_burn);
-        <a href="fungible_asset.md#0x1_fungible_asset_burn_internal">fungible_asset::burn_internal</a>(fa);
     };
 }
 </code></pre>
@@ -3745,8 +3764,10 @@ Get address by reflection.
 <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework) && <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(
     map,
     <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;()
-) && (!<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;()))
-    || !<a href="object.md#0x1_object_spec_exists_at">object::spec_exists_at</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;())));
+) && (!<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(<a href="object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;())))
+    || !<a href="object.md#0x1_object_spec_exists_at">object::spec_exists_at</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;(
+    <a href="object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;()))
+));
 </code></pre>
 
 
@@ -3770,7 +3791,7 @@ Get address by reflection.
    <b>if</b> (<b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework)) {
        <b>let</b> map = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework).coin_to_fungible_asset_map;
        <b>if</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;())) {
-           <b>let</b> metadata = <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;()));
+           <b>let</b> metadata = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;());
            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(metadata)
        } <b>else</b> {
            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>()

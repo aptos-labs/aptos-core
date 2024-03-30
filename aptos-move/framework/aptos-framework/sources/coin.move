@@ -97,6 +97,9 @@ module aptos_framework::coin {
 
     /// The BurnRef does not exist.
     const EBURN_REF_NOT_FOUND: u64 = 25;
+
+    /// The migration from coin to fungible asset is not enabled yet.
+    const EMIGRATION_NOT_ENABLED: u64 = 26;
     //
     // Constants
     //
@@ -202,7 +205,7 @@ module aptos_framework::coin {
 
     /// The mapping between coin and fungible asset.
     struct CoinConversionMap has key {
-        coin_to_fungible_asset_map: Table<TypeInfo, address>,
+        coin_to_fungible_asset_map: Table<TypeInfo, Object<Metadata>>,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -234,16 +237,6 @@ module aptos_framework::coin {
         metadata: Object<Metadata>,
     }
 
-    inline fun borrow_conversion_map_mut(): &mut CoinConversionMap {
-        if (!exists<CoinConversionMap>(@aptos_framework) && features::coin_to_fungible_asset_migration_feature_enabled(
-        )) {
-            move_to(&create_signer::create_signer(@aptos_framework), CoinConversionMap {
-                coin_to_fungible_asset_map: table::new(),
-            })
-        };
-        borrow_global_mut<CoinConversionMap>(@aptos_framework)
-    }
-
     #[view]
     /// Get the paired fungible asset metadata object of a coin type. If not exist, return option::none().
     public fun paired_metadata<CoinType>(): Option<Object<Metadata>> acquires CoinConversionMap {
@@ -251,7 +244,7 @@ module aptos_framework::coin {
             let map = &borrow_global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
             let type = type_info::type_of<CoinType>();
             if (table::contains(map, type)) {
-                return option::some(object::address_to_object(*table::borrow(map, type)))
+                return option::some(*table::borrow(map, type))
             }
         };
         option::none()
@@ -259,7 +252,16 @@ module aptos_framework::coin {
 
     /// Get the paired fungible asset metadata object of a coin type, create if not exist.
     public(friend) fun ensure_paired_metadata<CoinType>(): Object<Metadata> acquires CoinConversionMap, CoinInfo {
-        let map = borrow_conversion_map_mut();
+        assert!(
+            features::coin_to_fungible_asset_migration_feature_enabled(),
+            error::invalid_state(EMIGRATION_NOT_ENABLED)
+        );
+        if (!exists<CoinConversionMap>(@aptos_framework)) {
+            move_to(&create_signer::create_signer(@aptos_framework), CoinConversionMap {
+                coin_to_fungible_asset_map: table::new(),
+            })
+        };
+        let map = borrow_global_mut<CoinConversionMap>(@aptos_framework);
         let type = type_info::type_of<CoinType>();
         if (!table::contains(&map.coin_to_fungible_asset_map, type)) {
             let metadata_object_cref =
@@ -279,8 +281,8 @@ module aptos_framework::coin {
             );
             let metadata_object_signer = &object::generate_signer(&metadata_object_cref);
             move_to(metadata_object_signer, PairedCoinType { type });
-            let metadata_addr = object::address_from_constructor_ref(&metadata_object_cref);
-            table::add(&mut map.coin_to_fungible_asset_map, type, metadata_addr);
+            let metadata_obj = object::object_from_constructor_ref(&metadata_object_cref);
+            table::add(&mut map.coin_to_fungible_asset_map, type, metadata_obj);
 
             // Generates all three refs
             let mint_ref = fungible_asset::generate_mint_ref(&metadata_object_cref);
@@ -295,7 +297,7 @@ module aptos_framework::coin {
             );
 
         };
-        object::address_to_object(*table::borrow(&map.coin_to_fungible_asset_map, type))
+        *table::borrow(&map.coin_to_fungible_asset_map, type)
     }
 
     #[view]
@@ -447,6 +449,17 @@ module aptos_framework::coin {
         option::fill(burn_ref_opt, burn_ref);
     }
 
+    inline fun borrow_paired_burn_ref<CoinType>(
+        _: &BurnCapability<CoinType>
+    ): &BurnRef acquires CoinConversionMap, PairedFungibleAssetRefs {
+        let metadata = assert_paired_metadata_exists<CoinType>();
+        let metadata_addr = object_address(&metadata);
+        assert!(exists<PairedFungibleAssetRefs>(metadata_addr), error::internal(EPAIRED_FUNGIBLE_ASSET_REFS_NOT_FOUND));
+        let burn_ref_opt = &mut borrow_global_mut<PairedFungibleAssetRefs>(metadata_addr).burn_ref_opt;
+        assert!(option::is_some(burn_ref_opt), error::not_found(EBURN_REF_NOT_FOUND));
+        option::borrow(burn_ref_opt)
+    }
+
     //
     // Total supply config
     //
@@ -587,8 +600,8 @@ module aptos_framework::coin {
                     deleted_withdraw_event_handle_creation_number: guid::creation_num(event::guid(&withdraw_events))
                 }
             );
-            event::destory_handle(deposit_events);
-            event::destory_handle(withdraw_events);
+            event::destroy_handle(deposit_events);
+            event::destroy_handle(withdraw_events);
             fungible_asset::deposit(store, coin_to_fungible_asset(coin));
             // Note:
             // It is possible the primary fungible store may already exist before this function call.
@@ -734,7 +747,7 @@ module aptos_framework::coin {
         account_addr: address,
         amount: u64,
         burn_cap: &BurnCapability<CoinType>,
-    ) acquires CoinInfo, CoinStore, CoinConversionMap {
+    ) acquires CoinInfo, CoinStore, CoinConversionMap, PairedFungibleAssetRefs {
         // Skip burning if amount is zero. This shouldn't error out as it's called as part of transaction fee burning.
         if (amount == 0) {
             return
@@ -750,12 +763,11 @@ module aptos_framework::coin {
             burn(coin_to_burn, burn_cap);
         };
         if (fa_amount_to_burn > 0) {
-            let store_addr = primary_fungible_store::primary_store_address(
-                account_addr,
-                option::destroy_some(paired_metadata<CoinType>())
+            fungible_asset::burn_from(
+                borrow_paired_burn_ref(burn_cap),
+                primary_fungible_store::primary_store(account_addr, option::destroy_some(paired_metadata<CoinType>())),
+                fa_amount_to_burn
             );
-            let fa = fungible_asset::withdraw_internal(store_addr, fa_amount_to_burn);
-            fungible_asset::burn_internal(fa);
         };
     }
 
