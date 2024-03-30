@@ -138,7 +138,7 @@ impl Processor {
                 }
             }
 
-            info!(
+            tracing::info!(
                 batch_start_version = batch_start_version,
                 cache_worker_latest = cache_worker_latest,
                 batches = ?batches,
