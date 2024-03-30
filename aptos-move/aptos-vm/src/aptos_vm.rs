@@ -2482,23 +2482,19 @@ impl VMValidator for AptosVM {
 
         let resolver = self.as_move_resolver(&state_view);
         let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data));
-        let gas_meter =
-            match self.make_standard_gas_meter(txn.max_gas_amount().into(), &log_context) {
-                Ok(gas_meter) => gas_meter,
-                Err(_) => {
-                    return VMValidatorResult::error(StatusCode::UNKNOWN_VALIDATION_STATUS);
-                    //TODO: what's a better code?
-                },
-            };
+        let required_deposit = if let Ok(gas_params) = &self.gas_params {
+            self.get_required_deposit(
+                &mut session,
+                &resolver,
+                &gas_params.vm.txn,
+                &txn_data,
+                txn.payload(),
+            )
+        } else {
+            return VMValidatorResult::error(StatusCode::UNKNOWN_VALIDATION_STATUS);
+        };
 
         // Increment the counter for transactions verified.
-        let required_deposit = self.get_required_deposit(
-            &mut session,
-            &resolver,
-            &gas_meter.vm_gas_params().txn,
-            &txn_data,
-            txn.payload(),
-        );
         txn_data.set_required_deposit(required_deposit);
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
