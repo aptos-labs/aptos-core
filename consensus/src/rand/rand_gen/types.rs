@@ -566,15 +566,15 @@ impl CertifiedAugDataAck {
 
 #[derive(Clone)]
 pub struct RandConfig {
-    pub author: Author,
-    pub epoch: u64,
-    pub validator: ValidatorVerifier,
+    author: Author,
+    epoch: u64,
+    validator: ValidatorVerifier,
     // public parameters of the weighted VUF
-    pub vuf_pp: WvufPP,
+    vuf_pp: WvufPP,
     // key shares for weighted VUF
-    pub keys: Arc<RandKeys>,
+    keys: Arc<RandKeys>,
     // weighted config for weighted VUF
-    pub wconfig: WeightedConfig,
+    wconfig: WeightedConfig,
 }
 
 impl Debug for RandConfig {

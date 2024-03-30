@@ -1,17 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::rand::rand_gen::{
-    network_messages::RandMessage,
-    rand_store::RandStore,
-    types::{
-        AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, PathType, RandConfig,
-        RandShare, RequestShare, TAugmentedData, TShare,
+use crate::{
+    logging::{LogEvent, LogSchema},
+    rand::rand_gen::{
+        network_messages::RandMessage,
+        rand_store::RandStore,
+        types::{
+            AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, PathType, RandConfig,
+            RandShare, RequestShare, TAugmentedData, TShare,
+        },
     },
 };
 use anyhow::ensure;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
+use aptos_logger::info;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     aggregate_signature::PartialSignatures, epoch_state::EpochState, randomness::RandMetadata,
@@ -133,6 +137,10 @@ impl<S: TShare, D: TAugmentedData> BroadcastStatus<RandMessage<S, D>, RandMessag
             share.metadata()
         );
         share.verify(&self.rand_config)?;
+        info!(LogSchema::new(LogEvent::ReceiveReactiveRandShare)
+            .epoch(share.epoch())
+            .round(share.metadata().round())
+            .remote_peer(*share.author()));
         let mut store = self.rand_store.lock();
         let aggregated = if store.add_share(share, PathType::Slow)? {
             Some(())
