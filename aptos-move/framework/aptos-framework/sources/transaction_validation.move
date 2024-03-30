@@ -48,7 +48,7 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_ESEQUENCE_NUMBER_TOO_BIG: u64 = 1008;
     const PROLOGUE_ESECONDARY_KEYS_ADDRESSES_COUNT_MISMATCH: u64 = 1009;
     const PROLOGUE_EFEE_PAYER_NOT_ENABLED: u64 = 1010;
-
+    const PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT: u64 = 1011;
 
     /// Only called during genesis to initialize system resources for this module.
     public(friend) fun initialize(
@@ -73,29 +73,6 @@ module aptos_framework::transaction_validation {
     }
 
     fun prologue_common(
-        sender: signer,
-        gas_payer: address,
-        txn_sequence_number: u64,
-        txn_authentication_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) {
-        prologue_common_v2(
-            sender,
-            gas_payer,
-            txn_sequence_number,
-            txn_authentication_key,
-            txn_gas_price,
-            txn_max_gas_units,
-            txn_expiration_time,
-            chain_id,
-            option::none(),
-        )
-    }
-
-    fun prologue_common_v2(
         sender: signer,
         gas_payer: address,
         txn_sequence_number: u64,
@@ -164,7 +141,9 @@ module aptos_framework::transaction_validation {
         assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
 
         if (option::is_some(&required_deposit)) {
-            transaction_fee::burn_fee(gas_payer, option::extract(&mut required_deposit));
+            let required_deposit = *option::borrow(&mut required_deposit);
+            assert!(balance >= required_deposit, error::invalid_state(PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT));
+            transaction_fee::burn_fee(gas_payer, required_deposit);
         }
     }
 
@@ -203,7 +182,7 @@ module aptos_framework::transaction_validation {
         required_deposit: Option<u64>,
     ) {
         let gas_payer = signer::address_of(&sender);
-        prologue_common_v2(
+        prologue_common(
             sender,
             gas_payer,
             txn_sequence_number,
@@ -237,6 +216,7 @@ module aptos_framework::transaction_validation {
             txn_max_gas_units,
             txn_expiration_time,
             chain_id,
+            option::none(),
         );
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes);
     }
@@ -318,7 +298,7 @@ module aptos_framework::transaction_validation {
         required_deposit: Option<u64>,
     ) {
         assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
-        prologue_common_v2(
+        prologue_common(
             sender,
             fee_payer_address,
             txn_sequence_number,

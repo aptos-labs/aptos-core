@@ -9,7 +9,6 @@
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_transaction_validation_initialize)
 -  [Function `prologue_common`](#0x1_transaction_validation_prologue_common)
--  [Function `prologue_common_v2`](#0x1_transaction_validation_prologue_common_v2)
 -  [Function `script_prologue`](#0x1_transaction_validation_script_prologue)
 -  [Function `script_prologue_v2`](#0x1_transaction_validation_script_prologue_v2)
 -  [Function `multi_agent_script_prologue`](#0x1_transaction_validation_multi_agent_script_prologue)
@@ -25,7 +24,6 @@
     -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `prologue_common`](#@Specification_1_prologue_common)
-    -  [Function `prologue_common_v2`](#@Specification_1_prologue_common_v2)
     -  [Function `script_prologue`](#@Specification_1_script_prologue)
     -  [Function `script_prologue_v2`](#@Specification_1_script_prologue_v2)
     -  [Function `multi_agent_script_prologue`](#@Specification_1_multi_agent_script_prologue)
@@ -171,6 +169,15 @@ Transaction exceeded its allocated max gas
 
 
 
+<a id="0x1_transaction_validation_PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT"></a>
+
+
+
+<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT">PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT</a>: u64 = 1011;
+</code></pre>
+
+
+
 <a id="0x1_transaction_validation_PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY"></a>
 
 Prologue errors. These are separated out from the other errors in this
@@ -276,7 +283,7 @@ Only called during genesis to initialize system resources for this module.
 
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, txn_sequence_number: u64, txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, txn_sequence_number: u64, txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, required_deposit: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -286,49 +293,6 @@ Only called during genesis to initialize system resources for this module.
 
 
 <pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
-    sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    gas_payer: <b>address</b>,
-    txn_sequence_number: u64,
-    txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    txn_expiration_time: u64,
-    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
-) {
-    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common_v2">prologue_common_v2</a>(
-        sender,
-        gas_payer,
-        txn_sequence_number,
-        txn_authentication_key,
-        txn_gas_price,
-        txn_max_gas_units,
-        txn_expiration_time,
-        <a href="chain_id.md#0x1_chain_id">chain_id</a>,
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-    )
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_transaction_validation_prologue_common_v2"></a>
-
-## Function `prologue_common_v2`
-
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common_v2">prologue_common_v2</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, txn_sequence_number: u64, txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, required_deposit: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common_v2">prologue_common_v2</a>(
     sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     gas_payer: <b>address</b>,
     txn_sequence_number: u64,
@@ -397,7 +361,9 @@ Only called during genesis to initialize system resources for this module.
     <b>assert</b>!(balance &gt;= max_transaction_fee, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>));
 
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&required_deposit)) {
-        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> required_deposit));
+        <b>let</b> required_deposit = *<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&<b>mut</b> required_deposit);
+        <b>assert</b>!(balance &gt;= required_deposit, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT">PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT</a>));
+        <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, required_deposit);
     }
 }
 </code></pre>
@@ -476,7 +442,7 @@ Only called during genesis to initialize system resources for this module.
     required_deposit: Option&lt;u64&gt;,
 ) {
     <b>let</b> gas_payer = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
-    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common_v2">prologue_common_v2</a>(
+    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         gas_payer,
         txn_sequence_number,
@@ -530,6 +496,7 @@ Only called during genesis to initialize system resources for this module.
         txn_max_gas_units,
         txn_expiration_time,
         <a href="chain_id.md#0x1_chain_id">chain_id</a>,
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
     );
     <a href="transaction_validation.md#0x1_transaction_validation_multi_agent_common_prologue">multi_agent_common_prologue</a>(secondary_signer_addresses, secondary_signer_public_key_hashes);
 }
@@ -671,7 +638,7 @@ Only called during genesis to initialize system resources for this module.
     required_deposit: Option&lt;u64&gt;,
 ) {
     <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_fee_payer_enabled">features::fee_payer_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_EFEE_PAYER_NOT_ENABLED">PROLOGUE_EFEE_PAYER_NOT_ENABLED</a>));
-    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common_v2">prologue_common_v2</a>(
+    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(
         sender,
         fee_payer_address,
         txn_sequence_number,
@@ -929,7 +896,7 @@ Called by the Adapter
 
 
 <pre><code><b>pragma</b> verify = <b>true</b>;
-<b>pragma</b> aborts_if_is_strict;
+<b>pragma</b> aborts_if_is_partial;
 </code></pre>
 
 
@@ -970,6 +937,7 @@ Give some constraints that may abort according to the conditions.
     txn_max_gas_units: u64;
     txn_expiration_time: u64;
     <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8;
+    required_deposit: Option&lt;u64&gt;;
     <b>aborts_if</b> !<b>exists</b>&lt;CurrentTimeMicroseconds&gt;(@aptos_framework);
     <b>aborts_if</b> !(<a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() &lt; txn_expiration_time);
     <b>aborts_if</b> !<b>exists</b>&lt;ChainId&gt;(@aptos_framework);
@@ -1007,23 +975,7 @@ Give some constraints that may abort according to the conditions.
 ### Function `prologue_common`
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, txn_sequence_number: u64, txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
-</code></pre>
-
-
-
-
-<pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a>;
-</code></pre>
-
-
-
-<a id="@Specification_1_prologue_common_v2"></a>
-
-### Function `prologue_common_v2`
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common_v2">prologue_common_v2</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, txn_sequence_number: u64, txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, required_deposit: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, gas_payer: <b>address</b>, txn_sequence_number: u64, txn_authentication_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8, required_deposit: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -1047,7 +999,8 @@ Give some constraints that may abort according to the conditions.
 
 <pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
     gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender),
-    txn_authentication_key: txn_public_key
+    txn_authentication_key: txn_public_key,
+    required_deposit: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
 };
 </code></pre>
 
@@ -1114,6 +1067,7 @@ not equal the number of singers.
     gas_payer,
     txn_sequence_number,
     txn_authentication_key: txn_sender_public_key,
+    required_deposit: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
 };
 <b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf">MultiAgentPrologueCommonAbortsIf</a> {
     secondary_signer_addresses,
@@ -1160,6 +1114,7 @@ not equal the number of singers.
     gas_payer,
     txn_sequence_number,
     txn_authentication_key: txn_sender_public_key,
+    required_deposit: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
 };
 <b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_MultiAgentPrologueCommonAbortsIf">MultiAgentPrologueCommonAbortsIf</a> {
     secondary_signer_addresses,
