@@ -2325,20 +2325,19 @@ impl AptosVM {
                 let has_randomness_attr =
                     has_randomness_attribute(resolver, session, entry_func).unwrap_or(false);
                 if self.randomness_enabled && has_randomness_attr {
-                    //TODO: reuse existing constants.
-                    //TODO: handle overflows.
-                    let internal_gas_per_gas = 1000;
-                    let max_execution_io_gas = Gas::from(
-                        (u64::from(txn_gas_params.max_execution_gas + txn_gas_params.max_io_gas)
-                            + internal_gas_per_gas
-                            - 1)
-                            / internal_gas_per_gas,
+                    let internal_gas_per_gas = u64::from(txn_gas_params.scaling_factor());
+                    let max_execution_gas = Gas::from(
+                        u64::from(txn_gas_params.max_execution_gas).div_ceil(internal_gas_per_gas),
                     );
-                    let y0 = u64::from(txn_gas_params.min_price_per_gas_unit);
-                    let y1 = u64::from(txn_gas_params.max_storage_fee);
-                    let max_storage_gas: Gas = Gas::new((y1 + y0 - 1) / y0);
+                    let max_io_gas = Gas::from(
+                        u64::from(txn_gas_params.max_io_gas).div_ceil(internal_gas_per_gas),
+                    );
+                    let max_storage_gas = Gas::new(
+                        u64::from(txn_gas_params.max_storage_fee)
+                            .div_ceil(u64::from(txn_gas_params.min_price_per_gas_unit)),
+                    );
                     let required_gas_deposit = min(
-                        max_execution_io_gas + max_storage_gas,
+                        max_execution_gas + max_io_gas + max_storage_gas,
                         txn_gas_params.maximum_number_of_gas_units,
                     );
                     let required_fee_deposit =
