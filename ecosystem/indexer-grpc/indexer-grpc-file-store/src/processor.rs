@@ -183,7 +183,9 @@ impl Processor {
                         Some(FILE_ENTRY_TRANSACTION_COUNT as i64),
                         None,
                     );
-
+                    for (i, txn) in transactions.iter().enumerate() {
+                        assert_eq!(txn.version, start_version + i as u64);
+                    }
                     let upload_start_time = std::time::Instant::now();
                     let (start, end) = file_store_operator_clone
                         .upload_transaction_batch(chain_id, transactions)
