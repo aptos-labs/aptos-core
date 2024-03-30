@@ -18,13 +18,13 @@ fun m::test($t0: u64): u64 {
 
 
 Diagnostics:
-error: cannot write to reference in local `a` which is still borrowed
+error: cannot write local `a` since other mutable usages for this reference exist
   ┌─ tests/copy-propagation/mut_refs_3.move:7:9
   │
 7 │         *a = 0;
   │         ^^^^^^ written here
 8 │         *c
-  │         -- conflicting reference `c` used here
+  │         -- used here
 
 ============ after DeadStoreElimination: ================
 

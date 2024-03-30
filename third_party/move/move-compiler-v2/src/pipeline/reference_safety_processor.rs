@@ -1538,61 +1538,16 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             }
             // Handle case (b): check whether there is any alive mutable reference
             // which overlaps with the frozen reference.
-            for (temp, other_label) in self.state.temp_to_label_map.iter() {
-                if temp == &src || !self.ty(*temp).is_mutable_reference() {
-                    continue;
-                }
-                if other_label == label {
-                    // Compute all visible usages at leaves to show the conflict.
-                    // It is not enough to just show the usage of `temp`, because the
-                    // actual usage might be something derived from it, and `temp`
-                    // is not longer used.
-                    let leaves = self.state.leaves();
-                    let mut show: BTreeSet<(bool, Loc)> = BTreeSet::new();
-                    let mut todo = vec![*other_label];
-                    while let Some(l) = todo.pop() {
-                        if let Some(temps) = leaves.get(&l) {
-                            show.extend(
-                                temps
-                                    .iter()
-                                    .map(|t| {
-                                        self.alive
-                                            .after
-                                            .get(t)
-                                            .map(|i| {
-                                                i.usage_locations()
-                                                    .iter()
-                                                    .map(|l| (true, l.clone()))
-                                                    .collect::<BTreeSet<_>>()
-                                            })
-                                            .unwrap_or_default()
-                                    })
-                                    .concat(),
-                            )
-                        } else {
-                            for e in self.state.children(&l) {
-                                show.insert((false, e.loc.clone()));
-                                todo.push(e.target)
-                            }
-                        }
-                    }
-                    self.error_with_hints(
-                        self.cur_loc(),
-                        format!(
-                            "cannot {}freeze {} since other mutable usages for this reference exist",
-                            qualifier,
-                            self.display(src),
-                        ),
-                        format!("{}frozen here", qualifier),
-                        show.into_iter().map(|(is_leaf, loc)| {
-                            (
-                                loc,
-                                if is_leaf { "used here" } else { "derived here" }.to_string(),
-                            )
-                        }),
-                    )
-                }
-            }
+            self.check_overlapping_mutable_refs(
+                src,
+                label,
+                format!(
+                    "cannot {}freeze {} since other mutable usages for this reference exist",
+                    qualifier,
+                    self.display(src),
+                ),
+                format!("{}frozen here", qualifier),
+            );
         }
     }
 
@@ -1661,28 +1616,81 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         self.check_read_local(src, ReadMode::Argument);
     }
 
+    /// Check whether there is any alive mutable reference
+    /// which overlaps with the reference `target_temp`
+    fn check_overlapping_mutable_refs(
+        &self,
+        target_temp: TempIndex,
+        label: &LifetimeLabel,
+        msg: String,
+        primary: String,
+    ) {
+        for (temp, other_label) in self.state.temp_to_label_map.iter() {
+            if temp == &target_temp || !self.ty(*temp).is_mutable_reference() {
+                continue;
+            }
+            if other_label == label {
+                // Compute all visible usages at leaves to show the conflict.
+                // It is not enough to just show the usage of `temp`, because the
+                // actual usage might be something derived from it, and `temp`
+                // is not longer used.
+                let leaves = self.state.leaves();
+                let mut show: BTreeSet<(bool, Loc)> = BTreeSet::new();
+                let mut todo = vec![*other_label];
+                while let Some(l) = todo.pop() {
+                    if let Some(temps) = leaves.get(&l) {
+                        show.extend(
+                            temps
+                                .iter()
+                                .map(|t| {
+                                    self.alive
+                                        .after
+                                        .get(t)
+                                        .map(|i| {
+                                            i.usage_locations()
+                                                .iter()
+                                                .map(|l| (true, l.clone()))
+                                                .collect::<BTreeSet<_>>()
+                                        })
+                                        .unwrap_or_default()
+                                })
+                                .concat(),
+                        )
+                    } else {
+                        for e in self.state.children(&l) {
+                            show.insert((false, e.loc.clone()));
+                            todo.push(e.target)
+                        }
+                    }
+                }
+                self.error_with_hints(
+                    self.cur_loc(),
+                    msg.clone(),
+                    primary.clone(),
+                    show.into_iter().map(|(is_leaf, loc)| {
+                        (
+                            loc,
+                            if is_leaf { "used here" } else { "derived here" }.to_string(),
+                        )
+                    }),
+                )
+            }
+        }
+    }
+
     /// Process a WriteRef instruction.
     fn write_ref(&mut self, dest: TempIndex, src: TempIndex) {
         self.check_read_local(src, ReadMode::Argument);
-        if let Some(lbl) = self.state.label_for_temp(dest) {
-            if self.state.leaves().get(lbl).is_some() {
-                for temp in self.state.leaves().get(lbl).unwrap() {
-                    if *temp != dest && self.ty(*temp).is_mutable_reference() {
-                        let usage_info = || self.usage_info(lbl, |t| t != &dest);
-                        self.error_with_hints(
-                            self.cur_loc(),
-                            format!(
-                                "cannot write to reference in {} which is still borrowed",
-                                self.display(dest)
-                            ),
-                            "written here",
-                            self.borrow_info(lbl, |_| true)
-                                .into_iter()
-                                .chain(usage_info()),
-                        )
-                    }
-                }
-            }
+        if let Some(label) = self.state.label_for_temp(dest) {
+            self.check_overlapping_mutable_refs(
+                dest,
+                label,
+                format!(
+                    "cannot write {} since other mutable usages for this reference exist",
+                    self.display(dest),
+                ),
+                "written here".to_string(),
+            );
         }
         if let Some(label) = self.state.label_for_temp_with_children(dest) {
             self.error_with_hints(
