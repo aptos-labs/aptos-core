@@ -138,6 +138,12 @@ impl Processor {
                 }
             }
 
+            info!(
+                batch_start_version = batch_start_version,
+                cache_worker_latest = cache_worker_latest,
+                batches = ?batches,
+                "Filestore processor loop"
+            );
             // we're too close to the head
             if batches.is_empty() {
                 debug!(
@@ -154,6 +160,7 @@ impl Processor {
 
             // Create thread and fetch transactions
             let mut tasks = vec![];
+
             for start_version in batches {
                 let mut cache_operator_clone = self.cache_operator.clone();
                 let mut file_store_operator_clone = self.file_store_operator.clone_box();
