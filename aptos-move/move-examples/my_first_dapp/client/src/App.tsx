@@ -40,9 +40,9 @@ function App() {
       );
       setAccountHasList(true);
       // tasks table handle
-      const tableHandle = (todoListResource as any).data.tasks.handle;
+      const tableHandle = (todoListResource as any).tasks.handle;
       // tasks table counter
-      const taskCounter = (todoListResource as any).data.task_counter;
+      const taskCounter = (todoListResource as any).task_counter;
 
       let tasks = [];
       let counter = 1;
