@@ -569,7 +569,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             trans.builtin_qualified_symbol("freeze"),
             SpecOrBuiltinFunEntry {
                 loc: loc.clone(),
-                oper: Operation::Freeze,
+                oper: Operation::Freeze(true),
                 type_params: vec![param_t_decl.clone()],
                 type_param_constraints: BTreeMap::default(),
                 params: vec![mk_param(trans, 1, mut_ref_param_t)],

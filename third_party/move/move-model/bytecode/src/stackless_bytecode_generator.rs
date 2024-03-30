@@ -352,7 +352,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         self.local_types
                             .push(Type::Reference(ReferenceKind::Immutable, signature));
                         self.code.push(mk_call(
-                            Operation::FreezeRef,
+                            Operation::FreezeRef(true),
                             vec![immutable_ref_index],
                             vec![mutable_ref_index],
                         ));

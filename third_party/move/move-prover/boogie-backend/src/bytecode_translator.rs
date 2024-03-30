@@ -1119,7 +1119,7 @@ impl<'env> FunctionTranslator<'env> {
             Call(_, dests, oper, srcs, aa) => {
                 use Operation::*;
                 match oper {
-                    FreezeRef => unreachable!(),
+                    FreezeRef(_) => unreachable!(),
                     UnpackRef | UnpackRefDeep | PackRef | PackRefDeep => {
                         // No effect
                     },

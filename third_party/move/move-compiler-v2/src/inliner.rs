@@ -907,7 +907,11 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
                             let new_node = env.new_node(exp_loc, new_type.clone());
                             let new_exp_vec: Vec<Exp> = vec![exp.clone()];
                             (
-                                Exp::from(ExpData::Call(new_node, Operation::Freeze, new_exp_vec)),
+                                Exp::from(ExpData::Call(
+                                    new_node,
+                                    Operation::Freeze(false),
+                                    new_exp_vec,
+                                )),
                                 new_type,
                             )
                         } else {

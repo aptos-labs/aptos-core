@@ -577,7 +577,9 @@ impl<'env> Generator<'env> {
     fn gen_call(&mut self, targets: Vec<TempIndex>, id: NodeId, op: &Operation, args: &[Exp]) {
         match op {
             Operation::Vector => self.gen_op_call(targets, id, BytecodeOperation::Vector, args),
-            Operation::Freeze => self.gen_op_call(targets, id, BytecodeOperation::FreezeRef, args),
+            Operation::Freeze(explicit) => {
+                self.gen_op_call(targets, id, BytecodeOperation::FreezeRef(*explicit), args)
+            },
             Operation::Tuple => {
                 if targets.len() != args.len() {
                     self.internal_error(
@@ -911,7 +913,7 @@ impl<'env> Generator<'env> {
                 .new_node(self.env().get_node_loc(id), expected_ty.clone());
             self.env()
                 .set_node_instantiation(freeze_id, vec![et.as_ref().clone()]);
-            ExpData::Call(freeze_id, Operation::Freeze, vec![exp.clone()]).into_exp()
+            ExpData::Call(freeze_id, Operation::Freeze(false), vec![exp.clone()]).into_exp()
         } else {
             exp.clone()
         }
