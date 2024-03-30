@@ -1,0 +1,18 @@
+
+Diagnostics:
+error: cannot write to reference in local `a` which is still borrowed
+  ┌─ tests/reference-safety/debug_12301.move:6:9
+  │
+6 │         *a = 0;
+  │         ^^^^^^ written here
+7 │         *c
+  │         -- conflicting reference `c` used here
+
+error: cannot write to reference in local `a` which is still borrowed
+   ┌─ tests/reference-safety/debug_12301.move:15:9
+   │
+15 │         *a = 0;
+   │         ^^^^^^ written here
+16 │         *k = 1;
+17 │         *c
+   │         -- conflicting reference `c` used here

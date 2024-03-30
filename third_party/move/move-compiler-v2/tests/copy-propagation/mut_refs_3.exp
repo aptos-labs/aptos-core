@@ -16,6 +16,16 @@ fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
+
+Diagnostics:
+error: cannot write to reference in local `a` which is still borrowed
+  ┌─ tests/copy-propagation/mut_refs_3.move:7:9
+  │
+7 │         *a = 0;
+  │         ^^^^^^ written here
+8 │         *c
+  │         -- conflicting reference `c` used here
+
 ============ after DeadStoreElimination: ================
 
 [variant baseline]

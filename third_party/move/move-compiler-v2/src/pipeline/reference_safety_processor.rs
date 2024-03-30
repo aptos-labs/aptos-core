@@ -1664,6 +1664,26 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// Process a WriteRef instruction.
     fn write_ref(&mut self, dest: TempIndex, src: TempIndex) {
         self.check_read_local(src, ReadMode::Argument);
+        if let Some(lbl) = self.state.label_for_temp(dest) {
+            if self.state.leaves().get(lbl).is_some() {
+                for temp in self.state.leaves().get(lbl).unwrap() {
+                    if *temp != dest && self.ty(*temp).is_mutable_reference() {
+                        let usage_info = || self.usage_info(lbl, |t| t != &dest);
+                        self.error_with_hints(
+                            self.cur_loc(),
+                            format!(
+                                "cannot write to reference in {} which is still borrowed",
+                                self.display(dest)
+                            ),
+                            "written here",
+                            self.borrow_info(lbl, |_| true)
+                                .into_iter()
+                                .chain(usage_info()),
+                        )
+                    }
+                }
+            }
+        }
         if let Some(label) = self.state.label_for_temp_with_children(dest) {
             self.error_with_hints(
                 self.cur_loc(),
