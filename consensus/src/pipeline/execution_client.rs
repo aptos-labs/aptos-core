@@ -212,6 +212,7 @@ impl ExecutionProxyClient {
                     Arc::new(network_sender.clone()),
                     self.rand_storage.clone(),
                     self.bounded_executor.clone(),
+                    &self.consensus_config.rand_rb_config,
                 );
 
                 tokio::spawn(rand_manager.start(

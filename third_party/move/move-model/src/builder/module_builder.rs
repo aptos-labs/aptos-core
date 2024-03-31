@@ -30,7 +30,7 @@ use crate::{
         CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
+    ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -444,6 +444,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let attrs = self.translate_attributes(&def.attributes);
         let abilities = self.translate_abilities(&def.abilities);
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun();
         let type_params = et.analyze_and_add_type_params(
             def.type_parameters
                 .iter()
@@ -472,6 +473,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let fun_id = FunId::new(qsym.symbol);
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun();
         et.enter_scope();
         let type_params = et.analyze_and_add_type_params(
             def.signature
@@ -698,6 +700,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for_move_fun: bool,
     ) -> (Vec<TypeParameter>, Vec<Parameter>, Type) {
         let et = &mut ExpTranslator::new(self);
+        if for_move_fun {
+            et.set_translate_move_fun()
+        }
         let type_params = et.analyze_and_add_type_params(
             signature.type_parameters.iter().map(|(n, a)| (n, a, false)),
         );
@@ -1135,78 +1140,32 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// ## Struct Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    /// Same as ModelBuilder::infer_abilities_may_have
-    fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
-        self.parent.infer_abilities_may_have(ty)
-    }
-
-    /// Checks whether a struct's field type `field_ty` has the abilities required by the declared abilities `struct_abilities` of the struct.
-    fn ability_check_field(
-        &self,
-        struct_abilities: AbilitySet,
-        struct_name: &QualifiedSymbol,
-        field_ty: &Type,
-        field_ty_loc: &Loc,
-    ) {
-        let field_abilities = self.infer_abilities_may_have(field_ty);
-        for ability in field_missing_abilities(struct_abilities, field_abilities) {
-            match ability {
-                Ability::Copy => self.parent.error(
-                    field_ty_loc,
-                    &format!(
-                        "field must have copy ability because {} is declared with copy ability",
-                        struct_name.display_simple(self.parent.env)
-                    ),
-                ),
-                Ability::Drop => self.parent.error(
-                    field_ty_loc,
-                    &format!(
-                        "field must have drop ability because {} is declared with drop ability",
-                        struct_name.display_simple(self.parent.env)
-                    ),
-                ),
-                Ability::Store => {
-                    let mut abilities = Vec::new();
-                    if struct_abilities.has_store() {
-                        abilities.push("store");
-                    }
-                    if struct_abilities.has_key() {
-                        abilities.push("key");
-                    }
-                    self.parent.error(
-                        field_ty_loc,
-                        &format!(
-                            "field must have store ability because {} is declared with {}",
-                            struct_name.display_simple(self.parent.env),
-                            abilities.join(" + ")
-                        ),
-                    );
-                },
-                Ability::Key => panic!("ICE check_field: field missing key ability"),
-            }
-        }
-    }
-
     fn def_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let struct_entry = self.parent.struct_table.get(&qsym).expect("struct invalid");
         let struct_abilities = struct_entry.abilities;
         let type_params = struct_entry.type_params.clone();
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun(); // translating structs counts as move fun, not spec
         let loc = et.to_loc(&name.0.loc);
         et.define_type_params(&loc, &type_params, false);
         let fields = match &def.fields {
             EA::StructFields::Defined(fields) => {
                 let mut field_map = BTreeMap::new();
-                let mut field_ty_and_locs = Vec::new(); // fix borrowing issues
                 for (name_loc, field_name_, (idx, ty)) in fields {
                     let field_loc = et.to_loc(&name_loc);
                     let field_sym = et.symbol_pool().make(field_name_);
                     let field_ty = et.translate_type(ty);
                     let field_ty_loc = et.to_loc(&ty.loc);
-                    // store the `field_ty` and `field_ty_loc` to process with `ability_check_field`
-                    // outside of this loop to avoid borrow issues
-                    field_ty_and_locs.push((field_ty.clone(), field_ty_loc));
+                    for ctr in Constraint::for_field(struct_abilities, &field_ty) {
+                        et.add_constraint_and_report(
+                            &field_ty_loc,
+                            &ErrorMessageContext::General,
+                            &field_ty,
+                            ctr,
+                            Some(ConstraintContext::default().for_field(field_sym)),
+                        )
+                    }
                     field_map.insert(field_sym, (field_loc, *idx, field_ty));
                 }
                 if field_map.is_empty() {
@@ -1217,9 +1176,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let field_ty = Type::new_prim(PrimitiveType::Bool);
                     field_map.insert(field_sym, (loc.clone(), 0, field_ty));
                 }
-                for (field_ty, field_ty_loc) in field_ty_and_locs {
-                    self.ability_check_field(struct_abilities, &qsym, &field_ty, &field_ty_loc);
-                }
                 Some(field_map)
             },
             EA::StructFields::Native(_) => None,
@@ -1229,8 +1185,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .get_mut(&qsym)
             .expect("struct invalid")
             .fields = fields;
-        self.parent
-            .ability_check_struct_def(self.parent.struct_table.get(&qsym).expect("struct invalid"));
     }
 
     /// The name of a dummy field the legacy Move compilers adds to zero-arity structs.
@@ -3462,23 +3416,4 @@ pub(crate) fn extract_schema_access<'a>(exp: &'a EA::Exp, res: &mut Vec<&'a EA::
         },
         _ => {},
     }
-}
-
-/// Returns the abilities that a struct's field should have but does not, based on constraints placed by the containing struct.
-fn field_missing_abilities(
-    struct_abilities: AbilitySet,
-    field_abilities: AbilitySet,
-) -> AbilitySet {
-    let mut missing_abilities = AbilitySet::EMPTY;
-    if struct_abilities.has_copy() && !field_abilities.has_copy() {
-        missing_abilities = missing_abilities.add(Ability::Copy);
-    }
-    if struct_abilities.has_drop() && !field_abilities.has_drop() {
-        missing_abilities = missing_abilities.add(Ability::Drop);
-    }
-    if (struct_abilities.has_store() || struct_abilities.has_key()) && !field_abilities.has_store()
-    {
-        missing_abilities = missing_abilities.add(Ability::Store)
-    }
-    missing_abilities
 }

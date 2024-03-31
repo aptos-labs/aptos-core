@@ -9,8 +9,10 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - DefaultGasWithOverrideOld: # This is translated to `gas_schedule::set_gas_schedule(...)`.
-          - name: "txn.max_execution_gas"
-            value: 3676000000
+          feature_version: 13
+          overrides:
+            - name: "txn.max_execution_gas"
+              value: 3676000000
   - name: step_2_upgrade_framework
     metadata:
       title: "Multi-step proposal to upgrade mainnet framework to v1.10-plus"
@@ -21,7 +23,8 @@ proposals:
           bytecode_version: 6
           git_hash: ~
       - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move # Keep this in 1.11
-      - DefaultGas  # [probably 1.11] This is translated to `gas_schedule::set_for_next_epoch(...)`.
+      - DefaultGasWithOverride:  # [probably 1.11] This is translated to `gas_schedule::set_for_next_epoch(...)`.
+          feature_version: 13 
   - name: step_3_storage_fee_for_state_bytes_refundable
     metadata:
       title: "AIP-65: Storage Fee for State Bytes refundable"

@@ -19,7 +19,7 @@ module 0x8675309::M {
             s));
             if true {
               x: u64 = Add<u64>(x, 1);
-              M::foo(Freeze<M::S>(s), x: u64 = Add<u64>(x, 1);
+              M::foo(Freeze(true)<M::S>(s), x: u64 = Add<u64>(x, 1);
               f = 0;
               1)
             } else {

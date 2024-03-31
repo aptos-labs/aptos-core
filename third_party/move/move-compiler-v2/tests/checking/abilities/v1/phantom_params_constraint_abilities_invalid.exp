@@ -1,0 +1,121 @@
+
+Diagnostics:
+error: type `NoAbilities` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:11:15
+   │
+ 9 │     struct S1<T: drop + copy + store + key> { a: T }
+   │               - declaration of type parameter `T`
+10 │     struct S2 {
+11 │         a: S1<HasAbilities<NoAbilities, NoAbilities>>,
+   │               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasAbilities`
+   = required by instantiating type parameter `T:copy + drop + store + key` of struct `S1`
+
+error: type `NoAbilities` is missing required ability `drop`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:16:16
+   │
+14 │     struct S3<T1: drop, T2: copy, T3: store, T4: key> { a: T1, b: T2, c: T3, d: T4 }
+   │               -- declaration of type parameter `T1`
+15 │     struct S4 {
+16 │         a: S3< HasDrop<NoAbilities, NoAbilities>,
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasDrop`
+   = required by instantiating type parameter `T1:drop` of struct `S3`
+
+error: type `NoAbilities` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:17:16
+   │
+14 │     struct S3<T1: drop, T2: copy, T3: store, T4: key> { a: T1, b: T2, c: T3, d: T4 }
+   │                         -- declaration of type parameter `T2`
+   ·
+17 │                HasCopy<NoAbilities, NoAbilities>,
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasCopy`
+   = required by instantiating type parameter `T2:copy` of struct `S3`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:18:16
+   │
+14 │     struct S3<T1: drop, T2: copy, T3: store, T4: key> { a: T1, b: T2, c: T3, d: T4 }
+   │                                   -- declaration of type parameter `T3`
+   ·
+18 │                HasStore<NoAbilities, NoAbilities>,
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasStore`
+   = required by instantiating type parameter `T3:store` of struct `S3`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:19:16
+   │
+14 │     struct S3<T1: drop, T2: copy, T3: store, T4: key> { a: T1, b: T2, c: T3, d: T4 }
+   │                                              -- declaration of type parameter `T4`
+   ·
+19 │                HasKey<NoAbilities, NoAbilities>
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasKey`
+   = required by instantiating type parameter `T4:key` of struct `S3`
+
+error: type `NoAbilities` is missing required abilities `copy + drop + store`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:25:12
+   │
+23 │     fun f1<T: drop + copy + store + key>() { }
+   │            - declaration of type parameter `T`
+24 │     fun f2() {
+25 │         f1<HasAbilities<NoAbilities, NoAbilities>>();
+   │            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasAbilities`
+   = required by instantiating type parameter `T:copy + drop + store + key` of function `f1`
+
+error: type `NoAbilities` is missing required ability `drop`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:30:13
+   │
+28 │     fun f3<T1: drop, T2: copy, T3: store, T4: key>() { }
+   │            -- declaration of type parameter `T1`
+29 │     fun f4() {
+30 │         f3< HasDrop<NoAbilities, NoAbilities>,
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasDrop`
+   = required by instantiating type parameter `T1:drop` of function `f3`
+
+error: type `NoAbilities` is missing required ability `copy`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:31:13
+   │
+28 │     fun f3<T1: drop, T2: copy, T3: store, T4: key>() { }
+   │                      -- declaration of type parameter `T2`
+   ·
+31 │             HasCopy<NoAbilities, NoAbilities>,
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasCopy`
+   = required by instantiating type parameter `T2:copy` of function `f3`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:32:13
+   │
+28 │     fun f3<T1: drop, T2: copy, T3: store, T4: key>() { }
+   │                                -- declaration of type parameter `T3`
+   ·
+32 │             HasStore<NoAbilities, NoAbilities>,
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasStore`
+   = required by instantiating type parameter `T3:store` of function `f3`
+
+error: type `NoAbilities` is missing required ability `store`
+   ┌─ tests/checking/abilities/v1/phantom_params_constraint_abilities_invalid.move:33:13
+   │
+28 │     fun f3<T1: drop, T2: copy, T3: store, T4: key>() { }
+   │                                           -- declaration of type parameter `T4`
+   ·
+33 │             HasKey<NoAbilities, NoAbilities>
+   │             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T2` of struct `HasKey`
+   = required by instantiating type parameter `T4:key` of function `f3`

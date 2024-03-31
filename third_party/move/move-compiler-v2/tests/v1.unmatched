@@ -179,11 +179,6 @@ move-compiler/tests/move_check/to_bytecode/{
   unassigned_address.move,
 }
 move-compiler/tests/move_check/typing/{
-  ability_constraint_generic_in_field.move,
-  ability_constraint_prims_invalid.move,
-  ability_constraint_structs_invalid.move,
-  ability_constraint_tparams_invalid.move,
-  ability_constraints.move,
   abort_any_type.move,
   assign_pop_resource.move,
   bind_pop_resource.move,
@@ -208,6 +203,7 @@ move-compiler/tests/move_check/typing/{
   implicit_deref_borrow_field_not_copyable.move,
   infinite_instantiations_invalid.move,
   infinite_instantiations_valid.move,
+  instantiate_signatures.move,
   invalid_type_acquire.move,
   missing_acquire.move,
   module_call_constraints_not_satisfied.move,
@@ -221,18 +217,15 @@ move-compiler/tests/move_check/typing/{
   pack_unpack_private.move,
   pack_unpack_private_script.move,
   pay_me_a_river.move,
-  phantom_param_op_abilities.move,
-  phantom_param_op_abilities_invalid.move,
   phantom_param_struct_decl.move,
   phantom_param_struct_decl_invalid.move,
-  phantom_params_constraint_abilities.move,
-  phantom_params_constraint_abilities_invalid.move,
-  phantom_params_field_abilities.move,
-  phantom_params_field_abilities_invalid.move,
   seq_cannot_ignore_resource.move,
   tuple.move,
   unused_non_phantom_param.move,
   valid_acquire.move,
+}
+move-compiler/tests/move_check/v2-not-supported/{
+  no_receiver_calls.move,
 }
 move-compiler/tests/move_check/verification/{
   cross_module_invalid.move,

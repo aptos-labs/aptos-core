@@ -2191,6 +2191,7 @@ pub fn changing_working_quorum_test_helper(
             config.consensus.round_initial_timeout_ms = 500;
             config.consensus.round_timeout_backoff_exponent_base = 1.0;
             config.consensus.quorum_store_poll_time_ms = 100;
+            config.consensus.rand_rb_config.backoff_policy_max_delay_ms = 1000;
 
             let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;

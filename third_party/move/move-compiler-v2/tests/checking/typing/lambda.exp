@@ -30,11 +30,13 @@ error: cannot return `u64` from a function with result type `|integer|`
 61 │         x(1) // expected to be not a function
    │         ^^^^
 
-error: cannot pass `|integer|` to a function which expects argument of type `|&integer|`
-   ┌─ tests/checking/typing/lambda.move:67:21
+error: reference type `&integer` is not allowed as a type argument (type was inferred)
+   ┌─ tests/checking/typing/lambda.move:67:35
    │
 67 │         foreach(&v, |e| sum = sum + e) // expected to cannot infer type
-   │                     ^^^^^^^^^^^^^^^^^
+   │                                   ^
+   │
+   = required by instantiating type parameter `T` of function `+`
 
 error: cannot pass `|&integer|integer` to a function which expects argument of type `|&integer|`
    ┌─ tests/checking/typing/lambda.move:73:21
