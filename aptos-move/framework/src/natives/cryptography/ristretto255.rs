@@ -24,7 +24,7 @@ pub(crate) const COMPRESSED_POINT_NUM_BYTES: usize = 32;
 
 /// Returns gas costs for a variable-time multiscalar multiplication (MSM) of size-n. The MSM
 /// employed in curve25519 is:
-///  1. Strauss, when n <= 190, see https://www.jstor.org/stable/2310929
+///  1. Strauss, when n <= 190, see <https://www.jstor.org/stable/2310929>
 ///  2. Pippinger, when n > 190, which roughly requires O(n / log_2 n) scalar multiplications
 /// For simplicity, we estimate the complexity as O(n / log_2 n)
 pub fn multi_scalar_mul_gas(

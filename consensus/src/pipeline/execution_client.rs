@@ -37,7 +37,7 @@ use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_sto
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{FeatureFlag, Features, OnChainConsensusConfig, OnChainExecutionConfig},
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
     validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
@@ -59,8 +59,9 @@ pub trait TExecutionClient: Send + Sync {
         payload_manager: Arc<PayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
-        features: &Features,
+        onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     );
 
@@ -171,6 +172,7 @@ impl ExecutionProxyClient {
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let network_sender = NetworkSender::new(
@@ -205,10 +207,12 @@ impl ExecutionProxyClient {
                     epoch_state.clone(),
                     signer,
                     rand_config,
+                    fast_rand_config,
                     rand_ready_block_tx,
                     Arc::new(network_sender.clone()),
                     self.rand_storage.clone(),
                     self.bounded_executor.clone(),
+                    &self.consensus_config.rand_rb_config,
                 );
 
                 tokio::spawn(rand_manager.start(
@@ -271,14 +275,16 @@ impl TExecutionClient for ExecutionProxyClient {
         payload_manager: Arc<PayloadManager>,
         onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
-        features: &Features,
+        onchain_randomness_config: &OnChainRandomnessConfig,
         rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let maybe_rand_msg_tx = self.spawn_decoupled_execution(
             commit_signer_provider,
             epoch_state.clone(),
             rand_config,
+            fast_rand_config,
             rand_msg_rx,
         );
 
@@ -289,7 +295,7 @@ impl TExecutionClient for ExecutionProxyClient {
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
         let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
-            && features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG);
+            && onchain_randomness_config.randomness_enabled();
         self.execution_proxy.new_epoch(
             &epoch_state,
             payload_manager,
@@ -448,8 +454,9 @@ impl TExecutionClient for DummyExecutionClient {
         _payload_manager: Arc<PayloadManager>,
         _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
-        _features: &Features,
+        _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
+        _fast_rand_config: Option<RandConfig>,
         _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
     }

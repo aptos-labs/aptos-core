@@ -1,0 +1,116 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+  0: $t2 := infer($t0)
+  1: $t3 := borrow_local($t0)
+  2: $t4 := 1
+  3: write_ref($t3, $t4)
+  4: $t1 := infer($t2)
+  5: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+  0: $t2 := copy($t0)
+  1: $t3 := borrow_local($t0)
+  2: $t4 := 1
+  3: write_ref($t3, $t4)
+  4: $t1 := move($t2)
+  5: return $t1
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+     # live vars: $t0
+     # events: b:$t2
+  0: $t2 := copy($t0)
+     # live vars: $t0, $t2
+     # events: b:$t3
+  1: $t3 := borrow_local($t0)
+     # live vars: $t2, $t3
+     # events: b:$t4
+  2: $t4 := 1
+     # live vars: $t2, $t3, $t4
+     # events: e:$t3, e:$t4
+  3: write_ref($t3, $t4)
+     # live vars: $t2
+     # events: e:$t2, b:$t1
+  4: $t1 := move($t2)
+     # live vars: $t1
+     # events: e:$t1
+  5: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+  0: $t2 := copy($t0)
+  1: $t3 := borrow_local($t0)
+  2: $t4 := 1
+  3: write_ref($t3, $t4)
+  4: $t2 := move($t2)
+  5: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: u64
+  0: $t2 := copy($t0)
+  1: $t3 := borrow_local($t0)
+  2: $t4 := 1
+  3: write_ref($t3, $t4)
+  4: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+L2:	loc1: u64
+L3:	loc2: &mut u64
+B0:
+	0: CopyLoc[0](Arg0: u64)
+	1: StLoc[1](loc0: u64)
+	2: MutBorrowLoc[0](Arg0: u64)
+	3: LdU64(1)
+	4: StLoc[2](loc1: u64)
+	5: StLoc[3](loc2: &mut u64)
+	6: MoveLoc[2](loc1: u64)
+	7: MoveLoc[3](loc2: &mut u64)
+	8: WriteRef
+	9: MoveLoc[1](loc0: u64)
+	10: Ret
+}
+}
+============ bytecode verification succeeded ========

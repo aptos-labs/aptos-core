@@ -15,15 +15,13 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
   0: m::always_abort()
-  1: $t2 := 0
-  2: $t1 := infer($t2)
-  3: $t4 := 1
-  4: $t3 := +($t1, $t4)
-  5: $t1 := infer($t3)
-  6: $t0 := infer($t1)
-  7: return $t0
+  1: $t1 := 0
+  2: $t3 := 1
+  3: $t2 := +($t1, $t3)
+  4: $t1 := infer($t2)
+  5: $t0 := infer($t1)
+  6: return $t0
 }
 
 ============ after UnreachableCodeProcessor: ================
@@ -31,10 +29,25 @@ fun m::test(): u64 {
 [variant baseline]
 fun m::always_abort() {
      var $t0: u64
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   0: $t0 := 0
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   1: abort($t0)
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # no
   2: return ()
 }
@@ -46,23 +59,55 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
   0: m::always_abort()
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
-  1: $t2 := 0
+  1: $t1 := 0
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
-  2: $t1 := infer($t2)
+  2: $t3 := 1
+     # live vars: $t1, $t3
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
-  3: $t4 := 1
+  3: $t2 := +($t1, $t3)
+     # live vars: $t2
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
-  4: $t3 := +($t1, $t4)
+  4: $t1 := infer($t2)
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
-  5: $t1 := infer($t3)
+  5: $t0 := infer($t1)
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
      # maybe
-  6: $t0 := infer($t1)
-     # maybe
-  7: return $t0
+  6: return $t0
 }
 
 ============ after UnreachableCodeRemover: ================
@@ -81,13 +126,11 @@ fun m::test(): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-     var $t4: u64
   0: m::always_abort()
-  1: $t2 := 0
-  2: $t1 := infer($t2)
-  3: $t4 := 1
-  4: $t3 := +($t1, $t4)
-  5: $t1 := infer($t3)
-  6: $t0 := infer($t1)
-  7: return $t0
+  1: $t1 := 0
+  2: $t3 := 1
+  3: $t2 := +($t1, $t3)
+  4: $t1 := infer($t2)
+  5: $t0 := infer($t1)
+  6: return $t0
 }

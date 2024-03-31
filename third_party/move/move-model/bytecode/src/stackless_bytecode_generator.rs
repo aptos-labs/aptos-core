@@ -240,7 +240,12 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 ));
                 global_env
                     .find_module(&vec_module)
-                    .expect("unexpected reference to module not found in global env")
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "unexpected reference to module: `{}` not found in global env",
+                            vec_module.display_full(global_env)
+                        )
+                    })
                     .get_id()
             });
 
@@ -347,7 +352,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                         self.local_types
                             .push(Type::Reference(ReferenceKind::Immutable, signature));
                         self.code.push(mk_call(
-                            Operation::FreezeRef,
+                            Operation::FreezeRef(true),
                             vec![immutable_ref_index],
                             vec![mutable_ref_index],
                         ));

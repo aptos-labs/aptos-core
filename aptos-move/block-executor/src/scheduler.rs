@@ -79,15 +79,17 @@ pub enum ExecutionTaskType {
     Wakeup(DependencyCondvar),
 }
 
-/// A holder for potential task returned from the Scheduler. ExecutionTask and ValidationTask
-/// each contain a version of transaction that must be executed or validated, respectively.
-/// NoTask holds no task (similar None if we wrapped tasks in Option), and Done implies that
-/// there are no more tasks and the scheduler is done.
+/// Task type that the parallel execution workers get from the scheduler.
 #[derive(Debug)]
 pub enum SchedulerTask {
+    /// Execution task with a version of the transaction, and whether it's waking up an already
+    /// executing worker (suspended / waiting on a dependency).
     ExecutionTask(TxnIndex, Incarnation, ExecutionTaskType),
+    /// Validation task with a version of the transaction, and the validation wave information.
     ValidationTask(TxnIndex, Incarnation, Wave),
-    NoTask,
+    /// Retry holds no task (similar None if we wrapped tasks in Option)
+    Retry,
+    /// Done implies that there are no more tasks and the scheduler is done.
     Done,
 }
 
@@ -453,7 +455,7 @@ impl Scheduler {
                 && !self.never_executed(idx_to_validate);
 
             if !prefer_validate && idx_to_execute >= self.num_txns {
-                return SchedulerTask::NoTask;
+                return SchedulerTask::Retry;
             }
 
             if prefer_validate {
@@ -511,7 +513,7 @@ impl Scheduler {
     /// After txn is executed, schedule its dependencies for re-execution.
     /// If revalidate_suffix is true, decrease validation_idx to schedule all higher transactions
     /// for (re-)validation. Otherwise, in some cases (if validation_idx not already lower),
-    /// return a validation task of the transaction to the caller (otherwise NoTask).
+    /// return a validation task of the transaction to the caller (otherwise Retry).
     pub fn finish_execution(
         &self,
         txn_idx: TxnIndex,
@@ -521,10 +523,10 @@ impl Scheduler {
         // Note: It is preferable to hold the validation lock throughout the finish_execution,
         // in particular before updating execution status. The point was that we don't want
         // any validation to come before the validation status is correspondingly updated.
-        // It may be possible to make work more granular, but shouldn't make performance
-        // difference and like this correctness argument is much easier to see, in fact also
-        // the reason why we grab write lock directly, and never release it during the whole function.
-        // So even validation status readers have to wait if they somehow end up at the same index.
+        // It may be possible to reduce granularity, but shouldn't make performance difference
+        // and like this correctness argument is much easier to see, which is also why we grab
+        // the write lock directly, and never release it during the whole function. This way,
+        // even validation status readers have to wait if they somehow end up at the same index.
         let mut validation_status = self.txn_status[txn_idx as usize].1.write();
         self.set_executed_status(txn_idx, incarnation)?;
 
@@ -552,7 +554,7 @@ impl Scheduler {
             ));
         }
 
-        Ok(SchedulerTask::NoTask)
+        Ok(SchedulerTask::Retry)
     }
 
     pub fn finish_execution_during_commit(&self, txn_idx: TxnIndex) -> Result<(), PanicError> {
@@ -567,7 +569,7 @@ impl Scheduler {
     }
 
     /// Finalize a validation task of version (txn_idx, incarnation). In some cases,
-    /// may return a re-execution task back to the caller (otherwise, NoTask).
+    /// may return a re-execution task back to the caller (otherwise, Retry).
     pub fn finish_abort(
         &self,
         txn_idx: TxnIndex,
@@ -611,7 +613,7 @@ impl Scheduler {
             }
         }
 
-        Ok(SchedulerTask::NoTask)
+        Ok(SchedulerTask::Retry)
     }
 
     /// This function can halt the BlockSTM early, even if there are unfinished tasks.
@@ -674,13 +676,12 @@ impl TWaitForDependency for Scheduler {
         // mutexes. Thus, acquisitions always happen in the same order (here), may not deadlock.
 
         if self.is_executed(dep_txn_idx, true).is_some() {
-            // Current status of dep_txn_idx is 'executed', so the dependency got resolved.
-            // To avoid zombie dependency (and losing liveness), must return here and
-            // not add a (stale) dependency.
+            // Current status of dep_txn_idx is 'executed' (or even committed), so the dependency
+            // got resolved. To avoid zombie dependency (and losing liveness), must return here
+            // and not add a (stale) dependency.
 
             // Note: acquires (a different, status) mutex, while holding (dependency) mutex.
-            // Only place in scheduler where a thread may hold >1 mutexes, hence, such
-            // acquisitions always happens in the same order (this function), may not deadlock.
+            // For status lock this only happens here, thus the order is always higher index to lower.
             return Ok(DependencyResult::Resolved);
         }
 
@@ -706,17 +707,31 @@ impl TWaitForDependency for Scheduler {
 
 /// Private functions of the Scheduler
 impl Scheduler {
-    /// Helper function to be called from Scheduler::halt(); Sets the transaction status to Halted.
-    /// If the transaction is suspended, it will wake it up.
+    /// Helper function to be called from Scheduler::halt(); Sets the transaction status to Halted and
+    /// notifies the waiting thread, if applicable. The guarantee is that if halt(txn_idx) is called,
+    /// then no thread can remain suspended on some dependency while executing transaction txn_idx.
+    ///
+    /// Proof sketch as a result of code invariants that can be checked:
+    /// 1. Status is replaced with ExecutionHalted, and ExecutionHalted status can never change.
+    /// 2. In order for wait_for_dependency by txn_idx to return a CondVar to wait on, suspend must
+    ///    be successful, which implies the status at that point may not be ExecutionHalted and that
+    ///    the status at that point would be set to Suspended(_, CondVar).
+    /// 3. Suspended status can turn into Ready or Executing, all containing the CondVar, unless a
+    ///    worker with a ExecutionTaskType::WakeUp actually wakes up the suspending thread.
+    /// 4. The waking up consists of acquiring the CondVar lock, setting the status to ExecutionHalted
+    ///    or Resolved (if the worker with WakeUp task did it), and also calling notify_one. This
+    ///    ensures that a thread that waits until the condition variable changes from Unresolved will
+    ///    get released in all cases.
     fn halt_transaction_execution(&self, txn_idx: TxnIndex) {
         let mut status = self.txn_status[txn_idx as usize].0.write();
 
-        // Replace status to sure that the txn never gets suspended.
+        // Always replace the status.
         match std::mem::replace(&mut *status, ExecutionStatus::ExecutionHalted) {
             ExecutionStatus::Suspended(_, condvar)
             | ExecutionStatus::Ready(_, ExecutionTaskType::Wakeup(condvar))
             | ExecutionStatus::Executing(_, ExecutionTaskType::Wakeup(condvar)) => {
-                let (lock, cvar) = &*(condvar.clone());
+                // Condvar lock must always be taken inner-most.
+                let (lock, cvar) = &*condvar;
 
                 let mut lock = lock.lock();
                 *lock = DependencyStatus::ExecutionHalted;
@@ -839,7 +854,7 @@ impl Scheduler {
     }
 
     /// Grab an index to try and validate next (by fetch-and-incrementing validation_idx).
-    /// - If the index is out of bounds, return None (and invoke a check of whethre
+    /// - If the index is out of bounds, return None (and invoke a check of whether
     /// all txns can be committed).
     /// - If the transaction is ready for validation (EXECUTED state), return the version
     /// to the caller.

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     dag::{
@@ -185,6 +186,7 @@ fn setup(
             NoPipelineBackpressure::new(),
         ),
         false,
+        true,
     )
 }
 

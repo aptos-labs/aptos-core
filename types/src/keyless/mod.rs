@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     on_chain_config::CurrentTimeMicroseconds,
@@ -132,7 +133,7 @@ pub struct JWTHeader {
 }
 
 impl KeylessSignature {
-    /// A reasonable upper bound for the number of bytes we expect in a keyless public key. This is
+    /// A reasonable upper bound for the number of bytes we expect in a keyless signature. This is
     /// enforced by our full nodes when they receive TXNs.
     pub const MAX_LEN: usize = 4000;
 
@@ -293,7 +294,7 @@ impl TryFrom<&[u8]> for IdCommitment {
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct KeylessPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
-    /// e.g., https://accounts.google.com
+    /// e.g., <https://accounts.google.com>
     pub iss_val: String,
 
     /// SNARK-friendly commitment to:

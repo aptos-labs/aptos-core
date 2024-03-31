@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::utils::{
     parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
@@ -6,7 +7,7 @@ use crate::utils::{
 use blstrs::{
     pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt, Scalar,
 };
-use group::Curve;
+use group::{Curve, Group};
 use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
@@ -24,7 +25,7 @@ pub fn is_power_of_two(n: usize) -> bool {
 
 /// Hashes the specified `msg` and domain separation tag `dst` into a `Scalar` by computing a 512-bit
 /// number as SHA3-512(SHA3-512(dst) || msg) and reducing it modulo the order of the field.
-/// (Same design as in `curve25519-dalek` explained here https://crypto.stackexchange.com/questions/88002/how-to-map-output-of-hash-algorithm-to-a-finite-field)
+/// (Same design as in `curve25519-dalek` explained here <https://crypto.stackexchange.com/questions/88002/how-to-map-output-of-hash-algorithm-to-a-finite-field>)
 ///
 /// NOTE: Domain separation from other SHA3-512 calls in our system is left up to the caller.
 pub fn hash_to_scalar(msg: &[u8], dst: &[u8]) -> Scalar {
@@ -59,10 +60,10 @@ pub fn g1_multi_exp(bases: &[G1Projective], scalars: &[Scalar]) -> G1Projective 
         );
     }
 
-    if bases.len() == 1 {
-        bases[0].mul(scalars[0])
-    } else {
-        G1Projective::multi_exp(bases, scalars)
+    match bases.len() {
+        0 => G1Projective::identity(),
+        1 => bases[0].mul(scalars[0]),
+        _ => G1Projective::multi_exp(bases, scalars),
     }
 }
 
@@ -75,11 +76,10 @@ pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[Scalar]) -> G2Projective 
             scalars.len()
         );
     }
-
-    if bases.len() == 1 {
-        bases[0].mul(scalars[0])
-    } else {
-        G2Projective::multi_exp(bases, scalars)
+    match bases.len() {
+        0 => G2Projective::identity(),
+        1 => bases[0].mul(scalars[0]),
+        _ => G2Projective::multi_exp(bases, scalars),
     }
 }
 

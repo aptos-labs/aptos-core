@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     smoke_test_environment::SwarmBuilder,
@@ -7,7 +8,7 @@ use crate::{
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use futures::future::join_all;
 use std::{sync::Arc, time::Duration};
 
@@ -19,13 +20,9 @@ async fn dummy_validator_txns() {
             config.api.failpoints_enabled = true;
         }))
         .with_init_genesis_config(Arc::new(move |conf| {
-            // start with vtxn disabled.
-            conf.consensus_config.disable_validator_txns();
-
-            // start with dkg enabled.
-            let mut features = Features::default();
-            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            // start with randomness enabled.
+            conf.consensus_config.enable_validator_txns();
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .with_aptos()
         .build()

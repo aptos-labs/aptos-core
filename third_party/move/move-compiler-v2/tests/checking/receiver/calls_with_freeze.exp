@@ -1,0 +1,39 @@
+// -- Model dump before bytecode pipeline
+module 0x42::m {
+    struct S {
+        x: u64,
+    }
+    private fun sum(self: &m::S,_other: &m::S): u64 {
+        Abort(1)
+    }
+    private fun test_arg_freeze(s: m::S): u64 {
+        {
+          let p1: &m::S = Borrow(Immutable)(s);
+          {
+            let p1m: &mut m::S = Borrow(Mutable)(s);
+            {
+              let s2: m::S = pack m::S(4);
+              {
+                let p2: &m::S = Borrow(Immutable)(s2);
+                {
+                  let p2m: &mut m::S = Borrow(Mutable)(s);
+                  {
+                    let x1: u64 = m::sum(Freeze(false)(p1m), p1);
+                    {
+                      let x2: u64 = m::sum(Freeze(false)(p1m), Freeze(false)(p1m));
+                      {
+                        let x3: u64 = m::sum(Freeze(false)(p1m), p2);
+                        {
+                          let x4: u64 = m::sum(Freeze(false)(p2m), Freeze(false)(p2m));
+                          Add<u64>(Add<u64>(Add<u64>(x1, x2), x3), x4)
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+} // end 0x42::m

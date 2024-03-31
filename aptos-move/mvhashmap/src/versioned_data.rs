@@ -16,7 +16,10 @@ use std::{
     collections::btree_map::{self, BTreeMap},
     fmt::Debug,
     hash::Hash,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 /// Every entry in shared multi-version data-structure has an "estimate" flag
@@ -52,6 +55,7 @@ struct VersionedValue<V> {
 /// Maps each key (access path) to an internal versioned value representation.
 pub struct VersionedData<K, V> {
     values: DashMap<K, VersionedValue<V>>,
+    total_base_value_size: AtomicU64,
 }
 
 impl<V> Entry<V> {
@@ -213,7 +217,16 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
+            total_base_value_size: AtomicU64::new(0),
         }
+    }
+
+    pub(crate) fn num_keys(&self) -> usize {
+        self.values.len()
+    }
+
+    pub(crate) fn total_base_value_size(&self) -> u64 {
+        self.total_base_value_size.load(Ordering::Relaxed)
     }
 
     pub fn add_delta(&self, key: K, txn_idx: TxnIndex, delta: DeltaOp) {
@@ -278,6 +291,10 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite> VersionedData<K, V> {
         use ValueWithLayout::*;
         match v.versioned_map.entry(ShiftedTxnIndex::zero_idx()) {
             Vacant(v) => {
+                if let Some(base_size) = value.bytes_len() {
+                    self.total_base_value_size
+                        .fetch_add(base_size as u64, Ordering::Relaxed);
+                }
                 v.insert(CachePadded::new(Entry::new_write_from(0, value)));
             },
             Occupied(mut o) => {

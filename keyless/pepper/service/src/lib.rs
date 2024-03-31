@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     vuf_keys::VUF_SK,
@@ -9,6 +10,7 @@ use aptos_keyless_pepper_common::{
     vuf::{self, VUF},
     PepperInput, PepperRequest, PepperResponse,
 };
+use aptos_logger::info;
 use aptos_types::{
     keyless::{Configuration, OpenIdSig},
     transaction::authenticator::EphemeralPublicKey,
@@ -16,9 +18,11 @@ use aptos_types::{
 use jsonwebtoken::{Algorithm::RS256, Validation};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 pub mod about;
 pub mod jwk;
+pub mod metrics;
 pub mod vuf_keys;
 
 pub type Issuer = String;
@@ -30,7 +34,10 @@ pub enum ProcessingFailure {
     InternalError(String),
 }
 
-pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailure> {
+pub fn process(
+    session_id: &Uuid,
+    request: PepperRequest,
+) -> Result<PepperResponse, ProcessingFailure> {
     let PepperRequest {
         jwt,
         epk,
@@ -46,7 +53,6 @@ pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailu
 
     let claims = aptos_keyless_pepper_common::jwt::parse(jwt.as_str())
         .map_err(|e| BadRequest(format!("JWT decoding error: {e}")))?;
-
     let now_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -110,6 +116,14 @@ pub fn process(request: PepperRequest) -> Result<PepperResponse, ProcessingFailu
         uid_val,
         aud: claims.claims.aud.clone(),
     };
+    info!(
+        session_id = session_id,
+        iss = input.iss,
+        aud = input.aud,
+        uid_val = input.uid_val,
+        uid_key = input.uid_key,
+        "PepperInput is available."
+    );
     let input_bytes = bcs::to_bytes(&input).unwrap();
     let (pepper, vuf_proof) = vuf::bls12381_g1_bls::Bls12381G1Bls::eval(&VUF_SK, &input_bytes)
         .map_err(|e| InternalError(format!("bls12381_g1_bls eval error: {e}")))?;

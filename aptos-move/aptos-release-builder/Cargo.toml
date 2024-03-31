@@ -19,8 +19,10 @@ aptos-api-types = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-framework = { workspace = true }
+aptos-gas-schedule = { workspace = true }
 aptos-gas-schedule-updator = { workspace = true }
 aptos-genesis = { workspace = true }
+aptos-infallible = { workspace = true }
 aptos-keygen = { workspace = true }
 aptos-rest-client = { workspace = true }
 aptos-temppath = { workspace = true }

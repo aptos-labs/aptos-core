@@ -1,0 +1,22 @@
+
+Diagnostics:
+error: cannot freeze local `y`  since multiple mutable references exist
+  ┌─ tests/reference-safety/freeze_dead_code.move:8:9
+  │
+5 │         let n = &mut x;
+  │                 ------ conflicting mutable local borrow
+6 │         let y = &mut x;
+  │                 ------ originating mutable local borrow
+7 │         let _m = &mut x;
+8 │         freeze(y);
+  │         ^^^^^^^^^ frozen here
+
+error: cannot freeze local `y`  since multiple mutable references exist
+   ┌─ tests/reference-safety/freeze_dead_code.move:18:9
+   │
+16 │         let y = &mut x;
+   │                 ------ originating mutable local borrow
+17 │         let m = &mut x;
+   │                 ------ conflicting mutable local borrow
+18 │         freeze(y);
+   │         ^^^^^^^^^ frozen here

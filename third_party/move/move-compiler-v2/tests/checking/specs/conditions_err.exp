@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: expected `bool` but found a value of type `&mut u64`
+error: expected `bool` but found a value of type `u64`
   ┌─ tests/checking/specs/conditions_err.move:6:15
   │
 6 │     aborts_if x; // Type of condition not bool.

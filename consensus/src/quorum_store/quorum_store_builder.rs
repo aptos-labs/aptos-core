@@ -24,7 +24,9 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{QuorumStoreConfig, SecureBackend};
-use aptos_consensus_types::{common::Author, request_response::GetPayloadCommand};
+use aptos_consensus_types::{
+    common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
+};
 use aptos_global_constants::CONSENSUS_KEY;
 use aptos_logger::prelude::*;
 use aptos_mempool::QuorumStoreRequest;
@@ -122,6 +124,7 @@ pub struct InnerBuilder {
     aptos_db: Arc<dyn DbReader>,
     network_sender: NetworkSender,
     verifier: ValidatorVerifier,
+    proof_cache: ProofCache,
     backend: SecureBackend,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
@@ -155,6 +158,7 @@ impl InnerBuilder {
         aptos_db: Arc<dyn DbReader>,
         network_sender: NetworkSender,
         verifier: ValidatorVerifier,
+        proof_cache: ProofCache,
         backend: SecureBackend,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
@@ -193,6 +197,7 @@ impl InnerBuilder {
             aptos_db,
             network_sender,
             verifier,
+            proof_cache,
             backend,
             coordinator_tx,
             coordinator_rx: Some(coordinator_rx),
@@ -311,6 +316,7 @@ impl InnerBuilder {
             let batch_coordinator = BatchCoordinator::new(
                 self.author,
                 self.network_sender.clone(),
+                self.proof_manager_cmd_tx.clone(),
                 self.batch_store.clone().unwrap(),
                 self.config.receiver_max_batch_txns as u64,
                 self.config.receiver_max_batch_bytes as u64,
@@ -331,6 +337,7 @@ impl InnerBuilder {
             self.author,
             self.batch_reader.clone().unwrap(),
             self.batch_generator_cmd_tx.clone(),
+            self.proof_cache,
             self.broadcast_proofs,
         );
         spawn_named!(
@@ -350,6 +357,8 @@ impl InnerBuilder {
                 .back_pressure
                 .backlog_per_validator_batch_limit_count
                 * self.num_validators,
+            self.batch_store.clone().unwrap(),
+            self.config.allow_batches_without_pos_in_proposal,
         );
         spawn_named!(
             "proof_manager",

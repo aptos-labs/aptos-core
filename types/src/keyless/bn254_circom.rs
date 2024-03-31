@@ -1,5 +1,7 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
+use super::circuit_constants::MAX_EXTRA_FIELD_BYTES;
 use crate::{
     jwks::rsa::RSA_JWK,
     keyless::{
@@ -14,6 +16,7 @@ use ark_bn254::{Fq, Fq2, Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_traits::{One, Zero};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_big_array::BigArray;
 
@@ -21,6 +24,10 @@ use serde_big_array::BigArray;
 
 pub const G1_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 32;
 pub const G2_PROJECTIVE_COMPRESSED_NUM_BYTES: usize = 64;
+
+// When the extra_field is none, use this hash value which is equal to the hash of a single space string.
+static EMPTY_EXTRA_FIELD_HASH: Lazy<Fr> =
+    Lazy::new(|| poseidon_bn254::pad_and_hash_string(" ", MAX_EXTRA_FIELD_BYTES as usize).unwrap());
 
 /// This will do the proper subgroup membership checks.
 pub fn g1_projective_str_to_affine(x: &str, y: &str) -> anyhow::Result<G1Affine> {
@@ -240,7 +247,7 @@ pub fn get_public_inputs_hash(
 ) -> anyhow::Result<Fr> {
     if let EphemeralCertificate::ZeroKnowledgeSig(proof) = &sig.cert {
         let (has_extra_field, extra_field_hash) = match &proof.extra_field {
-            None => (Fr::zero(), Fr::zero()),
+            None => (Fr::zero(), *Lazy::force(&EMPTY_EXTRA_FIELD_HASH)),
             Some(extra_field) => (
                 Fr::one(),
                 poseidon_bn254::pad_and_hash_string(

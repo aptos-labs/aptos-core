@@ -426,7 +426,7 @@ fn wait_for_dependency(
             // eventually finish and lead to unblocking txn_idx, contradiction.
             let (lock, cvar) = &*dep_condition;
             let mut dep_resolved = lock.lock();
-            while let DependencyStatus::Unresolved = *dep_resolved {
+            while matches!(*dep_resolved, DependencyStatus::Unresolved) {
                 dep_resolved = cvar.wait(dep_resolved).unwrap();
             }
             // dep resolved status is either resolved or execution halted.
@@ -790,7 +790,7 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
     }
 
     pub(crate) fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
-        self.unsync_map.write_delayed_field(id, base_value)
+        self.unsync_map.set_base_delayed_field(id, base_value)
     }
 
     pub(crate) fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
@@ -1092,7 +1092,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         .ok_or_else(|| {
                             anyhow::anyhow!("Failed to deserialize resource during id replacement")
                         })?;
-                serialize_and_allow_delayed_values(&patched_value, layout)
+                serialize_and_allow_delayed_values(&patched_value, layout)?
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Failed to serialize value {} after id replacement",

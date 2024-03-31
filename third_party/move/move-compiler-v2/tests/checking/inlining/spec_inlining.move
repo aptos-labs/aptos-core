@@ -6,14 +6,14 @@ module 0x42::Test {
         predicate(v)
     }
 
-    public fun test_apply() {
-        let r1 = apply(0, |v| v >= 0);
+    public fun test_apply(x: u64) {
+        let r1 = apply(x, |v| v >= 0);
         spec {
             assert r1;
         };
         assert!(r1, 1);
 
-        let r2 = apply(0, |v| v != 0);
+        let r2 = apply(x, |v| v != 0);
         spec {
             assert r2;
         };

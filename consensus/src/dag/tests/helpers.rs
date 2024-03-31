@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     dag::{
@@ -37,7 +38,7 @@ pub(crate) fn new_certified_node(
         author,
         0,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false, true),
         parents,
         Extensions::empty(),
     );
@@ -56,7 +57,7 @@ pub(crate) fn new_node(
         author,
         timestamp,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false, true),
         parents,
         Extensions::empty(),
     )

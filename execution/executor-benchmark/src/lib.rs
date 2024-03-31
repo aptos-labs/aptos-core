@@ -39,8 +39,8 @@ use aptos_metrics_core::Histogram;
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
-    TransactionType::NonConflictingCoinTransfer,
+    create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
+    TransactionType::{self, NonConflictingCoinTransfer},
 };
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
@@ -236,6 +236,10 @@ pub fn run_benchmark<V>(
     if verify_sequence_numbers {
         generator.verify_sequence_numbers(db.reader.clone());
     }
+
+    // Assert there were no error log lines in the run.
+    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+
     log_total_supply(&db.reader);
 }
 
@@ -270,7 +274,7 @@ where
 
         create_txn_generator_creator(
             &[transaction_mix],
-            root_account,
+            AlwaysApproveRootAccountHandle { root_account },
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
@@ -387,6 +391,9 @@ fn add_accounts_impl<V>(
         now_version,
         generator.num_existing_accounts() + num_new_accounts,
     );
+
+    // Assert there were no error log lines in the run.
+    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
 
     log_total_supply(&db.reader);
 

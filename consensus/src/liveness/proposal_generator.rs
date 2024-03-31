@@ -166,6 +166,10 @@ pub struct ProposalGenerator {
     max_block_txns: u64,
     // Max number of bytes to be added to a proposed block.
     max_block_bytes: u64,
+    // Max number of inline transactions to be added to a proposed block.
+    max_inline_txns: u64,
+    // Max number of inline bytes to be added to a proposed block.
+    max_inline_bytes: u64,
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
 
@@ -176,9 +180,12 @@ pub struct ProposalGenerator {
     last_round_generated: Round,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
+
+    allow_batches_without_pos_in_proposal: bool,
 }
 
 impl ProposalGenerator {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         author: Author,
         block_store: Arc<dyn BlockReader + Send + Sync>,
@@ -187,11 +194,14 @@ impl ProposalGenerator {
         quorum_store_poll_time: Duration,
         max_block_txns: u64,
         max_block_bytes: u64,
+        max_inline_txns: u64,
+        max_inline_bytes: u64,
         max_failed_authors_to_store: usize,
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
+        allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         Self {
             author,
@@ -201,12 +211,15 @@ impl ProposalGenerator {
             quorum_store_poll_time,
             max_block_txns,
             max_block_bytes,
+            max_inline_txns,
+            max_inline_bytes,
             max_failed_authors_to_store,
             pipeline_backpressure_config,
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
             vtxn_config,
+            allow_batches_without_pos_in_proposal,
         }
     }
 
@@ -260,7 +273,10 @@ impl ProposalGenerator {
             // after reconfiguration until it's committed
             (
                 vec![],
-                Payload::empty(self.quorum_store_enabled),
+                Payload::empty(
+                    self.quorum_store_enabled,
+                    self.allow_batches_without_pos_in_proposal,
+                ),
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
@@ -335,6 +351,9 @@ impl ProposalGenerator {
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     max_block_txns,
                     max_block_bytes,
+                    // TODO: Set max_inline_txns and max_inline_bytes correctly
+                    self.max_inline_txns,
+                    self.max_inline_bytes,
                     validator_txn_filter,
                     payload_filter,
                     wait_callback,
@@ -395,7 +414,7 @@ impl ProposalGenerator {
         let mut values_max_block_txns = vec![self.max_block_txns];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
-        let mut max_txns_from_block_to_execute = None;
+        let mut values_max_txns_from_block_to_execute = vec![];
 
         let chain_health_backoff = self
             .chain_health_backoff_config
@@ -403,6 +422,9 @@ impl ProposalGenerator {
         if let Some(value) = chain_health_backoff {
             values_max_block_txns.push(value.max_sending_block_txns_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
+            if let Some(val) = value.max_txns_from_block_to_execute {
+                values_max_txns_from_block_to_execute.push(val);
+            }
             values_proposal_delay.push(Duration::from_millis(value.backoff_proposal_delay_ms));
             CHAIN_HEALTH_BACKOFF_TRIGGERED.observe(1.0);
         } else {
@@ -415,7 +437,9 @@ impl ProposalGenerator {
         if let Some(value) = pipeline_backpressure {
             values_max_block_txns.push(value.max_sending_block_txns_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
-            max_txns_from_block_to_execute = value.max_txns_from_block_to_execute;
+            if let Some(val) = value.max_txns_from_block_to_execute {
+                values_max_txns_from_block_to_execute.push(val);
+            }
             values_proposal_delay.push(Duration::from_millis(value.backpressure_proposal_delay_ms));
             PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(1.0);
         } else {
@@ -425,11 +449,13 @@ impl ProposalGenerator {
         let max_block_txns = values_max_block_txns.into_iter().min().unwrap();
         let max_block_bytes = values_max_block_bytes.into_iter().min().unwrap();
         let proposal_delay = values_proposal_delay.into_iter().max().unwrap();
-
+        let max_txns_from_block_to_execute =
+            values_max_txns_from_block_to_execute.into_iter().min();
         if pipeline_backpressure.is_some() || chain_health_backoff.is_some() {
             warn!(
-                "Generating proposal: reducing limits to {} txns and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms. Round: {}",
+                "Generating proposal: reducing limits to {} txns (filtered to {:?}) and {} bytes, due to pipeline_backpressure: {}, chain health backoff: {}. Delaying sending proposal by {}ms. Round: {}",
                 max_block_txns,
+                max_txns_from_block_to_execute,
                 max_block_bytes,
                 pipeline_backpressure.is_some(),
                 chain_health_backoff.is_some(),

@@ -846,7 +846,7 @@ fn check_registered_networks(
 
 /// Verifies that all returned peers are correct
 fn check_all_peers(peers_and_metadata: &Arc<PeersAndMetadata>, expected_peers: Vec<PeerNetworkId>) {
-    let all_peers = peers_and_metadata.get_all_peers().unwrap();
+    let all_peers = peers_and_metadata.get_all_peers();
     compare_vectors_ignore_order(all_peers, expected_peers);
 }
 

@@ -1,0 +1,94 @@
+
+Diagnostics:
+warning: Unused parameter `param`. Consider removing or prefixing with an underscore: `_param`
+   ┌─ tests/file-format-generator/borrow.move:12:15
+   │
+12 │     fun local(param: u64): u64 {
+   │               ^^^^^
+
+warning: Unused parameter `param`. Consider removing or prefixing with an underscore: `_param`
+   ┌─ tests/file-format-generator/borrow.move:29:19
+   │
+29 │     fun mut_local(param: u64): u64 {
+   │                   ^^^^^
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module 42.borrow {
+struct S {
+	f: u64
+}
+
+field(Arg0: &S): u64 /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](Arg0: &S)
+	1: ImmBorrowField[0](S.f: u64)
+	2: ReadRef
+	3: Ret
+}
+local(Arg0: u64): u64 /* def_idx: 1 */ {
+L1:	loc0: u64
+B0:
+	0: LdU64(33)
+	1: StLoc[1](loc0: u64)
+	2: ImmBorrowLoc[1](loc0: u64)
+	3: ReadRef
+	4: Ret
+}
+param(Arg0: u64): u64 /* def_idx: 2 */ {
+B0:
+	0: ImmBorrowLoc[0](Arg0: u64)
+	1: ReadRef
+	2: Ret
+}
+mut_field(Arg0: &mut S): u64 /* def_idx: 3 */ {
+L1:	loc0: u64
+L2:	loc1: &mut u64
+B0:
+	0: MoveLoc[0](Arg0: &mut S)
+	1: MutBorrowField[0](S.f: u64)
+	2: LdU64(22)
+	3: StLoc[1](loc0: u64)
+	4: StLoc[2](loc1: &mut u64)
+	5: MoveLoc[1](loc0: u64)
+	6: CopyLoc[2](loc1: &mut u64)
+	7: WriteRef
+	8: MoveLoc[2](loc1: &mut u64)
+	9: ReadRef
+	10: Ret
+}
+mut_local(Arg0: u64): u64 /* def_idx: 4 */ {
+L1:	loc0: u64
+L2:	loc1: &mut u64
+B0:
+	0: LdU64(33)
+	1: StLoc[1](loc0: u64)
+	2: MutBorrowLoc[1](loc0: u64)
+	3: LdU64(22)
+	4: StLoc[0](Arg0: u64)
+	5: StLoc[2](loc1: &mut u64)
+	6: MoveLoc[0](Arg0: u64)
+	7: CopyLoc[2](loc1: &mut u64)
+	8: WriteRef
+	9: MoveLoc[2](loc1: &mut u64)
+	10: ReadRef
+	11: Ret
+}
+mut_param(Arg0: u64): u64 /* def_idx: 5 */ {
+L1:	loc0: u64
+L2:	loc1: &mut u64
+B0:
+	0: MutBorrowLoc[0](Arg0: u64)
+	1: LdU64(22)
+	2: StLoc[1](loc0: u64)
+	3: StLoc[2](loc1: &mut u64)
+	4: MoveLoc[1](loc0: u64)
+	5: CopyLoc[2](loc1: &mut u64)
+	6: WriteRef
+	7: MoveLoc[2](loc1: &mut u64)
+	8: ReadRef
+	9: Ret
+}
+}
+============ bytecode verification succeeded ========

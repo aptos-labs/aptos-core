@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 #[cfg(test)]
 use crate::payload_client::user;
@@ -70,6 +71,8 @@ impl PayloadClient for MixedPayloadClient {
         mut max_poll_time: Duration,
         mut max_items: u64,
         mut max_bytes: u64,
+        max_inline_items: u64,
+        max_inline_bytes: u64,
         validator_txn_filter: vtxn_pool::TransactionFilter,
         user_txn_filter: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
@@ -113,6 +116,8 @@ impl PayloadClient for MixedPayloadClient {
                 max_poll_time,
                 max_items,
                 max_bytes,
+                max_inline_items,
+                max_inline_bytes,
                 user_txn_filter,
                 wait_callback,
                 pending_ordering,
@@ -150,6 +155,8 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_secs(1), // max_poll_time
             99,                     // max_items
             1048576,                // size limit: 1MB
+            50,
+            500000, // inline limit: 500KB
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
@@ -171,6 +178,8 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_micros(500), // max_poll_time
             99,                         // max_items
             1048576,                    // size limit: 1MB
+            50,
+            500000, // inline limit: 500KB
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
@@ -192,6 +201,8 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
             Duration::from_secs(1), // max_poll_time
             1,                      // max_items
             1048576,                // size limit: 1MB
+            0,
+            0, // inline limit: 0
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),
@@ -212,6 +223,8 @@ async fn mixed_payload_client_should_prioritize_validator_txns() {
         .pull_payload(
             Duration::from_secs(1), // max_poll_time
             99,                     // max_items
+            all_validator_txns[0].size_in_bytes() as u64,
+            50,
             all_validator_txns[0].size_in_bytes() as u64,
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
@@ -252,6 +265,8 @@ async fn mixed_payload_client_should_respect_validator_txn_feature_flag() {
             Duration::from_millis(50), // max_poll_time
             99,                        // max_items
             1048576,                   // size limit: 1MB
+            50,
+            500000, // inline limit: 500KB
             vtxn_pool::TransactionFilter::PendingTxnHashSet(HashSet::new()),
             PayloadFilter::Empty,
             Box::pin(async {}),

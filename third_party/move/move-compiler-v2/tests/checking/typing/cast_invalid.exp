@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: operand of cast must be a number
+error: expected `integer` but found a value of type `bool`
   ┌─ tests/checking/typing/cast_invalid.move:6:9
   │
 6 │         (false as u8);
   │         ^^^^^^^^^^^^^
 
-error: operand of cast must be a number
+error: expected `integer` but found a value of type `bool`
   ┌─ tests/checking/typing/cast_invalid.move:7:9
   │
 7 │         (true as u128);
   │         ^^^^^^^^^^^^^^
 
-error: operand of cast must be a number
+error: expected `integer` but found a value of type `()`
   ┌─ tests/checking/typing/cast_invalid.move:9:9
   │
 9 │         (() as u64);
   │         ^^^^^^^^^^^
 
-error: operand of cast must be a number
+error: expected `integer` but found a value of type `(integer, integer)`
    ┌─ tests/checking/typing/cast_invalid.move:10:9
    │
 10 │         ((0, 1) as u8);
@@ -60,7 +60,7 @@ error: cast target type must be a number
 17 │         (0 as (u64, u8));
    │         ^^^^^^^^^^^^^^^^
 
-error: operand of cast must be a number
+error: expected `integer` but found a value of type `vector<u8>`
    ┌─ tests/checking/typing/cast_invalid.move:19:2
    │
 19 │     (x"1234" as u64);

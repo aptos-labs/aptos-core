@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: undeclared receiver function `receiver_wrongly_spelled` for type `S<u64>`
+   ┌─ tests/checking/receiver/call_errors.move:20:9
+   │
+20 │         s.receiver_wrongly_spelled(x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: the receiver function takes 1 argument but 2 were provided
+   ┌─ tests/checking/receiver/call_errors.move:21:9
+   │
+21 │         s.receiver(x, x);
+   │         ^^^^^^^^^^^^^^^^
+
+error: the receiver function takes 1 argument but 2 were provided
+   ┌─ tests/checking/receiver/call_errors.move:22:9
+   │
+22 │         s.receiver_ref_mut(x, x);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: the receiver function takes 1 argument but 0 were provided
+   ┌─ tests/checking/receiver/call_errors.move:23:9
+   │
+23 │         s.receiver();
+   │         ^^^^^^^^^^^^
+
+error: cannot pass `u8` to a function which expects argument of type `u64`
+   ┌─ tests/checking/receiver/call_errors.move:24:28
+   │
+24 │         s.receiver_ref_mut(1u8);
+   │                            ^^^
+
+error: cannot pass `&mut S<u64>` to a function which expects argument of type `&mut S<u8>`
+   ┌─ tests/checking/receiver/call_errors.move:25:9
+   │
+25 │         s.receiver_ref_mut::<u8>(1);
+   │         ^
+
+error: the receiver function takes 1 type argument but 2 were provided
+   ┌─ tests/checking/receiver/call_errors.move:26:9
+   │
+26 │         s.receiver_ref_mut::<u8, u8>(1);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: unable to infer instantiation of type `_` (consider providing type arguments or annotating the type)
+   ┌─ tests/checking/receiver/call_errors.move:27:9
+   │
+27 │         s.receiver_needs_type_args(x)
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -12,16 +12,14 @@ B0:
 	3: Ret
 }
 }
+============ bytecode verification failed ========
+
 Diagnostics:
 bug: BYTECODE VERIFICATION FAILED
-  ┌─ tests/bytecode-verify-failure/equality.move:1:1
+  ┌─ tests/bytecode-verify-failure/equality.move:3:9
   │
-1 │ ╭ module 0xc0ffee::m {
-2 │ │   fun equality<T>(x: T, y: T): bool {
-3 │ │         x == y
-4 │ │     }
-5 │ │ }
-  │ ╰─^ ICE failed bytecode verifier: VMError {
+3 │         x == y
+  │         ^^^^^^ ICE failed bytecode verifier: VMError {
     major_status: EQUALITY_OP_TYPE_MISMATCH_ERROR,
     sub_status: None,
     message: None,

@@ -9,7 +9,7 @@ use move_binary_format::file_format::CodeOffset;
 use move_core_types::{u256, value::MoveValue};
 use move_model::{
     ast,
-    ast::{Address, Exp, ExpData, MemoryLabel, TempIndex, TraceKind},
+    ast::{Address, Exp, ExpData, MemoryLabel, Spec, TempIndex, TraceKind},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
     ty::{Type, TypeDisplayContext},
@@ -172,7 +172,7 @@ pub enum Operation {
 
     ReadRef,
     WriteRef,
-    FreezeRef,
+    FreezeRef(/*explicit*/ bool),
     Vector,
 
     // Unary
@@ -265,7 +265,7 @@ impl Operation {
             Operation::Release => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
-            Operation::FreezeRef => false,
+            Operation::FreezeRef(_) => false,
             Operation::Vector => false,
             Operation::Havoc(_) => false,
             Operation::Stop => false,
@@ -417,8 +417,9 @@ pub enum Bytecode {
     Label(AttrId, Label),
     Abort(AttrId, TempIndex),
     Nop(AttrId),
+    SpecBlock(AttrId, Spec),
 
-    // Extended bytecode: spec-only.
+    // Extended bytecode: spec-instrumentation only.
     SaveMem(AttrId, MemoryLabel, QualifiedInstId<StructId>),
     SaveSpecVar(AttrId, MemoryLabel, QualifiedInstId<SpecVarId>),
     Prop(AttrId, PropKind, Exp),
@@ -437,6 +438,7 @@ impl Bytecode {
             | Label(id, ..)
             | Abort(id, ..)
             | Nop(id)
+            | SpecBlock(id, ..)
             | SaveMem(id, ..)
             | SaveSpecVar(id, ..)
             | Prop(id, ..) => *id,
@@ -455,6 +457,7 @@ impl Bytecode {
             | Label(id, ..)
             | Abort(id, ..)
             | Nop(id)
+            | SpecBlock(id, ..)
             | SaveMem(id, ..)
             | SaveSpecVar(id, ..)
             | Prop(id, ..) => id,
@@ -519,6 +522,10 @@ impl Bytecode {
             | Bytecode::Nop(_) => {
                 vec![]
             },
+            Bytecode::SpecBlock(_, _) => {
+                // Specifications are not contributing to read variables
+                vec![]
+            },
             // Note that for all spec-only instructions, we currently return no sources.
             Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
@@ -552,6 +559,7 @@ impl Bytecode {
             | Bytecode::Nop(_)
             | Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
+            | Bytecode::SpecBlock(..)
             | Bytecode::Prop(_, _, _) => Vec::new(),
         }
     }
@@ -969,6 +977,9 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
             Nop(_) => {
                 write!(f, "nop")?;
             },
+            SpecBlock(_, spec) => {
+                write!(f, "{}", self.func_target.global_env().display(spec))?;
+            },
             SaveMem(_, label, qid) => {
                 let env = self.func_target.global_env();
                 write!(f, "@{} := save_mem({})", label.as_usize(), env.display(qid))?;
@@ -1155,8 +1166,12 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             WriteRef => {
                 write!(f, "write_ref")?;
             },
-            FreezeRef => {
-                write!(f, "freeze_ref")?;
+            FreezeRef(explicit) => {
+                if *explicit {
+                    write!(f, "freeze_ref")?;
+                } else {
+                    write!(f, "freeze_ref(implicit)")?;
+                }
             },
             Vector => {
                 write!(f, "vector")?;

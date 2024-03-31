@@ -76,7 +76,7 @@ impl PeersAndMetadata {
     /// Returns all peers. Note: this will return disconnected and unhealthy peers, so
     /// it is not recommended for applications to use this interface. Instead,
     /// `get_connected_peers_and_metadata()` should be used.
-    pub fn get_all_peers(&self) -> Result<Vec<PeerNetworkId>, Error> {
+    pub fn get_all_peers(&self) -> Vec<PeerNetworkId> {
         // Get the cached peers and metadata
         let cached_peers_and_metadata = self.cached_peers_and_metadata.load();
 
@@ -88,7 +88,7 @@ impl PeersAndMetadata {
                 all_peers.push(peer_network_id);
             }
         }
-        Ok(all_peers)
+        all_peers
     }
 
     /// Returns metadata for all peers currently connected to the node

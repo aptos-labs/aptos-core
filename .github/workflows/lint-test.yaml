@@ -118,7 +118,31 @@ jobs:
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+          BUILDKITE_ANALYTICS_TOKEN: ${{ secrets.BUILDKITE_ANALYTICS_TOKEN }}
       - run: echo "Skipping rust unit tests! Unrelated changes detected."
+        if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
+
+  # Run the cached packages build. This is a PR required job.
+  rust-build-cached-packages:
+    needs: file_change_determinator
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-e2e-tests') ||
+        github.event.pull_request.auto_merge != null
+      )
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v4
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+      - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}
+      - name: Run aptos cached packages build test
+        if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
+        run: scripts/cargo_build_aptos_cached_packages.sh --check
+      - run: echo "Skipping cached packages test! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'
 
   # Run the consensus only unit tests

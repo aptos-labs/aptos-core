@@ -1,0 +1,86 @@
+
+Diagnostics:
+error: type `u8` is missing required ability `key`
+  ┌─ tests/checking/abilities/invalid_struct_def.move:4:22
+  │
+2 │     struct Foo<T: key> { x: T }
+  │                - declaration of type parameter `T`
+3 │
+4 │     struct Bar { x: Foo<u8> }
+  │                         ^^
+  │
+  = required by instantiating type parameter `T:key` of struct `Foo`
+
+error: type `T` is missing required ability `key`
+  ┌─ tests/checking/abilities/invalid_struct_def.move:6:25
+  │
+2 │     struct Foo<T: key> { x: T }
+  │                - declaration of type parameter `T`
+  ·
+6 │     struct Baz<T> { x: Foo<T> }
+  │                            ^
+  │
+  = required by instantiating type parameter `T:key` of struct `Foo`
+
+error: type `HasKey` is missing required ability `store`
+   ┌─ tests/checking/abilities/invalid_struct_def.move:15:6
+   │
+15 │         x: HasKey
+   │            ^^^^^^
+   │
+   = required by declaration of field `x`
+
+error: type `Impotent` is missing required ability `drop`
+   ┌─ tests/checking/abilities/invalid_struct_def.move:19:6
+   │
+19 │         x: Impotent
+   │            ^^^^^^^^
+   │
+   = required by declaration of field `x`
+
+error: type `Impotent` is missing required ability `drop`
+   ┌─ tests/checking/abilities/invalid_struct_def.move:28:6
+   │
+28 │         y: Impotent,
+   │            ^^^^^^^^
+   │
+   = required by declaration of field `y`
+
+error: type `Impotent` is missing required ability `drop`
+   ┌─ tests/checking/abilities/invalid_struct_def.move:33:6
+   │
+33 │         x: ConditionalDrop<Impotent>
+   │            ^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = required by instantiating type parameter `T` of struct `ConditionalDrop`
+   = required by declaration of field `x`
+
+error: type `T` is missing required ability `key`
+   ┌─ tests/checking/abilities/invalid_struct_def.move:37:10
+   │
+ 2 │     struct Foo<T: key> { x: T }
+   │                - declaration of type parameter `T`
+   ·
+37 │         x: Foo<T>,
+   │                ^
+   │
+   = required by instantiating type parameter `T:key` of struct `Foo`
+
+error: phantom type `T` can only be used as an argument for another phantom type parameter
+   ┌─ tests/checking/abilities/invalid_struct_def.move:41:6
+   │
+41 │         x: T
+   │            ^
+   │
+   = required by declaration of field `x`
+
+error: phantom type `T` can only be used as an argument for another phantom type parameter
+   ┌─ tests/checking/abilities/invalid_struct_def.move:45:8
+   │
+31 │     struct S<T> has drop {
+   │              - declaration of type parameter `T`
+   ·
+45 │         x: S<T>
+   │              ^
+   │
+   = required by instantiating type parameter `T` of struct `S`

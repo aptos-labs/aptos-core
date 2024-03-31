@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     keyless::{
@@ -35,7 +36,7 @@ pub struct ZeroKnowledgeSig {
     /// The expiration horizon that the circuit should enforce on the expiration date committed in
     /// the nonce. This must be <= `Configuration::max_expiration_horizon_secs`.
     pub exp_horizon_secs: u64,
-    /// An optional extra field (e.g., `"<name>":"<val>") that will be matched publicly in the JWT
+    /// An optional extra field (e.g., `"<name>":"<val>"`) that will be matched publicly in the JWT
     pub extra_field: Option<String>,
     /// Will be set to the override `aud` value that the circuit should match, instead of the `aud`
     /// in the IDC. This will allow users to recover keyless accounts bound to an application that

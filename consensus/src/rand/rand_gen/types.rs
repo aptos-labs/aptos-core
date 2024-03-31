@@ -22,7 +22,14 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::{fmt::Debug, sync::Arc};
 
-const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
+pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
+pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
+
+#[derive(PartialEq)]
+pub enum PathType {
+    Fast,
+    Slow,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
@@ -38,6 +45,7 @@ pub struct Share {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AugmentedData {
     delta: Delta,
+    fast_delta: Option<Delta>,
 }
 
 impl TShare for Share {
@@ -124,7 +132,7 @@ impl TShare for Share {
 }
 
 impl TAugmentedData for AugmentedData {
-    fn generate(rand_config: &RandConfig) -> AugData<Self>
+    fn generate(rand_config: &RandConfig, fast_rand_config: &Option<RandConfig>) -> AugData<Self>
     where
         Self: Sized,
     {
@@ -132,23 +140,61 @@ impl TAugmentedData for AugmentedData {
         rand_config
             .add_certified_delta(&rand_config.author(), delta.clone())
             .expect("Add self delta should succeed");
+
+        let fast_delta = if let Some(fast_config) = fast_rand_config.as_ref() {
+            let fast_delta = fast_config.get_my_delta().clone();
+            fast_config
+                .add_certified_delta(&rand_config.author(), fast_delta.clone())
+                .expect("Add self delta for fast path should succeed");
+            Some(fast_delta)
+        } else {
+            None
+        };
+
         let data = AugmentedData {
             delta: delta.clone(),
+            fast_delta,
         };
         AugData::new(rand_config.epoch(), rand_config.author(), data)
     }
 
-    fn augment(&self, rand_config: &RandConfig, author: &Author) {
-        let AugmentedData { delta } = self;
+    fn augment(
+        &self,
+        rand_config: &RandConfig,
+        fast_rand_config: &Option<RandConfig>,
+        author: &Author,
+    ) {
+        let AugmentedData { delta, fast_delta } = self;
         rand_config
             .add_certified_delta(author, delta.clone())
-            .expect("Add delta should succeed")
+            .expect("Add delta should succeed");
+
+        if let (Some(config), Some(fast_delta)) = (fast_rand_config, fast_delta) {
+            config
+                .add_certified_delta(author, fast_delta.clone())
+                .expect("Add delta for fast path should succeed");
+        }
     }
 
-    fn verify(&self, rand_config: &RandConfig, author: &Author) -> anyhow::Result<()> {
+    fn verify(
+        &self,
+        rand_config: &RandConfig,
+        fast_rand_config: &Option<RandConfig>,
+        author: &Author,
+    ) -> anyhow::Result<()> {
         rand_config
             .derive_apk(author, self.delta.clone())
-            .map(|_| ())
+            .map(|_| ())?;
+
+        ensure!(
+            self.fast_delta.is_some() == fast_rand_config.is_some(),
+            "Fast path delta should be present iff fast_rand_config is present."
+        );
+        if let (Some(config), Some(fast_delta)) = (fast_rand_config, self.fast_delta.as_ref()) {
+            config.derive_apk(author, fast_delta.clone()).map(|_| ())
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -182,16 +228,27 @@ impl TShare for MockShare {
 }
 
 impl TAugmentedData for MockAugData {
-    fn generate(rand_config: &RandConfig) -> AugData<Self>
+    fn generate(rand_config: &RandConfig, _fast_rand_config: &Option<RandConfig>) -> AugData<Self>
     where
         Self: Sized,
     {
         AugData::new(rand_config.epoch(), rand_config.author(), Self)
     }
 
-    fn augment(&self, _rand_config: &RandConfig, _author: &Author) {}
+    fn augment(
+        &self,
+        _rand_config: &RandConfig,
+        _fast_rand_config: &Option<RandConfig>,
+        _author: &Author,
+    ) {
+    }
 
-    fn verify(&self, _rand_config: &RandConfig, _author: &Author) -> anyhow::Result<()> {
+    fn verify(
+        &self,
+        _rand_config: &RandConfig,
+        _fast_rand_config: &Option<RandConfig>,
+        _author: &Author,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 }
@@ -222,13 +279,23 @@ pub trait TShare:
 pub trait TAugmentedData:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
-    fn generate(rand_config: &RandConfig) -> AugData<Self>
+    fn generate(rand_config: &RandConfig, fast_rand_config: &Option<RandConfig>) -> AugData<Self>
     where
         Self: Sized;
 
-    fn augment(&self, rand_config: &RandConfig, author: &Author);
+    fn augment(
+        &self,
+        rand_config: &RandConfig,
+        fast_rand_config: &Option<RandConfig>,
+        author: &Author,
+    );
 
-    fn verify(&self, rand_config: &RandConfig, author: &Author) -> anyhow::Result<()>;
+    fn verify(
+        &self,
+        rand_config: &RandConfig,
+        fast_rand_config: &Option<RandConfig>,
+        author: &Author,
+    ) -> anyhow::Result<()>;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -310,6 +377,49 @@ impl RequestShare {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct FastShare<S> {
+    pub share: RandShare<S>,
+}
+
+impl<S: TShare> FastShare<S> {
+    pub fn new(share: RandShare<S>) -> Self {
+        Self { share }
+    }
+
+    pub fn author(&self) -> &Author {
+        self.share.author()
+    }
+
+    pub fn rand_share(&self) -> RandShare<S> {
+        self.share.clone()
+    }
+
+    pub fn share(&self) -> &S {
+        self.share.share()
+    }
+
+    pub fn metadata(&self) -> &RandMetadata {
+        self.share.metadata()
+    }
+
+    pub fn round(&self) -> Round {
+        self.share.round()
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.share.epoch()
+    }
+
+    pub fn verify(&self, rand_config: &RandConfig) -> anyhow::Result<()> {
+        self.share.verify(rand_config)
+    }
+
+    pub fn share_id(&self) -> ShareId {
+        self.share.share_id()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct AugDataId {
     epoch: u64,
@@ -361,9 +471,15 @@ impl<D: TAugmentedData> AugData<D> {
         &self.author
     }
 
-    pub fn verify(&self, rand_config: &RandConfig, sender: Author) -> anyhow::Result<()> {
+    pub fn verify(
+        &self,
+        rand_config: &RandConfig,
+        fast_rand_config: &Option<RandConfig>,
+        sender: Author,
+    ) -> anyhow::Result<()> {
         ensure!(self.author == sender, "Invalid author");
-        self.data.verify(rand_config, &self.author)?;
+        self.data
+            .verify(rand_config, fast_rand_config, &self.author)?;
         Ok(())
     }
 }
@@ -450,15 +566,15 @@ impl CertifiedAugDataAck {
 
 #[derive(Clone)]
 pub struct RandConfig {
-    pub author: Author,
-    pub epoch: u64,
-    pub validator: ValidatorVerifier,
+    author: Author,
+    epoch: u64,
+    validator: ValidatorVerifier,
     // public parameters of the weighted VUF
-    pub vuf_pp: WvufPP,
+    vuf_pp: WvufPP,
     // key shares for weighted VUF
-    pub keys: Arc<RandKeys>,
+    keys: Arc<RandKeys>,
     // weighted config for weighted VUF
-    pub wconfig: WeightedConfig,
+    wconfig: WeightedConfig,
 }
 
 impl Debug for RandConfig {

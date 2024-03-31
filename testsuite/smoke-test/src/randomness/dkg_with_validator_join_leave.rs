@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     randomness::{decrypt_key_map, num_validators, verify_dkg_transcript, wait_for_dkg_finish},
@@ -6,7 +7,7 @@ use crate::{
 };
 use aptos::test::CliTestFramework;
 use aptos_forge::{Node, Swarm};
-use aptos_types::on_chain_config::{FeatureFlag, Features};
+use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use std::sync::Arc;
 
 #[tokio::test]
@@ -22,13 +23,9 @@ async fn dkg_with_validator_join_leave() {
             conf.epoch_duration_secs = epoch_duration_secs;
             conf.allow_new_validators = true;
 
-            // Ensure vtxn is enabled.
+            // Ensure randomness is enabled.
             conf.consensus_config.enable_validator_txns();
-
-            // Ensure randomness flag is set.
-            let mut features = Features::default();
-            features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
-            conf.initial_features_override = Some(features);
+            conf.randomness_config_override = Some(OnChainRandomnessConfig::default_enabled());
         }))
         .build()
         .await;
