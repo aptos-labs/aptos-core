@@ -183,8 +183,7 @@ Abort if no DKG is in progress.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 1200;
-<b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">FinishRequirement</a>;
 </code></pre>
 
@@ -227,8 +226,7 @@ Abort if no DKG is in progress.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
-<b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">FinishRequirement</a>;
 <b>requires</b> <a href="dkg.md#0x1_dkg_has_incomplete_session">dkg::has_incomplete_session</a>();
 <b>aborts_if</b> <b>false</b>;
