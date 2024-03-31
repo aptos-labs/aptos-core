@@ -1,5 +1,13 @@
 
 Diagnostics:
+error: mutable reference in local `x` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/mutate_full_invalid.move:13:9
+   │
+13 │         *x = 0;
+   │         ^^^^^^ requirement enforced here
+14 │         *f;
+   │         -- conflicting reference `f` used here
+
 error: cannot write to reference in local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_full_invalid.move:18:9
    │

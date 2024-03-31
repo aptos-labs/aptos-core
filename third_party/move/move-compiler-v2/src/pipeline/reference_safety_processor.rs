@@ -159,6 +159,14 @@ pub struct LifetimeState {
     temp_to_label_map: BTreeMap<TempIndex, LifetimeLabel>,
     /// A map from globals to labels. Represents root states of the active graph.
     global_to_label_map: BTreeMap<QualifiedInstId<StructId>, LifetimeLabel>,
+    /// A map indicating which nodes have been derived from the given set of temporaries.
+    /// For example, if we have `label <- borrow_field(f)(src)`, then `label -> src` will be in
+    /// this map. This map is used to deal with a quirk of v1 borrow semantics which allows
+    /// a temporary which was used to derive a node to be used after the borrow again, but
+    /// does not allow the same thing with a temporary which contains a copy of this reference.
+    /// Once we update the v1 bytecode verifier, this should go away, because there is no safety
+    /// reason to not allow the copy.
+    derived_from: BTreeMap<LifetimeLabel, BTreeSet<TempIndex>>,
 }
 
 /// Represents a node of the borrow graph.
@@ -208,13 +216,14 @@ struct BorrowEdge {
 enum BorrowEdgeKind {
     /// Borrows the local at the MemoryLocation in the source node.
     BorrowLocal(bool),
-    /// Borrows the global at the MemoryLocation in the source node.
-    BorrowGlobal(bool),
+    /// Borrows the global at the MemoryLocation in the source node. Since the address
+    /// from which we borrow can be different for each call, they are distinguished by code offset
+    /// -- two borrow_global edges are never the same.
+    BorrowGlobal(bool, CodeOffset),
     /// Borrows a field from a reference.
     BorrowField(bool, FieldId),
-    /// Calls an operation, where the incoming references are used to derive outgoing references. Since every
-    /// call outcome can be different, they are distinguished by code offset -- two call edges are never the
-    /// same.
+    /// Calls an operation, where the incoming references are used to derive outgoing references. Similar
+    /// as for BorrowGlobal, a call offset is used to distinguish different results of calls.
     Call(bool, Operation, CodeOffset),
     /// Freezes a mutable reference.
     Freeze,
@@ -225,7 +234,7 @@ impl BorrowEdgeKind {
         use BorrowEdgeKind::*;
         match self {
             BorrowLocal(is_mut)
-            | BorrowGlobal(is_mut)
+            | BorrowGlobal(is_mut, _)
             | BorrowField(is_mut, _)
             | Call(is_mut, _, _) => *is_mut,
             Freeze => false,
@@ -504,6 +513,11 @@ impl LifetimeState {
         self.node(label).children.iter()
     }
 
+    /// Returns true if the node has incoming mut edges.
+    fn is_mut(&self, label: &LifetimeLabel) -> bool {
+        self.parent_edges(label).any(|(_, e)| e.kind.is_mut())
+    }
+
     /// Returns the children grouped by their edge kind.
     fn grouped_children(
         &self,
@@ -640,6 +654,9 @@ impl LifetimeState {
         if in_use.contains(label) {
             return;
         }
+        // Remove any information about temporaries used to derive this node.
+        self.derived_from.remove(label);
+        // Rempve the node from the graph.
         if let Some(node) = self.graph.remove(label) {
             debug_assert!(node.children.is_empty());
             removed.extend(node.locations.iter().cloned());
@@ -676,7 +693,7 @@ impl LifetimeState {
                 let in_use = self.leaves().keys().cloned().collect();
                 let mut indirectly_removed = BTreeSet::new();
                 self.drop_leaf_node(&label, &in_use, &mut indirectly_removed);
-                // Remove memory locations not longer borrowed.
+                // Remove memory locations no longer borrowed.
                 for location in indirectly_removed {
                     use MemoryLocation::*;
                     match location {
@@ -723,8 +740,9 @@ impl LifetimeState {
     /// Copies a reference from source to destination. This create a new lifetime node and clones the edges
     /// leading into the node associated with the source reference.
     fn copy_ref(&mut self, dest: TempIndex, src: TempIndex) {
-        if let Some(label) = self.label_for_temp(src) {
-            self.temp_to_label_map.insert(dest, *label);
+        if let Some(label) = self.label_for_temp(src).cloned() {
+            self.temp_to_label_map.insert(dest, label);
+            self.derived_from.entry(label).or_default().insert(src);
         }
     }
 
@@ -1019,21 +1037,24 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     ///
     /// If we walk this graph now from the root to the leaves, we can determine safety by directly comparing
     /// hyper edge siblings.
-    fn check_borrow_safety(&mut self, temps_vec: &[TempIndex]) {
+    fn check_borrow_safety(&mut self, exclusive_temps_vec: &[TempIndex]) {
         // First check direct duplicates
-        for (i, temp) in temps_vec.iter().enumerate() {
-            if self.ty(*temp).is_mutable_reference() && temps_vec[i + 1..].contains(temp) {
+        for (i, temp) in exclusive_temps_vec.iter().enumerate() {
+            if self.ty(*temp).is_mutable_reference() && exclusive_temps_vec[i + 1..].contains(temp)
+            {
                 self.exclusive_access_direct_dup_error(*temp)
             }
         }
         // Now build and analyze the hyper graph
-        let temps = &temps_vec.iter().cloned().collect::<BTreeSet<_>>();
+        let exclusive_temps =
+            // Temps which need to be exclusive at this program point.
+            exclusive_temps_vec.iter().cloned().collect::<BTreeSet<_>>();
         let filtered_leaves = self
             .state
             .leaves()
             .into_iter()
             .filter_map(|(l, mut ts)| {
-                ts = ts.intersection(temps).cloned().collect();
+                ts = ts.intersection(&exclusive_temps).cloned().collect();
                 if !ts.is_empty() {
                     Some((l, ts))
                 } else {
@@ -1091,8 +1112,10 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     targets.insert(target);
                     if edge.kind.is_mut() {
                         if let Some(ts) = filtered_leaves.get(&target) {
-                            let mut inter =
-                                ts.intersection(temps).cloned().collect::<BTreeSet<_>>();
+                            let mut inter = ts
+                                .intersection(&exclusive_temps)
+                                .cloned()
+                                .collect::<BTreeSet<_>>();
                             if !inter.is_empty() {
                                 if !self.state.is_leaf(&target) {
                                     // A mut leaf node must have exclusive access
@@ -1108,6 +1131,35 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                     self.exclusive_access_indirect_dup_error(&hyper, &mapped_temps)
                 }
                 hyper_nodes.insert(targets);
+            }
+        }
+        // Temps containing mut refs alive after this program point and referring to nodes
+        // in the exclusive set are not allowed in v1 borrow semantics unless they are used to
+        // derive the exclusive nodes. Consider
+        // `let r = &mut s; let r1 = r; let x = &mut r.f; *x; *r1`: this is not allowed in v1.
+        // In contrast, `let r = &mut s; let x = &mut r.f; *x; *r` *is* allowed. The reason
+        // is that `x` is derived from `r` but not (for the first example) from `r1`.
+        let derived = self
+            .state
+            .derived_from
+            .values()
+            .flatten()
+            .collect::<BTreeSet<_>>();
+        for mut_alive_after in self.alive.after.keys().cloned().filter(|t| {
+            self.ty(*t).is_mutable_reference()
+                && !exclusive_temps.contains(t)
+                && !derived.contains(t)
+        }) {
+            if let Some(label) = self.state.label_for_temp(mut_alive_after) {
+                if let Some(conflict) = filtered_leaves.keys().find(|exclusive_label| {
+                    self.state.is_mut(exclusive_label)
+                        && self.state.is_ancestor(label, exclusive_label)
+                }) {
+                    self.exclusive_access_borrow_error(
+                        conflict,
+                        filtered_leaves.get(conflict).unwrap(),
+                    )
+                }
             }
         }
     }
@@ -1282,7 +1334,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             e.loc.clone(),
             format!("{}{}{}", prefix, mut_prefix, match &e.kind {
                 BorrowLocal(_) => "local borrow",
-                BorrowGlobal(_) => "global borrow",
+                BorrowGlobal(..) => "global borrow",
                 BorrowField(..) => "field borrow",
                 Call(..) => "call result",
                 Freeze => "freeze",
@@ -1397,7 +1449,11 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         let is_mut = self.ty(dest).is_mutable_reference();
         self.state.add_edge(
             label,
-            BorrowEdge::new(BorrowEdgeKind::BorrowGlobal(is_mut), loc, child),
+            BorrowEdge::new(
+                BorrowEdgeKind::BorrowGlobal(is_mut, self.code_offset),
+                loc,
+                child,
+            ),
         );
     }
 
@@ -1411,6 +1467,11 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     ) {
         let label = self.state.make_temp(src, self.code_offset, 0, false);
         let child = self.state.replace_ref(dest, self.code_offset, 1);
+        self.state
+            .derived_from
+            .entry(child)
+            .or_default()
+            .insert(src);
         let loc = self.cur_loc();
         let is_mut = self.ty(dest).is_mutable_reference();
         let struct_env = self.global_env().get_struct(struct_.to_qualified_id());
@@ -1457,6 +1518,11 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                             false,
                         );
                         let child = &dest_labels[dest];
+                        self.state
+                            .derived_from
+                            .entry(*child)
+                            .or_default()
+                            .insert(*src);
                         self.state.add_edge(
                             label,
                             BorrowEdge::new(
@@ -1515,7 +1581,18 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             let qualifier = if explicit { "" } else { "implicitly " };
             for (parent, edge) in self.state.parent_edges(label) {
                 for sibling_edge in self.state.children(&parent) {
-                    if &sibling_edge.target == label {
+                    if &sibling_edge.target == label
+                        || sibling_edge.kind == edge.kind
+                            && matches!(edge.kind, BorrowEdgeKind::Call(..))
+                        || !sibling_edge.kind.overlaps(&edge.kind)
+                    {
+                        // The sibling edge is harmless if
+                        // (a) it is not actually a sibling but leads to the same target
+                        // (b) the kind is the same and stems from a call This happens e.g. for a
+                        //     call which returns multiple references, as in `(r1, r2) = foo(r)`,
+                        //     then even though we have different edges with different targets,
+                        //     they stem from the same borrow.
+                        // (c) if the sibling has no overlap, as in `&mut r.f1` and `&mut r.f2`.
                         continue;
                     }
                     if self.state.is_mut_path(sibling_edge) {
@@ -1538,15 +1615,22 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             }
             // Handle case (b): check whether there is any alive mutable reference
             // which overlaps with the frozen reference.
+            let derived = self
+                .state
+                .derived_from
+                .values()
+                .flatten()
+                .collect::<BTreeSet<_>>();
             for (temp, other_label) in self.state.temp_to_label_map.iter() {
-                if temp == &src || !self.ty(*temp).is_mutable_reference() {
+                if temp == &src || !self.ty(*temp).is_mutable_reference() || derived.contains(temp)
+                {
                     continue;
                 }
                 if other_label == label {
                     // Compute all visible usages at leaves to show the conflict.
                     // It is not enough to just show the usage of `temp`, because the
                     // actual usage might be something derived from it, and `temp`
-                    // is not longer used.
+                    // is no longer used.
                     let leaves = self.state.leaves();
                     let mut show: BTreeSet<(bool, Loc)> = BTreeSet::new();
                     let mut todo = vec![*other_label];
@@ -1693,7 +1777,7 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
         // Construct step context
         let mut step = self.new_step(code_offset, instr.get_attr_id(), state);
 
-        // Preprocessing: release all temps in the label map which are not longer alive at this point.
+        // Preprocessing: release all temps in the label map which are no longer alive at this point.
         step.state.debug_print("before enter release");
         let alive_temps = step.alive.before_set();
         for temp in step
@@ -1735,6 +1819,9 @@ impl<'env> TransferFunctions for LifeTimeAnalysis<'env> {
                     .cloned()
                     .collect_vec();
                 step.check_borrow_safety(&exclusive_refs)
+            },
+            Assign(_, _, src, _) if step.ty(*src).is_mutable_reference() => {
+                step.check_borrow_safety(&[*src])
             },
             _ => {},
         }
@@ -1922,9 +2009,9 @@ impl<'a> Display for BorrowEdgeDisplay<'a> {
         use BorrowEdgeKind::*;
         (match &edge.kind {
             BorrowLocal(is_mut) => write!(f, "borrow({})", is_mut),
-            BorrowGlobal(is_mut) => write!(f, "borrow_global({})", is_mut),
+            BorrowGlobal(is_mut, offs) => write!(f, "borrow_global({}, {})", is_mut, offs),
             BorrowField(is_mut, _) => write!(f, "borrow_field({})", is_mut),
-            Call(is_mut, _, _) => write!(f, "call({})", is_mut),
+            Call(is_mut, _, offs) => write!(f, "call({}, {})", is_mut, offs),
             Freeze => write!(f, "freeze"),
         })?;
         if display_child {
@@ -2006,6 +2093,7 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
             graph,
             temp_to_label_map,
             global_to_label_map,
+            derived_from,
         } = &self.1;
         let pool = self.0.global_env().symbol_pool();
         writeln!(
@@ -2032,7 +2120,26 @@ impl<'a> Display for LifetimeStateDisplay<'a> {
                 .iter()
                 .map(|(str, label)| format!("{}={}", self.0.global_env().display(str), label))
                 .join(",")
-        )
+        )?;
+        if !derived_from.is_empty() {
+            writeln!(
+                f,
+                "derived-from: {}",
+                derived_from
+                    .iter()
+                    .map(|(l, ts)| {
+                        format!(
+                            "{}={}",
+                            l,
+                            ts.iter()
+                                .map(|t| self.0.get_local_raw_name(*t).display(pool).to_string())
+                                .join(",")
+                        )
+                    })
+                    .join(",")
+            )?
+        }
+        Ok(())
     }
 }
 
