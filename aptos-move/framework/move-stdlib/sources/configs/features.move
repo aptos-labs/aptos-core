@@ -510,6 +510,15 @@ module std::features {
         is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
     }
 
+    /// Whether we use more efficient native implementation of computing object derived address
+    const OBJECT_NATIVE_DERIVED_ADDRESS: u64 = 62;
+
+    public fun get_object_native_derived_address_feature(): u64 { OBJECT_NATIVE_DERIVED_ADDRESS }
+
+    public fun object_native_derived_address_enabled(): bool acquires Features {
+        is_enabled(OBJECT_NATIVE_DERIVED_ADDRESS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
