@@ -72,6 +72,25 @@ module aptos_framework::transaction_validation {
         });
     }
 
+    /// Called in prologue to optionally hold some amount for special txns (e.g. randomness txns).
+    /// `release_to_balance()` should be invoked in the corresponding epilogue with the same arguments.
+    fun hold_from_balance(gas_payer: address, amount: Option<u64>) {
+        if (option::is_some(&amount)) {
+            let amount = option::extract(&mut amount);
+            let balance = coin::balance<AptosCoin>(gas_payer);
+            assert!(balance >= amount, error::invalid_state(PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT));
+            transaction_fee::burn_fee(gas_payer, amount);
+        }
+    }
+
+    /// Called in epilogue to optionally released the amount held in prologue for special txns (e.g. randomness txns).
+    fun release_to_balance(gas_payer: address, amount: Option<u64>) {
+        if (option::is_some(&amount)) {
+            let amount = option::extract(&mut amount);
+            transaction_fee::mint_and_refund(gas_payer, amount);
+        }
+    }
+
     fun prologue_common(
         sender: signer,
         gas_payer: address,
@@ -81,7 +100,6 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        required_deposit: Option<u64>,
     ) {
         assert!(
             timestamp::now_seconds() < txn_expiration_time,
@@ -139,12 +157,6 @@ module aptos_framework::transaction_validation {
         );
         let balance = coin::balance<AptosCoin>(gas_payer);
         assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
-
-        if (option::is_some(&required_deposit)) {
-            let required_deposit = *option::borrow(&mut required_deposit);
-            assert!(balance >= required_deposit, error::invalid_state(PROLOGUE_EINSUFFICIENT_BALANCE_FOR_REQUIRED_DEPOSIT));
-            transaction_fee::burn_fee(gas_payer, required_deposit);
-        }
     }
 
     fun script_prologue(
@@ -155,19 +167,10 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        script_hash: vector<u8>,
+        _script_hash: vector<u8>,
     ) {
-        script_prologue_v2(
-            sender,
-            txn_sequence_number,
-            txn_public_key,
-            txn_gas_price,
-            txn_max_gas_units,
-            txn_expiration_time,
-            chain_id,
-            script_hash,
-            option::none(),
-        )
+        let gas_payer = signer::address_of(&sender);
+        prologue_common(sender, gas_payer, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
     fun script_prologue_v2(
@@ -178,21 +181,12 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        _script_hash: vector<u8>,
+        script_hash: vector<u8>,
         required_deposit: Option<u64>,
     ) {
         let gas_payer = signer::address_of(&sender);
-        prologue_common(
-            sender,
-            gas_payer,
-            txn_sequence_number,
-            txn_public_key,
-            txn_gas_price,
-            txn_max_gas_units,
-            txn_expiration_time,
-            chain_id,
-            required_deposit,
-        )
+        script_prologue(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id, script_hash);
+        hold_from_balance(gas_payer, required_deposit);
     }
 
     fun multi_agent_script_prologue(
@@ -216,7 +210,6 @@ module aptos_framework::transaction_validation {
             txn_max_gas_units,
             txn_expiration_time,
             chain_id,
-            option::none(),
         );
         multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes);
     }
@@ -267,20 +260,22 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        fee_payer_script_prologue_v2(
+        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
+        prologue_common(
             sender,
+            fee_payer_address,
             txn_sequence_number,
             txn_sender_public_key,
-            secondary_signer_addresses,
-            secondary_signer_public_key_hashes,
-            fee_payer_address,
-            fee_payer_public_key_hash,
             txn_gas_price,
             txn_max_gas_units,
             txn_expiration_time,
             chain_id,
-            option::none(),
-        )
+        );
+        multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes);
+        assert!(
+            fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
+            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
+        );
     }
 
     fun fee_payer_script_prologue_v2(
@@ -297,23 +292,20 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
         required_deposit: Option<u64>,
     ) {
-        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
-        prologue_common(
+        fee_payer_script_prologue(
             sender,
-            fee_payer_address,
             txn_sequence_number,
             txn_sender_public_key,
+            secondary_signer_addresses,
+            secondary_signer_public_key_hashes,
+            fee_payer_address,
+            fee_payer_public_key_hash,
             txn_gas_price,
             txn_max_gas_units,
             txn_expiration_time,
             chain_id,
-            required_deposit,
         );
-        multi_agent_common_prologue(secondary_signer_addresses, secondary_signer_public_key_hashes);
-        assert!(
-            fee_payer_public_key_hash == account::get_authentication_key(fee_payer_address),
-            error::invalid_argument(PROLOGUE_EINVALID_ACCOUNT_AUTH_KEY),
-        );
+        hold_from_balance(fee_payer_address, required_deposit);
     }
 
     /// Epilogue function is run after a transaction is successfully executed.
@@ -326,11 +318,10 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64
     ) {
         let addr = signer::address_of(&account);
-        epilogue_gas_payer_v2(account, addr, storage_fee_refunded, txn_gas_price, txn_max_gas_units, gas_units_remaining, option::none());
+        epilogue_gas_payer(account, addr, storage_fee_refunded, txn_gas_price, txn_max_gas_units, gas_units_remaining);
     }
 
-    /// Epilogue function is run after a transaction is successfully executed.
-    /// Called by the Adapter
+    /// `epilogue()` then optionally return the amount held in prologue to the gas payer.
     fun epilogue_v2(
         account: signer,
         storage_fee_refunded: u64,
@@ -339,8 +330,15 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64,
         required_deposit: Option<u64>,
     ) {
-        let addr = signer::address_of(&account);
-        epilogue_gas_payer_v2(account, addr, storage_fee_refunded, txn_gas_price, txn_max_gas_units, gas_units_remaining, required_deposit);
+        let gas_payer = signer::address_of(&account);
+        epilogue(
+            account,
+            storage_fee_refunded,
+            txn_gas_price,
+            txn_max_gas_units,
+            gas_units_remaining,
+        );
+        release_to_balance(gas_payer, required_deposit);
     }
 
     /// Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
@@ -353,30 +351,6 @@ module aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         gas_units_remaining: u64
     ) {
-        epilogue_gas_payer_v2(
-            account,
-            gas_payer,
-            storage_fee_refunded,
-            txn_gas_price,
-            txn_max_gas_units,
-            gas_units_remaining,
-            option::none(),
-        )
-    }
-
-    fun epilogue_gas_payer_v2(
-        account: signer,
-        gas_payer: address,
-        storage_fee_refunded: u64,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        gas_units_remaining: u64,
-        required_deposit: Option<u64>,
-    ) {
-        if (option::is_some(&required_deposit)) {
-            transaction_fee::mint_and_refund(gas_payer, option::extract(&mut required_deposit));
-        };
-
         assert!(txn_max_gas_units >= gas_units_remaining, error::invalid_argument(EOUT_OF_GAS));
         let gas_used = txn_max_gas_units - gas_units_remaining;
 
@@ -418,5 +392,27 @@ module aptos_framework::transaction_validation {
         // Increment sequence number
         let addr = signer::address_of(&account);
         account::increment_sequence_number(addr);
+    }
+
+    /// `epilogue_gas_payer()` but optionally return the amount held in prologue to gas payer.
+    fun epilogue_gas_payer_v2(
+        account: signer,
+        gas_payer: address,
+        storage_fee_refunded: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        gas_units_remaining: u64,
+        required_deposit: Option<u64>,
+    ) {
+        epilogue_gas_payer(
+            account,
+            gas_payer,
+            storage_fee_refunded,
+            txn_gas_price,
+            txn_max_gas_units,
+            gas_units_remaining,
+        );
+        release_to_balance(gas_payer, required_deposit);
+
     }
 }

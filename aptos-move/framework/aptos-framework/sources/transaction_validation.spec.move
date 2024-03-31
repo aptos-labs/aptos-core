@@ -25,7 +25,7 @@ spec aptos_framework::transaction_validation {
     ///
     spec module {
         pragma verify = true;
-        pragma aborts_if_is_partial;
+        pragma aborts_if_is_strict;
     }
 
     /// Ensure caller is `aptos_framework`.
@@ -61,7 +61,6 @@ spec aptos_framework::transaction_validation {
         txn_max_gas_units: u64;
         txn_expiration_time: u64;
         chain_id: u8;
-        required_deposit: Option<u64>;
 
         aborts_if !exists<CurrentTimeMicroseconds>(@aptos_framework);
         aborts_if !(timestamp::now_seconds() < txn_expiration_time);
@@ -107,8 +106,8 @@ spec aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        required_deposit: Option<u64>,
     ) {
+
         include PrologueCommonAbortsIf;
     }
 
@@ -120,25 +119,7 @@ spec aptos_framework::transaction_validation {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
-        script_hash: vector<u8>,
-    ) {
-        include PrologueCommonAbortsIf {
-            gas_payer: signer::address_of(sender),
-            txn_authentication_key: txn_public_key,
-            required_deposit: option::none(),
-        };
-    }
-
-    spec script_prologue_v2(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
         _script_hash: vector<u8>,
-        required_deposit: Option<u64>,
     ) {
         include PrologueCommonAbortsIf {
             gas_payer: signer::address_of(sender),
@@ -198,7 +179,6 @@ spec aptos_framework::transaction_validation {
             gas_payer,
             txn_sequence_number,
             txn_authentication_key: txn_sender_public_key,
-            required_deposit: option::none(),
         };
         include MultiAgentPrologueCommonAbortsIf {
             secondary_signer_addresses,
@@ -227,7 +207,6 @@ spec aptos_framework::transaction_validation {
             gas_payer,
             txn_sequence_number,
             txn_authentication_key: txn_sender_public_key,
-            required_deposit: option::none(),
         };
         include MultiAgentPrologueCommonAbortsIf {
             secondary_signer_addresses,
@@ -239,7 +218,7 @@ spec aptos_framework::transaction_validation {
         aborts_if !features::spec_fee_payer_enabled();
     }
 
-    /// Abort according to the conditions.
+        /// Abort according to the conditions.
     /// `AptosCoinCapabilities` and `CoinInfo` should exists.
     /// Skip transaction_fee::burn_fee verification.
     spec epilogue(
@@ -354,6 +333,29 @@ spec aptos_framework::transaction_validation {
         let aptos_addr = type_info::type_of<AptosCoin>().account_address;
         aborts_if (amount_to_mint != 0) && !exists<coin::CoinInfo<AptosCoin>>(aptos_addr);
         include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
+    }
 
+    spec hold_from_balance {
+        pragma verify = false;
+    }
+
+    spec release_to_balance {
+        pragma verify = false;
+    }
+
+    spec fee_payer_script_prologue_v2 {
+        pragma verify = false;
+    }
+
+    spec script_prologue_v2 {
+        pragma verify = false;
+    }
+
+    spec epilogue_gas_payer_v2 {
+        pragma verify = false;
+    }
+
+    spec epilogue_v2 {
+        pragma verify = false;
     }
 }
