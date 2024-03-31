@@ -24,6 +24,8 @@ module aptos_framework::transaction_context {
     /// from other ways of generating unique addresses.
     native fun generate_unique_address(): address;
 
+    public native fun create_user_derived_object_address(source: address, derive_from: address): address;
+
     /// Return a aptos unique identifier. Internally calls
     /// the private function `generate_unique_address`. This function is
     /// created for to feature gate the `generate_unique_address` function.

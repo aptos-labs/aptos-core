@@ -14,6 +14,7 @@
 module aptos_framework::primary_fungible_store {
     use aptos_framework::fungible_asset::{Self, FungibleAsset, FungibleStore, Metadata, MintRef, TransferRef, BurnRef};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeriveRef};
+    use aptos_framework::transaction_context;
 
     use std::option::Option;
     use std::signer;
@@ -87,7 +88,7 @@ module aptos_framework::primary_fungible_store {
     /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        object::create_user_derived_object_address(owner, metadata_addr)
+        transaction_context::create_user_derived_object_address(owner, metadata_addr)
     }
 
     #[view]
