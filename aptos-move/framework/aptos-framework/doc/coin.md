@@ -1216,7 +1216,7 @@ Get the paired fungible asset metadata object of a coin type. If not exist, retu
     //     <b>return</b> <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(@aptos_fungible_asset)
     // } <b>else</b> {
     // }
-    <a href="object.md#0x1_object_address_to_object">object::address_to_object</a>&lt;Metadata&gt;(@aptos_fungible_asset)
+    <a href="object.md#0x1_object_address_to_object_unchecked">object::address_to_object_unchecked</a>&lt;Metadata&gt;(@aptos_fungible_asset)
 }
 </code></pre>
 

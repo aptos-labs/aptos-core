@@ -177,6 +177,10 @@ module aptos_framework::object {
         Object<T> { inner: object }
     }
 
+    public(friend) fun address_to_object_unchecked<T: key>(object: address): Object<T> {
+        Object<T> { inner: object }
+    }
+
     /// Returns true if there exists an object or the remnants of an object.
     public fun is_object(object: address): bool {
         exists<ObjectCore>(object)

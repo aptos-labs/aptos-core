@@ -262,7 +262,7 @@ module aptos_framework::coin {
         //     return object::address_to_object<Metadata>(@aptos_fungible_asset)
         // } else {
         // }
-        object::address_to_object<Metadata>(@aptos_fungible_asset)
+        object::address_to_object_unchecked<Metadata>(@aptos_fungible_asset)
     }
 
     /// Get the paired fungible asset metadata object of a coin type, create if not exist.

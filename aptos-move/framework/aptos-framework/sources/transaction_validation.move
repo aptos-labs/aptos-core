@@ -135,10 +135,10 @@ module aptos_framework::transaction_validation {
         let apt_fa = coin::apt_fa_metadata(); // ensure_paired_metadata<AptosCoin>();
 
         let max_transaction_fee = txn_gas_price * txn_max_gas_units;
-        assert!(
-            primary_fungible_store::primary_store_exists(gas_payer, apt_fa),
-            error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
-        );
+        // assert!(
+        //     primary_fungible_store::primary_store_exists(gas_payer, apt_fa),
+        //     error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+        // );
         let balance = primary_fungible_store::balance(gas_payer, apt_fa);
         // let balance = coin::balance<AptosCoin>(gas_payer);
         assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
