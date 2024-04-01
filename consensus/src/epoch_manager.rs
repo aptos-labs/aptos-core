@@ -1319,6 +1319,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             Err(anyhow::anyhow!("Injected error in process_message"))
         });
 
+        info!("ConsensusMsg::{}", consensus_msg.name());
+
         if let ConsensusMsg::ProposalMsg(proposal) = &consensus_msg {
             observe_block(
                 proposal.proposal().timestamp_usecs(),
@@ -1395,6 +1397,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             ConsensusMsg::ProposalMsg(_)
             | ConsensusMsg::SyncInfo(_)
             | ConsensusMsg::VoteMsg(_)
+            | ConsensusMsg::OrderVoteMsg(_)
             | ConsensusMsg::CommitVoteMsg(_)
             | ConsensusMsg::CommitDecisionMsg(_)
             | ConsensusMsg::BatchMsg(_)
