@@ -120,7 +120,9 @@ impl UnverifiedEvent {
             },
             UnverifiedEvent::OrderVoteMsg(v) => {
                 if !self_message {
+                    info!("ReceivedOrderVoteUnverifiedEvent");
                     v.verify(validator)?;
+                    info!("VerifiedOrderVoteUnverifiedEvent");
                     counters::VERIFY_MSG
                         .with_label_values(&["order_vote"])
                         .observe(start_time.elapsed().as_secs_f64());
@@ -899,6 +901,7 @@ impl RoundManager {
 
     async fn broadcast_order_vote(&mut self, vote: &Vote) -> anyhow::Result<()> {
         if let Some(proposed_block) = self.block_store.get_block(vote.vote_data().proposed().id()) {
+            // Generate an order vote with ledger_info = proposed_block
             info!("BrodcastOrderVoteBlockFound");
             let vote_proposal = proposed_block.vote_proposal();
             let order_vote_result = self
