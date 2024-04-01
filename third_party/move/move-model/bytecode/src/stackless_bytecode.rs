@@ -172,7 +172,7 @@ pub enum Operation {
 
     ReadRef,
     WriteRef,
-    FreezeRef(/*explicit*/ bool),
+    FreezeRef,
     Vector,
 
     // Unary
@@ -265,7 +265,7 @@ impl Operation {
             Operation::Release => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
-            Operation::FreezeRef(_) => false,
+            Operation::FreezeRef => false,
             Operation::Vector => false,
             Operation::Havoc(_) => false,
             Operation::Stop => false,
@@ -1166,12 +1166,8 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             WriteRef => {
                 write!(f, "write_ref")?;
             },
-            FreezeRef(explicit) => {
-                if *explicit {
-                    write!(f, "freeze_ref")?;
-                } else {
-                    write!(f, "freeze_ref(implicit)")?;
-                }
+            FreezeRef => {
+                write!(f, "freeze_ref")?;
             },
             Vector => {
                 write!(f, "vector")?;
