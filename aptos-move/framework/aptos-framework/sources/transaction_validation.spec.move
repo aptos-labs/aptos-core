@@ -343,19 +343,19 @@ spec aptos_framework::transaction_validation {
         pragma verify = false;
     }
 
-    spec fee_payer_script_prologue_v2 {
+    spec fee_payer_script_prologue_gas_deposit {
         pragma verify = false;
     }
 
-    spec script_prologue_v2 {
+    spec script_prologue_gas_deposit {
         pragma verify = false;
     }
 
-    spec epilogue_gas_payer_v2 {
+    spec epilogue_gas_payer_gas_deposit {
         pragma verify = false;
     }
 
-    spec epilogue_v2 {
+    spec epilogue_gas_deposit {
         pragma verify = false;
     }
 }

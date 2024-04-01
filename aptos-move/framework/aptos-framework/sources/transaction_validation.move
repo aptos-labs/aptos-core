@@ -173,7 +173,7 @@ module aptos_framework::transaction_validation {
         prologue_common(sender, gas_payer, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
-    fun script_prologue_v2(
+    fun script_prologue_gas_deposit(
         sender: signer,
         txn_sequence_number: u64,
         txn_public_key: vector<u8>,
@@ -278,7 +278,7 @@ module aptos_framework::transaction_validation {
         );
     }
 
-    fun fee_payer_script_prologue_v2(
+    fun fee_payer_script_prologue_gas_deposit(
         sender: signer,
         txn_sequence_number: u64,
         txn_sender_public_key: vector<u8>,
@@ -322,7 +322,7 @@ module aptos_framework::transaction_validation {
     }
 
     /// `epilogue()` then optionally return the amount held in prologue to the gas payer.
-    fun epilogue_v2(
+    fun epilogue_gas_deposit(
         account: signer,
         storage_fee_refunded: u64,
         txn_gas_price: u64,
@@ -395,7 +395,7 @@ module aptos_framework::transaction_validation {
     }
 
     /// `epilogue_gas_payer()` but optionally return the amount held in prologue to gas payer.
-    fun epilogue_gas_payer_v2(
+    fun epilogue_gas_payer_gas_deposit(
         account: signer,
         gas_payer: address,
         storage_fee_refunded: u64,

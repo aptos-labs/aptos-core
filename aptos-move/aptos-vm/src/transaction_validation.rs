@@ -36,14 +36,14 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         module_addr: CORE_CODE_ADDRESS,
         module_name: Identifier::new("transaction_validation").unwrap(),
         fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
-        fee_payer_prologue_v2_name: Identifier::new("fee_payer_script_prologue_v2").unwrap(),
+        fee_payer_prologue_gas_deposit_name: Identifier::new("fee_payer_script_prologue_gas_deposit").unwrap(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
-        script_prologue_v2_name: Identifier::new("script_prologue_v2").unwrap(),
+        script_prologue_gas_deposit_name: Identifier::new("script_prologue_gas_deposit").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
-        user_epilogue_v2_name: Identifier::new("epilogue_v2").unwrap(),
+        user_epilogue_gas_deposit_name: Identifier::new("epilogue_gas_deposit").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
-        user_epilogue_gas_payer_v2_name: Identifier::new("epilogue_gas_payer_v2").unwrap(),
+        user_epilogue_gas_payer_gas_deposit_name: Identifier::new("epilogue_gas_payer_gas_deposit").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
@@ -52,14 +52,14 @@ pub struct TransactionValidation {
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
     pub fee_payer_prologue_name: Identifier,
-    pub fee_payer_prologue_v2_name: Identifier,
+    pub fee_payer_prologue_gas_deposit_name: Identifier,
     pub script_prologue_name: Identifier,
-    pub script_prologue_v2_name: Identifier,
+    pub script_prologue_gas_deposit_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
-    pub user_epilogue_v2_name: Identifier,
+    pub user_epilogue_gas_deposit_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
-    pub user_epilogue_gas_payer_v2_name: Identifier,
+    pub user_epilogue_gas_payer_gas_deposit_name: Identifier,
 }
 
 impl TransactionValidation {
@@ -114,7 +114,7 @@ pub(crate) fn run_script_prologue(
         if txn_data.required_deposit.is_some() {
             args.push(txn_data.required_deposit.as_move_value());
             (
-                &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_v2_name,
+                &APTOS_TRANSACTION_VALIDATION.fee_payer_prologue_gas_deposit_name,
                 args,
             )
         } else {
@@ -149,7 +149,7 @@ pub(crate) fn run_script_prologue(
         ];
         if txn_data.required_deposit.is_some() {
             args.push(txn_data.required_deposit.as_move_value());
-            (&APTOS_TRANSACTION_VALIDATION.script_prologue_v2_name, args)
+            (&APTOS_TRANSACTION_VALIDATION.script_prologue_gas_deposit_name, args)
         } else {
             (&APTOS_TRANSACTION_VALIDATION.script_prologue_name, args)
         }
@@ -228,7 +228,7 @@ fn run_epilogue(
             if txn_data.required_deposit.is_some() {
                 args.push(txn_data.required_deposit.as_move_value());
                 (
-                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_v2_name,
+                    &APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_payer_gas_deposit_name,
                     args,
                 )
             } else {
@@ -257,7 +257,7 @@ fn run_epilogue(
             ];
             if txn_data.required_deposit.is_some() {
                 args.push(txn_data.required_deposit.as_move_value());
-                (&APTOS_TRANSACTION_VALIDATION.user_epilogue_v2_name, args)
+                (&APTOS_TRANSACTION_VALIDATION.user_epilogue_gas_deposit_name, args)
             } else {
                 (&APTOS_TRANSACTION_VALIDATION.user_epilogue_name, args)
             }
