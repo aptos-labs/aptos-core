@@ -6,12 +6,18 @@ use aptos_framework::BuiltPackage;
 use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     account_address::AccountAddress,
+    move_utils::{as_move_value::AsMoveValue, MemberId},
     on_chain_config::OnChainConfig,
     randomness::PerBlockRandomness,
     transaction::{ExecutionStatus, Script, TransactionStatus},
 };
-use claims::assert_ok;
-use move_core_types::{ident_str, language_storage::ModuleId, vm_status::AbortLocation};
+use claims::{assert_gt, assert_lt, assert_ok};
+use move_core_types::{
+    ident_str,
+    language_storage::ModuleId,
+    value::{serialize_values, MoveValue},
+    vm_status::AbortLocation,
+};
 
 // Error codes from randomness module.
 const E_API_USE_SUSCEPTIBLE_TO_TEST_AND_ABORT: u64 = 1;
@@ -114,16 +120,76 @@ fn test_unbiasable_annotation() {
     } else {
         unreachable!("Non-annotated entry call function should result in Move abort")
     }
+}
 
-    // Insufficient balance for required deposit should lead to discard.
-    let low_balance_account = h.new_account_with_balance_and_sequence_number(1, 789);
-    let status = h.run_entry_function(
-        &low_balance_account,
-        str::parse("0x1::test::ok_if_annotated_and_using_randomness").unwrap(),
-        vec![],
-        vec![],
-    );
+#[test]
+fn test_undergas_attack_prevention() {
+    let mut h = MoveHarness::new();
+    deploy_code(AccountAddress::ONE, "randomness.data/pack", &mut h)
+        .expect("building package must succeed");
+    set_randomness_seed(&mut h);
+
+    // Modify gas parameters so the required deposit for randomness txns is 234_000_000 when gas price is 1.
+    h.modify_gas_schedule(|gas_params| {
+        gas_params.vm.txn.max_execution_gas = 200_000_000.into();
+        gas_params.vm.txn.max_io_gas = 30_000_000.into();
+        gas_params.vm.txn.max_storage_fee = 4_000_000.into();
+        gas_params.vm.txn.maximum_number_of_gas_units = 234_000_001.into();
+    });
+
+    h.set_default_gas_unit_price(1);
+
+    // A function to send some amount to 2 people where how to split between the 2 is randomized.
+    let func: MemberId = str::parse("0x1::test::transfer_lucky_money").unwrap();
+    let recipient_0 = h.new_account_with_balance_and_sequence_number(0, 11);
+    let recipient_1 = h.new_account_with_balance_and_sequence_number(0, 12);
+
+    // A txn should be discarded if the sender balance is not enough to pay required deposit.
+    let sender = h.new_account_with_balance_and_sequence_number(999, 123);
+    let args = vec![
+        1_000_000_000_u64.as_move_value(),
+        MoveValue::Address(*recipient_0.address()),
+        MoveValue::Address(*recipient_1.address()),
+    ];
+    let status = h.run_entry_function(&sender, func.clone(), vec![], serialize_values(&args));
     assert!(status.is_discarded());
+    assert_eq!(999, h.read_aptos_balance(sender.address()));
+    assert_eq!(0, h.read_aptos_balance(recipient_0.address()));
+    assert_eq!(0, h.read_aptos_balance(recipient_1.address()));
+
+    // A txn should abort but be kept if the sender doesn't have enough balance to complete the transfer.
+    let sender = h.new_account_with_balance_and_sequence_number(234_999_999, 456);
+    let args = vec![
+        1_000_000_000_u64.as_move_value(),
+        MoveValue::Address(*recipient_0.address()),
+        MoveValue::Address(*recipient_1.address()),
+    ];
+    let status = h.run_entry_function(&sender, func.clone(), vec![], serialize_values(&args));
+    let status = assert_ok!(status.as_kept_status());
+    assert!(matches!(status, ExecutionStatus::MoveAbort { .. }));
+    let sender_balance = h.read_aptos_balance(sender.address());
+    assert_gt!(sender_balance, 234_000_000);
+    assert_lt!(sender_balance, 234_999_999);
+    assert_eq!(0, h.read_aptos_balance(recipient_0.address()));
+    assert_eq!(0, h.read_aptos_balance(recipient_1.address()));
+
+    // Otherwise, the txn should finish normally.
+    let sender = h.new_account_with_balance_and_sequence_number(1_234_999_999, 789);
+    let args = vec![
+        1_000_000_000_u64.as_move_value(),
+        MoveValue::Address(*recipient_0.address()),
+        MoveValue::Address(*recipient_1.address()),
+    ];
+    let status = h.run_entry_function(&sender, func.clone(), vec![], serialize_values(&args));
+    let status = assert_ok!(status.as_kept_status());
+    assert!(matches!(status, ExecutionStatus::Success));
+    let sender_balance = h.read_aptos_balance(sender.address());
+    assert_gt!(sender_balance, 234_000_000);
+    assert_lt!(sender_balance, 234_999_999);
+    assert_eq!(
+        1_000_000_000,
+        h.read_aptos_balance(recipient_0.address()) + h.read_aptos_balance(recipient_1.address())
+    );
 }
 
 fn set_randomness_seed(h: &mut MoveHarness) {
