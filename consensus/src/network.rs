@@ -308,6 +308,7 @@ impl NetworkSender {
         let self_msg = Event::Message(self.author, msg.clone());
         let mut self_sender = self.self_sender.clone();
         if let Err(err) = self_sender.send(self_msg).await {
+            info!("ErrorBroadcastedConsensusMsg::{}", msg.name());
             error!("Error broadcasting to self: {:?}", err);
         }
 
@@ -328,8 +329,10 @@ impl NetworkSender {
             .consensus_network_client
             .send_to_many(other_validators.into_iter(), msg)
         {
+            info!("ErrorBroadcastedConsensusMsg::{}", msg.name());
             warn!(error = ?err, "Error broadcasting message");
         }
+        info!("BroadcastedConsensusMsg::{}", msg.name());
     }
 
     pub fn broadcast_without_self(&self, msg: ConsensusMsg) {
