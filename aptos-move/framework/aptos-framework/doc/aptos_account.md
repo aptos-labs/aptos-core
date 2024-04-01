@@ -41,6 +41,9 @@
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="fungible_asset.md#0x1_fungible_asset">0x1::fungible_asset</a>;
+<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
+<b>use</b> <a href="primary_fungible_store.md#0x1_primary_fungible_store">0x1::primary_fungible_store</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
 
@@ -305,12 +308,19 @@ This would create the recipient account first, which also registers it to receiv
     <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
         <a href="aptos_account.md#0x1_aptos_account_create_account">create_account</a>(<b>to</b>)
     };
-    // Resource accounts can be created without registering them <b>to</b> receive APT.
-    // This conveniently does the registration <b>if</b> necessary.
-    <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(<b>to</b>)) {
-        <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(<b>to</b>));
-    };
-    <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(source, <b>to</b>, amount)
+
+    <a href="primary_fungible_store.md#0x1_primary_fungible_store_transfer">primary_fungible_store::transfer</a>(
+        source,
+        <a href="coin.md#0x1_coin_apt_fa_metadata">coin::apt_fa_metadata</a>(),
+        <b>to</b>,
+        amount,
+    )
+    // // Resource accounts can be created without registering them <b>to</b> receive APT.
+    // // This conveniently does the registration <b>if</b> necessary.
+    // <b>if</b> (!<a href="coin.md#0x1_coin_is_account_registered">coin::is_account_registered</a>&lt;AptosCoin&gt;(<b>to</b>)) {
+    //     <a href="aptos_account.md#0x1_aptos_account_register_apt">register_apt</a>(&<a href="create_signer.md#0x1_create_signer">create_signer</a>(<b>to</b>));
+    // };
+    // <a href="coin.md#0x1_coin_transfer">coin::transfer</a>&lt;AptosCoin&gt;(source, <b>to</b>, amount)
 }
 </code></pre>
 
