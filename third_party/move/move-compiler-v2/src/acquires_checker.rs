@@ -8,9 +8,8 @@
 //! Warn if access specifiers other than plain `acquires R` is used.
 //! This check is enabled by flag `Experiment::ACQUIRES_CHECK`, and is disabled by default.
 
-use move_binary_format::file_format;
 use move_model::{
-    ast::{AddressSpecifier, ExpData, Operation, ResourceSpecifier},
+    ast::{ExpData, Operation, ResourceSpecifier},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, StructId},
     ty::Type,
 };
@@ -64,28 +63,18 @@ fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
     if let Some(access_specifiers) = fun_env.get_access_specifiers() {
         access_specifiers
             .iter()
-            .filter_map(|access_specifier| {
-                if access_specifier.kind == file_format::AccessKind::Acquires
-                    && !access_specifier.negated
-                    && access_specifier.address.1 == AddressSpecifier::Any
-                {
-                    #[allow(clippy::single_match)]
-                    match &access_specifier.resource.1 {
-                        ResourceSpecifier::Resource(inst_qid) => {
-                            if inst_qid.inst.is_empty()
-                                && inst_qid.module_id == fun_env.module_env.get_id()
-                            {
-                                return Some((inst_qid.id, access_specifier.resource.0.clone()));
-                            }
-                        },
-                        _ => {},
+            .map(|access_specifier| {
+                if let ResourceSpecifier::Resource(inst_qid) = &access_specifier.resource.1 {
+                    if inst_qid.module_id != fun_env.module_env.get_id() {
+                        fun_env.module_env.env.error(
+                            &access_specifier.resource.0,
+                            "acquires a resource from another module",
+                        )
                     }
+                    (inst_qid.id, access_specifier.resource.0.clone())
+                } else {
+                    unreachable!("unexpected resource specifier")
                 }
-                fun_env.module_env.env.error(
-                    &access_specifier.loc,
-                    "access specifier not enabled. Only plain `acquires R` is enabled.",
-                );
-                None
             })
             .collect()
     } else {
