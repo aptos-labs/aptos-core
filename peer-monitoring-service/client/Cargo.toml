@@ -41,6 +41,3 @@ aptos-peer-monitoring-service-server = { workspace = true }
 bcs = { workspace = true }
 maplit = { workspace = true }
 tokio-stream = { workspace = true }
-
-[features]
-network-perf-test = ["aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test"]

@@ -179,11 +179,6 @@ impl<T: StorageReaderInterface> Handler<T> {
             },
             PeerMonitoringServiceRequest::GetNodeInformation => self.get_node_information(),
             PeerMonitoringServiceRequest::LatencyPing(request) => self.handle_latency_ping(request),
-
-            #[cfg(feature = "network-perf-test")] // Disabled by default
-            PeerMonitoringServiceRequest::PerformanceMonitoringRequest(request) => {
-                self.handle_performance_monitoring_request(request)
-            },
         };
 
         // Process the response and handle any errors
@@ -294,20 +289,6 @@ impl<T: StorageReaderInterface> Handler<T> {
         };
         Ok(PeerMonitoringServiceResponse::LatencyPing(
             latency_ping_response,
-        ))
-    }
-
-    #[cfg(feature = "network-perf-test")] // Disabled by default
-    fn handle_performance_monitoring_request(
-        &self,
-        performance_monitoring_request: &aptos_peer_monitoring_service_types::request::PerformanceMonitoringRequest,
-    ) -> Result<PeerMonitoringServiceResponse, Error> {
-        let performance_monitoring_response =
-            aptos_peer_monitoring_service_types::response::PerformanceMonitoringResponse {
-                response_counter: performance_monitoring_request.request_counter,
-            };
-        Ok(PeerMonitoringServiceResponse::PerformanceMonitoring(
-            performance_monitoring_response,
         ))
     }
 }
