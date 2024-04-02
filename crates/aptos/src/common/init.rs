@@ -202,7 +202,7 @@ impl CliCommand<()> for InitTool {
                 let input = input.trim();
                 if input.is_empty() {
                     if let Some(key) = profile_config.private_key {
-                        eprintln!("No key given, keeping existing key...");
+                        eprintln!("Private key given, keeping existing key...");
                         key
                     } else {
                         eprintln!("No key given, generating key...");
