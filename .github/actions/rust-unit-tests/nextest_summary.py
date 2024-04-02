@@ -4,6 +4,9 @@ import argparse
 import json
 import sys
 
+# how many failed tests to name before it's too many ...
+FAIL_HEAD_LINES = 20
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('nextest_json')
@@ -33,25 +36,33 @@ def main():
             if event == 'failed':
                 failnames.append(rec.get('name', '_'))
     with open(args.summary_out_path, 'at') as fout:
+        rows = []
         for event in ('ok', 'ignored', 'failed'):
             ec = eventCounts.pop(event, 0)
-            fout.write(f'| {event} | {ec} |\n')
+            style = ""
+            if event == 'failed':
+                style = ' style="font-weight:bold;font-size:120%;color:#f00;"'
+            rows.append(f'<tr{style}><td>{ec}</td><td>{event}</td></tr>')
         for event, ec in eventCounts.items():
-            fout.write(f'| {event} | {ec} |\n')
+            rows.append(f'<tr><td>{ec}</td><td>{event}</td></tr>')
         if badlines != 0:
-            fout.write(f'| bad lines | {badlines} |\n')
-        fout.write('\n')
+            rows.append(f'<tr><td>{badlines}</td><td>bad lines</td></tr>')
+        fout.write('<table>' + ''.join(rows) + '</table>\n\n')
         if failnames:
             failnames.sort()
             failshow = failnames
-            if len(failnames) > 30:
-                failshow = failnames[:30]
+            if len(failnames) > FAIL_HEAD_LINES:
+                failshow = failnames[:FAIL_HEAD_LINES]
             fout.write('## Failed\n\n')
             for fn in failshow:
                 fout.write(f'    {fn}\n')
-            if len(failnames) > 30:
-                fout.write(f'    ... and {len(failnames)-30} more\n')
+            if len(failnames) > FAIL_HEAD_LINES:
+                fout.write(f'    ... and {len(failnames)-FAIL_HEAD_LINES} more\n')
             fout.write('\n')
+    if failnames:
+        print(f"{len(failnames)} FAILING tests:")
+        print("\n".join(failnames))
+        print(f"{len(failnames)} FAILING tests")
     if eventCounts.get('failed',0) != 0:
         sys.exit(1)
     if args.fail:
