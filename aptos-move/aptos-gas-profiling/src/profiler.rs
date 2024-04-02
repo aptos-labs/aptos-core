@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::log::{
-    CallFrame, Dependency, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName,
-    StorageFees, TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
+    CallFrame, Dependency, EventStorage, EventTransient, ExecutionAndIOCosts, ExecutionGasEvent,
+    FrameName, StorageFees, TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
@@ -34,6 +34,8 @@ pub struct GasProfiler<G> {
     intrinsic_cost: Option<InternalGas>,
     dependencies: Vec<Dependency>,
     frames: Vec<CallFrame>,
+    transaction_transient: Option<InternalGas>,
+    events_transient: Vec<EventTransient>,
     write_set_transient: Vec<WriteTransient>,
     storage_fees: Option<StorageFees>,
 }
@@ -88,6 +90,8 @@ impl<G> GasProfiler<G> {
             intrinsic_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_script()],
+            transaction_transient: None,
+            events_transient: vec![],
             write_set_transient: vec![],
             storage_fees: None,
         }
@@ -105,6 +109,8 @@ impl<G> GasProfiler<G> {
             intrinsic_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_function(module_id, func_name, ty_args)],
+            transaction_transient: None,
+            events_transient: vec![],
             write_set_transient: vec![],
             storage_fees: None,
         }
@@ -642,6 +648,8 @@ where
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(|| 0.into()),
             dependencies: self.dependencies,
             call_graph: self.frames.pop().expect("frame must exist"),
+            transaction_transient: self.transaction_transient,
+            events_transient: self.events_transient,
             write_set_transient: self.write_set_transient,
         };
         exec_io.assert_consistency();

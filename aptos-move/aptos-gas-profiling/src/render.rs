@@ -133,3 +133,9 @@ impl<'a> Display for Render<'a, WriteOpType> {
         })
     }
 }
+
+impl<'a> Display for Render<'a, TypeTag> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
