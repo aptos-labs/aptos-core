@@ -11,14 +11,15 @@ use crate::{
 use aptos_forge::{NodeExt, SwarmExt};
 use aptos_logger::info;
 use aptos_types::{dkg::DKGState, on_chain_config::OnChainRandomnessConfig};
-use std::{sync::Arc, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 
 /// Verify the correctness of DKG transcript and block-level randomness seed.
 #[tokio::test]
 async fn randomness_correctness() {
     let epoch_duration_secs = 20;
-
-    let (swarm, _cli, _faucet) = SwarmBuilder::new_local(4)
+    let s = env::var("NUM_VALI").unwrap_or_else(||"4".tostring());
+    let num_validators = s.parse::<usize>().unwrap_or(4);
+    let (swarm, _cli, _faucet) = SwarmBuilder::new_local(num_validators)
         .with_num_fullnodes(1)
         .with_aptos()
         .with_init_genesis_config(Arc::new(move |conf| {

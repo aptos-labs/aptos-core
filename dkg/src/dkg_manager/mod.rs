@@ -387,6 +387,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                         .map_err(|e| anyhow!("transcript serialization error: {e}"))?,
                 });
 
+                println!("0402 - txn_size={}", txn.size_in_bytes());
                 let vtxn_guard = self.vtxn_pool.put(
                     Topic::DKG,
                     Arc::new(txn),
