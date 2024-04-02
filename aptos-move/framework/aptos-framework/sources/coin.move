@@ -570,14 +570,18 @@ module aptos_framework::coin {
         amount: u64
     ): (u64, u64) {
         let coin_balance = coin_balance<CoinType>(account_addr);
-        let metadata = paired_metadata<CoinType>();
-        if (coin_balance >= amount || option::is_none(&metadata) || !primary_fungible_store::primary_store_exists(
-            account_addr,
-            option::destroy_some(metadata)
-        ))
+        if (coin_balance >= amount) {
             (amount, 0)
-        else
-            (coin_balance, amount - coin_balance)
+        } else {
+            let metadata = paired_metadata<CoinType>();
+            if (option::is_none(&metadata) || !primary_fungible_store::primary_store_exists(
+                account_addr,
+                option::destroy_some(metadata)
+            ))
+                (amount, 0)
+            else
+                (coin_balance, amount - coin_balance)
+        }
     }
 
     fun maybe_convert_to_fungible_store<CoinType>(account: address) acquires CoinStore, CoinConversionMap, CoinInfo {
@@ -693,10 +697,14 @@ module aptos_framework::coin {
     #[view]
     /// Returns `true` if `account_addr` is registered to receive `CoinType`.
     public fun is_account_registered<CoinType>(account_addr: address): bool acquires CoinConversionMap {
-        let paired_metadata_opt = paired_metadata<CoinType>();
-        exists<CoinStore<CoinType>>(account_addr) || (option::is_some(
-            &paired_metadata_opt
-        ) && migrated_primary_fungible_store_exists(account_addr, option::destroy_some(paired_metadata_opt)))
+        if (exists<CoinStore<CoinType>>(account_addr)) {
+            true
+        } else {
+            let paired_metadata_opt = paired_metadata<CoinType>();
+            (option::is_some(
+                &paired_metadata_opt
+            ) && migrated_primary_fungible_store_exists(account_addr, option::destroy_some(paired_metadata_opt)))
+        }
     }
 
     #[view]
@@ -809,12 +817,14 @@ module aptos_framework::coin {
                 DepositEvent { amount: coin.value },
             );
             merge(&mut coin_store.coin, coin);
-        } else if (features::coin_to_fungible_asset_migration_feature_enabled(
-        ) && migrated_primary_fungible_store_exists(account_addr, ensure_paired_metadata<CoinType>())) {
-            primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
         } else {
-            abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
-        };
+            if (features::coin_to_fungible_asset_migration_feature_enabled(
+            ) && migrated_primary_fungible_store_exists(account_addr, ensure_paired_metadata<CoinType>())) {
+                primary_fungible_store::deposit(account_addr, coin_to_fungible_asset(coin));
+            } else {
+                abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
+            };
+        }
     }
 
     inline fun migrated_primary_fungible_store_exists(
@@ -831,20 +841,22 @@ module aptos_framework::coin {
         account_addr: address,
         coin: Coin<CoinType>
     ) acquires CoinStore, CoinConversionMap, CoinInfo {
-        let metadata = paired_metadata<CoinType>();
         if (exists<CoinStore<CoinType>>(account_addr)) {
             let coin_store = borrow_global_mut<CoinStore<CoinType>>(account_addr);
             merge(&mut coin_store.coin, coin);
-        } else if (option::is_some(&metadata) && migrated_primary_fungible_store_exists(
-            account_addr,
-            option::destroy_some(metadata)
-        )) {
-            let fa = coin_to_fungible_asset(coin);
-            let metadata = fungible_asset::asset_metadata(&fa);
-            let store = primary_fungible_store::primary_store(account_addr, metadata);
-            fungible_asset::deposit_internal(store, fa);
         } else {
-            abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
+            let metadata = paired_metadata<CoinType>();
+            if (option::is_some(&metadata) && migrated_primary_fungible_store_exists(
+                account_addr,
+                option::destroy_some(metadata)
+            )) {
+                let fa = coin_to_fungible_asset(coin);
+                let metadata = fungible_asset::asset_metadata(&fa);
+                let store = primary_fungible_store::primary_store(account_addr, metadata);
+                fungible_asset::deposit_internal(store, fa);
+            } else {
+                abort error::not_found(ECOIN_STORE_NOT_PUBLISHED)
+            }
         }
     }
 
