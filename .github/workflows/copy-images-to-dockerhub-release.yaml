@@ -9,6 +9,7 @@ on:
       # preview branches
       - preview
       - randomnet
+      - randomnet-2
       # aptos-indexer-grpc network-specific release branches
       - aptos-indexer-grpc-devnet
       - aptos-indexer-grpc-testnet

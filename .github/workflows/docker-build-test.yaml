@@ -39,6 +39,7 @@ on: # build on main branch OR when a PR is labeled with `CICD:build-images`
       - quorum-store
       - preview
       - randomnet
+      - randomnet-2
       # grpc release branches
       - aptos-indexer-grpc-devnet
       - aptos-indexer-grpc-testnet
