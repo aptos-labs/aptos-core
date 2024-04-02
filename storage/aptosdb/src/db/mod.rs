@@ -110,8 +110,11 @@ include!("include/aptosdb_writer.rs");
 // Other private methods.
 include!("include/aptosdb_internal.rs");
 // Testonly methods.
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(any(test, feature = "fuzzing", feature = "consensus-only-perf-test"))]
 include!("include/aptosdb_testonly.rs");
+
+#[cfg(feature = "consensus-only-perf-test")]
+pub mod fake_aptosdb;
 
 impl AptosDB {
     pub fn open(

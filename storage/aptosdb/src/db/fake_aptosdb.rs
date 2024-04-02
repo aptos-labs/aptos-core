@@ -1,21 +1,23 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use super::{gauged_api, Result};
 use crate::{
-    gauged_api,
     metrics::{LATEST_CHECKPOINT_VERSION, LEDGER_VERSION, NEXT_BLOCK_EPOCH},
     AptosDB,
 };
-use anyhow::{ensure, format_err, Result};
+use anyhow::format_err;
 use aptos_accumulator::{HashReader, MerkleAccumulator};
 use aptos_crypto::{
     hash::{CryptoHash, TransactionAccumulatorHasher, SPARSE_MERKLE_PLACEHOLDER_HASH},
     HashValue,
 };
 use aptos_infallible::Mutex;
+use aptos_logger::debug;
+use aptos_scratchpad::SparseMerkleTree;
 use aptos_storage_interface::{
-    cached_state_view::ShardedStateCache, state_delta::StateDelta, AptosDbError, DbReader,
-    DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
+    cached_state_view::ShardedStateCache, db_ensure as ensure, state_delta::StateDelta,
+    AptosDbError, DbReader, DbWriter, ExecutedTrees, MAX_REQUEST_LIMIT,
 };
 use aptos_types::{
     access_path::AccessPath,
@@ -34,6 +36,7 @@ use aptos_types::{
     },
     state_proof::StateProof,
     state_store::{
+        combine_sharded_state_updates,
         state_key::StateKey,
         state_key_prefix::StateKeyPrefix,
         state_storage_usage::StateStorageUsage,
@@ -41,20 +44,20 @@ use aptos_types::{
         table, ShardedStateUpdates,
     },
     transaction::{
-        Transaction, TransactionInfo, TransactionListWithProof, TransactionOutput,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof,
+        TransactionOutput, TransactionOutputListWithProof, TransactionToCommit,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
+use arc_swap::ArcSwapOption;
 use dashmap::DashMap;
 use itertools::zip_eq;
 use move_core_types::move_resource::MoveStructType;
 use std::{
     borrow::Borrow,
-    collections::HashMap,
-    mem::swap,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicPtr, AtomicU64, Ordering},
         Arc,
     },
 };
@@ -103,31 +106,38 @@ impl FakeBufferedState {
 
     pub fn update(
         &mut self,
-        updates_until_next_checkpoint_since_current_option: Option<
-            HashMap<StateKey, Option<StateValue>>,
-        >,
-        mut new_state_after_checkpoint: StateDelta,
+        updates_until_next_checkpoint_since_current_option: Option<ShardedStateUpdates>,
+        new_state_after_checkpoint: StateDelta,
     ) -> Result<()> {
         ensure!(
-            new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version
+            new_state_after_checkpoint.base_version >= self.state_after_checkpoint.base_version,
+            "new state base version smaller than state after checkpoint base version",
         );
-        if let Some(_updates_until_next_checkpoint_since_current) =
+        if let Some(updates_until_next_checkpoint_since_current) =
             updates_until_next_checkpoint_since_current_option
         {
+            ensure!(
+                new_state_after_checkpoint.base_version > self.state_after_checkpoint.base_version,
+                "Diff between base and latest checkpoints provided, while they are the same.",
+            );
+            combine_sharded_state_updates(
+                &mut self.state_after_checkpoint.updates_since_base,
+                updates_until_next_checkpoint_since_current,
+            );
             self.state_after_checkpoint.current = new_state_after_checkpoint.base.clone();
             self.state_after_checkpoint.current_version = new_state_after_checkpoint.base_version;
-            swap(
-                &mut self.state_after_checkpoint,
-                &mut new_state_after_checkpoint,
-            );
+            let state_after_checkpoint = self
+                .state_after_checkpoint
+                .replace_with(new_state_after_checkpoint);
             if let Some(ref mut delta) = self.state_until_checkpoint {
-                delta.merge(new_state_after_checkpoint);
+                delta.merge(state_after_checkpoint);
             } else {
-                self.state_until_checkpoint = Some(Box::new(new_state_after_checkpoint));
+                self.state_until_checkpoint = Some(Box::new(state_after_checkpoint));
             }
         } else {
             ensure!(
-                new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version
+                new_state_after_checkpoint.base_version == self.state_after_checkpoint.base_version,
+                "Diff between base and latest checkpoints not provided.",
             );
             self.state_after_checkpoint = new_state_after_checkpoint;
         }
@@ -155,6 +165,7 @@ pub struct FakeAptosDB {
     account_seq_num: Arc<DashMap<AccountAddress, u64>>,
     // A map of transaction version to block timestamp
     latest_block_timestamp: AtomicU64,
+    latest_version: Mutex<Option<Version>>,
     ledger_commit_lock: std::sync::Mutex<()>,
     buffered_state: Mutex<FakeBufferedState>,
 }
@@ -169,6 +180,7 @@ impl FakeAptosDB {
             txn_hash_by_position: Arc::new(DashMap::new()),
             account_seq_num: Arc::new(DashMap::new()),
             latest_block_timestamp: AtomicU64::new(0),
+            latest_version: Mutex::new(None),
             ledger_commit_lock: std::sync::Mutex::new(()),
             buffered_state: Mutex::new(FakeBufferedState::new_empty()),
         }
@@ -176,16 +188,11 @@ impl FakeAptosDB {
 
     fn save_and_compute_root_hash(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit>],
+        txns_to_commit: &[impl Borrow<TransactionInfo>],
         first_version: Version,
     ) -> Result<HashValue> {
-        let txn_infos: Vec<_> = txns_to_commit
-            .iter()
-            .map(|t| t.borrow().transaction_info())
-            .cloned()
-            .collect();
+        let txn_hashes: Vec<_> = txns_to_commit.iter().map(|t| t.borrow().hash()).collect();
 
-        let txn_hashes: Vec<HashValue> = txn_infos.iter().map(TransactionInfo::hash).collect();
         let (root_hash, writes) =
             MerkleAccumulator::<FakeAptosDB, TransactionAccumulatorHasher>::append(
                 self,
@@ -204,16 +211,168 @@ impl FakeAptosDB {
             self,
             num_transactions,
         )
+        .map_err(Into::into)
+    }
+
+    fn save_transactions_validation(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+        base_state_version: Option<Version>,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+        latest_in_memory_state: &StateDelta,
+    ) -> Result<()> {
+        let buffered_state = self.buffered_state.lock();
+        ensure!(
+            base_state_version == buffered_state.current_state().base_version,
+            "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
+            base_state_version,
+            buffered_state.current_state().base_version,
+            buffered_state.current_state().current_version,
+        );
+
+        // Ensure the incoming committing requests are always consecutive and the version in
+        // buffered state is consistent with that in db.
+        let next_version_in_buffered_state = buffered_state
+            .current_state()
+            .current_version
+            .map(|version| version + 1)
+            .unwrap_or(0);
+        let num_transactions_in_db = self.get_latest_version().map_or(0, |v| v + 1);
+        ensure!(num_transactions_in_db == first_version && num_transactions_in_db == next_version_in_buffered_state,
+            "The first version {} passed in, the next version in buffered state {} and the next version in db {} are inconsistent.",
+            first_version,
+            next_version_in_buffered_state,
+            num_transactions_in_db,
+        );
+
+        let num_txns = txns_to_commit.len() as u64;
+        // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
+        // txns_to_commit should not be empty. Otherwise it is okay to commit empty blocks.
+        ensure!(
+            ledger_info_with_sigs.is_some() || num_txns > 0,
+            "txns_to_commit is empty while ledger_info_with_sigs is None.",
+        );
+
+        let last_version = first_version + num_txns - 1;
+
+        if let Some(x) = ledger_info_with_sigs {
+            let claimed_last_version = x.ledger_info().version();
+            ensure!(
+                claimed_last_version  == last_version,
+                "Transaction batch not applicable: first_version {}, num_txns {}, last_version_in_ledger_info {}",
+                first_version,
+                num_txns,
+                claimed_last_version,
+            );
+        }
+
+        ensure!(
+            Some(last_version) == latest_in_memory_state.current_version,
+            "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
+            last_version,
+            latest_in_memory_state.current_version.expect("Must exist"),
+        );
+
+        Ok(())
+    }
+
+    fn calculate_and_commit_ledger_and_state_kv(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: Version,
+    ) -> Result<HashValue> {
+        let new_root_hash = self.save_and_compute_root_hash(
+            &txns_to_commit
+                .iter()
+                .map(|txn_to_commit| txn_to_commit.transaction_info())
+                .collect::<Vec<_>>(),
+            first_version,
+        )?;
+        let last_version = first_version + txns_to_commit.len() as u64 - 1;
+
+        // Iterate through the transactions and update the in-memory maps
+        zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
+            |(ver, txn_to_commit)| -> Result<(), anyhow::Error> {
+                self.txn_by_version
+                    .insert(ver, txn_to_commit.transaction().clone());
+                self.txn_info_by_version
+                    .insert(ver, txn_to_commit.transaction_info().clone());
+                self.txn_version_by_hash
+                    .insert(txn_to_commit.transaction().hash(), ver);
+
+                // If it is a user transaction, also update the account sequence number
+                if let Some(user_txn) = txn_to_commit.transaction().try_as_signed_user_txn() {
+                    self.account_seq_num
+                        .entry(user_txn.sender())
+                        .and_modify(|seq_num| {
+                            *seq_num = std::cmp::max(user_txn.sequence_number() + 1, *seq_num);
+                        })
+                        .or_insert(user_txn.sequence_number());
+                }
+
+                if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata_ext() {
+                    self.latest_block_timestamp
+                        .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
+                } else if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata() {
+                    self.latest_block_timestamp
+                        .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
+                }
+
+                Ok::<(), anyhow::Error>(())
+            },
+        )?;
+
+        *self.latest_version.lock() = Some(last_version);
+
+        Ok(new_root_hash)
+    }
+
+    fn commit_and_post_commit(
+        &self,
+        current_li: Result<LedgerInfoWithSignatures>,
+        new_root_hash: HashValue,
+        ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
+    ) -> Result<()> {
+        // If expected ledger info is provided, verify result root hash and save the ledger info.
+        if let Some(x) = ledger_info_with_sigs {
+            let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
+            ensure!(
+                new_root_hash == expected_root_hash,
+                "Root hash calculated doesn't match expected. {:?} vs {:?}",
+                new_root_hash,
+                expected_root_hash,
+            );
+            let current_epoch = current_li.map_or(0, |li| li.ledger_info().next_block_epoch());
+            ensure!(
+                x.ledger_info().epoch() == current_epoch,
+                "Gap in epoch history. Trying to put in LedgerInfo in epoch: {}, current epoch: {}",
+                x.ledger_info().epoch(),
+                current_epoch,
+            );
+
+            // Once everything is successfully persisted, update the latest in-memory ledger info.
+            self.inner
+                .ledger_db
+                .metadata_db()
+                .set_latest_ledger_info(x.clone());
+
+            LEDGER_VERSION.set(x.ledger_info().version() as i64);
+            NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
+        }
+
+        Ok(())
     }
 
     fn save_transactions_impl(
         &self,
-        txns_to_commit: &[impl Borrow<TransactionToCommit> + Sync],
+        txns_to_commit: &[TransactionToCommit],
         first_version: Version,
         base_state_version: Option<Version>,
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
     ) -> Result<()> {
         gauged_api("save_transactions", || {
             // Executing and committing from more than one threads not allowed -- consensus and
@@ -224,15 +383,27 @@ impl FakeAptosDB {
                 .try_lock()
                 .expect("Concurrent committing detected.");
 
+            // For reconfig suffix.
+            if ledger_info_with_sigs.is_none() && txns_to_commit.is_empty() {
+                return Ok(());
+            }
+
+            self.save_transactions_validation(
+                txns_to_commit,
+                first_version,
+                base_state_version,
+                ledger_info_with_sigs,
+                &latest_in_memory_state,
+            )?;
+
+            let current_li = self.get_latest_ledger_info();
+
             // Persist the writeset of the genesis transaction executed on the VM. The framework
             // code in genesis is necessary for benchmark execution. Note that only the genesis
             // transaction is executed on the VM when consensus-only-perf-test feature is enabled.
             if first_version == 0 {
                 self.inner.save_transactions_for_test(
-                    &txns_to_commit
-                        .iter()
-                        .map(|txn| txn.borrow().clone())
-                        .collect::<Vec<_>>(),
+                    txns_to_commit,
                     first_version,
                     base_state_version,
                     ledger_info_with_sigs,
@@ -241,122 +412,20 @@ impl FakeAptosDB {
                 )?;
             }
 
-            let num_txns = txns_to_commit.len() as u64;
-            // ledger_info_with_sigs could be None if we are doing state synchronization. In this case
-            // txns_to_commit should not be empty. Otherwise it is okay to commit empty blocks.
-            ensure!(
-                ledger_info_with_sigs.is_some() || num_txns > 0,
-                "txns_to_commit is empty while ledger_info_with_sigs is None.",
-            );
-
-            let last_version = first_version + num_txns - 1;
-
-            let new_root_hash = self.save_and_compute_root_hash(txns_to_commit, first_version)?;
-
-            // If expected ledger info is provided, verify result root hash.
-            if let Some(x) = ledger_info_with_sigs {
-                let expected_root_hash = x.ledger_info().transaction_accumulator_hash();
-                ensure!(
-                    new_root_hash == expected_root_hash,
-                    "Root hash calculated doesn't match expected. {:?} vs {:?}",
-                    new_root_hash,
-                    expected_root_hash,
-                );
-            }
-
-            ensure!(Some(last_version) == latest_in_memory_state.current_version,
-                "the last_version {:?} to commit doesn't match the current_version {:?} in latest_in_memory_state",
-                last_version,
-               latest_in_memory_state.current_version.expect("Must exist")
-            );
+            let new_root_hash =
+                self.calculate_and_commit_ledger_and_state_kv(txns_to_commit, first_version)?;
 
             {
                 let mut buffered_state = self.buffered_state.lock();
-                ensure!(
-                    base_state_version == buffered_state.state_after_checkpoint.base_version,
-                    "base_state_version {:?} does not equal to the base_version {:?} in buffered state with current version {:?}",
-                    base_state_version,
-                    buffered_state.state_after_checkpoint.base_version,
-                    buffered_state.state_after_checkpoint.current_version,
-                );
 
-                let updates_until_latest_checkpoint_since_current = if let Some(
-                    latest_checkpoint_version,
-                ) =
-                    latest_in_memory_state.base_version
-                {
-                    if latest_checkpoint_version >= first_version {
-                        let idx = (latest_checkpoint_version - first_version) as usize;
-                        ensure!(
-                            txns_to_commit[idx].borrow().is_state_checkpoint(),
-                            "The new latest snapshot version passed in {:?} does not match with the last checkpoint version in txns_to_commit {:?}",
-                            latest_checkpoint_version,
-                            first_version + idx as u64
-                        );
-                        Some(
-                            txns_to_commit[..=idx]
-                                .iter()
-                                .flat_map(|txn_to_commit| {
-                                    txn_to_commit.borrow().state_updates().clone()
-                                })
-                                .flatten()
-                                .collect(),
-                        )
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
+                self.commit_and_post_commit(current_li, new_root_hash, ledger_info_with_sigs)?;
 
-                buffered_state.update(
-                    updates_until_latest_checkpoint_since_current,
-                    latest_in_memory_state,
-                )?;
+                if !txns_to_commit.is_empty() {
+                    buffered_state
+                        .update(state_updates_until_last_checkpoint, latest_in_memory_state)?;
+                }
             }
 
-            let last_version = first_version + txns_to_commit.len() as u64 - 1;
-
-            // Iterate through the transactions and update the in-memory maps
-            zip_eq(first_version..=last_version, txns_to_commit).try_for_each(
-                |(ver, txn_to_commit)| -> Result<(), anyhow::Error> {
-                    let txn_to_commit: &TransactionToCommit = txn_to_commit.borrow();
-                    self.txn_by_version
-                        .insert(ver, txn_to_commit.transaction().clone());
-                    self.txn_info_by_version
-                        .insert(ver, txn_to_commit.transaction_info().clone());
-                    self.txn_version_by_hash
-                        .insert(txn_to_commit.transaction().hash(), ver);
-
-                    // If it is a user transaction, also update the account sequence number
-                    if let Some(user_txn) = txn_to_commit.transaction().try_as_signed_user_txn() {
-                        self.account_seq_num
-                            .entry(user_txn.sender())
-                            .and_modify(|seq_num| {
-                                *seq_num = std::cmp::max(user_txn.sequence_number() + 1, *seq_num);
-                            })
-                            .or_insert(user_txn.sequence_number());
-                    }
-
-                    if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata_ext() {
-                        self.latest_block_timestamp
-                            .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
-                    } else if let Some(txn) = txn_to_commit.transaction().try_as_block_metadata() {
-                        self.latest_block_timestamp
-                            .fetch_max(txn.timestamp_usecs(), Ordering::Relaxed);
-                    }
-
-                    Ok::<(), anyhow::Error>(())
-                },
-            )?;
-
-            // Once everything is successfully stored, update the latest in-memory ledger info.
-            if let Some(x) = ledger_info_with_sigs {
-                self.inner.ledger_store.set_latest_ledger_info(x.clone());
-
-                LEDGER_VERSION.set(x.ledger_info().version() as i64);
-                NEXT_BLOCK_EPOCH.set(x.ledger_info().next_block_epoch() as i64);
-            }
             Ok(())
         })
     }
@@ -390,9 +459,16 @@ impl DbWriter for FakeAptosDB {
         ledger_info_with_sigs: Option<&LedgerInfoWithSignatures>,
         sync_commit: bool,
         latest_in_memory_state: StateDelta,
-        _state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
+        state_updates_until_last_checkpoint: Option<ShardedStateUpdates>,
         _sharded_state_cache: Option<&ShardedStateCache>,
     ) -> Result<()> {
+        debug!(
+            "save_transaction: first_version {}, len: {}, base_state_version: {:?}, li {:?}",
+            first_version,
+            txns_to_commit.len(),
+            base_state_version,
+            ledger_info_with_sigs
+        );
         self.save_transactions_impl(
             txns_to_commit,
             first_version,
@@ -400,6 +476,7 @@ impl DbWriter for FakeAptosDB {
             ledger_info_with_sigs,
             sync_commit,
             latest_in_memory_state,
+            state_updates_until_last_checkpoint,
         )
     }
 }
@@ -557,6 +634,7 @@ impl DbReader for FakeAptosDB {
                         events,
                         txn_info.gas_used(),
                         txn_info.status().clone().into(),
+                        TransactionAuxiliaryData::None,
                     );
                     Ok((txn_info, (txn, txn_output)))
                 })
@@ -590,7 +668,10 @@ impl DbReader for FakeAptosDB {
 
     fn get_block_timestamp(&self, version: Version) -> Result<u64> {
         gauged_api("get_block_timestamp", || {
-            ensure!(version <= self.get_latest_version()?);
+            ensure!(
+                version <= self.get_latest_version()?,
+                "version older than latest version"
+            );
 
             let timestamp = self.latest_block_timestamp.load(Ordering::Relaxed);
             if timestamp > 0 {
@@ -630,7 +711,7 @@ impl DbReader for FakeAptosDB {
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
         version: Version,
-    ) -> Result<Box<dyn Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_>> {
+    ) -> Result<Box<dyn Iterator<Item = Result<(StateKey, StateValue)>> + '_>> {
         self.inner
             .get_prefixed_state_value_iterator(key_prefix, cursor, version)
     }
@@ -776,12 +857,24 @@ impl DbReader for FakeAptosDB {
         })
     }
 
+    fn get_buffered_state_base(&self) -> Result<SparseMerkleTree<StateValue>> {
+        self.inner.get_buffered_state_base()
+    }
+
+    fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>> {
+        self.inner.get_latest_block_events(num_events)
+    }
+
     fn get_epoch_ending_ledger_info(&self, known_version: u64) -> Result<LedgerInfoWithSignatures> {
         self.inner.get_epoch_ending_ledger_info(known_version)
     }
 
     fn get_latest_version(&self) -> Result<Version> {
-        Ok(self.get_latest_ledger_info()?.ledger_info().version())
+        gauged_api("get_latest_version", || {
+            self.latest_version
+                .lock()
+                .ok_or_else(|| AptosDbError::NotFound("No latest version found.".to_string()))
+        })
     }
 
     fn get_accumulator_root_hash(&self, _version: Version) -> Result<HashValue> {
@@ -804,6 +897,7 @@ impl DbReader for FakeAptosDB {
         let num_txns = ledger_version + 1;
         let frozen_subtrees = self.get_frozen_subtree_hashes(num_txns)?;
         TransactionAccumulatorSummary::new(InMemoryAccumulator::new(frozen_subtrees, num_txns)?)
+            .map_err(Into::into)
     }
 
     fn get_state_leaf_count(&self, version: Version) -> Result<usize> {
@@ -852,7 +946,7 @@ impl DbReader for FakeAptosDB {
 /// This is necessary for constructing the [ExecutedTrees] to serve [DbReader::get_latest_executed_trees]
 /// requests.
 impl HashReader for FakeAptosDB {
-    fn get(&self, position: Position) -> Result<HashValue> {
+    fn get(&self, position: Position) -> anyhow::Result<HashValue> {
         self.txn_hash_by_position
             .get(&position)
             .as_deref()
@@ -871,10 +965,9 @@ fn error_if_too_many_requested(num_requested: u64, max_allowed: u64) -> Result<(
 
 #[cfg(test)]
 mod tests {
-
+    use super::FakeAptosDB;
     use crate::{
-        fake_aptosdb::FakeAptosDB,
-        test_helper::{arb_blocks_to_commit, update_in_memory_state},
+        db::test_helper::{arb_blocks_to_commit, update_in_memory_state},
         AptosDB,
     };
     use anyhow::{anyhow, ensure, Result};
