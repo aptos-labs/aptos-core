@@ -7,7 +7,9 @@ use crate::log::{
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
+use aptos_types::{
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
+};
 use aptos_vm_types::{
     change_set::VMChangeSet, resolver::ExecutorView, storage::space_pricing::ChargeAndRefund,
 };
@@ -528,6 +530,25 @@ where
             amount: Fee,
             gas_unit_price: FeePerGasUnit,
         ) -> PartialVMResult<()>;
+    }
+
+    fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_io_gas_for_transaction(txn_size));
+
+        self.transaction_transient = Some(cost);
+
+        res
+    }
+
+    fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_io_gas_for_event(event));
+
+        self.events_transient.push(EventTransient {
+            ty: event.type_tag().clone(),
+            cost,
+        });
+
+        res
     }
 
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()> {
