@@ -1,0 +1,12 @@
+// -- Model dump before bytecode pipeline
+module 0x1::M {
+    public fun foo() {
+        Tuple()
+    }
+} // end 0x1::M
+module 0x1::Tests {
+    use 0x1::M; // resolved as: 0x1::M
+    private fun bar() {
+        M::foo()
+    }
+} // end 0x1::Tests

@@ -1,0 +1,9 @@
+// -- Model dump before bytecode pipeline
+module 0x1::M {
+    struct Foo {
+        dummy_field: bool,
+    }
+    public fun foo(): M::Foo {
+        pack M::Foo(false)
+    }
+} // end 0x1::M

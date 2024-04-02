@@ -1,0 +1,9 @@
+// -- Model dump before bytecode pipeline
+module 0x1::M {
+    public fun bar() {
+        Tuple()
+    }
+    public fun foo() {
+        M::bar()
+    }
+} // end 0x1::M

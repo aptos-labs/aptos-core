@@ -1,0 +1,12 @@
+// -- Model dump before bytecode pipeline
+module 0x1::M {
+    private fun no() {
+        Tuple()
+    }
+    private fun noo() {
+        Tuple()
+    }
+    private fun nope() {
+        Tuple()
+    }
+} // end 0x1::M
