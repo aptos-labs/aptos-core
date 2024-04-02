@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: cannot extract resource `A::T` which is still borrowed
-  ┌─ tests/reference-safety/v1-tests/borrow_global_bad2.move:8:22
+  ┌─ tests/reference-safety/v1-borrow-tests/borrow_global_bad2.move:8:22
   │
 7 │         let t_ref = borrow_global_mut<T>(sender);
   │                     ---------------------------- previous mutable global borrow

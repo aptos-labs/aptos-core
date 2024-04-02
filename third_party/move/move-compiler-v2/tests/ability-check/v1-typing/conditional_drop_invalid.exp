@@ -1,0 +1,403 @@
+
+Diagnostics:
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:10:9
+   │
+10 │         Box<R> { f: R{} };
+   │         ^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:11:9
+   │
+11 │         Box<Box<R>> { f: Box { f: R{} } };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:12:9
+   │
+12 │         Box<T> { f: t };
+   │         ^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:13:9
+   │
+13 │         Box<Box<T>> { f: Box { f: t } };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::Pair<M::S, M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:14:9
+   │
+14 │         Pair<S, R> { f1: S{}, f2: R{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::Pair<M::S, M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:15:10
+   │
+15 │         (Pair<S, R> { f1: S{}, f2: R{} }, 0, @0x1);
+   │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ implicitly dropped here since it is no longer used
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:17:9
+   │
+17 │         Box<R> { f: R {} } == Box<R> { f: R {} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:35
+   │
+18 │         Box<Box<R>> { f: Box { f: R {} } } == Box<Box<R>> { f: Box { f: R {} }};
+   │                                   ^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:26
+   │
+18 │         Box<Box<R>> { f: Box { f: R {} } } == Box<Box<R>> { f: Box { f: R {} }};
+   │                          ^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:9
+   │
+18 │         Box<Box<R>> { f: Box { f: R {} } } == Box<Box<R>> { f: Box { f: R {} }};
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:73
+   │
+18 │         Box<Box<R>> { f: Box { f: R {} } } == Box<Box<R>> { f: Box { f: R {} }};
+   │                                                                         ^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:64
+   │
+18 │         Box<Box<R>> { f: Box { f: R {} } } == Box<Box<R>> { f: Box { f: R {} }};
+   │                                                                ^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:47
+   │
+18 │         Box<Box<R>> { f: Box { f: R {} } } == Box<Box<R>> { f: Box { f: R {} }};
+   │                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:9
+   │
+18 │         Box<Box<R>> { f: Box { f: R {} } } == Box<Box<R>> { f: Box { f: R {} }};
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:18:9
+   │
+18 │         Box<Box<R>> { f: Box { f: R {} } } == Box<Box<R>> { f: Box { f: R {} }};
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:19:9
+   │
+19 │         Box<T> { f: t } == Box<T> { f: t };
+   │         ^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:19:9
+   │
+19 │         Box<T> { f: t } == Box<T> { f: t };
+   │         ^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:19:28
+   │
+19 │         Box<T> { f: t } == Box<T> { f: t };
+   │                            ^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:19:28
+   │
+19 │         Box<T> { f: t } == Box<T> { f: t };
+   │                            ^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:19:9
+   │
+19 │         Box<T> { f: t } == Box<T> { f: t };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:19:9
+   │
+19 │         Box<T> { f: t } == Box<T> { f: t };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:19:9
+   │
+19 │         Box<T> { f: t } == Box<T> { f: t };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:26
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                          ^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:26
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                          ^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:26
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                          ^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:9
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:9
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:9
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:61
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                                                             ^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:61
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                                                             ^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:61
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                                                             ^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:44
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:44
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:44
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:9
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:9
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:9
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:20:9
+   │
+20 │         Box<Box<T>> { f: Box { f: t } } == Box<Box<T>> { f: Box { f: t} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:26
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                          ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:26
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                          ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:26
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                          ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:26
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                          ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:35
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                   ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:35
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                   ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:35
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                   ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:35
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                   ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:61
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                                             ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:61
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                                             ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:61
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                                             ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:61
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                                             ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:70
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                                                      ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:70
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                                                      ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:70
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                                                      ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:70
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                                                      ^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:44
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:44
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:44
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:44
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<M::R>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::Box<T>>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<M::R>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Box<T>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
+
+error: value of type `M::Pair<M::R, M::S>` does not have the `drop` ability
+   ┌─ tests/ability-check/v1-typing/conditional_drop_invalid.move:21:9
+   │
+21 │         Pair<R, S> { f1: R{}, f2: S{} } == Pair<R, S> { f1: R{}, f2: S{} };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ operator drops value here (consider to borrow the argument)
