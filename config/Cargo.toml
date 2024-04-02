@@ -47,6 +47,5 @@ tempfile = { workspace = true }
 default = []
 failpoints = []
 fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
-network-perf-test = []
 testing = []
 tokio-console = []
