@@ -422,6 +422,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 INITIAL_BYTECODE_STAGE,
                 "VariableCoalescingAnnotator",
                 "VariableCoalescingTransformer",
+                "DeadStoreElimination",
                 FILE_FORMAT_STAGE,
             ]),
         },

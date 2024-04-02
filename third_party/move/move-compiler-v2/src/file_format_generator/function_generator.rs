@@ -793,7 +793,8 @@ impl<'a> FunctionGenerator<'a> {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
                     if fun_ctx.is_copyable(*temp)
-                        && (ctx.is_alive_after(*temp) || temps_to_push[pos + 1..].contains(temp))
+                        && (ctx.is_alive_after(*temp, true)
+                            || temps_to_push[pos + 1..].contains(temp))
                     {
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
@@ -832,7 +833,7 @@ impl<'a> FunctionGenerator<'a> {
         let mut stack_to_flush = self.stack.len();
         for temp in temps {
             if let Some(pos) = self.stack.iter().position(|t| t == temp) {
-                if ctx.is_alive_after(*temp) {
+                if ctx.is_alive_after(*temp, true) {
                     // Determine new lowest point to which we need to flush
                     stack_to_flush = std::cmp::min(stack_to_flush, pos);
                 }
@@ -866,7 +867,7 @@ impl<'a> FunctionGenerator<'a> {
         while self.stack.len() > top {
             let temp = self.stack.pop().unwrap();
             if before && ctx.is_alive_before(temp)
-                || !before && ctx.is_alive_after(temp)
+                || !before && ctx.is_alive_after(temp, false)
                 || self.pinned.contains(&temp)
             {
                 // Only need to save to a local if the temp is still used afterwards
@@ -985,7 +986,13 @@ impl<'env> FunctionContext<'env> {
 
 impl<'env> BytecodeContext<'env> {
     /// Determine whether the temporary is alive (used) in the reachable code after this point.
-    pub fn is_alive_after(&self, temp: TempIndex) -> bool {
+    /// If `dest_check` is true, temporary should not be written to by the current instruction
+    /// for it to be considered alive.
+    pub fn is_alive_after(&self, temp: TempIndex, dest_check: bool) -> bool {
+        let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
+        if dest_check && bc.dests().contains(&temp) {
+            return false;
+        }
         let an = self
             .fun_ctx
             .fun

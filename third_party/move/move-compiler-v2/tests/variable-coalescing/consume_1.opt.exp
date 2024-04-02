@@ -51,6 +51,59 @@ public fun m::test4($t0: m::W) {
   3: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+  0: $t1 := copy($t0)
+  1: m::consume($t0)
+  2: m::consume($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64) {
+     var $t1: u64
+  0: $t1 := copy($t0)
+  1: m::consume($t1)
+  2: m::consume($t0)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test3($t0: m::W) {
+     var $t1: m::W
+  0: $t1 := copy($t0)
+  1: m::consume_($t0)
+  2: m::consume_($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test4($t0: m::W) {
+     var $t1: m::W
+  0: $t1 := copy($t0)
+  1: m::consume_($t1)
+  2: m::consume_($t0)
+  3: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -137,6 +190,59 @@ public fun m::test4($t0: m::W) {
 }
 
 ============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::consume($t0: u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_($t0: m::W) {
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test1($t0: u64) {
+     var $t1: u64
+  0: $t1 := copy($t0)
+  1: m::consume($t0)
+  2: m::consume($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test2($t0: u64) {
+     var $t1: u64
+  0: $t1 := copy($t0)
+  1: m::consume($t1)
+  2: m::consume($t0)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test3($t0: m::W) {
+     var $t1: m::W
+  0: $t1 := copy($t0)
+  1: m::consume_($t0)
+  2: m::consume_($t1)
+  3: return ()
+}
+
+
+[variant baseline]
+public fun m::test4($t0: m::W) {
+     var $t1: m::W
+  0: $t1 := copy($t0)
+  1: m::consume_($t1)
+  2: m::consume_($t0)
+  3: return ()
+}
+
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 fun m::consume($t0: u64) {
