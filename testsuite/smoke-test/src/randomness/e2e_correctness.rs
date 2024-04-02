@@ -73,4 +73,6 @@ async fn randomness_correctness() {
         println!("wvuf_verify_result={:?}", wvuf_verify_result);
         assert!(wvuf_verify_result.is_ok());
     }
+
+    assert!(false);
 }
