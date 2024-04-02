@@ -20,11 +20,14 @@ use move_binary_format::CompiledModule;
 use move_command_line_common::files::MOVE_COMPILED_EXTENSION;
 use move_compiler::compiled_unit::{CompiledUnit, NamedCompiledModule};
 use move_core_types::{language_storage::ModuleId, metadata::Metadata};
-use move_model::model::GlobalEnv;
+use move_model::{
+    metadata::{CompilerVersion, LanguageVersion},
+    model::GlobalEnv,
+};
 use move_package::{
     compilation::{compiled_package::CompiledPackage, package_layout::CompiledPackageLayout},
     source_package::manifest_parser::{parse_move_manifest_string, parse_source_manifest},
-    BuildConfig, CompilerConfig, CompilerVersion, ModelConfig,
+    BuildConfig, CompilerConfig, ModelConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -76,8 +79,10 @@ pub struct BuildOptions {
     pub skip_fetch_latest_git_deps: bool,
     #[clap(long)]
     pub bytecode_version: Option<u32>,
-    #[clap(long)]
+    #[clap(long, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
+    pub language_version: Option<LanguageVersion>,
     #[clap(long)]
     pub skip_attribute_checks: bool,
     #[clap(long)]
@@ -105,6 +110,7 @@ impl Default for BuildOptions {
             skip_fetch_latest_git_deps: false,
             bytecode_version: None,
             compiler_version: None,
+            language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -127,6 +133,7 @@ pub fn build_model(
     target_filter: Option<String>,
     bytecode_version: Option<u32>,
     compiler_version: Option<CompilerVersion>,
+    language_version: Option<LanguageVersion>,
     skip_attribute_checks: bool,
     known_attributes: BTreeSet<String>,
 ) -> anyhow::Result<GlobalEnv> {
@@ -146,15 +153,19 @@ pub fn build_model(
         compiler_config: CompilerConfig {
             bytecode_version,
             compiler_version,
+            language_version,
             skip_attribute_checks,
             known_attributes,
         },
     };
     let compiler_version = compiler_version.unwrap_or_default();
+    let language_version = language_version.unwrap_or_default();
+    compiler_version.check_language_support(language_version)?;
     build_config.move_model_for_package(package_path, ModelConfig {
         target_filter,
         all_files_as_targets: false,
         compiler_version,
+        language_version,
     })
 }
 
@@ -166,6 +177,25 @@ impl BuiltPackage {
     pub fn build(package_path: PathBuf, options: BuildOptions) -> anyhow::Result<Self> {
         let bytecode_version = options.bytecode_version;
         let compiler_version = options.compiler_version;
+        let language_version = options.language_version;
+        let effective_compiler_version = compiler_version.unwrap_or_default();
+        let effective_language_version = language_version.unwrap_or_default();
+        if effective_compiler_version.unstable() {
+            eprintln!(
+                "Warning: using experimental compiler version `{}`.\n\
+                You cannot deploy unstable code in production networks.",
+                effective_compiler_version
+            )
+        }
+        if effective_language_version.unstable() {
+            eprintln!(
+                "Warning: using experimental language version `{}`.\n\
+                You cannot deploy unstable code in production networks.",
+                effective_language_version
+            )
+        }
+
+        effective_compiler_version.check_language_support(effective_language_version)?;
         let skip_attribute_checks = options.skip_attribute_checks;
         let build_config = BuildConfig {
             dev_mode: options.dev,
@@ -183,6 +213,7 @@ impl BuiltPackage {
             compiler_config: CompilerConfig {
                 bytecode_version,
                 compiler_version,
+                language_version,
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
             },

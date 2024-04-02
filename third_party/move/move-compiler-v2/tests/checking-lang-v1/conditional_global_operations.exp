@@ -1,25 +1,25 @@
 
 Diagnostics:
-error: access specifier not enabled. Only plain `acquires <ResourceName>` is enabled.
-   ┌─ tests/acquires-checker/conditional_global_operations.move:14:49
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:14:49
    │
 14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
    │                                                 ^^^^^^
 
-error: access specifier not enabled. Only plain `acquires <ResourceName>` is enabled.
-   ┌─ tests/acquires-checker/conditional_global_operations.move:14:57
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:14:57
    │
 14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
    │                                                         ^^^^^^
 
-error: access specifier not enabled. Only plain `acquires <ResourceName>` is enabled.
-   ┌─ tests/acquires-checker/conditional_global_operations.move:14:65
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:14:65
    │
 14 │     fun ex<T>(s: &signer, a1: address) acquires Box<R>, Box<T>, Pair<S, R> {
    │                                                                 ^^^^^^^^^^^
 
 error: type `R` is missing required ability `store` (type was inferred)
-   ┌─ tests/acquires-checker/conditional_global_operations.move:15:9
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:15:9
    │
 15 │         move_to(s, Box<R> { f: R {} });
    │         ^^^^^^^
@@ -28,7 +28,7 @@ error: type `R` is missing required ability `store` (type was inferred)
    = required by instantiating type parameter `T:key` of function `move_to`
 
 error: type `T` is missing required ability `store`
-   ┌─ tests/acquires-checker/conditional_global_operations.move:16:23
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:16:23
    │
 16 │         borrow_global<Box<T>>(a1);
    │                       ^^^^^^
@@ -37,7 +37,7 @@ error: type `T` is missing required ability `store`
    = required by instantiating type parameter `T:key` of function `borrow_global`
 
 error: type `T` is missing required ability `store`
-   ┌─ tests/acquires-checker/conditional_global_operations.move:17:27
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:17:27
    │
 17 │         borrow_global_mut<Box<Box<T>>>(a1);
    │                           ^^^^^^^^^^^
@@ -47,7 +47,7 @@ error: type `T` is missing required ability `store`
    = required by instantiating type parameter `T:key` of function `borrow_global_mut`
 
 error: type `R` is missing required ability `store`
-   ┌─ tests/acquires-checker/conditional_global_operations.move:18:43
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:18:43
    │
 18 │         Pair { f1: _, f2: _ } = move_from<Pair<S, R>>(a1);
    │                                           ^^^^^^^^^^
@@ -56,7 +56,7 @@ error: type `R` is missing required ability `store`
    = required by instantiating type parameter `T:key` of function `move_from`
 
 error: type `T` is missing required ability `store`
-   ┌─ tests/acquires-checker/conditional_global_operations.move:19:16
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:19:16
    │
 19 │         exists<Pair<Box<T>, S>>(a1);
    │                ^^^^^^^^^^^^^^^
@@ -66,7 +66,7 @@ error: type `T` is missing required ability `store`
    = required by instantiating type parameter `T:key` of function `exists`
 
 error: type `K` is missing required ability `store`
-   ┌─ tests/acquires-checker/conditional_global_operations.move:21:23
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:21:23
    │
 21 │         borrow_global<Box<K>>(a1);
    │                       ^^^^^^
@@ -75,7 +75,7 @@ error: type `K` is missing required ability `store`
    = required by instantiating type parameter `T:key` of function `borrow_global`
 
 error: type `K` is missing required ability `store`
-   ┌─ tests/acquires-checker/conditional_global_operations.move:22:27
+   ┌─ tests/checking-lang-v1/conditional_global_operations.move:22:27
    │
 22 │         borrow_global_mut<Pair<S, K>>(a1);
    │                           ^^^^^^^^^^

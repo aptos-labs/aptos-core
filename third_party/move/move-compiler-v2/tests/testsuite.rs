@@ -10,7 +10,7 @@ use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
     logging, pipeline, run_bytecode_verifier, run_file_format_gen, Experiment, Options,
 };
-use move_model::model::GlobalEnv;
+use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
 use once_cell::unsync::Lazy;
@@ -103,7 +103,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Spec rewriter is always on, so we test it, even though it's not part of regular compiler.
         .set_experiment(Experiment::SPEC_REWRITE, true)
         // Turn optimization on by default. Some configs below may turn it off.
-        .set_experiment(Experiment::OPTIMIZE, true);
+        .set_experiment(Experiment::OPTIMIZE, true)
+        .set_language_version(LanguageVersion::V2_0);
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -124,6 +125,20 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::ACQUIRES_CHECK, false),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
+        // Tests for checking v2 language features only supported if v2
+        // language is selected
+        TestConfig {
+            name: "checking-lang-v1",
+            runner: |p| run_test(p, get_config_by_name("checking-lang-v1")),
+            include: vec!["/checking-lang-v1/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_language_version(LanguageVersion::V1),
             stop_after: StopAfter::AstPipeline,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None,

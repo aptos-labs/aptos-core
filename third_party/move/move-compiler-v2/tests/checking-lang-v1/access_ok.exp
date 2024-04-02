@@ -1,0 +1,103 @@
+
+Diagnostics:
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:11:20
+   │
+11 │     fun f2() reads S {
+   │                    ^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:14:21
+   │
+14 │     fun f3() writes S {
+   │                     ^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:17:24
+   │
+17 │     fun f4() acquires S(*) {
+   │                        ^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:20:39
+   │
+20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
+   │                                       ^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:20:48
+   │
+20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
+   │                                                ^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:20:51
+   │
+20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
+   │                                                   ^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:20:59
+   │
+20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
+   │                                                           ^^^^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:23:23
+   │
+23 │     fun f5() acquires 0x42::*::* {
+   │                       ^^^^^^^^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:26:23
+   │
+26 │     fun f6() acquires 0x42::m::* {
+   │                       ^^^^^^^^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:29:24
+   │
+29 │     fun f7() acquires *(*) {
+   │                        ^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:29:23
+   │
+29 │     fun f7() acquires *(*) {
+   │                       ^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:32:23
+   │
+32 │     fun f8() acquires *(0x42) {
+   │                       ^^^^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:35:33
+   │
+35 │     fun f9(a: address) acquires *(a) {
+   │                                 ^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:38:31
+   │
+38 │     fun f10(x: u64) acquires *(make_up_address(x)) {
+   │                               ^^^^^^^^^^^^^^^^^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:38:30
+   │
+38 │     fun f10(x: u64) acquires *(make_up_address(x)) {
+   │                              ^^^^^^^^^^^^^^^^^^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:45:22
+   │
+45 │     fun f11() !reads *(0x42), *(0x43) {
+   │                      ^^^^^^^
+
+error: access specifiers not supported in language versions before `2.0-unstable`
+   ┌─ tests/checking-lang-v1/access_ok.move:45:31
+   │
+45 │     fun f11() !reads *(0x42), *(0x43) {
+   │                               ^^^^^^^

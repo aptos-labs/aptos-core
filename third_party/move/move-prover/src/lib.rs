@@ -76,6 +76,7 @@ pub fn run_move_prover_v2<W: WriteColor>(
         dependencies: cloned_options.move_deps,
         named_address_mapping: cloned_options.move_named_address_values,
         output_dir: cloned_options.output_path,
+        language_version: cloned_options.language_version,
         skip_attribute_checks: true,
         known_attributes: Default::default(),
         testing: cloned_options.backend.stable_test_output,
