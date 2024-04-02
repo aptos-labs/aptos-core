@@ -204,7 +204,7 @@ fn get_delayed_field_value_impl<T: Transaction>(
                 return Ok(value);
             },
             Err(PanicOr::Or(MVDelayedFieldsError::Dependency(dep_idx))) => {
-                if !wait_for_dependency(wait_for, txn_idx, dep_idx) {
+                if !wait_for_dependency(wait_for, txn_idx, dep_idx)? {
                     // TODO[agg_v2](cleanup): think of correct return type
                     return Err(PanicOr::Or(DelayedFieldsSpeculativeError::InconsistentRead));
                 }
@@ -370,7 +370,7 @@ fn delayed_field_try_add_delta_outcome_impl<T: Transaction>(
                 ) {
                     Ok(v) => break v,
                     Err(MVDelayedFieldsError::Dependency(dep_idx)) => {
-                        if !wait_for_dependency(wait_for, txn_idx, dep_idx) {
+                        if !wait_for_dependency(wait_for, txn_idx, dep_idx)? {
                             // TODO[agg_v2](cleanup): think of correct return type
                             return Err(PanicOr::Or(
                                 DelayedFieldsSpeculativeError::InconsistentRead,
@@ -406,8 +406,8 @@ fn wait_for_dependency(
     wait_for: &dyn TWaitForDependency,
     txn_idx: TxnIndex,
     dep_idx: TxnIndex,
-) -> bool {
-    match wait_for.wait_for_dependency(txn_idx, dep_idx) {
+) -> Result<bool, PanicError> {
+    match wait_for.wait_for_dependency(txn_idx, dep_idx)? {
         DependencyResult::Dependency(dep_condition) => {
             let _timer = counters::DEPENDENCY_WAIT_SECONDS.start_timer();
             // Wait on a condition variable corresponding to the encountered
@@ -426,14 +426,14 @@ fn wait_for_dependency(
             // eventually finish and lead to unblocking txn_idx, contradiction.
             let (lock, cvar) = &*dep_condition;
             let mut dep_resolved = lock.lock();
-            while let DependencyStatus::Unresolved = *dep_resolved {
+            while matches!(*dep_resolved, DependencyStatus::Unresolved) {
                 dep_resolved = cvar.wait(dep_resolved).unwrap();
             }
             // dep resolved status is either resolved or execution halted.
-            matches!(*dep_resolved, DependencyStatus::Resolved)
+            Ok(matches!(*dep_resolved, DependencyStatus::Resolved))
         },
-        DependencyResult::ExecutionHalted => false,
-        DependencyResult::Resolved => true,
+        DependencyResult::ExecutionHalted => Ok(false),
+        DependencyResult::Resolved => Ok(true),
     }
 }
 
@@ -508,7 +508,7 @@ impl<'a, T: Transaction, X: Executable> ParallelState<'a, T, X> {
                     unreachable!("Reading group size does not require a specific tag look-up");
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
+                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
                         return Err(PartialVMError::new(
                             StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
                         )
@@ -633,10 +633,22 @@ impl<'a, T: Transaction, X: Executable> ResourceState<T> for ParallelState<'a, T
                     return ReadResult::Uninitialized;
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
-                        return ReadResult::HaltSpeculativeExecution(
-                            "Interrupted as block execution was halted".to_string(),
-                        );
+                    match wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
+                        Err(e) => {
+                            error!("Error {:?} in wait for dependency", e);
+                            return ReadResult::HaltSpeculativeExecution(format!(
+                                "Error {:?} in wait for dependency",
+                                e
+                            ));
+                        },
+                        Ok(false) => {
+                            return ReadResult::HaltSpeculativeExecution(
+                                "Interrupted as block execution was halted".to_string(),
+                            );
+                        },
+                        Ok(true) => {
+                            //dependency resolved
+                        },
                     }
                 },
                 Err(DeltaApplicationFailure) => {
@@ -737,7 +749,7 @@ impl<'a, T: Transaction, X: Executable> ResourceGroupState<T> for ParallelState<
                     return Ok(GroupReadResult::Value(None, None));
                 },
                 Err(Dependency(dep_idx)) => {
-                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx) {
+                    if !wait_for_dependency(self.scheduler, txn_idx, dep_idx)? {
                         // TODO[agg_v2](cleanup): consider changing from PartialVMResult<GroupReadResult> to GroupReadResult
                         // like in ReadResult for resources.
                         return Err(PartialVMError::new(
@@ -778,7 +790,7 @@ impl<'a, T: Transaction, X: Executable> SequentialState<'a, T, X> {
     }
 
     pub(crate) fn set_delayed_field_value(&self, id: T::Identifier, base_value: DelayedFieldValue) {
-        self.unsync_map.write_delayed_field(id, base_value)
+        self.unsync_map.set_base_delayed_field(id, base_value)
     }
 
     pub(crate) fn read_delayed_field(&self, id: T::Identifier) -> Option<DelayedFieldValue> {
@@ -1080,7 +1092,7 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>, X: Executable> LatestView<
                         .ok_or_else(|| {
                             anyhow::anyhow!("Failed to deserialize resource during id replacement")
                         })?;
-                serialize_and_allow_delayed_values(&patched_value, layout)
+                serialize_and_allow_delayed_values(&patched_value, layout)?
                     .ok_or_else(|| {
                         anyhow::anyhow!(
                             "Failed to serialize value {} after id replacement",
@@ -1841,7 +1853,7 @@ mod test {
             &self,
             _txn_idx: TxnIndex,
             _dep_txn_idx: TxnIndex,
-        ) -> DependencyResult {
+        ) -> Result<DependencyResult, PanicError> {
             unreachable!();
         }
     }

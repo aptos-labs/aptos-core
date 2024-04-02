@@ -194,6 +194,8 @@ pub struct ModelConfig {
     /// If set, a string how targets are filtered. A target is included if its file name
     /// contains this string. This is similar as the `cargo test <string>` idiom.
     pub target_filter: Option<String>,
+    /// The compiler version used to build the model
+    pub compiler_version: CompilerVersion,
 }
 
 impl BuildConfig {

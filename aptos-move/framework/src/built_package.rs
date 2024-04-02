@@ -150,9 +150,11 @@ pub fn build_model(
             known_attributes,
         },
     };
+    let compiler_version = compiler_version.unwrap_or_default();
     build_config.move_model_for_package(package_path, ModelConfig {
         target_filter,
         all_files_as_targets: false,
+        compiler_version,
     })
 }
 

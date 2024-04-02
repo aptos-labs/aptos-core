@@ -4,7 +4,7 @@
 use super::reroot_path;
 use clap::*;
 use move_docgen::DocgenOptions;
-use move_package::{BuildConfig, ModelConfig};
+use move_package::{BuildConfig, CompilerVersion, ModelConfig};
 use std::{fs, path::PathBuf};
 
 /// Generate javadoc style documentation for Move packages
@@ -58,9 +58,14 @@ pub struct Docgen {
 impl Docgen {
     /// Calling the Docgen
     pub fn execute(self, path: Option<PathBuf>, config: BuildConfig) -> anyhow::Result<()> {
+        let compiler_version = config
+            .compiler_config
+            .compiler_version
+            .unwrap_or(CompilerVersion::V1);
         let model = config.move_model_for_package(&reroot_path(path).unwrap(), ModelConfig {
             all_files_as_targets: false,
             target_filter: None,
+            compiler_version,
         })?;
 
         let mut options = DocgenOptions::default();

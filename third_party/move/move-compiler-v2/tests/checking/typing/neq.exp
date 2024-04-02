@@ -1,13 +1,36 @@
-
-Diagnostics:
-error: invalid call of `!=`: mutability mismatch (&mut != &) for argument 2
-   ┌─ tests/checking/typing/neq.move:18:20
-   │
-18 │         (&mut s != s_ref: bool);
-   │                    ^^^^^
-
-error: invalid call of `!=`: mutability mismatch (&mut != &) for argument 2
-   ┌─ tests/checking/typing/neq.move:27:19
-   │
-27 │         (r_mut != r: bool);
-   │                   ^
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct G {
+        f: #0,
+    }
+    struct R {
+        f: u64,
+    }
+    struct S {
+        u: u64,
+    }
+    private fun t0(r: &M::R,r_mut: &mut M::R,s: M::S,s_ref: &M::S,s_mut: &mut M::S) {
+        true;
+        true;
+        true;
+        true;
+        true;
+        Neq<u64>(Borrow(Immutable)(0), Borrow(Immutable)(1));
+        true;
+        true;
+        Neq<M::S>(Borrow(Immutable)(s), s_ref);
+        Neq<M::S>(Freeze(false)(Borrow(Mutable)(s)), s_ref);
+        Neq<M::S>(Freeze(false)(Borrow(Mutable)(s)), Freeze(false)(s_mut));
+        Neq<M::S>(Borrow(Immutable)(s), Freeze(false)(s_mut));
+        Neq<M::S>(s_ref, Freeze(false)(s_mut));
+        Neq<M::S>(Freeze(false)(s_mut), Freeze(false)(s_mut));
+        Neq<M::S>(pack M::S(0), s);
+        Neq<M::R>(r, r);
+        Neq<M::R>(Freeze(false)(r_mut), Freeze(false)(r_mut));
+        Neq<M::R>(r, Freeze(false)(r_mut));
+        Neq<M::R>(Freeze(false)(r_mut), r);
+        Neq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(2));
+        Neq<M::G<u64>>(pack M::G<u64>(1), pack M::G<u64>(2));
+        Tuple()
+    }
+} // end 0x8675309::M

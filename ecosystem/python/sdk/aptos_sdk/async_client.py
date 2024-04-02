@@ -21,6 +21,7 @@ from .transactions import (
     TransactionArgument,
     TransactionPayload,
 )
+from .type_tag import StructTag, TypeTag
 
 U64_MAX = 18446744073709551615
 
@@ -28,11 +29,13 @@ U64_MAX = 18446744073709551615
 class ClientConfig:
     """Common configuration for clients, particularly for submitting transactions"""
 
-    expiration_ttl: int = 600
-    gas_unit_price: int = 100
-    max_gas_amount: int = 100_000
-    transaction_wait_in_seconds: int = 20
-    http2: bool = False
+    def __init__(self, api_key: str = None):
+        self.expiration_ttl: int = 600
+        self.gas_unit_price: int = 100
+        self.max_gas_amount: int = 100_000
+        self.transaction_wait_in_seconds: int = 20
+        self.http2: bool = False
+        self.api_key: str = api_key
 
 
 class RestClient:
@@ -60,6 +63,8 @@ class RestClient:
         )
         self.client_config = client_config
         self._chain_id = None
+        if client_config.api_key is not None:
+            self.client.headers["Authorization"] = f"Bearer {client_config.api_key}"
 
     async def close(self):
         await self.client.aclose()
@@ -370,19 +375,14 @@ class RestClient:
         key: Any,
         ledger_version: Optional[int] = None,
     ) -> Any:
-        if not ledger_version:
-            request = f"{self.base_url}/tables/{handle}/item"
-        else:
-            request = (
-                f"{self.base_url}/tables/{handle}/item?ledger_version={ledger_version}"
-            )
-        response = await self.client.post(
-            request,
-            json={
+        response = await self._post(
+            endpoint=f"{self.base_url}/tables/{handle}/item",
+            data={
                 "key_type": key_type,
                 "value_type": value_type,
                 "key": key,
             },
+            params={"ledger_version": ledger_version},
         )
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
@@ -491,6 +491,13 @@ class RestClient:
         if response.status_code >= 400:
             raise ApiError(response.text, response.status_code)
         return response.json()["hash"]
+
+    async def submit_and_wait_for_bcs_transaction(
+        self, signed_transaction: SignedTransaction
+    ) -> Dict[str, Any]:
+        txn_hash = await self.submit_bcs_transaction(signed_transaction)
+        await self.wait_for_transaction(txn_hash)
+        return await self.transaction_by_hash(txn_hash)
 
     async def submit_transaction(self, sender: Account, payload: Dict[str, Any]) -> str:
         """
@@ -761,6 +768,31 @@ class RestClient:
         )
         return await self.submit_bcs_transaction(signed_transaction)  # <:!:bcs_transfer
 
+    async def transfer_coins(
+        self,
+        sender: Account,
+        recipient: AccountAddress,
+        coin_type: str,
+        amount: int,
+        sequence_number: Optional[int] = None,
+    ) -> str:
+        transaction_arguments = [
+            TransactionArgument(recipient, Serializer.struct),
+            TransactionArgument(amount, Serializer.u64),
+        ]
+
+        payload = EntryFunction.natural(
+            "0x1::aptos_account",
+            "transfer_coins",
+            [TypeTag(StructTag.from_str(coin_type))],
+            transaction_arguments,
+        )
+
+        signed_transaction = await self.create_bcs_signed_transaction(
+            sender, TransactionPayload(payload), sequence_number=sequence_number
+        )
+        return await self.submit_bcs_transaction(signed_transaction)
+
     async def transfer_object(
         self, owner: Account, object: AccountAddress, to: AccountAddress
     ) -> str:
@@ -820,6 +852,44 @@ class RestClient:
             raise ApiError(response.text, response.status_code)
 
         return response.content
+
+    async def view_bcs_payload(
+        self,
+        module: str,
+        function: str,
+        ty_args: List[TypeTag],
+        args: List[TransactionArgument],
+        ledger_version: Optional[int] = None,
+    ) -> Dict[str, str]:
+        """
+        Execute a view Move function with the given parameters and return its execution result.
+        Note, this differs from `view` as in this expects bcs compatible inputs and submits the
+        view function in bcs format. This is convenient for clients that execute functions in
+        transactions similar to view functions.
+
+        The Aptos nodes prune account state history, via a configurable time window. If the requested ledger version
+        has been pruned, the server responds with a 410.
+
+        :param function: Entry function id is string representation of an entry function defined on-chain.
+        :param type_arguments: Type arguments of the function.
+        :param arguments: Arguments of the function.
+        :param ledger_version: Ledger version to get state of account. If not provided, it will be the latest version.
+        :returns: Execution result.
+        """
+        request = f"{self.base_url}/view"
+        if ledger_version:
+            request = f"{request}?ledger_version={ledger_version}"
+
+        view_data = EntryFunction.natural(module, function, ty_args, args)
+        ser = Serializer()
+        view_data.serialize(ser)
+        headers = {"Content-Type": "application/x.aptos.view_function+bcs"}
+        response = await self.client.post(
+            request, headers=headers, content=ser.output()
+        )
+        if response.status_code >= 400:
+            raise ApiError(response.text, response.status_code)
+        return response.json()
 
     async def _post(
         self,

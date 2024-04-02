@@ -1,6 +1,7 @@
 #![no_main]
 
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_language_e2e_tests::{
     account::Account, data_store::GENESIS_CHANGE_SET_HEAD, executor::FakeExecutor,
@@ -350,7 +351,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let raw_tx = tx.raw();
     let tx = match input.tx_auth_type {
         Authenticator::Ed25519 { sender: _ } => raw_tx
-            .sign(&sender_acc.privkey, sender_acc.pubkey)
+            .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
             .map_err(|_| Corpus::Keep)?
             .into_inner(),
         Authenticator::MultiAgent {

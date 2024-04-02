@@ -64,10 +64,10 @@ AnyPublicKey:
           - public_key:
               TYPENAME: Secp256r1EcdsaPublicKey
     3:
-      OIDB:
+      Keyless:
         STRUCT:
           - public_key:
-              TYPENAME: OidbPublicKey
+              TYPENAME: KeylessPublicKey
 AnySignature:
   ENUM:
     0:
@@ -86,10 +86,10 @@ AnySignature:
           - signature:
               TYPENAME: PartialAuthenticatorAssertionResponse
     3:
-      OIDB:
+      Keyless:
         STRUCT:
           - signature:
-              TYPENAME: OidbSignature
+              TYPENAME: KeylessSignature
 AssertionSignature:
   ENUM:
     0:
@@ -197,6 +197,16 @@ EntryFunction:
           TYPENAME: TypeTag
     - args:
         SEQ: BYTES
+EphemeralCertificate:
+  ENUM:
+    0:
+      ZeroKnowledgeSig:
+        NEWTYPE:
+          TYPENAME: ZeroKnowledgeSig
+    1:
+      OpenIdSig:
+        NEWTYPE:
+          TYPENAME: OpenIdSig
 EphemeralPublicKey:
   ENUM:
     0:
@@ -204,6 +214,11 @@ EphemeralPublicKey:
         STRUCT:
           - public_key:
               TYPENAME: Ed25519PublicKey
+    1:
+      Secp256r1Ecdsa:
+        STRUCT:
+          - public_key:
+              TYPENAME: Secp256r1EcdsaPublicKey
 EphemeralSignature:
   ENUM:
     0:
@@ -211,6 +226,11 @@ EphemeralSignature:
         STRUCT:
           - signature:
               TYPENAME: Ed25519Signature
+    1:
+      WebAuthn:
+        STRUCT:
+          - signature:
+              TYPENAME: PartialAuthenticatorAssertionResponse
 EventKey:
   STRUCT:
     - creation_number: U64
@@ -226,7 +246,7 @@ G2Bytes:
     TUPLEARRAY:
       CONTENT: U8
       SIZE: 64
-Groth16Zkp:
+Groth16Proof:
   STRUCT:
     - a:
         TYPENAME: G1Bytes
@@ -248,6 +268,21 @@ JWKMoveStruct:
   STRUCT:
     - variant:
         TYPENAME: Any
+KeylessPublicKey:
+  STRUCT:
+    - iss_val: STR
+    - idc:
+        TYPENAME: IdCommitment
+KeylessSignature:
+  STRUCT:
+    - cert:
+        TYPENAME: EphemeralCertificate
+    - jwt_header_json: STR
+    - exp_date_secs: U64
+    - ephemeral_pubkey:
+        TYPENAME: EphemeralPublicKey
+    - ephemeral_signature:
+        TYPENAME: EphemeralSignature
 ModuleId:
   STRUCT:
     - address:
@@ -286,25 +321,10 @@ MultisigTransactionPayload:
       EntryFunction:
         NEWTYPE:
           TYPENAME: EntryFunction
-OidbPublicKey:
-  STRUCT:
-    - iss_val: STR
-    - idc:
-        TYPENAME: IdCommitment
-OidbSignature:
-  STRUCT:
-    - sig:
-        TYPENAME: ZkpOrOpenIdSig
-    - jwt_header_b64: STR
-    - exp_timestamp_secs: U64
-    - ephemeral_pubkey:
-        TYPENAME: EphemeralPublicKey
-    - ephemeral_signature:
-        TYPENAME: EphemeralSignature
 OpenIdSig:
   STRUCT:
-    - jwt_sig_b64: STR
-    - jwt_payload_b64: STR
+    - jwt_sig: BYTES
+    - jwt_payload_json: STR
     - uid_key: STR
     - epk_blinder: BYTES
     - pepper:
@@ -390,20 +410,6 @@ Secp256r1EcdsaSignature:
   NEWTYPESTRUCT: BYTES
 Signature:
   NEWTYPESTRUCT: BYTES
-SignedGroth16Zkp:
-  STRUCT:
-    - proof:
-        TYPENAME: Groth16Zkp
-    - non_malleability_signature:
-        TYPENAME: EphemeralSignature
-    - exp_horizon_secs: U64
-    - extra_field:
-        OPTION: STR
-    - override_aud_val:
-        OPTION: STR
-    - training_wheels_signature:
-        OPTION:
-          TYPENAME: EphemeralSignature
 SignedTransaction:
   STRUCT:
     - raw_txn:
@@ -677,13 +683,21 @@ WriteSetPayload:
 WriteSetV0:
   NEWTYPESTRUCT:
     TYPENAME: WriteSetMut
-ZkpOrOpenIdSig:
+ZKP:
   ENUM:
     0:
-      Groth16Zkp:
+      Groth16:
         NEWTYPE:
-          TYPENAME: SignedGroth16Zkp
-    1:
-      OpenIdSig:
-        NEWTYPE:
-          TYPENAME: OpenIdSig
+          TYPENAME: Groth16Proof
+ZeroKnowledgeSig:
+  STRUCT:
+    - proof:
+        TYPENAME: ZKP
+    - exp_horizon_secs: U64
+    - extra_field:
+        OPTION: STR
+    - override_aud_val:
+        OPTION: STR
+    - training_wheels_signature:
+        OPTION:
+          TYPENAME: EphemeralSignature

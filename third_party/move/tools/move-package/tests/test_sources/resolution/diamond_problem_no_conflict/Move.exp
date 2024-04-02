@@ -27,7 +27,9 @@ ResolutionGraph {
                 "verify_only",
             },
             skip_attribute_checks: false,
-            compiler_version: None,
+            compiler_version: Some(
+                V1,
+            ),
         },
     },
     root_package: SourceManifest {

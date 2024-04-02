@@ -4,7 +4,9 @@
 
 use aptos_framework::{extended_checks, path_in_crate};
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::{Features, TimedFeaturesBuilder};
+use aptos_types::on_chain_config::{
+    aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder,
+};
 use aptos_vm::natives;
 use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
 use move_command_line_common::{env::read_bool_env_var, testing::MOVE_COMPILER_V2};
@@ -26,12 +28,14 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
         full_model_generation: true, // Run extended checks also on test code
         ..Default::default()
     };
+
     let mut ok = run_move_unit_tests(
         &pkg_path,
         build_config.clone(),
         // TODO(Gas): double check if this is correct
         UnitTestingConfig::default_with_bound(Some(100_000)),
         aptos_test_natives(),
+        aptos_test_feature_flags_genesis(),
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
@@ -49,6 +53,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>) {
             build_config,
             UnitTestingConfig::default_with_bound(Some(100_000)),
             aptos_test_natives(),
+            aptos_test_feature_flags_genesis(),
             /* cost_table */ None,
             /* compute_coverage */ false,
             &mut std::io::stdout(),

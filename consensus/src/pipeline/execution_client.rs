@@ -5,7 +5,7 @@
 use crate::{
     counters,
     error::StateSyncError,
-    network::{IncomingCommitRequest, NetworkSender},
+    network::{IncomingCommitRequest, IncomingRandGenRequest, NetworkSender},
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     payload_manager::PayloadManager,
     pipeline::{
@@ -13,6 +13,11 @@ use crate::{
         decoupled_execution_utils::prepare_phases_and_buffer_manager,
         errors::Error,
         signing_phase::CommitSignerProvider,
+    },
+    rand::rand_gen::{
+        rand_manager::RandManager,
+        storage::interface::RandStorage,
+        types::{AugmentedData, RandConfig, Share},
     },
     state_computer::ExecutionProxy,
     state_replication::{StateComputer, StateComputerCommitCallBackType},
@@ -22,15 +27,18 @@ use crate::{
 use anyhow::Result;
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
+use aptos_config::config::ConsensusConfig;
 use aptos_consensus_types::{common::Author, pipelined_block::PipelinedBlock};
 use aptos_executor_types::ExecutorResult;
 use aptos_infallible::RwLock;
 use aptos_logger::prelude::*;
 use aptos_network::{application::interface::NetworkClient, protocols::network::Event};
+use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{FeatureFlag, Features, OnChainExecutionConfig},
+    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
+    validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
 use futures::{
@@ -49,8 +57,12 @@ pub trait TExecutionClient: Send + Sync {
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<PayloadManager>,
+        onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
-        features: &Features,
+        onchain_randomness_config: &OnChainRandomnessConfig,
+        rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     );
 
     /// This is needed for some DAG tests. Clean this up as a TODO.
@@ -80,7 +92,8 @@ pub trait TExecutionClient: Send + Sync {
 struct BufferManagerHandle {
     pub execute_tx: Option<UnboundedSender<OrderedBlocks>>,
     pub commit_tx: Option<aptos_channel::Sender<AccountAddress, IncomingCommitRequest>>,
-    pub reset_tx: Option<UnboundedSender<ResetRequest>>,
+    pub reset_tx_to_buffer_manager: Option<UnboundedSender<ResetRequest>>,
+    pub reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
 }
 
 impl BufferManagerHandle {
@@ -88,7 +101,8 @@ impl BufferManagerHandle {
         Self {
             execute_tx: None,
             commit_tx: None,
-            reset_tx: None,
+            reset_tx_to_buffer_manager: None,
+            reset_tx_to_rand_manager: None,
         }
     }
 
@@ -96,23 +110,31 @@ impl BufferManagerHandle {
         &mut self,
         execute_tx: UnboundedSender<OrderedBlocks>,
         commit_tx: aptos_channel::Sender<AccountAddress, IncomingCommitRequest>,
-        reset_tx: UnboundedSender<ResetRequest>,
+        reset_tx_to_buffer_manager: UnboundedSender<ResetRequest>,
+        reset_tx_to_rand_manager: Option<UnboundedSender<ResetRequest>>,
     ) {
         self.execute_tx = Some(execute_tx);
         self.commit_tx = Some(commit_tx);
-        self.reset_tx = Some(reset_tx);
+        self.reset_tx_to_buffer_manager = Some(reset_tx_to_buffer_manager);
+        self.reset_tx_to_rand_manager = reset_tx_to_rand_manager;
     }
 
-    pub fn reset(&mut self) -> Option<UnboundedSender<ResetRequest>> {
-        let reset_tx = self.reset_tx.take();
+    pub fn reset(
+        &mut self,
+    ) -> (
+        Option<UnboundedSender<ResetRequest>>,
+        Option<UnboundedSender<ResetRequest>>,
+    ) {
+        let reset_tx_to_rand_manager = self.reset_tx_to_rand_manager.take();
+        let reset_tx_to_buffer_manager = self.reset_tx_to_buffer_manager.take();
         self.execute_tx = None;
         self.commit_tx = None;
-        self.reset_tx = None;
-        reset_tx
+        (reset_tx_to_rand_manager, reset_tx_to_buffer_manager)
     }
 }
 
 pub struct ExecutionProxyClient {
+    consensus_config: ConsensusConfig,
     execution_proxy: Arc<ExecutionProxy>,
     author: Author,
     self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
@@ -120,23 +142,28 @@ pub struct ExecutionProxyClient {
     bounded_executor: BoundedExecutor,
     // channels to buffer manager
     handle: Arc<RwLock<BufferManagerHandle>>,
+    rand_storage: Arc<dyn RandStorage<AugmentedData>>,
 }
 
 impl ExecutionProxyClient {
     pub fn new(
+        consensus_config: ConsensusConfig,
         execution_proxy: Arc<ExecutionProxy>,
         author: Author,
         self_sender: aptos_channels::UnboundedSender<Event<ConsensusMsg>>,
         network_sender: ConsensusNetworkClient<NetworkClient<ConsensusMsg>>,
         bounded_executor: BoundedExecutor,
+        rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     ) -> Self {
         Self {
+            consensus_config,
             execution_proxy,
             author,
             self_sender,
             network_sender,
             bounded_executor,
             handle: Arc::new(RwLock::new(BufferManagerHandle::new())),
+            rand_storage,
         }
     }
 
@@ -144,6 +171,9 @@ impl ExecutionProxyClient {
         &self,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         epoch_state: Arc<EpochState>,
+        rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
         let network_sender = NetworkSender::new(
             self.author,
@@ -152,8 +182,7 @@ impl ExecutionProxyClient {
             epoch_state.verifier.clone(),
         );
 
-        let (block_tx, block_rx) = unbounded::<OrderedBlocks>();
-        let (reset_tx, reset_rx) = unbounded::<ResetRequest>();
+        let (reset_buffer_manager_tx, reset_buffer_manager_rx) = unbounded::<ResetRequest>();
 
         let (commit_msg_tx, commit_msg_rx) =
             aptos_channel::new::<AccountAddress, IncomingCommitRequest>(
@@ -162,7 +191,53 @@ impl ExecutionProxyClient {
                 Some(&counters::BUFFER_MANAGER_MSGS),
             );
 
-        self.handle.write().init(block_tx, commit_msg_tx, reset_tx);
+        let (execution_ready_block_tx, execution_ready_block_rx, maybe_reset_tx_to_rand_manager) =
+            if let Some(rand_config) = rand_config {
+                let (ordered_block_tx, ordered_block_rx) = unbounded::<OrderedBlocks>();
+                let (rand_ready_block_tx, rand_ready_block_rx) = unbounded::<OrderedBlocks>();
+
+                let (reset_tx_to_rand_manager, reset_rand_manager_rx) = unbounded::<ResetRequest>();
+                let consensus_key =
+                    load_consensus_key_from_secure_storage(&self.consensus_config.safety_rules)
+                        .expect("Failed in loading consensus key for ExecutionProxyClient.");
+                let signer = Arc::new(ValidatorSigner::new(self.author, consensus_key));
+
+                let rand_manager = RandManager::<Share, AugmentedData>::new(
+                    self.author,
+                    epoch_state.clone(),
+                    signer,
+                    rand_config,
+                    fast_rand_config,
+                    rand_ready_block_tx,
+                    Arc::new(network_sender.clone()),
+                    self.rand_storage.clone(),
+                    self.bounded_executor.clone(),
+                    &self.consensus_config.rand_rb_config,
+                );
+
+                tokio::spawn(rand_manager.start(
+                    ordered_block_rx,
+                    rand_msg_rx,
+                    reset_rand_manager_rx,
+                    self.bounded_executor.clone(),
+                ));
+
+                (
+                    ordered_block_tx,
+                    rand_ready_block_rx,
+                    Some(reset_tx_to_rand_manager),
+                )
+            } else {
+                let (ordered_block_tx, ordered_block_rx) = unbounded();
+                (ordered_block_tx, ordered_block_rx, None)
+            };
+
+        self.handle.write().init(
+            execution_ready_block_tx,
+            commit_msg_tx,
+            reset_buffer_manager_tx,
+            maybe_reset_tx_to_rand_manager,
+        );
 
         let (
             execution_schedule_phase,
@@ -177,8 +252,8 @@ impl ExecutionProxyClient {
             network_sender,
             commit_msg_rx,
             self.execution_proxy.clone(),
-            block_rx,
-            reset_rx,
+            execution_ready_block_rx,
+            reset_buffer_manager_rx,
             epoch_state,
             self.bounded_executor.clone(),
         );
@@ -198,10 +273,20 @@ impl TExecutionClient for ExecutionProxyClient {
         epoch_state: Arc<EpochState>,
         commit_signer_provider: Arc<dyn CommitSignerProvider>,
         payload_manager: Arc<PayloadManager>,
+        onchain_consensus_config: &OnChainConsensusConfig,
         onchain_execution_config: &OnChainExecutionConfig,
-        features: &Features,
+        onchain_randomness_config: &OnChainRandomnessConfig,
+        rand_config: Option<RandConfig>,
+        fast_rand_config: Option<RandConfig>,
+        rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
-        self.spawn_decoupled_execution(commit_signer_provider, epoch_state.clone());
+        let maybe_rand_msg_tx = self.spawn_decoupled_execution(
+            commit_signer_provider,
+            epoch_state.clone(),
+            rand_config,
+            fast_rand_config,
+            rand_msg_rx,
+        );
 
         let transaction_shuffler =
             create_transaction_shuffler(onchain_execution_config.transaction_shuffler_type());
@@ -209,14 +294,18 @@ impl TExecutionClient for ExecutionProxyClient {
             onchain_execution_config.block_executor_onchain_config();
         let transaction_deduper =
             create_transaction_deduper(onchain_execution_config.transaction_deduper_type());
+        let randomness_enabled = onchain_consensus_config.is_vtxn_enabled()
+            && onchain_randomness_config.randomness_enabled();
         self.execution_proxy.new_epoch(
             &epoch_state,
             payload_manager,
             transaction_shuffler,
             block_executor_onchain_config,
             transaction_deduper,
-            features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
+            randomness_enabled,
         );
+
+        maybe_rand_msg_tx
     }
 
     fn get_execution_channel(&self) -> Option<UnboundedSender<OrderedBlocks>> {
@@ -280,9 +369,27 @@ impl TExecutionClient for ExecutionProxyClient {
             Err(anyhow::anyhow!("Injected error in sync_to").into())
         });
 
-        let reset_tx = self.handle.read().reset_tx.clone();
+        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
+            let handle = self.handle.read();
+            (
+                handle.reset_tx_to_rand_manager.clone(),
+                handle.reset_tx_to_buffer_manager.clone(),
+            )
+        };
 
-        if let Some(mut reset_tx) = reset_tx {
+        if let Some(mut reset_tx) = reset_tx_to_rand_manager {
+            let (ack_tx, ack_rx) = oneshot::channel::<ResetAck>();
+            reset_tx
+                .send(ResetRequest {
+                    tx: ack_tx,
+                    signal: ResetSignal::TargetRound(target.commit_info().round()),
+                })
+                .await
+                .map_err(|_| Error::RandResetDropped)?;
+            ack_rx.await.map_err(|_| Error::RandResetDropped)?;
+        }
+
+        if let Some(mut reset_tx) = reset_tx_to_buffer_manager {
             // reset execution phase and commit phase
             let (tx, rx) = oneshot::channel::<ResetAck>();
             reset_tx
@@ -302,8 +409,25 @@ impl TExecutionClient for ExecutionProxyClient {
     }
 
     async fn end_epoch(&self) {
-        let reset_tx = self.handle.write().reset();
-        if let Some(mut tx) = reset_tx {
+        let (reset_tx_to_rand_manager, reset_tx_to_buffer_manager) = {
+            let mut handle = self.handle.write();
+            handle.reset()
+        };
+
+        if let Some(mut tx) = reset_tx_to_rand_manager {
+            let (ack_tx, ack_rx) = oneshot::channel();
+            tx.send(ResetRequest {
+                tx: ack_tx,
+                signal: ResetSignal::Stop,
+            })
+            .await
+            .expect("[EpochManager] Fail to drop rand manager");
+            ack_rx
+                .await
+                .expect("[EpochManager] Fail to drop rand manager");
+        }
+
+        if let Some(mut tx) = reset_tx_to_buffer_manager {
             let (ack_tx, ack_rx) = oneshot::channel();
             tx.send(ResetRequest {
                 tx: ack_tx,
@@ -328,8 +452,12 @@ impl TExecutionClient for DummyExecutionClient {
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<PayloadManager>,
+        _onchain_consensus_config: &OnChainConsensusConfig,
         _onchain_execution_config: &OnChainExecutionConfig,
-        _features: &Features,
+        _onchain_randomness_config: &OnChainRandomnessConfig,
+        _rand_config: Option<RandConfig>,
+        _fast_rand_config: Option<RandConfig>,
+        _rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
     }
 

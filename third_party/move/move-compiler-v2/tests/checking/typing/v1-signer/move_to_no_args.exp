@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: invalid call of `move_to`: argument count mismatch (expected 2 but found 0)
+error: the function takes 2 arguments but 0 were provided
   ┌─ tests/checking/typing/v1-signer/move_to_no_args.move:4:9
   │
 4 │         move_to<R>();
   │         ^^^^^^^^^^^^
 
-error: invalid call of `move_to`: argument count mismatch (expected 2 but found 0)
+error: the function takes 2 arguments but 0 were provided
    ┌─ tests/checking/typing/v1-signer/move_to_no_args.move:12:14
    │
 12 │         () = move_to<R<bool>>();

@@ -12,39 +12,6 @@ fun m::cyclic($t0: u64): u64 {
   4: return $t1
 }
 
-============ after AvailableCopiesAnalysisProcessor: ================
-
-[variant baseline]
-fun m::cyclic($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     # before: {}, after: {$t2 := $t0}
-  0: $t2 := infer($t0)
-     # before: {$t2 := $t0}, after: {$t2 := $t0, $t3 := $t2}
-  1: $t3 := infer($t2)
-     # before: {$t2 := $t0, $t3 := $t2}, after: {$t0 := $t3, $t3 := $t2}
-  2: $t0 := infer($t3)
-     # before: {$t0 := $t3, $t3 := $t2}, after: {$t0 := $t3, $t1 := $t0, $t3 := $t2}
-  3: $t1 := infer($t0)
-     # before: {$t0 := $t3, $t1 := $t0, $t3 := $t2}, after: {$t0 := $t3, $t1 := $t0, $t3 := $t2}
-  4: return $t1
-}
-
-============ after CopyPropagation: ================
-
-[variant baseline]
-fun m::cyclic($t0: u64): u64 {
-     var $t1: u64
-     var $t2: u64
-     var $t3: u64
-  0: $t2 := infer($t0)
-  1: $t3 := infer($t0)
-  2: $t0 := infer($t0)
-  3: $t1 := infer($t2)
-  4: return $t2
-}
-
 ============ after DeadStoreElimination: ================
 
 [variant baseline]
@@ -52,6 +19,9 @@ fun m::cyclic($t0: u64): u64 {
      var $t1: u64
      var $t2: u64
      var $t3: u64
-  0: $t2 := infer($t0)
-  1: return $t2
+  0: $t2 := move($t0)
+  1: $t3 := move($t2)
+  2: $t0 := move($t3)
+  3: $t1 := move($t0)
+  4: return $t1
 }

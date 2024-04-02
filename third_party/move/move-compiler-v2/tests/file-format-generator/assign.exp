@@ -1,109 +1,3 @@
-============ initial bytecode ================
-
-[variant baseline]
-fun assign::assign_field($t0: &mut assign::S, $t1: u64) {
-     var $t2: &mut u64
-  0: $t2 := borrow_field<assign::S>.f($t0)
-  1: write_ref($t2, $t1)
-  2: return ()
-}
-
-
-[variant baseline]
-fun assign::assign_int($t0: &mut u64) {
-     var $t1: u64
-  0: $t1 := 42
-  1: write_ref($t0, $t1)
-  2: return ()
-}
-
-
-[variant baseline]
-fun assign::assign_pattern($t0: assign::S, $t1: u64, $t2: u64): u64 {
-     var $t3: u64
-     var $t4: assign::T
-  0: ($t1, $t4) := unpack assign::S($t0)
-  1: $t2 := unpack assign::T($t4)
-  2: $t3 := +($t1, $t2)
-  3: return $t3
-}
-
-
-[variant baseline]
-fun assign::assign_struct($t0: &mut assign::S) {
-     var $t1: assign::S
-     var $t2: u64
-     var $t3: assign::T
-     var $t4: u64
-  0: $t2 := 42
-  1: $t4 := 42
-  2: $t3 := pack assign::T($t4)
-  3: $t1 := pack assign::S($t2, $t3)
-  4: write_ref($t0, $t1)
-  5: return ()
-}
-
-============ after LiveVarAnalysisProcessor: ================
-
-[variant baseline]
-fun assign::assign_field($t0: &mut assign::S, $t1: u64) {
-     var $t2: &mut u64
-     # live vars: $t0, $t1
-  0: $t2 := borrow_field<assign::S>.f($t0)
-     # live vars: $t1, $t2
-  1: write_ref($t2, $t1)
-     # live vars:
-  2: return ()
-}
-
-
-[variant baseline]
-fun assign::assign_int($t0: &mut u64) {
-     var $t1: u64
-     # live vars: $t0
-  0: $t1 := 42
-     # live vars: $t0, $t1
-  1: write_ref($t0, $t1)
-     # live vars:
-  2: return ()
-}
-
-
-[variant baseline]
-fun assign::assign_pattern($t0: assign::S, $t1: u64, $t2: u64): u64 {
-     var $t3: u64
-     var $t4: assign::T
-     # live vars: $t0
-  0: ($t1, $t4) := unpack assign::S($t0)
-     # live vars: $t1, $t4
-  1: $t2 := unpack assign::T($t4)
-     # live vars: $t1, $t2
-  2: $t3 := +($t1, $t2)
-     # live vars: $t3
-  3: return $t3
-}
-
-
-[variant baseline]
-fun assign::assign_struct($t0: &mut assign::S) {
-     var $t1: assign::S
-     var $t2: u64
-     var $t3: assign::T
-     var $t4: u64
-     # live vars: $t0
-  0: $t2 := 42
-     # live vars: $t0, $t2
-  1: $t4 := 42
-     # live vars: $t0, $t2, $t4
-  2: $t3 := pack assign::T($t4)
-     # live vars: $t0, $t2, $t3
-  3: $t1 := pack assign::S($t2, $t3)
-     # live vars: $t0, $t1
-  4: write_ref($t0, $t1)
-     # live vars:
-  5: return ()
-}
-
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -117,6 +11,7 @@ struct S has drop {
 }
 
 assign_field(Arg0: &mut S, Arg1: u64) /* def_idx: 0 */ {
+L2:	loc0: &mut u64
 B0:
 	0: MoveLoc[0](Arg0: &mut S)
 	1: MutBorrowField[0](S.f: u64)
@@ -152,3 +47,4 @@ B0:
 	6: Ret
 }
 }
+============ bytecode verification succeeded ========

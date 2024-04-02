@@ -21,6 +21,7 @@ module ambassador::ambassador {
     use aptos_token_objects::token;
     use aptos_token_objects::property_map;
     use aptos_framework::event;
+    use aptos_std::string_utils::{to_string};
 
     /// The token does not exist
     const ETOKEN_DOES_NOT_EXIST: u64 = 1;
@@ -127,17 +128,6 @@ module ambassador::ambassador {
         );
     }
 
-    public entry fun mint_ambassador_token_by_user(
-        user: &signer,
-        creator: &signer,
-        description: String,
-        name: String,
-        uri: String,
-    ) {
-        mint_ambassador_token(creator, description, name, uri, signer::address_of(user));
-    }
-
-
     /// Mints an ambassador token. This function mints a new ambassador token and transfers it to the
     /// `soul_bound_to` address. The token is minted with level 0 and rank Bronze.
     public entry fun mint_ambassador_token(
@@ -150,16 +140,6 @@ module ambassador::ambassador {
         mint_ambassador_token_impl(creator, description, name, base_uri, soul_bound_to, false);
     }
 
-    public entry fun mint_numbered_ambassador_token_by_user(
-        user: &signer,
-        creator: &signer,
-        description: String,
-        name: String,
-        uri: String,
-    ) {
-        mint_numbered_ambassador_token(creator, description, name, uri, signer::address_of(user));
-    }
-
     /// Mints an ambassador token. This function mints a new ambassador token and transfers it to the
     /// `soul_bound_to` address. The token is minted with level 0 and rank Bronze.
     public entry fun mint_numbered_ambassador_token(
@@ -170,6 +150,31 @@ module ambassador::ambassador {
         soul_bound_to: address,
     ) {
         mint_ambassador_token_impl(creator, description, name, base_uri, soul_bound_to, true);
+    }
+
+    /// Function used for benchmarking.
+    /// Uses multisig to mint to user, with creator permissions.
+    /// Uses users address as unique name of the soulbound token.
+    public entry fun mint_ambassador_token_by_user(
+        user: &signer,
+        creator: &signer,
+        description: String,
+        uri: String,
+    ) {
+        let user_addr = signer::address_of(user);
+        mint_ambassador_token(creator, description, to_string<address>(&user_addr), uri, user_addr);
+    }
+
+    /// Function used for benchmarking.
+    /// Uses multisig to mint to user, with creator permissions.
+    public entry fun mint_numbered_ambassador_token_by_user(
+        user: &signer,
+        creator: &signer,
+        description: String,
+        name: String,
+        uri: String,
+    ) {
+        mint_numbered_ambassador_token(creator, description, name, uri, signer::address_of(user));
     }
 
     /// Mints an ambassador token. This function mints a new ambassador token and transfers it to the
@@ -248,7 +253,7 @@ module ambassador::ambassador {
 
     /// Burns an ambassador token. This function burns the ambassador token and destroys the
     /// AmbassadorToken resource, AmbassadorLevel resource, the event handle, and the property map.
-    public entry fun burn(creator: &signer, token: Object<AmbassadorToken>) acquires AmbassadorToken {
+    public entry fun burn(creator: &signer, token: Object<AmbassadorToken>) acquires AmbassadorToken, AmbassadorLevel {
         authorize_creator(creator, &token);
         let ambassador_token = move_from<AmbassadorToken>(object::object_address(&token));
         let AmbassadorToken {
@@ -258,8 +263,27 @@ module ambassador::ambassador {
             base_uri: _
         } = ambassador_token;
 
+        let AmbassadorLevel {
+            ambassador_level: _
+        } = move_from<AmbassadorLevel>(object::object_address(&token));
+
         property_map::burn(property_mutator_ref);
         token::burn(burn_ref);
+    }
+
+    /// Function used for benchmarking.
+    /// Uses multisig to mint to user, with creator permissions.
+    /// Uses users address as unique name of the soulbound token.
+    /// Burns token that was minted by mint_ambassador_token_by_user
+    public entry fun burn_named_by_user(user: &signer, creator: &signer) acquires AmbassadorToken, AmbassadorLevel {
+        let collection_name = string::utf8(COLLECTION_NAME);
+        let token_address = token::create_token_address(
+            &signer::address_of(creator),
+            &collection_name,
+            &to_string<address>(&signer::address_of(user)),
+        );
+        let token = object::address_to_object<AmbassadorToken>(token_address);
+        burn(creator, token);
     }
 
     /// Sets the ambassador level of the token. Only the creator of the token can set the level. When the level
@@ -385,5 +409,23 @@ module ambassador::ambassador {
         burn(creator, token);
         // Asserts that the token does not exist after burning.
         assert!(!exists<AmbassadorToken>(token_addr), 7);
+    }
+
+    #[test(creator = @0x123, user1 = @0x456)]
+    fun test_mint_burn_by_user(creator: &signer, user1: &signer) acquires AmbassadorToken, AmbassadorLevel {
+        // ------------------------------------------
+        // Creator creates the Ambassador Collection.
+        // ------------------------------------------
+        create_ambassador_collection(creator);
+
+        let token_description = string::utf8(b"Ambassador Token #1 Description");
+        let token_uri = string::utf8(b"Ambassador Token #1 URI/");
+        mint_ambassador_token_by_user(
+            user1,
+            creator,
+            token_description,
+            token_uri
+        );
+        burn_named_by_user(user1, creator);
     }
 }

@@ -109,6 +109,36 @@ impl TransactionGasLog {
             data.insert("intrinsic-percentage".to_string(), json!(percentage));
         }
 
+        let mut deps = self.exec_io.dependencies.clone();
+        deps.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
+        data.insert(
+            "deps".to_string(),
+            Value::Array(
+                deps.iter()
+                    .map(|dep| {
+                        let name = format!(
+                            "{}{}",
+                            Render(&dep.id),
+                            if dep.is_new { " (new)" } else { "" }
+                        );
+                        let cost_scaled =
+                            format!("{:.8}", (u64::from(dep.cost) as f64 / scaling_factor));
+                        let cost_scaled =
+                            crate::misc::strip_trailing_zeros_and_decimal_point(&cost_scaled);
+                        let percentage =
+                            format!("{:.2}%", u64::from(dep.cost) as f64 / total_exec_io * 100.0);
+
+                        json!({
+                            "name": name,
+                            "size": u64::from(dep.size),
+                            "cost": cost_scaled,
+                            "percentage": percentage,
+                        })
+                    })
+                    .collect(),
+            ),
+        );
+
         // Execution & IO (aggregated)
         let aggregated: crate::aggregate::AggregatedExecutionGasEvents =
             self.exec_io.aggregate_gas_events();
@@ -178,11 +208,12 @@ impl TransactionGasLog {
         }
 
         // Storage fees & refunds for state changes
+        let mut storage_writes = self.storage.write_set_storage.clone();
+        storage_writes.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
         data.insert(
             "storage-writes".to_string(),
             Value::Array(
-                self.storage
-                    .write_set_storage
+                storage_writes
                     .iter()
                     .map(|write| {
                         let (refund_scaled, refund_percentage) = if write.refund.is_zero() {
@@ -213,11 +244,12 @@ impl TransactionGasLog {
         );
 
         // Storage fees for events
+        let mut storage_events = self.storage.events.clone();
+        storage_events.sort_by(|lhs, rhs| rhs.cost.cmp(&lhs.cost));
         data.insert(
             "storage-events".to_string(),
             Value::Array(
-                self.storage
-                    .events
+                storage_events
                     .iter()
                     .map(|event| {
                         json!({

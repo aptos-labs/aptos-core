@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
-use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, oidb::Claims};
+use crate::{keyless::Claims, move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::poseidon_bn254;
 use base64::URL_SAFE_NO_PAD;
@@ -58,7 +59,7 @@ impl RSA_JWK {
         self.kid.as_bytes().to_vec()
     }
 
-    // TODO(oidb): Move this to aptos-crypto so other services can use this
+    // TODO(keyless): Move this to aptos-crypto so other services can use this
     pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
         let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
         // The circuit only supports RSA256

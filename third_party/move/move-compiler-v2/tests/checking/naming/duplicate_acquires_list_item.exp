@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct R {
         dummy_field: bool,
@@ -26,6 +26,4 @@ module 0x8675309::M {
         BorrowGlobal(Mutable)<M::X>(0x1);
         Tuple()
     }
-    spec fun $t0();
-    spec fun $t1();
 } // end 0x8675309::M

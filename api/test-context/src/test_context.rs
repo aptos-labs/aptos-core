@@ -397,6 +397,7 @@ impl TestContext {
                 "type": "multisig_payload",
                 "multisig_address": multisig_account.to_hex_literal(),
                 "transaction_payload": {
+                    "type": "entry_function_payload",
                     "function": function,
                     "type_arguments": type_args,
                     "arguments": args
@@ -822,6 +823,7 @@ impl TestContext {
                 "type": "multisig_payload",
                 "multisig_address": multisig_account.to_hex_literal(),
                 "transaction_payload": {
+                    "type": "entry_function_payload",
                     "function": function,
                     "type_arguments": type_args,
                     "arguments": args

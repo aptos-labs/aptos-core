@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x2::X {
     struct R {
         dummy_field: bool,
@@ -16,11 +16,8 @@ module 0x2::M {
     }
     private fun t1(): u64 {
         loop {
-          {
-            let x: u64 = 0;
-            x;
-            Tuple()
-          }
+          0;
+          Tuple()
         }
     }
     private fun t2() {
@@ -39,43 +36,11 @@ module 0x2::M {
     }
     private fun t4() {
         {
-          let () = loop {
+          let (): () = loop {
             break
           };
           {
-            let () = loop {
-              if false {
-                break
-              } else {
-                Tuple()
-              }
-            };
-            Tuple()
-          }
-        }
-    }
-    spec fun $foo(_x: u64) {
-        Tuple()
-    }
-    spec fun $t0(): X::R {
-        loop {
-          Tuple()
-        }
-    }
-    spec fun $t1(): u64;
-    spec fun $t2() {
-        M::$foo(loop {
-          Tuple()
-        })
-    }
-    spec fun $t3(): X::R;
-    spec fun $t4() {
-        {
-          let () = loop {
-            break
-          };
-          {
-            let () = loop {
+            let (): () = loop {
               if false {
                 break
               } else {

@@ -51,8 +51,16 @@ pub fn create_ordered_blocks(rounds: Vec<Round>) -> OrderedBlocks {
     }
 }
 
-pub(super) fn create_share_for_round(round: Round, author: Author) -> RandShare<MockShare> {
-    RandShare::<MockShare>::new(author, RandMetadata::new_for_testing(round), MockShare)
+pub(super) fn create_share_for_round(
+    epoch: u64,
+    round: Round,
+    author: Author,
+) -> RandShare<MockShare> {
+    RandShare::<MockShare>::new(
+        author,
+        RandMetadata::new(epoch, round, HashValue::zero(), 1700000000),
+        MockShare,
+    )
 }
 
 pub(super) fn create_share(rand_metadata: RandMetadata, author: Author) -> RandShare<MockShare> {

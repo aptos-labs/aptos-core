@@ -95,6 +95,7 @@ pub enum KeptVMStatus {
         location: AbortLocation,
         function: u16,
         code_offset: u16,
+        message: Option<String>,
     },
     MiscellaneousError,
 }
@@ -208,14 +209,16 @@ impl VMStatus {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
-                    | StatusCode::STORAGE_LIMIT_REACHED,
+                    | StatusCode::STORAGE_LIMIT_REACHED
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
                 ..
             }
             | VMStatus::Error {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
                     | StatusCode::IO_LIMIT_REACHED
-                    | StatusCode::STORAGE_LIMIT_REACHED,
+                    | StatusCode::STORAGE_LIMIT_REACHED
+                    | StatusCode::TOO_MANY_DELAYED_FIELDS,
                 ..
             } => Ok(KeptVMStatus::MiscellaneousError),
 
@@ -224,14 +227,18 @@ impl VMStatus {
                 location,
                 function,
                 code_offset,
+                message,
                 ..
             } => Ok(KeptVMStatus::ExecutionFailure {
                 location,
                 function,
                 code_offset,
+                message,
             }),
             VMStatus::Error {
-                status_code: code, ..
+                status_code: code,
+                message,
+                ..
             } => {
                 match code.status_type() {
                     // Any unknown error should be discarded
@@ -253,6 +260,7 @@ impl VMStatus {
                         location: AbortLocation::Script,
                         function: 0,
                         code_offset: 0,
+                        message,
                     }),
                 }
             },
@@ -305,10 +313,11 @@ impl fmt::Display for KeptVMStatus {
                 location,
                 function,
                 code_offset,
+                message,
             } => write!(
                 f,
-                "EXECUTION_FAILURE at bytecode offset {} in function index {} in {}",
-                code_offset, function, location
+                "EXECUTION_FAILURE at bytecode offset {} in function index {} in {} with error message {:?}",
+                code_offset, function, location, message
             ),
         }
     }
@@ -367,11 +376,13 @@ impl fmt::Debug for KeptVMStatus {
                 location,
                 function,
                 code_offset,
+                message,
             } => f
                 .debug_struct("EXECUTION_FAILURE")
                 .field("location", location)
                 .field("function_definition", function)
                 .field("code_offset", code_offset)
+                .field("message", message)
                 .finish(),
             KeptVMStatus::MiscellaneousError => write!(f, "MISCELLANEOUS_ERROR"),
         }
@@ -505,7 +516,8 @@ pub enum StatusCode {
     SEQUENCE_NUMBER_TOO_OLD = 3,
     // Sequence number is too new
     SEQUENCE_NUMBER_TOO_NEW = 4,
-    // Insufficient balance to pay minimum transaction fee
+    // Insufficient balance to pay for max_gas specified in the transaction.
+    // Balance needs to be above max_gas_amount * gas_unit_price to proceed.
     INSUFFICIENT_BALANCE_FOR_TRANSACTION_FEE = 5,
     // The transaction has expired
     TRANSACTION_EXPIRED = 6,
@@ -700,13 +712,15 @@ pub enum StatusCode {
     MAX_FUNCTION_DEFINITIONS_REACHED = 1119,
     MAX_STRUCT_DEFINITIONS_REACHED = 1120,
     MAX_FIELD_DEFINITIONS_REACHED = 1121,
-    // Reserved error code for future use
     TOO_MANY_BACK_EDGES = 1122,
     EVENT_METADATA_VALIDATION_ERROR = 1123,
-    RESERVED_VERIFICATION_ERROR_2 = 1124,
-    RESERVED_VERIFICATION_ERROR_3 = 1125,
-    RESERVED_VERIFICATION_ERROR_4 = 1126,
-    RESERVED_VERIFICATION_ERROR_5 = 1127,
+    DEPENDENCY_LIMIT_REACHED = 1124,
+    // Reserved error code for future use
+    RESERVED_VERIFICATION_ERROR_1 = 1125,
+    RESERVED_VERIFICATION_ERROR_2 = 1126,
+    RESERVED_VERIFICATION_ERROR_3 = 1127,
+    RESERVED_VERIFICATION_ERROR_4 = 1128,
+    RESERVED_VERIFICATION_ERROR_5 = 1129,
 
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
@@ -746,8 +760,8 @@ pub enum StatusCode {
     RESERVED_INVARIANT_VIOLATION_ERROR_1 = 2026,
     RESERVED_INVARIANT_VIOLATION_ERROR_2 = 2027,
     RESERVED_INVARIANT_VIOLATION_ERROR_3 = 2028,
-    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2029,
-    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2030,
+    RESERVED_INVARIANT_VIOLATION_ERROR_4 = 2039,
+    RESERVED_INVARIANT_VIOLATION_ERROR_5 = 2040,
 
     // Errors that can arise from binary decoding (deserialization)
     // Deserialization Errors: 3000-3999
@@ -812,11 +826,14 @@ pub enum StatusCode {
     ACCESS_DENIED = 4034,
     // The stack of access control specifier has overflowed.
     ACCESS_STACK_LIMIT_EXCEEDED = 4035,
+    // We tried to create resource with more than currently allowed number of DelayedFields
+    TOO_MANY_DELAYED_FIELDS = 4036,
+
     // Reserved error code for future use. Always keep this buffer of well-defined new codes.
-    RESERVED_RUNTIME_ERROR_1 = 4036,
-    RESERVED_RUNTIME_ERROR_2 = 4037,
-    RESERVED_RUNTIME_ERROR_3 = 4038,
-    RESERVED_RUNTIME_ERROR_4 = 4039,
+    RESERVED_RUNTIME_ERROR_1 = 4037,
+    RESERVED_RUNTIME_ERROR_2 = 4038,
+    RESERVED_RUNTIME_ERROR_3 = 4039,
+    RESERVED_RUNTIME_ERROR_4 = 4040,
 
     // A reserved status to represent an unknown vm status.
     // this is std::u64::MAX, but we can't pattern match on that, so put the hardcoded value in

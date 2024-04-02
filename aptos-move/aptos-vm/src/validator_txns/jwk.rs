@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     aptos_vm::get_or_vm_startup_failure,
@@ -147,7 +148,7 @@ impl AptosVM {
             })
             .map_err(|r| Unexpected(r.unwrap_err()))?;
 
-        let output = crate::aptos_vm::get_transaction_output(
+        let output = crate::aptos_vm::get_system_transaction_output(
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,

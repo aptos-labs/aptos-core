@@ -1,6 +1,6 @@
 ---
 remote_endpoint: ~
-name: "v1.10"
+name: "v1.10-plus"
 proposals:
   - name: step_1_increase_max_txn_gas
     metadata:
@@ -8,19 +8,23 @@ proposals:
       description: "Increase max txn gas temporarily for framework upgrade"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGasWithOverride:
-          - name: "txn.max_execution_gas"
-            value: 3676000000
+      - DefaultGasWithOverrideOld: # This is translated to `gas_schedule::set_gas_schedule(...)`.
+          feature_version: 13
+          overrides:
+            - name: "txn.max_execution_gas"
+              value: 3676000000
   - name: step_2_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.10"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.10"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.10-plus"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.10 plus some others in main."
     execution_mode: MultiStep
     update_sequence:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-      - DefaultGas
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/randomness_framework_initialization.move # Keep this in 1.11
+      - DefaultGasWithOverride:  # [probably 1.11] This is translated to `gas_schedule::set_for_next_epoch(...)`.
+          feature_version: 13 
   - name: step_3_storage_fee_for_state_bytes_refundable
     metadata:
       title: "AIP-65: Storage Fee for State Bytes refundable"
@@ -28,7 +32,7 @@ proposals:
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/328"
     execution_mode: MultiStep
     update_sequence:
-      - FeatureFlag:
+      - FeatureFlag: # This and the following `FeatureFlag` entries are translated to `features::change_feature_flags_for_next_epoch(...)`.
           enabled:
             - refundable_bytes
   - name: step_4_enable_fairness_shuffler
@@ -151,20 +155,50 @@ proposals:
       - FeatureFlag:
           enabled:
             - jwk_consensus
-  - name: step_12_enable_oidb
+  - name: step_12_enable_keyless_accounts
     metadata:
-      title: "AIP-61: OpenID blockchain (OIDB) accounts"
-      description: "Enable validation of OIDB transactions, allowing users to transact using their Web2 accounts"
+      title: "AIP-61: Keyless accounts"
+      description: "Enable keyless blockchain accounts, allowing users to transact directly using their Web2 accounts instead of managing a secret key"
       discussion_url: "https://github.com/aptos-foundation/AIPs/issues/297"
     execution_mode: MultiStep
     update_sequence:
       - FeatureFlag:
           enabled:
-            - oidb_signature
+            - keyless_accounts
   - name: step_13_start_watching_google_jwks
     metadata:
       title: "Start JWK consensus for Google"
-      description: "JWK Consensus (AIP-67) for Google enables Google-based OIDB accounts (AIP-61)."
+      description: "JWK Consensus (AIP-67) for Google enables Google-based keyless accounts (AIP-61)."
     execution_mode: MultiStep
     update_sequence:
       - RawScript: aptos-move/aptos-release-builder/data/proposals/start_jwk_consensus_for_google.move
+  - name: step_14_migrate_jwk_consensus_config
+    metadata:
+      title: "[probably 1.11] Migrate JWK consensus config"
+      description: "Move JWK consensus on-off control and the supported OIDC provider list to its own resource."
+    execution_mode: MultiStep
+    update_sequence:
+      - RawScript: aptos-move/aptos-release-builder/data/proposals/jwk_consensus_config_migration.move
+  - name: step_15_enable_randomness # Keep this the last step, so the above steps use fast reconfig and we save time.
+    metadata:
+      title: "[probably 1.11] Enable randomness"
+      description: "Move JWK consensus on-off control and the supported OIDC provider list to its own resource."
+    execution_mode: MultiStep
+    update_sequence:
+      - Randomness: # Generated script should be like: aptos-move/aptos-release-builder/data/proposals/enable_randomness.move
+          V1:
+            secrecy_threshold_in_percentage: 50
+            reconstruct_threshold_in_percentage: 66
+  - name: step_16_update_oidc_providers_test_only #
+    metadata:
+      title: "test only step"
+      description: "test only step"
+    execution_mode: MultiStep
+    update_sequence:
+      - JwkConsensus:
+          V1:
+            oidc_providers:
+              - name: "https://www.facebook.com"
+                config_url: "https://www.facebook.com/.well-known/openid-configuration"
+              - name: "https://accounts.google.com"
+                config_url: "https://accounts.google.com/.well-known/openid-configuration"

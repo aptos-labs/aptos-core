@@ -377,6 +377,10 @@ impl<
         }
     }
 
+    pub(crate) fn num_keys(&self) -> usize {
+        self.group_values.len()
+    }
+
     pub fn set_raw_base_values(&self, key: K, base_values: impl IntoIterator<Item = (T, V)>) {
         // Incarnation is irrelevant for storage version, set to 0.
         self.group_values

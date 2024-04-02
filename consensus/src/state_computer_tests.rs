@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     error::MempoolError, payload_manager::PayloadManager, state_computer::ExecutionProxy,
@@ -64,8 +65,8 @@ struct DummyTxnNotifier {}
 impl TxnNotifier for DummyTxnNotifier {
     async fn notify_failed_txn(
         &self,
-        _txns: Vec<SignedTransaction>,
-        _compute_results: &StateComputeResult,
+        _txns: &[SignedTransaction],
+        _statuses: &[TransactionStatus],
     ) -> anyhow::Result<(), MempoolError> {
         Ok(())
     }

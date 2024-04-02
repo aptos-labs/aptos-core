@@ -4,8 +4,8 @@
 
 use crate::{
     parser::ast::{
-        self as P, Ability, Ability_, BinOp, ConstantName, Field, FunctionName, ModuleName,
-        QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, ENTRY_MODIFIER,
+        self as P, Ability, Ability_, BinOp, CallKind, ConstantName, Field, FunctionName,
+        ModuleName, QuantKind, SpecApplyPattern, StructName, UnaryOp, UseDecl, Var, ENTRY_MODIFIER,
     },
     shared::{
         ast_debug::*,
@@ -437,12 +437,7 @@ pub enum Exp_ {
     Copy(Var),
 
     Name(ModuleAccess, Option<Vec<Type>>),
-    Call(
-        ModuleAccess,
-        /* is_macro */ bool,
-        Option<Vec<Type>>,
-        Spanned<Vec<Exp>>,
-    ),
+    Call(ModuleAccess, CallKind, Option<Vec<Type>>, Spanned<Vec<Exp>>),
     Pack(ModuleAccess, Option<Vec<Type>>, Fields<Exp>),
     Vector(Loc, Option<Vec<Type>>, Spanned<Vec<Exp>>),
 
@@ -1517,11 +1512,9 @@ impl AstDebug for Exp_ {
                     w.write(">");
                 }
             },
-            E::Call(ma, is_macro, tys_opt, sp!(_, rhs)) => {
+            E::Call(ma, kind, tys_opt, sp!(_, rhs)) => {
                 ma.ast_debug(w);
-                if *is_macro {
-                    w.write("!");
-                }
+                w.write(kind.to_string());
                 if let Some(ss) = tys_opt {
                     w.write("<");
                     ss.ast_debug(w);

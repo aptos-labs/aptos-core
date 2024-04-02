@@ -22,8 +22,10 @@ spec aptos_framework::consensus_config {
     /// </high-level-req>
     ///
     spec module {
+        use aptos_framework::chain_status;
         pragma verify = true;
         pragma aborts_if_is_strict;
+        invariant [suspendable] chain_status::is_operating() ==> exists<ConsensusConfig>(@aptos_framework);
     }
 
     /// Ensure caller is admin.
@@ -52,7 +54,7 @@ spec aptos_framework::consensus_config {
         use aptos_framework::staking_config;
 
         // TODO: set because of timeout (property proved)
-        pragma verify_duration_estimate = 120;
+        pragma verify_duration_estimate = 600;
         include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         let addr = signer::address_of(account);
@@ -68,4 +70,26 @@ spec aptos_framework::consensus_config {
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
         ensures global<ConsensusConfig>(@aptos_framework).config == config;
     }
+
+    spec set_for_next_epoch(account: &signer, config: vector<u8>) {
+        include config_buffer::SetForNextEpochAbortsIf;
+    }
+
+    spec on_new_epoch() {
+        include config_buffer::OnNewEpochAbortsIf<ConsensusConfig>;
+    }
+
+    spec validator_txn_enabled(): bool {
+        pragma opaque;
+        aborts_if !exists<ConsensusConfig>(@aptos_framework);
+        ensures [abstract] result == spec_validator_txn_enabled_internal(global<ConsensusConfig>(@aptos_framework).config);
+    }
+
+    spec validator_txn_enabled_internal(config_bytes: vector<u8>): bool {
+        pragma opaque;
+        ensures [abstract] result == spec_validator_txn_enabled_internal(config_bytes);
+    }
+
+    spec fun spec_validator_txn_enabled_internal(config_bytes: vector<u8>): bool;
+
 }

@@ -24,6 +24,7 @@ use aptos_consensus_types::{
     common::Author, pipeline::commit_decision::CommitDecision, pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::HashValue;
+use aptos_executor_types::ExecutorError;
 use aptos_logger::prelude::*;
 use aptos_network::protocols::{rpc::error::RpcError, wire::handshake::v1::ProtocolId};
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -357,13 +358,8 @@ impl BufferManager {
                     self.commit_proof_rb_handle
                         .replace(self.do_reliable_broadcast(commit_decision));
                 }
-                if aggregated_item.commit_proof.ledger_info().ends_epoch() {
-                    self.commit_msg_tx
-                        .send_epoch_change(EpochChangeProof::new(
-                            vec![aggregated_item.commit_proof.clone()],
-                            false,
-                        ))
-                        .await;
+                let commit_proof = aggregated_item.commit_proof.clone();
+                if commit_proof.ledger_info().ends_epoch() {
                     // the epoch ends, reset to avoid executing more blocks, execute after
                     // this persisting request will result in BlockNotFound
                     self.reset().await;
@@ -382,6 +378,12 @@ impl BufferManager {
                     }))
                     .await
                     .expect("Failed to send persist request");
+                // this needs to be done after creating the persisting request to avoid it being lost
+                if commit_proof.ledger_info().ends_epoch() {
+                    self.commit_msg_tx
+                        .send_epoch_change(EpochChangeProof::new(vec![commit_proof], false))
+                        .await;
+                }
                 info!("Advance head to {:?}", self.buffer.head_cursor());
                 self.previous_commit_time = Instant::now();
                 return;
@@ -440,6 +442,10 @@ impl BufferManager {
 
         let executed_blocks = match inner {
             Ok(result) => result,
+            Err(ExecutorError::CouldNotGetData) => {
+                warn!("Execution error - CouldNotGetData");
+                return;
+            },
             Err(e) => {
                 error!("Execution error {:?}", e);
                 return;

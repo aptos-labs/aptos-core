@@ -74,12 +74,30 @@ impl PayloadManager {
                         Payload::DirectMempool(_) => {
                             unreachable!("InQuorumStore should be used");
                         },
-                        Payload::InQuorumStore(proof_with_status) => proof_with_status.proofs,
-                        Payload::InQuorumStoreWithLimit(proof_with_status) => {
-                            proof_with_status.proof_with_data.proofs
+                        Payload::InQuorumStore(proof_with_status) => proof_with_status
+                            .proofs
+                            .iter()
+                            .map(|proof| proof.info().clone())
+                            .collect::<Vec<_>>(),
+                        Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
+                            .proof_with_data
+                            .proofs
+                            .iter()
+                            .map(|proof| proof.info().clone())
+                            .collect::<Vec<_>>(),
+                        Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
+                            inline_batches
+                                .iter()
+                                .map(|(batch_info, _)| batch_info.clone())
+                                .chain(
+                                    proof_with_data
+                                        .proofs
+                                        .iter()
+                                        .map(|proof| proof.info().clone()),
+                                )
+                                .collect::<Vec<_>>()
                         },
                     })
-                    .map(|proof| proof.info().clone())
                     .collect();
 
                 let mut tx = coordinator_tx.clone();
@@ -123,6 +141,9 @@ impl PayloadManager {
                         &proof_with_data.proof_with_data,
                         batch_reader.clone(),
                     );
+                },
+                Payload::QuorumStoreInlineHybrid(_, proof_with_data, _) => {
+                    request_txns_and_update_status(proof_with_data, batch_reader.clone());
                 },
                 Payload::DirectMempool(_) => {
                     unreachable!()
@@ -238,6 +259,28 @@ impl PayloadManager {
                 )
                 .await?,
                 proof_with_data.max_txns_to_execute,
+            )),
+            (
+                PayloadManager::InQuorumStore(batch_reader, _),
+                Payload::QuorumStoreInlineHybrid(
+                    inline_batches,
+                    proof_with_data,
+                    max_txns_to_execute,
+                ),
+            ) => Ok((
+                {
+                    let mut all_txns =
+                        process_payload(proof_with_data, batch_reader.clone(), block).await?;
+                    all_txns.append(
+                        &mut inline_batches
+                            .iter()
+                            // TODO: Can clone be avoided here?
+                            .flat_map(|(_batch_info, txns)| txns.clone())
+                            .collect(),
+                    );
+                    all_txns
+                },
+                *max_txns_to_execute,
             )),
             (_, _) => unreachable!(
                 "Wrong payload {} epoch {}, round {}, id {}",

@@ -227,6 +227,18 @@ pub enum EntryFunctionCall {
         is_multi_step_proposal: bool,
     },
 
+    /// Change epoch immediately.
+    /// If `RECONFIGURE_WITH_DKG` is enabled and we are in the middle of a DKG,
+    /// stop waiting for DKG and enter the new epoch without randomness.
+    ///
+    /// WARNING: currently only used by tests. In most cases you should use `reconfigure()` instead.
+    /// TODO: migrate these tests to be aware of async reconfiguration.
+    AptosGovernanceForceEndEpoch {},
+
+    /// `force_end_epoch()` equivalent but only called in testnet,
+    /// where the core resources account exists and has been granted power to mint Aptos coins.
+    AptosGovernanceForceEndEpochTestOnly {},
+
     /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
     AptosGovernancePartialVote {
         stake_pool: AccountAddress,
@@ -234,6 +246,17 @@ pub enum EntryFunctionCall {
         voting_power: u64,
         should_pass: bool,
     },
+
+    /// Manually reconfigure. Called at the end of a governance txn that alters on-chain configs.
+    ///
+    /// WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.
+    /// - If feature `RECONFIGURE_WITH_DKG` is disabled, it finishes immediately.
+    ///   - At the end of the calling transaction, we will be in a new epoch.
+    /// - If feature `RECONFIGURE_WITH_DKG` is enabled, it starts DKG, and the new epoch will start in a block prologue after DKG finishes.
+    ///
+    /// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
+    /// since such updates are applied whenever we enter an new epoch.
+    AptosGovernanceReconfigure {},
 
     /// Vote on proposal with `proposal_id` and all voting power from `stake_pool`.
     AptosGovernanceVote {
@@ -524,6 +547,12 @@ pub enum EntryFunctionCall {
         multisig_account: AccountAddress,
     },
 
+    /// Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
+    MultisigAccountExecuteRejectedTransactions {
+        multisig_account: AccountAddress,
+        final_sequence_number: u64,
+    },
+
     /// Reject a multisig transaction.
     MultisigAccountRejectTransaction {
         multisig_account: AccountAddress,
@@ -588,6 +617,23 @@ pub enum EntryFunctionCall {
     },
 
     /// Generic function that can be used to either approve or reject a multisig transaction
+    MultisigAccountVoteTransaction {
+        multisig_account: AccountAddress,
+        sequence_number: u64,
+        approved: bool,
+    },
+
+    /// Generic function that can be used to either approve or reject a batch of transactions within a specified range.
+    MultisigAccountVoteTransactions {
+        multisig_account: AccountAddress,
+        starting_sequence_number: u64,
+        final_sequence_number: u64,
+        approved: bool,
+    },
+
+    /// Generic function that can be used to either approve or reject a multisig transaction
+    /// Retained for backward compatibility: the function with the typographical error in its name
+    /// will continue to be an accessible entry point.
     MultisigAccountVoteTransanction {
         multisig_account: AccountAddress,
         sequence_number: u64,
@@ -835,8 +881,19 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    /// Updates the major version to a larger version.
-    /// This can be called by on chain governance.
+    /// Used in on-chain governances to update the major version for the next epoch.
+    /// Example usage:
+    /// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
+    /// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
+    VersionSetForNextEpoch {
+        major: u64,
+    },
+
+    /// Deprecated by `set_for_next_epoch()`.
+    ///
+    /// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+    ///
+    /// TODO: update all the tests that reference this function, then disable this function.
     VersionSetVersion {
         major: u64,
     },
@@ -1050,12 +1107,15 @@ impl EntryFunctionCall {
                 metadata_hash,
                 is_multi_step_proposal,
             ),
+            AptosGovernanceForceEndEpoch {} => aptos_governance_force_end_epoch(),
+            AptosGovernanceForceEndEpochTestOnly {} => aptos_governance_force_end_epoch_test_only(),
             AptosGovernancePartialVote {
                 stake_pool,
                 proposal_id,
                 voting_power,
                 should_pass,
             } => aptos_governance_partial_vote(stake_pool, proposal_id, voting_power, should_pass),
+            AptosGovernanceReconfigure {} => aptos_governance_reconfigure(),
             AptosGovernanceVote {
                 stake_pool,
                 proposal_id,
@@ -1253,6 +1313,13 @@ impl EntryFunctionCall {
             MultisigAccountExecuteRejectedTransaction { multisig_account } => {
                 multisig_account_execute_rejected_transaction(multisig_account)
             },
+            MultisigAccountExecuteRejectedTransactions {
+                multisig_account,
+                final_sequence_number,
+            } => multisig_account_execute_rejected_transactions(
+                multisig_account,
+                final_sequence_number,
+            ),
             MultisigAccountRejectTransaction {
                 multisig_account,
                 sequence_number,
@@ -1286,6 +1353,22 @@ impl EntryFunctionCall {
             MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required,
             } => multisig_account_update_signatures_required(new_num_signatures_required),
+            MultisigAccountVoteTransaction {
+                multisig_account,
+                sequence_number,
+                approved,
+            } => multisig_account_vote_transaction(multisig_account, sequence_number, approved),
+            MultisigAccountVoteTransactions {
+                multisig_account,
+                starting_sequence_number,
+                final_sequence_number,
+                approved,
+            } => multisig_account_vote_transactions(
+                multisig_account,
+                starting_sequence_number,
+                final_sequence_number,
+                approved,
+            ),
             MultisigAccountVoteTransanction {
                 multisig_account,
                 sequence_number,
@@ -1440,6 +1523,7 @@ impl EntryFunctionCall {
                 operator,
                 new_voter,
             } => staking_proxy_set_voter(operator, new_voter),
+            VersionSetForNextEpoch { major } => version_set_for_next_epoch(major),
             VersionSetVersion { major } => version_set_version(major),
             VestingAdminWithdraw { contract_address } => vesting_admin_withdraw(contract_address),
             VestingDistribute { contract_address } => vesting_distribute(contract_address),
@@ -2003,6 +2087,44 @@ pub fn aptos_governance_create_proposal_v2(
     ))
 }
 
+/// Change epoch immediately.
+/// If `RECONFIGURE_WITH_DKG` is enabled and we are in the middle of a DKG,
+/// stop waiting for DKG and enter the new epoch without randomness.
+///
+/// WARNING: currently only used by tests. In most cases you should use `reconfigure()` instead.
+/// TODO: migrate these tests to be aware of async reconfiguration.
+pub fn aptos_governance_force_end_epoch() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("force_end_epoch").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
+/// `force_end_epoch()` equivalent but only called in testnet,
+/// where the core resources account exists and has been granted power to mint Aptos coins.
+pub fn aptos_governance_force_end_epoch_test_only() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("force_end_epoch_test_only").to_owned(),
+        vec![],
+        vec![],
+    ))
+}
+
 /// Vote on proposal with `proposal_id` and specified voting power from `stake_pool`.
 pub fn aptos_governance_partial_vote(
     stake_pool: AccountAddress,
@@ -2026,6 +2148,30 @@ pub fn aptos_governance_partial_vote(
             bcs::to_bytes(&voting_power).unwrap(),
             bcs::to_bytes(&should_pass).unwrap(),
         ],
+    ))
+}
+
+/// Manually reconfigure. Called at the end of a governance txn that alters on-chain configs.
+///
+/// WARNING: this function always ensures a reconfiguration starts, but when the reconfiguration finishes depends.
+/// - If feature `RECONFIGURE_WITH_DKG` is disabled, it finishes immediately.
+///   - At the end of the calling transaction, we will be in a new epoch.
+/// - If feature `RECONFIGURE_WITH_DKG` is enabled, it starts DKG, and the new epoch will start in a block prologue after DKG finishes.
+///
+/// This behavior affects when an update of an on-chain config (e.g. `ConsensusConfig`, `Features`) takes effect,
+/// since such updates are applied whenever we enter an new epoch.
+pub fn aptos_governance_reconfigure() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("aptos_governance").to_owned(),
+        ),
+        ident_str!("reconfigure").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -2883,6 +3029,28 @@ pub fn multisig_account_execute_rejected_transaction(
     ))
 }
 
+/// Remove the next transactions until the final_sequence_number if they have sufficient owner rejections.
+pub fn multisig_account_execute_rejected_transactions(
+    multisig_account: AccountAddress,
+    final_sequence_number: u64,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("execute_rejected_transactions").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&final_sequence_number).unwrap(),
+        ],
+    ))
+}
+
 /// Reject a multisig transaction.
 pub fn multisig_account_reject_transaction(
     multisig_account: AccountAddress,
@@ -3063,6 +3231,58 @@ pub fn multisig_account_update_signatures_required(
 }
 
 /// Generic function that can be used to either approve or reject a multisig transaction
+pub fn multisig_account_vote_transaction(
+    multisig_account: AccountAddress,
+    sequence_number: u64,
+    approved: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("vote_transaction").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&sequence_number).unwrap(),
+            bcs::to_bytes(&approved).unwrap(),
+        ],
+    ))
+}
+
+/// Generic function that can be used to either approve or reject a batch of transactions within a specified range.
+pub fn multisig_account_vote_transactions(
+    multisig_account: AccountAddress,
+    starting_sequence_number: u64,
+    final_sequence_number: u64,
+    approved: bool,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("multisig_account").to_owned(),
+        ),
+        ident_str!("vote_transactions").to_owned(),
+        vec![],
+        vec![
+            bcs::to_bytes(&multisig_account).unwrap(),
+            bcs::to_bytes(&starting_sequence_number).unwrap(),
+            bcs::to_bytes(&final_sequence_number).unwrap(),
+            bcs::to_bytes(&approved).unwrap(),
+        ],
+    ))
+}
+
+/// Generic function that can be used to either approve or reject a multisig transaction
+/// Retained for backward compatibility: the function with the typographical error in its name
+/// will continue to be an accessible entry point.
 pub fn multisig_account_vote_transanction(
     multisig_account: AccountAddress,
     sequence_number: u64,
@@ -3868,8 +4088,30 @@ pub fn staking_proxy_set_voter(
     ))
 }
 
-/// Updates the major version to a larger version.
-/// This can be called by on chain governance.
+/// Used in on-chain governances to update the major version for the next epoch.
+/// Example usage:
+/// - `aptos_framework::version::set_for_next_epoch(&framework_signer, new_version);`
+/// - `aptos_framework::aptos_governance::reconfigure(&framework_signer);`
+pub fn version_set_for_next_epoch(major: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("version").to_owned(),
+        ),
+        ident_str!("set_for_next_epoch").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&major).unwrap()],
+    ))
+}
+
+/// Deprecated by `set_for_next_epoch()`.
+///
+/// WARNING: calling this while randomness is enabled will trigger a new epoch without randomness!
+///
+/// TODO: update all the tests that reference this function, then disable this function.
 pub fn version_set_version(major: u64) -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
@@ -4490,6 +4732,26 @@ mod decoder {
         }
     }
 
+    pub fn aptos_governance_force_end_epoch(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceForceEndEpoch {})
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_governance_force_end_epoch_test_only(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceForceEndEpochTestOnly {})
+        } else {
+            None
+        }
+    }
+
     pub fn aptos_governance_partial_vote(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -4500,6 +4762,14 @@ mod decoder {
                 voting_power: bcs::from_bytes(script.args().get(2)?).ok()?,
                 should_pass: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn aptos_governance_reconfigure(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::AptosGovernanceReconfigure {})
         } else {
             None
         }
@@ -5008,6 +5278,21 @@ mod decoder {
         }
     }
 
+    pub fn multisig_account_execute_rejected_transactions(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::MultisigAccountExecuteRejectedTransactions {
+                    multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                    final_sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+                },
+            )
+        } else {
+            None
+        }
+    }
+
     pub fn multisig_account_reject_transaction(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -5102,6 +5387,35 @@ mod decoder {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::MultisigAccountUpdateSignaturesRequired {
                 new_num_signatures_required: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_vote_transaction(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountVoteTransaction {
+                multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+                approved: bcs::from_bytes(script.args().get(2)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn multisig_account_vote_transactions(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::MultisigAccountVoteTransactions {
+                multisig_account: bcs::from_bytes(script.args().get(0)?).ok()?,
+                starting_sequence_number: bcs::from_bytes(script.args().get(1)?).ok()?,
+                final_sequence_number: bcs::from_bytes(script.args().get(2)?).ok()?,
+                approved: bcs::from_bytes(script.args().get(3)?).ok()?,
             })
         } else {
             None
@@ -5585,6 +5899,16 @@ mod decoder {
         }
     }
 
+    pub fn version_set_for_next_epoch(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::VersionSetForNextEpoch {
+                major: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn version_set_version(payload: &TransactionPayload) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::VersionSetVersion {
@@ -5894,8 +6218,20 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::aptos_governance_create_proposal_v2),
         );
         map.insert(
+            "aptos_governance_force_end_epoch".to_string(),
+            Box::new(decoder::aptos_governance_force_end_epoch),
+        );
+        map.insert(
+            "aptos_governance_force_end_epoch_test_only".to_string(),
+            Box::new(decoder::aptos_governance_force_end_epoch_test_only),
+        );
+        map.insert(
             "aptos_governance_partial_vote".to_string(),
             Box::new(decoder::aptos_governance_partial_vote),
+        );
+        map.insert(
+            "aptos_governance_reconfigure".to_string(),
+            Box::new(decoder::aptos_governance_reconfigure),
         );
         map.insert(
             "aptos_governance_vote".to_string(),
@@ -6054,6 +6390,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::multisig_account_execute_rejected_transaction),
         );
         map.insert(
+            "multisig_account_execute_rejected_transactions".to_string(),
+            Box::new(decoder::multisig_account_execute_rejected_transactions),
+        );
+        map.insert(
             "multisig_account_reject_transaction".to_string(),
             Box::new(decoder::multisig_account_reject_transaction),
         );
@@ -6084,6 +6424,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "multisig_account_update_signatures_required".to_string(),
             Box::new(decoder::multisig_account_update_signatures_required),
+        );
+        map.insert(
+            "multisig_account_vote_transaction".to_string(),
+            Box::new(decoder::multisig_account_vote_transaction),
+        );
+        map.insert(
+            "multisig_account_vote_transactions".to_string(),
+            Box::new(decoder::multisig_account_vote_transactions),
         );
         map.insert(
             "multisig_account_vote_transanction".to_string(),
@@ -6237,6 +6585,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "staking_proxy_set_voter".to_string(),
             Box::new(decoder::staking_proxy_set_voter),
+        );
+        map.insert(
+            "version_set_for_next_epoch".to_string(),
+            Box::new(decoder::version_set_for_next_epoch),
         );
         map.insert(
             "version_set_version".to_string(),

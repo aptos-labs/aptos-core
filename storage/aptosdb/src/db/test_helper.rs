@@ -22,6 +22,8 @@ use aptos_storage_interface::{state_delta::StateDelta, DbReader, DbWriter, Order
 use aptos_temppath::TempPath;
 #[cfg(test)]
 use aptos_types::state_store::state_storage_usage::StateStorageUsage;
+#[cfg(test)]
+use aptos_types::transaction::TransactionAuxiliaryData;
 use aptos_types::{
     account_address::AccountAddress,
     contract_event::ContractEvent,
@@ -926,6 +928,21 @@ pub(crate) fn put_transaction_infos(
         .unwrap();
     db.commit_transaction_accumulator(&txns_to_commit, version)
         .unwrap()
+}
+
+#[cfg(test)]
+pub(crate) fn put_transaction_auxiliary_data(
+    db: &AptosDB,
+    version: Version,
+    auxiliary_data: &[TransactionAuxiliaryData],
+) {
+    let txns_to_commit: Vec<_> = auxiliary_data
+        .iter()
+        .cloned()
+        .map(TransactionToCommit::dummy_with_transaction_auxiliary_data)
+        .collect();
+    db.commit_transaction_auxiliary_data(&txns_to_commit, version)
+        .unwrap();
 }
 
 pub fn put_as_state_root(db: &AptosDB, version: Version, key: StateKey, value: StateValue) {

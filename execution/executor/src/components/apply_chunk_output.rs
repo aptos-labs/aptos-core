@@ -28,8 +28,8 @@ use aptos_types::{
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     state_store::ShardedStateUpdates,
     transaction::{
-        ExecutionStatus, Transaction, TransactionInfo, TransactionOutput, TransactionStatus,
-        TransactionToCommit,
+        ExecutionStatus, Transaction, TransactionAuxiliaryData, TransactionInfo, TransactionOutput,
+        TransactionStatus, TransactionToCommit,
     },
     write_set::WriteSet,
 };
@@ -251,6 +251,7 @@ impl ApplyChunkOutput {
                     Vec::new(),
                     0,
                     TransactionStatus::Keep(ExecutionStatus::Success),
+                    TransactionAuxiliaryData::default(),
                 ));
             to_keep.push((state_checkpoint_txn, state_checkpoint_txn_output));
         }
@@ -328,7 +329,7 @@ impl ApplyChunkOutput {
             state_updates_vec,
             hashes_vec
         ) {
-            let (write_set, events, per_txn_reconfig_events, gas_used, status) =
+            let (write_set, events, per_txn_reconfig_events, gas_used, status, auxiliary_data) =
                 txn_output.unpack();
 
             let subscribable_events: Vec<ContractEvent> = events
@@ -356,6 +357,7 @@ impl ApplyChunkOutput {
                 write_set,
                 events,
                 !per_txn_reconfig_events.is_empty(),
+                auxiliary_data,
             );
             all_subscribable_events.extend(subscribable_events);
             to_commit.push(txn_to_commit);
@@ -417,12 +419,14 @@ fn assemble_ledger_diff_should_filter_subscribable_events() {
                 vec![event_0.clone()],
                 0,
                 TransactionStatus::Keep(ExecutionStatus::Success),
+                TransactionAuxiliaryData::default(),
             )),
             ParsedTransactionOutput::from(TransactionOutput::new(
                 WriteSet::default(),
                 vec![event_1.clone(), event_2.clone()],
                 0,
                 TransactionStatus::Keep(ExecutionStatus::Success),
+                TransactionAuxiliaryData::default(),
             )),
         ]);
     let state_updates_vec = vec![

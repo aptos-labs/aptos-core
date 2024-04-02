@@ -184,7 +184,7 @@ public fun A::mutate_at($t0|addr: address) {
      # VC: function does not abort under this condition at tests/spec_instrumentation/modifies.move:24:9+27
  10: assert Not(Not(exists[@0]<A::S>($t0)))
      # VC: post-condition does not hold at tests/spec_instrumentation/modifies.move:23:9+31
- 11: assert Eq<u64>(select A::S.x(global<A::S>($t0)), 2)
+ 11: assert Eq<u64>(select A::S.x<A::S>(global<A::S>($t0)), 2)
  12: return ()
  13: label L2
      # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/modifies.move:21:5+162
@@ -205,7 +205,7 @@ public fun A::read_at($t0|addr: address): u64 {
      # VC: function does not abort under this condition at tests/spec_instrumentation/modifies.move:13:9+27
   4: assert Not(Not(exists[@1]<A::S>($t0)))
      # VC: post-condition does not hold at tests/spec_instrumentation/modifies.move:14:9+36
-  5: assert Eq<u64>($t3, select A::S.x(global<A::S>($t0)))
+  5: assert Eq<u64>($t3, select A::S.x<A::S>(global<A::S>($t0)))
   6: return $t3
   7: label L2
      # VC: abort not covered by any of the `aborts_if` clauses at tests/spec_instrumentation/modifies.move:11:5+131
@@ -234,7 +234,7 @@ public fun B::move_from_test_incorrect($t0|addr1: address, $t1|addr2: address): 
   6: goto 26
   7: label L3
   8: assume WellFormed($t5)
-  9: assume Eq<u64>($t5, select A::S.x(global<A::S>($t1)))
+  9: assume Eq<u64>($t5, select A::S.x<A::S>(global<A::S>($t1)))
  10: $t5 := opaque end: A::read_at($t1)
      # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:65:17+9
  11: assert CanModify<B::T>($t0)
@@ -247,7 +247,7 @@ public fun B::move_from_test_incorrect($t0|addr1: address, $t1|addr2: address): 
  18: goto 26
  19: label L5
  20: assume WellFormed($t9)
- 21: assume Eq<u64>($t9, select A::S.x(global<A::S>($t1)))
+ 21: assume Eq<u64>($t9, select A::S.x<A::S>(global<A::S>($t1)))
  22: $t9 := opaque end: A::read_at($t1)
  23: assert Eq<u64>($t5, $t9)
  24: label L1
@@ -277,7 +277,7 @@ public fun B::move_to_test_incorrect($t0|account: signer, $t1|addr2: address) {
   6: goto 28
   7: label L3
   8: assume WellFormed($t4)
-  9: assume Eq<u64>($t4, select A::S.x(global<A::S>($t1)))
+  9: assume Eq<u64>($t4, select A::S.x<A::S>(global<A::S>($t1)))
  10: $t4 := opaque end: A::read_at($t1)
  11: $t7 := 2
  12: $t8 := pack B::T($t7)
@@ -292,7 +292,7 @@ public fun B::move_to_test_incorrect($t0|account: signer, $t1|addr2: address) {
  20: goto 28
  21: label L5
  22: assume WellFormed($t9)
- 23: assume Eq<u64>($t9, select A::S.x(global<A::S>($t1)))
+ 23: assume Eq<u64>($t9, select A::S.x<A::S>(global<A::S>($t1)))
  24: $t9 := opaque end: A::read_at($t1)
  25: assert Eq<u64>($t4, $t9)
  26: label L1
@@ -322,7 +322,7 @@ public fun B::mutate_S_test1_incorrect($t0|addr1: address, $t1|addr2: address) {
   7: goto 36
   8: label L3
   9: assume WellFormed($t4)
- 10: assume Eq<u64>($t4, select A::S.x(global<A::S>($t1)))
+ 10: assume Eq<u64>($t4, select A::S.x<A::S>(global<A::S>($t1)))
  11: $t4 := opaque end: A::read_at($t1)
      # VC: caller does not have permission to modify `A::S` at given address at tests/spec_instrumentation/modifies.move:79:9+19
  12: assert CanModify<A::S>($t0)
@@ -334,7 +334,7 @@ public fun B::mutate_S_test1_incorrect($t0|addr1: address, $t1|addr2: address) {
  18: goto 36
  19: label L5
  20: modifies global<A::S>($t0)
- 21: assume Eq<u64>(select A::S.x(global<A::S>($t0)), 2)
+ 21: assume Eq<u64>(select A::S.x<A::S>(global<A::S>($t0)), 2)
  22: opaque end: A::mutate_at($t0)
  23: $t8 := opaque begin: A::read_at($t1)
  24: assume Identical($t9, Not(exists<A::S>($t1)))
@@ -344,7 +344,7 @@ public fun B::mutate_S_test1_incorrect($t0|addr1: address, $t1|addr2: address) {
  28: goto 36
  29: label L7
  30: assume WellFormed($t8)
- 31: assume Eq<u64>($t8, select A::S.x(global<A::S>($t1)))
+ 31: assume Eq<u64>($t8, select A::S.x<A::S>(global<A::S>($t1)))
  32: $t8 := opaque end: A::read_at($t1)
  33: assert Eq<u64>($t4, $t8)
  34: label L1
@@ -373,7 +373,7 @@ public fun B::mutate_S_test2_incorrect($t0|addr: address) {
   6: goto 35
   7: label L3
   8: assume WellFormed($t3)
-  9: assume Eq<u64>($t3, select A::S.x(global<A::S>($t0)))
+  9: assume Eq<u64>($t3, select A::S.x<A::S>(global<A::S>($t0)))
  10: $t3 := opaque end: A::read_at($t0)
      # VC: caller does not have permission to modify `A::S` at given address at tests/spec_instrumentation/modifies.move:92:9+18
  11: assert CanModify<A::S>($t0)
@@ -385,7 +385,7 @@ public fun B::mutate_S_test2_incorrect($t0|addr: address) {
  17: goto 35
  18: label L5
  19: modifies global<A::S>($t0)
- 20: assume Eq<u64>(select A::S.x(global<A::S>($t0)), 2)
+ 20: assume Eq<u64>(select A::S.x<A::S>(global<A::S>($t0)), 2)
  21: opaque end: A::mutate_at($t0)
  22: $t7 := opaque begin: A::read_at($t0)
  23: assume Identical($t8, Not(exists<A::S>($t0)))
@@ -395,7 +395,7 @@ public fun B::mutate_S_test2_incorrect($t0|addr: address) {
  27: goto 35
  28: label L7
  29: assume WellFormed($t7)
- 30: assume Eq<u64>($t7, select A::S.x(global<A::S>($t0)))
+ 30: assume Eq<u64>($t7, select A::S.x<A::S>(global<A::S>($t0)))
  31: $t7 := opaque end: A::read_at($t0)
  32: assert Eq<u64>($t3, $t7)
  33: label L1
@@ -427,7 +427,7 @@ public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
   6: goto 31
   7: label L3
   8: assume WellFormed($t5)
-  9: assume Eq<u64>($t5, select A::S.x(global<A::S>($t1)))
+  9: assume Eq<u64>($t5, select A::S.x<A::S>(global<A::S>($t1)))
  10: $t5 := opaque end: A::read_at($t1)
      # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:38:17+17
  11: assert CanModify<B::T>($t0)
@@ -445,7 +445,7 @@ public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
  23: goto 31
  24: label L5
  25: assume WellFormed($t11)
- 26: assume Eq<u64>($t11, select A::S.x(global<A::S>($t1)))
+ 26: assume Eq<u64>($t11, select A::S.x<A::S>(global<A::S>($t1)))
  27: $t11 := opaque end: A::read_at($t1)
  28: assert Eq<u64>($t5, $t11)
  29: label L1
@@ -460,14 +460,14 @@ public fun B::mutate_at_test_incorrect($t0|addr1: address, $t1|addr2: address) {
 
 fun A::mutate_at[baseline]
 spec {
-  ensures Eq<u64>(select A::S.x(global<A::S>($t0)), 2);
+  ensures Eq<u64>(select A::S.x<A::S>(global<A::S>($t0)), 2);
   aborts_if Not(exists<A::S>($t0));
   modifies global<A::S>($t0);
 }
 
 fun A::mutate_at[verification]
 spec {
-  ensures Eq<u64>(select A::S.x(global<A::S>($t0)), 2);
+  ensures Eq<u64>(select A::S.x<A::S>(global<A::S>($t0)), 2);
   aborts_if Not(exists<A::S>($t0));
   modifies global<A::S>($t0);
 }
@@ -475,63 +475,102 @@ spec {
 fun A::read_at[baseline]
 spec {
   aborts_if Not(exists<A::S>($t0));
-  ensures Eq<u64>(result0(), select A::S.x(global<A::S>($t0)));
+  ensures Eq<u64>(result0(), select A::S.x<A::S>(global<A::S>($t0)));
 }
 
 fun A::read_at[verification]
 spec {
   aborts_if Not(exists<A::S>($t0));
-  ensures Eq<u64>(result0(), select A::S.x(global<A::S>($t0)));
+  ensures Eq<u64>(result0(), select A::S.x<A::S>(global<A::S>($t0)));
 }
 
 fun B::move_from_test_incorrect[baseline]
 spec {
   modifies global<B::T>($t1);
 }
+9 -> spec {
+  assert Eq<u64>($t3, $t4);
+}
+
 
 fun B::move_from_test_incorrect[verification]
 spec {
   modifies global<B::T>($t1);
 }
+9 -> spec {
+  assert Eq<u64>($t3, $t4);
+}
+
 
 fun B::move_to_test_incorrect[baseline]
 spec {
   modifies global<B::T>($t1);
 }
+10 -> spec {
+  assert Eq<u64>($t2, $t3);
+}
+
 
 fun B::move_to_test_incorrect[verification]
 spec {
   modifies global<B::T>($t1);
 }
+10 -> spec {
+  assert Eq<u64>($t2, $t3);
+}
+
 
 fun B::mutate_S_test1_incorrect[baseline]
 spec {
   requires Neq<address>($t0, $t1);
   modifies global<A::S>($t1);
 }
+8 -> spec {
+  assert Eq<u64>($t2, $t3);
+}
+
 
 fun B::mutate_S_test1_incorrect[verification]
 spec {
   requires Neq<address>($t0, $t1);
   modifies global<A::S>($t1);
 }
+8 -> spec {
+  assert Eq<u64>($t2, $t3);
+}
+
 
 fun B::mutate_S_test2_incorrect[baseline]
 spec {
   modifies global<A::S>($t0);
 }
+8 -> spec {
+  assert Eq<u64>($t1, $t2);
+}
+
 
 fun B::mutate_S_test2_incorrect[verification]
 spec {
   modifies global<A::S>($t0);
 }
+8 -> spec {
+  assert Eq<u64>($t1, $t2);
+}
+
 
 fun B::mutate_at_test_incorrect[baseline]
 spec {
   modifies global<B::T>($t1);
 }
+13 -> spec {
+  assert Eq<u64>($t3, $t4);
+}
+
 
 fun B::mutate_at_test_incorrect[verification]
 spec {
   modifies global<B::T>($t1);
+}
+13 -> spec {
+  assert Eq<u64>($t3, $t4);
 }

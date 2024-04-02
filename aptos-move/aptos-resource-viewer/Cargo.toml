@@ -15,6 +15,5 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-types = { workspace = true }
-aptos-vm = { workspace = true }
 move-core-types = { workspace = true }
 move-resource-viewer = { workspace = true }

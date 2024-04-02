@@ -161,6 +161,10 @@ impl ContractEvent {
             ContractEvent::V2(_event) => false,
         }
     }
+
+    pub fn expect_new_block_event(&self) -> Result<NewBlockEvent> {
+        NewBlockEvent::try_from_bytes(self.event_data())
+    }
 }
 
 /// Entry produced via a call to the `emit_event` builtin.

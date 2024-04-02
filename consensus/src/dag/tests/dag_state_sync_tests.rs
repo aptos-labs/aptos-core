@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::helpers::TEST_DAG_WINDOW;
 use crate::{
@@ -7,6 +8,7 @@ use crate::{
         dag_fetcher::{FetchRequestHandler, TDagFetcher},
         dag_state_sync::DagStateSynchronizer,
         dag_store::DagStore,
+        errors::DagFetchError,
         storage::DAGStorage,
         tests::{
             dag_test::MockStorage,
@@ -84,7 +86,7 @@ impl TDagFetcher for MockDagFetcher {
         remote_request: RemoteFetchRequest,
         _responders: Vec<Author>,
         new_dag: Arc<DagStore>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), DagFetchError> {
         let response = FetchRequestHandler::new(self.target_dag.clone(), self.epoch_state.clone())
             .process(remote_request)
             .await

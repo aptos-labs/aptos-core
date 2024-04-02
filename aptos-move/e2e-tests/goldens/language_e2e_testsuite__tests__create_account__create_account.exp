@@ -29,6 +29,7 @@ Ok(
             status: Keep(
                 Success,
             ),
+            auxiliary_data: None,
         },
     ],
 )

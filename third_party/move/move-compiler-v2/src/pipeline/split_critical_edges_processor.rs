@@ -248,7 +248,7 @@ fn count_incoming_edges(code: &[Bytecode]) -> BTreeMap<Label, usize> {
                 if code_offset != 0 {
                     let prev_instr = code.get(code_offset - 1).expect("instruction");
                     // treat fall-through's to the label
-                    if !prev_instr.is_branch() {
+                    if !prev_instr.is_branching() {
                         increment_key_count(&mut srcs_count, *label)
                     }
                 }

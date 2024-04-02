@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     dag::{
@@ -161,7 +162,7 @@ impl NetworkHandler {
                                 if let Err(e) = dag_driver_clone.process(certified_node).await {
                                     warn!(error = ?e, "error processing certified node fetch notification");
                                 } else {
-                                    dag_driver_clone.try_order_all();
+                                    dag_driver_clone.fetch_callback();
                                 }
                             },
                             Err(e) => {
@@ -172,11 +173,14 @@ impl NetworkHandler {
                 },
                 Some(result) = node_fetch_waiter.next() => {
                     let node_receiver_clone = node_receiver.clone();
+                    let dag_driver_clone = dag_driver.clone();
                     executor.spawn(async move {
                         monitor!("dag_on_node_fetch", match result {
                             Ok(node) => {
                                 if let Err(e) = node_receiver_clone.process(node).await {
                                     warn!(error = ?e, "error processing node fetch notification");
+                                } else {
+                                    dag_driver_clone.fetch_callback();
                                 }
                             },
                             Err(e) => {

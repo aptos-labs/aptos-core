@@ -35,6 +35,9 @@ pub struct Command {
 
     #[clap(long)]
     add_system_txns: bool,
+
+    #[clap(long)]
+    repeat_execution_times: Option<u64>,
 }
 
 impl Command {
@@ -84,7 +87,11 @@ impl Command {
             user_txns
         };
 
-        let txn_outputs = debugger.execute_transactions_at_version(self.begin_version, block)?;
+        let txn_outputs = debugger.execute_transactions_at_version(
+            self.begin_version,
+            block,
+            self.repeat_execution_times.unwrap_or(1),
+        )?;
         println!("{txn_outputs:#?}");
 
         Ok(())

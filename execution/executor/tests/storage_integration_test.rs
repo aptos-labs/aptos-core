@@ -132,16 +132,24 @@ fn test_reconfiguration() {
         300000001,
     ));
 
-    // txn3 = set the aptos version
+    // txn3 = set the aptos version for next epoch
     let txn3 = get_test_signed_transaction(
         aptos_test_root_address(),
         /* sequence_number = */ 1,
         genesis_key.clone(),
         genesis_key.public_key(),
-        Some(aptos_stdlib::version_set_version(42)),
+        Some(aptos_stdlib::version_set_for_next_epoch(42)),
     );
 
-    let txn_block = into_signature_verified_block(vec![txn1, txn2, txn3]);
+    let txn4 = get_test_signed_transaction(
+        aptos_test_root_address(),
+        2,
+        genesis_key.clone(),
+        genesis_key.public_key(),
+        Some(aptos_stdlib::aptos_governance_force_end_epoch_test_only()),
+    );
+
+    let txn_block = into_signature_verified_block(vec![txn1, txn2, txn3, txn4]);
     let block_id = gen_block_id(1);
     let vm_output = executor
         .execute_block(
@@ -165,11 +173,11 @@ fn test_reconfiguration() {
     let latest_li = state_proof.latest_ledger_info();
     let current_version = latest_li.version();
 
-    let t3 = db
+    let t4 = db
         .reader
-        .get_transaction_by_version(3, current_version, /*fetch_events=*/ true)
+        .get_transaction_by_version(4, current_version, /*fetch_events=*/ true)
         .unwrap();
-    verify_committed_txn_status(latest_li, &t3, &txn_block[2]).unwrap();
+    verify_committed_txn_status(latest_li, &t4, &txn_block[3]).unwrap();
 
     let db_state_view = db
         .reader

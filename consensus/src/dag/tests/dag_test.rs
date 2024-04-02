@@ -9,6 +9,7 @@ use crate::dag::{
     types::{CertifiedNode, DagSnapshotBitmask, Node},
     NodeId, Vote,
 };
+use aptos_consensus_types::common::Author;
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
 use aptos_types::{
@@ -22,6 +23,7 @@ pub struct MockStorage {
     vote_data: Mutex<HashMap<NodeId, Vote>>,
     certified_node_data: Mutex<HashMap<HashValue, CertifiedNode>>,
     latest_ledger_info: Option<LedgerInfoWithSignatures>,
+    epoch_state: Option<Arc<EpochState>>,
 }
 
 impl MockStorage {
@@ -31,15 +33,20 @@ impl MockStorage {
             vote_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
             latest_ledger_info: None,
+            epoch_state: None,
         }
     }
 
-    pub fn new_with_ledger_info(ledger_info: LedgerInfoWithSignatures) -> Self {
+    pub fn new_with_ledger_info(
+        ledger_info: LedgerInfoWithSignatures,
+        epoch_state: Arc<EpochState>,
+    ) -> Self {
         Self {
             node_data: Mutex::new(None),
             vote_data: Mutex::new(HashMap::new()),
             certified_node_data: Mutex::new(HashMap::new()),
             latest_ledger_info: Some(ledger_info),
+            epoch_state: Some(epoch_state),
         }
     }
 }
@@ -106,6 +113,19 @@ impl DAGStorage for MockStorage {
         self.latest_ledger_info
             .clone()
             .ok_or_else(|| anyhow::anyhow!("ledger info not set"))
+    }
+
+    fn get_epoch_to_proposers(&self) -> HashMap<u64, Vec<Author>> {
+        self.epoch_state
+            .as_ref()
+            .map(|epoch_state| {
+                [(
+                    epoch_state.epoch,
+                    epoch_state.verifier.get_ordered_account_addresses(),
+                )]
+                .into()
+            })
+            .unwrap_or_default()
     }
 }
 

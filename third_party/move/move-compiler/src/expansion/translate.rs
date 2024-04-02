@@ -13,9 +13,9 @@ use crate::{
         byte_string, hex_string,
     },
     parser::ast::{
-        self as P, Ability, AccessSpecifier_, AddressSpecifier_, ConstantName, Field, FunctionName,
-        LeadingNameAccess, LeadingNameAccess_, ModuleMember, ModuleName, NameAccessChain,
-        NameAccessChain_, StructName, Var,
+        self as P, Ability, AccessSpecifier_, AddressSpecifier_, CallKind, ConstantName, Field,
+        FunctionName, LeadingNameAccess, LeadingNameAccess_, ModuleMember, ModuleName,
+        NameAccessChain, NameAccessChain_, StructName, Var,
     },
     shared::{
         known_attributes::{AttributeKind, AttributePosition, KnownAttribute},
@@ -2442,17 +2442,25 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                 },
             }
         },
-        PE::Call(pn, is_macro, ptys_opt, sp!(rloc, prs)) => {
+        PE::Call(pn, kind, ptys_opt, sp!(rloc, prs)) => {
             let tys_opt = optional_types(context, ptys_opt);
             let ers = sp(rloc, exps(context, prs));
-            let en_opt = name_access_chain(
-                context,
-                Access::ApplyPositional,
-                pn,
-                Some(DeprecatedItem::Function),
-            );
+            let en_opt = if kind != CallKind::Receiver {
+                name_access_chain(
+                    context,
+                    Access::ApplyPositional,
+                    pn,
+                    Some(DeprecatedItem::Function),
+                )
+            } else {
+                // Skip resolution for receiver calls, which are expected to use a single name
+                let P::NameAccessChain_::One(name) = pn.value else {
+                    panic!("unexpected qualified name in receiver call")
+                };
+                Some(E::ModuleAccess::new(pn.loc, E::ModuleAccess_::Name(name)))
+            };
             match en_opt {
-                Some(en) => EE::Call(en, is_macro, tys_opt, ers),
+                Some(en) => EE::Call(en, kind, tys_opt, ers),
                 None => {
                     assert!(context.env.has_errors());
                     EE::UnresolvedError

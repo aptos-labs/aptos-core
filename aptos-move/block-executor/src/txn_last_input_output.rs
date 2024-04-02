@@ -172,7 +172,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn fee_statement(&self, txn_idx: TxnIndex) -> Option<FeeStatement> {
         match self.outputs[txn_idx as usize]
             .load_full()
-            .expect("[BlockSTM]: Execution output must be recorded after execution")
+	    .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
             .as_ref()
         {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -185,7 +185,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
     pub(crate) fn output_approx_size(&self, txn_idx: TxnIndex) -> Option<u64> {
         match self.outputs[txn_idx as usize]
             .load_full()
-            .expect("[BlockSTM]: Execution output must be recorded after execution")
+            .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
             .as_ref()
         {
             ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
@@ -200,7 +200,7 @@ impl<T: Transaction, O: TransactionOutput<Txn = T>, E: Debug + Send + Clone>
         matches!(
             self.outputs[txn_idx as usize]
                 .load_full()
-                .expect("[BlockSTM]: Execution output must be recorded after execution")
+                .unwrap_or_else(|| panic!("[BlockSTM]: Execution output for txn {txn_idx} must be recorded after execution"))
                 .as_ref(),
             ExecutionStatus::SkipRest(_)
         )

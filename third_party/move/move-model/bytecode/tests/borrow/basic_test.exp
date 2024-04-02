@@ -234,7 +234,7 @@ fun TestBorrow::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut TestBorrow::R) {
 [variant baseline]
 fun TestBorrow::test1(): TestBorrow::R {
      var $t0|r: TestBorrow::R
-     var $t1|x_ref: &mut u64
+     var $t1|x_ref: &mut u64 [unused]
      var $t2: u64
      var $t3: &mut TestBorrow::R
      var $t4: &mut u64

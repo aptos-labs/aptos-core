@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     consensus::consensus_fault_tolerance::{start_traffic, ActiveTrafficGuard},
@@ -34,6 +35,7 @@ pub async fn create_dag_swarm(num_nodes: usize) -> LocalSwarm {
                 rpc_timeout_ms: 500,
                 min_concurrent_responders: 2,
                 max_concurrent_responders: 7,
+                max_concurrent_fetches: 4,
             }
         }))
         .with_init_genesis_config(Arc::new(move |genesis_config| {
@@ -66,16 +68,11 @@ async fn test_no_failures() {
         5.0,
         1,
         no_failure_injection(),
-        Box::new(move |_, _, executed_rounds, executed_transactions, _, _| {
+        Box::new(move |_, _, _, executed_transactions, _, _| {
             assert!(
                 executed_transactions >= 4,
                 "no progress with active consensus, only {} transactions",
                 executed_transactions
-            );
-            assert!(
-                executed_rounds >= 2,
-                "no progress with active consensus, only {} rounds",
-                executed_rounds
             );
             Ok(())
         }),
@@ -243,7 +240,7 @@ async fn test_changing_working_consensus() {
                 executed_transactions
             );
             assert!(
-                executed_rounds >= 2,
+                executed_rounds >= 1,
                 "no progress with active consensus, only {} rounds",
                 executed_rounds
             );

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     models::{ledger_info::LedgerInfo, nft_metadata_crawler_uris::NFTMetadataCrawlerURIs},
@@ -35,6 +36,7 @@ pub fn run_migrations(pool: &Pool<ConnectionManager<PgConnection>>) {
 pub fn upsert_uris(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     entry: &NFTMetadataCrawlerURIs,
+    ltv: i64,
 ) -> anyhow::Result<usize> {
     use schema::nft_metadata_crawler::parsed_asset_uris::dsl::*;
 
@@ -51,8 +53,9 @@ pub fn upsert_uris(
             image_optimizer_retry_count.eq(excluded(image_optimizer_retry_count)),
             json_parser_retry_count.eq(excluded(json_parser_retry_count)),
             animation_optimizer_retry_count.eq(excluded(animation_optimizer_retry_count)),
+            inserted_at.eq(excluded(inserted_at)),
             do_not_parse.eq(excluded(do_not_parse)),
-            last_transaction_version.eq(excluded(last_transaction_version)),
+            last_transaction_version.eq(ltv),
         ));
 
     let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();

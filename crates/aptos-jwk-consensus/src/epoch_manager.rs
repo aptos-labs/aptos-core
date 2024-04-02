@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     jwk_manager::JWKManager,
@@ -22,9 +23,11 @@ use aptos_reliable_broadcast::ReliableBroadcast;
 use aptos_types::{
     account_address::AccountAddress,
     epoch_state::EpochState,
+    jwks,
     jwks::{ObservedJWKs, ObservedJWKsUpdated, SupportedOIDCProviders},
     on_chain_config::{
-        FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
+        FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainJWKConsensusConfig, ValidatorSet,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -166,10 +169,31 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
 
         let features = payload.get::<Features>().unwrap_or_default();
+        let jwk_consensus_config = payload.get::<OnChainJWKConsensusConfig>();
+        let onchain_observed_jwks = payload.get::<ObservedJWKs>().ok();
+        let onchain_consensus_config = payload.get::<OnChainConsensusConfig>().unwrap_or_default();
 
-        if features.is_enabled(FeatureFlag::JWK_CONSENSUS) && my_index.is_some() {
-            let onchain_oidc_provider_set = payload.get::<SupportedOIDCProviders>().ok();
-            let onchain_observed_jwks = payload.get::<ObservedJWKs>().ok();
+        let (jwk_manager_should_run, oidc_providers) = match jwk_consensus_config {
+            Ok(config) => {
+                let should_run =
+                    config.jwk_consensus_enabled() && onchain_consensus_config.is_vtxn_enabled();
+                let providers = config
+                    .oidc_providers_cloned()
+                    .into_iter()
+                    .map(jwks::OIDCProvider::from)
+                    .collect();
+                (should_run, Some(SupportedOIDCProviders { providers }))
+            },
+            Err(_) => {
+                //TODO: remove this case once the framework change of this commit is published.
+                let should_run = features.is_enabled(FeatureFlag::JWK_CONSENSUS)
+                    && onchain_consensus_config.is_vtxn_enabled();
+                let providers = payload.get::<SupportedOIDCProviders>().ok();
+                (should_run, providers)
+            },
+        };
+
+        if jwk_manager_should_run && my_index.is_some() {
             info!(epoch = epoch_state.epoch, "JWKManager starting.");
             let network_sender = NetworkSender::new(
                 self.my_addr,
@@ -203,7 +227,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.jwk_manager_close_tx = Some(jwk_manager_close_tx);
 
             tokio::spawn(jwk_consensus_manager.run(
-                onchain_oidc_provider_set,
+                oidc_providers,
                 onchain_observed_jwks,
                 jwk_event_rx,
                 jwk_rpc_msg_rx,

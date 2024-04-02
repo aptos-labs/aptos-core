@@ -858,7 +858,7 @@ module aptos_framework::fungible_asset {
     ) acquires Supply, ConcurrentSupply, FungibleStore {
         let feature = features::get_concurrent_fungible_assets_feature();
         let agg_feature = features::get_aggregator_v2_api_feature();
-        features::change_feature_flags(fx, vector[], vector[feature, agg_feature]);
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature, agg_feature]);
 
         let (creator_ref, token_object) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
@@ -870,7 +870,7 @@ module aptos_framework::fungible_asset {
 
         deposit_with_ref(&transfer_ref, creator_store, fa);
 
-        features::change_feature_flags(fx, vector[feature, agg_feature], vector[]);
+        features::change_feature_flags_for_testing(fx, vector[feature, agg_feature], vector[]);
 
         let extend_ref = object::generate_extend_ref(&creator_ref);
         upgrade_to_concurrent(&extend_ref);

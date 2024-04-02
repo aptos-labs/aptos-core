@@ -66,8 +66,8 @@ use aptos_types::{
     jwks::QuorumCertifiedUpdate,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, FeatureFlag, Features, OnChainConsensusConfig,
-        ValidatorTxnConfig,
+        ConsensusAlgorithmConfig, ConsensusConfigV1, OnChainConsensusConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig, ValidatorTxnConfig,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -113,7 +113,8 @@ pub struct NodeSetup {
     id: usize,
     onchain_consensus_config: OnChainConsensusConfig,
     local_consensus_config: ConsensusConfig,
-    features: Features,
+    onchain_randomness_config: OnChainRandomnessConfig,
+    onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
 }
 
 impl NodeSetup {
@@ -142,9 +143,14 @@ impl NodeSetup {
         proposer_indices: Option<Vec<usize>>,
         onchain_consensus_config: Option<OnChainConsensusConfig>,
         local_consensus_config: Option<ConsensusConfig>,
-        features: Option<Features>,
+        onchain_randomness_config: Option<OnChainRandomnessConfig>,
+        onchain_jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     ) -> Vec<Self> {
         let onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
+        let onchain_randomness_config =
+            onchain_randomness_config.unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
+        let onchain_jwk_consensus_config = onchain_jwk_consensus_config
+            .unwrap_or_else(OnChainJWKConsensusConfig::default_if_missing);
         let local_consensus_config = local_consensus_config.unwrap_or_default();
         let (signers, validators) = random_validator_verifier(num_nodes, None, false);
         let proposers = proposer_indices
@@ -195,7 +201,8 @@ impl NodeSetup {
                 id,
                 onchain_consensus_config.clone(),
                 local_consensus_config.clone(),
-                features.clone().unwrap_or_default(),
+                onchain_randomness_config.clone(),
+                onchain_jwk_consensus_config.clone(),
             ));
         }
         nodes
@@ -212,7 +219,8 @@ impl NodeSetup {
         id: usize,
         onchain_consensus_config: OnChainConsensusConfig,
         local_consensus_config: ConsensusConfig,
-        features: Features,
+        onchain_randomness_config: OnChainRandomnessConfig,
+        onchain_jwk_consensus_config: OnChainJWKConsensusConfig,
     ) -> Self {
         let _entered_runtime = executor.enter();
         let epoch_state = Arc::new(EpochState {
@@ -282,11 +290,14 @@ impl NodeSetup {
             Duration::ZERO,
             10,
             1000,
+            5,
+            500,
             10,
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
             onchain_consensus_config.effective_validator_txn_config(),
+            true,
         );
 
         let round_state = Self::create_round_state(time_service);
@@ -295,6 +306,9 @@ impl NodeSetup {
         safety_rules.perform_initialize().unwrap();
 
         let (round_manager_tx, _) = aptos_channel::new(QueueStyle::LIFO, 1, None);
+
+        let mut local_config = local_consensus_config.clone();
+        local_config.enable_broadcast_vote(false);
 
         let mut round_manager = RoundManager::new(
             epoch_state,
@@ -307,8 +321,10 @@ impl NodeSetup {
             storage.clone(),
             onchain_consensus_config.clone(),
             round_manager_tx,
-            local_consensus_config.clone(),
-            features.clone(),
+            local_config,
+            onchain_randomness_config.clone(),
+            onchain_jwk_consensus_config.clone(),
+            None,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {
@@ -326,7 +342,8 @@ impl NodeSetup {
             id,
             onchain_consensus_config,
             local_consensus_config,
-            features,
+            onchain_randomness_config,
+            onchain_jwk_consensus_config,
         }
     }
 
@@ -346,7 +363,8 @@ impl NodeSetup {
             self.id,
             self.onchain_consensus_config.clone(),
             self.local_consensus_config.clone(),
-            self.features,
+            self.onchain_randomness_config.clone(),
+            self.onchain_jwk_consensus_config.clone(),
         )
     }
 
@@ -645,6 +663,7 @@ fn new_round_on_quorum_cert() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     let genesis = node.block_store.ordered_root();
@@ -690,6 +709,7 @@ fn vote_on_successful_proposal() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
 
@@ -699,7 +719,7 @@ fn vote_on_successful_proposal() {
         node.next_proposal().await;
 
         let proposal = Block::new_proposal(
-            Payload::empty(false),
+            Payload::empty(false, true),
             1,
             1,
             genesis_qc.clone(),
@@ -735,6 +755,7 @@ fn delay_proposal_processing_in_sync_only() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
 
@@ -748,7 +769,7 @@ fn delay_proposal_processing_in_sync_only() {
             .block_store
             .set_back_pressure_for_test(true);
         let proposal = Block::new_proposal(
-            Payload::empty(false),
+            Payload::empty(false, true),
             1,
             1,
             genesis_qc.clone(),
@@ -804,11 +825,12 @@ fn no_vote_on_old_proposal() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
     let new_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -818,7 +840,7 @@ fn no_vote_on_old_proposal() {
     .unwrap();
     let new_block_id = new_block.id();
     let old_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         2,
         genesis_qc,
@@ -861,12 +883,13 @@ fn no_vote_on_mismatch_round() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -875,7 +898,7 @@ fn no_vote_on_mismatch_round() {
     )
     .unwrap();
     let block_skip_round = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         2,
         2,
         genesis_qc.clone(),
@@ -914,6 +937,7 @@ fn sync_info_carried_on_timeout_vote() {
         &mut playground,
         runtime.handle().clone(),
         1,
+        None,
         None,
         None,
         None,
@@ -981,12 +1005,13 @@ fn no_vote_on_invalid_proposer() {
         None,
         None,
         None,
+        None,
     );
     let incorrect_proposer = nodes.pop().unwrap();
     let mut node = nodes.pop().unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -995,7 +1020,7 @@ fn no_vote_on_invalid_proposer() {
     )
     .unwrap();
     let block_incorrect_proposer = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -1040,12 +1065,13 @@ fn new_round_on_timeout_certificate() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
     let genesis_qc = certificate_for_genesis();
     let correct_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -1054,7 +1080,7 @@ fn new_round_on_timeout_certificate() {
     )
     .unwrap();
     let block_skip_round = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         2,
         2,
         genesis_qc.clone(),
@@ -1107,6 +1133,7 @@ fn reject_invalid_failed_authors() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
@@ -1125,7 +1152,7 @@ fn reject_invalid_failed_authors() {
 
     let create_proposal = |round: Round, failed_authors: Vec<(Round, Author)>| {
         let block = Block::new_proposal(
-            Payload::empty(false),
+            Payload::empty(false, true),
             round,
             2,
             genesis_qc.clone(),
@@ -1202,13 +1229,14 @@ fn response_on_block_retrieval() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
 
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -1314,6 +1342,7 @@ fn recover_on_restart() {
         None,
         None,
         None,
+        None,
     )
     .pop()
     .unwrap();
@@ -1328,7 +1357,7 @@ fn recover_on_restart() {
             genesis_qc.clone(),
             i,
             i,
-            Payload::empty(false),
+            Payload::empty(false, true),
             (std::cmp::max(1, i.saturating_sub(10))..i)
                 .map(|i| (i, inserter.signer().author()))
                 .collect(),
@@ -1390,6 +1419,7 @@ fn nil_vote_on_timeout() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     let genesis = node.block_store.ordered_root();
@@ -1432,6 +1462,7 @@ fn vote_resent_on_timeout() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     timed_block_on(&runtime, async {
@@ -1468,6 +1499,7 @@ fn sync_on_partial_newer_sync_info() {
         &mut playground,
         runtime.handle().clone(),
         1,
+        None,
         None,
         None,
         None,
@@ -1528,6 +1560,7 @@ fn safety_rules_crash() {
         &mut playground,
         runtime.handle().clone(),
         1,
+        None,
         None,
         None,
         None,
@@ -1596,6 +1629,7 @@ fn echo_timeout() {
         None,
         None,
         None,
+        None,
     );
     runtime.spawn(playground.start());
     timed_block_on(&runtime, async {
@@ -1650,6 +1684,7 @@ fn no_next_test() {
         None,
         None,
         None,
+        None,
     );
     runtime.spawn(playground.start());
 
@@ -1683,6 +1718,7 @@ fn commit_pipeline_test() {
         runtime.handle().clone(),
         7,
         Some(proposers.clone()),
+        None,
         None,
         None,
         None,
@@ -1723,6 +1759,7 @@ fn block_retrieval_test() {
         runtime.handle().clone(),
         4,
         Some(vec![0, 1]),
+        None,
         None,
         None,
         None,
@@ -1792,6 +1829,7 @@ pub fn forking_retrieval_test() {
             proposal_node,
             proposal_node,
         ]),
+        None,
         None,
         None,
         None,
@@ -2039,13 +2077,14 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
         None,
         None,
         None,
+        None,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
 
     let invalid_block = Block::new_proposal_ext(
         vec![ValidatorTransaction::dummy(vec![0xFF]); 5],
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -2055,7 +2094,7 @@ fn no_vote_on_proposal_ext_when_feature_disabled() {
     .unwrap();
 
     let valid_block = Block::new_proposal(
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc,
@@ -2087,19 +2126,28 @@ fn no_vote_on_proposal_with_unexpected_vtxns() {
     let vtxns = vec![ValidatorTransaction::ObservedJWKUpdate(
         QuorumCertifiedUpdate::dummy(),
     )];
-    let mut features = Features::default();
-    features.disable(FeatureFlag::JWK_CONSENSUS);
-    assert_process_proposal_result(Some(features.clone()), vtxns.clone(), false);
 
-    features.enable(FeatureFlag::JWK_CONSENSUS);
-    assert_process_proposal_result(Some(features), vtxns, true);
+    assert_process_proposal_result(
+        None,
+        Some(OnChainJWKConsensusConfig::default_disabled()),
+        vtxns.clone(),
+        false,
+    );
+
+    assert_process_proposal_result(
+        None,
+        Some(OnChainJWKConsensusConfig::default_enabled()),
+        vtxns,
+        true,
+    );
 }
 
 /// Setup a node with default configs and an optional `Features` override.
 /// Create a block, fill it with the given vtxns, and process it with the `RoundManager` from the setup.
 /// Assert the processing result.
 fn assert_process_proposal_result(
-    features: Option<Features>,
+    randomness_config: Option<OnChainRandomnessConfig>,
+    jwk_consensus_config: Option<OnChainJWKConsensusConfig>,
     vtxns: Vec<ValidatorTransaction>,
     expected_result: bool,
 ) {
@@ -2112,14 +2160,15 @@ fn assert_process_proposal_result(
         None,
         Some(OnChainConsensusConfig::default_for_genesis()),
         None,
-        features,
+        randomness_config,
+        jwk_consensus_config,
     );
 
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
     let block = Block::new_proposal_ext(
         vtxns,
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),
@@ -2163,8 +2212,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
         ..Default::default()
     };
 
-    let mut features = Features::default();
-    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
+    let randomness_config = OnChainRandomnessConfig::default_enabled();
     let mut nodes = NodeSetup::create_nodes(
         &mut playground,
         runtime.handle().clone(),
@@ -2175,7 +2223,8 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
             vtxn: vtxn_config,
         }),
         Some(local_config),
-        Some(features),
+        Some(randomness_config),
+        None,
     );
     let node = &mut nodes[0];
     let genesis_qc = certificate_for_genesis();
@@ -2215,7 +2264,7 @@ fn no_vote_on_proposal_ext_when_receiving_limit_exceeded() {
 
     let block_vtxns_too_large = Block::new_proposal_ext(
         vec![ValidatorTransaction::dummy(vec![0xFF; 200]); 5], // total_bytes >= 200 * 5 = 1000
-        Payload::empty(false),
+        Payload::empty(false, true),
         1,
         1,
         genesis_qc.clone(),

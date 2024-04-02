@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dag::types::{CertifiedNode, Extensions, Node, NodeCertificate},
+    dag::{
+        order_rule::TOrderRule,
+        types::{CertifiedNode, Extensions, Node, NodeCertificate, NodeMetadata},
+    },
     payload_manager::TPayloadManager,
 };
 use aptos_consensus_types::common::{Author, Payload, Round};
@@ -15,6 +19,14 @@ impl TPayloadManager for MockPayloadManager {
     fn prefetch_payload_data(&self, _payload: &Payload, _timestamp: u64) {}
 }
 
+pub(super) struct MockOrderRule {}
+
+impl TOrderRule for MockOrderRule {
+    fn process_new_node(&self, _node_metadata: &NodeMetadata) {}
+
+    fn process_all(&self) {}
+}
+
 pub(crate) fn new_certified_node(
     round: Round,
     author: Author,
@@ -26,7 +38,7 @@ pub(crate) fn new_certified_node(
         author,
         0,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false, true),
         parents,
         Extensions::empty(),
     );
@@ -45,7 +57,7 @@ pub(crate) fn new_node(
         author,
         timestamp,
         vec![],
-        Payload::empty(false),
+        Payload::empty(false, true),
         parents,
         Extensions::empty(),
     )

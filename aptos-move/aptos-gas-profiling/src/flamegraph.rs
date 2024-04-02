@@ -108,6 +108,17 @@ impl ExecutionAndIOCosts {
             path: &'a mut Vec<String>,
         }
 
+        for dep in &self.dependencies {
+            lines.push(
+                format!(
+                    "dependencies;{}{}",
+                    Render(&dep.id),
+                    if dep.is_new { "(new)" } else { "" }
+                ),
+                dep.cost,
+            )
+        }
+
         impl<'a> Rec<'a> {
             fn visit(&mut self, frame: &CallFrame) {
                 self.path.push(format!("{}", frame.name));

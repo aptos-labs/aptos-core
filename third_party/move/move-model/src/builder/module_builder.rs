@@ -5,9 +5,8 @@
 use crate::{
     ast::{
         AccessSpecifier, Address, Attribute, AttributeValue, Condition, ConditionKind, Exp,
-        ExpData, FriendDecl, GlobalInvariant, ModuleName, Operation, PropertyBag, PropertyValue,
-        QualifiedSymbol, Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex,
-        UseDecl, Value,
+        ExpData, FriendDecl, ModuleName, Operation, PropertyBag, PropertyValue, QualifiedSymbol,
+        Spec, SpecBlockInfo, SpecBlockTarget, SpecFunDecl, SpecVarDecl, TempIndex, UseDecl, Value,
     },
     builder::{
         exp_builder::ExpTranslator,
@@ -21,9 +20,8 @@ use crate::{
     intrinsics::process_intrinsic_declaration,
     model::{
         EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, Loc, ModuleId,
-        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, SchemaId, SpecFunId, SpecVarId, StructData, StructId, TypeParameter,
-        TypeParameterKind,
+        MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId, SpecFunId,
+        SpecVarId, StructData, StructId, TypeParameter, TypeParameterKind,
     },
     options::ModelBuilderOptions,
     pragmas::{
@@ -32,7 +30,7 @@ use crate::{
         CONDITION_INJECTED_PROP, OPAQUE_PRAGMA, VERIFY_PRAGMA,
     },
     symbol::{Symbol, SymbolPool},
-    ty::{PrimitiveType, Type, BOOL_TYPE},
+    ty::{Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType, Type, BOOL_TYPE},
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
@@ -45,7 +43,7 @@ use move_bytecode_source_map::source_map::SourceMap;
 use move_compiler::{
     compiled_unit::{FunctionInfo, SpecInfo},
     expansion::ast as EA,
-    parser::{ast as PA, ast::FunctionName},
+    parser::ast as PA,
     shared::{unique_map::UniqueMap, Identifier, Name},
 };
 use move_ir_types::{ast::ConstantName, location::Spanned};
@@ -92,10 +90,6 @@ pub(crate) struct ModuleBuilder<'env, 'translator> {
     /// Let bindings for the current spec block, characterized by a boolean indicating whether
     /// post state is active and the node id of the original expression of the let.
     pub spec_block_lets: BTreeMap<Symbol, (bool, NodeId)>,
-    /// Whether during model building, we actually compile the full Move source. If this is not
-    /// set, we assume a compiled bytecode module as input. We still need the AST of the spec
-    /// language part.
-    pub compile_move: bool,
 }
 
 /// Represents information about a module already compiled into bytecode by the legacy
@@ -144,11 +138,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         module_id: ModuleId,
         module_name: ModuleName,
     ) -> Self {
-        let compile_move = parent
-            .env
-            .get_extension::<ModelBuilderOptions>()
-            .map(|o| o.compile_via_model)
-            .unwrap_or_default();
         Self {
             parent,
             module_id,
@@ -166,7 +155,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             module_spec: Spec::default(),
             spec_block_infos: Default::default(),
             spec_block_lets: BTreeMap::new(),
-            compile_move,
         }
     }
 
@@ -339,8 +327,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .new_node(self.parent.to_loc(&v.loc), Type::Tuple(vec![]));
                 let v = match &v.value {
                     EA::AttributeValue_::Value(val) => {
-                        let val = if let Some((val, _)) =
-                            ExpTranslator::new(self).translate_value_free(val)
+                        let val = if let Some((val, _)) = ExpTranslator::new(self)
+                            .translate_value_free(val, &ErrorMessageContext::General)
                         {
                             val
                         } else {
@@ -456,6 +444,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let attrs = self.translate_attributes(&def.attributes);
         let abilities = self.translate_abilities(&def.abilities);
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun();
         let type_params = et.analyze_and_add_type_params(
             def.type_parameters
                 .iter()
@@ -484,6 +473,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         let fun_id = FunId::new(qsym.symbol);
         let attributes = self.translate_attributes(&def.attributes);
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun();
         et.enter_scope();
         let type_params = et.analyze_and_add_type_params(
             def.signature
@@ -520,45 +510,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             type_params: type_params.clone(),
             params: params.clone(),
             result_type: result_type.clone(),
-            is_pure: false,
             attributes,
             inline_specs: def.specs.clone(),
         });
-
-        // Add function as a spec fun entry as well.
-        let spec_fun_id = SpecFunId::new(self.spec_funs.len());
-        self.parent
-            .define_spec_or_builtin_fun(qsym, SpecOrBuiltinFunEntry {
-                loc: def_loc.clone(),
-                oper: Operation::SpecFunction(self.module_id, spec_fun_id, None),
-                type_params: type_params.clone(),
-                type_param_constraints: BTreeMap::default(),
-                params: params.clone(),
-                result_type: result_type.clone(),
-                visibility: EntryVisibility::Spec,
-            });
-
-        // Add $ to the name so the spec version does not name clash with the Move version.
-        let spec_fun_name = self.symbol_pool().make(&format!("${}", name.0.value));
-        let mut fun_decl = SpecFunDecl {
-            loc: def_loc,
-            name: spec_fun_name,
-            type_params,
-            params,
-            context_params: None,
-            result_type,
-            used_memory: BTreeSet::new(),
-            uninterpreted: false,
-            is_move_fun: true,
-            is_native: false,
-            body: None,
-            callees: Default::default(),
-            is_recursive: Default::default(),
-        };
-        if let EA::FunctionBody_::Native = def.body.value {
-            fun_decl.is_native = true;
-        }
-        self.spec_funs.push(fun_decl);
     }
 
     fn decl_ana_use_decl(&mut self, use_decl: &PA::UseDecl) {
@@ -746,6 +700,9 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         for_move_fun: bool,
     ) -> (Vec<TypeParameter>, Vec<Parameter>, Type) {
         let et = &mut ExpTranslator::new(self);
+        if for_move_fun {
+            et.set_translate_move_fun()
+        }
         let type_params = et.analyze_and_add_type_params(
             signature.type_parameters.iter().map(|(n, a)| (n, a, false)),
         );
@@ -859,35 +816,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             self.def_ana_constant(&name, def, compiled_module);
         }
 
-        // Need to run def_ana_fun twice.
-        // In the first time we need to analyze all functions in the spec mode
-        // then we can check whether the function is pure or not
-        for (idx, (name, fun_def)) in module_def.functions.key_cloned_iter().enumerate() {
-            self.def_ana_fun(&name, fun_def, idx, true);
-        }
-
-        // Propagate the impurity of functions: a Move function which calls an
-        // impure Move function is also considered impure.
-        let mut visited = BTreeMap::new();
-        for (idx, (name, _)) in module_def.functions.key_cloned_iter().enumerate() {
-            let is_pure = self.propagate_function_impurity(&mut visited, SpecFunId::new(idx));
-            if is_pure {
-                // Modify the types of parameters, return values and expressions
-                // of pure Move functions so they no longer have references.
-                self.deref_move_fun_types(name, idx);
-            }
-            self.parent
-                .fun_table
-                .entry(self.qualified_by_module_from_name(&name.0))
-                .and_modify(|e| e.is_pure = is_pure);
-        }
-
-        // Run def_ana_fun the second time in the move function mode
-        // Inline spec will be checked in this pass
-        for (idx, (name, fun_def)) in module_def.functions.key_cloned_iter().enumerate() {
-            self.def_ana_fun(&name, fun_def, idx, false);
-        }
-
         // Analyze all schemas. This must be done before other things because schemas need to be
         // ready for inclusion. We also must do this recursively, so use a visited set to detect
         // cycles.
@@ -915,6 +843,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     block,
                 );
             }
+        }
+
+        // Analyze all function definitions.
+        for (name, fun_def) in module_def.functions.key_cloned_iter() {
+            self.def_ana_fun(&name, fun_def);
         }
 
         // TODO: we should re-visit this decision once we have high-order function ready on
@@ -984,12 +917,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
         if let Some(compiled_module) = compiled_module {
             self.def_ana_code_specs(module_def, compiled_module);
         }
-
-        // Perform post analyzes of state usage in spec functions.
-        self.compute_state_usage();
-
-        // Perform post reduction of module invariants.
-        self.process_module_invariants();
 
         // Apply tweaks after all specs are analyzed
         self.apply_tweaks(module_def);
@@ -1189,7 +1116,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 ok = false;
             }
             if ok {
-                let mut folder = ConstantFolder::new(self.parent.env);
+                let mut folder = ConstantFolder::new(self.parent.env, true);
                 let rewritten = folder.rewrite_exp(exp);
                 if let ExpData::Value(_, value) = rewritten.as_ref() {
                     value.clone()
@@ -1213,78 +1140,32 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 /// ## Struct Definition Analysis
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    /// Same as ModelBuilder::infer_abilities_may_have
-    fn infer_abilities_may_have(&self, ty: &Type) -> AbilitySet {
-        self.parent.infer_abilities_may_have(ty)
-    }
-
-    /// Checks whether a struct's field type `field_ty` has the abilities required by the declared abilities `struct_abilities` of the struct.
-    fn ability_check_field(
-        &self,
-        struct_abilities: AbilitySet,
-        struct_name: &QualifiedSymbol,
-        field_ty: &Type,
-        field_ty_loc: &Loc,
-    ) {
-        let field_abilities = self.infer_abilities_may_have(field_ty);
-        for ability in field_missing_abilities(struct_abilities, field_abilities) {
-            match ability {
-                Ability::Copy => self.parent.error(
-                    field_ty_loc,
-                    &format!(
-                        "field must have copy ability because {} is declared with copy ability",
-                        struct_name.display_simple(self.parent.env)
-                    ),
-                ),
-                Ability::Drop => self.parent.error(
-                    field_ty_loc,
-                    &format!(
-                        "field must have drop ability because {} is declared with drop ability",
-                        struct_name.display_simple(self.parent.env)
-                    ),
-                ),
-                Ability::Store => {
-                    let mut abilities = Vec::new();
-                    if struct_abilities.has_store() {
-                        abilities.push("store");
-                    }
-                    if struct_abilities.has_key() {
-                        abilities.push("key");
-                    }
-                    self.parent.error(
-                        field_ty_loc,
-                        &format!(
-                            "field must have store ability because {} is declared with {}",
-                            struct_name.display_simple(self.parent.env),
-                            abilities.join(" + ")
-                        ),
-                    );
-                },
-                Ability::Key => panic!("ICE check_field: field missing key ability"),
-            }
-        }
-    }
-
     fn def_ana_struct(&mut self, name: &PA::StructName, def: &EA::StructDefinition) {
         let qsym = self.qualified_by_module_from_name(&name.0);
         let struct_entry = self.parent.struct_table.get(&qsym).expect("struct invalid");
         let struct_abilities = struct_entry.abilities;
         let type_params = struct_entry.type_params.clone();
         let mut et = ExpTranslator::new(self);
+        et.set_translate_move_fun(); // translating structs counts as move fun, not spec
         let loc = et.to_loc(&name.0.loc);
         et.define_type_params(&loc, &type_params, false);
         let fields = match &def.fields {
             EA::StructFields::Defined(fields) => {
                 let mut field_map = BTreeMap::new();
-                let mut field_ty_and_locs = Vec::new(); // fix borrowing issues
                 for (name_loc, field_name_, (idx, ty)) in fields {
                     let field_loc = et.to_loc(&name_loc);
                     let field_sym = et.symbol_pool().make(field_name_);
                     let field_ty = et.translate_type(ty);
                     let field_ty_loc = et.to_loc(&ty.loc);
-                    // store the `field_ty` and `field_ty_loc` to process with `ability_check_field`
-                    // outside of this loop to avoid borrow issues
-                    field_ty_and_locs.push((field_ty.clone(), field_ty_loc));
+                    for ctr in Constraint::for_field(struct_abilities, &field_ty) {
+                        et.add_constraint_and_report(
+                            &field_ty_loc,
+                            &ErrorMessageContext::General,
+                            &field_ty,
+                            ctr,
+                            Some(ConstraintContext::default().for_field(field_sym)),
+                        )
+                    }
                     field_map.insert(field_sym, (field_loc, *idx, field_ty));
                 }
                 if field_map.is_empty() {
@@ -1295,9 +1176,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     let field_ty = Type::new_prim(PrimitiveType::Bool);
                     field_map.insert(field_sym, (loc.clone(), 0, field_ty));
                 }
-                for (field_ty, field_ty_loc) in field_ty_and_locs {
-                    self.ability_check_field(struct_abilities, &qsym, &field_ty, &field_ty_loc);
-                }
                 Some(field_map)
             },
             EA::StructFields::Native(_) => None,
@@ -1307,8 +1185,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             .get_mut(&qsym)
             .expect("struct invalid")
             .fields = fields;
-        self.parent
-            .ability_check_struct_def(self.parent.struct_table.get(&qsym).expect("struct invalid"));
     }
 
     /// The name of a dummy field the legacy Move compilers adds to zero-arity structs.
@@ -1321,17 +1197,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     /// Definition analysis for Move functions.
-    /// When as_spec_fun is true, the function is translated into a spec function.
-    /// When as_spec_fun is false, the function is translated as a move function.
-    /// If the function is pure, we translate its body.
     /// If we are operating as a Move compiler, we also translate its body.
-    fn def_ana_fun(
-        &mut self,
-        name: &PA::FunctionName,
-        def: &EA::Function,
-        fun_idx: usize,
-        as_spec_fun: bool,
-    ) {
+    fn def_ana_fun(&mut self, name: &PA::FunctionName, def: &EA::Function) {
         let body = &def.body;
         if let EA::FunctionBody_::Defined(seq) = &body.value {
             let full_name = self.qualified_by_module_from_name(&name.0);
@@ -1345,172 +1212,32 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             let result_type = entry.result_type.clone();
             let spec_block_map = entry.inline_specs.clone();
 
-            let body_translator = |et: &mut ExpTranslator, as_spec_fun: bool| {
-                if as_spec_fun {
-                    et.set_translate_fun_as_spec_fun()
-                } else {
-                    et.set_translate_move_fun()
-                }
-                let loc = et.to_loc(&body.loc);
-                for (pos, TypeParameter(name, _, loc)) in type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos), false);
-                }
-                et.enter_scope();
-                for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
-                    et.define_local(loc, *n, ty.clone(), None, Some(idx));
-                }
-                let access_specifiers = if !as_spec_fun {
-                    // Translate access specifiers
-                    et.translate_access_specifiers(&def.access_specifiers)
-                } else {
-                    None
-                };
-                let mut result = et.translate_seq(&loc, seq, &result_type);
-                et.finalize_types();
-                result = et.post_process_body(result.into_exp()).into();
-                (result, access_specifiers)
-            };
-
-            // Attempt to translate as specification function
-            if as_spec_fun {
-                let mut et = ExpTranslator::new(self);
-                let (translated, _) = body_translator(&mut et, true);
-                if !et.had_errors {
-                    // Rewrite all type annotations in expressions to skip references.
-                    for node_id in translated.node_ids() {
-                        let ty = et.get_node_type(node_id);
-                        et.update_node_type(node_id, ty.skip_reference().clone());
-                    }
-                    et.called_spec_funs.iter().for_each(|(mid, fid)| {
-                        self.parent.add_edge_to_move_fun_call_graph(
-                            self.module_id.qualified(SpecFunId::new(fun_idx)),
-                            mid.qualified(*fid),
-                        );
-                    });
-                    self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
-                }
-            } else if self.compile_move {
-                // Also translate as regular Move function
-                let mut et = ExpTranslator::new(self);
-                et.set_spec_block_map(spec_block_map);
-                et.set_result_type(result_type.clone());
-                et.set_fun_name(full_name.clone());
-                let (translated, access_specifiers) = body_translator(&mut et, false);
+            let mut et = ExpTranslator::new(self);
+            et.set_spec_block_map(spec_block_map);
+            et.set_result_type(result_type.clone());
+            et.set_fun_name(full_name.clone());
+            et.set_translate_move_fun();
+            let loc = et.to_loc(&body.loc);
+            for (pos, TypeParameter(name, kind, loc)) in type_params.iter().enumerate() {
+                et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
+            }
+            et.enter_scope();
+            for (idx, Parameter(n, ty, loc)) in params.iter().enumerate() {
+                et.define_local(loc, *n, ty.clone(), None, Some(idx));
+            }
+            let access_specifiers = et.translate_access_specifiers(&def.access_specifiers);
+            let result = et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
+            et.finalize_types();
+            let translated = et.post_process_body(result.into_exp());
+            et.check_mutable_borrow_field(&translated);
+            assert!(self.fun_defs.insert(full_name.symbol, translated).is_none());
+            if let Some(specifiers) = access_specifiers {
                 assert!(self
-                    .fun_defs
-                    .insert(full_name.symbol, translated.into_exp())
+                    .fun_access_specifiers
+                    .insert(full_name.symbol, specifiers)
                     .is_none());
-                if let Some(specifiers) = access_specifiers {
-                    assert!(self
-                        .fun_access_specifiers
-                        .insert(full_name.symbol, specifiers)
-                        .is_none());
-                }
             }
         }
-        if as_spec_fun {
-            self.spec_fun_index += 1; // TODO: why is this at the end? Document or move close to use
-        }
-    }
-
-    /// Propagate the impurity of Move functions from callees to callers so
-    /// that we can detect pure-looking Move functions which calls impure
-    /// Move functions.
-    fn propagate_function_impurity(
-        &mut self,
-        visited: &mut BTreeMap<SpecFunId, bool>,
-        spec_fun_id: SpecFunId,
-    ) -> bool {
-        if let Some(is_pure) = visited.get(&spec_fun_id) {
-            return *is_pure;
-        }
-        let spec_fun_idx = spec_fun_id.as_usize();
-        let body = if self.spec_funs[spec_fun_idx].body.is_some() {
-            self.spec_funs[spec_fun_idx].body.take().unwrap()
-        } else {
-            // If the function is native and contains no mutable references
-            // as parameters, consider it pure.
-            // Otherwise the function is non-native, its body cannot be parsed
-            // so we consider it impure.
-            // TODO(emmazzz) right now all the native Move functions without
-            // parameters of type mutable references are considered pure.
-            // In the future we might want to only allow a certain subset of the
-            // native Move functions, through something similar to an allow list or
-            // a pragma.
-            let no_mut_ref_param = self.spec_funs[spec_fun_idx]
-                .params
-                .iter()
-                .map(|Parameter(_, ty, _)| !ty.is_mutable_reference())
-                .all(|b| b); // `no_mut_ref_param` if none of the types are mut refs.
-            return self.spec_funs[spec_fun_idx].is_native && no_mut_ref_param;
-        };
-        let mut is_pure = true;
-        body.visit_pre_order(&mut |e: &ExpData| {
-            if let ExpData::Call(_, Operation::SpecFunction(mid, fid, _), _) = e {
-                if mid.to_usize() < self.module_id.to_usize() {
-                    // This is calling a function from another module we already have
-                    // translated. In this case, the impurity has already been propagated
-                    // in translate_call.
-                    true
-                } else {
-                    // This is calling a function from the module we are currently translating.
-                    // Need to recursively ensure we have propagated impurity because of
-                    // arbitrary call graphs, including cyclic.
-                    if !self.propagate_function_impurity(visited, *fid) {
-                        is_pure = false;
-                        false // Short-circuit the visit; this function is not pure
-                    } else {
-                        true
-                    }
-                }
-            } else {
-                true
-            }
-        });
-        if is_pure {
-            // Restore the function body if the Move function is pure.
-            self.spec_funs[spec_fun_idx].body = Some(body);
-        }
-        visited.insert(spec_fun_id, is_pure);
-        is_pure
-    }
-
-    fn deref_move_fun_types(&mut self, name: FunctionName, spec_fun_idx: usize) {
-        if let Some(entry) = self
-            .parent
-            .spec_fun_table
-            .get_mut(&self.qualified_by_module_from_name(&name.0))
-        {
-            if entry.len() != 1 {
-                let error_msg = if entry.is_empty() {
-                    "missing"
-                } else {
-                    "duplicate"
-                };
-                self.parent.error(
-                    &self.parent.to_loc(&name.loc()),
-                    &format!("{} declaration of `{}`", error_msg, name.value()),
-                );
-            } else {
-                let e = &mut entry[0];
-                e.params = e
-                    .params
-                    .iter()
-                    .map(|Parameter(n, ty, loc)| {
-                        Parameter(*n, ty.skip_reference().clone(), loc.clone())
-                    })
-                    .collect_vec();
-                e.result_type = e.result_type.skip_reference().clone();
-            }
-        };
-
-        let spec_fun_decl = &mut self.spec_funs[spec_fun_idx];
-        spec_fun_decl.params = spec_fun_decl
-            .params
-            .iter()
-            .map(|Parameter(s, ty, loc)| Parameter(*s, ty.skip_reference().clone(), loc.clone()))
-            .collect_vec();
-        spec_fun_decl.result_type = spec_fun_decl.result_type.skip_reference().clone();
     }
 }
 
@@ -1718,7 +1445,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             None => PropertyValue::Value(Value::Bool(true)),
             Some(EA::PragmaValue::Literal(ev)) => {
                 let mut et = ExpTranslator::new(self);
-                match et.translate_value_free(ev) {
+                match et.translate_value_free(ev, &ErrorMessageContext::General) {
                     None => {
                         // Error reported
                         return;
@@ -1808,11 +1535,12 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
                     et.define_type_param(
                         loc,
                         *name,
                         Type::new_param(pos),
+                        kind.clone(),
                         false, /*report_errors*/
                     );
                 }
@@ -1847,8 +1575,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos), false);
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
+                    et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
                 }
 
                 et.enter_scope();
@@ -1894,8 +1622,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     .expect("invalid spec block context")
                     .clone();
                 let mut et = ExpTranslator::new_with_old(self, allows_old);
-                for (pos, TypeParameter(name, _, loc)) in entry.type_params.iter().enumerate() {
-                    et.define_type_param(loc, *name, Type::new_param(pos), false);
+                for (pos, TypeParameter(name, kind, loc)) in entry.type_params.iter().enumerate() {
+                    et.define_type_param(loc, *name, Type::new_param(pos), kind.clone(), false);
                 }
 
                 et.enter_scope();
@@ -2319,6 +2047,11 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             },
         };
         et.finalize_types();
+        let translated = et.post_process_body(translated);
+        let translated_additional = translated_additional
+            .into_iter()
+            .map(|e| et.post_process_body(e))
+            .collect();
         self.add_conditions_to_context(
             context,
             loc,
@@ -2473,7 +2206,8 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 for Parameter(n, ty, loc) in params {
                     et.define_local(&loc, n, ty, None, None);
                 }
-                let translated = et.translate_seq(&loc, seq, &result_type);
+                let translated =
+                    et.translate_seq(&loc, seq, &result_type, &ErrorMessageContext::Return);
                 et.finalize_types();
                 self.spec_funs[self.spec_fun_index].body = Some(translated.into_exp());
             },
@@ -3003,10 +2737,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                     loc,
                     &ty,
                     &entry.type_,
-                    &format!(
-                        "for `{}` included from schema",
-                        name.display(et.symbol_pool())
-                    ),
+                    &ErrorMessageContext::SchemaInclusion(*name),
                 );
                 // Put into argument map.
                 let node_id = et.new_node_id_with_type_loc(&entry.type_, loc);
@@ -3398,168 +3129,6 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
     }
 }
 
-/// ## Spec Var Usage Analysis
-
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    /// Compute state usage of spec funs.
-    fn compute_state_usage(&mut self) {
-        let mut visited = BTreeSet::new();
-        for idx in 0..self.spec_funs.len() {
-            self.compute_state_usage_and_callees_for_fun(&mut visited, idx);
-        }
-        // Check for purity requirements. All data invariants must be pure expressions and
-        // not depend on global state.
-        let check_uses_no_memory = |mid: ModuleId, fid: SpecFunId| {
-            if mid.to_usize() < self.parent.env.get_module_count() {
-                // This is calling a function from another module we already have
-                // translated.
-                let module_env = self.parent.env.get_module(mid);
-                let fun_decl = module_env.get_spec_fun(fid);
-                fun_decl.used_memory.is_empty()
-            } else {
-                // This is calling a function from the module we are currently translating.
-                let fun_decl = &self.spec_funs[fid.as_usize()];
-                fun_decl.used_memory.is_empty()
-            }
-        };
-
-        for struct_spec in self.struct_specs.values() {
-            for cond in &struct_spec.conditions {
-                if matches!(cond.kind, ConditionKind::StructInvariant)
-                    && !cond.exp.uses_no_memory(&check_uses_no_memory)
-                {
-                    self.parent.error(
-                        &cond.loc,
-                        "data invariants cannot depend on global state \
-                        (directly or indirectly uses a global spec var or resource storage).",
-                    );
-                }
-            }
-        }
-    }
-
-    /// Compute state usage for a given spec fun, defined via its index into the spec_funs
-    /// vector of the currently translated module. This recursively computes the values for
-    /// functions called from this one; the visited set is there to break cycles.
-    fn compute_state_usage_and_callees_for_fun(
-        &mut self,
-        visited: &mut BTreeSet<usize>,
-        fun_idx: usize,
-    ) {
-        if !visited.insert(fun_idx) {
-            return;
-        }
-
-        // Detach the current SpecFunDecl body so we can traverse it while at the same time mutating
-        // the full self. Rust requires us to do so (at least the author doesn't know better yet),
-        // but moving it should be not too expensive.
-        let body = if self.spec_funs[fun_idx].body.is_some() {
-            self.spec_funs[fun_idx].body.take().unwrap()
-        } else {
-            // No body: assume it is pure.
-            return;
-        };
-
-        let (used_memory, callees) =
-            self.compute_state_usage_and_callees_for_exp(Some(visited), &body);
-        let fun_decl = &mut self.spec_funs[fun_idx];
-        fun_decl.body = Some(body);
-        fun_decl.used_memory = used_memory;
-        fun_decl.callees = callees;
-    }
-
-    /// Computes state usage and called functions for an expression. If the visited_opt is
-    /// available, this recurses to compute the usage for any functions called. Otherwise
-    /// it assumes this information is already computed.
-    fn compute_state_usage_and_callees_for_exp(
-        &mut self,
-        mut visited_opt: Option<&mut BTreeSet<usize>>,
-        exp: &ExpData,
-    ) -> (
-        BTreeSet<QualifiedInstId<StructId>>,
-        BTreeSet<QualifiedId<SpecFunId>>,
-    ) {
-        let mut used_memory = BTreeSet::new();
-        let mut callees = BTreeSet::new();
-        exp.visit_post_order(&mut |e: &ExpData| {
-            match e {
-                ExpData::Call(id, Operation::SpecFunction(mid, fid, _), _) => {
-                    callees.insert(mid.qualified(*fid));
-                    let inst = self.parent.env.get_node_instantiation(*id);
-                    // Extend used memory with that of called functions, after applying type
-                    // instantiation of this call.
-                    if mid.to_usize() < self.parent.env.get_module_count() {
-                        // This is calling a function from another module we already have
-                        // translated.
-                        let module_env = self.parent.env.get_module(*mid);
-                        let fun_decl = module_env.get_spec_fun(*fid);
-                        used_memory.extend(
-                            fun_decl
-                                .used_memory
-                                .iter()
-                                .map(|id| id.instantiate_ref(&inst)),
-                        );
-                    } else {
-                        // This is calling a function from the module we are currently translating.
-                        // Need to recursively ensure we have computed used_spec_vars because of
-                        // arbitrary call graphs, including cyclic. If visted_opt is not set,
-                        // we know we already computed this.
-                        if let Some(visited) = &mut visited_opt {
-                            self.compute_state_usage_and_callees_for_fun(visited, fid.as_usize());
-                        }
-                        let fun_decl = &self.spec_funs[fid.as_usize()];
-                        used_memory.extend(
-                            fun_decl
-                                .used_memory
-                                .iter()
-                                .map(|id| id.instantiate_ref(&inst)),
-                        );
-                    }
-                },
-                ExpData::Call(node_id, Operation::Global(_), _)
-                | ExpData::Call(node_id, Operation::Exists(_), _) => {
-                    if !self.parent.env.has_errors() {
-                        let ty = &self.parent.env.get_node_instantiation(*node_id)[0];
-                        if let Type::Struct(mid, sid, inst) = ty {
-                            used_memory.insert(mid.qualified_inst(*sid, inst.to_owned()));
-                        }
-                    }
-                },
-                _ => {},
-            }
-            true // continue visit, note all problematic subexprs
-        });
-        (used_memory, callees)
-    }
-}
-
-/// ## Module Invariants
-
-impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
-    /// Process module invariants, attaching them to the global env.
-    fn process_module_invariants(&mut self) {
-        for cond in self.module_spec.conditions.iter().cloned().collect_vec() {
-            if matches!(
-                cond.kind,
-                ConditionKind::GlobalInvariant(..) | ConditionKind::GlobalInvariantUpdate(..)
-            ) {
-                let (mem_usage, _) = self.compute_state_usage_and_callees_for_exp(None, &cond.exp);
-                let id = self.parent.env.new_global_id();
-                let Condition { loc, exp, .. } = cond;
-                self.parent.env.add_global_invariant(GlobalInvariant {
-                    id,
-                    loc,
-                    kind: cond.kind,
-                    mem_usage,
-                    declaring_module: self.module_id,
-                    cond: exp,
-                    properties: cond.properties.clone(),
-                });
-            }
-        }
-    }
-}
-
 /// # Spec Block Infos
 
 impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
@@ -3575,7 +3144,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 .map(|m| self.parent.to_loc(&m.loc))
                 .collect_vec();
             let target = match self.get_spec_block_context(&block.value.target) {
-                Some(SpecBlockContext::Module) => SpecBlockTarget::Module,
+                Some(SpecBlockContext::Module) => SpecBlockTarget::Module(self.module_id),
                 Some(SpecBlockContext::Function(qsym)) => {
                     SpecBlockTarget::Function(self.module_id, FunId::new(qsym.symbol))
                 },
@@ -3606,7 +3175,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 },
                 None => {
                     // This has been reported as an error. Choose a dummy target.
-                    SpecBlockTarget::Module
+                    SpecBlockTarget::Inline
                 },
             };
             self.spec_block_infos.push(SpecBlockInfo {
@@ -3742,7 +3311,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 abilities: entry.abilities,
                 spec_var_opt: None,
                 field_data,
-                spec,
+                spec: RefCell::new(spec),
             };
             struct_data.insert(StructId::new(name.symbol), data);
         }
@@ -3751,9 +3320,17 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
             if entry.module_id != self.module_id {
                 continue;
             }
+            // If the function is from a script, its return value must be unit.
+            if self.module_name.is_script() && !entry.result_type.is_unit() {
+                self.parent.error(
+                    &entry.name_loc,
+                    "The function entry point to a `script` must have the return type `()`",
+                );
+            }
             // New function
             let spec = self.fun_specs.remove(&name.symbol).unwrap_or_default();
             let def = self.fun_defs.remove(&name.symbol);
+            let called_funs = Some(def.as_ref().map(|e| e.called_funs()).unwrap_or_default());
             let access_specifiers = self.fun_access_specifiers.remove(&name.symbol);
             let data = FunctionData {
                 name: name.symbol,
@@ -3771,7 +3348,7 @@ impl<'env, 'translator> ModuleBuilder<'env, 'translator> {
                 access_specifiers,
                 spec: spec.into(),
                 def,
-                called_funs: None,
+                called_funs,
                 calling_funs: RefCell::default(),
                 transitive_closure_of_called_funs: RefCell::default(),
             };
@@ -3839,23 +3416,4 @@ pub(crate) fn extract_schema_access<'a>(exp: &'a EA::Exp, res: &mut Vec<&'a EA::
         },
         _ => {},
     }
-}
-
-/// Returns the abilities that a struct's field should have but does not, based on constraints placed by the containing struct.
-fn field_missing_abilities(
-    struct_abilities: AbilitySet,
-    field_abilities: AbilitySet,
-) -> AbilitySet {
-    let mut missing_abilities = AbilitySet::EMPTY;
-    if struct_abilities.has_copy() && !field_abilities.has_copy() {
-        missing_abilities = missing_abilities.add(Ability::Copy);
-    }
-    if struct_abilities.has_drop() && !field_abilities.has_drop() {
-        missing_abilities = missing_abilities.add(Ability::Drop);
-    }
-    if (struct_abilities.has_store() || struct_abilities.has_key()) && !field_abilities.has_store()
-    {
-        missing_abilities = missing_abilities.add(Ability::Store)
-    }
-    missing_abilities
 }

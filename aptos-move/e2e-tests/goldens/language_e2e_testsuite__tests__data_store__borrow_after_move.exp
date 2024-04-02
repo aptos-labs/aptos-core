@@ -24,6 +24,18 @@ Ok(
                     code_offset: 2,
                 },
             ),
+            auxiliary_data: V1(
+                TransactionAuxiliaryDataV1 {
+                    detail_error_message: Some(
+                        VMErrorDetail {
+                            status_code: MISSING_DATA,
+                            message: Some(
+                                "Failed to move resource from f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1",
+                            ),
+                        },
+                    ),
+                },
+            ),
         },
     ],
 )
@@ -53,6 +65,7 @@ Ok(
             status: Keep(
                 Success,
             ),
+            auxiliary_data: None,
         },
     ],
 )
@@ -78,6 +91,7 @@ Ok(
             status: Keep(
                 Success,
             ),
+            auxiliary_data: None,
         },
     ],
 )
@@ -107,6 +121,7 @@ Ok(
             status: Keep(
                 Success,
             ),
+            auxiliary_data: None,
         },
         TransactionOutput {
             write_set: V0(
@@ -130,6 +145,18 @@ Ok(
                     location: f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1::M,
                     function: 0,
                     code_offset: 2,
+                },
+            ),
+            auxiliary_data: V1(
+                TransactionAuxiliaryDataV1 {
+                    detail_error_message: Some(
+                        VMErrorDetail {
+                            status_code: MISSING_DATA,
+                            message: Some(
+                                "Failed to borrow global resource from f5b9d6f01a99e74c790e2f330c092fa05455a8193f1dfc1b113ecc54d067afe1",
+                            ),
+                        },
+                    ),
                 },
             ),
         },

@@ -5,6 +5,7 @@ use super::utils::{mock_tag_0, VMChangeSetBuilder};
 use crate::{
     abstract_write_op::{AbstractResourceWriteOp, GroupWrite},
     change_set::VMChangeSet,
+    resolver::ResourceGroupSize,
     tests::utils::{
         as_bytes, as_state_key, mock_add, mock_create, mock_create_with_layout, mock_delete,
         mock_delete_with_layout, mock_modify, mock_modify_with_layout, mock_tag_1, raw_metadata,
@@ -515,10 +516,18 @@ fn test_resource_groups_squashing() {
     }
 
     let create_tag_0_op = (mock_tag_0(), as_create_op!(5));
+    let single_tag_group_size = ResourceGroupSize::Combined {
+        num_tagged_resources: 1,
+        all_tagged_resources_size: 100,
+    };
+    let two_tag_group_size = ResourceGroupSize::Combined {
+        num_tagged_resources: 2,
+        all_tagged_resources_size: 200,
+    };
     let create_group_write_0 = GroupWrite::new(
         modification_metadata.clone(),
         BTreeMap::from([create_tag_0_op.clone()]),
-        100,
+        single_tag_group_size,
         0,
     );
     let create_tag_0 = ExpandedVMChangeSetBuilder::new()
@@ -528,8 +537,8 @@ fn test_resource_groups_squashing() {
     let modify_group_write_0 = GroupWrite::new(
         modification_metadata.clone(),
         BTreeMap::from([(mock_tag_0(), as_modify_op!(7))]),
-        100,
-        100,
+        single_tag_group_size,
+        single_tag_group_size.get(),
     );
     let modify_tag_0 = ExpandedVMChangeSetBuilder::new()
         .with_resource_group_write_set(vec![(as_state_key!("1"), modify_group_write_0.clone())])
@@ -539,8 +548,8 @@ fn test_resource_groups_squashing() {
     let create_group_write_1 = GroupWrite::new(
         modification_metadata.clone(),
         BTreeMap::from([create_tag_1_op.clone()]),
-        200,
-        100,
+        two_tag_group_size,
+        single_tag_group_size.get(),
     );
     let create_tag_1 = ExpandedVMChangeSetBuilder::new()
         .with_resource_group_write_set(vec![(as_state_key!("1"), create_group_write_1.clone())])
@@ -550,8 +559,8 @@ fn test_resource_groups_squashing() {
     let modify_group_write_1 = GroupWrite::new(
         modification_metadata.clone(),
         BTreeMap::from([modify_tag_1_op.clone()]),
-        200,
-        200,
+        two_tag_group_size,
+        two_tag_group_size.get(),
     );
     let modify_tag_1 = ExpandedVMChangeSetBuilder::new()
         .with_resource_group_write_set(vec![(as_state_key!("1"), modify_group_write_1.clone())])
@@ -569,7 +578,7 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([(mock_tag_0(), as_create_op!(7))]),
-                100,
+                single_tag_group_size,
                 0,
             ))
         );
@@ -586,7 +595,7 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([create_tag_0_op.clone(), create_tag_1_op.clone()]),
-                200,
+                two_tag_group_size,
                 0,
             ))
         );
@@ -601,7 +610,7 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([create_tag_0_op.clone(), (mock_tag_1(), as_create_op!(17))]),
-                200,
+                two_tag_group_size,
                 0,
             ))
         );
@@ -618,15 +627,16 @@ fn test_resource_groups_squashing() {
             &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
                 modification_metadata.clone(),
                 BTreeMap::from([create_tag_0_op.clone(), modify_tag_1_op.clone()]),
-                200,
+                two_tag_group_size,
                 0,
             ))
         );
     }
 
     {
+        // read cannot modify size
         let mut change_set = create_tag_0.clone();
-        assert_ok!(change_set.squash_additional_change_set(
+        assert_err!(change_set.squash_additional_change_set(
             ExpandedVMChangeSetBuilder::new()
                 .with_group_reads_needing_delayed_field_exchange(vec![(
                     as_state_key!("1"),
@@ -635,17 +645,6 @@ fn test_resource_groups_squashing() {
                 .build(),
             &MockChangeSetChecker
         ));
-        assert_eq!(change_set.resource_write_set().len(), 1);
-        // only read size should be updated
-        assert_some_eq!(
-            change_set.resource_write_set().get(&as_state_key!("1")),
-            &AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
-                modification_metadata.clone(),
-                BTreeMap::from([create_tag_0_op.clone()]),
-                400,
-                0,
-            ))
-        );
     }
 }
 
@@ -670,16 +669,24 @@ fn test_write_and_read_discrepancy_caught() {
         data: Bytes::new(),
         metadata: raw_metadata(1000),
     };
-    let group_size = 15;
+    let group_size = ResourceGroupSize::Combined {
+        num_tagged_resources: 1,
+        all_tagged_resources_size: 14,
+    };
 
     assert_err!(ExpandedVMChangeSetBuilder::new()
         .with_resource_group_write_set(vec![(
             as_state_key!("1"),
-            GroupWrite::new(metadata_op.clone(), BTreeMap::new(), group_size, group_size)
+            GroupWrite::new(
+                metadata_op.clone(),
+                BTreeMap::new(),
+                group_size,
+                group_size.get()
+            )
         )])
         .with_group_reads_needing_delayed_field_exchange(vec![(
             as_state_key!("1"),
-            (metadata_op.metadata().clone(), group_size)
+            (metadata_op.metadata().clone(), group_size.get())
         )])
         .try_build());
 }
@@ -720,13 +727,18 @@ mod tests {
     fn group_write(
         metadata_op: WriteOp,
         inner_ops: Vec<(StructTag, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
-        group_size: u64,
+        num_tagged_resources: usize,
+        all_tagged_resources_size: u64,
     ) -> AbstractResourceWriteOp {
+        let group_size = ResourceGroupSize::Combined {
+            num_tagged_resources,
+            all_tagged_resources_size,
+        };
         AbstractResourceWriteOp::WriteResourceGroup(GroupWrite::new(
             metadata_op,
             inner_ops.into_iter().collect(),
             group_size,
-            group_size, // prev_group_size
+            group_size.get(), // prev_group_size
         ))
     }
 
@@ -740,7 +752,7 @@ mod tests {
 
     macro_rules! assert_group_write_size {
         ($op:expr, $s:expr, $exp:expr) => {{
-            let group_write = GroupWrite::new($op, BTreeMap::new(), $s, $s);
+            let group_write = GroupWrite::new($op, BTreeMap::new(), $s, $s.get());
             assert_eq!(group_write.maybe_group_op_size(), $exp);
         }};
     }
@@ -748,16 +760,41 @@ mod tests {
     #[test]
     fn test_group_write_size() {
         // Deletions should lead to size 0.
-        assert_group_write_size!(WriteOp::legacy_deletion(), 0, None);
+        assert_group_write_size!(
+            WriteOp::legacy_deletion(),
+            ResourceGroupSize::zero_combined(),
+            None
+        );
         assert_group_write_size!(
             WriteOp::Deletion {
                 metadata: raw_metadata(10)
             },
-            0,
+            ResourceGroupSize::zero_combined(),
             None
         );
 
-        let sizes = [20, 100, 45279432, 5];
+        let sizes = [
+            ResourceGroupSize::Combined {
+                num_tagged_resources: 1,
+                all_tagged_resources_size: 20,
+            },
+            ResourceGroupSize::Combined {
+                num_tagged_resources: 1,
+                all_tagged_resources_size: 100,
+            },
+            ResourceGroupSize::Combined {
+                num_tagged_resources: 1,
+                all_tagged_resources_size: 45279432,
+            },
+            ResourceGroupSize::Combined {
+                num_tagged_resources: 1,
+                all_tagged_resources_size: 5,
+            },
+            ResourceGroupSize::Combined {
+                num_tagged_resources: 1024,
+                all_tagged_resources_size: 45279432,
+            },
+        ];
         assert_group_write_size!(
             WriteOp::legacy_creation(Bytes::new()),
             sizes[0],
@@ -794,12 +831,12 @@ mod tests {
         let mut base_update = BTreeMap::new();
         base_update.insert(
             key_1.clone(),
-            group_write(write_op_with_metadata(CREATION, 100), vec![], 0),
+            group_write(write_op_with_metadata(CREATION, 100), vec![], 0, 0),
         );
         let mut additional_update = BTreeMap::new();
         additional_update.insert(
             key_2.clone(),
-            group_write(write_op_with_metadata(CREATION, 200), vec![], 0),
+            group_write(write_op_with_metadata(CREATION, 200), vec![], 0, 0),
         );
 
         assert_ok!(VMChangeSet::squash_additional_resource_writes(
@@ -833,11 +870,16 @@ mod tests {
         let mut additional_update = BTreeMap::new();
         base_update.insert(
             key.clone(),
-            group_write(write_op_with_metadata(base_type_idx, 100), vec![], 0),
+            group_write(write_op_with_metadata(base_type_idx, 100), vec![], 0, 0),
         );
         additional_update.insert(
             key.clone(),
-            group_write(write_op_with_metadata(additional_type_idx, 100), vec![], 0),
+            group_write(
+                write_op_with_metadata(additional_type_idx, 100),
+                vec![],
+                0,
+                0,
+            ),
         );
 
         assert_ok!(VMChangeSet::squash_additional_resource_writes(
@@ -866,11 +908,16 @@ mod tests {
         let mut additional_update = BTreeMap::new();
         base_update.insert(
             key.clone(),
-            group_write(write_op_with_metadata(base_type_idx, 100), vec![], 0),
+            group_write(write_op_with_metadata(base_type_idx, 100), vec![], 0, 0),
         );
         additional_update.insert(
             key.clone(),
-            group_write(write_op_with_metadata(additional_type_idx, 200), vec![], 0),
+            group_write(
+                write_op_with_metadata(additional_type_idx, 200),
+                vec![],
+                0,
+                0,
+            ),
         );
 
         assert_err!(VMChangeSet::squash_additional_resource_writes(
@@ -891,6 +938,7 @@ mod tests {
                 write_op_with_metadata(CREATION, 100), // create
                 vec![],
                 0,
+                0,
             ),
         );
         additional_update.insert(
@@ -898,6 +946,7 @@ mod tests {
             group_write(
                 write_op_with_metadata(DELETION, 100), // delete
                 vec![],
+                0,
                 0,
             ),
         );
@@ -932,6 +981,7 @@ mod tests {
                     ),
                 ],
                 0,
+                0,
             ),
         );
         additional_update.insert(
@@ -948,6 +998,7 @@ mod tests {
                         (WriteOp::legacy_modification(vec![1].into()), None),
                     ),
                 ],
+                0,
                 0,
             ),
         );
@@ -968,6 +1019,7 @@ mod tests {
                     ),
                 ],
                 0,
+                0,
             ),
         );
         additional_update.insert(
@@ -982,6 +1034,7 @@ mod tests {
                     (mock_tag_1(), (WriteOp::legacy_deletion(), None)),
                     (mock_tag_2(), (WriteOp::legacy_deletion(), None)),
                 ],
+                0,
                 0,
             ),
         );
@@ -1021,6 +1074,7 @@ mod tests {
             group_write(
                 write_op_with_metadata(MODIFICATION, 100),
                 vec![(mock_tag_1(), (WriteOp::legacy_deletion(), None))],
+                0,
                 0,
             ),
         )]);

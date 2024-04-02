@@ -262,6 +262,7 @@ fn load_with_extra_ability() {
     adapter.vm.load_module(&module_id, &adapter.store).unwrap();
 }
 
+#[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
 #[test]
 fn deep_dependency_list_err_0() {
     let data_store = InMemoryStorage::new();
@@ -282,6 +283,7 @@ fn deep_dependency_list_err_0() {
     adapter.publish_modules_with_error(vec![module]);
 }
 
+#[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
 #[test]
 fn deep_dependency_list_err_1() {
     let data_store = InMemoryStorage::new();
@@ -342,6 +344,7 @@ fn deep_dependency_list_ok_1() {
     adapter.publish_modules(vec![module]);
 }
 
+#[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
 #[test]
 fn deep_dependency_tree_err_0() {
     let data_store = InMemoryStorage::new();
@@ -364,6 +367,7 @@ fn deep_dependency_tree_err_0() {
     adapter.publish_modules_with_error(vec![module]);
 }
 
+#[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
 #[test]
 fn deep_dependency_tree_err_1() {
     let data_store = InMemoryStorage::new();
@@ -386,6 +390,7 @@ fn deep_dependency_tree_err_1() {
     adapter.publish_modules_with_error(vec![module]);
 }
 
+#[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
 #[test]
 fn deep_dependency_tree_ok_0() {
     let data_store = InMemoryStorage::new();
@@ -408,6 +413,7 @@ fn deep_dependency_tree_ok_0() {
     adapter.publish_modules(vec![module]);
 }
 
+#[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
 #[test]
 fn deep_dependency_tree_ok_1() {
     let data_store = InMemoryStorage::new();
@@ -430,6 +436,7 @@ fn deep_dependency_tree_ok_1() {
     adapter.publish_modules(vec![module]);
 }
 
+#[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
 #[test]
 fn deep_friend_list_err_0() {
     let data_store = InMemoryStorage::new();
@@ -450,6 +457,7 @@ fn deep_friend_list_err_0() {
     adapter.publish_modules_with_error(vec![module]);
 }
 
+#[ignore = "temporarily disabled because we reimplemented dependency check outside the Move VM"]
 #[test]
 fn deep_friend_list_err_1() {
     let data_store = InMemoryStorage::new();

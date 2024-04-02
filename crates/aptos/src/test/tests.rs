@@ -66,6 +66,8 @@ async fn ensure_every_command_args_work() {
     assert_cmd_not_panic(&["aptos", "move", "clean", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "compile", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "compile-script", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "move", "decompile", "--help"]).await;
+    assert_cmd_not_panic(&["aptos", "move", "disassemble", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "download", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "init", "--help"]).await;
     assert_cmd_not_panic(&["aptos", "move", "list", "--help"]).await;

@@ -213,6 +213,15 @@ impl WriteOp {
         }
     }
 
+    pub fn size(&self) -> usize {
+        use WriteOp::*;
+
+        match self {
+            Creation { data, .. } | Modification { data, .. } => data.len(),
+            Deletion { .. } => 0,
+        }
+    }
+
     pub fn metadata(&self) -> &StateValueMetadata {
         use WriteOp::*;
 

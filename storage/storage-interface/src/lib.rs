@@ -30,8 +30,9 @@ use aptos_types::{
         ShardedStateUpdates,
     },
     transaction::{
-        AccountTransactionsWithProof, Transaction, TransactionInfo, TransactionListWithProof,
-        TransactionOutputListWithProof, TransactionToCommit, TransactionWithProof, Version,
+        AccountTransactionsWithProof, Transaction, TransactionAuxiliaryData, TransactionInfo,
+        TransactionListWithProof, TransactionOutputListWithProof, TransactionToCommit,
+        TransactionWithProof, Version,
     },
     write_set::WriteSet,
 };
@@ -52,6 +53,7 @@ pub mod state_view;
 
 use crate::state_delta::StateDelta;
 use aptos_scratchpad::SparseMerkleTree;
+pub use aptos_types::block_info::BlockHeight;
 pub use errors::AptosDbError;
 pub use executed_trees::ExecutedTrees;
 
@@ -169,15 +171,20 @@ pub trait DbReader: Send + Sync {
             fetch_events: bool,
         ) -> Result<TransactionWithProof>;
 
+        fn get_transaction_auxiliary_data_by_version(
+            &self,
+            version: Version,
+        ) -> Result<TransactionAuxiliaryData>;
+
         /// See [AptosDB::get_first_txn_version].
         ///
         /// [AptosDB::get_first_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_txn_version
         fn get_first_txn_version(&self) -> Result<Option<Version>>;
 
-        /// See [AptosDB::get_first_viable_txn_version].
+        /// See [AptosDB::get_first_viable_block].
         ///
-        /// [AptosDB::get_first_viable_txn_version]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_txn_version
-        fn get_first_viable_txn_version(&self) -> Result<Version>;
+        /// [AptosDB::get_first_viable_block]: ../aptosdb/struct.AptosDB.html#method.get_first_viable_block
+        fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)>;
 
         /// See [AptosDB::get_first_write_set_version].
         ///
@@ -241,9 +248,7 @@ pub trait DbReader: Send + Sync {
         /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
         fn get_block_timestamp(&self, version: Version) -> Result<u64>;
 
-        fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)>;
-
-        /// See [AptosDB::get_latest_block_events].
+        /// See `AptosDB::get_latest_block_events`.
         fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>>;
 
         /// Returns the start_version, end_version and NewBlockEvent of the block containing the input

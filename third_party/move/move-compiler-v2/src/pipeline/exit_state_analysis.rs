@@ -32,7 +32,7 @@ use std::{collections::BTreeMap, fmt::Display};
 ///
 /// That is, if at a program point the abstract state is `s`, then for all paths from that point,
 /// the program can only exit in the exit states contained in `s`, if the program does terminate.
-#[derive(AbstractDomain, Clone)]
+#[derive(AbstractDomain, Clone, Default)]
 pub struct ExitState(SetDomain<ExitStatus>);
 
 impl ExitState {
@@ -70,26 +70,14 @@ impl Display for ExitStatus {
     }
 }
 
-/// Before and after abort state at a program point
+/// An annotation at each code offset indicating the exit behavior of the next instruction.
 #[derive(Clone)]
-pub struct ExitStateAtCodeOffset {
-    pub before: ExitState,
-    pub after: ExitState,
-}
-
-impl ExitStateAtCodeOffset {
-    pub fn new(before: ExitState, after: ExitState) -> Self {
-        Self { before, after }
-    }
-}
-
-#[derive(Clone)]
-pub struct ExitStateAnnotation(BTreeMap<CodeOffset, ExitStateAtCodeOffset>);
+pub struct ExitStateAnnotation(BTreeMap<CodeOffset, ExitState>);
 
 impl ExitStateAnnotation {
     /// Get the abort state at the given code offset
-    pub fn get_annotation_at(&self, code_offset: CodeOffset) -> Option<&ExitStateAtCodeOffset> {
-        self.0.get(&code_offset)
+    pub fn get_state_at(&self, code_offset: CodeOffset) -> &ExitState {
+        self.0.get(&code_offset).expect("exit state at")
     }
 }
 
@@ -97,13 +85,11 @@ pub struct ExitStateAnalysis {}
 
 impl ExitStateAnalysis {
     /// Returns the state per instruction of the given function
-    fn analyze(&self, target: &FunctionTarget) -> BTreeMap<CodeOffset, ExitStateAtCodeOffset> {
+    fn analyze(&self, target: &FunctionTarget) -> BTreeMap<CodeOffset, ExitState> {
         let code = target.get_bytecode();
         let cfg = StacklessControlFlowGraph::new_backward(code, true);
         let state_map = self.analyze_function(ExitState::bot(), code, &cfg);
-        self.state_per_instruction(state_map, code, &cfg, |before, after| {
-            ExitStateAtCodeOffset::new(before.clone(), after.clone())
-        })
+        self.state_per_instruction_with_default(state_map, code, &cfg, |before, _| before.clone())
     }
 }
 
@@ -168,12 +154,12 @@ pub fn format_abort_state_annotation(
     target: &FunctionTarget,
     code_offset: CodeOffset,
 ) -> Option<String> {
-    let ExitStateAnnotation(state_per_instr) =
-        target.get_annotations().get::<ExitStateAnnotation>()?;
-    let ExitStateAtCodeOffset { before, after } = state_per_instr.get(&code_offset)?;
+    let state = target
+        .get_annotations()
+        .get::<ExitStateAnnotation>()?
+        .get_state_at(code_offset);
     Some(format!(
-        "abort state before: {}\nabort state after : {}",
-        before.0.to_string(ExitStatus::to_string),
-        after.0.to_string(ExitStatus::to_string)
+        "abort state: {}",
+        state.0.to_string(ExitStatus::to_string),
     ))
 }

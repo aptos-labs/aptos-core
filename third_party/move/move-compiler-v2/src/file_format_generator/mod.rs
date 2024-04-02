@@ -1,9 +1,5 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
-
-mod function_generator;
-mod module_generator;
 
 use crate::file_format_generator::module_generator::ModuleContext;
 use module_generator::ModuleGenerator;
@@ -13,6 +9,9 @@ use move_compiler::compiled_unit as CU;
 use move_model::model::GlobalEnv;
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use move_symbol_pool::Symbol;
+
+mod function_generator;
+mod module_generator;
 
 pub fn generate_file_format(
     env: &GlobalEnv,

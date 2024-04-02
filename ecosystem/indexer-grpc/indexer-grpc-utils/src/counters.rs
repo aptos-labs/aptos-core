@@ -10,6 +10,8 @@ use prometheus::{register_int_counter_vec, IntCounterVec};
 pub enum IndexerGrpcStep {
     // [Data Service] New request received.
     DataServiceNewRequestReceived,
+    // [Data Service] Fetching data from in-memory cache.
+    DataServiceFetchingDataFromInMemoryCache,
     // [Data Service] Waiting for data from cache.
     DataServiceWaitingForCacheData,
     // [Data Service] Fetched data from Redis cache.
@@ -63,6 +65,7 @@ impl IndexerGrpcStep {
         match self {
             // Data service steps
             IndexerGrpcStep::DataServiceNewRequestReceived => "1",
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache => "2.0.0",
             IndexerGrpcStep::DataServiceWaitingForCacheData => "2.0",
             IndexerGrpcStep::DataServiceDataFetchedCache => "2.1",
             IndexerGrpcStep::DataServiceDataFetchedFilestore => "2.2",
@@ -96,6 +99,9 @@ impl IndexerGrpcStep {
             // Data service steps
             IndexerGrpcStep::DataServiceNewRequestReceived => {
                 "[Data Service] New request received."
+            }
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache => {
+                "[Data Service] Fetching data from in-memory cache."
             }
             IndexerGrpcStep::DataServiceWaitingForCacheData => {
                 "[Data Service] Waiting for data from cache."

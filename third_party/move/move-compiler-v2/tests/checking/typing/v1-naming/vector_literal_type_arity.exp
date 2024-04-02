@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: wrong number of type arguments (expected 1, got 0)
+error: expected 1 type argument but 0 were provided
   ┌─ tests/checking/typing/v1-naming/vector_literal_type_arity.move:4:18
   │
 4 │         let v0 = vector<>[];
   │                  ^^^^^^
 
-error: wrong number of type arguments (expected 1, got 2)
+error: expected 1 type argument but 2 were provided
   ┌─ tests/checking/typing/v1-naming/vector_literal_type_arity.move:5:18
   │
 5 │         let v2 = vector<u64, bool>[0, false];

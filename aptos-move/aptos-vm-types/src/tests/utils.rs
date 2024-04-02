@@ -17,7 +17,7 @@ use aptos_types::{
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
     state_store::{state_key::StateKey, state_value::StateValueMetadata},
-    transaction::{ExecutionStatus, TransactionStatus},
+    transaction::{ExecutionStatus, TransactionAuxiliaryData, TransactionStatus},
     write_set::WriteOp,
 };
 use move_core_types::{
@@ -263,6 +263,7 @@ pub(crate) fn build_vm_output(
             .build(),
         FeeStatement::new(GAS_USED, GAS_USED, 0, 0, 0),
         STATUS,
+        TransactionAuxiliaryData::default(),
     )
 }
 

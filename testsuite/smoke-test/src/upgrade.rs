@@ -19,7 +19,7 @@ use aptos_release_builder::{
     ReleaseEntry,
 };
 use aptos_temppath::TempPath;
-use aptos_types::on_chain_config::OnChainConsensusConfig;
+use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, OnChainConsensusConfig};
 use std::{fs, path::PathBuf, process::Command, sync::Arc};
 
 // Ignored. This is redundant with the forge compat test but this test is easier to run locally and
@@ -59,7 +59,7 @@ async fn test_upgrade_flow() {
     };
 
     let (_, update_gas_script) =
-        generate_gas_upgrade_proposal(&gas_schedule, true, "".to_owned().into_bytes())
+        generate_gas_upgrade_proposal(true, &gas_schedule, true, "".to_owned().into_bytes())
             .unwrap()
             .pop()
             .unwrap();
@@ -129,7 +129,7 @@ async fn test_upgrade_flow() {
                 metadata: ProposalMetadata::default(),
                 update_sequence: vec![
                     ReleaseEntry::FeatureFlag(Features {
-                        enabled: aptos_vm_genesis::default_features()
+                        enabled: AptosFeatureFlag::default_features()
                             .into_iter()
                             .map(FeatureFlag::from)
                             .collect(),
