@@ -28,3 +28,13 @@ error: same mutable reference in local `r1` is also used in other local `r2` in 
    │                  ------ previous mutable local borrow
 20 │         s(r1, r2)
    │         ^^^^^^^^^ requirement enforced here
+
+error: cannot implicitly freeze local `r1`  since multiple mutable references exist
+   ┌─ tests/reference-safety/multiple_use_invalid.move:27:9
+   │
+25 │         let r1 = &mut x;
+   │                  ------ originating mutable local borrow
+26 │         let r2 = &mut x;
+   │                  ------ conflicting mutable local borrow
+27 │         r1 == r2
+   │         ^^ implicitly frozen here

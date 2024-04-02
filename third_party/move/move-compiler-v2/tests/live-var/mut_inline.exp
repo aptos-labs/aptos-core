@@ -41,13 +41,13 @@ fun m::foo(): u64 {
   1: $t2 := borrow_local($t1)
   2: $t4 := infer($t2)
   3: $t5 := 0
-  4: $t7 := freeze_ref($t4)
+  4: $t7 := freeze_ref(implicit)($t4)
   5: $t6 := vector::length<u64>($t7)
   6: label L0
   7: $t8 := <($t5, $t6)
   8: if ($t8) goto 9 else goto 27
   9: label L2
- 10: $t13 := freeze_ref($t4)
+ 10: $t13 := freeze_ref(implicit)($t4)
  11: $t12 := vector::borrow<u64>($t13, $t5)
  12: $t11 := infer($t12)
  13: $t14 := read_ref($t11)
@@ -77,7 +77,7 @@ fun m::foo(): u64 {
  37: $t21 := <($t5, $t6)
  38: if ($t21) goto 39 else goto 59
  39: label L10
- 40: $t25 := freeze_ref($t4)
+ 40: $t25 := freeze_ref(implicit)($t4)
  41: $t24 := vector::borrow<u64>($t25, $t5)
  42: $t23 := infer($t24)
  43: $t26 := read_ref($t23)
@@ -102,7 +102,7 @@ fun m::foo(): u64 {
  62: goto 36
  63: label L9
  64: $t3 := infer($t18)
- 65: $t33 := freeze_ref($t2)
+ 65: $t33 := freeze_ref(implicit)($t2)
  66: $t34 := 0
  67: $t32 := vector::borrow<u64>($t33, $t34)
  68: $t0 := read_ref($t32)
@@ -157,7 +157,7 @@ fun m::foo(): u64 {
      # live vars: $t2, $t4
   3: $t5 := 0
      # live vars: $t2, $t4, $t5
-  4: $t7 := freeze_ref($t4)
+  4: $t7 := freeze_ref(implicit)($t4)
      # live vars: $t2, $t4, $t5, $t7
   5: $t6 := vector::length<u64>($t7)
      # live vars: $t2, $t4, $t5, $t6
@@ -169,7 +169,7 @@ fun m::foo(): u64 {
      # live vars: $t2, $t4, $t5, $t6
   9: label L2
      # live vars: $t2, $t4, $t5, $t6
- 10: $t13 := freeze_ref($t4)
+ 10: $t13 := freeze_ref(implicit)($t4)
      # live vars: $t2, $t4, $t5, $t6, $t13
  11: $t12 := vector::borrow<u64>($t13, $t5)
      # live vars: $t2, $t4, $t5, $t6, $t12
@@ -229,7 +229,7 @@ fun m::foo(): u64 {
      # live vars: $t2, $t4, $t5, $t6, $t18
  39: label L10
      # live vars: $t2, $t4, $t5, $t6, $t18
- 40: $t25 := freeze_ref($t4)
+ 40: $t25 := freeze_ref(implicit)($t4)
      # live vars: $t2, $t4, $t5, $t6, $t18, $t25
  41: $t24 := vector::borrow<u64>($t25, $t5)
      # live vars: $t2, $t4, $t5, $t6, $t18, $t24
@@ -279,7 +279,7 @@ fun m::foo(): u64 {
      # live vars: $t2, $t18
  64: $t3 := infer($t18)
      # live vars: $t2
- 65: $t33 := freeze_ref($t2)
+ 65: $t33 := freeze_ref(implicit)($t2)
      # live vars: $t33
  66: $t34 := 0
      # live vars: $t33, $t34

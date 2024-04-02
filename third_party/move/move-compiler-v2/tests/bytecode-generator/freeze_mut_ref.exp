@@ -8,40 +8,40 @@ module 0x42::freeze_mut_ref {
         dummy_field: bool,
     }
     public fun borrow_mut<Element>(map: &mut vector<#0>): &#0 {
-        Freeze(vector::borrow_mut<Element>(map, 0))
+        Freeze(false)(vector::borrow_mut<Element>(map, 0))
     }
     public fun borrow_mut2<Element>(v: &mut #0): &#0 {
-        Freeze(v)
+        Freeze(false)(v)
     }
     public fun borrow_mut3<Element>(v1: &mut #0,v2: &#0): &#0 {
         if true {
-          Freeze(v1)
+          Freeze(false)(v1)
         } else {
           v2
         }
     }
     public fun borrow_mut4<Element>(v: &mut #0): &#0 {
-        return Freeze(v)
+        return Freeze(false)(v)
     }
     private fun t0() {
         {
-          let x: &u64 = Freeze(Borrow(Mutable)(0));
+          let x: &u64 = Freeze(false)(Borrow(Mutable)(0));
           x;
           Tuple()
         }
     }
     private fun t1(s: &mut freeze_mut_ref::S): &freeze_mut_ref::S {
-        Freeze(s)
+        Freeze(false)(s)
     }
     private fun t2(u1: &mut u64,u2: &mut u64): (&u64, &mut u64) {
-        Tuple(Freeze(u1), u2)
+        Tuple(Freeze(false)(u1), u2)
     }
     public fun t4() {
         {
           let x: &u64;
           {
             let y: &u64;
-            (x: &u64, y: &u64): (&u64, &u64) = Tuple(Freeze(Borrow(Mutable)(0)), Freeze(Borrow(Mutable)(0)));
+            (x: &u64, y: &u64): (&u64, &u64) = Tuple(Freeze(false)(Borrow(Mutable)(0)), Freeze(false)(Borrow(Mutable)(0)));
             Tuple()
           }
         }
@@ -60,7 +60,7 @@ module 0x42::freeze_mut_ref {
                 {
                   let z: &u64;
                   f = 0;
-                  z: &u64 = Freeze(y);
+                  z: &u64 = Freeze(false)(y);
                   g = 2;
                   Tuple()
                 }
@@ -73,7 +73,7 @@ module 0x42::freeze_mut_ref {
         {
           let x: &freeze_mut_ref::S;
           if cond {
-            x: &freeze_mut_ref::S = Freeze(Copy(s))
+            x: &freeze_mut_ref::S = Freeze(false)(Copy(s))
           } else {
             x: &freeze_mut_ref::S = other
           };
@@ -84,7 +84,7 @@ module 0x42::freeze_mut_ref {
         {
           let _x: &freeze_mut_ref::S;
           _x: &freeze_mut_ref::S = if cond {
-            Freeze(s)
+            Freeze(false)(s)
           } else {
             other
           };
@@ -94,7 +94,7 @@ module 0x42::freeze_mut_ref {
     private fun t8(cond: bool,s: &mut freeze_mut_ref::S,other: &freeze_mut_ref::S) {
         {
           let _x: &freeze_mut_ref::S = if cond {
-            Freeze(s)
+            Freeze(false)(s)
           } else {
             other
           };
@@ -112,7 +112,7 @@ public fun freeze_mut_ref::borrow_mut<#0>($t0: &mut vector<#0>): &#0 {
      var $t3: u64
   0: $t3 := 0
   1: $t2 := vector::borrow_mut<#0>($t0, $t3)
-  2: $t1 := freeze_ref($t2)
+  2: $t1 := freeze_ref(implicit)($t2)
   3: return $t1
 }
 
@@ -120,7 +120,7 @@ public fun freeze_mut_ref::borrow_mut<#0>($t0: &mut vector<#0>): &#0 {
 [variant baseline]
 public fun freeze_mut_ref::borrow_mut2<#0>($t0: &mut #0): &#0 {
      var $t1: &#0
-  0: $t1 := freeze_ref($t0)
+  0: $t1 := freeze_ref(implicit)($t0)
   1: return $t1
 }
 
@@ -132,7 +132,7 @@ public fun freeze_mut_ref::borrow_mut3<#0>($t0: &mut #0, $t1: &#0): &#0 {
   0: $t3 := true
   1: if ($t3) goto 2 else goto 5
   2: label L0
-  3: $t2 := freeze_ref($t0)
+  3: $t2 := freeze_ref(implicit)($t0)
   4: goto 7
   5: label L1
   6: $t2 := infer($t1)
@@ -144,7 +144,7 @@ public fun freeze_mut_ref::borrow_mut3<#0>($t0: &mut #0, $t1: &#0): &#0 {
 [variant baseline]
 public fun freeze_mut_ref::borrow_mut4<#0>($t0: &mut #0): &#0 {
      var $t1: &#0
-  0: $t1 := freeze_ref($t0)
+  0: $t1 := freeze_ref(implicit)($t0)
   1: return $t1
   2: return $t1
 }
@@ -158,7 +158,7 @@ fun freeze_mut_ref::t0() {
      var $t3: &u64
   0: $t2 := 0
   1: $t1 := borrow_local($t2)
-  2: $t0 := freeze_ref($t1)
+  2: $t0 := freeze_ref(implicit)($t1)
   3: $t3 := infer($t0)
   4: return ()
 }
@@ -167,7 +167,7 @@ fun freeze_mut_ref::t0() {
 [variant baseline]
 fun freeze_mut_ref::t1($t0: &mut freeze_mut_ref::S): &freeze_mut_ref::S {
      var $t1: &freeze_mut_ref::S
-  0: $t1 := freeze_ref($t0)
+  0: $t1 := freeze_ref(implicit)($t0)
   1: return $t1
 }
 
@@ -176,7 +176,7 @@ fun freeze_mut_ref::t1($t0: &mut freeze_mut_ref::S): &freeze_mut_ref::S {
 fun freeze_mut_ref::t2($t0: &mut u64, $t1: &mut u64): (&u64, &mut u64) {
      var $t2: &u64
      var $t3: &mut u64
-  0: $t2 := freeze_ref($t0)
+  0: $t2 := freeze_ref(implicit)($t0)
   1: $t3 := infer($t1)
   2: return ($t2, $t3)
 }
@@ -194,11 +194,11 @@ public fun freeze_mut_ref::t4() {
      var $t7: u64
   0: $t4 := 0
   1: $t3 := borrow_local($t4)
-  2: $t2 := freeze_ref($t3)
+  2: $t2 := freeze_ref(implicit)($t3)
   3: $t0 := infer($t2)
   4: $t7 := 0
   5: $t6 := borrow_local($t7)
-  6: $t5 := freeze_ref($t6)
+  6: $t5 := freeze_ref(implicit)($t6)
   7: $t1 := infer($t5)
   8: return ()
 }
@@ -238,7 +238,7 @@ public fun freeze_mut_ref::t5($t0: &mut freeze_mut_ref::G) {
  13: $t13 := 2
  14: $t15 := 0
  15: write_ref($t2, $t15)
- 16: $t16 := freeze_ref($t10)
+ 16: $t16 := freeze_ref(implicit)($t10)
  17: $t12 := infer($t16)
  18: $t14 := infer($t6)
  19: write_ref($t14, $t13)
@@ -254,7 +254,7 @@ fun freeze_mut_ref::t6($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_
   0: if ($t0) goto 1 else goto 6
   1: label L0
   2: $t5 := copy($t1)
-  3: $t4 := freeze_ref($t5)
+  3: $t4 := freeze_ref(implicit)($t5)
   4: $t3 := infer($t4)
   5: goto 8
   6: label L1
@@ -270,7 +270,7 @@ fun freeze_mut_ref::t7($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_
      var $t4: &freeze_mut_ref::S
   0: if ($t0) goto 1 else goto 4
   1: label L0
-  2: $t4 := freeze_ref($t1)
+  2: $t4 := freeze_ref(implicit)($t1)
   3: goto 6
   4: label L1
   5: $t4 := infer($t2)
@@ -285,7 +285,7 @@ fun freeze_mut_ref::t8($t0: bool, $t1: &mut freeze_mut_ref::S, $t2: &freeze_mut_
      var $t3: &freeze_mut_ref::S
   0: if ($t0) goto 1 else goto 4
   1: label L0
-  2: $t3 := freeze_ref($t1)
+  2: $t3 := freeze_ref(implicit)($t1)
   3: goto 6
   4: label L1
   5: $t3 := infer($t2)

@@ -1,12 +1,12 @@
 module 0x42::test {
 	struct T { }
 
-	struct S<T: drop> {
-		x: T
+	struct S<Y: drop> {
+		x: Y
 	}
 
-	struct U<T> {
-		x: T
+	struct U<X> {
+		x: X
 	}
 
 	fun test(): U<S<T>> {
