@@ -38,6 +38,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `store_metadata`](#0x1_fungible_asset_store_metadata)
 -  [Function `amount`](#0x1_fungible_asset_amount)
 -  [Function `balance`](#0x1_fungible_asset_balance)
+-  [Function `is_balance_at_least`](#0x1_fungible_asset_is_balance_at_least)
 -  [Function `is_frozen`](#0x1_fungible_asset_is_frozen)
 -  [Function `asset_metadata`](#0x1_fungible_asset_asset_metadata)
 -  [Function `mint_ref_metadata`](#0x1_fungible_asset_mint_ref_metadata)
@@ -1339,6 +1340,37 @@ Get the balance of a given store.
         <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).balance
     } <b>else</b> {
         0
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_is_balance_at_least"></a>
+
+## Function `is_balance_at_least`
+
+Check whether the balance of a given store is >= <code>amount</code>.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_balance_at_least">is_balance_at_least</a>&lt;T: key&gt;(store: <a href="object.md#0x1_object_Object">object::Object</a>&lt;T&gt;, amount: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_is_balance_at_least">is_balance_at_least</a>&lt;T: key&gt;(store: Object&lt;T&gt;, amount: u64): bool <b>acquires</b> <a href="fungible_asset.md#0x1_fungible_asset_FungibleStore">FungibleStore</a> {
+    <b>let</b> store_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&store);
+    <b>if</b> (<a href="fungible_asset.md#0x1_fungible_asset_store_exists">store_exists</a>(store_addr)) {
+        <a href="fungible_asset.md#0x1_fungible_asset_borrow_store_resource">borrow_store_resource</a>(&store).balance &gt;= amount
+    } <b>else</b> {
+        amount == 0
     }
 }
 </code></pre>
