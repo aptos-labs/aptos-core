@@ -2322,10 +2322,9 @@ impl AptosVM {
     ) -> Option<u64> {
         match payload {
             TransactionPayload::EntryFunction(entry_func) => {
-                if !self.randomness_enabled {
-                    return None;
-                }
-                if has_randomness_attribute(resolver, session, entry_func).unwrap_or(false) {
+                if self.randomness_enabled
+                    && has_randomness_attribute(resolver, session, entry_func).unwrap_or(false)
+                {
                     let max_execution_gas: Gas = txn_gas_params
                         .max_execution_gas
                         .to_unit_round_up_with_params(txn_gas_params);
@@ -2336,11 +2335,6 @@ impl AptosVM {
                         + txn_gas_params.max_storage_fee;
                     let cand_1 =
                         txn_metadata.gas_unit_price * txn_gas_params.maximum_number_of_gas_units;
-                    println!(
-                        "txn_metadata.gas_unit_price={}",
-                        txn_metadata.gas_unit_price
-                    );
-                    println!("cand_0={cand_0}, cand_1={cand_1}");
                     let required_fee_deposit = min(cand_0, cand_1);
                     Some(u64::from(required_fee_deposit))
                 } else {
