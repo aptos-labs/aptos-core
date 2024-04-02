@@ -1,11 +1,5 @@
 
 Diagnostics:
-error: unnecessary acquires annotation
-  ┌─ tests/acquires-checker/access_ok.move:8:23
-  │
-8 │     fun f1() acquires S {
-  │                       ^^
-
 error: access specifier not enabled. Only plain `acquires R` is enabled.
    ┌─ tests/acquires-checker/access_ok.move:11:20
    │
@@ -18,17 +12,11 @@ error: access specifier not enabled. Only plain `acquires R` is enabled.
 14 │     fun f3() writes S {
    │                     ^^
 
-error: unnecessary acquires annotation
-   ┌─ tests/acquires-checker/access_ok.move:17:23
+error: access specifier not enabled. Only plain `acquires R` is enabled.
+   ┌─ tests/acquires-checker/access_ok.move:17:24
    │
 17 │     fun f4() acquires S(*) {
-   │                       ^^^^
-
-error: unnecessary acquires annotation
-   ┌─ tests/acquires-checker/access_ok.move:20:31
-   │
-20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
-   │                               ^^
+   │                        ^^^
 
 error: access specifier not enabled. Only plain `acquires R` is enabled.
    ┌─ tests/acquires-checker/access_ok.move:20:39
@@ -78,35 +66,17 @@ error: access specifier not enabled. Only plain `acquires R` is enabled.
 32 │     fun f8() acquires *(0x42) {
    │                       ^^^^^^^
 
-warning: Unused parameter `a`. Consider removing or prefixing with an underscore: `_a`
-   ┌─ tests/acquires-checker/access_ok.move:35:12
-   │
-35 │     fun f9(a: address) acquires *(a) {
-   │            ^
-
 error: access specifier not enabled. Only plain `acquires R` is enabled.
    ┌─ tests/acquires-checker/access_ok.move:35:33
    │
 35 │     fun f9(a: address) acquires *(a) {
    │                                 ^^^^
 
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/acquires-checker/access_ok.move:38:13
-   │
-38 │     fun f10(x: u64) acquires *(make_up_address(x)) {
-   │             ^
-
 error: access specifier not enabled. Only plain `acquires R` is enabled.
    ┌─ tests/acquires-checker/access_ok.move:38:30
    │
 38 │     fun f10(x: u64) acquires *(make_up_address(x)) {
    │                              ^^^^^^^^^^^^^^^^^^^^^
-
-warning: Unused parameter `x`. Consider removing or prefixing with an underscore: `_x`
-   ┌─ tests/acquires-checker/access_ok.move:41:25
-   │
-41 │     fun make_up_address(x: u64): address {
-   │                         ^
 
 error: access specifier not enabled. Only plain `acquires R` is enabled.
    ┌─ tests/acquires-checker/access_ok.move:45:22
