@@ -716,7 +716,7 @@ impl RoundManager {
             vtxn_bytes_limit = vtxn_bytes_limit,
             vtxn_bytes_proposed = validator_txns_total_bytes,
             proposer = author_hex,
-            "Summarizing proposed validator txns."
+            "[0402] Summarizing proposed validator txns."
         );
 
         ensure!(

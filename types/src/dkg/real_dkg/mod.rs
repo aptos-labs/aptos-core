@@ -75,7 +75,7 @@ pub fn build_dkg_pvss_config(
     );
 
     println!(
-        "[Randomness] rounding: epoch {} starts, profile = {:?}",
+        "[0402] rounding: epoch {} starts, profile = {:?}",
         cur_epoch, dkg_rounding.profile
     );
 
