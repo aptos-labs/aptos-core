@@ -500,7 +500,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .clone()
                 .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_compile_test_code(true),
-            stop_after: StopAfter::FileFormat,
+            stop_after: StopAfter::BytecodePipeline(None),
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
@@ -515,7 +515,22 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .clone()
                 .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_compile_test_code(false),
-            stop_after: StopAfter::FileFormat,
+            stop_after: StopAfter::BytecodePipeline(None),
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
+        TestConfig {
+            name: "skip-attribute-checks",
+            runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
+            include: vec!["/skip_attribute_checks/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts
+                .clone()
+                .set_experiment(Experiment::AST_SIMPLIFY, true)
+                .set_skip_attribute_checks(true),
+            stop_after: StopAfter::BytecodePipeline(None),
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
@@ -546,7 +561,15 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     } else {
         vec![]
     };
-    options.named_address_mapping = vec!["std=0x1".to_string()];
+    options.named_address_mapping = vec![
+        "std=0x1".to_string(),
+        "aptos_std=0x1".to_string(),
+        "M=0x1".to_string(),
+        "A=0x42".to_string(),
+        "B=0x42".to_string(),
+        "K=0x19".to_string(),
+        "Async=0x20".to_string(),
+    ];
 
     // Putting the generated test baseline into a Refcell to avoid problems with mut borrow
     // in closures.
