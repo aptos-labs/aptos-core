@@ -253,7 +253,6 @@ impl PeersAndMetadata {
             if active_connection_id == connection_id {
                 let peer_metadata = entry.remove();
                 let nc = self.get_network_context(&peer_network_id.network_id());
-                // TODO: get some actual DisconnectReason in here?
                 let event = ConnectionNotification::LostPeer(
                     peer_metadata.connection_metadata.clone(),
                     nc,

@@ -47,7 +47,7 @@ impl TestHarness {
             aptos_channel::new(QueueStyle::FIFO, 1, None);
         let (peer_mgr_notifs_tx, peer_mgr_notifs_rx) =
             aptos_channel::new(QueueStyle::FIFO, 1, None);
-        let (connection_notifs_tx, connection_notifs_rx) = tokio::sync::mpsc::channel(10); //conn_notifs_channel::new();
+        let (connection_notifs_tx, connection_notifs_rx) = tokio::sync::mpsc::channel(10);
 
         let network_sender = NetworkSender::new(
             PeerManagerRequestSender::new(peer_mgr_reqs_tx),

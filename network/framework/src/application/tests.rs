@@ -437,8 +437,11 @@ async fn test_peers_and_metadata_subscriptions() {
     let mut connection_events = peers_and_metadata.subscribe();
 
     match connection_events.try_recv() {
-        Ok(wat) => {
-            panic!("connection_events should be empty but got {:?}", wat)
+        Ok(unwanted_event) => {
+            panic!(
+                "connection_events should be empty but got {:?}",
+                unwanted_event,
+            )
         },
         Err(tre) => match tre {
             TryRecvError::Empty => {

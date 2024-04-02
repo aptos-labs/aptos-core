@@ -111,6 +111,7 @@ pub struct HealthChecker<NetworkClient> {
     /// Counter incremented in each round of health checks
     round: u64,
 
+    /// This should normally be None and is only used in testing to inject test events.
     connection_events_injection: Option<tokio::sync::mpsc::Receiver<ConnectionNotification>>,
 }
 
@@ -138,6 +139,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
     }
 
     #[cfg(test)]
+    /// Set source of mock connection events for testing.
     pub fn set_connection_source(
         &mut self,
         connection_events: tokio::sync::mpsc::Receiver<ConnectionNotification>,
@@ -145,6 +147,7 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
         self.connection_events_injection = Some(connection_events);
     }
 
+    /// testing_connection_events should be None except in unit test code
     pub async fn start(mut self) {
         let mut tick_handlers = FuturesUnordered::new();
         info!(
