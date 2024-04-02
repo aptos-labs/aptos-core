@@ -227,6 +227,7 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
         } else {
             &options.known_attributes
         },
+        !options.experiment_on(Experiment::ACQUIRES_CHECK)
     )?;
     // Store address aliases
     let map = addrs

@@ -15,6 +15,7 @@ use crate::{
         FieldId, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId, QualifiedInstId,
         SpecFunId, StructId, TypeParameter, TypeParameterKind,
     },
+    options::ModelBuilderOptions,
     symbol::{Symbol, SymbolPool},
     ty::{
         AbilityContext, Constraint, ConstraintContext, ErrorMessageContext, PrimitiveType,
@@ -24,7 +25,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
-use move_binary_format::file_format::AbilitySet;
+use move_binary_format::file_format::{self, AbilitySet};
 use move_compiler::{
     expansion::ast as EA,
     hlir::ast as HA,
@@ -1068,15 +1069,32 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     ) -> Option<Vec<AccessSpecifier>> {
         specifiers.as_ref().map(|v| {
             v.iter()
-                .map(|s| self.translate_access_specifier(s))
+                .filter_map(|s| self.translate_access_specifier(s))
                 .collect()
         })
     }
 
-    fn translate_access_specifier(&mut self, specifier: &EA::AccessSpecifier) -> AccessSpecifier {
+    fn invalid_acquries(&mut self, loc: &Loc) {
+        self.error(
+            loc,
+            "access specifier not enabled. Only plain `acquires R` is enabled.",
+        );
+    }
+
+    fn translate_access_specifier(
+        &mut self,
+        specifier: &EA::AccessSpecifier,
+    ) -> Option<AccessSpecifier> {
+        let options = self
+            .env()
+            .get_extension::<ModelBuilderOptions>()
+            .unwrap_or_default();
+        let support_access_specifier = options.support_access_specifier;
+
         fn is_wildcard(name: &Name) -> bool {
             name.value.as_str() == "*"
         }
+
         let loc = self.to_loc(&specifier.loc);
         let EA::AccessSpecifier_ {
             kind,
@@ -1087,6 +1105,14 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             type_args,
             address,
         } = &specifier.value;
+        if !support_access_specifier
+            && (*kind != file_format::AccessKind::Acquires
+                || *negated
+                || type_args.is_some() && !type_args.as_ref().unwrap().is_empty())
+        {
+            self.invalid_acquries(&loc);
+            return None;
+        }
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
                 // This stems from a  specifier of the form `acquires *(0x1)`
@@ -1169,23 +1195,36 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 ResourceSpecifier::Any
             },
         };
-        let address = self.translate_address_specifier(address);
-        AccessSpecifier {
+        if !support_access_specifier && !matches!(resource, ResourceSpecifier::Resource(..)) {
+            self.invalid_acquries(&loc);
+            return None;
+        }
+        let address = self.translate_address_specifier(address, support_access_specifier)?;
+        Some(AccessSpecifier {
             loc: loc.clone(),
             kind: *kind,
             negated: *negated,
             resource: (loc, resource),
             address,
-        }
+        })
     }
 
     fn translate_address_specifier(
         &mut self,
         specifier: &EA::AddressSpecifier,
-    ) -> (Loc, AddressSpecifier) {
+        support_access_specifier: bool,
+    ) -> Option<(Loc, AddressSpecifier)> {
         let loc = self.to_loc(&specifier.loc);
-        match &specifier.value {
-            EA::AddressSpecifier_::Any => (loc, AddressSpecifier::Any),
+        let res = match &specifier.value {
+            EA::AddressSpecifier_::Empty => (loc, AddressSpecifier::Any),
+            EA::AddressSpecifier_::Any => {
+                if support_access_specifier {
+                    (loc, AddressSpecifier::Any)
+                } else {
+                    self.invalid_acquries(&loc);
+                    return None;
+                }
+            },
             EA::AddressSpecifier_::Literal(addr) => (
                 loc,
                 AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
@@ -1206,6 +1245,10 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 )
             },
             EA::AddressSpecifier_::Call(maccess, type_args, name) => {
+                if !support_access_specifier {
+                    self.invalid_acquries(&loc);
+                    return None;
+                }
                 // Construct an expansion function call for regular type check
                 let name_exp = sp(
                     name.loc,
@@ -1236,7 +1279,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     (loc, AddressSpecifier::Any)
                 }
             },
-        }
+        };
+        Some(res)
     }
 
     fn translate_address(&mut self, loc: &Loc, addr: &EA::Address) -> Address {
