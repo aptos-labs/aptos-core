@@ -74,7 +74,7 @@ module aptos_framework::transaction_validation {
 
     /// Called in prologue to optionally hold some amount for special txns (e.g. randomness txns).
     /// `release_to_balance()` should be invoked in the corresponding epilogue with the same arguments.
-    fun hold_from_balance(gas_payer: address, amount: Option<u64>) {
+    fun collect_deposit(gas_payer: address, amount: Option<u64>) {
         if (option::is_some(&amount)) {
             let amount = option::extract(&mut amount);
             let balance = coin::balance<AptosCoin>(gas_payer);
@@ -84,7 +84,7 @@ module aptos_framework::transaction_validation {
     }
 
     /// Called in epilogue to optionally released the amount held in prologue for special txns (e.g. randomness txns).
-    fun release_to_balance(gas_payer: address, amount: Option<u64>) {
+    fun refund_deposit(gas_payer: address, amount: Option<u64>) {
         if (option::is_some(&amount)) {
             let amount = option::extract(&mut amount);
             transaction_fee::mint_and_refund(gas_payer, amount);
@@ -186,7 +186,7 @@ module aptos_framework::transaction_validation {
     ) {
         let gas_payer = signer::address_of(&sender);
         script_prologue(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id, script_hash);
-        hold_from_balance(gas_payer, required_deposit);
+        collect_deposit(gas_payer, required_deposit);
     }
 
     fun multi_agent_script_prologue(
@@ -305,7 +305,7 @@ module aptos_framework::transaction_validation {
             txn_expiration_time,
             chain_id,
         );
-        hold_from_balance(fee_payer_address, required_deposit);
+        collect_deposit(fee_payer_address, required_deposit);
     }
 
     /// Epilogue function is run after a transaction is successfully executed.
@@ -338,7 +338,7 @@ module aptos_framework::transaction_validation {
             txn_max_gas_units,
             gas_units_remaining,
         );
-        release_to_balance(gas_payer, required_deposit);
+        refund_deposit(gas_payer, required_deposit);
     }
 
     /// Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
@@ -412,7 +412,7 @@ module aptos_framework::transaction_validation {
             txn_max_gas_units,
             gas_units_remaining,
         );
-        release_to_balance(gas_payer, required_deposit);
+        refund_deposit(gas_payer, required_deposit);
 
     }
 }

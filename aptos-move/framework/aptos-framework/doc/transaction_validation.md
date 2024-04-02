@@ -8,8 +8,8 @@
 -  [Resource `TransactionValidation`](#0x1_transaction_validation_TransactionValidation)
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_transaction_validation_initialize)
--  [Function `hold_from_balance`](#0x1_transaction_validation_hold_from_balance)
--  [Function `release_to_balance`](#0x1_transaction_validation_release_to_balance)
+-  [Function `collect_deposit`](#0x1_transaction_validation_collect_deposit)
+-  [Function `refund_deposit`](#0x1_transaction_validation_refund_deposit)
 -  [Function `prologue_common`](#0x1_transaction_validation_prologue_common)
 -  [Function `script_prologue`](#0x1_transaction_validation_script_prologue)
 -  [Function `script_prologue_gas_deposit`](#0x1_transaction_validation_script_prologue_gas_deposit)
@@ -25,8 +25,8 @@
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
-    -  [Function `hold_from_balance`](#@Specification_1_hold_from_balance)
-    -  [Function `release_to_balance`](#@Specification_1_release_to_balance)
+    -  [Function `collect_deposit`](#@Specification_1_collect_deposit)
+    -  [Function `refund_deposit`](#@Specification_1_refund_deposit)
     -  [Function `prologue_common`](#@Specification_1_prologue_common)
     -  [Function `script_prologue`](#@Specification_1_script_prologue)
     -  [Function `script_prologue_gas_deposit`](#@Specification_1_script_prologue_gas_deposit)
@@ -284,15 +284,15 @@ Only called during genesis to initialize system resources for this module.
 
 </details>
 
-<a id="0x1_transaction_validation_hold_from_balance"></a>
+<a id="0x1_transaction_validation_collect_deposit"></a>
 
-## Function `hold_from_balance`
+## Function `collect_deposit`
 
 Called in prologue to optionally hold some amount for special txns (e.g. randomness txns).
-<code><a href="transaction_validation.md#0x1_transaction_validation_release_to_balance">release_to_balance</a>()</code> should be invoked in the corresponding epilogue with the same arguments.
+<code>release_to_balance()</code> should be invoked in the corresponding epilogue with the same arguments.
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_hold_from_balance">hold_from_balance</a>(gas_payer: <b>address</b>, amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_collect_deposit">collect_deposit</a>(gas_payer: <b>address</b>, amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -301,7 +301,7 @@ Called in prologue to optionally hold some amount for special txns (e.g. randomn
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_hold_from_balance">hold_from_balance</a>(gas_payer: <b>address</b>, amount: Option&lt;u64&gt;) {
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_collect_deposit">collect_deposit</a>(gas_payer: <b>address</b>, amount: Option&lt;u64&gt;) {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amount)) {
         <b>let</b> amount = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> amount);
         <b>let</b> balance = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(gas_payer);
@@ -315,14 +315,14 @@ Called in prologue to optionally hold some amount for special txns (e.g. randomn
 
 </details>
 
-<a id="0x1_transaction_validation_release_to_balance"></a>
+<a id="0x1_transaction_validation_refund_deposit"></a>
 
-## Function `release_to_balance`
+## Function `refund_deposit`
 
 Called in epilogue to optionally released the amount held in prologue for special txns (e.g. randomness txns).
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_release_to_balance">release_to_balance</a>(gas_payer: <b>address</b>, amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer: <b>address</b>, amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -331,7 +331,7 @@ Called in epilogue to optionally released the amount held in prologue for specia
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_release_to_balance">release_to_balance</a>(gas_payer: <b>address</b>, amount: Option&lt;u64&gt;) {
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer: <b>address</b>, amount: Option&lt;u64&gt;) {
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&amount)) {
         <b>let</b> amount = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> amount);
         <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, amount);
@@ -493,7 +493,7 @@ Called in epilogue to optionally released the amount held in prologue for specia
 ) {
     <b>let</b> gas_payer = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
     <a href="transaction_validation.md#0x1_transaction_validation_script_prologue">script_prologue</a>(sender, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, <a href="chain_id.md#0x1_chain_id">chain_id</a>, script_hash);
-    <a href="transaction_validation.md#0x1_transaction_validation_hold_from_balance">hold_from_balance</a>(gas_payer, required_deposit);
+    <a href="transaction_validation.md#0x1_transaction_validation_collect_deposit">collect_deposit</a>(gas_payer, required_deposit);
 }
 </code></pre>
 
@@ -692,7 +692,7 @@ Called in epilogue to optionally released the amount held in prologue for specia
         txn_expiration_time,
         <a href="chain_id.md#0x1_chain_id">chain_id</a>,
     );
-    <a href="transaction_validation.md#0x1_transaction_validation_hold_from_balance">hold_from_balance</a>(fee_payer_address, required_deposit);
+    <a href="transaction_validation.md#0x1_transaction_validation_collect_deposit">collect_deposit</a>(fee_payer_address, required_deposit);
 }
 </code></pre>
 
@@ -765,7 +765,7 @@ Called by the Adapter
         txn_max_gas_units,
         gas_units_remaining,
     );
-    <a href="transaction_validation.md#0x1_transaction_validation_release_to_balance">release_to_balance</a>(gas_payer, required_deposit);
+    <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer, required_deposit);
 }
 </code></pre>
 
@@ -879,7 +879,7 @@ Called by the Adapter
         txn_max_gas_units,
         gas_units_remaining,
     );
-    <a href="transaction_validation.md#0x1_transaction_validation_release_to_balance">release_to_balance</a>(gas_payer, required_deposit);
+    <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer, required_deposit);
 
 }
 </code></pre>
@@ -1012,12 +1012,12 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a id="@Specification_1_hold_from_balance"></a>
+<a id="@Specification_1_collect_deposit"></a>
 
-### Function `hold_from_balance`
+### Function `collect_deposit`
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_hold_from_balance">hold_from_balance</a>(gas_payer: <b>address</b>, amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_collect_deposit">collect_deposit</a>(gas_payer: <b>address</b>, amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -1028,12 +1028,12 @@ Give some constraints that may abort according to the conditions.
 
 
 
-<a id="@Specification_1_release_to_balance"></a>
+<a id="@Specification_1_refund_deposit"></a>
 
-### Function `release_to_balance`
+### Function `refund_deposit`
 
 
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_release_to_balance">release_to_balance</a>(gas_payer: <b>address</b>, amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer: <b>address</b>, amount: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 

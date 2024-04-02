@@ -335,11 +335,11 @@ spec aptos_framework::transaction_validation {
         include coin::CoinAddAbortsIf<AptosCoin> { amount: amount_to_mint };
     }
 
-    spec hold_from_balance {
+    spec collect_deposit {
         pragma verify = false;
     }
 
-    spec release_to_balance {
+    spec refund_deposit {
         pragma verify = false;
     }
 
