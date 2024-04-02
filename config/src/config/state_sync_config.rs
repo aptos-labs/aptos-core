@@ -362,7 +362,7 @@ impl Default for AptosDataMultiFetchConfig {
             enable_multi_fetch: true,
             additional_requests_per_peer_bucket: 1,
             min_peers_for_multi_fetch: 2,
-            max_peers_for_multi_fetch: 5,
+            max_peers_for_multi_fetch: 3,
             multi_fetch_peer_bucket_size: 10,
         }
     }

@@ -388,7 +388,7 @@ async fn disable_ignoring_low_score_peers() {
         };
 
         // Create the mock network, mock time, client and poller
-        let (mut mock_network, mock_time, client, poller) =
+        let (mut mock_network, mut mock_time, client, poller) =
             MockNetwork::new(Some(base_config), Some(data_client_config), None);
 
         // Add a connected peer
@@ -425,12 +425,8 @@ async fn disable_ignoring_low_score_peers() {
         });
 
         // Advance time so the poller sends data summary requests
-        let poll_loop_interval_ms = data_client_config.data_poller_config.poll_loop_interval_ms;
         for _ in 0..10 {
-            tokio::task::yield_now().await;
-            mock_time
-                .advance_async(Duration::from_millis(poll_loop_interval_ms))
-                .await;
+            utils::advance_polling_timer(&mut mock_time, &data_client_config).await;
         }
 
         // Verify that this request range is serviceable by the peer
