@@ -167,49 +167,15 @@ impl DKGRoundingProfile {
         assert!(secrecy_threshold_in_stake_ratio < reconstruct_threshold_in_stake_ratio);
         assert!(reconstruct_threshold_in_stake_ratio * U64F64::from_num(3) <= U64F64::from_num(2));
 
-        let mut weight_low = total_weight_min as u64;
-        let mut weight_high = total_weight_max as u64;
-        let mut best_profile = compute_profile_fixed_point(
-            validator_stakes,
-            weight_low,
+        let n = validator_stakes.len();
+        Self {
+            validator_weights: vec![100; n],
             secrecy_threshold_in_stake_ratio,
-            fast_secrecy_threshold_in_stake_ratio,
-        );
-
-        if is_valid_profile(&best_profile, reconstruct_threshold_in_stake_ratio) {
-            return best_profile;
+            reconstruct_threshold_in_stake_ratio,
+            reconstruct_threshold_in_weights: 50_u64 * n,
+            fast_reconstruct_threshold_in_stake_ratio: None,
+            fast_reconstruct_threshold_in_weights: Some(50_u64 * n),
         }
-
-        // binary search for the minimum weight that satisfies the conditions
-        while weight_low <= weight_high {
-            let weight_mid = weight_low + (weight_high - weight_low) / 2;
-            let profile = compute_profile_fixed_point(
-                validator_stakes,
-                weight_mid,
-                secrecy_threshold_in_stake_ratio,
-                fast_secrecy_threshold_in_stake_ratio,
-            );
-
-            // Check if the current weight satisfies the conditions
-            if is_valid_profile(&profile, reconstruct_threshold_in_stake_ratio) {
-                best_profile = profile;
-                weight_high = weight_mid - 1;
-            } else {
-                weight_low = weight_mid + 1;
-            }
-        }
-
-        // todo: remove once aptos-dkg supports 0 weights
-        if !is_valid_profile(&best_profile, reconstruct_threshold_in_stake_ratio) {
-            println!("[Randomness] Rounding error: failed to find a valid profile, using default");
-            return Self::default(
-                validator_stakes.len(),
-                secrecy_threshold_in_stake_ratio,
-                reconstruct_threshold_in_stake_ratio,
-            );
-        }
-
-        best_profile
     }
 
     pub fn default(

@@ -386,6 +386,9 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
                     transcript_bytes: bcs::to_bytes(&agg_trx)
                         .map_err(|e| anyhow!("transcript serialization error: {e}"))?,
                 });
+
+                info!(num_shares = , "DKG transcript specs.");
+
                 let vtxn_guard = self.vtxn_pool.put(
                     Topic::DKG,
                     Arc::new(txn),
