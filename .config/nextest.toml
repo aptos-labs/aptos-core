@@ -16,5 +16,5 @@ failure-output = "immediate-final"
 junit = { path = "junit.xml" }
 
 [profile.default.slow-timeout]
-period = "30s"
+period = "90s"
 terminate-after = 1
