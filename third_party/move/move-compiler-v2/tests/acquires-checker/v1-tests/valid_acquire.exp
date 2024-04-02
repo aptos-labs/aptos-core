@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: type `R1` is missing required ability `store`
-   ┌─ tests/bytecode-generator/v1-typing/valid_acquire.move:43:32
+   ┌─ tests/acquires-checker/v1-tests/valid_acquire.move:43:32
    │
 43 │         R3{ f: _ } = move_from<R3<R1>>(a);
    │                                ^^^^^^
@@ -10,7 +10,7 @@ error: type `R1` is missing required ability `store`
    = required by instantiating type parameter `T:key` of function `move_from`
 
 error: type `R2` is missing required ability `store`
-   ┌─ tests/bytecode-generator/v1-typing/valid_acquire.move:45:27
+   ┌─ tests/acquires-checker/v1-tests/valid_acquire.move:45:27
    │
 45 │         borrow_global_mut<R3<R2>>(a);
    │                           ^^^^^^
@@ -19,7 +19,7 @@ error: type `R2` is missing required ability `store`
    = required by instantiating type parameter `T:key` of function `borrow_global_mut`
 
 error: type `R1` is missing required ability `store`
-   ┌─ tests/bytecode-generator/v1-typing/valid_acquire.move:50:16
+   ┌─ tests/acquires-checker/v1-tests/valid_acquire.move:50:16
    │
 50 │         exists<R3<R1>>(a);
    │                ^^^^^^
@@ -28,7 +28,7 @@ error: type `R1` is missing required ability `store`
    = required by instantiating type parameter `T:key` of function `exists`
 
 error: type `R2` is missing required ability `store`
-   ┌─ tests/bytecode-generator/v1-typing/valid_acquire.move:52:17
+   ┌─ tests/acquires-checker/v1-tests/valid_acquire.move:52:17
    │
 52 │         move_to<R3<R2>>(account, R3{ f: R2{} });
    │                 ^^^^^^
