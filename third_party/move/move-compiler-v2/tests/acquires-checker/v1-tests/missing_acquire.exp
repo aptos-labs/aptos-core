@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: missing acquires annotation for `R1`
-  ┌─ tests/bytecode-generator/v1-typing/missing_acquire.move:5:9
+  ┌─ tests/acquires-checker/v1-tests/missing_acquire.move:5:9
   │
 5 │     fun t1(a: address) acquires R2 {
   │         ^^
