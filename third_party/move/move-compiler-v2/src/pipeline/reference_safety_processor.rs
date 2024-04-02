@@ -742,8 +742,18 @@ impl LifetimeState {
     fn copy_ref(&mut self, dest: TempIndex, src: TempIndex) {
         if let Some(label) = self.label_for_temp(src).cloned() {
             self.temp_to_label_map.insert(dest, label);
-            self.derived_from.entry(label).or_default().insert(src);
+            self.mark_derived_from(label, src)
         }
+    }
+
+    /// Marks the node with label to be derived from temporary.
+    fn mark_derived_from(&mut self, label: LifetimeLabel, temp: TempIndex) {
+        self.derived_from.entry(label).or_default().insert(temp);
+    }
+
+    /// Gets the set of active temporaries from which nodes are derived.
+    fn derived_temps(&self) -> BTreeSet<TempIndex> {
+        self.derived_from.values().flatten().cloned().collect()
     }
 
     /// Returns an iterator of the edges which are leading into this node.
@@ -1014,8 +1024,9 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         }
     }
 
-    /// Check whether the borrow graph is 'safe' w.r.t a set of `temps`. See the discussion of safety at the
-    /// beginning of this file.
+    /// Check whether the borrow graph is 'safe' w.r.t a set of `exclusive_temps`. Those temporaries
+    /// are used as a list of arguments to a function call and need to follow borrow rules of
+    /// exclusive access, as discussed at the beginning of this file.
     ///
     /// To effectively check the path-oriented conditions of safety here, we need to deal with the fact
     /// that graphs have non-explicit choice nodes, for example:
@@ -1038,17 +1049,19 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     /// If we walk this graph now from the root to the leaves, we can determine safety by directly comparing
     /// hyper edge siblings.
     fn check_borrow_safety(&mut self, exclusive_temps_vec: &[TempIndex]) {
-        // First check direct duplicates
-        for (i, temp) in exclusive_temps_vec.iter().enumerate() {
-            if self.ty(*temp).is_mutable_reference() && exclusive_temps_vec[i + 1..].contains(temp)
-            {
-                self.exclusive_access_direct_dup_error(*temp)
+        // Make a set out of the temporaries to check.
+        let exclusive_temps = exclusive_temps_vec.iter().cloned().collect::<BTreeSet<_>>();
+
+        // Check direct duplicates if needed.
+        if exclusive_temps.len() != exclusive_temps_vec.len() {
+            for (i, temp) in exclusive_temps_vec.iter().enumerate() {
+                if self.ty(*temp).is_mutable_reference()
+                    && exclusive_temps_vec[i + 1..].contains(temp)
+                {
+                    self.exclusive_access_direct_dup_error(*temp)
+                }
             }
         }
-        // Now build and analyze the hyper graph
-        let exclusive_temps =
-            // Temps which need to be exclusive at this program point.
-            exclusive_temps_vec.iter().cloned().collect::<BTreeSet<_>>();
         let filtered_leaves = self
             .state
             .leaves()
@@ -1139,12 +1152,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
         // `let r = &mut s; let r1 = r; let x = &mut r.f; *x; *r1`: this is not allowed in v1.
         // In contrast, `let r = &mut s; let x = &mut r.f; *x; *r` *is* allowed. The reason
         // is that `x` is derived from `r` but not (for the first example) from `r1`.
-        let derived = self
-            .state
-            .derived_from
-            .values()
-            .flatten()
-            .collect::<BTreeSet<_>>();
+        let derived = self.state.derived_temps();
         for mut_alive_after in self.alive.after.keys().cloned().filter(|t| {
             self.ty(*t).is_mutable_reference()
                 && !exclusive_temps.contains(t)
@@ -1467,11 +1475,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
     ) {
         let label = self.state.make_temp(src, self.code_offset, 0, false);
         let child = self.state.replace_ref(dest, self.code_offset, 1);
-        self.state
-            .derived_from
-            .entry(child)
-            .or_default()
-            .insert(src);
+        self.state.mark_derived_from(child, src);
         let loc = self.cur_loc();
         let is_mut = self.ty(dest).is_mutable_reference();
         let struct_env = self.global_env().get_struct(struct_.to_qualified_id());
@@ -1518,11 +1522,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
                             false,
                         );
                         let child = &dest_labels[dest];
-                        self.state
-                            .derived_from
-                            .entry(*child)
-                            .or_default()
-                            .insert(*src);
+                        self.state.mark_derived_from(*child, *src);
                         self.state.add_edge(
                             label,
                             BorrowEdge::new(
@@ -1615,12 +1615,7 @@ impl<'env, 'state> LifetimeAnalysisStep<'env, 'state> {
             }
             // Handle case (b): check whether there is any alive mutable reference
             // which overlaps with the frozen reference.
-            let derived = self
-                .state
-                .derived_from
-                .values()
-                .flatten()
-                .collect::<BTreeSet<_>>();
+            let derived = self.state.derived_temps();
             for (temp, other_label) in self.state.temp_to_label_map.iter() {
                 if temp == &src || !self.ty(*temp).is_mutable_reference() || derived.contains(temp)
                 {
