@@ -986,7 +986,7 @@ fn realistic_env_sweep_wrap(
 }
 
 fn realistic_env_load_sweep_test() -> ForgeConfig {
-    realistic_env_sweep_wrap(100, 10, LoadVsPerfBenchmark {
+    realistic_env_sweep_wrap(20, 10, LoadVsPerfBenchmark {
         test: Box::new(PerformanceBenchmark),
         workloads: Workloads::TPS(vec![10, 100, 1000, 3000, 5000]),
         criteria: [
@@ -2191,7 +2191,6 @@ pub fn changing_working_quorum_test_helper(
             config.consensus.round_initial_timeout_ms = 500;
             config.consensus.round_timeout_backoff_exponent_base = 1.0;
             config.consensus.quorum_store_poll_time_ms = 100;
-            config.consensus.rand_rb_config.backoff_policy_max_delay_ms = 1000;
 
             let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
