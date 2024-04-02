@@ -726,12 +726,7 @@ module aptos_framework::delegation_pool {
         delegator_address: address,
     ): bool acquires DelegationPoolAllowlisting {
         if (!allowlisting_enabled(pool_address)) { return true };
-
-        *smart_table::borrow_with_default(
-            freeze(borrow_mut_delegators_allowlist(pool_address)),
-            delegator_address,
-            &false
-        )
+        smart_table::contains(freeze(borrow_mut_delegators_allowlist(pool_address)), delegator_address)
     }
 
     #[view]
@@ -742,7 +737,7 @@ module aptos_framework::delegation_pool {
         assert_allowlisting_enabled(pool_address);
 
         let allowlist = vector[];
-        smart_table::for_each_ref(freeze(borrow_mut_delegators_allowlist(pool_address)), |delegator, _included| {
+        smart_table::for_each_ref(freeze(borrow_mut_delegators_allowlist(pool_address)), |delegator, _v| {
             vector::push_back(&mut allowlist, *delegator);
         });
         allowlist
