@@ -327,7 +327,7 @@ impl NetworkSender {
         // Broadcast message over direct-send to all other validators.
         if let Err(err) = self
             .consensus_network_client
-            .send_to_many(other_validators.into_iter(), msg)
+            .send_to_many(other_validators.into_iter(), msg.clone())
         {
             info!("ErrorBroadcastedConsensusMsg::{}", msg.name());
             warn!(error = ?err, "Error broadcasting message");
