@@ -17,7 +17,7 @@ use std::{env, sync::Arc, time::Duration};
 #[tokio::test]
 async fn randomness_correctness() {
     let epoch_duration_secs = 20;
-    let s = env::var("NUM_VALI").unwrap_or_else(||"4".tostring());
+    let s = env::var("NUM_VALI").unwrap_or_else(||"4".to_string());
     let num_validators = s.parse::<usize>().unwrap_or(4);
     let (swarm, _cli, _faucet) = SwarmBuilder::new_local(num_validators)
         .with_num_fullnodes(1)
