@@ -2147,7 +2147,7 @@ module aptos_framework::delegation_pool {
 
     #[test_only]
     public fun enable_delegation_pool_allowlisting_feature(aptos_framework: &signer) {
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_delegation_pool_allowlisting_feature()],
             vector[]
@@ -4521,7 +4521,7 @@ module aptos_framework::delegation_pool {
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123)]
     #[expected_failure(abort_code = 0x30018, location = Self)]
-    public entry fun test_cannot_disable_allowlisting_if_disabled(
+    public entry fun test_cannot_disable_allowlisting_if_already_off(
         aptos_framework: &signer,
         validator: &signer,
     ) acquires DelegationPoolOwnership, DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage, DelegationPoolAllowlisting {
@@ -4834,41 +4834,62 @@ module aptos_framework::delegation_pool {
         assert_delegation(delegator_2_address, pool_address, 0, 0, 30 * ONE_APT);
 
         end_aptos_epoch();
+        // 5000000000 * 1.01 active
         assert_delegation(delegator_1_address, pool_address, 5050000000, 0, 0);
+        // 3000000000 * 1.01 pending-inactive
         assert_delegation(delegator_2_address, pool_address, 0, 0, 3030000000);
 
         // can add stake when allowlisted
         add_stake(delegator_1, pool_address, 10 * ONE_APT);
         end_aptos_epoch();
+        // 5050000000 * 1.01 + 1000000000 active
         assert_delegation(delegator_1_address, pool_address, 6100500000, 0, 0);
+        // 3030000000 * 1.01 pending-inactive
         assert_delegation(delegator_2_address, pool_address, 0, 0, 3060300000);
 
         end_aptos_epoch();
+        // 6100500000 * 1.01 active
         assert_delegation(delegator_1_address, pool_address, 6161505000, 0, 0);
+        // 3060300000 * 1.01 pending-inactive
         assert_delegation(delegator_2_address, pool_address, 0, 0, 3090903000);
 
         remove_delegator_from_allowlist(validator, delegator_1_address);
         assert!(!delegator_allowlisted(pool_address, delegator_1_address), 0);
-        assert!(vector::length(&get_delegators_allowlist(pool_address)) == 0, 0);
 
         // check that in-flight active rewards are evicted too, which validates that `synchronize_delegation_pool` was called
+        let active = pool_u64::balance(
+            &borrow_global<DelegationPool>(pool_address).active_shares,
+            delegator_1_address
+        ) + get_add_stake_fee(pool_address, 10 * ONE_APT);
+        // 5050000000 + 1000000000 active at last `synchronize_delegation_pool`
+        assert!(active == 6050000000, active);
+
         evict_delegator(validator, delegator_1_address);
-        assert_delegation(delegator_1_address, pool_address, 0, 0, 6161505000 - 1);
+        assert_delegation(delegator_1_address, pool_address, 0, 0, 6161504999);
+        let pending_inactive = pool_u64::balance(
+            pending_inactive_shares_pool(borrow_global<DelegationPool>(pool_address)),
+            delegator_1_address
+        );
+        assert!(pending_inactive == 6161504999, pending_inactive);
 
         // allowlist delegator 1 back and check that they can add stake
         allowlist_delegator(validator, delegator_1_address);
         add_stake(delegator_1, pool_address, 20 * ONE_APT);
         end_aptos_epoch();
-        assert_delegation(delegator_1_address, pool_address, 20 * ONE_APT, 0, 6223120050 - 1);
+        // 2000000000 active and 6161505000 * 1.01 pending-inactive
+        assert_delegation(delegator_1_address, pool_address, 20 * ONE_APT, 0, 6223120049);
 
         // can reactivate stake when allowlisted
         reactivate_stake(delegator_1, pool_address, 5223120050);
-        assert_delegation(delegator_1_address, pool_address, 20 * ONE_APT + 5223120050 - 1, 0, 10 * ONE_APT);
+        assert_delegation(delegator_1_address, pool_address, 20 * ONE_APT + 5223120049, 0, 10 * ONE_APT);
 
+        // evict delegator 1 after they reactivated
         remove_delegator_from_allowlist(validator, delegator_1_address);
         evict_delegator(validator, delegator_1_address);
+
         end_aptos_epoch();
-        assert_delegation(delegator_1_address, pool_address, 0, 0, 8223120050 + 8223120050 / 100 - 1);
+        // (2000000000 + 5223120050 + 1000000000) * 1.01 pending-inactive
+        assert_delegation(delegator_1_address, pool_address, 0, 0, 8305351249);
     }
 
     #[test_only]
