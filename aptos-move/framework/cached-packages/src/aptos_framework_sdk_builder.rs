@@ -268,6 +268,11 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Allowlist a delegator as the pool owner.
+    DelegationPoolAllowlistDelegator {
+        delegator_address: AccountAddress,
+    },
+
     /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
     /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
     /// `aptos_governance.move`.
@@ -286,11 +291,11 @@ pub enum EntryFunctionCall {
         new_voter: AccountAddress,
     },
 
-    /// Enable ownership lookup in order to access owner's address directly from the delegation pool.
-    DelegationPoolEnableOwnershipLookup {
-        pool_address: AccountAddress,
-        owner_address: AccountAddress,
-    },
+    /// Disable delegators allowlisting as the pool owner. The existing allowlist will be emptied.
+    DelegationPoolDisableDelegatorsAllowlisting {},
+
+    /// Enable delegators allowlisting as the pool owner.
+    DelegationPoolEnableDelegatorsAllowlisting {},
 
     /// Enable partial governance voting on a stake pool. The voter of this stake pool will be managed by this module.
     /// THe existing voter will be replaced. The function is permissionless.
@@ -316,6 +321,11 @@ pub enum EntryFunctionCall {
     DelegationPoolReactivateStake {
         pool_address: AccountAddress,
         amount: u64,
+    },
+
+    /// Remove a delegator from the allowlist as the pool owner, but do not unlock their stake.
+    DelegationPoolRemoveDelegatorFromAllowlist {
+        delegator_address: AccountAddress,
     },
 
     /// Allows an operator to change its beneficiary. Any existing unpaid commission rewards will be paid to the new
@@ -370,22 +380,6 @@ pub enum EntryFunctionCall {
     DelegationPoolWithdraw {
         pool_address: AccountAddress,
         amount: u64,
-    },
-
-    /// Allowlist a delegator as the pool owner.
-    DelegationPoolAllowlistAllowlistDelegator {
-        delegator_address: AccountAddress,
-    },
-
-    /// Disable delegators allowlisting as the pool owner. The existing allowlist will be emptied.
-    DelegationPoolAllowlistDisableDelegatorsAllowlisting {},
-
-    /// Enable delegators allowlisting as the pool owner.
-    DelegationPoolAllowlistEnableDelegatorsAllowlisting {},
-
-    /// Remove a delegator from the allowlist as the pool owner.
-    DelegationPoolAllowlistRemoveDelegatorFromAllowlist {
-        delegator_address: AccountAddress,
     },
 
     /// Withdraw an `amount` of coin `CoinType` from `account` and burn it.
@@ -1081,6 +1075,9 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_add_stake(pool_address, amount),
+            DelegationPoolAllowlistDelegator { delegator_address } => {
+                delegation_pool_allowlist_delegator(delegator_address)
+            },
             DelegationPoolCreateProposal {
                 pool_address,
                 execution_hash,
@@ -1098,10 +1095,12 @@ impl EntryFunctionCall {
                 pool_address,
                 new_voter,
             } => delegation_pool_delegate_voting_power(pool_address, new_voter),
-            DelegationPoolEnableOwnershipLookup {
-                pool_address,
-                owner_address,
-            } => delegation_pool_enable_ownership_lookup(pool_address, owner_address),
+            DelegationPoolDisableDelegatorsAllowlisting {} => {
+                delegation_pool_disable_delegators_allowlisting()
+            },
+            DelegationPoolEnableDelegatorsAllowlisting {} => {
+                delegation_pool_enable_delegators_allowlisting()
+            },
             DelegationPoolEnablePartialGovernanceVoting { pool_address } => {
                 delegation_pool_enable_partial_governance_voting(pool_address)
             },
@@ -1119,6 +1118,9 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_reactivate_stake(pool_address, amount),
+            DelegationPoolRemoveDelegatorFromAllowlist { delegator_address } => {
+                delegation_pool_remove_delegator_from_allowlist(delegator_address)
+            },
             DelegationPoolSetBeneficiaryForOperator { new_beneficiary } => {
                 delegation_pool_set_beneficiary_for_operator(new_beneficiary)
             },
@@ -1148,18 +1150,6 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
-            DelegationPoolAllowlistAllowlistDelegator { delegator_address } => {
-                delegation_pool_allowlist_allowlist_delegator(delegator_address)
-            },
-            DelegationPoolAllowlistDisableDelegatorsAllowlisting {} => {
-                delegation_pool_allowlist_disable_delegators_allowlisting()
-            },
-            DelegationPoolAllowlistEnableDelegatorsAllowlisting {} => {
-                delegation_pool_allowlist_enable_delegators_allowlisting()
-            },
-            DelegationPoolAllowlistRemoveDelegatorFromAllowlist { delegator_address } => {
-                delegation_pool_allowlist_remove_delegator_from_allowlist(delegator_address)
-            },
             ManagedCoinBurn { coin_type, amount } => managed_coin_burn(coin_type, amount),
             ManagedCoinInitialize {
                 coin_type,
@@ -2138,6 +2128,24 @@ pub fn delegation_pool_add_stake(pool_address: AccountAddress, amount: u64) -> T
     ))
 }
 
+/// Allowlist a delegator as the pool owner.
+pub fn delegation_pool_allowlist_delegator(
+    delegator_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("allowlist_delegator").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&delegator_address).unwrap()],
+    ))
+}
+
 /// A voter could create a governance proposal by this function. To successfully create a proposal, the voter's
 /// voting power in THIS delegation pool must be not less than the minimum required voting power specified in
 /// `aptos_governance.move`.
@@ -2191,11 +2199,8 @@ pub fn delegation_pool_delegate_voting_power(
     ))
 }
 
-/// Enable ownership lookup in order to access owner's address directly from the delegation pool.
-pub fn delegation_pool_enable_ownership_lookup(
-    pool_address: AccountAddress,
-    owner_address: AccountAddress,
-) -> TransactionPayload {
+/// Disable delegators allowlisting as the pool owner. The existing allowlist will be emptied.
+pub fn delegation_pool_disable_delegators_allowlisting() -> TransactionPayload {
     TransactionPayload::EntryFunction(EntryFunction::new(
         ModuleId::new(
             AccountAddress::new([
@@ -2204,12 +2209,25 @@ pub fn delegation_pool_enable_ownership_lookup(
             ]),
             ident_str!("delegation_pool").to_owned(),
         ),
-        ident_str!("enable_ownership_lookup").to_owned(),
+        ident_str!("disable_delegators_allowlisting").to_owned(),
         vec![],
-        vec![
-            bcs::to_bytes(&pool_address).unwrap(),
-            bcs::to_bytes(&owner_address).unwrap(),
-        ],
+        vec![],
+    ))
+}
+
+/// Enable delegators allowlisting as the pool owner.
+pub fn delegation_pool_enable_delegators_allowlisting() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("enable_delegators_allowlisting").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -2292,6 +2310,24 @@ pub fn delegation_pool_reactivate_stake(
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// Remove a delegator from the allowlist as the pool owner, but do not unlock their stake.
+pub fn delegation_pool_remove_delegator_from_allowlist(
+    delegator_address: AccountAddress,
+) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("delegation_pool").to_owned(),
+        ),
+        ident_str!("remove_delegator_from_allowlist").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&delegator_address).unwrap()],
     ))
 }
 
@@ -2451,74 +2487,6 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
-    ))
-}
-
-/// Allowlist a delegator as the pool owner.
-pub fn delegation_pool_allowlist_allowlist_delegator(
-    delegator_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("delegation_pool_allowlist").to_owned(),
-        ),
-        ident_str!("allowlist_delegator").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&delegator_address).unwrap()],
-    ))
-}
-
-/// Disable delegators allowlisting as the pool owner. The existing allowlist will be emptied.
-pub fn delegation_pool_allowlist_disable_delegators_allowlisting() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("delegation_pool_allowlist").to_owned(),
-        ),
-        ident_str!("disable_delegators_allowlisting").to_owned(),
-        vec![],
-        vec![],
-    ))
-}
-
-/// Enable delegators allowlisting as the pool owner.
-pub fn delegation_pool_allowlist_enable_delegators_allowlisting() -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("delegation_pool_allowlist").to_owned(),
-        ),
-        ident_str!("enable_delegators_allowlisting").to_owned(),
-        vec![],
-        vec![],
-    ))
-}
-
-/// Remove a delegator from the allowlist as the pool owner.
-pub fn delegation_pool_allowlist_remove_delegator_from_allowlist(
-    delegator_address: AccountAddress,
-) -> TransactionPayload {
-    TransactionPayload::EntryFunction(EntryFunction::new(
-        ModuleId::new(
-            AccountAddress::new([
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                0, 0, 0, 1,
-            ]),
-            ident_str!("delegation_pool_allowlist").to_owned(),
-        ),
-        ident_str!("remove_delegator_from_allowlist").to_owned(),
-        vec![],
-        vec![bcs::to_bytes(&delegator_address).unwrap()],
     ))
 }
 
@@ -4593,6 +4561,18 @@ mod decoder {
         }
     }
 
+    pub fn delegation_pool_allowlist_delegator(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::DelegationPoolAllowlistDelegator {
+                delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn delegation_pool_create_proposal(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -4622,14 +4602,21 @@ mod decoder {
         }
     }
 
-    pub fn delegation_pool_enable_ownership_lookup(
+    pub fn delegation_pool_disable_delegators_allowlisting(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(EntryFunctionCall::DelegationPoolEnableOwnershipLookup {
-                pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                owner_address: bcs::from_bytes(script.args().get(1)?).ok()?,
-            })
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::DelegationPoolDisableDelegatorsAllowlisting {})
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_enable_delegators_allowlisting(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::DelegationPoolEnableDelegatorsAllowlisting {})
         } else {
             None
         }
@@ -4682,6 +4669,20 @@ mod decoder {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
+        } else {
+            None
+        }
+    }
+
+    pub fn delegation_pool_remove_delegator_from_allowlist(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(
+                EntryFunctionCall::DelegationPoolRemoveDelegatorFromAllowlist {
+                    delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
+                },
+            )
         } else {
             None
         }
@@ -4777,54 +4778,6 @@ mod decoder {
                 pool_address: bcs::from_bytes(script.args().get(0)?).ok()?,
                 amount: bcs::from_bytes(script.args().get(1)?).ok()?,
             })
-        } else {
-            None
-        }
-    }
-
-    pub fn delegation_pool_allowlist_allowlist_delegator(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::DelegationPoolAllowlistAllowlistDelegator {
-                    delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                },
-            )
-        } else {
-            None
-        }
-    }
-
-    pub fn delegation_pool_allowlist_disable_delegators_allowlisting(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
-            Some(EntryFunctionCall::DelegationPoolAllowlistDisableDelegatorsAllowlisting {})
-        } else {
-            None
-        }
-    }
-
-    pub fn delegation_pool_allowlist_enable_delegators_allowlisting(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(_script) = payload {
-            Some(EntryFunctionCall::DelegationPoolAllowlistEnableDelegatorsAllowlisting {})
-        } else {
-            None
-        }
-    }
-
-    pub fn delegation_pool_allowlist_remove_delegator_from_allowlist(
-        payload: &TransactionPayload,
-    ) -> Option<EntryFunctionCall> {
-        if let TransactionPayload::EntryFunction(script) = payload {
-            Some(
-                EntryFunctionCall::DelegationPoolAllowlistRemoveDelegatorFromAllowlist {
-                    delegator_address: bcs::from_bytes(script.args().get(0)?).ok()?,
-                },
-            )
         } else {
             None
         }
@@ -5965,6 +5918,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::delegation_pool_add_stake),
         );
         map.insert(
+            "delegation_pool_allowlist_delegator".to_string(),
+            Box::new(decoder::delegation_pool_allowlist_delegator),
+        );
+        map.insert(
             "delegation_pool_create_proposal".to_string(),
             Box::new(decoder::delegation_pool_create_proposal),
         );
@@ -5973,8 +5930,12 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::delegation_pool_delegate_voting_power),
         );
         map.insert(
-            "delegation_pool_enable_ownership_lookup".to_string(),
-            Box::new(decoder::delegation_pool_enable_ownership_lookup),
+            "delegation_pool_disable_delegators_allowlisting".to_string(),
+            Box::new(decoder::delegation_pool_disable_delegators_allowlisting),
+        );
+        map.insert(
+            "delegation_pool_enable_delegators_allowlisting".to_string(),
+            Box::new(decoder::delegation_pool_enable_delegators_allowlisting),
         );
         map.insert(
             "delegation_pool_enable_partial_governance_voting".to_string(),
@@ -5991,6 +5952,10 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_reactivate_stake".to_string(),
             Box::new(decoder::delegation_pool_reactivate_stake),
+        );
+        map.insert(
+            "delegation_pool_remove_delegator_from_allowlist".to_string(),
+            Box::new(decoder::delegation_pool_remove_delegator_from_allowlist),
         );
         map.insert(
             "delegation_pool_set_beneficiary_for_operator".to_string(),
@@ -6023,22 +5988,6 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
-        );
-        map.insert(
-            "delegation_pool_allowlist_allowlist_delegator".to_string(),
-            Box::new(decoder::delegation_pool_allowlist_allowlist_delegator),
-        );
-        map.insert(
-            "delegation_pool_allowlist_disable_delegators_allowlisting".to_string(),
-            Box::new(decoder::delegation_pool_allowlist_disable_delegators_allowlisting),
-        );
-        map.insert(
-            "delegation_pool_allowlist_enable_delegators_allowlisting".to_string(),
-            Box::new(decoder::delegation_pool_allowlist_enable_delegators_allowlisting),
-        );
-        map.insert(
-            "delegation_pool_allowlist_remove_delegator_from_allowlist".to_string(),
-            Box::new(decoder::delegation_pool_allowlist_remove_delegator_from_allowlist),
         );
         map.insert(
             "managed_coin_burn".to_string(),
