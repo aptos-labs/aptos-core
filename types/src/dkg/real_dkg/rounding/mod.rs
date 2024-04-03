@@ -16,7 +16,7 @@ pub fn total_weight_lower_bound(validator_stakes: &Vec<u64>) -> usize {
     validator_stakes.len()
 }
 
-/// Return the smallest `total weight` that guarantees a valid rounding.
+/// Find the smallest `stake_per_weight` that guarantees a valid rounding.
 /// Output the resulting total weight.
 pub fn total_weight_upper_bound(
     validator_stakes: &Vec<u64>,
@@ -37,6 +37,7 @@ pub fn total_weight_upper_bound(
 
 #[derive(Clone, Debug)]
 pub struct DKGRounding {
+    /// Currently either "binary_search" or "infallible".
     pub rounding_method: String,
     pub profile: DKGRoundingProfile,
     pub wconfig: WeightedConfig,
