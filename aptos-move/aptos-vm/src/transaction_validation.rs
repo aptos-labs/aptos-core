@@ -41,13 +41,16 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         )
         .unwrap(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
-        script_prologue_collect_deposit_name: Identifier::new("script_prologue_collect_deposit").unwrap(),
+        script_prologue_collect_deposit_name: Identifier::new("script_prologue_collect_deposit")
+            .unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         user_epilogue_return_deposit_name: Identifier::new("epilogue_return_deposit").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
-        user_epilogue_gas_payer_return_deposit_name: Identifier::new("epilogue_gas_payer_return_deposit")
-            .unwrap(),
+        user_epilogue_gas_payer_return_deposit_name: Identifier::new(
+            "epilogue_gas_payer_return_deposit",
+        )
+        .unwrap(),
     });
 
 /// On-chain functions used to validate transactions
