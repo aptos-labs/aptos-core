@@ -35,7 +35,7 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
         module_addr: CORE_CODE_ADDRESS,
         module_name: Identifier::new("transaction_validation").unwrap(),
-        fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue_collect_deposit").unwrap(),
+        fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
         fee_payer_prologue_collect_deposit_name: Identifier::new(
             "fee_payer_script_prologue_collect_deposit",
         )
