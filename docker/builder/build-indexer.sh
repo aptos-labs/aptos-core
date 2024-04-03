@@ -14,6 +14,7 @@ echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 cargo build --locked --profile=$PROFILE \
     -p aptos-indexer-grpc-cache-worker \
     -p aptos-indexer-grpc-file-store \
+    -p aptos-indexer-grpc-file-store-data-integrity-checker \
     -p aptos-indexer-grpc-data-service \
     -p aptos-nft-metadata-crawler-parser \
     "$@"
@@ -22,6 +23,7 @@ cargo build --locked --profile=$PROFILE \
 BINS=(
     aptos-indexer-grpc-cache-worker
     aptos-indexer-grpc-file-store
+    aptos-indexer-grpc-file-store-data-integrity-checker
     aptos-indexer-grpc-data-service
     aptos-nft-metadata-crawler-parser
 )
