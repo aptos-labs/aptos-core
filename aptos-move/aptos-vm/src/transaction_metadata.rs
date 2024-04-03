@@ -165,6 +165,8 @@ impl TransactionMetadata {
             self.chain_id.id(),
             self.entry_function_payload()
                 .map(|entry_func| entry_func.as_entry_function_payload()),
+            self.multisig_payload()
+                .map(|multisig| multisig.as_multisig_payload()),
         )
     }
 }

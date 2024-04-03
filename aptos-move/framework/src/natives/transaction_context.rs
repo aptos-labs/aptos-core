@@ -8,7 +8,8 @@ use aptos_native_interface::{
 use aptos_types::{
     error,
     transaction::{
-        authenticator::AuthenticationKey, user_transaction_context::UserTransactionContext,
+        authenticator::AuthenticationKey,
+        user_transaction_context::{EntryFunctionPayload, UserTransactionContext},
     },
 };
 use better_any::{Tid, TidAble};
@@ -138,7 +139,7 @@ fn native_get_script_hash(
 
 fn native_sender_internal(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_SENDER_BASE)?;
@@ -155,7 +156,7 @@ fn native_sender_internal(
 
 fn native_secondary_signers_internal(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_SECONDARY_SIGNERS_BASE)?;
@@ -177,7 +178,7 @@ fn native_secondary_signers_internal(
 
 fn native_gas_payer_internal(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_FEE_PAYER_BASE)?;
@@ -194,7 +195,7 @@ fn native_gas_payer_internal(
 
 fn native_max_gas_amount_internal(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_MAX_GAS_AMOUNT_BASE)?;
@@ -211,7 +212,7 @@ fn native_max_gas_amount_internal(
 
 fn native_gas_unit_price_internal(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GAS_UNIT_PRICE_BASE)?;
@@ -228,7 +229,7 @@ fn native_gas_unit_price_internal(
 
 fn native_chain_id_internal(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_CHAIN_ID_BASE)?;
@@ -256,6 +257,7 @@ fn create_string_value(s: String) -> Value {
 }
 
 fn create_vector_value(vv: Vec<Value>) -> Value {
+    // This is safe because this function is only used to create vectors of homogenous values.
     Value::vector_for_testing_only(vv)
 }
 
@@ -265,6 +267,44 @@ fn create_singleton_vector(v: Value) -> Value {
 
 fn create_empty_vector() -> Value {
     create_vector_value(vec![])
+}
+
+fn num_bytes_from_entry_function_payload(entry_function_payload: &EntryFunctionPayload) -> usize {
+    entry_function_payload.account_address.len()
+        + entry_function_payload.module_name.len()
+        + entry_function_payload.function_name.len()
+        + entry_function_payload
+            .ty_arg_names
+            .iter()
+            .map(|s| s.len())
+            .sum::<usize>()
+        + entry_function_payload
+            .args
+            .iter()
+            .map(|v| v.len())
+            .sum::<usize>()
+}
+
+fn create_entry_function_payload(entry_function_payload: EntryFunctionPayload) -> Value {
+    let args = entry_function_payload
+        .args
+        .iter()
+        .map(|arg| Value::vector_u8(arg.clone()))
+        .collect::<Vec<_>>();
+
+    let ty_args = entry_function_payload
+        .ty_arg_names
+        .iter()
+        .map(|ty_arg| create_string_value(ty_arg.clone()))
+        .collect::<Vec<_>>();
+
+    Value::struct_(Struct::pack(vec![
+        Value::address(entry_function_payload.account_address),
+        create_string_value(entry_function_payload.module_name),
+        create_string_value(entry_function_payload.function_name),
+        create_vector_value(ty_args),
+        create_vector_value(args),
+    ]))
 }
 
 fn native_entry_function_payload_internal(
@@ -278,44 +318,53 @@ fn native_entry_function_payload_internal(
 
     if let Some(transaction_context) = user_transaction_context_opt {
         if let Some(entry_function_payload) = transaction_context.entry_function_payload() {
-            let num_bytes = entry_function_payload.account_address.len()
-                + entry_function_payload.module_name.len()
-                + entry_function_payload.function_name.len()
-                + entry_function_payload
-                    .ty_arg_names
-                    .iter()
-                    .map(|s| s.len())
-                    .sum::<usize>()
-                + entry_function_payload
-                    .args
-                    .iter()
-                    .map(|v| v.len())
-                    .sum::<usize>();
+            let num_bytes = num_bytes_from_entry_function_payload(&entry_function_payload);
             context.charge(
                 TRANSACTION_CONTEXT_ENTRY_FUNCTION_PAYLOAD_PER_BYTE_IN_STR
                     * NumBytes::new(num_bytes as u64),
             )?;
-
-            let args = entry_function_payload
-                .args
-                .iter()
-                .map(|arg| Value::vector_u8(arg.clone()))
-                .collect::<Vec<_>>();
-
-            let ty_args = entry_function_payload
-                .ty_arg_names
-                .iter()
-                .map(|ty_arg| create_string_value(ty_arg.clone()))
-                .collect::<Vec<_>>();
-
-            let payload = Value::struct_(Struct::pack(vec![
-                Value::address(entry_function_payload.account_address),
-                create_string_value(entry_function_payload.module_name),
-                create_string_value(entry_function_payload.function_name),
-                create_vector_value(ty_args),
-                create_vector_value(args),
-            ]));
+            let payload = create_entry_function_payload(entry_function_payload);
             Ok(smallvec![create_option_some_value(payload)])
+        } else {
+            Ok(smallvec![create_option_none()])
+        }
+    } else {
+        Err(SafeNativeError::Abort {
+            abort_code: error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
+        })
+    }
+}
+
+fn native_multisig_payload_internal(
+    context: &mut SafeNativeContext,
+    mut _ty_args: Vec<Type>,
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_MULTISIG_PAYLOAD_BASE)?;
+
+    let user_transaction_context_opt = get_user_transaction_context_opt_from_context(context);
+
+    if let Some(transaction_context) = user_transaction_context_opt {
+        if let Some(multisig_payload) = transaction_context.multisig_payload() {
+            if let Some(entry_function_payload) = multisig_payload.entry_function_payload {
+                let num_bytes = num_bytes_from_entry_function_payload(&entry_function_payload);
+                context.charge(
+                    TRANSACTION_CONTEXT_MULTISIG_PAYLOAD_PER_BYTE_IN_STR
+                        * NumBytes::new(num_bytes as u64),
+                )?;
+                let inner_entry_fun_payload = create_entry_function_payload(entry_function_payload);
+                let multisig_payload = Value::struct_(Struct::pack(vec![
+                    Value::address(multisig_payload.multisig_address),
+                    create_option_some_value(inner_entry_fun_payload),
+                ]));
+                Ok(smallvec![create_option_some_value(multisig_payload)])
+            } else {
+                let multisig_payload = Value::struct_(Struct::pack(vec![
+                    Value::address(multisig_payload.multisig_address),
+                    create_option_none(),
+                ]));
+                Ok(smallvec![create_option_some_value(multisig_payload)])
+            }
         } else {
             Ok(smallvec![create_option_none()])
         }
@@ -358,6 +407,10 @@ pub fn make_all(
         (
             "entry_function_payload_internal",
             native_entry_function_payload_internal,
+        ),
+        (
+            "multisig_payload_internal",
+            native_multisig_payload_internal,
         ),
     ];
 

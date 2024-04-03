@@ -6,17 +6,18 @@ use aptos_language_e2e_tests::account::{Account, TransactionBuilder};
 use aptos_types::{
     move_utils::MemberId,
     on_chain_config::FeatureFlag,
-    transaction::{EntryFunction, TransactionPayload},
+    transaction::{EntryFunction, MultisigTransactionPayload, TransactionPayload},
 };
+use bcs::to_bytes;
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
-    language_storage::{StructTag, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag, CORE_CODE_ADDRESS},
     parser::parse_struct_tag,
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 struct TransactionContextStore {
     sender: AccountAddress,
     secondary_signers: Vec<AccountAddress>,
@@ -29,6 +30,7 @@ struct TransactionContextStore {
     function_name: String,
     type_arg_names: Vec<String>,
     args: Vec<Vec<u8>>,
+    multisig_address: AccountAddress,
 }
 
 fn setup(harness: &mut MoveHarness) -> Account {
@@ -404,4 +406,65 @@ fn test_transaction_context_entry_function_payload() {
         bcs::to_bytes(&7777777u64).unwrap(),
         bcs::to_bytes(&true).unwrap()
     ]);
+}
+
+#[test]
+fn test_transaction_context_multisig_payload() {
+    let mut harness = new_move_harness();
+    let account = setup(&mut harness);
+
+    let multisig_transaction_payload =
+        MultisigTransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                CORE_CODE_ADDRESS,
+                ident_str!("transaction_context_test").to_owned(),
+            ),
+            ident_str!("store_multisig_payload_from_native_txn_context").to_owned(),
+            vec![],
+            vec![],
+        ));
+
+    let serialized_multisig_transaction_payload =
+        bcs::to_bytes(&multisig_transaction_payload).unwrap();
+
+    let status = harness.run_entry_function(
+        &account,
+        str::parse("0x1::transaction_context_test::prepare_multisig_payload_test").unwrap(),
+        vec![],
+        vec![to_bytes(&serialized_multisig_transaction_payload).unwrap()],
+    );
+    assert!(status.status().unwrap().is_success());
+
+    let txn_ctx_store = harness
+        .read_resource::<crate::tests::transaction_context::TransactionContextStore>(
+            account.address(),
+            parse_struct_tag("0x1::transaction_context_test::TransactionContextStore").unwrap(),
+        )
+        .unwrap();
+
+    let multisig_address = txn_ctx_store.multisig_address;
+
+    let status = harness.run_multisig(
+        &account,
+        txn_ctx_store.multisig_address,
+        Some(multisig_transaction_payload),
+    );
+    assert!(status.status().unwrap().is_success());
+
+    let txn_ctx_store = harness
+        .read_resource::<crate::tests::transaction_context::TransactionContextStore>(
+            account.address(),
+            parse_struct_tag("0x1::transaction_context_test::TransactionContextStore").unwrap(),
+        )
+        .unwrap();
+
+    assert_eq!(multisig_address, txn_ctx_store.multisig_address);
+    assert_eq!(txn_ctx_store.account_address, AccountAddress::ONE);
+    assert_eq!(txn_ctx_store.module_name, "transaction_context_test");
+    assert_eq!(
+        txn_ctx_store.function_name,
+        "store_multisig_payload_from_native_txn_context"
+    );
+    assert!(txn_ctx_store.type_arg_names.is_empty());
+    assert!(txn_ctx_store.args.is_empty());
 }

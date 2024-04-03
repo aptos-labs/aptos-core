@@ -12,6 +12,7 @@ pub struct UserTransactionContext {
     gas_unit_price: u64,
     chain_id: u8,
     entry_function_payload: Option<EntryFunctionPayload>,
+    multisig_payload: Option<MultisigPayload>,
 }
 
 impl UserTransactionContext {
@@ -23,6 +24,7 @@ impl UserTransactionContext {
         gas_unit_price: u64,
         chain_id: u8,
         entry_function_payload: Option<EntryFunctionPayload>,
+        multisig_payload: Option<MultisigPayload>,
     ) -> Self {
         Self {
             sender,
@@ -32,6 +34,7 @@ impl UserTransactionContext {
             gas_unit_price,
             chain_id,
             entry_function_payload,
+            multisig_payload,
         }
     }
 
@@ -62,6 +65,10 @@ impl UserTransactionContext {
     pub fn entry_function_payload(&self) -> Option<EntryFunctionPayload> {
         self.entry_function_payload.clone()
     }
+
+    pub fn multisig_payload(&self) -> Option<MultisigPayload> {
+        self.multisig_payload.clone()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +93,23 @@ impl EntryFunctionPayload {
             function_name,
             ty_arg_names,
             args,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MultisigPayload {
+    pub multisig_address: AccountAddress,
+    pub entry_function_payload: Option<EntryFunctionPayload>,
+}
+impl MultisigPayload {
+    pub fn new(
+        multisig_address: AccountAddress,
+        entry_function_payload: Option<EntryFunctionPayload>,
+    ) -> Self {
+        Self {
+            multisig_address,
+            entry_function_payload,
         }
     }
 }

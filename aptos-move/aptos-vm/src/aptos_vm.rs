@@ -2492,7 +2492,11 @@ impl VMValidator for AptosVM {
         let mut txn_data = TransactionMetadata::new(&txn);
 
         let resolver = self.as_move_resolver(&state_view);
-        let mut session = self.new_session(&resolver, SessionId::prologue_meta(&txn_data), Some(txn_data.as_user_transaction_context());
+        let mut session = self.new_session(
+            &resolver,
+            SessionId::prologue_meta(&txn_data),
+            Some(txn_data.as_user_transaction_context()),
+        );
         let required_deposit = if let Ok(gas_params) = &self.gas_params {
             self.get_required_deposit(
                 &mut session,

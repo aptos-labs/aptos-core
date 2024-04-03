@@ -101,4 +101,9 @@ spec aptos_framework::transaction_context {
         //TODO: temporary mockup
         pragma opaque;
     }
+
+    spec multisig_payload_internal(): Option<MultisigPayload> {
+        //TODO: temporary mockup
+        pragma opaque;
+    }
 }

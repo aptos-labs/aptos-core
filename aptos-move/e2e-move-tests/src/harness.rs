@@ -25,8 +25,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueMetadata},
     },
     transaction::{
-        EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus, ViewFunctionOutput,
+        EntryFunction, Multisig, MultisigTransactionPayload, Script, SignedTransaction,
+        TransactionArgument, TransactionOutput, TransactionPayload, TransactionStatus,
+        ViewFunctionOutput,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
@@ -349,6 +350,22 @@ impl MoveHarness {
         )
     }
 
+    /// Create a multisig transaction.
+    pub fn create_multisig(
+        &mut self,
+        account: &Account,
+        multisig_address: AccountAddress,
+        transaction_payload: Option<MultisigTransactionPayload>,
+    ) -> SignedTransaction {
+        self.create_transaction_payload(
+            account,
+            TransactionPayload::Multisig(Multisig {
+                multisig_address,
+                transaction_payload,
+            }),
+        )
+    }
+
     pub fn create_script(
         &mut self,
         account: &Account,
@@ -371,6 +388,17 @@ impl MoveHarness {
         args: Vec<Vec<u8>>,
     ) -> TransactionStatus {
         let txn = self.create_entry_function(account, fun, ty_args, args);
+        self.run(txn)
+    }
+
+    /// Run the multisig transaction.
+    pub fn run_multisig(
+        &mut self,
+        account: &Account,
+        multisig_address: AccountAddress,
+        transaction_payload: Option<MultisigTransactionPayload>,
+    ) -> TransactionStatus {
+        let txn = self.create_multisig(account, multisig_address, transaction_payload);
         self.run(txn)
     }
 
