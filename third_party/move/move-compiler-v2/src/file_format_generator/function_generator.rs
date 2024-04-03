@@ -986,11 +986,13 @@ impl<'env> FunctionContext<'env> {
 
 impl<'env> BytecodeContext<'env> {
     /// Determine whether the temporary is alive (used) in the reachable code after this point.
-    /// If `dest_check` is true, temporary should not be written to by the current instruction
-    /// for it to be considered alive.
-    pub fn is_alive_after(&self, temp: TempIndex, dest_check: bool) -> bool {
+    /// If `is_source` is true, then we are checking for liveness of `temp` in the context of it
+    /// being a source of the current instruction.
+    pub fn is_alive_after(&self, temp: TempIndex, is_source: bool) -> bool {
         let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
-        if dest_check && bc.dests().contains(&temp) {
+        if is_source && bc.dests().contains(&temp) {
+            // `temp` is a source of the current instruction, but also a destination.
+            // Because it is rewritten, the pre-overwritten version is not live after.
             return false;
         }
         let an = self
