@@ -120,7 +120,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ],
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
-            exclude: vec!["/inlining/"],
+            exclude: vec!["/inlining/", "/skip_attribute_checks/"],
             exp_suffix: None,
             options: opts
                 .clone()
