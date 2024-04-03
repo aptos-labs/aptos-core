@@ -256,9 +256,12 @@ impl DKGRoundingProfile {
 
         let stake_total = U64F64::from_num(validator_stakes.clone().into_iter().sum::<u64>());
 
+        // This `stake_per_weight` value guarantees a weight assignment that achieves liveness and privacy
         let stake_per_weight = stake_total
             * 2
-            * (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio);
+            * (reconstruct_threshold_in_stake_ratio - secrecy_threshold_in_stake_ratio)
+            / U64F64::from_num(validator_stakes.len())
+            - U64F64::from_num(1);
         compute_profile_fixed_point(
             validator_stakes,
             stake_per_weight,
@@ -297,9 +300,8 @@ fn compute_profile_fixed_point(
     for stake in validator_stakes {
         let ideal_weight_fixed = U64F64::from_num(*stake) / stake_per_weight;
         // rounded to the nearest integer
-        let rounded_weight_fixed = (ideal_weight_fixed
-            + (U64F64::from_num(1) / U64F64::from_num(2)))
-        .floor();
+        let rounded_weight_fixed =
+            (ideal_weight_fixed + (U64F64::from_num(1) / U64F64::from_num(2))).floor();
         let rounded_weight = rounded_weight_fixed.to_num::<u64>();
         validator_weights.push(rounded_weight);
         if ideal_weight_fixed > rounded_weight_fixed {

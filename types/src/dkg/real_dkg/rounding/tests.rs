@@ -3,11 +3,13 @@
 
 use crate::dkg::real_dkg::rounding::{
     is_valid_profile, total_weight_lower_bound, total_weight_upper_bound, DKGRounding,
-    DEFAULT_FAST_PATH_SECRECY_THRESHOLD, DEFAULT_RECONSTRUCT_THRESHOLD, DEFAULT_SECRECY_THRESHOLD,
+    DKGRoundingProfile, DEFAULT_FAST_PATH_SECRECY_THRESHOLD, DEFAULT_RECONSTRUCT_THRESHOLD,
+    DEFAULT_SECRECY_THRESHOLD,
 };
 use aptos_dkg::pvss::WeightedConfig;
+use claims::assert_lt;
 use fixed::types::U64F64;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use std::ops::Deref;
 
 #[test]
@@ -324,3 +326,60 @@ pub const MAINNET_STAKES: [u64; 129] = [
     53685896908423700,
     40216803848486900,
 ];
+
+#[test]
+fn test_infallible_rounding_brute_force() {
+    let mut rng = thread_rng();
+    for _ in 0..100 {
+        let n: u64 = rng.gen_range(10, 20);
+        let n_fixed = U64F64::from_num(n);
+        let stakes: Vec<u64> = (0..n).map(|_| rng.gen_range(1, 100)).collect();
+        let stake_total = U64F64::from_num(stakes.clone().into_iter().sum::<u64>());
+        let stake_secrecy_threshold = stake_total * *DEFAULT_SECRECY_THRESHOLD;
+        let stake_reconstruct_threshold = stake_total * *DEFAULT_RECONSTRUCT_THRESHOLD;
+        let fast_path_stake_secrecy_threshold = stake_total * *DEFAULT_FAST_PATH_SECRECY_THRESHOLD;
+        let profile = DKGRoundingProfile::infallible(
+            &stakes,
+            *DEFAULT_SECRECY_THRESHOLD,
+            *DEFAULT_RECONSTRUCT_THRESHOLD,
+            Some(*DEFAULT_FAST_PATH_SECRECY_THRESHOLD),
+        );
+        let num_subsets: u64 = 1 << n;
+        let weight_total = U64F64::from_num(profile.validator_weights.iter().sum::<u64>());
+        let one = U64F64::from_num(1);
+
+        // With default thresholds, weight_total <= 3.5*n
+        assert_lt!(
+            weight_total,
+            n_fixed
+                * (one + one / ((*DEFAULT_RECONSTRUCT_THRESHOLD - *DEFAULT_SECRECY_THRESHOLD) * 2))
+        );
+
+        for subset in 0..num_subsets {
+            let stake_sub_total = U64F64::from(get_sub_total(stakes.as_slice(), subset));
+            let weight_sub_total = get_sub_total(profile.validator_weights.as_slice(), subset);
+            if stake_sub_total <= stake_secrecy_threshold
+                && weight_sub_total >= profile.reconstruct_threshold_in_weights
+            {
+                unreachable!();
+            }
+            if stake_sub_total > stake_reconstruct_threshold
+                && weight_sub_total < profile.reconstruct_threshold_in_weights
+            {
+                unreachable!();
+            }
+            if stake_sub_total <= fast_path_stake_secrecy_threshold
+                && weight_sub_total >= profile.fast_reconstruct_threshold_in_weights.unwrap()
+            {
+                unreachable!();
+            }
+        }
+    }
+}
+
+fn get_sub_total(vals: &[u64], subset: u64) -> u64 {
+    vals.iter()
+        .enumerate()
+        .map(|(idx, &val)| val * ((subset >> idx) & 1))
+        .sum()
+}
