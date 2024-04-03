@@ -255,6 +255,8 @@ impl Payload {
             Payload::DirectMempool(txns) => txns.len(),
             Payload::InQuorumStore(proof_with_status) => proof_with_status.len(),
             Payload::InQuorumStoreWithLimit(proof_with_status) => {
+                // here we return the actual length of the payload; limit is considered at the stage
+                // where we prepare the block from the payload
                 proof_with_status.proof_with_data.len()
             },
             Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _) => {
