@@ -461,10 +461,6 @@ impl TransactionStore {
                     TimelineState::Ready(_) => {},
                     _ => {
                         self.parking_lot_index.insert(txn);
-                        if txn.insertion_info.park_time.is_none() {
-                            txn.insertion_info.park_time = Some(SystemTime::now());
-                        }
-                        txn.was_parked = true;
                         parking_lot_txns += 1;
                     },
                 }
@@ -722,7 +718,6 @@ impl TransactionStore {
                 // mark all following txns as non-ready, i.e. park them
                 for (_, t) in txns.range_mut((park_range_start, park_range_end)) {
                     self.parking_lot_index.insert(t);
-                    t.was_parked = true;
                     self.priority_index.remove(t);
                     self.timeline_index.remove(t);
                     if let TimelineState::Ready(_) = t.timeline_state {
