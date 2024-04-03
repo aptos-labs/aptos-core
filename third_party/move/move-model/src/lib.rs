@@ -82,6 +82,7 @@ pub fn run_model_builder_in_compiler_mode(
     deps: Vec<PackageInfo>,
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
+    support_access_specifier: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -96,6 +97,7 @@ pub fn run_model_builder_in_compiler_mode(
         deps.into_iter().map(to_package_paths).collect(),
         ModelBuilderOptions {
             compile_via_model: true,
+            support_access_specifier,
             ..ModelBuilderOptions::default()
         },
         Flags::model_compilation().set_skip_attribute_checks(skip_attribute_checks),

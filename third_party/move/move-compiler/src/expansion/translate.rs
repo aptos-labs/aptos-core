@@ -1810,7 +1810,8 @@ fn access_specifier_name_access_chain(
 
 fn address_specifier(context: &mut Context, specifier: P::AddressSpecifier) -> E::AddressSpecifier {
     let s = match specifier.value {
-        AddressSpecifier_::Empty | AddressSpecifier_::Any => E::AddressSpecifier_::Any,
+        AddressSpecifier_::Empty => E::AddressSpecifier_::Empty,
+        AddressSpecifier_::Any => E::AddressSpecifier_::Any,
         AddressSpecifier_::Literal(addr) => E::AddressSpecifier_::Literal(addr),
         AddressSpecifier_::Name(name) => E::AddressSpecifier_::Name(name),
         AddressSpecifier_::Call(chain, type_args, name) => {

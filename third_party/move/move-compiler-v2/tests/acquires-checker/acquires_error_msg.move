@@ -3,7 +3,7 @@ module 0x42::test {
         value: u64
     }
 
-    public fun call_modify_without_acquire() acquires Test {
+    public fun call_modify_without_acquire() {
         modify(); // expect error message here
     }
 

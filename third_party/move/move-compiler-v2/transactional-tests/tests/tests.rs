@@ -32,12 +32,18 @@ const TEST_CONFIGS: &[TestConfig] = &[
     TestConfig {
         name: "optimize",
         runner: |p| run(p, get_config_by_name("optimize")),
-        experiments: &[(Experiment::OPTIMIZE, true)],
+        experiments: &[
+            (Experiment::OPTIMIZE, true),
+            (Experiment::ACQUIRES_CHECK, false),
+        ],
     },
     TestConfig {
         name: "no-optimize",
         runner: |p| run(p, get_config_by_name("no-optimize")),
-        experiments: &[(Experiment::OPTIMIZE, false)],
+        experiments: &[
+            (Experiment::OPTIMIZE, false),
+            (Experiment::ACQUIRES_CHECK, false),
+        ],
     },
     TestConfig {
         name: "optimize-no-simplify",
@@ -45,6 +51,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[
             (Experiment::OPTIMIZE, true),
             (Experiment::AST_SIMPLIFY, false),
+            (Experiment::ACQUIRES_CHECK, false),
         ],
     },
 ];
