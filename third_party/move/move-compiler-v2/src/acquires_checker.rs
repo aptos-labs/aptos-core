@@ -9,7 +9,7 @@
 //! This check is enabled by flag `Experiment::ACQUIRES_CHECK`, and is disabled by default.
 
 use move_model::{
-    ast::{ExpData, Operation, ResourceSpecifier},
+    ast::{ExpData, Operation, ResourceSpecifier, VisitorPosition},
     model::{FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, StructId},
     ty::Type,
 };
@@ -82,6 +82,7 @@ fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
     }
 }
 
+#[derive(Debug)]
 enum AcquiredAt {
     /// Acquired by move_from<T>, borrow_global_mut<T>, or borrow_global<T>
     Directly(Loc),
@@ -100,6 +101,7 @@ impl AcquiredAt {
 }
 
 /// Maps to resource acquired by where it's acquired
+#[derive(Debug)]
 struct AcquiredResources(BTreeMap<StructId, AcquiredAt>);
 
 impl AcquiredResources {
@@ -220,40 +222,60 @@ fn get_callees_and_acquired_resources(
     let mut resources = BTreeMap::new();
     let mid = fun_env.module_env.get_id();
     if let Some(fun_body) = fun_env.get_def() {
-        let mut collect_callees = |exp: &ExpData| match exp {
+        let mut in_spec_block = false;
+        let mut collect_callees = |pos, exp: &ExpData| match exp {
             ExpData::Call(node_id, op, _) => {
-                if let Operation::MoveFunction(exp_mid, exp_fid) = op {
-                    if *exp_mid == fun_env.module_env.get_id() {
-                        let loc = fun_env.module_env.env.get_node_loc(*node_id);
-                        callees.entry(*exp_fid).or_insert(loc);
+                if !in_spec_block && matches!(pos, VisitorPosition::Pre) {
+                    if let Operation::MoveFunction(exp_mid, exp_fid) = op {
+                        if *exp_mid == fun_env.module_env.get_id() {
+                            let loc = fun_env.module_env.env.get_node_loc(*node_id);
+                            callees.entry(*exp_fid).or_insert(loc);
+                        }
                     }
                 }
                 true
             },
-            ExpData::SpecBlock(..) => false,
-            _ => true,
-        };
-        let mut collect_directly_used_resources = |exp: &ExpData| match exp {
-            ExpData::Call(node_id, op, _) => {
-                match op {
-                    Operation::MoveFrom | Operation::BorrowGlobal(..) => {
-                        let ty_params = fun_env.module_env.env.get_node_instantiation(*node_id);
-                        let ty_param = ty_params.first().expect("type parameter");
-                        if let Type::Struct(exp_mid, sid, _insts) = ty_param {
-                            if *exp_mid == mid {
-                                let loc = fun_env.module_env.env.get_node_loc(*node_id);
-                                resources.entry(*sid).or_insert(loc);
-                            }
-                        }
-                    },
+            ExpData::SpecBlock(..) => {
+                match pos {
+                    VisitorPosition::Pre => in_spec_block = true,
+                    VisitorPosition::Post => in_spec_block = false,
                     _ => {},
                 }
                 true
             },
-            ExpData::SpecBlock(..) => false,
             _ => true,
         };
-        fun_body.visit_pre_order(&mut |e| collect_callees(e) && collect_directly_used_resources(e));
+        let mut in_spec_block = false;
+        let mut collect_directly_used_resources = |pos, exp: &ExpData| match exp {
+            ExpData::Call(node_id, op, _) => {
+                if matches!(pos, VisitorPosition::Pre) {
+                    match op {
+                        Operation::MoveFrom | Operation::BorrowGlobal(..) => {
+                            let ty_params = fun_env.module_env.env.get_node_instantiation(*node_id);
+                            let ty_param = ty_params.first().expect("type parameter");
+                            if let Type::Struct(exp_mid, sid, _insts) = ty_param {
+                                if *exp_mid == mid {
+                                    let loc = fun_env.module_env.env.get_node_loc(*node_id);
+                                    resources.entry(*sid).or_insert(loc);
+                                }
+                            }
+                        },
+                        _ => {},
+                    }
+                }
+                true
+            },
+            ExpData::SpecBlock(..) => {
+                match pos {
+                    VisitorPosition::Pre => in_spec_block = true,
+                    VisitorPosition::Post => in_spec_block = false,
+                    _ => {},
+                }
+                true
+            },
+            _ => true,
+        };
+        fun_body.visit_positions(&mut |pos, e| collect_callees(pos.clone(), e) && collect_directly_used_resources(pos, e));
     }
     (callees, resources)
 }
