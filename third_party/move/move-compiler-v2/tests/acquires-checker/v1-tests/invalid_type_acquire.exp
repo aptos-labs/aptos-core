@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: access specifier not enabled. Only plain `acquires R` is enabled.
+error: access specifier not enabled. Only plain `acquires <ResourceName>` is enabled.
    ┌─ tests/acquires-checker/v1-tests/invalid_type_acquire.move:18:9
    │
 18 │         T,
@@ -12,7 +12,7 @@ error: invalid access specifier
 18 │         T,
    │         ^
 
-error: access specifier not enabled. Only plain `acquires R` is enabled.
+error: access specifier not enabled. Only plain `acquires <ResourceName>` is enabled.
    ┌─ tests/acquires-checker/v1-tests/invalid_type_acquire.move:19:9
    │
 19 │         u64,
