@@ -38,7 +38,7 @@ impl RunnableConfig for IndexerGrpcFileStoreDataIntegrityCheckerConfig {
             .run()
             .await
             .context("Failed to run data integrity checker")
-            .expect("Cache worker failed");
+            .expect("Data integrity checker failed");
         Ok(())
     }
 
