@@ -161,6 +161,36 @@ impl Mempool {
         }
     }
 
+    fn log_commit_and_parked_latency(insertion_info: &InsertionInfo, bucket: &str) {
+        let parked_duration = if let Some(park_time) = insertion_info.park_time {
+            let parked_duration = park_time
+                .duration_since(insertion_info.insertion_time)
+                .unwrap_or(Duration::ZERO);
+            counters::core_mempool_txn_commit_latency(
+                counters::PARKED_TIME_LABEL,
+                insertion_info.submitted_by_label(),
+                bucket,
+                parked_duration,
+            );
+            parked_duration
+        } else {
+            Duration::ZERO
+        };
+
+        if let Ok(commit_duration) = SystemTime::now().duration_since(insertion_info.insertion_time)
+        {
+            let commit_minus_parked = commit_duration
+                .checked_sub(parked_duration)
+                .unwrap_or(Duration::ZERO);
+            counters::core_mempool_txn_commit_latency(
+                counters::NON_PARKED_COMMIT_ACCEPTED_LABEL,
+                insertion_info.submitted_by_label(),
+                bucket,
+                commit_minus_parked,
+            );
+        }
+    }
+
     fn log_commit_latency(
         &self,
         account: AccountAddress,
@@ -172,6 +202,7 @@ impl Mempool {
             .get_insertion_info_and_bucket(&account, sequence_number)
         {
             Self::log_txn_latency(insertion_info, bucket, counters::COMMIT_ACCEPTED_LABEL);
+            Self::log_commit_and_parked_latency(insertion_info, bucket);
 
             let insertion_timestamp =
                 aptos_infallible::duration_since_epoch_at(&insertion_info.insertion_time);

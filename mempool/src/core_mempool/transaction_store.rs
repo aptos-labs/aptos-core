@@ -377,9 +377,10 @@ impl TransactionStore {
     fn log_ready_transaction(
         ranking_score: u64,
         bucket: &str,
-        insertion_info: &InsertionInfo,
+        insertion_info: &mut InsertionInfo,
         broadcast_ready: bool,
     ) {
+        insertion_info.ready_time = SystemTime::now();
         if let Ok(time_delta) = SystemTime::now().duration_since(insertion_info.insertion_time) {
             let submitted_by = insertion_info.submitted_by_label();
             if broadcast_ready {
@@ -443,7 +444,7 @@ impl TransactionStore {
                     Self::log_ready_transaction(
                         txn.ranking_score,
                         self.timeline_index.get_bucket(txn.ranking_score),
-                        &txn.insertion_info,
+                        &mut txn.insertion_info,
                         process_broadcast_ready,
                     );
                 }
@@ -460,6 +461,9 @@ impl TransactionStore {
                     TimelineState::Ready(_) => {},
                     _ => {
                         self.parking_lot_index.insert(txn);
+                        if txn.insertion_info.park_time.is_none() {
+                            txn.insertion_info.park_time = Some(SystemTime::now());
+                        }
                         txn.was_parked = true;
                         parking_lot_txns += 1;
                     },
