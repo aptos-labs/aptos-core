@@ -295,8 +295,6 @@ fn compute_profile_fixed_point(
     let mut delta_down_fixed = U64F64::from_num(0);
     let mut delta_up_fixed = U64F64::from_num(0);
     let mut validator_weights: Vec<u64> = vec![];
-    let x = (U64F64::from_num(1) / U64F64::from_num(2)).to_num::<f64>();
-    println!("x={}", x);
     for stake in validator_stakes {
         let ideal_weight_fixed = U64F64::from_num(*stake) / stake_per_weight;
         // rounded to the nearest integer
