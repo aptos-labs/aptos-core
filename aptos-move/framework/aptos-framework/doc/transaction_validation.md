@@ -758,6 +758,7 @@ Called by the Adapter
     required_deposit: Option&lt;u64&gt;,
 ) {
     <b>let</b> gas_payer = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&<a href="account.md#0x1_account">account</a>);
+    <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer, required_deposit);
     <a href="transaction_validation.md#0x1_transaction_validation_epilogue">epilogue</a>(
         <a href="account.md#0x1_account">account</a>,
         storage_fee_refunded,
@@ -765,7 +766,6 @@ Called by the Adapter
         txn_max_gas_units,
         gas_units_remaining,
     );
-    <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer, required_deposit);
 }
 </code></pre>
 
@@ -871,6 +871,7 @@ Called by the Adapter
     gas_units_remaining: u64,
     required_deposit: Option&lt;u64&gt;,
 ) {
+    <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer, required_deposit);
     <a href="transaction_validation.md#0x1_transaction_validation_epilogue_gas_payer">epilogue_gas_payer</a>(
         <a href="account.md#0x1_account">account</a>,
         gas_payer,
@@ -879,8 +880,6 @@ Called by the Adapter
         txn_max_gas_units,
         gas_units_remaining,
     );
-    <a href="transaction_validation.md#0x1_transaction_validation_refund_deposit">refund_deposit</a>(gas_payer, required_deposit);
-
 }
 </code></pre>
 

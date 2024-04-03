@@ -331,6 +331,7 @@ module aptos_framework::transaction_validation {
         required_deposit: Option<u64>,
     ) {
         let gas_payer = signer::address_of(&account);
+        refund_deposit(gas_payer, required_deposit);
         epilogue(
             account,
             storage_fee_refunded,
@@ -338,7 +339,6 @@ module aptos_framework::transaction_validation {
             txn_max_gas_units,
             gas_units_remaining,
         );
-        refund_deposit(gas_payer, required_deposit);
     }
 
     /// Epilogue function with explicit gas payer specified, is run after a transaction is successfully executed.
@@ -404,6 +404,7 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64,
         required_deposit: Option<u64>,
     ) {
+        refund_deposit(gas_payer, required_deposit);
         epilogue_gas_payer(
             account,
             gas_payer,
@@ -412,7 +413,5 @@ module aptos_framework::transaction_validation {
             txn_max_gas_units,
             gas_units_remaining,
         );
-        refund_deposit(gas_payer, required_deposit);
-
     }
 }

@@ -2493,8 +2493,9 @@ impl VMValidator for AptosVM {
             return VMValidatorResult::error(StatusCode::UNKNOWN_VALIDATION_STATUS);
         };
 
-        // Increment the counter for transactions verified.
         txn_data.set_required_deposit(required_deposit);
+
+        // Increment the counter for transactions verified.
         let (counter_label, result) = match self.validate_signed_transaction(
             &mut session,
             &resolver,
