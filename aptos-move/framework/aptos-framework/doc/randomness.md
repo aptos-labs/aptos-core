@@ -1231,7 +1231,8 @@ function as its payload.
 
 
 
-<pre><code><b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 <b>aborts_if</b> min_incl &gt;= max_excl;
 <b>ensures</b> result &gt;= min_incl && result &lt; max_excl;
 </code></pre>
