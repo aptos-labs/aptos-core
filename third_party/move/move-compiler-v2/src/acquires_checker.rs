@@ -58,7 +58,7 @@ pub fn acquires_checker(env: &GlobalEnv) {
     }
 }
 
-/// Gets the acquried resources declared by `acquires R`
+/// Gets the acquired resources declared by `acquires R`
 fn get_acquired_resources(fun_env: &FunctionEnv) -> BTreeMap<StructId, Loc> {
     if let Some(access_specifiers) = fun_env.get_access_specifiers() {
         access_specifiers
@@ -134,16 +134,17 @@ impl<'a> AcquireChecker<'a> {
 
     /// Computes the resources acquired by each function in the module
     pub fn analyze(&self) -> BTreeMap<FunId, AcquiredResources> {
-        let (call_graph, acquire_env) = self.get_call_graph_and_directly_acquired_resoruces();
+        let (call_graph, acquire_env) = self.get_call_graph_and_directly_acquired_resources();
         self.compute_fixed_point(call_graph, acquire_env)
     }
 
     /// Returns
-    /// - the call graph where `f` maps to `(g, loc)` iff `f` calls `g` at `loc`,
+    /// - the call graph where `f` maps to `(g, loc)` if `f` calls `g` at `loc`,
+    /// (just one example is provided if there are multiple such calls)
     /// only functions defined in the current module are included
     /// - a map from functions to resources directly acquired by `move_from<T>`, `borrow_global_mut<T>`, or `borrow_global<T>`
     /// by the function
-    fn get_call_graph_and_directly_acquired_resoruces(
+    fn get_call_graph_and_directly_acquired_resources(
         &self,
     ) -> (
         BTreeMap<FunId, BTreeMap<FunId, Loc>>,

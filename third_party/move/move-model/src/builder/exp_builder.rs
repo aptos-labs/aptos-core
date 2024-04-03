@@ -1077,7 +1077,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
     fn invalid_acquries(&mut self, loc: &Loc) {
         self.error(
             loc,
-            "access specifier not enabled. Only plain `acquires R` is enabled.",
+            "access specifier not enabled. Only plain `acquires <ResourceName>` is enabled.",
         );
     }
 
