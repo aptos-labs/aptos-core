@@ -163,8 +163,9 @@ impl Mempool {
 
     fn log_commit_and_parked_latency(insertion_info: &InsertionInfo, bucket: &str) {
         let parked_duration = if let Some(park_time) = insertion_info.park_time {
-            let parked_duration = park_time
-                .duration_since(insertion_info.insertion_time)
+            let parked_duration = insertion_info
+                .ready_time
+                .duration_since(park_time)
                 .unwrap_or(Duration::ZERO);
             counters::core_mempool_txn_commit_latency(
                 counters::PARKED_TIME_LABEL,
