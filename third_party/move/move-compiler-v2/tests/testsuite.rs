@@ -236,14 +236,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter:
             // For debugging:
-            // Some(vec![
-            //   INITIAL_BYTECODE_STAGE,
-            //   "ReferenceSafetyProcessor",
-            //   "DeadStoreElimination",
-            //   FILE_FORMAT_STAGE,
-            //]),
+             Some(vec![
+               INITIAL_BYTECODE_STAGE,
+               "ReferenceSafetyProcessor",
+               "DeadStoreElimination",
+               FILE_FORMAT_STAGE,
+            ]),
         },
         // Reference safety tests (without optimizations on)
         TestConfig {
@@ -258,7 +258,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter:
+            // For debugging:
+            Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "ReferenceSafetyProcessor",
+                "DeadStoreElimination",
+                FILE_FORMAT_STAGE,
+            ]),
         },
         // Abort analysis tests
         TestConfig {
