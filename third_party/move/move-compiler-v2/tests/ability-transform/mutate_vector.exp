@@ -101,18 +101,21 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # graph: {@100=local($t2)[borrow(true) -> @101],@101=derived[borrow_field(true) -> @201],@201=derived[]}
      # locals: {$t2=@100,$t4=@201}
      # globals: {}
+     # derived-from: @201=$t5
      #
   3: $t6 := 0
      # live vars: $t0, $t2, $t4, $t6
      # graph: {@100=local($t2)[borrow(true) -> @101],@101=derived[borrow_field(true) -> @201],@201=derived[]}
      # locals: {$t2=@100,$t4=@201}
      # globals: {}
+     # derived-from: @201=$t5
      #
   4: $t3 := vector::borrow_mut<u8>($t4, $t6)
      # live vars: $t0, $t2, $t3
-     # graph: {@100=local($t2)[borrow(true) -> @101],@101=derived[borrow_field(true) -> @201],@201=derived[call(true) -> @400],@400=derived[]}
+     # graph: {@100=local($t2)[borrow(true) -> @101],@101=derived[borrow_field(true) -> @201],@201=derived[call(true, 4) -> @400],@400=derived[]}
      # locals: {$t2=@100,$t3=@400}
      # globals: {}
+     # derived-from: @201=$t5,@400=$t4
      #
   5: write_ref($t3, $t0)
      # live vars: $t2
@@ -190,6 +193,7 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # graph: {@100=local($t2)[borrow(true) -> @101],@101=derived[borrow_field(true) -> @201],@201=derived[]}
      # locals: {$t2=@100,$t4=@201}
      # globals: {}
+     # derived-from: @201=$t5
      #
   3: $t6 := 0
      # abort state: {returns,aborts}
@@ -197,13 +201,15 @@ public fun m::new_scalar_from_u8($t0: u8): m::Scalar {
      # graph: {@100=local($t2)[borrow(true) -> @101],@101=derived[borrow_field(true) -> @201],@201=derived[]}
      # locals: {$t2=@100,$t4=@201}
      # globals: {}
+     # derived-from: @201=$t5
      #
   4: $t3 := vector::borrow_mut<u8>($t4, $t6)
      # abort state: {returns}
      # live vars: $t0, $t2, $t3
-     # graph: {@100=local($t2)[borrow(true) -> @101],@101=derived[borrow_field(true) -> @201],@201=derived[call(true) -> @400],@400=derived[]}
+     # graph: {@100=local($t2)[borrow(true) -> @101],@101=derived[borrow_field(true) -> @201],@201=derived[call(true, 4) -> @400],@400=derived[]}
      # locals: {$t2=@100,$t3=@400}
      # globals: {}
+     # derived-from: @201=$t5,@400=$t4
      #
   5: write_ref($t3, $t0)
      # abort state: {returns}

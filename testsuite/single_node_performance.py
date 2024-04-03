@@ -201,6 +201,7 @@ else:
     DB_PRUNER_FLAGS = ""
 
 HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
+SKIP_MOVE_E2E = os.environ.get("SKIP_MOVE_E2E")
 
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
@@ -419,17 +420,18 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
-    try:
-        execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
-        move_e2e_benchmark_failed = False
-    except:
-        # for land-blocking (i.e. on PR), fail immediately, for speedy response.
-        # Otherwise run all tests, and fail in the end.
-        if SELECTED_FLOW == Flow.LAND_BLOCKING:
-            print("Move E2E benchmark failed, exiting")
-            exit(1)
-        move_e2e_benchmark_failed = True
+    move_e2e_benchmark_failed = False
+    if not SKIP_MOVE_E2E:
+        execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        try:
+            execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
+        except:
+            # for land-blocking (i.e. on PR), fail immediately, for speedy response.
+            # Otherwise run all tests, and fail in the end.
+            if SELECTED_FLOW == Flow.LAND_BLOCKING:
+                print("Move E2E benchmark failed, exiting")
+                exit(1)
+            move_e2e_benchmark_failed = True
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
