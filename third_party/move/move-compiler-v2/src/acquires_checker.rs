@@ -275,7 +275,9 @@ fn get_callees_and_acquired_resources(
             },
             _ => true,
         };
-        fun_body.visit_positions(&mut |pos, e| collect_callees(pos.clone(), e) && collect_directly_used_resources(pos, e));
+        fun_body.visit_positions(&mut |pos, e| {
+            collect_callees(pos.clone(), e) && collect_directly_used_resources(pos, e)
+        });
     }
     (callees, resources)
 }
