@@ -1,0 +1,34 @@
+[package]
+name = "aptos-indexer-grpc-file-store-data-integrity-checker"
+description = "Integrity checker for the file store."
+version = "1.0.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-indexer-grpc-server-framework = { workspace = true }
+aptos-indexer-grpc-utils = { workspace = true }
+async-trait = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
+
+[dev-dependencies]
+aptos-config = { workspace = true }
+reqwest = { workspace = true }
+tempfile = { workspace = true }
+
+[features]
+integration-tests = []

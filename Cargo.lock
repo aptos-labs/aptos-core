@@ -2020,6 +2020,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-file-store-data-integrity-checker"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-config",
+ "aptos-indexer-grpc-server-framework",
+ "aptos-indexer-grpc-utils",
+ "async-trait",
+ "clap 4.4.14",
+ "jemallocator",
+ "reqwest",
+ "serde",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-fullnode"
 version = "1.0.0"
 dependencies = [
@@ -2164,9 +2182,9 @@ dependencies = [
  "chrono",
  "cloud-storage",
  "dashmap",
- "flate2",
  "futures",
  "itertools 0.12.1",
+ "lz4",
  "once_cell",
  "prometheus",
  "prost 0.12.3",
