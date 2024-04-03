@@ -73,7 +73,7 @@ module aptos_framework::transaction_validation {
     }
 
     /// Called in prologue to optionally hold some amount for special txns (e.g. randomness txns).
-    /// `release_to_balance()` should be invoked in the corresponding epilogue with the same arguments.
+    /// `return_deposit()` should be invoked in the corresponding epilogue with the same arguments.
     fun collect_deposit(gas_payer: address, amount: Option<u64>) {
         if (option::is_some(&amount)) {
             let amount = option::extract(&mut amount);
@@ -84,7 +84,7 @@ module aptos_framework::transaction_validation {
     }
 
     /// Called in epilogue to optionally released the amount held in prologue for special txns (e.g. randomness txns).
-    fun refund_deposit(gas_payer: address, amount: Option<u64>) {
+    fun return_deposit(gas_payer: address, amount: Option<u64>) {
         if (option::is_some(&amount)) {
             let amount = option::extract(&mut amount);
             transaction_fee::mint_and_refund(gas_payer, amount);
@@ -173,7 +173,10 @@ module aptos_framework::transaction_validation {
         prologue_common(sender, gas_payer, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
-    fun script_prologue_gas_deposit(
+    /// `script_prologue()` then collect an optional deposit depending on the txn.
+    ///
+    /// Deposit collection goes last so `script_prologue()` doesn't have to be aware of the deposit logic.
+    fun script_prologue_collect_deposit(
         sender: signer,
         txn_sequence_number: u64,
         txn_public_key: vector<u8>,
@@ -278,7 +281,10 @@ module aptos_framework::transaction_validation {
         );
     }
 
-    fun fee_payer_script_prologue_gas_deposit(
+    /// `fee_payer_script_prologue()` then collect an optional deposit depending on the txn.
+    ///
+    /// Deposit collection goes last so `fee_payer_script_prologue()` doesn't have to be aware of the deposit logic.
+    fun fee_payer_script_prologue_collect_deposit(
         sender: signer,
         txn_sequence_number: u64,
         txn_sender_public_key: vector<u8>,
@@ -321,8 +327,10 @@ module aptos_framework::transaction_validation {
         epilogue_gas_payer(account, addr, storage_fee_refunded, txn_gas_price, txn_max_gas_units, gas_units_remaining);
     }
 
-    /// `epilogue()` then optionally return the amount held in prologue to the gas payer.
-    fun epilogue_gas_deposit(
+    /// Return the deposit held in prologue, then `epilogue()`.
+    ///
+    /// Deposit return goes first so `epilogue()` doesn't have to be aware of this change.
+    fun epilogue_return_deposit(
         account: signer,
         storage_fee_refunded: u64,
         txn_gas_price: u64,
@@ -331,7 +339,7 @@ module aptos_framework::transaction_validation {
         required_deposit: Option<u64>,
     ) {
         let gas_payer = signer::address_of(&account);
-        refund_deposit(gas_payer, required_deposit);
+        return_deposit(gas_payer, required_deposit);
         epilogue(
             account,
             storage_fee_refunded,
@@ -394,8 +402,10 @@ module aptos_framework::transaction_validation {
         account::increment_sequence_number(addr);
     }
 
-    /// `epilogue_gas_payer()` but optionally return the amount held in prologue to gas payer.
-    fun epilogue_gas_payer_gas_deposit(
+    /// Return the deposit held in prologue to the gas payer, then `epilogue_gas_payer()`.
+    ///
+    /// Deposit return should go first so `epilogue_gas_payer()` doesn't have to be aware of this change.
+    fun epilogue_gas_payer_return_deposit(
         account: signer,
         gas_payer: address,
         storage_fee_refunded: u64,
@@ -404,7 +414,7 @@ module aptos_framework::transaction_validation {
         gas_units_remaining: u64,
         required_deposit: Option<u64>,
     ) {
-        refund_deposit(gas_payer, required_deposit);
+        return_deposit(gas_payer, required_deposit);
         epilogue_gas_payer(
             account,
             gas_payer,
