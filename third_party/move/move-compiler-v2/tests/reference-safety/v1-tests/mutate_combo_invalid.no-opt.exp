@@ -40,6 +40,14 @@ error: mutable reference in local `s` requires exclusive access but is borrowed
 24 │         *f;
    │         -- conflicting reference `f` used here
 
+error: mutable reference in local `s` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:32:9
+   │
+32 │         *s = S { f: 0, g: 0 };
+   │         ^^^^^^^^^^^^^^^^^^^^^ requirement enforced here
+33 │         *f;
+   │         -- conflicting reference `f` used here
+
 error: cannot write to reference in local `s` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/mutate_combo_invalid.move:41:9
    │
