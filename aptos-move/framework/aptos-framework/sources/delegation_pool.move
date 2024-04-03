@@ -4770,23 +4770,31 @@ module aptos_framework::delegation_pool {
         enable_delegators_allowlisting(validator);
         // allowlist delegator
         allowlist_delegator(validator, delegator_1_address);
+        assert!(delegator_allowlisted(pool_address, delegator_1_address), 0);
 
         // delegator is allowed to add stake
         stake::mint(delegator_1, 50 * ONE_APT);
         add_stake(delegator_1, pool_address, 50 * ONE_APT);
 
+        // restore `add_stake` fee back to delegator
+        end_aptos_epoch();
+        assert_delegation(delegator_1_address, pool_address, 50 * ONE_APT, 0, 0);
+
         // some of the stake is unlocked by the delegator
         unlock(delegator_1, pool_address, 30 * ONE_APT);
+        assert_delegation(delegator_1_address, pool_address, 20 * ONE_APT, 0, 2999999999);
 
         // remove delegator from allowlist
         remove_delegator_from_allowlist(validator, delegator_1_address);
+        assert!(!delegator_allowlisted(pool_address, delegator_1_address), 0);
+
         // remaining stake is unlocked by the pool owner by evicting the delegator
         evict_delegator(validator, delegator_1_address);
+        assert_delegation(delegator_1_address, pool_address, 0, 0, 4999999999);
 
-        end_aptos_epoch();
-        assert_delegation(delegator_1_address, pool_address, 0, 0, 50 * ONE_APT);
         // delegator cannot reactivate stake
         reactivate_stake(delegator_1, pool_address, 50 * ONE_APT);
+        assert_delegation(delegator_1_address, pool_address, 0, 0, 4999999999);
     }
 
     #[test(aptos_framework = @aptos_framework, validator = @0x123, delegator_1 = @0x010, delegator_2 = @0x020)]
@@ -4886,6 +4894,8 @@ module aptos_framework::delegation_pool {
         // evict delegator 1 after they reactivated
         remove_delegator_from_allowlist(validator, delegator_1_address);
         evict_delegator(validator, delegator_1_address);
+        // 2000000000 + 5223120050 + 1000000000 pending-inactive
+        assert_delegation(delegator_1_address, pool_address, 0, 0, 8223120049);
 
         end_aptos_epoch();
         // (2000000000 + 5223120050 + 1000000000) * 1.01 pending-inactive
