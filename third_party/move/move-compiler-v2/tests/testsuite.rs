@@ -120,7 +120,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             ],
             // Need to exclude `inlining` because it is under checking
             // TODO: move `inlining` tests to top-level test directory
-            exclude: vec!["/inlining/", "/skip_attribute_checks/"],
+            exclude: vec!["/inlining/"],
             exp_suffix: None,
             options: opts
                 .clone()
@@ -492,7 +492,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Test for unit tests on and off
         TestConfig {
             name: "unit-test-on",
-            runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
+            runner: |p| run_test(p, get_config_by_name("unit-test-on")),
             include: vec!["/unit_test/test/"],
             exclude: vec![],
             exp_suffix: None,
@@ -507,7 +507,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         },
         TestConfig {
             name: "unit-test-off",
-            runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
+            runner: |p| run_test(p, get_config_by_name("unit-test-off")),
             include: vec!["/unit_test/notest/"],
             exclude: vec![],
             exp_suffix: None,
@@ -522,7 +522,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         },
         TestConfig {
             name: "skip-attribute-checks",
-            runner: |p| run_test(p, get_config_by_name("inlining-et-al")),
+            runner: |p| run_test(p, get_config_by_name("skip-attribute-checks")),
             include: vec!["/skip_attribute_checks/"],
             exclude: vec![],
             exp_suffix: None,

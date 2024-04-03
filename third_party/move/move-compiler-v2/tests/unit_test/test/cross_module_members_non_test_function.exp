@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: unbound module
-   ┌─ tests/unit_test/test/cross_module_members_non_test_function.move:24:9
-   │
-24 │         A::build_foo()
-   │         ^ Unbound module alias 'A'

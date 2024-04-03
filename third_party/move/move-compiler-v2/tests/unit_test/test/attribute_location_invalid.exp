@@ -7,6 +7,15 @@ error: unable to generate test
   │   ^^^^^^^^^ Testing attributes are not allowed in scripts.
 
 error: invalid attribute
+  ┌─ tests/unit_test/test/attribute_location_invalid.move:6:3
+  │
+6 │ #[test]
+  │   ^^^^
+  │   │
+  │   Attribute 'test' is not expected with a module
+  │   Expected to be used with one of the following: function
+
+error: invalid attribute
    ┌─ tests/unit_test/test/attribute_location_invalid.move:10:7
    │
 10 │     #[expected_failure(abort_code = 0)]

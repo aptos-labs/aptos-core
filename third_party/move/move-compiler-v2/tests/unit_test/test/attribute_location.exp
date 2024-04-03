@@ -1,5 +1,0 @@
-// -- Model dump before bytecode pipeline
-module 0x42::N {
-} // end 0x42::N
-module 0x42::Z {
-} // end 0x42::Z
