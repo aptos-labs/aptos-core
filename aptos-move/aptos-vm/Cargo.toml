@@ -15,7 +15,6 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
-aptos-bitvec = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-crypto = { workspace = true }
@@ -37,19 +36,15 @@ aptos-types = { workspace = true }
 aptos-utils = { workspace = true }
 aptos-vm-logging = { workspace = true }
 aptos-vm-types = { workspace = true }
-base64-url = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 claims = { workspace = true }
 crossbeam-channel = { workspace = true }
-dashmap = { workspace = true }
 derive_more = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
-jsonwebtoken = { workspace = true }
 move-binary-format = { workspace = true }
-move-bytecode-utils = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-unit-test = { workspace = true, optional = true }
@@ -61,9 +56,6 @@ ouroboros = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-smallvec = { workspace = true }
-tracing = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
