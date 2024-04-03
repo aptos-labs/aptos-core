@@ -83,7 +83,9 @@ impl DKGRounding {
                 (profile, Some(format!("{e}")), "infallible".to_string())
             },
         };
-
+        println!("profile={:?}", profile);
+        println!("rounding_error={:?}", rounding_error);
+        println!("rounding_method={:?}", rounding_method);
         let wconfig = WeightedConfig::new(
             profile.reconstruct_threshold_in_weights as usize,
             profile
@@ -270,9 +272,8 @@ fn is_valid_profile(
     profile: &DKGRoundingProfile,
     reconstruct_threshold_in_stake_ratio: U64F64,
 ) -> bool {
-    // ensure the reconstruction is below threshold, all validators have at least 1 weight, and the fast path threshold is valid
+    // ensure the reconstruction is below threshold, and the fast path threshold is valid
     profile.reconstruct_threshold_in_stake_ratio <= reconstruct_threshold_in_stake_ratio
-        && profile.validator_weights.iter().all(|&w| w > 0)
         && (profile.fast_reconstruct_threshold_in_stake_ratio.is_none()
             || profile.fast_reconstruct_threshold_in_stake_ratio.unwrap() <= U64F64::from_num(1))
 }
@@ -291,11 +292,13 @@ fn compute_profile_fixed_point(
     let mut delta_down_fixed = U64F64::from_num(0);
     let mut delta_up_fixed = U64F64::from_num(0);
     let mut validator_weights: Vec<u64> = vec![];
+    let x = (U64F64::from_num(1) / U64F64::from_num(2)).to_num::<f64>();
+    println!("x={}", x);
     for stake in validator_stakes {
         let ideal_weight_fixed = U64F64::from_num(*stake) / stake_per_weight;
         // rounded to the nearest integer
-        let rounded_weight_fixed = (U64F64::from_num(*stake) / stake_per_weight
-            + U64F64::from_num(1) / U64F64::from_num(2))
+        let rounded_weight_fixed = (ideal_weight_fixed
+            + (U64F64::from_num(1) / U64F64::from_num(2)))
         .floor();
         let rounded_weight = rounded_weight_fixed.to_num::<u64>();
         validator_weights.push(rounded_weight);
