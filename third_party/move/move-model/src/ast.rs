@@ -643,6 +643,7 @@ pub enum RewriteResult {
 }
 
 /// Visitor position
+#[derive(Clone)]
 pub enum VisitorPosition {
     Pre,              // before visiting any subexpressions
     MidMutate,        // after RHS and before LHS of Mutate expression.

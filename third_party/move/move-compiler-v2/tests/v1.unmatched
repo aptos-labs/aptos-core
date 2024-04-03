@@ -57,10 +57,6 @@ move-compiler/tests/move_check/borrow_tests/{
   writeref_borrow_valid1.move,
   writeref_borrow_valid2.move,
 }
-move-compiler/tests/move_check/borrows/{
-  call_acquires.move,
-  call_acquires_invalid.move,
-}
 move-compiler/tests/move_check/commands/{
   abort_negative_stack_size.move,
   assign_resource.move,
@@ -198,14 +194,11 @@ move-compiler/tests/move_check/typing/{
   constraints_not_satisfied_type_arguments_internal_pack.move,
   declare_pop_resource.move,
   entry_signature_no_warning.move,
-  extraneous_acquire.move,
   ignore_inferred_resource.move,
   implicit_deref_borrow_field_not_copyable.move,
   infinite_instantiations_invalid.move,
   infinite_instantiations_valid.move,
   instantiate_signatures.move,
-  invalid_type_acquire.move,
-  missing_acquire.move,
   module_call_constraints_not_satisfied.move,
   module_call_internal.move,
   mutable_borrow_from_immutable.move,
@@ -222,7 +215,6 @@ move-compiler/tests/move_check/typing/{
   seq_cannot_ignore_resource.move,
   tuple.move,
   unused_non_phantom_param.move,
-  valid_acquire.move,
 }
 move-compiler/tests/move_check/v2-not-supported/{
   no_receiver_calls.move,

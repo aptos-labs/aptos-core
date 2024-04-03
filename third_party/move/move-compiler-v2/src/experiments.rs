@@ -80,6 +80,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::ACQUIRES_CHECK.to_string(),
+            description: "Turns on or off v1 style acquires checks".to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
+        },
+        Experiment {
             name: Experiment::INLINING.to_string(),
             description: "Turns on or off inlining".to_string(),
             default: Given(true),
@@ -165,6 +170,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
 impl Experiment {
     pub const ABILITY_CHECK: &'static str = "ability-check";
     pub const ACCESS_CHECK: &'static str = "access-use-function-check";
+    pub const ACQUIRES_CHECK: &'static str = "acquires-check";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const CHECKS: &'static str = "checks";
