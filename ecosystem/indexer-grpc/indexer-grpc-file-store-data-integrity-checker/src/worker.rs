@@ -24,8 +24,8 @@ impl Worker {
 
     pub async fn run(&mut self) -> Result<()> {
         let file_store_operator = self.file_store_config.create();
-        let starting_vresion = self.starting_version.unwrap_or(0);
-        let cursor = Arc::new(Mutex::new(starting_vresion));
+        let starting_version = self.starting_version.unwrap_or(0);
+        let cursor = Arc::new(Mutex::new(starting_version));
         let data_to_process = Arc::new(Mutex::new(BTreeMap::new()));
         let task_count = 32;
         let current_metadata = file_store_operator.get_file_store_metadata().await.unwrap();
