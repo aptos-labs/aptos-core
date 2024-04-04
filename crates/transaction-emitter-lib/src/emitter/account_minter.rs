@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::EmitJobRequest;
+use crate::{emitter::signable_account_generator::SignableAccountGenerator, EmitJobRequest};
 use anyhow::{anyhow, bail, format_err, Context, Result};
 use aptos_crypto::{
     ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
@@ -267,6 +267,7 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         txn_executor: &dyn ReliableTransactionSubmitter,
         req: &EmitJobRequest,
+        account_generator: Box<dyn SignableAccountGenerator>,
         max_submit_batch_size: usize,
         local_accounts: Vec<Box<dyn SignableAccount>>,
     ) -> Result<Vec<Box<dyn SignableAccount>>> {
@@ -333,6 +334,7 @@ impl<'t> AccountMinter<'t> {
             .create_and_fund_seed_accounts(
                 new_source_account,
                 txn_executor,
+                account_generator,
                 expected_num_seed_accounts,
                 coins_per_seed_account,
                 max_submit_batch_size,
@@ -411,6 +413,7 @@ impl<'t> AccountMinter<'t> {
         &mut self,
         mut new_source_account: Option<LocalAccount>,
         txn_executor: &dyn ReliableTransactionSubmitter,
+        account_generator: Box<dyn SignableAccountGenerator>,
         seed_account_num: usize,
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
@@ -425,7 +428,9 @@ impl<'t> AccountMinter<'t> {
         while i < seed_account_num {
             let batch_size = min(max_submit_batch_size, seed_account_num - i);
             let mut rng = StdRng::from_rng(self.rng()).unwrap();
-            let mut batch = gen_reusable_accounts(txn_executor, batch_size, &mut rng).await?;
+            let mut batch = account_generator
+                .gen_signable_accounts(txn_executor, batch_size, &mut rng)
+                .await?;
             let txn_factory = &self.txn_factory;
             let create_requests: Vec<_> = batch
                 .iter()

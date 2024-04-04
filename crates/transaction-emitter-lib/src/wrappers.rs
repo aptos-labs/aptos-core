@@ -5,8 +5,8 @@ use crate::{
     args::{ClusterArgs, EmitArgs},
     cluster::Cluster,
     emitter::{
-        create_accounts, parse_seed, stats::TxnStats, EmitJobMode, EmitJobRequest, NumAccountsMode,
-        TxnEmitter,
+        create_accounts, parse_seed, signable_account_generator::LocalAccountGenerator,
+        stats::TxnStats, EmitJobMode, EmitJobRequest, NumAccountsMode, TxnEmitter,
     },
     instance::Instance,
     CreateAccountsArgs,
@@ -95,6 +95,7 @@ pub async fn emit_transactions_with_cluster(
             .mode(emitter_mode)
             .transaction_mix_per_phase(transaction_mix_per_phase)
             .txn_expiration_time_secs(args.txn_expiration_time_secs)
+            .account_type(args.account_type)
             .coordination_delay_between_instances(Duration::from_secs(
                 args.coordination_delay_between_instances.unwrap_or(0),
             ));
@@ -196,6 +197,7 @@ pub async fn create_accounts_command(
     create_accounts(
         &coin_source_account,
         &txn_factory,
+        Box::new(LocalAccountGenerator),
         &emit_job_request,
         DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
         false,
