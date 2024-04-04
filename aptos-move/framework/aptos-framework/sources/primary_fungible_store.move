@@ -74,8 +74,11 @@ module aptos_framework::primary_fungible_store {
         let metadata_addr = object::object_address(&metadata);
         object::address_to_object<Metadata>(metadata_addr);
         let derive_ref = &borrow_global<DeriveRefPod>(metadata_addr).metadata_derive_ref;
-        let constructor_ref = &object::create_user_derived_object(owner_addr, derive_ref);
-
+        let constructor_ref = if (features::primary_apt_fungible_store_at_user_address_enabled()) {
+            &object::create_sticky_object_at_address(owner_addr, owner_addr)
+        } else {
+            &object::create_user_derived_object(owner_addr, derive_ref)
+        };
         // Disable ungated transfer as deterministic stores shouldn't be transferrable.
         let transfer_ref = &object::generate_transfer_ref(constructor_ref);
         object::disable_ungated_transfer(transfer_ref);
@@ -87,7 +90,11 @@ module aptos_framework::primary_fungible_store {
     /// Get the address of the primary store for the given account.
     public fun primary_store_address<T: key>(owner: address, metadata: Object<T>): address {
         let metadata_addr = object::object_address(&metadata);
-        object::create_user_derived_object_address(owner, metadata_addr)
+        if (features::primary_apt_fungible_store_at_user_address_enabled()) {
+            owner
+        } else {
+            object::create_user_derived_object_address(owner, metadata_addr)
+        }
     }
 
     #[view]

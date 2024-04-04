@@ -447,6 +447,14 @@ module std::features {
         is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
     }
 
+    const PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS: u64 = 57;
+
+    public fun get_primary_apt_fungible_store_at_user_address_feature(): u64 { PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS }
+
+    public fun primary_apt_fungible_store_at_user_address_enabled(): bool acquires Features {
+        is_enabled(PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
