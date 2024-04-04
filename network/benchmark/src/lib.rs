@@ -26,7 +26,7 @@ use futures::{
 use once_cell::sync::Lazy;
 use rand::{rngs::OsRng, Rng};
 use serde::{Deserialize, Serialize};
-use std::{ops::DerefMut, sync::Arc, time::Duration};
+use std::{collections::HashSet, ops::DerefMut, sync::Arc, time::Duration};
 use tokio::{runtime::Handle, select, sync::RwLock};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -288,6 +288,8 @@ async fn connection_listener(
 ) {
     let config = node_config.netbench.unwrap();
     let peers_and_metadata = network_client.get_peers_and_metadata();
+    let mut connected_peers = HashSet::new();
+    let mut connection_notifications = peers_and_metadata.subscribe();
     if let Ok(peers) = peers_and_metadata.get_connected_peers_and_metadata() {
         info!(
             "netbench connection_listener got {} initial peers",
@@ -318,9 +320,9 @@ async fn connection_listener(
                     shared.clone(),
                 ));
             }
+            connected_peers.insert(*peer_network_id);
         }
     }
-    let mut connection_notifications = peers_and_metadata.subscribe();
     loop {
         match connection_notifications.recv().await {
             None => {
@@ -329,6 +331,11 @@ async fn connection_listener(
             },
             Some(note) => match note {
                 ConnectionNotification::NewPeer(meta, netcontext) => {
+                    let peer_network_id =
+                        PeerNetworkId::new(netcontext.network_id(), meta.remote_peer_id);
+                    if connected_peers.contains(&peer_network_id) {
+                        continue;
+                    }
                     info!(
                         "netbench connection_listener new {:?} {:?}",
                         meta, netcontext
@@ -339,7 +346,7 @@ async fn connection_listener(
                             network_client.clone(),
                             time_service.clone(),
                             netcontext.network_id(),
-                            netcontext.peer_id(),
+                            meta.remote_peer_id,
                             shared.clone(),
                         ));
                     }
@@ -349,13 +356,16 @@ async fn connection_listener(
                             network_client.clone(),
                             time_service.clone(),
                             netcontext.network_id(),
-                            netcontext.peer_id(),
+                            meta.remote_peer_id,
                             shared.clone(),
                         ));
                     }
+                    connected_peers.insert(peer_network_id);
                 },
-                ConnectionNotification::LostPeer(_, _, _) => {
-                    // don't care, things will disconnect elsewhere
+                ConnectionNotification::LostPeer(meta, netcontext, _) => {
+                    let peer_network_id =
+                        PeerNetworkId::new(netcontext.network_id(), meta.remote_peer_id);
+                    connected_peers.remove(&peer_network_id);
                 },
             },
         }
