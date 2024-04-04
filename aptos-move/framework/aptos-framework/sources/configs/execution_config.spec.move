@@ -10,7 +10,6 @@ spec aptos_framework::execution_config {
         use aptos_framework::timestamp;
         use std::signer;
         use std::features;
-        use aptos_framework::transaction_fee;
         use aptos_framework::chain_status;
         use aptos_framework::stake;
         use aptos_framework::staking_config;
@@ -19,7 +18,6 @@ spec aptos_framework::execution_config {
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 600;
         let addr = signer::address_of(account);
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         requires chain_status::is_genesis();
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<staking_config::StakingRewardsConfig>(@aptos_framework);

@@ -29,13 +29,11 @@ spec aptos_framework::version {
         use aptos_framework::stake;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
-        use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
         use aptos_framework::reconfiguration;
 
         // TODO: set because of timeout (property proved)
         pragma verify_duration_estimate = 120;
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
         requires chain_status::is_genesis();
         requires timestamp::spec_now_microseconds() >= reconfiguration::last_reconfiguration_time();

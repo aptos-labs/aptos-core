@@ -127,7 +127,6 @@ spec aptos_framework::block {
         use aptos_framework::chain_status;
         use aptos_framework::coin::CoinInfo;
         use aptos_framework::aptos_coin::AptosCoin;
-        use aptos_framework::transaction_fee;
         use aptos_framework::staking_config;
 
         vm: signer;
@@ -147,7 +146,6 @@ spec aptos_framework::block {
         requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
         requires exists<stake::ValidatorFees>(@aptos_framework);
         requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
         include staking_config::StakingRewardsConfigRequirement;
     }
 
