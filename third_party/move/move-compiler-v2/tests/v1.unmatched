@@ -206,7 +206,6 @@ move-compiler/tests/move_check/typing/{
   non_phantom_in_phantom_pos.move,
   pack_constraint_not_satisfied.move,
   pack_private_with_field.move,
-  pack_unit.move,
   pack_unpack_private.move,
   pack_unpack_private_script.move,
   pay_me_a_river.move,

@@ -364,6 +364,7 @@ move-compiler/tests/move_check/typing/pack_invalid_argument.exp   move-compiler-
 move-compiler/tests/move_check/typing/pack_missing_field.exp   move-compiler-v2/tests/checking/typing/pack_missing_field.exp
 move-compiler/tests/move_check/typing/pack_multiple.exp   move-compiler-v2/tests/checking/typing/pack_multiple.exp
 move-compiler/tests/move_check/typing/pack_reference.exp   move-compiler-v2/tests/checking/typing/pack_reference.exp
+move-compiler/tests/move_check/typing/pack_unit.exp   move-compiler-v2/tests/checking/typing/pack_unit.exp
 move-compiler/tests/move_check/typing/phantom_param_op_abilities.exp   move-compiler-v2/tests/checking/abilities/v1/phantom_param_op_abilities.exp
 move-compiler/tests/move_check/typing/phantom_param_op_abilities_invalid.exp   move-compiler-v2/tests/checking/abilities/v1/phantom_param_op_abilities_invalid.exp
 move-compiler/tests/move_check/typing/phantom_params_constraint_abilities.exp   move-compiler-v2/tests/checking/abilities/v1/phantom_params_constraint_abilities.exp
