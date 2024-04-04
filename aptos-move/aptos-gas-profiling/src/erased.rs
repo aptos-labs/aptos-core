@@ -3,8 +3,8 @@
 
 use crate::{
     log::{
-        CallFrame, Dependency, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, StorageFees,
-        WriteStorage, WriteTransient,
+        CallFrame, Dependency, EventStorage, EventTransient, ExecutionAndIOCosts,
+        ExecutionGasEvent, StorageFees, WriteStorage, WriteTransient,
     },
     render::Render,
     FrameName, TransactionGasLog,
@@ -182,6 +182,12 @@ impl CallFrame {
     }
 }
 
+impl EventTransient {
+    fn to_erased(&self) -> Node<InternalGas> {
+        Node::new(format!("{}", Render(&self.ty)), self.cost)
+    }
+}
+
 impl WriteTransient {
     fn to_erased(&self) -> Node<InternalGas> {
         Node::new(
@@ -222,6 +228,16 @@ impl ExecutionAndIOCosts {
 
         nodes.push(self.call_graph.to_erased());
 
+        nodes.push(Node::new(
+            "transaction",
+            self.transaction_transient.unwrap_or_else(|| 0.into()),
+        ));
+        let events = Node::new_with_children(
+            "events",
+            0,
+            self.events_transient.iter().map(|event| event.to_erased()),
+        );
+        nodes.push(events);
         let writes = Node::new_with_children(
             "writes",
             0,

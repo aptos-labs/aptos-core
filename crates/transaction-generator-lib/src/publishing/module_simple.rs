@@ -221,6 +221,9 @@ pub enum EntryPoints {
     TokenV1MintAndTransferNFTSequential,
     TokenV1MintAndStoreFT,
     TokenV1MintAndTransferFT,
+    // register if not registered already
+    CoinInitAndMint,
+    FungibleAssetMint,
 
     TokenV2AmbassadorMint {
         numbered: bool,
@@ -282,7 +285,9 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
-            | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "framework_usecases",
+            | EntryPoints::ResourceGroupsSenderMultiChange { .. }
+            | EntryPoints::CoinInitAndMint
+            | EntryPoints::FungibleAssetMint => "framework_usecases",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
@@ -333,6 +338,8 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
+            EntryPoints::CoinInitAndMint => "coin_example",
+            EntryPoints::FungibleAssetMint => "fungible_asset_example",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador"
             },
@@ -548,6 +555,16 @@ impl EntryPoints {
                     bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
                 ])
             },
+            EntryPoints::CoinInitAndMint => {
+                get_payload(module_id, ident_str!("mint_p").to_owned(), vec![
+                    bcs::to_bytes(&1000u64).unwrap(), // amount
+                ])
+            },
+            EntryPoints::FungibleAssetMint => {
+                get_payload(module_id, ident_str!("mint_p").to_owned(), vec![
+                    bcs::to_bytes(&1000u64).unwrap(), // amount
+                ])
+            },
             EntryPoints::TokenV2AmbassadorMint { numbered: true } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
@@ -651,6 +668,9 @@ impl EntryPoints {
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
+            EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
+                MultiSigConfig::Publisher
+            },
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 MultiSigConfig::Publisher
             },
@@ -698,6 +718,9 @@ impl EntryPoints {
             },
             EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => AutomaticArgs::Signer,
+            EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
+                AutomaticArgs::SignerAndMultiSig
+            },
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 AutomaticArgs::SignerAndMultiSig
             },

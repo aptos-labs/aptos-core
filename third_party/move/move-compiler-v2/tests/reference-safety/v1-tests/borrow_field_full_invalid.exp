@@ -22,6 +22,14 @@ error: mutable reference in local `inner` requires exclusive access but is borro
 17 │         *f1;
    │         --- conflicting reference `f1` used here
 
+error: mutable reference in local `inner` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:18:9
+   │
+18 │         *inner;
+   │         ^^^^^^ requirement enforced here
+19 │         *c;
+   │         -- conflicting reference `c` used here
+
 error: cannot immutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:23:18
    │
@@ -111,6 +119,23 @@ error: mutable reference in local `inner` requires exclusive access but is borro
    │         ^^^^^^ requirement enforced here
 35 │         *f1;
    │         --- conflicting reference `f1` used here
+
+error: mutable reference in local `f1` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:35:9
+   │
+35 │         *f1;
+   │         ^^^ requirement enforced here
+36 │         *inner;
+37 │         *c;
+   │         -- conflicting reference `c` used here
+
+error: mutable reference in local `inner` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:36:9
+   │
+36 │         *inner;
+   │         ^^^^^^ requirement enforced here
+37 │         *c;
+   │         -- conflicting reference `c` used here
 
 error: cannot mutably borrow since mutable references exist
    ┌─ tests/reference-safety/v1-tests/borrow_field_full_invalid.move:41:18
