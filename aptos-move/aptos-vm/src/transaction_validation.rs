@@ -27,7 +27,7 @@ use move_core_types::{
     value::{serialize_values, MoveValue},
     vm_status::{AbortLocation, StatusCode, VMStatus},
 };
-use move_vm_runtime::logging::expect_no_verification_errors;
+use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::TraversalContext};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 
@@ -73,6 +73,7 @@ pub(crate) fn run_script_prologue(
     session: &mut SessionExt,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     let txn_sequence_number = txn_data.sequence_number();
     let txn_authentication_key = txn_data.authentication_key().to_vec();
@@ -141,6 +142,7 @@ pub(crate) fn run_script_prologue(
             vec![],
             serialize_values(&args),
             &mut gas_meter,
+            traversal_context,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -157,6 +159,7 @@ pub(crate) fn run_multisig_prologue(
     txn_data: &TransactionMetadata,
     payload: &Multisig,
     log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
     let provided_payload = if let Some(payload) = &payload.transaction_payload {
@@ -177,6 +180,7 @@ pub(crate) fn run_multisig_prologue(
                 MoveValue::vector_u8(provided_payload),
             ]),
             &mut UnmeteredGasMeter,
+            traversal_context,
         )
         .map(|_return_vals| ())
         .map_err(expect_no_verification_errors)
@@ -189,6 +193,7 @@ fn run_epilogue(
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
     features: &Features,
+    traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
@@ -209,6 +214,7 @@ fn run_epilogue(
                 MoveValue::U64(gas_remaining.into()),
             ]),
             &mut UnmeteredGasMeter,
+            traversal_context,
         )
     } else {
         // Regular tx, run the normal epilogue
@@ -224,6 +230,7 @@ fn run_epilogue(
                 MoveValue::U64(gas_remaining.into()),
             ]),
             &mut UnmeteredGasMeter,
+            traversal_context,
         )
     }
     .map(|_return_vals| ())
@@ -231,7 +238,7 @@ fn run_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, fee_statement)?;
+        emit_fee_statement(session, fee_statement, traversal_context)?;
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -239,7 +246,11 @@ fn run_epilogue(
     Ok(())
 }
 
-fn emit_fee_statement(session: &mut SessionExt, fee_statement: FeeStatement) -> VMResult<()> {
+fn emit_fee_statement(
+    session: &mut SessionExt,
+    fee_statement: FeeStatement,
+    traversal_context: &mut TraversalContext,
+) -> VMResult<()> {
     session
         .execute_function_bypass_visibility(
             &TRANSACTION_FEE_MODULE,
@@ -247,6 +258,7 @@ fn emit_fee_statement(session: &mut SessionExt, fee_statement: FeeStatement) -> 
             vec![],
             vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
             &mut UnmeteredGasMeter,
+            traversal_context,
         )
         .map(|_return_vals| ())
 }
@@ -260,6 +272,7 @@ pub(crate) fn run_success_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
     fail_point!("move_adapter::run_success_epilogue", |_| {
         Err(VMStatus::error(
@@ -268,8 +281,15 @@ pub(crate) fn run_success_epilogue(
         ))
     });
 
-    run_epilogue(session, gas_remaining, fee_statement, txn_data, features)
-        .or_else(|err| convert_epilogue_error(err, log_context))
+    run_epilogue(
+        session,
+        gas_remaining,
+        fee_statement,
+        txn_data,
+        features,
+        traversal_context,
+    )
+    .or_else(|err| convert_epilogue_error(err, log_context))
 }
 
 /// Run the failure epilogue of a transaction by calling into `USER_EPILOGUE_NAME` function
@@ -281,8 +301,17 @@ pub(crate) fn run_failure_epilogue(
     features: &Features,
     txn_data: &TransactionMetadata,
     log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
-    run_epilogue(session, gas_remaining, fee_statement, txn_data, features).or_else(|e| {
+    run_epilogue(
+        session,
+        gas_remaining,
+        fee_statement,
+        txn_data,
+        features,
+        traversal_context,
+    )
+    .or_else(|e| {
         expect_only_successful_execution(
             e,
             APTOS_TRANSACTION_VALIDATION.user_epilogue_name.as_str(),

@@ -6,6 +6,7 @@ use crate::{
     access_control::AccessControlState,
     data_cache::TransactionDataCache,
     loader::{Function, Loader, ModuleStorageAdapter, Resolver},
+    module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
     trace,
@@ -90,6 +91,7 @@ impl Interpreter {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         loader: &Loader,
     ) -> VMResult<Vec<Value>> {
@@ -105,6 +107,7 @@ impl Interpreter {
             data_store,
             module_store,
             gas_meter,
+            traversal_context,
             extensions,
             function,
             ty_args,
@@ -124,6 +127,7 @@ impl Interpreter {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
         ty_args: Vec<Type>,
@@ -230,6 +234,7 @@ impl Interpreter {
                             data_store,
                             module_store,
                             gas_meter,
+                            traversal_context,
                             extensions,
                             func,
                             vec![],
@@ -290,6 +295,7 @@ impl Interpreter {
                             data_store,
                             module_store,
                             gas_meter,
+                            traversal_context,
                             extensions,
                             func,
                             ty_args,
@@ -326,14 +332,12 @@ impl Interpreter {
     ) -> PartialVMResult<()> {
         if let Some(module_id) = func.module_id() {
             if let Some(current_module_id) = current_frame.function.module_id() {
-                if module_id != current_module_id {
-                    if self.executed_modules.contains(module_id) {
-                        return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
-                            .with_message(format!(
-                                "Re-entrancy detected: {} already exists on top of the stack",
-                                module_id
-                            )));
-                    }
+                if module_id != current_module_id && self.executed_modules.contains(module_id) {
+                    return Err(PartialVMError::new(StatusCode::RUNTIME_DISPATCH_ERROR)
+                        .with_message(format!(
+                            "Re-entrancy detected: {} already exists on top of the stack",
+                            module_id
+                        )));
                 }
             }
             self.executed_modules.insert(module_id.clone());
@@ -443,6 +447,7 @@ impl Interpreter {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
         ty_args: Vec<Type>,
@@ -454,6 +459,7 @@ impl Interpreter {
             data_store,
             module_store,
             gas_meter,
+            traversal_context,
             extensions,
             function.clone(),
             ty_args,
@@ -483,6 +489,7 @@ impl Interpreter {
         data_store: &mut TransactionDataCache,
         module_store: &ModuleStorageAdapter,
         gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         function: Arc<Function>,
         ty_args: Vec<Type>,
@@ -582,17 +589,6 @@ impl Interpreter {
                 ty_args,
                 args,
             } => {
-                resolver
-                    .loader()
-                    .load_module(&module_name, data_store, module_store)
-                    .map_err(|_| {
-                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE).with_message(
-                            format!(
-                                "Dispatch destination {}::{} doesn't exist",
-                                module_name, func_name
-                            ),
-                        )
-                    })?;
                 let func = resolver.function_from_name(&module_name, &func_name)?;
 
                 if func.is_friend_or_private() {
@@ -628,6 +624,35 @@ impl Interpreter {
                     func,
                     ty_args,
                 )
+            },
+            NativeResult::LoadModule { module_name } => {
+                let arena_id = traversal_context
+                    .referenced_module_ids
+                    .alloc(module_name.clone());
+                resolver
+                    .loader()
+                    .check_dependencies_and_charge_gas(
+                        module_store,
+                        data_store,
+                        gas_meter,
+                        &mut traversal_context.visited,
+                        traversal_context.referenced_modules,
+                        [(arena_id.address(), arena_id.name())],
+                    )
+                    .map_err(|err| {
+                        PartialVMError::new(err.major_status())
+                            .with_message(format!("Module {} failed to be charged", module_name))
+                    })?;
+                resolver
+                    .loader()
+                    .load_module(&module_name, data_store, module_store)
+                    .map_err(|_| {
+                        PartialVMError::new(StatusCode::FUNCTION_RESOLUTION_FAILURE)
+                            .with_message(format!("Module {} doesn't exist", module_name))
+                    })?;
+
+                current_frame.pc += 1; // advance past the Call instruction in the caller
+                Ok(())
             },
         }
     }

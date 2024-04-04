@@ -22,7 +22,9 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    move_vm::MoveVM, native_extensions::NativeContextExtensions,
+    module_traversal::{TraversalContext, TraversalStorage},
+    move_vm::MoveVM,
+    native_extensions::NativeContextExtensions,
     native_functions::NativeFunctionTable,
 };
 use move_vm_test_utils::{
@@ -271,12 +273,14 @@ impl SharedTestingConfig {
         // TODO: collect VM logs if the verbose flag (i.e, `self.verbose`) is set
 
         let now = Instant::now();
+        let storage = TraversalStorage::new();
         let serialized_return_values_result = session.execute_function_bypass_visibility(
             &test_plan.module_id,
             IdentStr::new(function_name).unwrap(),
             vec![], // no ty args, at least for now
             serialize_values(test_info.arguments.iter()),
             &mut gas_meter,
+            &mut TraversalContext::new(&storage),
         );
         let mut return_result = serialized_return_values_result.map(|res| {
             res.return_values

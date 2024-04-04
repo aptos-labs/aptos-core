@@ -44,6 +44,7 @@ move-command-line-common = { workspace = true }
 move-core-types = { workspace = true, features = ["fuzzing"] }
 move-ir-compiler = { workspace = true }
 move-model = { workspace = true }
+move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
