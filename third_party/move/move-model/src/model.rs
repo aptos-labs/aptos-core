@@ -457,9 +457,6 @@ impl QualifiedInstId<StructId> {
 }
 
 // =================================================================================================
-/// # Language Version
-
-// =================================================================================================
 /// # Verification Scope
 
 /// Defines what functions to verify.
@@ -608,7 +605,7 @@ impl GlobalEnv {
         let unknown_move_ir_loc = MoveIrLoc::new(FileHash::new("<unknown>"), 0, 0);
         let internal_loc = fake_loc("<internal>");
         GlobalEnv {
-            language_version: LanguageVersion::V1,
+            language_version: LanguageVersion::default(),
             source_files,
             doc_comments: Default::default(),
             unknown_loc,

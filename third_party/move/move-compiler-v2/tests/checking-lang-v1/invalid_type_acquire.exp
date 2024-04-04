@@ -1,24 +1,24 @@
 
 Diagnostics:
-error: access specifiers not supported in language versions before `2.0-unstable`
-   ┌─ tests/checking-lang-v1/invalid_type_acquire.move:18:9
-   │
-18 │         T,
-   │         ^
-
 error: invalid access specifier
    ┌─ tests/checking-lang-v1/invalid_type_acquire.move:18:9
    │
 18 │         T,
    │         ^
 
-error: access specifiers not supported in language versions before `2.0-unstable`
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/invalid_type_acquire.move:18:9
+   │
+18 │         T,
+   │         ^
+
+error: invalid access specifier
    ┌─ tests/checking-lang-v1/invalid_type_acquire.move:19:9
    │
 19 │         u64,
    │         ^^^
 
-error: invalid access specifier
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
    ┌─ tests/checking-lang-v1/invalid_type_acquire.move:19:9
    │
 19 │         u64,

@@ -13,7 +13,7 @@ use aptos_types::{account_address::AccountAddress, transaction::EntryABI};
 use clap::Parser;
 use codespan_reporting::{
     diagnostic::Severity,
-    term::termcolor::{ColorChoice, StandardStream},
+    term::termcolor::{Color, ColorChoice, ColorSpec, StandardStream, WriteColor},
 };
 use itertools::Itertools;
 use move_binary_format::CompiledModule;
@@ -32,7 +32,7 @@ use move_package::{
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    io::stderr,
+    io::{stderr, Write},
     path::{Path, PathBuf},
 };
 
@@ -178,24 +178,7 @@ impl BuiltPackage {
         let bytecode_version = options.bytecode_version;
         let compiler_version = options.compiler_version;
         let language_version = options.language_version;
-        let effective_compiler_version = compiler_version.unwrap_or_default();
-        let effective_language_version = language_version.unwrap_or_default();
-        if effective_compiler_version.unstable() {
-            eprintln!(
-                "Warning: using experimental compiler version `{}`.\n\
-                You cannot deploy unstable code in production networks.",
-                effective_compiler_version
-            )
-        }
-        if effective_language_version.unstable() {
-            eprintln!(
-                "Warning: using experimental language version `{}`.\n\
-                You cannot deploy unstable code in production networks.",
-                effective_language_version
-            )
-        }
-
-        effective_compiler_version.check_language_support(effective_language_version)?;
+        Self::check_versions(&compiler_version, &language_version)?;
         let skip_attribute_checks = options.skip_attribute_checks;
         let build_config = BuildConfig {
             dev_mode: options.dev,
@@ -279,6 +262,35 @@ impl BuiltPackage {
             package_path,
             package,
         })
+    }
+
+    // Check versions and warn user if using unstable ones.
+    fn check_versions(
+        compiler_version: &Option<CompilerVersion>,
+        language_version: &Option<LanguageVersion>,
+    ) -> anyhow::Result<()> {
+        let effective_compiler_version = compiler_version.unwrap_or_default();
+        let effective_language_version = language_version.unwrap_or_default();
+        let mut error_writer = StandardStream::stderr(ColorChoice::Auto);
+        error_writer.set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))?;
+        if effective_compiler_version.unstable() {
+            writeln!(
+                &mut error_writer,
+                "Warning: compiler version `{}` is experimental \
+                and should not be used in production",
+                effective_compiler_version
+            )?
+        }
+        if effective_language_version.unstable() {
+            writeln!(
+                &mut error_writer,
+                "Warning: language version `{}` is experimental \
+                and should not be used in production",
+                effective_language_version
+            )?
+        }
+        effective_compiler_version.check_language_support(effective_language_version)?;
+        Ok(())
     }
 
     /// Returns the name of this package.

@@ -13,19 +13,28 @@ use std::{
 
 const UNSTABLE_MARKER: &str = "-unstable";
 
+// ================================================================================'
+// Metadata for compilation result (WORK IN PROGRESS)
+
 /// Metadata about a compilation result. To maintain serialization
-/// compatibility, this uses a free-form string to represent compiler version
-/// and language version.
+/// stability, this uses a free-form string to represent compiler version
+/// and language version, which is interpreted by the `CompilerVersion`
+/// and `LanguageVersion` types. This allows to always successfully
+/// deserialize the metadata (even older code with newer data), and leave it
+/// up to the program how to deal with decoding errors.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CompilationMetadata {
-    /// The version of the compiler, as a string.
-    pub compiler_version: String,
-    /// The version of the language, as a string.
-    pub language_version: String,
     /// A flag indicating whether, at time of creation, the compilation
     /// result was considered as unstable. Unstable code may have restrictions
-    /// for deployment on production networks.
+    /// for deployment on production networks. This flag is true if either the
+    /// compiler or language versions are unstable.
     pub unstable: bool,
+    /// The version of the compiler, as a string. See
+    /// `CompilationVersion::from_str` for supported version strings.
+    pub compiler_version: String,
+    /// The version of the language, as a string. See
+    /// `LanguageVersion::from_str` for supported version strings.
+    pub language_version: String,
 }
 
 impl CompilationMetadata {
@@ -51,12 +60,19 @@ impl CompilationMetadata {
     }
 }
 
-/// Represents a compiler version
+// ================================================================================'
+// Compiler Version
+
+/// Represents a compiler version.
+///
+/// The versioning scheme is `major.minor`, where for `major = 1` we do not
+/// distinguish a minor version. A major version change represents
+/// a different/largely refactored compiler. This we have versions `1, 2.0, 2.1, 2.2, .., `.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum CompilerVersion {
     /// The legacy v1 Move compiler
     V1,
-    /// The v2 compiler, starting with 2.0. Each new released version of the compiler
+    /// The v2 compiler, starting with 2.0-unstable. Each new released version of the compiler
     /// should get an enum entry here.
     V2_0,
 }
@@ -76,6 +92,8 @@ impl Default for CompilerVersion {
 impl FromStr for CompilerVersion {
     type Err = anyhow::Error;
 
+    /// Parses a compiler version. If the caller only provides a major
+    /// version number, this chooses the latest stable minor version (if any).
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // Strip unstable marker as it is not relevant for parsing.
         let s1 = s.replace(UNSTABLE_MARKER, "");
@@ -131,18 +149,28 @@ impl CompilerVersion {
     }
 }
 
+// ================================================================================'
+// Language Version
+
 /// Represents a language version.
+///
+/// The versioning scheme is `major.minor`, where for `major = 1` we do not
+/// distinguish a minor version. This we have versions `1, 2.0, 2.1, .., 3.0, 3.1, ..`.
+/// Typically, a major version change is given with an addition of larger new language
+/// features. There are no breaking changes expected with major version changes,
+/// however, there maybe some isolated exceptions.
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, Eq, PartialEq, PartialOrd, Ord)]
 pub enum LanguageVersion {
     /// The version of Move at around the genesis of the Aptos network end
     /// of '22. This is the original Diem Move plus the extension of inline
-    /// functions with lambda parameters.
+    /// functions with lambda parameters, as well as a simple form of `for`
+    /// loops.
     V1,
     /// The upcoming (currently unstable) 2.0 version of Move. The following
     /// experimental language features are supported so far:
     ///
     /// - Access control specifiers as described in AIP-56.
-    /// - receiver style (method style) function calls with auto-referencing
+    /// - Receiver style (method) function calls with auto-referencing
     V2_0,
 }
 
@@ -160,6 +188,8 @@ impl Default for LanguageVersion {
 impl FromStr for LanguageVersion {
     type Err = anyhow::Error;
 
+    /// Parses a language version. If the caller only provides a major
+    /// version number, this chooses the latest stable minor version (if any).
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // Strip unstable marker as it is not relevant for parsing.
         let s1 = s.replace(UNSTABLE_MARKER, "");

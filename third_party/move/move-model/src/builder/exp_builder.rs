@@ -172,8 +172,8 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             self.env().error(
                 loc,
                 &format!(
-                    "{} not supported in language versions before `{}`",
-                    feature, version_min
+                    "not supported before language version `{}`: {}",
+                    version_min, feature
                 ),
             )
         }
@@ -1104,11 +1104,20 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             type_args,
             address,
         } = &specifier.value;
-        if *kind != file_format::AccessKind::Acquires
-            || *negated
-            || type_args.is_some() && !type_args.as_ref().unwrap().is_empty()
-        {
-            self.check_language_version(&loc, "access specifiers", LanguageVersion::V2_0)
+        if *kind != file_format::AccessKind::Acquires {
+            self.check_language_version(
+                &loc,
+                "read/write access specifiers. Try `acquires` instead.",
+                LanguageVersion::V2_0,
+            )
+        } else if *negated {
+            self.check_language_version(&loc, "access specifier negation", LanguageVersion::V2_0)
+        } else if type_args.is_some() && !type_args.as_ref().unwrap().is_empty() {
+            self.check_language_version(
+                &loc,
+                "access specifier type instantiation. Try removing the type instantiation.",
+                LanguageVersion::V2_0,
+            )
         }
         let resource = match (module_address, module_name, resource_name) {
             (None, None, None) => {
@@ -1184,7 +1193,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             (Some(_), Some(module), Some(resource))
                 if is_wildcard(&module.0) && !is_wildcard(resource) =>
             {
-                self.error(&loc, "invalid access specifier: a wildcard cannot be followed by a non-wildcard name component");
+                self.error(
+                    &loc,
+                    "invalid access specifier: a wildcard \
+                cannot be followed by a non-wildcard name component",
+                );
                 ResourceSpecifier::Any
             },
             _ => {
@@ -1193,7 +1206,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
             },
         };
         if !matches!(resource, ResourceSpecifier::Resource(..)) {
-            self.check_language_version(&loc, "access specifiers", LanguageVersion::V2_0);
+            self.check_language_version(
+                &loc,
+                "address and wildcard access specifiers. Only resource type names can be provided.",
+                LanguageVersion::V2_0,
+            );
         }
         let address = self.translate_address_specifier(address)?;
         Some(AccessSpecifier {
@@ -1213,14 +1230,30 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
         let res = match &specifier.value {
             EA::AddressSpecifier_::Empty => (loc, AddressSpecifier::Any),
             EA::AddressSpecifier_::Any => {
-                self.check_language_version(&loc, "access specifiers", LanguageVersion::V2_0);
+                self.check_language_version(
+                    &loc,
+                    "wildcard address specifiers",
+                    LanguageVersion::V2_0,
+                );
                 (loc, AddressSpecifier::Any)
             },
-            EA::AddressSpecifier_::Literal(addr) => (
-                loc,
-                AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
-            ),
+            EA::AddressSpecifier_::Literal(addr) => {
+                self.check_language_version(
+                    &loc,
+                    "literal address specifiers",
+                    LanguageVersion::V2_0,
+                );
+                (
+                    loc,
+                    AddressSpecifier::Address(Address::Numerical(addr.into_inner())),
+                )
+            },
             EA::AddressSpecifier_::Name(name) => {
+                self.check_language_version(
+                    &loc,
+                    "named address specifiers",
+                    LanguageVersion::V2_0,
+                );
                 // Construct an expansion name exp for regular type check
                 let maccess = sp(name.loc, EA::ModuleAccess_::Name(*name));
                 self.translate_name(
@@ -1236,7 +1269,11 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                 )
             },
             EA::AddressSpecifier_::Call(maccess, type_args, name) => {
-                self.check_language_version(&loc, "access specifiers", LanguageVersion::V2_0);
+                self.check_language_version(
+                    &loc,
+                    "derived address specifiers",
+                    LanguageVersion::V2_0,
+                );
                 // Construct an expansion function call for regular type check
                 let name_exp = sp(
                     name.loc,
