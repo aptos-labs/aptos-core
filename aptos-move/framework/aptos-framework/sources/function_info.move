@@ -1,9 +1,10 @@
-/// The `string` module defines the `String` type which represents UTF8 encoded strings.
+/// The `function_info` module defines the `FunctionInfo` type which simulates a function pointer.
 module aptos_framework::function_info {
     use std::error;
     use std::features;
     use std::string::{Self, String};
 
+    friend aptos_framework::fungible_asset;
     friend aptos_framework::dispatchable_fungible_asset;
     #[test_only]
     friend aptos_framework::function_info_tests;
@@ -28,8 +29,14 @@ module aptos_framework::function_info {
         module_name: String,
         function_name: String,
     ): FunctionInfo {
-        assert!(is_identifier(string::bytes(&module_name)), EINVALID_IDENTIFIER);
-        assert!(is_identifier(string::bytes(&function_name)), EINVALID_IDENTIFIER);
+        assert!(
+            is_identifier(string::bytes(&module_name)),
+            EINVALID_IDENTIFIER
+        );
+        assert!(
+            is_identifier(string::bytes(&function_name)),
+            EINVALID_IDENTIFIER
+        );
         FunctionInfo {
             module_address,
             module_name,
@@ -51,11 +58,23 @@ module aptos_framework::function_info {
         framework_function: &FunctionInfo,
         dispatch_target: &FunctionInfo,
     ): bool {
-        assert!(features::dispatchable_fungible_asset_enabled(), error::aborted(ENOT_ACTIVATED));
+        assert!(
+            features::dispatchable_fungible_asset_enabled(),
+            error::aborted(ENOT_ACTIVATED)
+        );
         load_function_impl(dispatch_target);
         check_dispatch_type_compatibility_impl(framework_function, dispatch_target)
     }
 
+    /// Load up a function into VM's loader and charge for its dependencies
+    ///
+    /// It is **critical** to make sure that this function is invoked before `check_dispatch_type_compatibility`
+    /// or performing any other dispatching logic to ensure:
+    /// 1. We properly charge gas for the function to dispatch.
+    /// 2. The function is loaded in the cache so that we can perform further type checking/dispatching logic.
+    ///
+    /// Calling `check_dispatch_type_compatibility_impl` or dispatch without loading up the module would yield an error
+    /// if such module isn't accessed previously in the transaction.
     public(friend) fun load_function(f: &FunctionInfo) {
         load_function_impl(f)
     }

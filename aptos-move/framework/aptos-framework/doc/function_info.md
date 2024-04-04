@@ -17,7 +17,9 @@ The <code><a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">s
 -  [Specification](#@Specification_1)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 
@@ -87,6 +89,16 @@ String is not a valid Move identifier
 
 
 
+<a id="0x1_function_info_ENOT_ACTIVATED"></a>
+
+Feature hasn't been activated yet.
+
+
+<pre><code><b>const</b> <a href="function_info.md#0x1_function_info_ENOT_ACTIVATED">ENOT_ACTIVATED</a>: u64 = 3;
+</code></pre>
+
+
+
 <a id="0x1_function_info_new_function_info"></a>
 
 ## Function `new_function_info`
@@ -108,8 +120,14 @@ Creates a new function info from names.
     module_name: String,
     function_name: String,
 ): <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
-    <b>assert</b>!(<a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&module_name)), <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>);
-    <b>assert</b>!(<a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&function_name)), <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>);
+    <b>assert</b>!(
+        <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&module_name)),
+        <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>
+    );
+    <b>assert</b>!(
+        <a href="function_info.md#0x1_function_info_is_identifier">is_identifier</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_bytes">string::bytes</a>(&function_name)),
+        <a href="function_info.md#0x1_function_info_EINVALID_IDENTIFIER">EINVALID_IDENTIFIER</a>
+    );
     <a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a> {
         module_address,
         module_name,
@@ -126,9 +144,19 @@ Creates a new function info from names.
 
 ## Function `check_dispatch_type_compatibility`
 
+Check if the dispatch target function meets the type requirements of the disptach entry point.
+
+framework_function is the dispatch native function defined in the aptos_framework.
+dispatch_target is the function passed in by the user.
+
+dispatch_target should have the same signature (same argument type, same generics constraint) except
+that the framework_function will have a <code>&<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a></code> in the last argument that will instruct the VM which
+function to jump to.
+
+dispatch_target also needs to be public so the type signature will remain unchanged.
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(lhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, rhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(framework_function: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>, dispatch_target: &<a href="function_info.md#0x1_function_info_FunctionInfo">function_info::FunctionInfo</a>): bool
 </code></pre>
 
 
@@ -138,11 +166,15 @@ Creates a new function info from names.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility">check_dispatch_type_compatibility</a>(
-    lhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
-    rhs: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
+    framework_function: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
+    dispatch_target: &<a href="function_info.md#0x1_function_info_FunctionInfo">FunctionInfo</a>,
 ): bool {
-    <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(rhs);
-    <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(lhs, rhs)
+    <b>assert</b>!(
+        <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_dispatchable_fungible_asset_enabled">features::dispatchable_fungible_asset_enabled</a>(),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_aborted">error::aborted</a>(<a href="function_info.md#0x1_function_info_ENOT_ACTIVATED">ENOT_ACTIVATED</a>)
+    );
+    <a href="function_info.md#0x1_function_info_load_function_impl">load_function_impl</a>(dispatch_target);
+    <a href="function_info.md#0x1_function_info_check_dispatch_type_compatibility_impl">check_dispatch_type_compatibility_impl</a>(framework_function, dispatch_target)
 }
 </code></pre>
 

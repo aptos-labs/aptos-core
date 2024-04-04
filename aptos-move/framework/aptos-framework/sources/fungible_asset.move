@@ -3,6 +3,7 @@
 module aptos_framework::fungible_asset {
     use aptos_framework::aggregator_v2::{Self, Aggregator};
     use aptos_framework::event;
+    use aptos_framework::function_info::{Self, FunctionInfo};
     use aptos_framework::object::{Self, Object, ConstructorRef, DeleteRef, ExtendRef};
     use std::string;
     use std::features;
@@ -15,6 +16,10 @@ module aptos_framework::fungible_asset {
     friend aptos_framework::coin;
     friend aptos_framework::primary_fungible_store;
 
+    friend aptos_framework::dispatchable_fungible_asset;
+
+    /// Amount cannot be zero.
+    const EAMOUNT_CANNOT_BE_ZERO: u64 = 1;
     /// The transfer ref and the fungible asset do not match.
     const ETRANSFER_REF_AND_FUNGIBLE_ASSET_MISMATCH: u64 = 2;
     /// Store is disabled from sending and receiving this fungible asset.
@@ -61,6 +66,16 @@ module aptos_framework::fungible_asset {
     const EFUNGIBLE_STORE_EXISTENCE: u64 = 23;
     /// Account is not the owner of metadata object.
     const ENOT_METADATA_OWNER: u64 = 24;
+    /// Provided withdraw function type doesn't meet the signature requirement.
+    const EWITHDRAW_FUNCTION_SIGNATURE_MISMATCH: u64 = 23;
+    /// Provided deposit function type doesn't meet the signature requirement.
+    const EDEPOSIT_FUNCTION_SIGNATURE_MISMATCH: u64 = 24;
+    /// Provided derived_balance function type doesn't meet the signature requirement.
+    const EDERIVED_BALANCE_FUNCTION_SIGNATURE_MISMATCH: u64 = 25;
+    /// Invalid withdraw/deposit on dispatchable token.
+    const EINVALID_DISPATCHABLE_OPERATIONS: u64 = 26;
+    /// Trying to re-register dispatch hook on a fungible asset.
+    const EALREADY_REGISTERED: u64 = 27;
 
     //
     // Constants
@@ -114,6 +129,13 @@ module aptos_framework::fungible_asset {
         balance: u64,
         /// If true, owner transfer is disabled that only `TransferRef` can move in/out from this store.
         frozen: bool,
+    }
+
+    #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
+    struct DispatchFunctionStore has key {
+		withdraw_function: FunctionInfo,
+		deposit_function: FunctionInfo,
+        derived_balance_function: FunctionInfo,
     }
 
     /// FungibleAsset can be passed into function for type safety and to guarantee a specific amount.
@@ -218,6 +240,85 @@ module aptos_framework::fungible_asset {
         let metadata = borrow_global_mut<Metadata>(metadata_addr);
         metadata.icon_uri = new_icon_uri;
         metadata.project_uri = new_project_uri;
+    }
+
+    /// Create a fungible asset store whose transfer rule would be overloaded by the provided function.
+    public(friend) fun register_dispatch_functions(
+        constructor_ref: &ConstructorRef,
+        withdraw_function: FunctionInfo,
+        deposit_function: FunctionInfo,
+        derived_balance_function: FunctionInfo,
+    ) {
+        let dispatcher_withdraw_function_info = function_info::new_function_info(
+            @aptos_framework,
+            string::utf8(b"dispatchable_fungible_asset"),
+            string::utf8(b"dispatchable_withdraw"),
+        );
+        // Verify that caller type matches callee type so wrongly typed function cannot be registered.
+        assert!(
+            function_info::check_dispatch_type_compatibility(
+                &dispatcher_withdraw_function_info,
+                &withdraw_function
+            ),
+            error::invalid_argument(
+                EWITHDRAW_FUNCTION_SIGNATURE_MISMATCH
+            )
+        );
+
+        let dispatcher_deposit_function_info = function_info::new_function_info(
+            @aptos_framework,
+            string::utf8(b"dispatchable_fungible_asset"),
+            string::utf8(b"dispatchable_deposit"),
+        );
+        // Verify that caller type matches callee type so wrongly typed function cannot be registered.
+        assert!(
+            function_info::check_dispatch_type_compatibility(
+                &dispatcher_deposit_function_info,
+                &deposit_function
+            ),
+            error::invalid_argument(
+                EDEPOSIT_FUNCTION_SIGNATURE_MISMATCH
+            )
+        );
+
+        let dispatcher_derived_balance_function_info = function_info::new_function_info(
+            @aptos_framework,
+            string::utf8(b"dispatchable_fungible_asset"),
+            string::utf8(b"dispatchable_derived_balance"),
+        );
+        // Verify that caller type matches callee type so wrongly typed function cannot be registered.
+        assert!(
+            function_info::check_dispatch_type_compatibility(
+                &dispatcher_derived_balance_function_info,
+                &derived_balance_function
+            ),
+            error::invalid_argument(
+                EDERIVED_BALANCE_FUNCTION_SIGNATURE_MISMATCH
+            )
+        );
+
+        assert!(
+            !object::can_generate_delete_ref(constructor_ref),
+            error::invalid_argument(EOBJECT_IS_DELETABLE)
+        );
+        assert!(
+            !exists<DispatchFunctionStore>(
+                object::address_from_constructor_ref(constructor_ref)
+            ),
+            error::already_exists(EALREADY_REGISTERED)
+        );
+
+        let store_obj = &object::generate_signer(constructor_ref);
+
+        // Store the overload function hook.
+        move_to<DispatchFunctionStore>(
+            store_obj,
+            DispatchFunctionStore {
+                withdraw_function,
+                deposit_function,
+                derived_balance_function,
+            }
+        );
     }
 
     /// Creates a mint ref that can be used to mint fungible assets from the given fungible object's constructor ref.
@@ -336,6 +437,32 @@ module aptos_framework::fungible_asset {
         store_exists(object::object_address(&store)) && borrow_store_resource(&store).frozen
     }
 
+    #[view]
+    /// Return whether a fungible asset type is dispatchable.
+    public fun is_dispatchable<T: key>(store: Object<T>): bool acquires FungibleStore {
+        let fa_store = borrow_store_resource(&store);
+        let metadata_addr = object::object_address(&fa_store.metadata);
+        exists<DispatchFunctionStore>(metadata_addr)
+    }
+
+    public(friend) fun deposit_dispatch_function<T: key>(store: Object<T>): FunctionInfo acquires FungibleStore, DispatchFunctionStore {
+        let fa_store = borrow_store_resource(&store);
+        let metadata_addr = object::object_address(&fa_store.metadata);
+        borrow_global<DispatchFunctionStore>(metadata_addr).deposit_function
+    }
+
+    public(friend) fun withdraw_dispatch_function<T: key>(store: Object<T>): FunctionInfo acquires FungibleStore, DispatchFunctionStore {
+        let fa_store = borrow_store_resource(&store);
+        let metadata_addr = object::object_address(&fa_store.metadata);
+        borrow_global<DispatchFunctionStore>(metadata_addr).withdraw_function
+    }
+
+    public(friend) fun derived_balance_dispatch_function<T: key>(store: Object<T>): FunctionInfo acquires FungibleStore, DispatchFunctionStore {
+        let fa_store = borrow_store_resource(&store);
+        let metadata_addr = object::object_address(&fa_store.metadata);
+        borrow_global<DispatchFunctionStore>(metadata_addr).derived_balance_function
+    }
+
     public fun asset_metadata(fa: &FungibleAsset): Object<Metadata> {
         fa.metadata
     }
@@ -410,12 +537,14 @@ module aptos_framework::fungible_asset {
     ): FungibleAsset acquires FungibleStore {
         assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
         assert!(!is_frozen(store), error::permission_denied(ESTORE_IS_FROZEN));
+        assert!(!is_dispatchable(store), error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS));
         withdraw_internal(object::object_address(&store), amount)
     }
 
     /// Deposit `amount` of the fungible asset to `store`.
     public fun deposit<T: key>(store: Object<T>, fa: FungibleAsset) acquires FungibleStore {
         assert!(!is_frozen(store), error::permission_denied(ESTORE_IS_FROZEN));
+        assert!(!is_dispatchable(store), error::invalid_argument(EINVALID_DISPATCHABLE_OPERATIONS));
         deposit_internal(store, fa);
     }
 

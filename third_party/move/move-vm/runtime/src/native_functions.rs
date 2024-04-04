@@ -6,6 +6,7 @@ use crate::{
     data_cache::TransactionDataCache,
     interpreter::Interpreter,
     loader::{Function, Resolver},
+    module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
 };
 use move_binary_format::errors::{
@@ -101,6 +102,7 @@ pub struct NativeContext<'a, 'b, 'c> {
     resolver: &'a Resolver<'a>,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_balance: InternalGas,
+    traversal_context: &'a TraversalContext<'a>,
 }
 
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
@@ -110,6 +112,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
         resolver: &'a Resolver<'a>,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_balance: InternalGas,
+        traversal_context: &'a TraversalContext<'a>,
     ) -> Self {
         Self {
             interpreter,
@@ -117,6 +120,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
             resolver,
             extensions,
             gas_balance,
+            traversal_context,
         }
     }
 }
@@ -183,6 +187,10 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
 
     pub fn gas_balance(&self) -> InternalGas {
         self.gas_balance
+    }
+
+    pub fn traversal_context(&self) -> &TraversalContext {
+        &self.traversal_context
     }
 
     pub fn load_function(

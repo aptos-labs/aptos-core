@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_binary_format::errors::PartialVMError;
+use move_core_types::{
+    gas_algebra::InternalGas, identifier::Identifier, language_storage::ModuleId,
+};
+use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use smallvec::SmallVec;
 
 /// Saner representation of a native function error.
 #[allow(unused)]
@@ -23,6 +28,18 @@ pub enum SafeNativeError {
     /// Indicating that the native function ran into some internal errors that shall not normally
     /// be triggerable by user inputs.
     InvariantViolation(PartialVMError),
+
+    /// Indicating the native function will result in a switch in control flow.
+    FunctionDispatch {
+        cost: InternalGas,
+        module_name: ModuleId,
+        func_name: Identifier,
+        ty_args: Vec<Type>,
+        args: SmallVec<[Value; 1]>,
+    },
+
+    /// Load up a module
+    LoadModule { module_name: ModuleId },
 }
 
 // Allows us to keep using the `?` operator on function calls that return `PartialVMResult` inside safe natives.
