@@ -21,3 +21,11 @@ error: mutable reference in local `s` requires exclusive access but is borrowed
    │         ^^ requirement enforced here
 21 │         *f;
    │         -- conflicting reference `f` used here
+
+error: mutable reference in local `s` requires exclusive access but is borrowed
+   ┌─ tests/reference-safety/v1-tests/dereference_combo_invalid.move:27:9
+   │
+27 │         *s;
+   │         ^^ requirement enforced here
+28 │         *x;
+   │         -- conflicting reference `x` used here

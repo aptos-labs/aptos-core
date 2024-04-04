@@ -10,7 +10,6 @@ publish = false
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
 fail = "0.4.0"
 move-binary-format = { path = "../move-binary-format" }
 petgraph = "0.5.1"

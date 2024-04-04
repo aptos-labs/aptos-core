@@ -19,4 +19,7 @@ pub struct ModelBuilderOptions {
     /// Ignore the "opaque" pragma on all function specs when possible. The opaque can be ignored
     /// as long as the function spec has no property marked as `[concrete]` or `[abstract]`.
     pub ignore_pragma_opaque_when_possible: bool,
+
+    /// Whether to support general access specifiers
+    pub support_access_specifier: bool,
 }

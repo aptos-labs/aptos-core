@@ -1,34 +1,11 @@
 
-============ bytecode verification failed ========
-
 Diagnostics:
-bug: BYTECODE VERIFICATION FAILED
+error: cannot mutably borrow since mutable references exist
   ┌─ tests/reference-safety/v1-tests/borrow_global_bad1.move:8:17
   │
+7 │         let x = borrow_global_mut<T>(sender);
+  │                 ---------------------------- previous mutable global borrow
 8 │         let y = borrow_global_mut<T>(addr);
-  │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ ICE failed bytecode verifier: VMError {
-    major_status: GLOBAL_REFERENCE_ERROR,
-    sub_status: None,
-    message: None,
-    exec_state: None,
-    location: Module(
-        ModuleId {
-            address: 0000000000000000000000000000000000000000000000000000000008675309,
-            name: Identifier(
-                "A",
-            ),
-        },
-    ),
-    indices: [
-        (
-            FunctionDefinition,
-            0,
-        ),
-    ],
-    offsets: [
-        (
-            FunctionDefinitionIndex(0),
-            4,
-        ),
-    ],
-}
+  │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ mutable borrow attempted here
+9 │         x;
+  │         - requirement enforced here

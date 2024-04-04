@@ -6,7 +6,7 @@ use crate::{
     config::{
         node_config_loader::NodeType, utils::get_config_name, AdminServiceConfig, Error,
         IndexerConfig, InspectionServiceConfig, LoggerConfig, MempoolConfig, NodeConfig, Peer,
-        PeerMonitoringServiceConfig, PeerRole, PeerSet, StateSyncConfig,
+        PeerRole, PeerSet, StateSyncConfig,
     },
     network_id::NetworkId,
 };
@@ -122,14 +122,6 @@ impl ConfigOptimizer for NodeConfig {
         }
         if MempoolConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(MempoolConfig::get_optimizer_name());
-        }
-        if PeerMonitoringServiceConfig::optimize(
-            node_config,
-            local_config_yaml,
-            node_type,
-            chain_id,
-        )? {
-            optimizers_with_modifications.push(PeerMonitoringServiceConfig::get_optimizer_name());
         }
         if StateSyncConfig::optimize(node_config, local_config_yaml, node_type, chain_id)? {
             optimizers_with_modifications.push(StateSyncConfig::get_optimizer_name());

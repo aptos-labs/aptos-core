@@ -52,6 +52,9 @@ pub enum TransactionTypeArg {
     TokenV1NFTMintAndTransferParallel,
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
+    // register if not registered already
+    CoinInitAndMint,
+    FungibleAssetMint,
     TokenV2AmbassadorMint,
     TokenV2AmbassadorMintAndBurn1M,
     VectorPictureCreate30k,
@@ -321,6 +324,16 @@ impl TransactionTypeArg {
             },
             TransactionTypeArg::TokenV1FTMintAndTransfer => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::TokenV1MintAndTransferFT,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::CoinInitAndMint => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::CoinInitAndMint,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::FungibleAssetMint => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::FungibleAssetMint,
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },

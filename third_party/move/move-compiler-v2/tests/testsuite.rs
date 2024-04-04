@@ -121,7 +121,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // TODO: move `inlining` tests to top-level test directory
             exclude: vec!["/inlining/"],
             exp_suffix: None,
-            options: opts.clone(),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::ACQUIRES_CHECK, false),
             stop_after: StopAfter::AstPipeline,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None,
@@ -236,14 +238,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter:
             // For debugging:
-            // Some(vec![
-            //   INITIAL_BYTECODE_STAGE,
-            //   "ReferenceSafetyProcessor",
-            //   "DeadStoreElimination",
-            //   FILE_FORMAT_STAGE,
-            //]),
+             Some(vec![
+               INITIAL_BYTECODE_STAGE,
+               "ReferenceSafetyProcessor",
+               "DeadStoreElimination",
+               FILE_FORMAT_STAGE,
+            ]),
         },
         // Reference safety tests (without optimizations on)
         TestConfig {
@@ -258,7 +260,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter:
+            // For debugging:
+            Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "ReferenceSafetyProcessor",
+                "DeadStoreElimination",
+                FILE_FORMAT_STAGE,
+            ]),
         },
         // Abort analysis tests
         TestConfig {
@@ -304,6 +313,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 "ReferenceSafetyProcessor",
                 "AbilityProcessor",
             ]),
+        },
+        TestConfig {
+            name: "acquires-checker",
+            runner: |p| run_test(p, get_config_by_name("acquires-checker")),
+            include: vec!["/acquires-checker/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone(),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
         },
         // Bytecode verifier tests
         TestConfig {

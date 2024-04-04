@@ -167,6 +167,12 @@ impl ExecutionAndIOCosts {
         }
         .visit(&self.call_graph);
 
+        if let Some(cost) = &self.transaction_transient {
+            lines.push("transaction_size", *cost)
+        }
+        for item in &self.events_transient {
+            lines.push(format!("event_emits;<{}>", Render(&item.ty)), item.cost)
+        }
         for item in &self.write_set_transient {
             lines.push(
                 format!("write_set;{}<{}>", Render(&item.op_type), Render(&item.key)),
