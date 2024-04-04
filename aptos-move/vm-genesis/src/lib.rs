@@ -25,8 +25,10 @@ use aptos_types::{
         patch::{PatchJWKMoveStruct, PatchUpsertJWK},
         rsa::RSA_JWK,
     },
-    keyless,
-    keyless::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME},
+    keyless::{
+        self, test_utils::get_sample_iss, Groth16VerificationKey, DEVNET_VERIFICATION_KEY,
+        KEYLESS_ACCOUNT_MODULE_NAME,
+    },
     move_utils::as_move_value::AsMoveValue,
     on_chain_config::{
         FeatureFlag, Features, GasScheduleV2, OnChainConsensusConfig, OnChainExecutionConfig,
@@ -634,7 +636,7 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
         );
 
         let patch: PatchJWKMoveStruct = PatchUpsertJWK {
-            issuer: "test.oidc.provider".to_owned(),
+            issuer: get_sample_iss(),
             jwk: RSA_JWK::secure_test_jwk().into(),
         }
         .into();
