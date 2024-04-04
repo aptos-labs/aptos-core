@@ -12,7 +12,7 @@ use crate::{
     DisconnectReason, ProtocolId,
 };
 use aptos_config::{
-    config::{Peer, PeerSet, RoleType},
+    config::{Peer, PeerSet},
     network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
@@ -207,8 +207,10 @@ impl PeersAndMetadata {
         self.set_cached_peers_and_metadata(peers_and_metadata.clone());
 
         let net_context = self.get_network_context(&peer_network_id.network_id());
-        let event = ConnectionNotification::NewPeer(connection_metadata, net_context);
-        self.broadcast(event);
+        if let Some(net_context) = net_context {
+            let event = ConnectionNotification::NewPeer(connection_metadata, net_context);
+            self.broadcast(event);
+        }
 
         Ok(())
     }
@@ -218,12 +220,8 @@ impl PeersAndMetadata {
     }
 
     // Return NetworkContext for a NetworkId, or fake-up something best effort because it's just for logging.
-    fn get_network_context(&self, network_id: &NetworkId) -> NetworkContext {
-        self.contexts
-            .load()
-            .get(network_id)
-            .cloned()
-            .unwrap_or_else(|| NetworkContext::new(RoleType::Validator, *network_id, PeerId::ZERO))
+    fn get_network_context(&self, network_id: &NetworkId) -> Option<NetworkContext> {
+        self.contexts.load().get(network_id).cloned()
     }
 
     /// Removes the peer metadata from the container. If the peer
@@ -253,12 +251,14 @@ impl PeersAndMetadata {
             if active_connection_id == connection_id {
                 let peer_metadata = entry.remove();
                 let nc = self.get_network_context(&peer_network_id.network_id());
-                let event = ConnectionNotification::LostPeer(
-                    peer_metadata.connection_metadata.clone(),
-                    nc,
-                    reason,
-                );
-                self.broadcast(event);
+                if let Some(nc) = nc {
+                    let event = ConnectionNotification::LostPeer(
+                        peer_metadata.connection_metadata.clone(),
+                        nc,
+                        reason,
+                    );
+                    self.broadcast(event);
+                }
                 peer_metadata
             } else {
                 return Err(Error::UnexpectedError(format!(
