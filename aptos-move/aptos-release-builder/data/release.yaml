@@ -8,7 +8,7 @@ proposals:
       description: "Increase max txn gas temporarily for framework upgrade"
     execution_mode: MultiStep
     update_sequence:
-      - DefaultGasWithOverride:
+      - DefaultGasWithOverrideOld:
           feature_version: 13
           overrides:
             - name: "txn.max_execution_gas"
