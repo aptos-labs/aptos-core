@@ -12,7 +12,6 @@ runs:
   using: composite
   steps:
     # The source code must be checkout out by the workflow that invokes this action.
-
     - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       with:
         GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
@@ -31,7 +30,7 @@ runs:
     - uses: taiki-e/install-action@v1.5.6
       with:
         tool: nextest
-    
+
     # Install buildkite-test-collector
     - name: Install buildkite-test-collector
       run: cargo install buildkite-test-collector
