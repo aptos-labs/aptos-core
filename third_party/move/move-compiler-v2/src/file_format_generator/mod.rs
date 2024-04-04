@@ -28,6 +28,7 @@ pub fn generate_file_format(
             continue;
         }
         if !compile_test_code && module_env.is_test_only() {
+            assert!(false);
             continue;
         }
         let (ff_module, source_map, main_handle) = ModuleGenerator::run(&ctx, &module_env);

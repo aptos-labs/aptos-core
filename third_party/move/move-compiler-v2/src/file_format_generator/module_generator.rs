@@ -163,17 +163,15 @@ impl ModuleGenerator {
         let compile_test_code = options.compile_test_code;
 
         for struct_env in module_env.get_structs() {
-            if compile_test_code || !struct_env.is_test_only() {
-                self.gen_struct(ctx, &struct_env)
-            }
+            assert!(compile_test_code || !struct_env.is_test_only());
+            self.gen_struct(ctx, &struct_env)
         }
 
         let acquires_map = ctx.generate_acquires_map(module_env);
         for fun_env in module_env.get_functions() {
-            if compile_test_code || !fun_env.is_test_only() {
-                let acquires_list = &acquires_map[&fun_env.get_id()];
-                FunctionGenerator::run(self, ctx, fun_env, acquires_list);
-            }
+            assert!(compile_test_code || !fun_env.is_test_only());
+            let acquires_list = &acquires_map[&fun_env.get_id()];
+            FunctionGenerator::run(self, ctx, fun_env, acquires_list);
         }
 
         // At handles of friend modules
