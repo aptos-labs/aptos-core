@@ -792,13 +792,13 @@ impl MoveHarness {
             .map(|c| c.coin())
             .unwrap_or(0)
             + self
-            .read_resource_from_resource_group::<FungibleStoreResource>(
-                &aptos_types::account_config::fungible_store::primary_store(addr),
-                ObjectGroupResource::struct_tag(),
-                FungibleStoreResource::struct_tag(),
-            )
-            .map(|c| c.balance())
-            .unwrap_or(0)
+                .read_resource_from_resource_group::<FungibleStoreResource>(
+                    &aptos_types::account_config::fungible_store::primary_store(addr),
+                    ObjectGroupResource::struct_tag(),
+                    FungibleStoreResource::struct_tag(),
+                )
+                .map(|c| c.balance())
+                .unwrap_or(0)
     }
 
     /// Write the resource data `T`.
