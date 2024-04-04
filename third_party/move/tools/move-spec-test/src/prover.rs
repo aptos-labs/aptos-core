@@ -29,7 +29,10 @@ pub(crate) fn prove<W: WriteColor>(
         ModelConfig {
             all_files_as_targets: true,
             target_filter: None,
-            compiler_version: CompilerVersion::V2,
+            compiler_version: config
+                .compiler_config
+                .compiler_version
+                .unwrap_or(CompilerVersion::V2),
         },
     )?;
 

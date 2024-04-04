@@ -136,7 +136,11 @@ pub fn run_move_mutator(
                 }
             }
 
-            let mutant_path = output::setup_mutant_path(&output_dir, path)?;
+            let Ok(mutant_path) = output::setup_mutant_path(&output_dir, path) else {
+                // If we cannot set up the mutant path, we skip the mutant.
+                debug!("Cannot set up mutant path for {path:?}");
+                continue;
+            };
 
             fs::write(&mutant_path, &mutated.mutated_source)?;
 
