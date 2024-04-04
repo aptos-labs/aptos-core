@@ -158,7 +158,7 @@ pub fn setup_network() -> DummyNetwork {
 
     // Wait for establishing connection
     let first_dialer_event = block_on(connection_events.recv()).unwrap();
-    if let ConnectionNotification::NewPeer(metadata, _network_context) = first_dialer_event {
+    if let ConnectionNotification::NewPeer(metadata, _network_id) = first_dialer_event {
         assert_eq!(metadata.remote_peer_id, listener_peer.peer_id());
         assert_eq!(metadata.origin, ConnectionOrigin::Outbound);
         assert_eq!(metadata.role, PeerRole::Validator);
@@ -170,7 +170,7 @@ pub fn setup_network() -> DummyNetwork {
     }
 
     let first_listener_event = block_on(listener_connection_events.recv()).unwrap();
-    if let ConnectionNotification::NewPeer(metadata, _network_context) = first_listener_event {
+    if let ConnectionNotification::NewPeer(metadata, _network_id) = first_listener_event {
         assert_eq!(metadata.remote_peer_id, dialer_peer.peer_id());
         assert_eq!(metadata.origin, ConnectionOrigin::Inbound);
         assert_eq!(metadata.role, PeerRole::Validator);

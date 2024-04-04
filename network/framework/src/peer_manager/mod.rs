@@ -55,7 +55,6 @@ mod types;
 pub use self::error::PeerManagerError;
 use crate::{
     application::{error::Error, storage::PeersAndMetadata},
-    peer::DisconnectReason,
     peer_manager::transport::{TransportHandler, TransportRequest},
     protocols::network::SerializedRequest,
 };
@@ -298,11 +297,7 @@ where
                     if connection_id == lost_conn_metadata.connection_id {
                         // We lost an active connection.
                         entry.remove();
-                        self.remove_peer_from_metadata(
-                            peer_id,
-                            connection_id,
-                            DisconnectReason::ConnectionLost,
-                        );
+                        self.remove_peer_from_metadata(peer_id, connection_id);
                     }
                 }
                 self.update_connected_peers_metrics();
@@ -330,8 +325,7 @@ where
                 if !self.active_peers.contains_key(&peer_id) {
                     let notif = ConnectionNotification::LostPeer(
                         lost_conn_metadata,
-                        self.network_context,
-                        reason,
+                        self.network_context.network_id(),
                     );
                     self.send_conn_notification(peer_id, notif);
                 }
@@ -415,16 +409,11 @@ where
         self.update_connected_peers_metrics();
     }
 
-    fn remove_peer_from_metadata(
-        &mut self,
-        peer_id: AccountAddress,
-        connection_id: ConnectionId,
-        reason: DisconnectReason,
-    ) {
+    fn remove_peer_from_metadata(&mut self, peer_id: AccountAddress, connection_id: ConnectionId) {
         let peer_network_id = PeerNetworkId::new(self.network_context.network_id(), peer_id);
-        if let Err(error) =
-            self.peers_and_metadata
-                .remove_peer_metadata(peer_network_id, connection_id, reason)
+        if let Err(error) = self
+            .peers_and_metadata
+            .remove_peer_metadata(peer_network_id, connection_id)
         {
             warn!(
                 NetworkSchema::new(&self.network_context),
@@ -478,11 +467,7 @@ where
                 // PeerRequest channel.
                 if let Some((conn_metadata, sender)) = self.active_peers.remove(&peer_id) {
                     let connection_id = conn_metadata.connection_id;
-                    self.remove_peer_from_metadata(
-                        conn_metadata.remote_peer_id,
-                        connection_id,
-                        DisconnectReason::Requested,
-                    );
+                    self.remove_peer_from_metadata(conn_metadata.remote_peer_id, connection_id);
 
                     // This triggers a disconnect.
                     drop(sender);
@@ -701,7 +686,8 @@ where
         )?;
         // Send NewPeer notification to connection event handlers.
         if send_new_peer_notification {
-            let notif = ConnectionNotification::NewPeer(conn_meta, self.network_context);
+            let notif =
+                ConnectionNotification::NewPeer(conn_meta, self.network_context.network_id());
             self.send_conn_notification(peer_id, notif);
         }
 

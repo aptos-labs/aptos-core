@@ -19,11 +19,10 @@ use crate::{
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
     },
     transport::ConnectionMetadata,
-    DisconnectReason,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{Peer, PeerRole, PeerSet, RoleType},
+    config::{Peer, PeerRole, PeerSet},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
@@ -460,13 +459,11 @@ async fn test_peers_and_metadata_subscriptions() {
     );
     match connection_events.try_recv() {
         Ok(notif) => match notif {
-            ConnectionNotification::NewPeer(conn_meta, nc) => {
-                assert_eq!(nc.network_id(), NetworkId::Validator);
-                assert_eq!(nc.peer_id(), PeerId::ZERO);
-                assert_eq!(nc.role(), RoleType::Validator);
+            ConnectionNotification::NewPeer(conn_meta, network_id) => {
+                assert_eq!(network_id, NetworkId::Validator);
                 assert_eq!(conn_meta, connection_1);
             },
-            ConnectionNotification::LostPeer(_, _, _) => {
+            ConnectionNotification::LostPeer(_, _) => {
                 panic!("should get connect but got lost")
             },
         },
@@ -476,23 +473,16 @@ async fn test_peers_and_metadata_subscriptions() {
     }
 
     peers_and_metadata
-        .remove_peer_metadata(
-            peer_network_id_1,
-            connection_1.connection_id,
-            DisconnectReason::Requested,
-        )
+        .remove_peer_metadata(peer_network_id_1, connection_1.connection_id)
         .unwrap();
     match connection_events.try_recv() {
         Ok(notif) => match notif {
             ConnectionNotification::NewPeer(_, _) => {
                 panic!("expecting lost but got new")
             },
-            ConnectionNotification::LostPeer(conn_meta, nc, reason) => {
-                assert_eq!(nc.network_id(), NetworkId::Validator);
-                assert_eq!(nc.peer_id(), PeerId::ZERO);
-                assert_eq!(nc.role(), RoleType::Validator);
+            ConnectionNotification::LostPeer(conn_meta, network_id) => {
+                assert_eq!(network_id, NetworkId::Validator);
                 assert_eq!(conn_meta, connection_1);
-                assert_eq!(reason, DisconnectReason::Requested);
             },
         },
         Err(_tre) => {
@@ -1084,11 +1074,7 @@ fn remove_peer_metadata(
     peer_network_id: PeerNetworkId,
     connection_id: u32,
 ) -> Result<PeerMetadata, Error> {
-    peers_and_metadata.remove_peer_metadata(
-        peer_network_id,
-        connection_id.into(),
-        DisconnectReason::Requested,
-    )
+    peers_and_metadata.remove_peer_metadata(peer_network_id, connection_id.into())
 }
 
 /// Updates the connection metadata for the specified peer

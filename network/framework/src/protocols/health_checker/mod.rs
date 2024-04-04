@@ -207,12 +207,12 @@ impl<NetworkClient: NetworkClientInterface<HealthCheckerMsg> + Unpin> HealthChec
                 }
                 conn_event = connection_events.select_next_some() => {
                     match conn_event {
-                        ConnectionNotification::NewPeer(metadata, _network_context) => {
+                        ConnectionNotification::NewPeer(metadata, _network_id) => {
                             self.network_interface.create_peer_and_health_data(
                                 metadata.remote_peer_id, self.round
                             );
                         }
-                        ConnectionNotification::LostPeer(metadata, _network_context, _reason) => {
+                        ConnectionNotification::LostPeer(metadata, _network_id) => {
                             self.network_interface.remove_peer_and_health_data(
                                 &metadata.remote_peer_id
                             );

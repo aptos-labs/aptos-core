@@ -330,22 +330,21 @@ async fn connection_listener(
                 return;
             },
             Some(note) => match note {
-                ConnectionNotification::NewPeer(meta, netcontext) => {
-                    let peer_network_id =
-                        PeerNetworkId::new(netcontext.network_id(), meta.remote_peer_id);
+                ConnectionNotification::NewPeer(meta, network_id) => {
+                    let peer_network_id = PeerNetworkId::new(network_id, meta.remote_peer_id);
                     if connected_peers.contains(&peer_network_id) {
                         continue;
                     }
                     info!(
                         "netbench connection_listener new {:?} {:?}",
-                        meta, netcontext
+                        meta, network_id
                     );
                     if config.enable_direct_send_testing {
                         handle.spawn(direct_sender(
                             node_config.clone(),
                             network_client.clone(),
                             time_service.clone(),
-                            netcontext.network_id(),
+                            network_id,
                             meta.remote_peer_id,
                             shared.clone(),
                         ));
@@ -355,16 +354,15 @@ async fn connection_listener(
                             node_config.clone(),
                             network_client.clone(),
                             time_service.clone(),
-                            netcontext.network_id(),
+                            network_id,
                             meta.remote_peer_id,
                             shared.clone(),
                         ));
                     }
                     connected_peers.insert(peer_network_id);
                 },
-                ConnectionNotification::LostPeer(meta, netcontext, _) => {
-                    let peer_network_id =
-                        PeerNetworkId::new(netcontext.network_id(), meta.remote_peer_id);
+                ConnectionNotification::LostPeer(meta, network_id) => {
+                    let peer_network_id = PeerNetworkId::new(network_id, meta.remote_peer_id);
                     connected_peers.remove(&peer_network_id);
                 },
             },

@@ -5,7 +5,7 @@ use crate::services::start_netbench_service;
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{NetworkConfig, NodeConfig},
-    network_id::{NetworkContext, NetworkId},
+    network_id::NetworkId,
 };
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_dkg_runtime::DKGMessage;
@@ -31,10 +31,7 @@ use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
 use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use tokio::runtime::Runtime;
 
 /// A simple struct that holds both the network client
@@ -237,8 +234,6 @@ pub fn setup_networks_and_get_interfaces(
     // Gather all network configs
     let network_configs = extract_network_configs(node_config);
 
-    let mut context_for_network = BTreeMap::new();
-
     // Create each network and register the application handles
     let mut network_runtimes = vec![];
     let mut consensus_network_handle = None;
@@ -254,13 +249,6 @@ pub fn setup_networks_and_get_interfaces(
 
         // Entering gives us a runtime to instantiate all the pieces of the builder
         let _enter = runtime.enter();
-
-        let network_context = NetworkContext::new(
-            node_config.base.role,
-            network_config.network_id,
-            network_config.peer_id(),
-        );
-        context_for_network.insert(network_config.network_id, network_context);
 
         // Create a new network builder
         let mut network_builder = NetworkBuilder::create(
@@ -357,8 +345,6 @@ pub fn setup_networks_and_get_interfaces(
             network_builder.network_context()
         );
     }
-
-    peers_and_metadata.set_network_contexts(context_for_network);
 
     // Transform all network handles into application interfaces
     let (
