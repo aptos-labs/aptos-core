@@ -68,6 +68,7 @@ pub enum FeatureFlag {
     KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
     MULTISIG_V2_ENHANCEMENT = 55,
     COIN_TO_FUNGIBLE_ASSET_MIGRATION = 56,
+    MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE = 57,
 }
 
 impl FeatureFlag {
@@ -123,6 +124,7 @@ impl FeatureFlag {
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE,
         ]
     }
 }

@@ -63,6 +63,8 @@ module aptos_framework::fungible_asset {
     /// Account is not the owner of metadata object.
     const ENOT_METADATA_OWNER: u64 = 24;
 
+    const ECONCURRENT_BALANCE_NOT_ENABLED: u64 = 25;
+
     //
     // Constants
     //
@@ -172,14 +174,16 @@ module aptos_framework::fungible_asset {
         features::concurrent_fungible_assets_enabled()
     }
 
-    inline fun default_to_concurrent_fungible_balance(): bool {
-        // false
+    inline fun allow_upgrade_to_concurrent_fungible_balance(): bool {
         features::concurrent_fungible_assets_enabled()
     }
 
+    inline fun default_to_concurrent_fungible_balance(): bool {
+        features::migrate_to_concurrent_fungible_balance_enabled()
+    }
+
     inline fun auto_upgrade_to_concurrent_fungible_balance(): bool {
-        // false
-        features::concurrent_fungible_assets_enabled()
+        features::migrate_to_concurrent_fungible_balance_enabled()
     }
 
     /// Make an existing object fungible by adding the Metadata resource.
@@ -776,6 +780,16 @@ module aptos_framework::fungible_asset {
         // update current state:
         aggregator_v2::add(&mut supply.current, current);
         move_to(&metadata_object_signer, supply);
+    }
+
+    public fun upgrade_store_to_concurrent<T: key>(
+        owner: &signer,
+        store: Object<T>,
+    ) acquires FungibleStore {
+        assert!(object::owns(store, signer::address_of(owner)), error::permission_denied(ENOT_STORE_OWNER));
+        assert!(!is_frozen(store), error::invalid_argument(ESTORE_IS_FROZEN));
+        assert!(allow_upgrade_to_concurrent_fungible_balance(), error::invalid_argument(ECONCURRENT_BALANCE_NOT_ENABLED));
+        ensure_store_upgraded_to_concurrent_internal(object::object_address(&store));
     }
 
     /// Ensure a known `FungibleStore` has `ConcurrentFungibleBalance`.

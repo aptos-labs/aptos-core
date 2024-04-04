@@ -447,6 +447,19 @@ module std::features {
         is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
     }
 
+
+    /// Whether enable Fungible Asset creation
+    /// to create higher throughput concurrent variants.
+    /// Lifetime: transient
+    const MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE: u64 = 57;
+
+    public fun get_migrate_to_concurrent_fungible_balance_feature(): u64 { MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE }
+
+    public fun migrate_to_concurrent_fungible_balance_enabled(): bool acquires Features {
+        // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
+        is_enabled(MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE) && aggregator_v2_api_enabled()
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

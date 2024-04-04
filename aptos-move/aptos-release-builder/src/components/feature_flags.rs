@@ -107,6 +107,7 @@ pub enum FeatureFlag {
     KeylessAccountsWithPasskeys,
     MultisigV2Enhancement,
     CoinToFungibleAssetMigration,
+    MigrateToConcurrentFungibleBalance,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -270,6 +271,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CoinToFungibleAssetMigration => {
                 AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION
             },
+            FeatureFlag::MigrateToConcurrentFungibleBalance => {
+                AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE
+            },
         }
     }
 }
@@ -361,6 +365,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT => FeatureFlag::MultisigV2Enhancement,
             AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION => {
                 FeatureFlag::CoinToFungibleAssetMigration
+            },
+            AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE => {
+                FeatureFlag::MigrateToConcurrentFungibleBalance
             },
         }
     }
