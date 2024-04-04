@@ -117,6 +117,20 @@ fn traverse_function(
     function: &FunctionEnv<'_>,
     conf: &Configuration,
 ) -> anyhow::Result<Vec<Mutant>> {
+    let attrs = function.get_attributes();
+    for attr in attrs {
+        // Omit all functions with test attribute.
+        if attr
+            .name()
+            .display(function.module_env.symbol_pool())
+            .to_string()
+            .contains("test")
+        {
+            trace!("Skipping test function {}", &function.get_name_str());
+            return Ok(vec![]);
+        }
+    }
+
     let mut is_inside_spec = false;
 
     let function_name = function.get_name_str();
