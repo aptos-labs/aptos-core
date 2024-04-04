@@ -11,6 +11,7 @@ use aptos_sdk::types::chain_id::ChainId;
 use aptos_transaction_emitter_lib::{
     emit_transactions_with_cluster, Cluster, ClusterArgs, CoinSourceArgs, EmitArgs,
 };
+use futures::executor::block_on;
 use serde::{Deserialize, Serialize};
 use thiserror::Error as ThisError;
 
@@ -134,9 +135,11 @@ impl Checker for TpsChecker {
             .await
             .map_err(TpsCheckerError::BuildClusterError)?;
 
-        let stats = emit_transactions_with_cluster(&cluster, &self.config.emit_config)
-            .await
-            .map_err(TpsCheckerError::TransactionEmitterError)?;
+        let stats = block_on(emit_transactions_with_cluster(
+            &cluster,
+            &self.config.emit_config,
+        ))
+        .map_err(TpsCheckerError::TransactionEmitterError)?;
 
         // AKA stats per second.
         let rate = stats.rate();
