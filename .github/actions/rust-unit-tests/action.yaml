@@ -44,7 +44,10 @@ runs:
 
     # Run the rust unit tests
     - name: Run all unit tests
-      run: NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast --message-format libtest-json | buildkite-test-collector
+      run: |
+        NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast --message-format libtest-json > nextest_output.json
+        buildkite-test-collector < nextest_output.json || echo "Warning: buildkite-test-collector encountered an error"
+        rm nextest_output.json
       shell: bash
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres

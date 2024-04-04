@@ -1,5 +1,5 @@
 module 0x42::m {
-    struct S { x: u64, y: u64 }
+    struct S has drop { x: u64, y: u64 }
 
     fun t0(s: S) {
         let x = &mut s.x;

@@ -49,6 +49,7 @@ Security holds under the same proof-of-stake assumption that secures the Aptos n
     -  [Function `u64_integer`](#@Specification_1_u64_integer)
     -  [Function `u128_integer`](#@Specification_1_u128_integer)
     -  [Function `u256_integer`](#@Specification_1_u256_integer)
+    -  [Function `u256_integer_internal`](#@Specification_1_u256_integer_internal)
     -  [Function `u8_range`](#@Specification_1_u8_range)
     -  [Function `u64_range`](#@Specification_1_u64_range)
     -  [Function `u256_range`](#@Specification_1_u256_range)
@@ -494,11 +495,6 @@ Generates an u128 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u128 = 0;
     <b>while</b> (i &lt; 16) {
-        <b>spec</b> {
-            // TODO: Prove these <b>with</b> proper <b>loop</b> invaraints.
-            <b>assume</b> ret * 256 + 255 &lt;= <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
-            <b>assume</b> len(raw) &gt; 0;
-        };
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u128);
         i = i + 1;
     };
@@ -560,11 +556,6 @@ Generates a u256 uniformly at random.
     <b>let</b> i = 0;
     <b>let</b> ret: u256 = 0;
     <b>while</b> (i &lt; 32) {
-        <b>spec</b> {
-            // TODO: Prove these <b>with</b> proper <b>loop</b> invaraints.
-            <b>assume</b> ret * 256 + 255 &lt;= <a href="randomness.md#0x1_randomness_MAX_U256">MAX_U256</a>;
-            <b>assume</b> len(raw) &gt; 0;
-        };
         ret = ret * 256 + (<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_pop_back">vector::pop_back</a>(&<b>mut</b> raw) <b>as</b> u256);
         i = i + 1;
     };
@@ -1183,6 +1174,23 @@ function as its payload.
 
 
 
+<a id="@Specification_1_u256_integer_internal"></a>
+
+### Function `u256_integer_internal`
+
+
+<pre><code><b>fun</b> <a href="randomness.md#0x1_randomness_u256_integer_internal">u256_integer_internal</a>(): u256
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> unroll = 32;
+<b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
+</code></pre>
+
+
+
 
 <a id="0x1_randomness_spec_u256_integer"></a>
 
@@ -1223,7 +1231,8 @@ function as its payload.
 
 
 
-<pre><code><b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
+<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<b>include</b> <a href="randomness.md#0x1_randomness_NextBlobAbortsIf">NextBlobAbortsIf</a>;
 <b>aborts_if</b> min_incl &gt;= max_excl;
 <b>ensures</b> result &gt;= min_incl && result &lt; max_excl;
 </code></pre>

@@ -4,7 +4,7 @@
 
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
-    QuorumStoreConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
+    QuorumStoreConfig, ReliableBroadcastConfig, SafetyRulesConfig, BATCH_PADDING_BYTES,
 };
 use aptos_types::chain_id::ChainId;
 use cfg_if::cfg_if;
@@ -73,6 +73,7 @@ pub struct ConsensusConfig {
     pub max_blocks_per_receiving_request_quorum_store_override: u64,
     pub broadcast_vote: bool,
     pub proof_cache_capacity: u64,
+    pub rand_rb_config: ReliableBroadcastConfig,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -313,6 +314,12 @@ impl Default for ConsensusConfig {
             max_blocks_per_receiving_request_quorum_store_override: 100,
             broadcast_vote: true,
             proof_cache_capacity: 10_000,
+            rand_rb_config: ReliableBroadcastConfig {
+                backoff_policy_base_ms: 2,
+                backoff_policy_factor: 100,
+                backoff_policy_max_delay_ms: 10000,
+                rpc_timeout_ms: 10000,
+            },
         }
     }
 }

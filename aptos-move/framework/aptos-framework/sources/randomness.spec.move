@@ -86,6 +86,11 @@ spec aptos_framework::randomness {
         ensures [abstract] result == spec_u256_integer();
     }
 
+    spec u256_integer_internal(): u256 {
+        pragma unroll = 32;
+        include NextBlobAbortsIf;
+    }
+
     spec fun spec_u256_integer(): u256;
 
     spec u8_range(min_incl: u8, max_excl: u8): u8 {
@@ -98,6 +103,7 @@ spec aptos_framework::randomness {
 
 
     spec u64_range(min_incl: u64, max_excl: u64): u64 {
+        pragma verify_duration_estimate = 120;
         include NextBlobAbortsIf;
         aborts_if min_incl >= max_excl;
         ensures result >= min_incl && result < max_excl;

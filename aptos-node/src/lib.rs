@@ -685,6 +685,7 @@ pub fn setup_environment_and_start_node(
             let (reconfig_events, dkg_start_events) = dkg_subscriptions
                 .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
             let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
+            let rb_config = node_config.consensus.rand_rb_config.clone();
             let dkg_runtime = start_dkg_runtime(
                 my_addr,
                 dkg_dealer_sk,
@@ -693,6 +694,7 @@ pub fn setup_environment_and_start_node(
                 reconfig_events,
                 dkg_start_events,
                 vtxn_pool.clone(),
+                rb_config,
             );
             Some(dkg_runtime)
         },

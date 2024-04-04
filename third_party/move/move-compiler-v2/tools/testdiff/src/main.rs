@@ -63,7 +63,7 @@ static IGNORED_UNIT_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
     set
 });
 
-/// Remapping of test directories between v2 and v1 tree. This are paths
+/// Remapping of test directories between v2 and v1 tree. These are paths
 /// relative to the according roots.
 static UNIT_PATH_REMAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
     let mut map = BTreeMap::new();
@@ -109,6 +109,11 @@ static UNIT_PATH_REMAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
     map.insert(
         "cyclic-instantiation-checker/v1-tests".to_string(),
         "instantiation_loops".to_string(),
+    );
+    map.insert("abilities/v1".to_string(), "typing".to_string());
+    map.insert(
+        "acquires-checker/v1-tests".to_string(),
+        "typing".to_string(),
     );
     map
 });

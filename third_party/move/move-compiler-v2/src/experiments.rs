@@ -80,6 +80,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::CHECKS.to_string()),
         },
         Experiment {
+            name: Experiment::ACQUIRES_CHECK.to_string(),
+            description: "Turns on or off v1 style acquires checks".to_string(),
+            default: Inherited(Experiment::CHECKS.to_string()),
+        },
+        Experiment {
             name: Experiment::INLINING.to_string(),
             description: "Turns on or off inlining".to_string(),
             default: Given(true),
@@ -154,6 +159,13 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
+            description: "Whether to generate access specifiers in the file format.\
+             This is currently off by default to mitigate bug #12623."
+                .to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -165,11 +177,13 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
 impl Experiment {
     pub const ABILITY_CHECK: &'static str = "ability-check";
     pub const ACCESS_CHECK: &'static str = "access-use-function-check";
+    pub const ACQUIRES_CHECK: &'static str = "acquires-check";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
+    pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";

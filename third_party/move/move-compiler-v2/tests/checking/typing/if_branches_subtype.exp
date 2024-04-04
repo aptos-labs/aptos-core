@@ -5,19 +5,19 @@ module 0x8675309::M {
           let _: &u64 = if cond {
             u
           } else {
-            Freeze(u_mut)
+            Freeze(false)(u_mut)
           };
           {
             let _: &u64 = if cond {
-              Freeze(u_mut)
+              Freeze(false)(u_mut)
             } else {
               u
             };
             {
               let _: &u64 = if cond {
-                Freeze(u_mut)
+                Freeze(false)(u_mut)
               } else {
-                Freeze(u_mut)
+                Freeze(false)(u_mut)
               };
               Tuple()
             }
@@ -29,19 +29,19 @@ module 0x8675309::M {
           let (_, _): (&u64, &u64) = if cond {
             Tuple(u, u)
           } else {
-            Tuple(Freeze(u_mut), Freeze(u_mut))
+            Tuple(Freeze(false)(u_mut), Freeze(false)(u_mut))
           };
           {
             let (_, _): (&u64, &u64) = if cond {
-              Tuple(Freeze(u_mut), u)
+              Tuple(Freeze(false)(u_mut), u)
             } else {
-              Tuple(u, Freeze(u_mut))
+              Tuple(u, Freeze(false)(u_mut))
             };
             {
               let (_, _): (&u64, &u64) = if cond {
-                Tuple(u, Freeze(u_mut))
+                Tuple(u, Freeze(false)(u_mut))
               } else {
-                Tuple(Freeze(u_mut), u)
+                Tuple(Freeze(false)(u_mut), u)
               };
               Tuple()
             }

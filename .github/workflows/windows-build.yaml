@@ -12,6 +12,13 @@ on:
 jobs:
   windows-build:
     runs-on: windows-latest-8-core
+    if: | # Only run on each PR once an appropriate event occurs
+      (
+        github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'push' ||
+        contains(github.event.pull_request.labels.*.name, 'CICD:run-windows-tests') ||
+        github.event.pull_request.auto_merge != null
+      )
     defaults:
       run:
         shell: pwsh

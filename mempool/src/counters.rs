@@ -33,6 +33,8 @@ pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
 pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
 pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
 pub const BROADCAST_BATCHED_LABEL: &str = "broadcast_batched";
+pub const PARKED_TIME_LABEL: &str = "parked_time";
+pub const NON_PARKED_COMMIT_ACCEPTED_LABEL: &str = "non_park_commit_accepted";
 
 // Core mempool GC type labels
 pub const GC_SYSTEM_TTL_LABEL: &str = "system_ttl";

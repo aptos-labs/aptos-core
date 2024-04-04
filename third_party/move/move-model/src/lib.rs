@@ -7,6 +7,7 @@
 use crate::{
     ast::ModuleName,
     builder::{model_builder::ModelBuilder, module_builder::BytecodeModule},
+    metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, ModuleId, StructId},
     options::ModelBuilderOptions,
 };
@@ -53,6 +54,7 @@ pub mod constant_folder;
 pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod intrinsics;
+pub mod metadata;
 pub mod model;
 pub mod options;
 pub mod pragmas;
@@ -82,6 +84,7 @@ pub fn run_model_builder_in_compiler_mode(
     deps: Vec<PackageInfo>,
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
+    language_version: LanguageVersion,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -96,6 +99,7 @@ pub fn run_model_builder_in_compiler_mode(
         deps.into_iter().map(to_package_paths).collect(),
         ModelBuilderOptions {
             compile_via_model: true,
+            language_version,
             ..ModelBuilderOptions::default()
         },
         Flags::model_compilation().set_skip_attribute_checks(skip_attribute_checks),
@@ -140,6 +144,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     known_attributes: &BTreeSet<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
+    env.set_language_version(options.language_version);
     let compile_via_model = options.compile_via_model;
     env.set_extension(options);
 
