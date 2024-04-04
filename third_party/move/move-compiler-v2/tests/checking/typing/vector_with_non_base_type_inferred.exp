@@ -16,6 +16,14 @@ error: reference type `&mut integer` is not allowed as a type argument (type was
   │
   = required by instantiating vector type parameter
 
+error: tuple type `()` is not allowed as a type argument (type was inferred)
+  ┌─ tests/checking/typing/vector_with_non_base_type_inferred.move:6:9
+  │
+6 │         vector[()];
+  │         ^^^^^^
+  │
+  = required by instantiating vector type parameter
+
 error: tuple type `(integer, bool)` is not allowed as a type argument (type was inferred)
   ┌─ tests/checking/typing/vector_with_non_base_type_inferred.move:7:9
   │

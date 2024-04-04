@@ -1718,7 +1718,7 @@ impl Substitution {
                     }
                 },
                 (Constraint::NoTuple, ty) => {
-                    if ty.is_tuple() {
+                    if ty.is_tuple() || ty.is_unit() {
                         constraint_unsatisfied_error()
                     } else {
                         Ok(())
@@ -2796,6 +2796,14 @@ impl TypeUnificationError {
                         origin: ConstraintOrigin::Local(_),
                         ..
                     }) => "as a local variable type",
+                    Some(ConstraintContext {
+                        origin: ConstraintOrigin::Unspecified,
+                        ..
+                    }) => "",
+                    Some(ConstraintContext {
+                        origin: ConstraintOrigin::TupleElement(_, _),
+                        ..
+                    }) => "as a tuple element",
                     _ => "as a type argument",
                 };
                 let (mut note, mut hints, mut labels) = ctx_opt
