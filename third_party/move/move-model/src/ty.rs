@@ -1313,8 +1313,13 @@ impl Type {
     }
 
     /// If this is a tuple and it is not a unit type, return true.
-    pub fn is_tuple(&self) -> bool {
+    pub fn is_non_unit_tuple(&self) -> bool {
         matches!(self, Type::Tuple(ts) if !ts.is_empty())
+    }
+
+    /// If this is a tuple, return true.
+    pub fn is_tuple(&self) -> bool {
+        matches!(self, Type::Tuple(_))
     }
 }
 
@@ -1718,7 +1723,7 @@ impl Substitution {
                     }
                 },
                 (Constraint::NoTuple, ty) => {
-                    if ty.is_tuple() || ty.is_unit() {
+                    if ty.is_tuple() {
                         constraint_unsatisfied_error()
                     } else {
                         Ok(())
