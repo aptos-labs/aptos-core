@@ -435,7 +435,7 @@ module std::features {
     public fun multisig_v2_enhancement_feature_enabled(): bool acquires Features {
         is_enabled(MULTISIG_V2_ENHANCEMENT)
     }
-    
+
     /// Whether delegators allowlisting for delegation pools is supported.
     /// Lifetime: transient
     const DELEGATION_POOL_ALLOWLISTING: u64 = 56;
