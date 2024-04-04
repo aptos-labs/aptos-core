@@ -1,3 +1,5 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use aptos_sdk::types::{AccountKey, LocalAccount, SignableAccount};
 use aptos_transaction_generator_lib::{AccountType, ReliableTransactionSubmitter};
 use async_trait::async_trait;
