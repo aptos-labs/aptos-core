@@ -24,6 +24,7 @@ futures = { workspace = true }
 itertools = { workspace = true }
 move-compiler = { workspace = true }
 move-core-types = { workspace = true }
+move-model = { workspace = true }
 move-package = { workspace = true }
 rocksdb = { workspace = true }
 serde = { workspace = true }

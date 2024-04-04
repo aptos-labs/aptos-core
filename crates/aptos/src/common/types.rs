@@ -48,7 +48,7 @@ use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
-use move_package::CompilerVersion;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -1059,8 +1059,14 @@ pub struct MovePackageDir {
     /// Specify the version of the compiler.
     ///
     /// Currently hidden until the official launch of Compiler V2
-    #[clap(long, hide = true)]
+    #[clap(long, hide = true, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
+
+    /// Specify the language version to be supported.
+    ///
+    /// Currently hidden until the official launch of Compiler V2
+    #[clap(long, hide = true, value_parser = clap::value_parser!(LanguageVersion))]
+    pub language_version: Option<LanguageVersion>,
 
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
@@ -1083,6 +1089,7 @@ impl MovePackageDir {
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
+            language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
         }

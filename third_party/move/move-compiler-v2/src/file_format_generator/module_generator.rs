@@ -1,16 +1,19 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::file_format_generator::{
-    function_generator::FunctionGenerator, MAX_ADDRESS_COUNT, MAX_CONST_COUNT, MAX_FIELD_COUNT,
-    MAX_FIELD_INST_COUNT, MAX_FUNCTION_COUNT, MAX_FUNCTION_INST_COUNT, MAX_IDENTIFIER_COUNT,
-    MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
-    MAX_STRUCT_DEF_INST_COUNT,
+use crate::{
+    file_format_generator::{
+        function_generator::FunctionGenerator, MAX_ADDRESS_COUNT, MAX_CONST_COUNT, MAX_FIELD_COUNT,
+        MAX_FIELD_INST_COUNT, MAX_FUNCTION_COUNT, MAX_FUNCTION_INST_COUNT, MAX_IDENTIFIER_COUNT,
+        MAX_MODULE_COUNT, MAX_SIGNATURE_COUNT, MAX_STRUCT_COUNT, MAX_STRUCT_DEF_COUNT,
+        MAX_STRUCT_DEF_INST_COUNT,
+    },
+    Experiment, Options,
 };
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::{
     file_format as FF,
-    file_format::{FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
+    file_format::{AccessKind, FunctionHandle, ModuleHandle, StructDefinitionIndex, TableIndex},
     file_format_common,
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
@@ -18,6 +21,7 @@ use move_core_types::{account_address::AccountAddress, identifier::Identifier};
 use move_ir_types::ast as IR_AST;
 use move_model::{
     ast::{AccessSpecifier, Address, AddressSpecifier, ResourceSpecifier},
+    metadata::LanguageVersion,
     model::{
         FieldEnv, FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, ModuleId, Parameter, QualifiedId,
         StructEnv, StructId, TypeParameter, TypeParameterKind,
@@ -35,6 +39,8 @@ use std::collections::{BTreeMap, BTreeSet};
 /// Internal state of the module code generator
 #[derive(Debug)]
 pub struct ModuleGenerator {
+    /// Whether to generate access specifiers
+    gen_access_specifiers: bool,
     /// The module index for which we generate code.
     #[allow(unused)]
     module_idx: FF::ModuleHandleIndex,
@@ -95,6 +101,10 @@ impl ModuleGenerator {
         ctx: &ModuleContext,
         module_env: &ModuleEnv,
     ) -> (FF::CompiledModule, SourceMap, Option<FF::FunctionHandle>) {
+        let options = module_env.env.get_extension::<Options>().expect("options");
+        let gen_access_specifiers = options.language_version.unwrap_or_default()
+            >= LanguageVersion::V2_0
+            && options.experiment_on(Experiment::GEN_ACCESS_SPECIFIERS);
         let module = move_binary_format::CompiledModule {
             version: file_format_common::VERSION_NEXT,
             self_module_handle_idx: FF::ModuleHandleIndex(0),
@@ -115,6 +125,7 @@ impl ModuleGenerator {
             SourceMap::new(ctx.env.to_ir_loc(&module_env.get_loc()), module_name_opt)
         };
         let mut gen = Self {
+            gen_access_specifiers,
             module_idx: FF::ModuleHandleIndex(0),
             module_to_idx: Default::default(),
             name_to_idx: Default::default(),
@@ -418,11 +429,34 @@ impl ModuleGenerator {
             loc,
             fun_env.get_result_type().flatten().into_iter().collect(),
         );
-        let access_specifiers = fun_env.get_access_specifiers().as_ref().map(|v| {
-            v.iter()
-                .map(|s| self.access_specifier(ctx, fun_env, s))
-                .collect()
-        });
+        let access_specifiers = if self.gen_access_specifiers {
+            fun_env.get_access_specifiers().as_ref().map(|v| {
+                v.iter()
+                    .map(|s| self.access_specifier(ctx, fun_env, s))
+                    .collect()
+            })
+        } else {
+            // Report an error if we cannot drop the access specifiers.
+            // TODO(#12623): remove this once the bug is fixed
+            if fun_env
+                .get_access_specifiers()
+                .map(|v| {
+                    v.iter().any(|s| {
+                        s.kind != AccessKind::Acquires
+                            || s.negated
+                            || !matches!(s.resource.1, ResourceSpecifier::Resource(_))
+                            || !matches!(s.address.1, AddressSpecifier::Any)
+                    })
+                })
+                .unwrap_or_default()
+            {
+                ctx.internal_error(
+                    loc,
+                    "cannot strip extended access specifiers to mitigate bug #12623",
+                )
+            }
+            None
+        };
         let handle = FF::FunctionHandle {
             module,
             name,

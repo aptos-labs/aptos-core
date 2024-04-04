@@ -159,6 +159,13 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::GEN_ACCESS_SPECIFIERS.to_string(),
+            description: "Whether to generate access specifiers in the file format.\
+             This is currently off by default to mitigate bug #12623."
+                .to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -176,6 +183,7 @@ impl Experiment {
     pub const CHECKS: &'static str = "checks";
     pub const COPY_PROPAGATION: &'static str = "copy-propagation";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
+    pub const GEN_ACCESS_SPECIFIERS: &'static str = "gen-access-specifiers";
     pub const INLINING: &'static str = "inlining";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
