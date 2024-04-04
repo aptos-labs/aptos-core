@@ -57,6 +57,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `migrate_to_fungible_store`](#0x1_coin_migrate_to_fungible_store)
 -  [Function `coin_address`](#0x1_coin_coin_address)
 -  [Function `balance`](#0x1_coin_balance)
+-  [Function `is_balance_at_least`](#0x1_coin_is_balance_at_least)
 -  [Function `coin_balance`](#0x1_coin_coin_balance)
 -  [Function `is_coin_initialized`](#0x1_coin_is_coin_initialized)
 -  [Function `is_coin_store_frozen`](#0x1_coin_is_coin_store_frozen)
@@ -2097,6 +2098,45 @@ Returns the balance of <code>owner</code> for provided <code>CoinType</code> and
 
 </details>
 
+<a id="0x1_coin_is_balance_at_least"></a>
+
+## Function `is_balance_at_least`
+
+Returns whether the balance of <code>owner</code> for provided <code>CoinType</code> and its paired FA is >= <code>amount</code>.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_balance_at_least">is_balance_at_least</a>&lt;CoinType&gt;(owner: <b>address</b>, amount: u64): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_is_balance_at_least">is_balance_at_least</a>&lt;CoinType&gt;(owner: <b>address</b>, amount: u64): bool <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinStore">CoinStore</a> {
+    <b>let</b> coin_balance = <a href="coin.md#0x1_coin_coin_balance">coin_balance</a>&lt;CoinType&gt;(owner);
+    <b>if</b> (coin_balance &gt;= amount) {
+        <b>return</b> <b>true</b>
+    };
+
+    <b>let</b> paired_metadata = <a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;();
+    <b>let</b> left_amount = amount - coin_balance;
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&paired_metadata)) {
+        <a href="primary_fungible_store.md#0x1_primary_fungible_store_is_balance_at_least">primary_fungible_store::is_balance_at_least</a>(
+            owner,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_extract">option::extract</a>(&<b>mut</b> paired_metadata),
+            left_amount
+        )
+    } <b>else</b> { <b>false</b> }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_coin_coin_balance"></a>
 
 ## Function `coin_balance`
@@ -3760,14 +3800,7 @@ Get address by reflection.
 
 
 <pre><code><b>pragma</b> aborts_if_is_partial;
-<b>let</b> map = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework).coin_to_fungible_asset_map;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>&gt;(@aptos_framework) && <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(
-    map,
-    <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;()
-) && (!<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(<a href="object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;())))
-    || !<a href="object.md#0x1_object_spec_exists_at">object::spec_exists_at</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;(
-    <a href="object.md#0x1_object_object_address">object::object_address</a>(<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(map, <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;()))
-));
+<b>aborts_if</b> <b>false</b>;
 </code></pre>
 
 
@@ -4239,27 +4272,6 @@ The creator of <code>CoinType</code> must be <code>@aptos_framework</code>.
     symbol: symbol.bytes
 };
 <b>ensures</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(addr);
-</code></pre>
-
-
-Make sure <code>name</code> and <code>symbol</code> are legal length.
-Only the creator of <code>CoinType</code> can initialize.
-
-
-<a id="0x1_coin_InitializeInternalSchema"></a>
-
-
-<pre><code><b>schema</b> <a href="coin.md#0x1_coin_InitializeInternalSchema">InitializeInternalSchema</a>&lt;CoinType&gt; {
-    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    symbol: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
-    <b>let</b> account_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
-    <b>let</b> coin_address = <a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_type_of">type_info::type_of</a>&lt;CoinType&gt;().account_address;
-    <b>aborts_if</b> coin_address != account_addr;
-    <b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>&lt;CoinType&gt;&gt;(account_addr);
-    <b>aborts_if</b> len(name) &gt; <a href="coin.md#0x1_coin_MAX_COIN_NAME_LENGTH">MAX_COIN_NAME_LENGTH</a>;
-    <b>aborts_if</b> len(symbol) &gt; <a href="coin.md#0x1_coin_MAX_COIN_SYMBOL_LENGTH">MAX_COIN_SYMBOL_LENGTH</a>;
-}
 </code></pre>
 
 

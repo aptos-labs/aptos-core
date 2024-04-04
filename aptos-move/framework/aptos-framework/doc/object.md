@@ -89,6 +89,7 @@ make it so that a reference to a global object can be returned from a function.
     -  [Module-level Specification](#module-level-spec)
     -  [Function `address_to_object`](#@Specification_1_address_to_object)
     -  [Function `create_object_address`](#@Specification_1_create_object_address)
+    -  [Function `create_user_derived_object_address_impl`](#@Specification_1_create_user_derived_object_address_impl)
     -  [Function `create_user_derived_object_address`](#@Specification_1_create_user_derived_object_address)
     -  [Function `create_guid_object_address`](#@Specification_1_create_guid_object_address)
     -  [Function `exists_at`](#@Specification_1_exists_at)
@@ -2308,6 +2309,25 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
+<a id="@Specification_1_create_user_derived_object_address_impl"></a>
+
+### Function `create_user_derived_object_address_impl`
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_create_user_derived_object_address_impl">create_user_derived_object_address_impl</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> opaque;
+<b>pragma</b> aborts_if_is_strict = <b>false</b>;
+<b>aborts_if</b> [abstract] <b>false</b>;
+<b>ensures</b> [abstract] result == <a href="object.md#0x1_object_spec_create_user_derived_object_address_impl">spec_create_user_derived_object_address_impl</a>(source, derive_from);
+</code></pre>
+
+
+
 <a id="@Specification_1_create_user_derived_object_address"></a>
 
 ### Function `create_user_derived_object_address`
@@ -3139,6 +3159,15 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_guid_object_address">spec_create_guid_object_address</a>(source: <b>address</b>, creation_num: u64): <b>address</b>;
+</code></pre>
+
+
+
+
+<a id="0x1_object_spec_create_user_derived_object_address_impl"></a>
+
+
+<pre><code><b>fun</b> <a href="object.md#0x1_object_spec_create_user_derived_object_address_impl">spec_create_user_derived_object_address_impl</a>(source: <b>address</b>, derive_from: <b>address</b>): <b>address</b>;
 </code></pre>
 
 

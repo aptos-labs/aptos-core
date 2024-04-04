@@ -649,7 +649,7 @@ module aptos_framework::coin {
     public fun is_balance_at_least<CoinType>(owner: address, amount: u64): bool acquires CoinConversionMap, CoinStore {
         let coin_balance = coin_balance<CoinType>(owner);
         if (coin_balance >= amount) {
-            return true;
+            return true
         };
 
         let paired_metadata = paired_metadata<CoinType>();

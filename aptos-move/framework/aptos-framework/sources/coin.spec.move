@@ -152,17 +152,8 @@ spec aptos_framework::coin {
     }
 
     spec is_account_registered<CoinType>(account_addr: address): bool {
-        use aptos_framework::fungible_asset;
-        use aptos_framework::object;
         pragma aborts_if_is_partial;
-        let map = global<CoinConversionMap>(@aptos_framework).coin_to_fungible_asset_map;
-        aborts_if exists<CoinConversionMap>(@aptos_framework) && table::spec_contains(
-            map,
-            type_info::type_of<CoinType>()
-        ) && (!exists<object::ObjectCore>(object::object_address(table::spec_get(map, type_info::type_of<CoinType>())))
-            || !object::spec_exists_at<fungible_asset::Metadata>(
-            object::object_address(table::spec_get(map, type_info::type_of<CoinType>()))
-        ));
+        aborts_if false;
     }
 
     spec fun get_coin_supply_opt<CoinType>(): Option<OptionalAggregator> {

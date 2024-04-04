@@ -281,7 +281,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::CoinToFungibleAssetMigration => {
                 AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION
-            },
+            }
         }
     }
 }
