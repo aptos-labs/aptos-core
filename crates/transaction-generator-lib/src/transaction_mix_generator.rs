@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::types::{transaction::SignedTransaction, SignableAccount};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
@@ -38,7 +38,7 @@ impl PhasedTxnMixGenerator {
 impl TransactionGenerator for PhasedTxnMixGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let phase = if self.txn_mix_per_phase.len() == 1 {

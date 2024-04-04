@@ -8,7 +8,10 @@ use crate::{
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_sdk::{
+    transaction_builder::TransactionFactory,
+    types::{LocalAccount, SignableAccount},
+};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_types::{
     account_address::AccountAddress, account_config::aptos_test_root_address,

@@ -8,7 +8,10 @@ use aptos_forge::{
 };
 use aptos_keygen::KeyGen;
 use aptos_logger::info;
-use aptos_sdk::crypto::{ed25519::Ed25519PrivateKey, PrivateKey};
+use aptos_sdk::{
+    crypto::{ed25519::Ed25519PrivateKey, PrivateKey},
+    types::SignableAccount,
+};
 use aptos_temppath::TempPath;
 use aptos_types::transaction::authenticator::AuthenticationKey;
 use tokio::{runtime::Runtime, time::Duration};

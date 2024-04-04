@@ -12,7 +12,7 @@ use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
         transaction::{authenticator::AuthenticationKey, SignedTransaction},
-        AccountKey, LocalAccount,
+        AccountKey, LocalAccount, SignableAccount,
     },
 };
 use aptos_transaction_generator_lib::{
@@ -26,7 +26,6 @@ use futures::{future::try_join_all, StreamExt};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::{
     path::Path,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -236,6 +235,24 @@ impl<'t> AccountMinter<'t> {
         funds_needed
     }
 
+    fn split_by_seed_accounts(
+        mut local_accounts: Vec<Box<dyn SignableAccount>>,
+        num_seed_accounts: usize,
+    ) -> Vec<Vec<Box<dyn SignableAccount>>> {
+        let len = local_accounts.len();
+        let num_chunks = (len + num_seed_accounts - 1) / num_seed_accounts; // Ceiling division
+        let chunk_size = len / num_chunks;
+        let mut result = Vec::with_capacity(num_chunks);
+
+        for _ in 0..num_chunks {
+            let chunk = local_accounts
+                .drain(..chunk_size.min(local_accounts.len()))
+                .collect();
+            result.push(chunk);
+        }
+        result
+    }
+
     /// workflow of create accounts:
     /// 1. Use given source_account as the money source
     /// 1a. Optionally, and if it is root account, mint balance to that account
@@ -251,8 +268,8 @@ impl<'t> AccountMinter<'t> {
         txn_executor: &dyn ReliableTransactionSubmitter,
         req: &EmitJobRequest,
         max_submit_batch_size: usize,
-        local_accounts: Vec<Arc<LocalAccount>>,
-    ) -> Result<()> {
+        local_accounts: Vec<Box<dyn SignableAccount>>,
+    ) -> Result<Vec<Box<dyn SignableAccount>>> {
         let num_accounts = local_accounts.len();
 
         info!(
@@ -341,20 +358,17 @@ impl<'t> AccountMinter<'t> {
         let start = Instant::now();
         let request_counters = txn_executor.create_counter_state();
 
-        let approx_accounts_per_seed =
-            (num_accounts + actual_num_seed_accounts - 1) / actual_num_seed_accounts;
+        let num_local_accounts = local_accounts.len();
 
-        let local_accounts_by_seed: Vec<Vec<Arc<LocalAccount>>> = local_accounts
-            .chunks(approx_accounts_per_seed)
-            .map(|chunk| chunk.to_vec())
-            .collect();
+        let local_accounts_by_seed =
+            Self::split_by_seed_accounts(local_accounts, actual_num_seed_accounts);
 
         let txn_factory = self.txn_factory.clone();
 
         // For each seed account, create a future and transfer coins from that seed account to new accounts
         let account_futures = seed_accounts
             .into_iter()
-            .zip(local_accounts_by_seed.into_iter())
+            .zip(local_accounts_by_seed.iter())
             .map(|(seed_account, accounts)| {
                 // Spawn new threads
                 create_and_fund_new_accounts(
@@ -382,11 +396,15 @@ impl<'t> AccountMinter<'t> {
 
         info!(
             "Successfully completed creating {} accounts in {}s, request stats: {}",
-            local_accounts.len(),
+            num_local_accounts,
             start.elapsed().as_secs(),
             request_counters.show_simple(),
         );
-        Ok(())
+        let mut merged_accounts: Vec<Box<dyn SignableAccount>> = Vec::new();
+        for chunk in local_accounts_by_seed {
+            merged_accounts.extend(chunk);
+        }
+        Ok(merged_accounts)
     }
 
     pub async fn create_and_fund_seed_accounts(
@@ -397,7 +415,7 @@ impl<'t> AccountMinter<'t> {
         coins_per_seed_account: u64,
         max_submit_batch_size: usize,
         counters: &CounterState,
-    ) -> Result<Vec<LocalAccount>> {
+    ) -> Result<Vec<Box<dyn SignableAccount>>> {
         info!(
             "Creating and funding seeds accounts (txn {} gas price)",
             self.txn_factory.get_gas_unit_price()
@@ -513,8 +531,8 @@ impl<'t> AccountMinter<'t> {
 /// Create `num_new_accounts` by transferring coins from `source_account`. Return Vec of created
 /// accounts
 async fn create_and_fund_new_accounts(
-    source_account: LocalAccount,
-    accounts: Vec<Arc<LocalAccount>>,
+    source_account: Box<dyn SignableAccount>,
+    accounts: &[Box<dyn SignableAccount>],
     coins_per_new_account: u64,
     max_num_accounts_per_batch: usize,
     txn_executor: &dyn ReliableTransactionSubmitter,
@@ -523,14 +541,13 @@ async fn create_and_fund_new_accounts(
 ) -> Result<()> {
     let accounts_by_batch = accounts
         .chunks(max_num_accounts_per_batch)
-        .map(|chunk| chunk.to_vec())
         .collect::<Vec<_>>();
     for batch in accounts_by_batch {
         let creation_requests: Vec<_> = batch
             .iter()
             .map(|account| {
                 create_and_fund_account_request(
-                    &source_account,
+                    &*source_account,
                     coins_per_new_account,
                     account.public_key(),
                     txn_factory,
@@ -550,7 +567,7 @@ pub async fn gen_reusable_accounts<R>(
     txn_executor: &dyn ReliableTransactionSubmitter,
     num_accounts: usize,
     rng: &mut R,
-) -> Result<Vec<LocalAccount>>
+) -> Result<Vec<Box<dyn SignableAccount>>>
 where
     R: rand_core::RngCore + ::rand_core::CryptoRng,
 {
@@ -573,18 +590,18 @@ where
         .into_iter()
         .zip(seq_nums.into_iter())
         .map(|(account_key, sequence_number)| {
-            LocalAccount::new(
+            Box::new(LocalAccount::new(
                 account_key.authentication_key().account_address(),
                 account_key,
                 sequence_number,
-            )
+            )) as Box<dyn SignableAccount>
         })
         .collect();
     Ok(accounts)
 }
 
 pub fn create_and_fund_account_request(
-    creation_account: &LocalAccount,
+    creation_account: &dyn SignableAccount,
     amount: u64,
     pubkey: &Ed25519PublicKey,
     txn_factory: &TransactionFactory,

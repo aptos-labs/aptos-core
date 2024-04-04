@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, format_err, Result};
-use aptos_sdk::transaction_builder::TransactionFactory;
+use aptos_sdk::{transaction_builder::TransactionFactory, types::SignableAccount};
 use aptos_transaction_emitter_lib::{query_sequence_number, Cluster, TxnEmitter};
 use futures::future::join_all;
 use rand::{rngs::StdRng, SeedableRng};

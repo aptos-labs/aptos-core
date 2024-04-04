@@ -7,7 +7,7 @@ use aptos_forge::{reconfig, LocalSwarm, NodeExt, Swarm, SwarmExt};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, LocalAccount, SignableAccount},
 };
 use rand::random;
 use std::time::Duration;

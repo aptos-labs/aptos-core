@@ -12,7 +12,7 @@ use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{AccountKey, LocalAccount},
+    types::{AccountKey, LocalAccount, SignableAccount},
 };
 use aptos_storage_interface::{
     state_view::{DbStateViewAtVersion, VerifiedStateViewAtVersion},

@@ -13,6 +13,7 @@ use crate::{
 };
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
+use aptos_sdk::types::SignableAccount;
 use aptos_types::{
     jwks::{jwk::JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, ProviderJWKs},
     on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig},

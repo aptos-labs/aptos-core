@@ -9,7 +9,7 @@ use aptos_logger::{info, sample, sample::SampleRate, warn};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, LocalAccount, SignableAccount},
 };
 use args::TransactionTypeArg;
 use async_trait::async_trait;
@@ -114,7 +114,7 @@ impl Default for TransactionType {
 pub trait TransactionGenerator: Sync + Send {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction>;
 }
@@ -228,7 +228,7 @@ impl<'t> RootAccountHandle for AlwaysApproveRootAccountHandle<'t> {
 pub async fn create_txn_generator_creator(
     transaction_mix_per_phase: &[Vec<(TransactionType, usize)>],
     root_account: impl RootAccountHandle,
-    source_accounts: &mut [LocalAccount],
+    source_accounts: &mut [Box<dyn SignableAccount>],
     initial_burner_accounts: Vec<LocalAccount>,
     txn_executor: &dyn ReliableTransactionSubmitter,
     txn_factory: &TransactionFactory,
@@ -239,11 +239,19 @@ pub async fn create_txn_generator_creator(
     Arc<ObjectPool<AccountAddress>>,
     Arc<ObjectPool<LocalAccount>>,
 ) {
+    let source_account_addresses = source_accounts
+        .iter()
+        .map(|d| d.address())
+        .collect::<Vec<_>>();
+    let burner_account_addresses = initial_burner_accounts
+        .iter()
+        .map(|d| d.address())
+        .collect::<Vec<_>>();
     let addresses_pool = Arc::new(ObjectPool::new_initial(
-        source_accounts
+        source_account_addresses
             .iter()
-            .chain(initial_burner_accounts.iter())
-            .map(|d| d.address())
+            .chain(burner_account_addresses.iter())
+            .cloned()
             .collect(),
     ));
     let accounts_pool = Arc::new(ObjectPool::new_initial(initial_burner_accounts));
@@ -394,7 +402,7 @@ pub async fn create_txn_generator_creator(
 /// Overflow replaces at random positions as well.
 ///
 /// It's efficient to lock the objects for short time - and replace
-/// in place, but its not a concurrent datastructure.
+/// in place, but it's not a concurrent datastructure.
 pub struct ObjectPool<T> {
     pool: RwLock<Vec<T>>,
 }
@@ -510,7 +518,7 @@ impl<T: Clone> ObjectPool<T> {
 }
 
 pub fn create_account_transaction(
-    from: &LocalAccount,
+    from: &dyn SignableAccount,
     to: AccountAddress,
     txn_factory: &TransactionFactory,
     creation_balance: u64,

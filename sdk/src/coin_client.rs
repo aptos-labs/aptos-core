@@ -13,7 +13,7 @@ use crate::{
         account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{EntryFunction, TransactionPayload},
-        LocalAccount,
+        LocalAccount, SignableAccount,
     },
 };
 use anyhow::{Context, Result};

@@ -9,7 +9,7 @@ use aptos_cached_packages::aptos_token_sdk_builder::EntryFunctionCall;
 use aptos_sdk::{
     rest_client::{Client as ApiClient, PendingTransaction},
     transaction_builder::TransactionFactory,
-    types::LocalAccount,
+    types::{LocalAccount, SignableAccount},
 };
 use aptos_types::{
     account_address::AccountAddress, chain_id::ChainId, transaction::TransactionPayload,

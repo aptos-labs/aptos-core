@@ -6,7 +6,7 @@ use anyhow::Ok;
 use aptos::test::CliTestFramework;
 use aptos_forge::{NetworkTest, NodeExt, SwarmExt, Test};
 use aptos_logger::info;
-use aptos_sdk::bcs;
+use aptos_sdk::{bcs, types::SignableAccount};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     on_chain_config::{

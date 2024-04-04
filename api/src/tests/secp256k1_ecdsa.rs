@@ -7,7 +7,7 @@ use aptos_api_test_context::current_function_name;
 use aptos_crypto::{ed25519::Ed25519PrivateKey, secp256k1_ecdsa};
 use aptos_sdk::types::{
     transaction::authenticator::{AnyPublicKey, AuthenticationKey},
-    LocalAccount,
+    LocalAccount, SignableAccount,
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::convert::TryInto;

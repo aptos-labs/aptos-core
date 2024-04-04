@@ -18,6 +18,7 @@ use aptos_release_builder::{
     },
     ReleaseEntry,
 };
+use aptos_sdk::types::SignableAccount;
 use aptos_temppath::TempPath;
 use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, OnChainConsensusConfig};
 use std::{fs, path::PathBuf, process::Command, sync::Arc};

@@ -19,7 +19,7 @@ use anyhow::anyhow;
 use aptos_api_types::{ViewRequest, U64};
 use aptos_logger::error;
 use aptos_rest_client::Client;
-use aptos_sdk::types::LocalAccount;
+use aptos_sdk::types::{LocalAccount, SignableAccount};
 use aptos_types::account_address::AccountAddress;
 
 /// Tests view function use. Checks that:

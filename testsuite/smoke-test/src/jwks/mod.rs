@@ -11,6 +11,7 @@ use aptos::{common::types::TransactionSummary, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
+use aptos_sdk::types::SignableAccount;
 use aptos_types::{
     jwks::{
         jwk::{JWKMoveStruct, JWK},

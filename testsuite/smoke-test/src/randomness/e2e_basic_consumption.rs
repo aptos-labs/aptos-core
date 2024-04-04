@@ -5,6 +5,7 @@ use crate::smoke_test_environment::SwarmBuilder;
 use aptos::{move_tool::MemberId, test::CliTestFramework};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::info;
+use aptos_sdk::types::SignableAccount;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, str::FromStr, sync::Arc, time::Duration};

@@ -9,7 +9,7 @@ use crate::{
 use aptos_logger::info;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, LocalAccount, SignableAccount},
 };
 use async_trait::async_trait;
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
@@ -18,7 +18,7 @@ use std::sync::Arc;
 // Fn + Send + Sync, as it will be called from multiple threads simultaneously
 // if you need any coordination, use Arc<RwLock<X>> fields
 pub type TransactionGeneratorWorker = dyn Fn(
-        &LocalAccount,
+        &dyn SignableAccount,
         &Package,
         &LocalAccount,
         &TransactionFactory,
@@ -82,7 +82,7 @@ impl CustomModulesDelegationGenerator {
 impl TransactionGenerator for CustomModulesDelegationGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);

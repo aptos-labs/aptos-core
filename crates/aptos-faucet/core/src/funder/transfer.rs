@@ -22,7 +22,7 @@ use aptos_sdk::{
         account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{authenticator::AuthenticationKey, SignedTransaction, TransactionPayload},
-        LocalAccount,
+        LocalAccount, SignableAccount,
     },
 };
 use async_trait::async_trait;

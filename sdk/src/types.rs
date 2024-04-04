@@ -22,10 +22,34 @@ pub use aptos_types::*;
 use bip39::{Language, Mnemonic, Seed};
 use ed25519_dalek_bip32::{DerivationPath, ExtendedSecretKey};
 use std::{
+    fmt::Debug,
     str::FromStr,
     sync::atomic::{AtomicU64, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+pub trait SignableAccount: Send + Sync + Debug {
+    fn address(&self) -> AccountAddress;
+
+    fn public_key(&self) -> &Ed25519PublicKey;
+    fn sequence_number(&self) -> u64;
+    fn set_sequence_number(&self, sequence_number: u64);
+    fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction;
+    fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction;
+
+    fn sign_multi_agent_with_transaction_builder(
+        &self,
+        secondary_signers: Vec<&LocalAccount>,
+        builder: TransactionBuilder,
+    ) -> SignedTransaction;
+
+    fn sign_fee_payer_with_transaction_builder(
+        &self,
+        secondary_signers: Vec<&LocalAccount>,
+        fee_payer_signer: &LocalAccount,
+        builder: TransactionBuilder,
+    ) -> SignedTransaction;
+}
 
 /// LocalAccount represents an account on the Aptos blockchain. Internally it
 /// holds the private / public key pair and the address of the account. You can
@@ -89,13 +113,60 @@ impl LocalAccount {
         Self::new(address, key, 0)
     }
 
-    pub fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction {
+    pub fn private_key(&self) -> &Ed25519PrivateKey {
+        self.key.private_key()
+    }
+
+    pub fn authentication_key(&self) -> AuthenticationKey {
+        self.key.authentication_key()
+    }
+
+    pub fn increment_sequence_number(&self) -> u64 {
+        self.sequence_number.fetch_add(1, Ordering::SeqCst)
+    }
+
+    pub fn decrement_sequence_number(&self) -> u64 {
+        self.sequence_number.fetch_sub(1, Ordering::SeqCst)
+    }
+
+    pub fn rotate_key<T: Into<AccountKey>>(&mut self, new_key: T) -> AccountKey {
+        std::mem::replace(&mut self.key, new_key.into())
+    }
+
+    pub fn received_event_key(&self) -> EventKey {
+        EventKey::new(2, self.address)
+    }
+
+    pub fn sent_event_key(&self) -> EventKey {
+        EventKey::new(3, self.address)
+    }
+}
+
+impl SignableAccount for LocalAccount {
+    fn address(&self) -> AccountAddress {
+        self.address
+    }
+
+    fn public_key(&self) -> &Ed25519PublicKey {
+        self.key.public_key()
+    }
+
+    fn sequence_number(&self) -> u64 {
+        self.sequence_number.load(Ordering::SeqCst)
+    }
+
+    fn set_sequence_number(&self, sequence_number: u64) {
+        self.sequence_number
+            .store(sequence_number, Ordering::SeqCst);
+    }
+
+    fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction {
         txn.sign(self.private_key(), self.public_key().clone())
             .expect("Signing a txn can't fail")
             .into_inner()
     }
 
-    pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
+    fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
         let raw_txn = builder
             .sender(self.address())
             .sequence_number(self.increment_sequence_number())
@@ -103,9 +174,9 @@ impl LocalAccount {
         self.sign_transaction(raw_txn)
     }
 
-    pub fn sign_multi_agent_with_transaction_builder(
+    fn sign_multi_agent_with_transaction_builder(
         &self,
-        secondary_signers: Vec<&Self>,
+        secondary_signers: Vec<&LocalAccount>,
         builder: TransactionBuilder,
     ) -> SignedTransaction {
         let secondary_signer_addresses = secondary_signers
@@ -130,10 +201,10 @@ impl LocalAccount {
             .into_inner()
     }
 
-    pub fn sign_fee_payer_with_transaction_builder(
+    fn sign_fee_payer_with_transaction_builder(
         &self,
-        secondary_signers: Vec<&Self>,
-        fee_payer_signer: &Self,
+        secondary_signers: Vec<&LocalAccount>,
+        fee_payer_signer: &LocalAccount,
         builder: TransactionBuilder,
     ) -> SignedTransaction {
         let secondary_signer_addresses = secondary_signers
@@ -158,51 +229,6 @@ impl LocalAccount {
             )
             .expect("Signing multi agent txn failed")
             .into_inner()
-    }
-
-    pub fn address(&self) -> AccountAddress {
-        self.address
-    }
-
-    pub fn private_key(&self) -> &Ed25519PrivateKey {
-        self.key.private_key()
-    }
-
-    pub fn public_key(&self) -> &Ed25519PublicKey {
-        self.key.public_key()
-    }
-
-    pub fn authentication_key(&self) -> AuthenticationKey {
-        self.key.authentication_key()
-    }
-
-    pub fn sequence_number(&self) -> u64 {
-        self.sequence_number.load(Ordering::SeqCst)
-    }
-
-    pub fn increment_sequence_number(&self) -> u64 {
-        self.sequence_number.fetch_add(1, Ordering::SeqCst)
-    }
-
-    pub fn decrement_sequence_number(&self) -> u64 {
-        self.sequence_number.fetch_sub(1, Ordering::SeqCst)
-    }
-
-    pub fn set_sequence_number(&self, sequence_number: u64) {
-        self.sequence_number
-            .store(sequence_number, Ordering::SeqCst);
-    }
-
-    pub fn rotate_key<T: Into<AccountKey>>(&mut self, new_key: T) -> AccountKey {
-        std::mem::replace(&mut self.key, new_key.into())
-    }
-
-    pub fn received_event_key(&self) -> EventKey {
-        EventKey::new(2, self.address)
-    }
-
-    pub fn sent_event_key(&self) -> EventKey {
-        EventKey::new(3, self.address)
     }
 }
 

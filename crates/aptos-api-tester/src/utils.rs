@@ -14,7 +14,7 @@ use anyhow::{anyhow, Error, Result};
 use aptos_api_types::U64;
 use aptos_logger::{error, info};
 use aptos_rest_client::{error::RestError, Client, FaucetClient};
-use aptos_sdk::types::LocalAccount;
+use aptos_sdk::types::{LocalAccount, SignableAccount};
 use aptos_types::account_address::AccountAddress;
 use std::{env, num::ParseIntError, str::FromStr};
 

@@ -11,6 +11,7 @@ use crate::{
 };
 use aptos_forge::{Node, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
+use aptos_sdk::types::SignableAccount;
 use aptos_types::{
     dkg::DKGState, on_chain_config::OnChainRandomnessConfig, randomness::PerBlockRandomness,
 };

@@ -6,7 +6,7 @@ use crate::{
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, LocalAccount, SignableAccount},
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
@@ -43,7 +43,7 @@ impl AccountGenerator {
 impl TransactionGenerator for AccountGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);

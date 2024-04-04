@@ -27,7 +27,7 @@ use aptos_sdk::{
     transaction_builder::TransactionFactory,
     types::{
         account_config::aptos_test_root_address, transaction::SignedTransaction, AccountKey,
-        LocalAccount,
+        LocalAccount, SignableAccount,
     },
 };
 use aptos_storage_interface::{state_view::DbStateView, DbReaderWriter};

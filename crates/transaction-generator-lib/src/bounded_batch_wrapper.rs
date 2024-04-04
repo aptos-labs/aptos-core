@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{TransactionGenerator, TransactionGeneratorCreator};
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::types::{transaction::SignedTransaction, SignableAccount};
 
 struct BoundedBatchWrapperTransactionGenerator {
     batch_size: usize,
@@ -12,7 +12,7 @@ struct BoundedBatchWrapperTransactionGenerator {
 impl TransactionGenerator for BoundedBatchWrapperTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         self.generator

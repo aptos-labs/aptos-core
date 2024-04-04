@@ -6,7 +6,7 @@ use crate::{
 use aptos_infallible::RwLock;
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, SignableAccount},
 };
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
@@ -34,7 +34,7 @@ impl PublishPackageGenerator {
 impl TransactionGenerator for PublishPackageGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);

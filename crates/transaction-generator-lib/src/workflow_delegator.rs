@@ -11,7 +11,7 @@ use crate::{
 use aptos_logger::{info, sample, sample::SampleRate};
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, LocalAccount, SignableAccount},
 };
 use std::{
     cmp,
@@ -113,7 +113,7 @@ impl WorkflowTxnGenerator {
 impl TransactionGenerator for WorkflowTxnGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         mut num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         assert_ne!(num_to_create, 0);

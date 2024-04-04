@@ -35,7 +35,9 @@ use aptos_rest_client::{
 };
 use aptos_sdk::{
     transaction_builder::TransactionFactory,
-    types::{HardwareWalletAccount, HardwareWalletType, LocalAccount, TransactionSigner},
+    types::{
+        HardwareWalletAccount, HardwareWalletType, LocalAccount, SignableAccount, TransactionSigner,
+    },
 };
 use aptos_types::{
     chain_id::ChainId,

@@ -6,7 +6,7 @@ use super::new_test_context;
 use aptos_api_test_context::current_function_name;
 use aptos_api_types::Address;
 use aptos_crypto::ed25519::Ed25519PrivateKey;
-use aptos_sdk::types::LocalAccount;
+use aptos_sdk::types::{LocalAccount, SignableAccount};
 use serde_json::json;
 use std::convert::TryInto;
 

@@ -14,7 +14,7 @@ use crate::{
 use aptos_api_types::U64;
 use aptos_logger::error;
 use aptos_rest_client::{Account, Client, FaucetClient};
-use aptos_sdk::types::LocalAccount;
+use aptos_sdk::types::{LocalAccount, SignableAccount};
 use aptos_types::account_address::AccountAddress;
 
 /// Tests new account creation. Checks that:

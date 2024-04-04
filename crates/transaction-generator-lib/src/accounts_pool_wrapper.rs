@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
-use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount};
+use aptos_sdk::types::{transaction::SignedTransaction, LocalAccount, SignableAccount};
 use rand::{rngs::StdRng, SeedableRng};
 use std::sync::Arc;
 
@@ -37,7 +37,7 @@ impl AccountsPoolWrapperGenerator {
 impl TransactionGenerator for AccountsPoolWrapperGenerator {
     fn generate_transactions(
         &mut self,
-        _account: &LocalAccount,
+        _account: &dyn SignableAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut accounts_to_use =

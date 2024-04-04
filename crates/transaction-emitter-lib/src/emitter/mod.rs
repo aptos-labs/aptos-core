@@ -20,7 +20,7 @@ use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Clien
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{transaction::SignedTransaction, LocalAccount},
+    types::{transaction::SignedTransaction, LocalAccount, SignableAccount},
 };
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, ReliableTransactionSubmitter, TransactionType,
@@ -560,7 +560,7 @@ impl EmitModeParams {
 
 #[derive(Debug)]
 struct Worker {
-    join_handle: JoinHandle<Vec<LocalAccount>>,
+    join_handle: JoinHandle<Vec<Box<dyn SignableAccount>>>,
 }
 
 #[derive(Debug)]
@@ -968,7 +968,7 @@ async fn wait_for_accounts_sequence(
 }
 
 fn update_seq_num_and_get_num_expired(
-    accounts: &mut [LocalAccount],
+    accounts: &mut [Box<dyn SignableAccount>],
     account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
     latest_fetched_counts: HashMap<AccountAddress, u64>,
 ) -> (usize, usize) {
@@ -1126,7 +1126,7 @@ pub async fn create_accounts(
     seed: [u8; 32],
     num_accounts: usize,
     retries: usize,
-) -> Result<Vec<LocalAccount>> {
+) -> Result<Vec<Box<dyn SignableAccount>>> {
     info!(
         "Using reliable/retriable init transaction executor with {} retries, every {}s",
         retries,
@@ -1168,14 +1168,9 @@ pub async fn create_accounts(
     );
 
     if !skip_minting_accounts {
-        let accounts: Vec<_> = accounts.into_iter().map(Arc::new).collect();
-        account_minter
-            .create_and_fund_accounts(&txn_executor, req, max_submit_batch_size, accounts.clone())
+        let accounts = account_minter
+            .create_and_fund_accounts(&txn_executor, req, max_submit_batch_size, accounts)
             .await?;
-        let accounts: Vec<_> = accounts
-            .into_iter()
-            .map(|a| Arc::try_unwrap(a).unwrap())
-            .collect();
         info!("Accounts created and funded");
         Ok(accounts)
     } else {

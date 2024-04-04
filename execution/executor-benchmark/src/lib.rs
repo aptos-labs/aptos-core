@@ -36,7 +36,7 @@ use aptos_jellyfish_merkle::metrics::{
 };
 use aptos_logger::{info, warn};
 use aptos_metrics_core::Histogram;
-use aptos_sdk::types::LocalAccount;
+use aptos_sdk::types::{LocalAccount, SignableAccount};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
@@ -246,7 +246,7 @@ pub fn run_benchmark<V>(
 fn init_workload<V>(
     transaction_mix: Vec<(TransactionType, usize)>,
     root_account: &mut LocalAccount,
-    mut main_signer_accounts: Vec<LocalAccount>,
+    main_signer_accounts: Vec<LocalAccount>,
     burner_accounts: Vec<LocalAccount>,
     db: DbReaderWriter,
     pipeline_config: &PipelineConfig,
@@ -266,6 +266,10 @@ where
     let transaction_factory = TransactionGenerator::create_transaction_factory();
     let phase = Arc::new(AtomicUsize::new(0));
     let phase_clone = phase.clone();
+    let mut main_signer_accounts = main_signer_accounts
+        .into_iter()
+        .map(|acc| Box::new(acc) as Box<dyn SignableAccount>)
+        .collect::<Vec<_>>();
     let (txn_generator_creator, _address_pool, _account_pool) = runtime.block_on(async {
         let db_gen_init_transaction_executor = DbReliableTransactionSubmitter {
             db: db.clone(),

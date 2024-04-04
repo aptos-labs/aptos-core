@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use aptos_sdk::{
     coin_client::CoinClient,
     rest_client::{Client, FaucetClient},
-    types::LocalAccount,
+    types::{LocalAccount, SignableAccount},
 };
 use once_cell::sync::Lazy;
 use std::str::FromStr;

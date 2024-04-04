@@ -4,6 +4,7 @@
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
 use aptos_crypto::ed25519::Ed25519Signature;
+use aptos_sdk::types::SignableAccount;
 use aptos_types::transaction::{
     authenticator::TransactionAuthenticator, EntryFunction, TransactionPayload,
 };

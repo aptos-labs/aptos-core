@@ -10,7 +10,7 @@ use aptos_sdk::{
     types::{
         account_address::AccountAddress,
         transaction::{SignedTransaction, TransactionPayload},
-        LocalAccount,
+        SignableAccount,
     },
 };
 use move_binary_format::{access::ModuleAccess, file_format::SignatureToken, CompiledModule};
@@ -172,7 +172,7 @@ impl Package {
     pub fn use_random_transaction(
         &self,
         rng: &mut StdRng,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         txn_factory: &TransactionFactory,
     ) -> SignedTransaction {
         // let payload = module_simple::rand_gen_function(rng, module_id);

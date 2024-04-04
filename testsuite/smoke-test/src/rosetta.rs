@@ -33,7 +33,10 @@ use aptos_rosetta::{
     },
     ROSETTA_VERSION,
 };
-use aptos_sdk::{transaction_builder::TransactionFactory, types::LocalAccount};
+use aptos_sdk::{
+    transaction_builder::TransactionFactory,
+    types::{LocalAccount, SignableAccount},
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::CORE_CODE_ADDRESS,

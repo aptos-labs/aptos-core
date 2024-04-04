@@ -16,7 +16,7 @@ use aptos_sdk::{
         transaction::{
             authenticator::AuthenticationKey, Script, SignedTransaction, TransactionArgument,
         },
-        LocalAccount,
+        LocalAccount, SignableAccount,
     },
 };
 use async_trait::async_trait;

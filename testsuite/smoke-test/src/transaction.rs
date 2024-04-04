@@ -12,7 +12,10 @@ use aptos_rest_client::{
 };
 use aptos_sdk::{
     crypto::{PrivateKey, SigningKey},
-    types::transaction::{authenticator::AuthenticationKey, SignedTransaction},
+    types::{
+        transaction::{authenticator::AuthenticationKey, SignedTransaction},
+        SignableAccount,
+    },
 };
 
 // TODO: debug me and re-enable the test!

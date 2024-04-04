@@ -18,7 +18,7 @@ use aptos_sdk::{
             authenticator::{AnyPublicKey, AuthenticationKey},
             SignedTransaction,
         },
-        LocalAccount,
+        LocalAccount, SignableAccount,
     },
 };
 use rand::{rngs::OsRng, Rng, SeedableRng};

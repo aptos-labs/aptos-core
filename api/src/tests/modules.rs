@@ -3,6 +3,7 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
+use aptos_sdk::types::SignableAccount;
 use std::path::PathBuf;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

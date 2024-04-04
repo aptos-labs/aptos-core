@@ -22,6 +22,7 @@ use aptos_genesis::config::HostAndPort;
 use aptos_keygen::KeyGen;
 use aptos_logger::info;
 use aptos_rest_client::{Client, State};
+use aptos_sdk::types::SignableAccount;
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS,
     network_address::DnsName,

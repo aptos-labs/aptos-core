@@ -11,7 +11,7 @@ use aptos_crypto::{
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
-use aptos_sdk::types::LocalAccount;
+use aptos_sdk::types::{LocalAccount, SignableAccount};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::aptos_test_root_address,

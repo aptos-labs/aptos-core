@@ -3,7 +3,10 @@
 
 use super::new_test_context;
 use aptos_api_test_context::{current_function_name, TestContext};
-use aptos_sdk::{transaction_builder::aptos_stdlib::aptos_token_stdlib, types::LocalAccount};
+use aptos_sdk::{
+    transaction_builder::aptos_stdlib::aptos_token_stdlib,
+    types::{LocalAccount, SignableAccount},
+};
 use aptos_storage_interface::DbReader;
 use move_core_types::account_address::AccountAddress;
 use move_package::BuildConfig;

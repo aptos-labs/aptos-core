@@ -4,7 +4,7 @@ use crate::{ObjectPool, TransactionGenerator, TransactionGeneratorCreator};
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::{aptos_stdlib, TransactionFactory},
-    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount},
+    types::{chain_id::ChainId, transaction::SignedTransaction, LocalAccount, SignableAccount},
 };
 use rand::{
     distributions::{Distribution, Standard},
@@ -172,7 +172,7 @@ impl P2PTransactionGenerator {
 
     fn gen_single_txn(
         &self,
-        from: &LocalAccount,
+        from: &dyn SignableAccount,
         to: &AccountAddress,
         num_coins: u64,
         txn_factory: &TransactionFactory,
@@ -185,7 +185,7 @@ impl P2PTransactionGenerator {
     fn generate_invalid_transaction(
         &mut self,
         rng: &mut StdRng,
-        sender: &LocalAccount,
+        sender: &dyn SignableAccount,
         receiver: &AccountAddress,
         reqs: &[SignedTransaction],
     ) -> SignedTransaction {
@@ -249,7 +249,7 @@ impl Distribution<InvalidTransactionType> for Standard {
 impl TransactionGenerator for P2PTransactionGenerator {
     fn generate_transactions(
         &mut self,
-        account: &LocalAccount,
+        account: &dyn SignableAccount,
         num_to_create: usize,
     ) -> Vec<SignedTransaction> {
         let mut requests = Vec::with_capacity(num_to_create);

@@ -18,7 +18,7 @@ use aptos_sdk::{
     rest_client::Client,
     types::{
         account_address::AccountAddress, chain_id::ChainId, transaction::SignedTransaction,
-        LocalAccount,
+        LocalAccount, SignableAccount,
     },
 };
 use clap::Parser;

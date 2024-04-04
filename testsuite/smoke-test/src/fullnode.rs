@@ -10,6 +10,7 @@ use aptos_cached_packages::aptos_stdlib;
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_forge::{NodeExt, Result, Swarm};
 use aptos_rest_client::Client as RestClient;
+use aptos_sdk::types::SignableAccount;
 use aptos_types::account_address::AccountAddress;
 use std::time::{Duration, Instant};
 

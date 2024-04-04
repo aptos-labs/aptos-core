@@ -24,8 +24,12 @@ use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
     move_types::account_address::AccountAddress,
     transaction_builder::aptos_stdlib,
-    types::on_chain_config::{
-        BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig, TransactionShufflerType,
+    types::{
+        on_chain_config::{
+            BlockGasLimitType, OnChainConsensusConfig, OnChainExecutionConfig,
+            TransactionShufflerType,
+        },
+        SignableAccount,
     },
 };
 use aptos_testcases::{

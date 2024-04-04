@@ -13,6 +13,7 @@ use aptos_forge::{
 };
 use aptos_logger::info;
 use aptos_rest_client::Client;
+use aptos_sdk::types::SignableAccount;
 use aptos_types::{
     on_chain_config::{ConsensusConfigV1, OnChainConsensusConfig},
     PeerId,

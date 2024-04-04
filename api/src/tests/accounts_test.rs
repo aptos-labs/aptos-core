@@ -6,6 +6,7 @@ use super::new_test_context;
 use aptos_api_test_context::{current_function_name, find_value};
 use aptos_api_types::{MoveModuleBytecode, MoveResource, MoveStructTag, StateKeyWrapper};
 use aptos_cached_packages::aptos_stdlib;
+use aptos_sdk::types::SignableAccount;
 use serde_json::json;
 use std::str::FromStr;
 

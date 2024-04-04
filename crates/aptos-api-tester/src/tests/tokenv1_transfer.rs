@@ -25,7 +25,7 @@ use crate::{
 use aptos_api_types::U64;
 use aptos_logger::error;
 use aptos_rest_client::Client;
-use aptos_sdk::types::LocalAccount;
+use aptos_sdk::types::{LocalAccount, SignableAccount};
 use aptos_types::account_address::AccountAddress;
 
 const COLLECTION_NAME: &str = "test collection";
