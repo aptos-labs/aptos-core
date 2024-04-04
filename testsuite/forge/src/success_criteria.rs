@@ -549,8 +549,9 @@ impl SuccessCriteriaChecker {
     async fn check_no_errors(swarm: &mut dyn Swarm) -> anyhow::Result<()> {
         let error_count = fetch_error_metrics(swarm).await?;
         if error_count > 0 {
-            bail!("Error count was {} and should be 0", error_count);
+            bail!("error!() count in validator logs was {}, and must be 0", error_count);
         } else {
+            println!("No error!() found in validator logs");
             Ok(())
         }
     }
