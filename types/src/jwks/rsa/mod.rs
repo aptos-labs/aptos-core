@@ -47,6 +47,16 @@ impl RSA_JWK {
         }
     }
 
+    pub fn secure_test_jwk() -> RSA_JWK {
+        RSA_JWK {
+            kid:"test-rsa".to_owned(),
+            kty:"RSA".to_owned(),
+            alg:"RS256".to_owned(),
+            e:"AQAB".to_owned(),
+            n:"y5Efs1ZzisLLKCARSvTztgWj5JFP3778dZWt-od78fmOZFxem3a_aYbOXSJToRp862do0PxJ4PDMpmqwV5f7KplFI6NswQV-WPufQH8IaHXZtuPdCjPOcHybcDiLkO12d0dG6iZQUzypjAJf63APcadio-4JDNWlGC5_Ow_XQ9lIY71kTMiT9lkCCd0ZxqEifGtnJe5xSoZoaMRKrvlOw-R6iVjLUtPAk5hyUX95LDKxwAR-oshnj7gmATejga2EvH9ozdn3M8Go11PSDa04OQxPcA25OoDTfxLvT28LRpSXrbmUWZ-O_lGtDl3ZAtjIguYGEobTk4N11eRssC95Cw".to_owned()
+        }
+    }
+
     pub fn verify_signature(&self, jwt_token: &str) -> Result<TokenData<Claims>> {
         let mut validation = Validation::new(Algorithm::RS256);
         validation.validate_exp = false;

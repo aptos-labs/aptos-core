@@ -21,6 +21,10 @@ use aptos_types::{
     account_config::{self, aptos_test_root_address, events::NewEpochEvent, CORE_CODE_ADDRESS},
     chain_id::ChainId,
     contract_event::{ContractEvent, ContractEventV1},
+    jwks::{
+        patch::{PatchJWKMoveStruct, PatchUpsertJWK},
+        rsa::RSA_JWK,
+    },
     keyless,
     keyless::{Groth16VerificationKey, DEVNET_VERIFICATION_KEY, KEYLESS_ACCOUNT_MODULE_NAME},
     move_utils::as_move_value::AsMoveValue,
@@ -626,6 +630,22 @@ fn initialize_keyless_accounts(session: &mut SessionExt, chain_id: ChainId) {
             serialize_values(&vec![
                 MoveValue::Signer(CORE_CODE_ADDRESS),
                 vk.as_move_value(),
+            ]),
+        );
+
+        let patch: PatchJWKMoveStruct = PatchUpsertJWK {
+            issuer: "test.oidc.provider".to_owned(),
+            jwk: RSA_JWK::secure_test_jwk().into(),
+        }
+        .into();
+        exec_function(
+            session,
+            JWKS_MODULE_NAME,
+            "set_patches",
+            vec![],
+            serialize_values(&vec![
+                MoveValue::Signer(CORE_CODE_ADDRESS),
+                MoveValue::Vector(vec![patch.as_move_value()]),
             ]),
         );
     }
