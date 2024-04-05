@@ -1477,11 +1477,32 @@ impl AptosVM {
                 .is_enabled(FeatureFlag::SAFER_RESOURCE_GROUPS),
         )?;
         verifier::event_validation::validate_module_events(session, modules)?;
+        self.validate_unstable_bytecode(modules)?;
 
         if !expected_modules.is_empty() {
             return Err(Self::metadata_validation_error(
                 "not all registered modules published",
             ));
+        }
+        Ok(())
+    }
+
+    /// Check whether the bytecode can be published to mainnet based on the unstable tag in the metadata
+    fn validate_unstable_bytecode(&self, modules: &[CompiledModule]) -> VMResult<()> {
+        if self.move_vm.chain_id().is_mainnet() {
+            for module in modules {
+                if let Some(metadata) =
+                    aptos_framework::get_compilation_metadata_from_compiled_module(module)
+                {
+                    if metadata.unstable {
+                        return Err(PartialVMError::new(StatusCode::UNSTABLE_BYTECODE)
+                            .with_message(
+                                "unstable code cannot be published to mainnet".to_string(),
+                            )
+                            .finish(Location::Undefined));
+                    }
+                }
+            }
         }
         Ok(())
     }
