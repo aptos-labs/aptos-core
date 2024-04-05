@@ -79,6 +79,7 @@ use std::{
 use suites::dag::get_dag_test;
 use tokio::{runtime::Runtime, select};
 use url::Url;
+use aptos_sdk::types::on_chain_config::OnChainJWKConsensusConfig;
 
 mod suites;
 
@@ -1947,6 +1948,9 @@ fn realistic_env_max_load_test(
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
+            helm_values["chain"]["jwk_consensus_config_override"] =
+                serde_yaml::to_value(OnChainJWKConsensusConfig::default_enabled())
+                    .unwrap();
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
