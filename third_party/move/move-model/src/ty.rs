@@ -1313,8 +1313,13 @@ impl Type {
     }
 
     /// If this is a tuple and it is not a unit type, return true.
-    pub fn is_tuple(&self) -> bool {
+    pub fn is_non_unit_tuple(&self) -> bool {
         matches!(self, Type::Tuple(ts) if !ts.is_empty())
+    }
+
+    /// If this is a tuple, return true.
+    pub fn is_tuple(&self) -> bool {
+        matches!(self, Type::Tuple(_))
     }
 }
 
@@ -2796,6 +2801,14 @@ impl TypeUnificationError {
                         origin: ConstraintOrigin::Local(_),
                         ..
                     }) => "as a local variable type",
+                    Some(ConstraintContext {
+                        origin: ConstraintOrigin::Unspecified,
+                        ..
+                    }) => "",
+                    Some(ConstraintContext {
+                        origin: ConstraintOrigin::TupleElement(_, _),
+                        ..
+                    }) => "as a tuple element",
                     _ => "as a type argument",
                 };
                 let (mut note, mut hints, mut labels) = ctx_opt

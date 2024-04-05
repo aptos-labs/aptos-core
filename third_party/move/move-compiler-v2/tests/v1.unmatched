@@ -206,7 +206,6 @@ move-compiler/tests/move_check/typing/{
   non_phantom_in_phantom_pos.move,
   pack_constraint_not_satisfied.move,
   pack_private_with_field.move,
-  pack_unit.move,
   pack_unpack_private.move,
   pack_unpack_private_script.move,
   pay_me_a_river.move,
@@ -225,4 +224,18 @@ move-compiler/tests/move_check/verification/{
   double_annotation.move,
   single_module_invalid.move,
   single_module_valid.move,
+}
+move-compiler/tests/move_check/unit_test/{
+  cross_module_members_non_test_function.move
+  expected_failure_bad_value.unit_test
+  expected_failure_constants_invalid.unit_test
+  expected_failure_invalid_literals.unit_test
+  expected_failure_not_test.unit_test
+  expected_failure_out_of_range_value.unit_test
+  extra_attributes.unit_test
+  invalid_expected_code_name.unit_test
+  invalid_expected_failure_name.unit_test
+  other_failures_invalid_assignment.unit_test
+  other_failures_invalid_location.unit_test
+  test_and_test_only_annotation.unit_test
 }

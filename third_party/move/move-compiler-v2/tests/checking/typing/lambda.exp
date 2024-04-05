@@ -38,8 +38,13 @@ error: reference type `&integer` is not allowed as a type argument (type was inf
    │
    = required by instantiating type parameter `T` of function `+`
 
-error: cannot pass `|&integer|integer` to a function which expects argument of type `|&integer|`
-   ┌─ tests/checking/typing/lambda.move:73:21
+error: tuple type `()` is not allowed as a type argument (type was inferred)
+   ┌─ tests/checking/typing/lambda.move:73:37
    │
+ 4 │     public inline fun foreach<T>(v: &vector<T>, action: |&T|) { // expected to be not implemented
+   │                               - declaration of type parameter `T`
+   ·
 73 │         foreach(&v, |e| { sum = sum + *e; *e }) // expected to have wrong result type of lambda
-   │                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                                     ^
+   │
+   = required by instantiating type parameter `T` of function `foreach`

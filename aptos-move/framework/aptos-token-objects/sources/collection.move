@@ -89,6 +89,9 @@ module aptos_token_objects::collection {
     /// directly understand the behavior in a writeset.
     struct Mutation has drop, store {
         mutated_field_name: String,
+        collection: Object<Collection>,
+        old_value: String,
+        new_value: String,
     }
 
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
@@ -171,7 +174,8 @@ module aptos_token_objects::collection {
     #[event]
     struct SetMaxSupply has drop, store {
         collection: Object<Collection>,
-        max_supply: u64,
+        old_max_supply: u64,
+        new_max_supply: u64,
     }
 
     /// Creates a fixed-sized collection, or a collection that supports a fixed amount of tokens.
@@ -618,10 +622,14 @@ module aptos_token_objects::collection {
     public fun set_name(mutator_ref: &MutatorRef, name: String) acquires Collection {
         assert!(string::length(&name) <= MAX_COLLECTION_NAME_LENGTH, error::out_of_range(ECOLLECTION_NAME_TOO_LONG));
         let collection = borrow_mut(mutator_ref);
+        let old_name = collection.name;
         collection.name = name;
-        event::emit(
-            Mutation { mutated_field_name: string::utf8(b"name") },
-        );
+        event::emit(Mutation {
+            mutated_field_name: string::utf8(b"name") ,
+            collection: object::address_to_object(mutator_ref.self),
+            old_value: old_name,
+            new_value: name,
+        });
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Collection {
@@ -647,6 +655,7 @@ module aptos_token_objects::collection {
     public fun set_max_supply(mutator_ref: &MutatorRef, max_supply: u64) acquires ConcurrentSupply, FixedSupply {
         let collection = object::address_to_object<Collection>(mutator_ref.self);
         let collection_address = object::object_address(&collection);
+        let old_max_supply;
 
         if (exists<ConcurrentSupply>(collection_address)) {
             let supply = borrow_global_mut<ConcurrentSupply>(collection_address);
@@ -655,6 +664,7 @@ module aptos_token_objects::collection {
                 max_supply >= current_supply,
                 error::out_of_range(EINVALID_MAX_SUPPLY),
             );
+            old_max_supply = aggregator_v2::max_value(&supply.current_supply);
             supply.current_supply = aggregator_v2::create_aggregator(max_supply);
             aggregator_v2::add(&mut supply.current_supply, current_supply);
         } else if (exists<FixedSupply>(collection_address)) {
@@ -663,12 +673,13 @@ module aptos_token_objects::collection {
                 max_supply >= supply.current_supply,
                 error::out_of_range(EINVALID_MAX_SUPPLY),
             );
+            old_max_supply = supply.max_supply;
             supply.max_supply = max_supply;
         } else {
             abort error::invalid_argument(ENO_MAX_SUPPLY_IN_COLLECTION)
         };
 
-        event::emit(SetMaxSupply { collection, max_supply });
+        event::emit(SetMaxSupply { collection, old_max_supply, new_max_supply: max_supply });
     }
 
     // Tests
@@ -776,6 +787,9 @@ module aptos_token_objects::collection {
         assert!(new_collection_name == name(collection), 1);
         event::was_event_emitted<Mutation>(&Mutation {
             mutated_field_name: string::utf8(b"name"),
+            collection,
+            old_value: collection_name,
+            new_value: new_collection_name,
         });
     }
 
@@ -826,7 +840,8 @@ module aptos_token_objects::collection {
 
         event::was_event_emitted<SetMaxSupply>(&SetMaxSupply {
             collection: object::address_to_object<Collection>(collection_address),
-            max_supply: new_max_supply,
+            old_max_supply: max_supply,
+            new_max_supply,
         });
     }
 
@@ -860,7 +875,8 @@ module aptos_token_objects::collection {
 
         event::was_event_emitted<SetMaxSupply>(&SetMaxSupply {
             collection: object::address_to_object<Collection>(collection_address),
-            max_supply: current_supply,
+            old_max_supply: current_supply,
+            new_max_supply: current_supply,
         });
     }
 

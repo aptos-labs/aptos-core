@@ -68,6 +68,9 @@ pub struct Options {
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
     pub whole_program: bool,
+    /// Whether to compile #[test] and #[test_only] code
+    #[clap(skip)]
+    pub compile_test_code: bool,
 }
 
 impl Default for Options {
@@ -140,6 +143,20 @@ impl Options {
             on
         } else {
             panic!("unknown experiment `{}`", name)
+        }
+    }
+
+    pub fn set_skip_attribute_checks(self, value: bool) -> Self {
+        Self {
+            skip_attribute_checks: value,
+            ..self
+        }
+    }
+
+    pub fn set_compile_test_code(self, value: bool) -> Self {
+        Self {
+            compile_test_code: value,
+            ..self
         }
     }
 }

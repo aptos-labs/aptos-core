@@ -31,7 +31,7 @@ jobs:
     # Run on a machine with more local storage for large docker images
     runs-on: medium-perf-docker-with-local-ssd
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         with:

@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: unable to generate test
+  ┌─ tests/unit_test/notest/script_with_test_on_main.move:3:7
+  │
+3 │     #[test]
+  │       ^^^^ Testing attributes are not allowed in scripts.

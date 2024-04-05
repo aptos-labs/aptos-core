@@ -42,6 +42,45 @@ fun <SELF>_0::main() {
  25: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64
+     var $t1: u64 [unused]
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     var $t8: bool
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+  0: $t2 := true
+  1: if ($t2) goto 2 else goto 6
+  2: label L0
+  3: $t5 := 5
+  4: $t0 := move($t5)
+  5: goto 9
+  6: label L1
+  7: $t7 := 0
+  8: $t0 := move($t7)
+  9: label L2
+ 10: $t9 := copy($t0)
+ 11: $t10 := 5
+ 12: $t8 := ==($t9, $t10)
+ 13: if ($t8) goto 14 else goto 16
+ 14: label L3
+ 15: goto 19
+ 16: label L4
+ 17: $t11 := 42
+ 18: abort($t11)
+ 19: label L5
+ 20: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -151,6 +190,43 @@ fun <SELF>_0::main() {
  18: abort($t5)
  19: label L5
  20: return ()
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun <SELF>_0::main() {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: bool
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     var $t8: bool [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
+  0: $t2 := true
+  1: if ($t2) goto 2 else goto 5
+  2: label L0
+  3: $t5 := 5
+  4: goto 8
+  5: label L1
+  6: $t7 := 0
+  7: $t5 := move($t7)
+  8: label L2
+  9: $t7 := 5
+ 10: $t2 := ==($t5, $t7)
+ 11: if ($t2) goto 12 else goto 14
+ 12: label L3
+ 13: goto 17
+ 14: label L4
+ 15: $t5 := 42
+ 16: abort($t5)
+ 17: label L5
+ 18: return ()
 }
 
 
