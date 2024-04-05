@@ -345,7 +345,6 @@ pub struct DagBootstrapper {
     jwk_consensus_config: OnChainJWKConsensusConfig,
     executor: BoundedExecutor,
     allow_batches_without_pos_in_proposal: bool,
-    features: Features,
     peers_and_metadata: Arc<PeersAndMetadata>,
 }
 
@@ -372,7 +371,6 @@ impl DagBootstrapper {
         jwk_consensus_config: OnChainJWKConsensusConfig,
         executor: BoundedExecutor,
         allow_batches_without_pos_in_proposal: bool,
-        features: Features,
         peers_and_metadata: Arc<PeersAndMetadata>,
     ) -> Self {
         info!("OnChainConfig: {:?}", onchain_config);
@@ -397,7 +395,6 @@ impl DagBootstrapper {
             jwk_consensus_config,
             executor,
             allow_batches_without_pos_in_proposal,
-            features,
             peers_and_metadata,
         }
     }
@@ -802,8 +799,6 @@ pub(super) fn bootstrap_dag_for_test(
     UnboundedReceiver<OrderedBlocks>,
 ) {
     let (ordered_nodes_tx, ordered_nodes_rx) = futures_channel::mpsc::unbounded();
-    let mut features = Features::default();
-    features.enable(FeatureFlag::RECONFIGURE_WITH_DKG);
     let mut onchain_config = DagConsensusConfigV1::default();
     onchain_config.anchor_election_mode = AnchorElectionMode::LeaderReputation(
         LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
@@ -840,7 +835,6 @@ pub(super) fn bootstrap_dag_for_test(
         OnChainJWKConsensusConfig::default_enabled(),
         BoundedExecutor::new(2, Handle::current()),
         true,
-        features,
         peers_and_metadata,
     );
 

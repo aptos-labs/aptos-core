@@ -1318,7 +1318,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.config
                 .quorum_store
                 .allow_batches_without_pos_in_proposal,
-            features.clone(),
             self.peers_and_metadata.clone(),
         );
 

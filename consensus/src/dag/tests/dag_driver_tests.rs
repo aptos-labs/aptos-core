@@ -187,6 +187,7 @@ fn setup(
             NoPipelineBackpressure::new(),
         ),
         false,
+        false,
         PeersByLatency::new(
             signers.iter().map(|s| s.author()).collect(),
             PeersAndMetadata::new(&[NetworkId::Validator]),
