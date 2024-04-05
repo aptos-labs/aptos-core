@@ -332,12 +332,6 @@ pub fn check_and_rewrite_pipeline<'a, 'b>(
         });
     }
 
-    if !for_v1_model && options.experiment_on(Experiment::DUPLICATE_STRUCT_PARAMS_CHECK) {
-        env_pipeline.add("duplicate struct params check", |env| {
-            unused_params_checker::duplicate_params_checker(env)
-        });
-    }
-
     if !for_v1_model && options.experiment_on(Experiment::UNUSED_STRUCT_PARAMS_CHECK) {
         env_pipeline.add("unused struct params check", |env| {
             unused_params_checker::unused_params_checker(env)

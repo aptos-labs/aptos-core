@@ -131,11 +131,6 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
-            name: Experiment::DUPLICATE_STRUCT_PARAMS_CHECK.to_string(),
-            description: "Whether to check for duplicate struct type parameters".to_string(),
-            default: Inherited(Experiment::CHECKS.to_string()),
-        },
-        Experiment {
             name: Experiment::UNUSED_STRUCT_PARAMS_CHECK.to_string(),
             description: "Whether to check for unused struct type parameters".to_string(),
             default: Inherited(Experiment::CHECKS.to_string()),
