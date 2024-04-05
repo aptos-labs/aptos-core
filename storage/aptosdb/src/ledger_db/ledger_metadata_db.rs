@@ -19,9 +19,9 @@ use aptos_storage_interface::{
     db_ensure as ensure, AptosDbError, Result,
 };
 use aptos_types::{
-    account_config::NewBlockEvent, contract_event::ContractEvent, epoch_state::EpochState,
-    ledger_info::LedgerInfoWithSignatures, state_store::state_storage_usage::StateStorageUsage,
-    transaction::Version,
+    account_config::NewBlockEvent, block_info::BlockHeight, contract_event::ContractEvent,
+    epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
+    state_store::state_storage_usage::StateStorageUsage, transaction::Version,
 };
 use arc_swap::ArcSwap;
 use std::{ops::Deref, path::Path, sync::Arc};
@@ -285,6 +285,22 @@ impl LedgerMetadataDb {
         ))?;
 
         Ok(block_height)
+    }
+
+    pub(crate) fn get_block_height_at_or_after_version(
+        &self,
+        version: Version,
+    ) -> Result<(Version, BlockHeight)> {
+        let mut iter = self
+            .db
+            .iter::<BlockByVersionSchema>(ReadOptions::default())?;
+        iter.seek(&version)?;
+        let (block_version, block_height) = iter
+            .next()
+            .transpose()?
+            .ok_or(anyhow!("Block is not found at or after version {version}"))?;
+
+        Ok((block_version, block_height))
     }
 
     pub(crate) fn put_block_info(

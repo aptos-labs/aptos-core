@@ -32,6 +32,16 @@ Ok(
                     ),
                 ),
             ),
+            auxiliary_data: V1(
+                TransactionAuxiliaryDataV1 {
+                    detail_error_message: Some(
+                        VMErrorDetail {
+                            status_code: NEGATIVE_STACK_SIZE_WITHIN_BLOCK,
+                            message: None,
+                        },
+                    ),
+                },
+            ),
         },
     ],
 )

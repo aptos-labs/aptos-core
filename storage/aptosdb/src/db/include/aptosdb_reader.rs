@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_types::block_info::BlockHeight;
+
 impl DbReader for AptosDB {
     fn get_epoch_ending_ledger_infos(
         &self,
@@ -28,6 +30,17 @@ impl DbReader for AptosDB {
                     .get_prefixed_state_value_iterator(key_prefix, cursor, version)?,
             )
                 as Box<dyn Iterator<Item = Result<(StateKey, StateValue)>>>)
+        })
+    }
+
+    fn get_transaction_auxiliary_data_by_version(
+        &self,
+        version: Version,
+    ) -> Result<TransactionAuxiliaryData> {
+        gauged_api("get_transaction_auxiliary_data_by_version", || {
+            self.error_if_ledger_pruned("Transaction", version)?;
+            self.ledger_db
+                .transaction_auxiliary_data_db().get_transaction_auxiliary_data(version)
         })
     }
 
@@ -184,10 +197,23 @@ impl DbReader for AptosDB {
         })
     }
 
-    /// Get the first version that will likely not be pruned soon
-    fn get_first_viable_txn_version(&self) -> Result<Version> {
-        gauged_api("get_first_viable_txn_version", || {
-            Ok(self.ledger_pruner.get_min_viable_version())
+    /// Get the first block version / height that will likely not be pruned soon.
+    fn get_first_viable_block(&self) -> Result<(Version, BlockHeight)> {
+        gauged_api("get_first_viable_block", || {
+            let min_version = self.ledger_pruner.get_min_viable_version();
+            if !self.skip_index_and_usage {
+                let (block_version, index, _seq_num) = self
+                    .event_store
+                    .lookup_event_at_or_after_version(&new_block_event_key(), min_version)?
+                    .ok_or_else(|| AptosDbError::NotFound(format!("NewBlockEvent at or after version {}", min_version)))?;
+                let event = self.event_store.get_event_by_version_and_index(block_version, index)?;
+                return Ok((block_version, event.expect_new_block_event()?.height()));
+            }
+
+            self
+                .ledger_db
+                .metadata_db()
+                .get_block_height_at_or_after_version(min_version)
         })
     }
 
@@ -230,11 +256,13 @@ impl DbReader for AptosDB {
                     let events = self.ledger_db.event_db().get_events_by_version(version)?;
                     let write_set = self.ledger_db.write_set_db().get_write_set(version)?;
                     let txn = self.ledger_db.transaction_db().get_transaction(version)?;
+                    let auxiliary_data = self.ledger_db.transaction_auxiliary_data_db().get_transaction_auxiliary_data(version).unwrap_or_default();
                     let txn_output = TransactionOutput::new(
                         write_set,
                         events,
                         txn_info.gas_used(),
                         txn_info.status().clone().into(),
+                        auxiliary_data,
                     );
                     Ok((txn_info, (txn, txn_output)))
                 })
@@ -500,41 +528,8 @@ impl DbReader for AptosDB {
                 "version older than latest version"
             );
 
-            match self.event_store.get_block_metadata(version) {
-                Ok((_first_version, new_block_event)) => Ok(new_block_event.proposed_time()),
-                Err(err) => {
-                    // when event index is disabled, we won't be able to search the NewBlock event stream.
-                    // TODO(grao): evaluate adding dedicated block_height_by_version index
-                    warn!(
-                        error = ?err,
-                        "Failed to fetch block timestamp, falling back to on-chain config.",
-                    );
-                    let ts = self
-                        .get_state_value_by_version(
-                            &StateKey::access_path(CurrentTimeMicroseconds::access_path()?),
-                            version,
-                        )?
-                        .ok_or_else(|| anyhow!("Timestamp not found at version {}", version))?;
-                    Ok(bcs::from_bytes::<CurrentTimeMicroseconds>(ts.bytes())?.microseconds)
-                },
-            }
-        })
-    }
-
-    fn get_next_block_event(&self, version: Version) -> Result<(Version, NewBlockEvent)> {
-        gauged_api("get_next_block_event", || {
-            self.error_if_ledger_pruned("NewBlockEvent", version)?;
-            if let Some((block_version, _, _)) = self
-                .event_store
-                .lookup_event_at_or_after_version(&new_block_event_key(), version)?
-            {
-                self.event_store.get_block_metadata(block_version)
-            } else {
-                bail!(
-                    "Failed to find a block event at or after version {}",
-                    version
-                )
-            }
+            let (_first_version, _last_version, new_block_event) = self.get_block_info_by_version(version)?;
+            Ok(new_block_event.proposed_time())
         })
     }
 
@@ -558,22 +553,9 @@ impl DbReader for AptosDB {
 
             let mut events = Vec::with_capacity(num_events);
             for item in iter.take(num_events) {
-                let (block_height, block_info) = item?;
+                let (_block_height, block_info) = item?;
                 let first_version = block_info.first_version();
-                let event = self
-                    .ledger_db
-                    .event_db()
-                    .get_events_by_version(first_version)?
-                    .into_iter()
-                    .find(|event| {
-                        if let Some(key) = event.event_key() {
-                            if *key == new_block_event_key() {
-                                return true;
-                            }
-                        }
-                        false
-                    })
-                    .ok_or_else(|| anyhow!("Event for block_height {block_height} at version {first_version} is not found."))?;
+                let event = self.ledger_db.event_db().expect_new_block_event(first_version)?;
                 events.push(EventWithVersion::new(first_version, event));
             }
 
@@ -817,39 +799,12 @@ impl DbReader for AptosDB {
         self.indexer.is_some()
     }
 
-    /// Returns whether the indexer async v2 DB has been enabled or not
-    fn indexer_async_v2_enabled(&self) -> bool {
-        self.indexer_async_v2.is_some()
-    }
-
     fn get_state_storage_usage(&self, version: Option<Version>) -> Result<StateStorageUsage> {
         gauged_api("get_state_storage_usage", || {
             if let Some(v) = version {
                 self.error_if_ledger_pruned("state storage usage", v)?;
             }
             self.state_store.get_usage(version)
-        })
-    }
-
-    /// Returns the next version for indexer async v2 to be processed
-    /// It is mainly used by table info service to decide the start version
-    fn get_indexer_async_v2_next_version(&self) -> Result<Version> {
-        gauged_api("get_indexer_async_v2_next_version", || {
-            Ok(self
-                .indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.next_version())
-                .unwrap_or(0))
-        })
-    }
-
-    fn is_indexer_async_v2_pending_on_empty(&self) -> Result<bool> {
-        gauged_api("is_indexer_async_v2_pending_on_empty", || {
-            Ok(self
-                .indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.is_indexer_async_v2_pending_on_empty())
-                .unwrap_or(false))
         })
     }
 }
@@ -1026,26 +981,8 @@ impl AptosDB {
         Ok(events_with_version)
     }
 
-    fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
-        if self.indexer_async_v2_enabled() {
-            return self.get_table_info_from_indexer_async_v2(handle);
-        }
-
-        self.get_table_info_from_indexer(handle)
-    }
-
-    fn get_table_info_from_indexer_async_v2(
-        &self,
-        handle: TableHandle,
-    ) -> Result<Option<TableInfo>> {
-        match &self.indexer_async_v2 {
-            Some(indexer_async_v2) => indexer_async_v2.get_table_info_with_retry(handle),
-            None => bail!("Indexer Async V2 not enabled."),
-        }
-    }
-
     /// TODO(jill): deprecate Indexer once Indexer Async V2 is ready
-    fn get_table_info_from_indexer(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
+    fn get_table_info_option(&self, handle: TableHandle) -> Result<Option<TableInfo>> {
         match &self.indexer {
             Some(indexer) => indexer.get_table_info(handle),
             None => bail!("Indexer not enabled."),

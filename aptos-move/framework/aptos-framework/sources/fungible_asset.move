@@ -188,7 +188,7 @@ module aptos_framework::fungible_asset {
             }
         );
 
-        if (features::concurrent_assets_enabled()) {
+        if (features::concurrent_fungible_assets_enabled()) {
             let unlimited = option::is_none(&maximum_supply);
             move_to(metadata_object_signer, ConcurrentSupply {
                 current: if (unlimited) {
@@ -635,7 +635,7 @@ module aptos_framework::fungible_asset {
     ) acquires Supply {
         let metadata_object_address = object::address_from_extend_ref(ref);
         let metadata_object_signer = object::generate_signer_for_extending(ref);
-        assert!(features::concurrent_assets_enabled(), error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED));
+        assert!(features::concurrent_fungible_assets_enabled(), error::invalid_argument(ECONCURRENT_SUPPLY_NOT_ENABLED));
         assert!(exists<Supply>(metadata_object_address), error::not_found(ESUPPLY_NOT_FOUND));
         let Supply {
             current,
@@ -856,9 +856,9 @@ module aptos_framework::fungible_asset {
         fx: &signer,
         creator: &signer
     ) acquires Supply, ConcurrentSupply, FungibleStore {
-        let feature = features::get_concurrent_assets_feature();
+        let feature = features::get_concurrent_fungible_assets_feature();
         let agg_feature = features::get_aggregator_v2_api_feature();
-        features::change_feature_flags(fx, vector[], vector[feature, agg_feature]);
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature, agg_feature]);
 
         let (creator_ref, token_object) = create_test_token(creator);
         let (mint_ref, transfer_ref, _burn) = init_test_metadata(&creator_ref);
@@ -870,7 +870,7 @@ module aptos_framework::fungible_asset {
 
         deposit_with_ref(&transfer_ref, creator_store, fa);
 
-        features::change_feature_flags(fx, vector[feature, agg_feature], vector[]);
+        features::change_feature_flags_for_testing(fx, vector[feature, agg_feature], vector[]);
 
         let extend_ref = object::generate_extend_ref(&creator_ref);
         upgrade_to_concurrent(&extend_ref);

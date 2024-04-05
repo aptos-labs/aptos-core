@@ -1,0 +1,5 @@
+{
+  "message": "Transaction not allowed by simulation filter",
+  "error_code": "invalid_input",
+  "vm_error_code": null
+}

@@ -13,7 +13,7 @@ module Alice::hello_world {
         state: String,
     }
 
-    fun init_module(sender: &signer) {
+    public entry fun  initialize(sender: &signer) {
         move_to(
             sender,
             ModuleData { global_counter: 0, state: string::utf8(b"init") }
@@ -33,6 +33,7 @@ module Alice::hello_world {
     }
 }
 
+//# run --signers Alice --show-events -- Alice::hello_world::initialize
 
 //# run --signers Alice --args x"68656C6C6F20776F726C64" --show-events -- Alice::hello_world::hi
 

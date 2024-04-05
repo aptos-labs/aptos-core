@@ -1,0 +1,165 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun M::tborrow($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &u64
+  0: if ($t0) goto 1 else goto 5
+  1: label L0
+  2: $t2 := 0
+  3: $t1 := infer($t2)
+  4: goto 6
+  5: label L1
+  6: label L2
+  7: $t3 := borrow_local($t1)
+  8: return ()
+}
+
+
+[variant baseline]
+fun M::tcopy($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+  0: if ($t0) goto 1 else goto 5
+  1: label L0
+  2: $t2 := 0
+  3: $t1 := infer($t2)
+  4: goto 6
+  5: label L1
+  6: label L2
+  7: $t4 := 1
+  8: $t3 := +($t1, $t4)
+  9: return ()
+}
+
+
+[variant baseline]
+fun M::tmove($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: if ($t0) goto 1 else goto 5
+  1: label L0
+  2: $t2 := 0
+  3: $t1 := infer($t2)
+  4: goto 6
+  5: label L1
+  6: label L2
+  7: $t4 := move($t1)
+  8: $t5 := 1
+  9: $t3 := +($t4, $t5)
+ 10: return ()
+}
+
+
+Diagnostics:
+error: use of possibly unassigned local `x`
+  ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_if.move:5:17
+  │
+5 │         let _ = move x + 1;
+  │                 ^^^^^^
+
+error: use of possibly unassigned local `x`
+   ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_if.move:11:17
+   │
+11 │         let _ = x + 1;
+   │                 ^^^^^
+
+error: use of possibly unassigned local `x`
+   ┌─ tests/uninit-use-checker/v1-locals/use_before_assign_if.move:17:17
+   │
+17 │         let _ = &x;
+   │                 ^^
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun M::tborrow($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: &u64
+     # before: { no: $t1, $t2, $t3 }, after: { no: $t1, $t2, $t3 }
+  0: if ($t0) goto 1 else goto 5
+     # before: { no: $t1, $t2, $t3 }, after: { no: $t1, $t2, $t3 }
+  1: label L0
+     # before: { no: $t1, $t2, $t3 }, after: { no: $t1, $t3 }
+  2: $t2 := 0
+     # before: { no: $t1, $t3 }, after: { no: $t3 }
+  3: $t1 := infer($t2)
+     # before: { no: $t3 }, after: { no: $t3 }
+  4: goto 6
+     # before: { no: $t1, $t2, $t3 }, after: { no: $t1, $t2, $t3 }
+  5: label L1
+     # before: { no: $t3 }{ maybe: $t1, $t2 }, after: { no: $t3 }{ maybe: $t1, $t2 }
+  6: label L2
+     # before: { no: $t3 }{ maybe: $t1, $t2 }, after: { maybe: $t1, $t2 }
+  7: $t3 := borrow_local($t1)
+     # before: { maybe: $t1, $t2 }, after: { maybe: $t1, $t2 }
+  8: return ()
+}
+
+
+[variant baseline]
+fun M::tcopy($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # before: { no: $t1, $t2, $t3, $t4 }, after: { no: $t1, $t2, $t3, $t4 }
+  0: if ($t0) goto 1 else goto 5
+     # before: { no: $t1, $t2, $t3, $t4 }, after: { no: $t1, $t2, $t3, $t4 }
+  1: label L0
+     # before: { no: $t1, $t2, $t3, $t4 }, after: { no: $t1, $t3, $t4 }
+  2: $t2 := 0
+     # before: { no: $t1, $t3, $t4 }, after: { no: $t3, $t4 }
+  3: $t1 := infer($t2)
+     # before: { no: $t3, $t4 }, after: { no: $t3, $t4 }
+  4: goto 6
+     # before: { no: $t1, $t2, $t3, $t4 }, after: { no: $t1, $t2, $t3, $t4 }
+  5: label L1
+     # before: { no: $t3, $t4 }{ maybe: $t1, $t2 }, after: { no: $t3, $t4 }{ maybe: $t1, $t2 }
+  6: label L2
+     # before: { no: $t3, $t4 }{ maybe: $t1, $t2 }, after: { no: $t3 }{ maybe: $t1, $t2 }
+  7: $t4 := 1
+     # before: { no: $t3 }{ maybe: $t1, $t2 }, after: { maybe: $t1, $t2 }
+  8: $t3 := +($t1, $t4)
+     # before: { maybe: $t1, $t2 }, after: { maybe: $t1, $t2 }
+  9: return ()
+}
+
+
+[variant baseline]
+fun M::tmove($t0: bool) {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # before: { no: $t1, $t2, $t3, $t4, $t5 }, after: { no: $t1, $t2, $t3, $t4, $t5 }
+  0: if ($t0) goto 1 else goto 5
+     # before: { no: $t1, $t2, $t3, $t4, $t5 }, after: { no: $t1, $t2, $t3, $t4, $t5 }
+  1: label L0
+     # before: { no: $t1, $t2, $t3, $t4, $t5 }, after: { no: $t1, $t3, $t4, $t5 }
+  2: $t2 := 0
+     # before: { no: $t1, $t3, $t4, $t5 }, after: { no: $t3, $t4, $t5 }
+  3: $t1 := infer($t2)
+     # before: { no: $t3, $t4, $t5 }, after: { no: $t3, $t4, $t5 }
+  4: goto 6
+     # before: { no: $t1, $t2, $t3, $t4, $t5 }, after: { no: $t1, $t2, $t3, $t4, $t5 }
+  5: label L1
+     # before: { no: $t3, $t4, $t5 }{ maybe: $t1, $t2 }, after: { no: $t3, $t4, $t5 }{ maybe: $t1, $t2 }
+  6: label L2
+     # before: { no: $t3, $t4, $t5 }{ maybe: $t1, $t2 }, after: { no: $t3, $t5 }{ maybe: $t1, $t2 }
+  7: $t4 := move($t1)
+     # before: { no: $t3, $t5 }{ maybe: $t1, $t2 }, after: { no: $t3 }{ maybe: $t1, $t2 }
+  8: $t5 := 1
+     # before: { no: $t3 }{ maybe: $t1, $t2 }, after: { maybe: $t1, $t2 }
+  9: $t3 := +($t4, $t5)
+     # before: { maybe: $t1, $t2 }, after: { maybe: $t1, $t2 }
+ 10: return ()
+}

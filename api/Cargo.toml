@@ -19,6 +19,7 @@ aptos-bcs-utils = { workspace = true }
 aptos-build-info = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
+aptos-db-indexer = { workspace = true }
 aptos-framework =  { workspace = true }
 aptos-gas-schedule = { workspace = true }
 aptos-global-constants = { workspace = true }
@@ -39,6 +40,7 @@ hex = { workspace = true }
 hyper = { workspace = true }
 itertools = { workspace = true }
 mime = { workspace = true }
+mini-moka = { workspace = true }
 move-core-types = { workspace = true }
 num_cpus = { workspace = true }
 once_cell = { workspace = true }
@@ -49,7 +51,6 @@ regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
-url = { workspace = true }
 
 [dev-dependencies]
 aptos-api-test-context = { workspace = true }
@@ -70,3 +71,6 @@ warp = { workspace = true }
 
 [features]
 failpoints = ["fail/failpoints"]
+
+[package.metadata.cargo-machete]
+ignored = ["mime"]

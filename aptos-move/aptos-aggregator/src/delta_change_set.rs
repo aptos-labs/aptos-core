@@ -219,8 +219,11 @@ mod test {
         FakeAggregatorView,
     };
     use aptos_types::{
-        aggregator::PanicError,
-        state_store::{state_key::StateKey, state_value::StateValue},
+        delayed_fields::PanicError,
+        state_store::{
+            state_key::StateKey,
+            state_value::{StateValue, StateValueMetadata},
+        },
         write_set::WriteOp,
     };
     use claims::{assert_err, assert_none, assert_ok, assert_ok_eq, assert_some_eq};
@@ -509,7 +512,6 @@ mod test {
         type Identifier = ();
         type ResourceGroupTag = ();
         type ResourceKey = ();
-        type ResourceValue = ();
 
         fn is_delayed_field_optimization_capable(&self) -> bool {
             unimplemented!("Irrelevant for the test")
@@ -532,14 +534,11 @@ mod test {
             Err(code_invariant_error("Error message from BadStorage.").into())
         }
 
-        fn generate_delayed_field_id(&self) -> Self::Identifier {
+        fn generate_delayed_field_id(&self, _width: u32) -> Self::Identifier {
             unimplemented!("Irrelevant for the test")
         }
 
-        fn validate_and_convert_delayed_field_id(
-            &self,
-            _id: u64,
-        ) -> Result<Self::Identifier, PanicError> {
+        fn validate_delayed_field_id(&self, _id: &Self::Identifier) -> Result<(), PanicError> {
             unimplemented!("Irrelevant for the test")
         }
 
@@ -548,7 +547,7 @@ mod test {
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
         ) -> Result<
-            BTreeMap<Self::ResourceKey, (Self::ResourceValue, Arc<MoveTypeLayout>)>,
+            BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
             PanicError,
         > {
             unimplemented!("Irrelevant for the test")
@@ -558,7 +557,7 @@ mod test {
             &self,
             _delayed_write_set_keys: &HashSet<Self::Identifier>,
             _skip: &HashSet<Self::ResourceKey>,
-        ) -> Result<BTreeMap<Self::ResourceKey, (Self::ResourceValue, u64)>, PanicError> {
+        ) -> PartialVMResult<BTreeMap<Self::ResourceKey, (StateValueMetadata, u64)>> {
             unimplemented!("Irrelevant for the test")
         }
     }

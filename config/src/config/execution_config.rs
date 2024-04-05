@@ -16,6 +16,7 @@ use std::{
 };
 
 const GENESIS_DEFAULT: &str = "genesis.blob";
+pub const DEFAULT_CONCURRENCY_LEVEL: u16 = 32;
 
 #[derive(Clone, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
@@ -25,12 +26,15 @@ pub struct ExecutionConfig {
     pub genesis: Option<Transaction>,
     /// Location of the genesis file
     pub genesis_file_location: PathBuf,
-    /// Number of threads to run execution
+    /// Number of threads to run execution.
+    /// If 0, we use min of (num of cores/2, DEFAULT_CONCURRENCY_LEVEL) as default concurrency level
     pub concurrency_level: u16,
     /// Number of threads to read proofs
     pub num_proof_reading_threads: u16,
     /// Enables paranoid mode for types, which adds extra runtime VM checks
     pub paranoid_type_verification: bool,
+    /// Enabled discarding blocks that fail execution due to BlockSTM/VM issue.
+    pub discard_failed_blocks: bool,
     /// Enables paranoid mode for hot potatoes, which adds extra runtime VM checks
     pub paranoid_hot_potato_verification: bool,
     /// Enables enhanced metrics around processed transactions
@@ -62,11 +66,12 @@ impl Default for ExecutionConfig {
         ExecutionConfig {
             genesis: None,
             genesis_file_location: PathBuf::new(),
-            // Parallel execution by default.
-            concurrency_level: 8,
+            // use min of (num of cores/2, DEFAULT_CONCURRENCY_LEVEL) as default concurrency level
+            concurrency_level: 0,
             num_proof_reading_threads: 32,
             paranoid_type_verification: true,
             paranoid_hot_potato_verification: true,
+            discard_failed_blocks: false,
             processed_transactions_detailed_counters: false,
             transaction_filter: Filter::empty(),
             genesis_waypoint: None,

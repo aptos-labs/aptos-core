@@ -1,19 +1,18 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::update_field_ok {
     struct R {
         x: u64,
         y: u64,
     }
     private fun f(r: &mut update_field_ok::R) {
-        select update_field_ok::R.x(r) = 1;
+        select update_field_ok::R.x<&mut update_field_ok::R>(r) = 1;
         Tuple()
     }
     spec {
       aborts_if false;
-      ensures Eq<update_field_ok::R>($t0, update_field_ok::assign_x_1(Old<update_field_ok::R>($t0)));
+      ensures Eq<update_field_ok::R>(Freeze(false)($t0), update_field_ok::assign_x_1(Old<update_field_ok::R>($t0)));
     }
 
-    spec fun $f(r: &mut update_field_ok::R);
     spec fun assign_x_1(r: update_field_ok::R): update_field_ok::R {
         update update_field_ok::R.x<update_field_ok::R>(r, 1)
     }

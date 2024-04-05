@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     counters::WAIT_FOR_FULL_BLOCKS_TRIGGERED, error::QuorumStoreError, monitor,
@@ -46,6 +47,8 @@ impl QuorumStoreClient {
         &self,
         max_items: u64,
         max_bytes: u64,
+        max_inline_items: u64,
+        max_inline_bytes: u64,
         return_non_full: bool,
         exclude_payloads: PayloadFilter,
     ) -> anyhow::Result<Payload, QuorumStoreError> {
@@ -53,6 +56,8 @@ impl QuorumStoreClient {
         let req = GetPayloadCommand::GetPayloadRequest(
             max_items,
             max_bytes,
+            max_inline_items,
+            max_inline_bytes,
             return_non_full,
             exclude_payloads.clone(),
             callback,
@@ -84,6 +89,8 @@ impl UserPayloadClient for QuorumStoreClient {
         max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
+        max_inline_items: u64,
+        max_inline_bytes: u64,
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
@@ -111,6 +118,8 @@ impl UserPayloadClient for QuorumStoreClient {
                 .pull_internal(
                     max_items,
                     max_bytes,
+                    max_inline_items,
+                    max_inline_bytes,
                     return_non_full || return_empty || done,
                     exclude.clone(),
                 )
@@ -130,6 +139,8 @@ impl UserPayloadClient for QuorumStoreClient {
             payload_len = payload.len(),
             max_items = max_items,
             max_bytes = max_bytes,
+            max_inline_items = max_inline_items,
+            max_inline_bytes = max_inline_bytes,
             pending_ordering = pending_ordering,
             return_empty = return_empty,
             return_non_full = return_non_full,

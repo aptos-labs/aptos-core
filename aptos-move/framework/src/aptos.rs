@@ -120,6 +120,7 @@ impl ReleaseTarget {
                 skip_fetch_latest_git_deps: true,
                 bytecode_version: None,
                 compiler_version: None,
+                language_version: None,
                 skip_attribute_checks: false,
                 check_test_code: false,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -187,6 +188,7 @@ static NAMED_ADDRESSES: Lazy<BTreeMap<String, NumericalAddress>> = Lazy::new(|| 
     result.insert("aptos_token".to_owned(), three);
     result.insert("aptos_token_objects".to_owned(), four);
     result.insert("core_resources".to_owned(), resources);
+    result.insert("vm".to_owned(), zero);
     result.insert("vm_reserved".to_owned(), zero);
     result
 });

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     get_uri_metadata,
@@ -28,8 +29,8 @@ impl JSONParser {
         max_file_size_bytes: u32,
     ) -> anyhow::Result<(Option<String>, Option<String>, Value)> {
         PARSE_JSON_INVOCATION_COUNT.inc();
-        let (mime, size) = get_uri_metadata(uri.clone()).await?;
-        if ImageFormat::from_mime_type(mime.clone()).is_some() {
+        let (mime, size) = get_uri_metadata(&uri).await?;
+        if ImageFormat::from_mime_type(&mime).is_some() {
             FAILED_TO_PARSE_JSON_COUNT
                 .with_label_values(&["found image instead"])
                 .inc();

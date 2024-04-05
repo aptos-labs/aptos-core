@@ -47,8 +47,6 @@ spec aptos_framework::object {
     ///
     spec module {
         pragma aborts_if_is_strict;
-        //ghost variable
-        global g_roll: u8;
     }
 
     spec fun spec_exists_at<T: key>(object: address): bool;
@@ -504,6 +502,7 @@ spec aptos_framework::object {
     }
 
     spec owns<T: key>(object: Object<T>, owner: address): bool {
+        pragma aborts_if_is_partial;
         let current_address_0 = object.inner;
         let object_0 = global<ObjectCore>(current_address_0);
         let current_address = object_0.owner;

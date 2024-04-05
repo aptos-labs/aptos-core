@@ -1,12 +1,9 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     struct R {
         dummy_field: bool,
     }
     public fun new(): M::R {
-        pack M::R(false)
-    }
-    spec fun $new(): M::R {
         pack M::R(false)
     }
 } // end 0x42::M
@@ -20,5 +17,4 @@ module <SELF>_0 {
           Tuple()
         }
     }
-    spec fun $test<Token>(account: signer);
 } // end <SELF>_0

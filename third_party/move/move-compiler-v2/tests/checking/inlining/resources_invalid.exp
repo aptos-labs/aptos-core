@@ -1,10 +1,7 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::objects {
     struct ReaderRef {
         addr: address,
-    }
-    spec fun $reader<T>(ref: objects::ReaderRef<#0>): #0 {
-        global<#0>(select objects::ReaderRef.addr(ref))
     }
 } // end 0x42::objects
 module 0x42::token {
@@ -12,13 +9,12 @@ module 0x42::token {
     struct Token {
         val: u64,
     }
-    public fun get_value(ref: &objects::ReaderRef<token::Token>): u64 {
-        select token::Token.val({
-          let (ref: &objects::ReaderRef<token::Token>) = Tuple(ref);
-          BorrowGlobal(Immutable)<token::Token>(select objects::ReaderRef.addr(ref))
+    public fun get_value(ref: &objects::ReaderRef<token::Token>): u64
+        acquires token::Token(*)
+     {
+        select token::Token.val<&token::Token>({
+          let (ref: &objects::ReaderRef<token::Token>): (&objects::ReaderRef<token::Token>) = Tuple(ref);
+          BorrowGlobal(Immutable)<token::Token>(select objects::ReaderRef.addr<&objects::ReaderRef<token::Token>>(ref))
         })
-    }
-    spec fun $get_value(ref: objects::ReaderRef<token::Token>): u64 {
-        select token::Token.val(objects::$reader<token::Token>(ref))
     }
 } // end 0x42::token

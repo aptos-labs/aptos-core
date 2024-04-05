@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
-use aptos_logger::error;
+use aptos_logger::{error, info};
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
     internal::fullnode::v1::transactions_from_node_response,
@@ -23,7 +23,6 @@ type TransactionResponseStream =
 
 pub struct LocalnetDataService {
     pub service_context: ServiceContext,
-    pub enable_expensive_logging: bool,
 }
 
 /// External service on the fullnode is for testing/local development only.
@@ -48,7 +47,6 @@ impl RawData for LocalnetDataService {
         // Creates a channel to send the stream to the client
         let (tx, mut rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
         let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
-        let enable_expensive_logging = self.enable_expensive_logging;
 
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
@@ -64,9 +62,15 @@ impl RawData for LocalnetDataService {
             );
             loop {
                 // Processes and sends batch of transactions to client
-                let results = coordinator
-                    .process_next_batch(enable_expensive_logging)
-                    .await;
+                let results = coordinator.process_next_batch().await;
+                if results.is_empty() {
+                    info!(
+                        start_version = starting_version,
+                        chain_id = ledger_chain_id,
+                        "[Indexer Fullnode] Client disconnected."
+                    );
+                    break;
+                }
                 let max_version = match IndexerStreamCoordinator::get_max_batch_version(results) {
                     Ok(max_version) => max_version,
                     Err(e) => {

@@ -234,7 +234,7 @@ fun TestPackref::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut TestPackref::R) 
 [variant baseline]
 fun TestPackref::test1(): TestPackref::R {
      var $t0|r: TestPackref::R
-     var $t1|x_ref: &mut u64
+     var $t1|x_ref: &mut u64 [unused]
      var $t2: u64
      var $t3: &mut TestPackref::R
      var $t4: &mut u64

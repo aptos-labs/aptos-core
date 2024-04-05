@@ -13,6 +13,7 @@ use move_compiler::{
     unit_test::{plan_builder::construct_test_plan, TestPlan},
     Compiler, Flags, PASS_CFGIR,
 };
+use move_core_types::effects::ChangeSet;
 use move_coverage::coverage_map::{output_map_to_file, CoverageMap};
 use move_model::PackageInfo;
 use move_package::{
@@ -96,6 +97,7 @@ impl Test {
         path: Option<PathBuf>,
         config: BuildConfig,
         natives: Vec<NativeFunctionRecord>,
+        genesis: ChangeSet,
         cost_table: Option<CostTable>,
     ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
@@ -133,6 +135,7 @@ impl Test {
             config,
             unit_test_config,
             natives,
+            genesis,
             cost_table,
             compute_coverage,
             &mut std::io::stdout(),
@@ -158,6 +161,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     mut build_config: move_package::BuildConfig,
     mut unit_test_config: UnitTestingConfig,
     natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
     cost_table: Option<CostTable>,
     compute_coverage: bool,
     writer: &mut W,
@@ -332,7 +336,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     // Run the tests. If any of the tests fail, then we don't produce a coverage report, so cleanup
     // the trace files.
     if !unit_test_config
-        .run_and_report_unit_tests(test_plan, Some(natives), cost_table, writer)
+        .run_and_report_unit_tests(test_plan, Some(natives), Some(genesis), cost_table, writer)
         .unwrap()
         .1
     {

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     move_vm_ext::{AptosMoveResolver, SessionId},
@@ -21,12 +22,12 @@ impl AptosVM {
             ValidatorTransaction::DKGResult(dkg_node) => {
                 self.process_dkg_result(resolver, log_context, session_id, dkg_node)
             },
-            ValidatorTransaction::DummyTopic1(dummy) | ValidatorTransaction::DummyTopic2(dummy) => {
-                self.process_dummy_validator_txn(resolver, log_context, session_id, dummy)
+            ValidatorTransaction::ObservedJWKUpdate(jwk_update) => {
+                self.process_jwk_update(resolver, log_context, session_id, jwk_update)
             },
         }
     }
 }
 
 mod dkg;
-mod dummy;
+mod jwk;

@@ -1,21 +1,21 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use super::{
     adapter::TLedgerInfoProvider,
     dag_fetcher::TDagFetcher,
-    dag_store::Dag,
+    dag_store::DagStore,
     storage::DAGStorage,
     types::{CertifiedNodeMessage, RemoteFetchRequest},
     ProofNotifier,
 };
 use crate::{
     dag::DAGMessage, network::IncomingDAGRequest, payload_manager::TPayloadManager,
-    state_replication::StateComputer,
+    pipeline::execution_client::TExecutionClient,
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::{Author, Round};
-use aptos_infallible::RwLock;
 use aptos_logger::{debug, error};
 use aptos_time_service::TimeService;
 use aptos_types::{
@@ -45,7 +45,7 @@ impl fmt::Display for SyncOutcome {
 pub(super) struct StateSyncTrigger {
     epoch_state: Arc<EpochState>,
     ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
-    dag_store: Arc<RwLock<Dag>>,
+    dag_store: Arc<DagStore>,
     proof_notifier: Arc<dyn ProofNotifier>,
     dag_window_size_config: Round,
 }
@@ -54,7 +54,7 @@ impl StateSyncTrigger {
     pub(super) fn new(
         epoch_state: Arc<EpochState>,
         ledger_info_provider: Arc<dyn TLedgerInfoProvider>,
-        dag_store: Arc<RwLock<Dag>>,
+        dag_store: Arc<DagStore>,
         proof_notifier: Arc<dyn ProofNotifier>,
         dag_window_size_config: Round,
     ) -> Self {
@@ -83,14 +83,14 @@ impl StateSyncTrigger {
     pub(super) async fn check(&self, node: CertifiedNodeMessage) -> anyhow::Result<SyncOutcome> {
         let ledger_info_with_sigs = node.ledger_info();
 
+        self.notify_commit_proof(ledger_info_with_sigs).await;
+
         if !self.need_sync_for_ledger_info(ledger_info_with_sigs) {
             return Ok(SyncOutcome::Synced(Some(node)));
         }
 
         // Only verify the certificate if we need to sync
         self.verify_ledger_info(ledger_info_with_sigs)?;
-
-        self.notify_commit_proof(ledger_info_with_sigs).await;
 
         if ledger_info_with_sigs.ledger_info().ends_epoch() {
             self.proof_notifier
@@ -158,7 +158,7 @@ impl StateSyncTrigger {
 pub(super) struct DagStateSynchronizer {
     epoch_state: Arc<EpochState>,
     time_service: TimeService,
-    state_computer: Arc<dyn StateComputer>,
+    execution_client: Arc<dyn TExecutionClient>,
     storage: Arc<dyn DAGStorage>,
     payload_manager: Arc<dyn TPayloadManager>,
     dag_window_size_config: Round,
@@ -168,7 +168,7 @@ impl DagStateSynchronizer {
     pub fn new(
         epoch_state: Arc<EpochState>,
         time_service: TimeService,
-        state_computer: Arc<dyn StateComputer>,
+        execution_client: Arc<dyn TExecutionClient>,
         storage: Arc<dyn DAGStorage>,
         payload_manager: Arc<dyn TPayloadManager>,
         dag_window_size_config: Round,
@@ -176,7 +176,7 @@ impl DagStateSynchronizer {
         Self {
             epoch_state,
             time_service,
-            state_computer,
+            execution_client,
             storage,
             payload_manager,
             dag_window_size_config,
@@ -186,9 +186,9 @@ impl DagStateSynchronizer {
     pub(crate) fn build_request(
         &self,
         node: &CertifiedNodeMessage,
-        current_dag_store: Arc<RwLock<Dag>>,
+        current_dag_store: Arc<DagStore>,
         highest_committed_anchor_round: Round,
-    ) -> (RemoteFetchRequest, Vec<Author>, Arc<RwLock<Dag>>) {
+    ) -> (RemoteFetchRequest, Vec<Author>, Arc<DagStore>) {
         let commit_li = node.ledger_info();
 
         {
@@ -212,13 +212,13 @@ impl DagStateSynchronizer {
             .commit_info()
             .round()
             .saturating_sub(self.dag_window_size_config);
-        let sync_dag_store = Arc::new(RwLock::new(Dag::new_empty(
+        let sync_dag_store = Arc::new(DagStore::new_empty(
             self.epoch_state.clone(),
             self.storage.clone(),
             self.payload_manager.clone(),
             start_round,
             self.dag_window_size_config,
-        )));
+        ));
         let bitmask = { sync_dag_store.read().bitmask(target_round) };
         let request = RemoteFetchRequest::new(
             self.epoch_state.epoch,
@@ -240,9 +240,9 @@ impl DagStateSynchronizer {
         dag_fetcher: impl TDagFetcher,
         request: RemoteFetchRequest,
         responders: Vec<Author>,
-        sync_dag_store: Arc<RwLock<Dag>>,
+        sync_dag_store: Arc<DagStore>,
         commit_li: LedgerInfoWithSignatures,
-    ) -> anyhow::Result<Dag> {
+    ) -> anyhow::Result<DagStore> {
         match dag_fetcher
             .fetch(request, responders, sync_dag_store.clone())
             .await
@@ -250,13 +250,13 @@ impl DagStateSynchronizer {
             Ok(_) => {},
             Err(err) => {
                 error!("error fetching nodes {}", err);
-                return Err(err);
+                bail!(err)
             },
         }
 
-        self.state_computer.sync_to(commit_li).await?;
+        self.execution_client.sync_to(commit_li).await?;
 
-        Ok(Arc::into_inner(sync_dag_store).unwrap().into_inner())
+        Ok(Arc::into_inner(sync_dag_store).unwrap())
     }
 }
 

@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! NOTE: Until the bug #12068 is fixed, we should not use this module.
+//!
 //! Implements the "definitely available copies" analysis, also called "available copies" analysis (in short).
 //! This analysis is a prerequisite for the copy propagation transformation.
 //!
@@ -10,9 +12,9 @@
 //! along all possible program paths such that neither `a` nor `b` is overwritten along any of these paths.
 //! That is, `a` and `b` are always available unmodified at `P` after the copy `a := b`,
 //! making it definitely available.
-//! In the current implementation, variables that are borrowed are excluded from being a part of an
-//! available copy. We can make this analysis more precise by having more refined rules when it comes
-//! to borrowed variables.
+//! In the current implementation, variables that are borrowed or which are used in specs ('pinned'
+//! variables) are excluded from being a part of an available copy. We can make this analysis more
+//! precise by having more refined rules when it comes to borrowed variables.
 //!
 //! This is a forward "must" analysis.
 //! In a forward analysis, we reason about facts at a program point `P` using facts at its predecessors.
@@ -27,7 +29,7 @@ use move_stackless_bytecode::{
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{Bytecode, Operation},
+    stackless_bytecode::Bytecode,
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -44,7 +46,7 @@ impl AvailCopies {
     }
 
     /// Make a copy `dst := src` available.
-    /// Neither `dst` nor `src` should be borrowed locals.
+    /// Neither `dst` nor `src` should be pinned.
     /// To call this method, `dst := x` should not already be available for any `x`.
     fn make_copy_available(&mut self, dst: TempIndex, src: TempIndex) {
         if src == dst {
@@ -62,7 +64,7 @@ impl AvailCopies {
     }
 
     /// Kill all available copies of the form `x := y` where `x` or `y` is `tmp`.
-    /// Note that `tmp` should not be a borrowed local.
+    /// Note that `tmp` should not be a pinned temporary.
     fn kill_copies_with(&mut self, tmp: TempIndex) {
         // TODO: consider optimizing the following operation by keeping a two-way map between
         // `dst -> src` and `src -> set(dst)`. Another optimization to consider is to use im::OrdMap.
@@ -147,16 +149,16 @@ impl AvailCopiesAnnotation {
 
 /// The definitely available copies analysis for a function.
 pub struct AvailCopiesAnalysis {
-    borrowed_locals: BTreeSet<TempIndex>, // Locals borrowed in the function being analyzed.
+    /// Temporaries pinned because they are borrowed or used in specs.
+    pinned_temps: BTreeSet<TempIndex>,
 }
 
 impl AvailCopiesAnalysis {
     /// Create a new instance of definitely available copies analysis.
-    /// `code` is the bytecode of the function being analyzed.
-    pub fn new(code: &[Bytecode]) -> Self {
-        Self {
-            borrowed_locals: Self::get_borrowed_locals(code),
-        }
+    /// `pinned_temps` is the set of temporaries that have been borrowed
+    /// or used in specs in function being analyzed.
+    pub fn new(pinned_temps: BTreeSet<TempIndex>) -> Self {
+        Self { pinned_temps }
     }
 
     /// Analyze the given function and return the definitely available copies annotation.
@@ -173,20 +175,6 @@ impl AvailCopiesAnalysis {
             });
         AvailCopiesAnnotation(per_bytecode_state)
     }
-
-    /// Get the set of locals that have been borrowed in the function being analyzed.
-    fn get_borrowed_locals(code: &[Bytecode]) -> BTreeSet<TempIndex> {
-        code.iter()
-            .filter_map(|bc| {
-                if let Bytecode::Call(_, _, Operation::BorrowLoc, srcs, _) = bc {
-                    // BorrowLoc should have only one source.
-                    srcs.first().cloned()
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
 }
 
 impl TransferFunctions for AvailCopiesAnalysis {
@@ -198,15 +186,15 @@ impl TransferFunctions for AvailCopiesAnalysis {
     fn execute(&self, state: &mut Self::State, instr: &Bytecode, _offset: CodeOffset) {
         use Bytecode::*;
         instr.dests().iter().for_each(|dst| {
-            if !self.borrowed_locals.contains(dst) {
-                // We don't track copies of borrowed locals, so no need to kill them.
+            if !self.pinned_temps.contains(dst) {
+                // We don't track copies of pinned temps, so no need to kill them.
                 state.kill_copies_with(*dst);
             }
         });
         if let Assign(_, dst, src, _) = instr {
-            if !self.borrowed_locals.contains(dst) && !self.borrowed_locals.contains(src) {
+            if !self.pinned_temps.contains(dst) && !self.pinned_temps.contains(src) {
                 // Note that we are conservative here for the sake of simplicity, and disallow
-                // tracking copies when either `dst` or `src` is borrowed.
+                // tracking copies when either `dst` or `src` is pinned.
                 // We could track more copies as available by using the reference analysis.
                 state.make_copy_available(*dst, *src);
             }
@@ -231,7 +219,7 @@ impl FunctionTargetProcessor for AvailCopiesAnalysisProcessor {
             return data;
         }
         let target = FunctionTarget::new(func_env, &data);
-        let analysis = AvailCopiesAnalysis::new(target.get_bytecode());
+        let analysis = AvailCopiesAnalysis::new(target.get_pinned_temps(false));
         let annotation = analysis.analyze(&target);
         data.annotations.set(annotation, true);
         data

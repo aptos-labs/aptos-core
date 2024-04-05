@@ -55,7 +55,10 @@ impl VMValidator {
             AdapterLogSchema::new(state_view.id(), 0),
             "AptosVM created for Validation"
         );
-        AptosVM::new(&state_view.as_move_resolver())
+        AptosVM::new(
+            &state_view.as_move_resolver(),
+            /*override_is_delayed_field_optimization_capable=*/ None,
+        )
     }
 
     pub fn new(db_reader: Arc<dyn DbReader>) -> Self {

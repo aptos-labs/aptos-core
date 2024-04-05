@@ -7,9 +7,10 @@ use aptos_language_e2e_tests::{
     executor::FakeExecutor,
 };
 use aptos_types::{
-    transaction::{Transaction, TransactionStatus, WriteSetPayload},
+    transaction::{ChangeSet, Transaction, TransactionStatus, WriteSetPayload},
     write_set::TransactionWrite,
 };
+use move_core_types::vm_status::StatusCode;
 
 #[test]
 fn no_deletion_in_genesis() {
@@ -30,9 +31,7 @@ fn execute_genesis_write_set() {
     assert!(!output.pop().unwrap().status().is_discarded())
 }
 
-// TODO[agg_v2](fix) - investigate/make BlockSTM discard instead of fail if WriteSetPayload::Direct is in the block
-// #[test]
-#[allow(unused)]
+#[test]
 fn execute_genesis_and_drop_other_transaction() {
     let mut executor = FakeExecutor::no_genesis();
     let txn =
@@ -49,4 +48,19 @@ fn execute_genesis_and_drop_other_transaction() {
     // Transaction that comes after genesis should be dropped.
     assert_eq!(output.len(), 2);
     assert_eq!(output.pop().unwrap().status(), &TransactionStatus::Retry)
+}
+
+#[test]
+fn fail_no_epoch_change_write_set() {
+    let mut executor = FakeExecutor::no_genesis();
+    let txn = Transaction::GenesisTransaction(WriteSetPayload::Direct(ChangeSet::empty()));
+
+    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let receiver = executor.create_raw_account_data(100_000, 10);
+    let txn2 = peer_to_peer_txn(sender.account(), receiver.account(), 11, 1000, 0);
+
+    let output_err = executor
+        .execute_transaction_block(vec![txn, Transaction::UserTransaction(txn2)])
+        .unwrap_err();
+    assert_eq!(StatusCode::INVALID_WRITE_SET, output_err.status_code());
 }

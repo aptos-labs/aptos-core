@@ -9,7 +9,6 @@
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_transaction_validation_initialize)
 -  [Function `prologue_common`](#0x1_transaction_validation_prologue_common)
--  [Function `module_prologue`](#0x1_transaction_validation_module_prologue)
 -  [Function `script_prologue`](#0x1_transaction_validation_script_prologue)
 -  [Function `multi_agent_script_prologue`](#0x1_transaction_validation_multi_agent_script_prologue)
 -  [Function `multi_agent_common_prologue`](#0x1_transaction_validation_multi_agent_common_prologue)
@@ -21,7 +20,6 @@
     -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `prologue_common`](#@Specification_1_prologue_common)
-    -  [Function `module_prologue`](#@Specification_1_module_prologue)
     -  [Function `script_prologue`](#@Specification_1_script_prologue)
     -  [Function `multi_agent_script_prologue`](#@Specification_1_multi_agent_script_prologue)
     -  [Function `multi_agent_common_prologue`](#@Specification_1_multi_agent_common_prologue)
@@ -241,6 +239,7 @@ Only called during genesis to initialize system resources for this module.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_initialize">initialize</a>(
     aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     script_prologue_name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+    // module_prologue_name is deprecated and not used.
     module_prologue_name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     multi_agent_prologue_name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
     user_epilogue_name: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
@@ -251,6 +250,7 @@ Only called during genesis to initialize system resources for this module.
         module_addr: @aptos_framework,
         module_name: b"<a href="transaction_validation.md#0x1_transaction_validation">transaction_validation</a>",
         script_prologue_name,
+        // module_prologue_name is deprecated and not used.
         module_prologue_name,
         multi_agent_prologue_name,
         user_epilogue_name,
@@ -343,39 +343,6 @@ Only called during genesis to initialize system resources for this module.
     );
     <b>let</b> balance = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;AptosCoin&gt;(gas_payer);
     <b>assert</b>!(balance &gt;= max_transaction_fee, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ECANT_PAY_GAS_DEPOSIT">PROLOGUE_ECANT_PAY_GAS_DEPOSIT</a>));
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x1_transaction_validation_module_prologue"></a>
-
-## Function `module_prologue`
-
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_module_prologue">module_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_module_prologue">module_prologue</a>(
-    sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
-    txn_sequence_number: u64,
-    txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
-    txn_gas_price: u64,
-    txn_max_gas_units: u64,
-    txn_expiration_time: u64,
-    <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8,
-) {
-    <b>let</b> gas_payer = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(&sender);
-    <a href="transaction_validation.md#0x1_transaction_validation_prologue_common">prologue_common</a>(sender, gas_payer, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, <a href="chain_id.md#0x1_chain_id">chain_id</a>)
 }
 </code></pre>
 
@@ -808,25 +775,6 @@ Give some constraints that may abort according to the conditions.
 
 
 <pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a>;
-</code></pre>
-
-
-
-<a id="@Specification_1_module_prologue"></a>
-
-### Function `module_prologue`
-
-
-<pre><code><b>fun</b> <a href="transaction_validation.md#0x1_transaction_validation_module_prologue">module_prologue</a>(sender: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, txn_sequence_number: u64, txn_public_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, txn_gas_price: u64, txn_max_gas_units: u64, txn_expiration_time: u64, <a href="chain_id.md#0x1_chain_id">chain_id</a>: u8)
-</code></pre>
-
-
-
-
-<pre><code><b>include</b> <a href="transaction_validation.md#0x1_transaction_validation_PrologueCommonAbortsIf">PrologueCommonAbortsIf</a> {
-    gas_payer: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(sender),
-    txn_authentication_key: txn_public_key
-};
 </code></pre>
 
 

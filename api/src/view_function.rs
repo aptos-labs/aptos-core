@@ -4,7 +4,7 @@
 use crate::{
     accept_type::AcceptType,
     bcs_payload::Bcs,
-    context::api_spawn_blocking,
+    context::{api_spawn_blocking, FunctionStats},
     failpoint::fail_point_poem,
     response::{
         BadRequestError, BasicErrorWith404, BasicResponse, BasicResponseStatus, BasicResultWith404,
@@ -97,7 +97,7 @@ fn view_request(
         ViewFunctionRequest::Json(data) => {
             let resolver = state_view.as_move_resolver();
             resolver
-                .as_converter(context.db.clone())
+                .as_converter(context.db.clone(), context.table_info_reader.clone())
                 .convert_view_function(data.0)
                 .map_err(|err| {
                     BasicErrorWith404::bad_request_with_code(
@@ -135,22 +135,22 @@ fn view_request(
         ));
     }
 
-    let return_vals = AptosVM::execute_view_function(
+    let output = AptosVM::execute_view_function(
         &state_view,
         view_function.module.clone(),
         view_function.function.clone(),
         view_function.ty_args.clone(),
         view_function.args.clone(),
         context.node_config.api.max_gas_view_function,
-    )
-    .map_err(|err| {
+    );
+    let values = output.values.map_err(|err| {
         BasicErrorWith404::bad_request_with_code_no_info(err, AptosErrorCode::InvalidInput)
     })?;
-    match accept_type {
+    let result = match accept_type {
         AcceptType::Bcs => {
             // The return values are already BCS encoded, but we still need to encode the outside
             // vector without re-encoding the inside values
-            let num_vals = return_vals.len();
+            let num_vals = values.len();
 
             // Push the length of the return values
             let mut length = vec![];
@@ -163,7 +163,7 @@ fn view_request(
             })?;
 
             // Combine all of the return values
-            let values = return_vals.into_iter().concat();
+            let values = values.into_iter().concat();
             let ret = [length, values].concat();
 
             BasicResponse::try_from_encoded((ret, &ledger_info, BasicResponseStatus::Ok))
@@ -171,7 +171,7 @@ fn view_request(
         AcceptType::Json => {
             let resolver = state_view.as_move_resolver();
             let return_types = resolver
-                .as_converter(context.db.clone())
+                .as_converter(context.db.clone(), context.table_info_reader.clone())
                 .function_return_types(&view_function)
                 .and_then(|tys| {
                     tys.into_iter()
@@ -186,12 +186,12 @@ fn view_request(
                     )
                 })?;
 
-            let move_vals = return_vals
+            let move_vals = values
                 .into_iter()
                 .zip(return_types.into_iter())
                 .map(|(v, ty)| {
                     resolver
-                        .as_converter(context.db.clone())
+                        .as_converter(context.db.clone(), context.table_info_reader.clone())
                         .try_into_move_value(&ty, &v)
                 })
                 .collect::<anyhow::Result<Vec<_>>>()
@@ -205,5 +205,10 @@ fn view_request(
 
             BasicResponse::try_from_json((move_vals, &ledger_info, BasicResponseStatus::Ok))
         },
-    }
+    };
+    context.view_function_stats().increment(
+        FunctionStats::function_to_key(&view_function.module, &view_function.function),
+        output.gas_used,
+    );
+    result
 }

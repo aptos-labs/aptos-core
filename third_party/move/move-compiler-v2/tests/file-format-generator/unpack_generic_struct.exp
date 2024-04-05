@@ -1,148 +1,3 @@
-============ initial bytecode ================
-
-[variant baseline]
-public fun m::destroy_none<#0>($t0: m::Option<#0>) {
-     var $t1: bool
-     var $t2: &m::Option<#0>
-     var $t3: u64
-     var $t4: vector<#0>
-  0: $t2 := borrow_local($t0)
-  1: $t1 := m::is_none<#0>($t2)
-  2: if ($t1) goto 3 else goto 5
-  3: label L0
-  4: goto 8
-  5: label L1
-  6: $t3 := 262144
-  7: abort($t3)
-  8: label L2
-  9: $t4 := unpack m::Option<#0>($t0)
- 10: vector::destroy_empty<#0>($t4)
- 11: return ()
-}
-
-
-[variant baseline]
-public fun m::foo<#0>($t0: m::E<#0>, $t1: &mut #0) {
-     var $t2: m::E<#0>
-     var $t3: m::E<#0>
-     var $t4: m::E<#0>
-     var $t5: #0
-     var $t6: #0
-     var $t7: m::E<#0>
-     var $t8: m::E<#0>
-     var $t9: #0
-     var $t10: u64
-     var $t11: u64
-  0: $t4 := infer($t0)
-  1: $t5 := unpack m::E<#0>($t4)
-  2: $t6 := infer($t5)
-  3: $t3 := pack m::E<#0>($t6)
-  4: $t2 := infer($t3)
-  5: $t7 := infer($t2)
-  6: $t8 := infer($t7)
-  7: $t9 := unpack m::E<#0>($t8)
-  8: $t11 := 3
-  9: $t10 := infer($t11)
- 10: write_ref($t1, $t9)
- 11: return ()
-}
-
-
-[variant baseline]
-public fun m::is_none<#0>($t0: &m::Option<#0>): bool {
-     var $t1: bool
-     var $t2: &vector<#0>
-  0: $t2 := borrow_field<m::Option<#0>>.vec($t0)
-  1: $t1 := vector::is_empty<#0>($t2)
-  2: return $t1
-}
-
-============ after LiveVarAnalysisProcessor: ================
-
-[variant baseline]
-public fun m::destroy_none<#0>($t0: m::Option<#0>) {
-     var $t1: bool
-     var $t2: &m::Option<#0>
-     var $t3: u64
-     var $t4: vector<#0>
-     # live vars: $t0
-  0: $t2 := borrow_local($t0)
-     # live vars: $t0, $t2
-  1: $t1 := m::is_none<#0>($t2)
-     # live vars: $t0, $t1
-  2: if ($t1) goto 3 else goto 5
-     # live vars: $t0
-  3: label L0
-     # live vars: $t0
-  4: goto 8
-     # live vars: $t0
-  5: label L1
-     # live vars:
-  6: $t3 := 262144
-     # live vars: $t3
-  7: abort($t3)
-     # live vars: $t0
-  8: label L2
-     # live vars: $t0
-  9: $t4 := unpack m::Option<#0>($t0)
-     # live vars: $t4
- 10: vector::destroy_empty<#0>($t4)
-     # live vars:
- 11: return ()
-}
-
-
-[variant baseline]
-public fun m::foo<#0>($t0: m::E<#0>, $t1: &mut #0) {
-     var $t2: m::E<#0>
-     var $t3: m::E<#0>
-     var $t4: m::E<#0>
-     var $t5: #0
-     var $t6: #0
-     var $t7: m::E<#0>
-     var $t8: m::E<#0>
-     var $t9: #0
-     var $t10: u64
-     var $t11: u64
-     # live vars: $t0, $t1
-  0: $t4 := move($t0)
-     # live vars: $t1, $t4
-  1: $t5 := unpack m::E<#0>($t4)
-     # live vars: $t1, $t5
-  2: $t6 := move($t5)
-     # live vars: $t1, $t6
-  3: $t3 := pack m::E<#0>($t6)
-     # live vars: $t1, $t3
-  4: $t2 := move($t3)
-     # live vars: $t1, $t2
-  5: $t7 := move($t2)
-     # live vars: $t1, $t7
-  6: $t8 := move($t7)
-     # live vars: $t1, $t8
-  7: $t9 := unpack m::E<#0>($t8)
-     # live vars: $t1, $t9
-  8: $t11 := 3
-     # live vars: $t1, $t9, $t11
-  9: $t10 := copy($t11)
-     # live vars: $t1, $t9
- 10: write_ref($t1, $t9)
-     # live vars:
- 11: return ()
-}
-
-
-[variant baseline]
-public fun m::is_none<#0>($t0: &m::Option<#0>): bool {
-     var $t1: bool
-     var $t2: &vector<#0>
-     # live vars: $t0
-  0: $t2 := borrow_field<m::Option<#0>>.vec($t0)
-     # live vars: $t2
-  1: $t1 := vector::is_empty<#0>($t2)
-     # live vars: $t1
-  2: return $t1
-}
-
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -174,10 +29,11 @@ B3:
 	9: Ret
 }
 public foo<Ty0: drop + store>(Arg0: E<Ty0>, Arg1: &mut Ty0) /* def_idx: 1 */ {
-L0:	loc2: E<Ty0>
-L1:	loc3: E<Ty0>
-L2:	loc4: E<Ty0>
-L3:	loc5: u64
+L2:	loc0: E<Ty0>
+L3:	loc1: Ty0
+L4:	loc2: E<Ty0>
+L5:	loc3: E<Ty0>
+L6:	loc4: u64
 B0:
 	0: MoveLoc[0](Arg0: E<Ty0>)
 	1: StLoc[2](loc0: E<Ty0>)
@@ -190,14 +46,12 @@ B0:
 	8: MoveLoc[4](loc2: E<Ty0>)
 	9: StLoc[5](loc3: E<Ty0>)
 	10: MoveLoc[5](loc3: E<Ty0>)
-	11: StLoc[6](loc4: E<Ty0>)
-	12: MoveLoc[6](loc4: E<Ty0>)
-	13: UnpackGeneric[1](E<Ty0>)
-	14: LdU64(3)
-	15: StLoc[7](loc5: u64)
-	16: MoveLoc[1](Arg1: &mut Ty0)
-	17: WriteRef
-	18: Ret
+	11: UnpackGeneric[1](E<Ty0>)
+	12: LdU64(3)
+	13: StLoc[6](loc4: u64)
+	14: MoveLoc[1](Arg1: &mut Ty0)
+	15: WriteRef
+	16: Ret
 }
 public is_none<Ty0>(Arg0: &Option<Ty0>): bool /* def_idx: 2 */ {
 B0:
@@ -207,3 +61,4 @@ B0:
 	3: Ret
 }
 }
+============ bytecode verification succeeded ========

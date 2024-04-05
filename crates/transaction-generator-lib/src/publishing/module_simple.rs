@@ -9,7 +9,10 @@ use aptos_sdk::{
         account_address::AccountAddress, ident_str, identifier::Identifier,
         language_storage::ModuleId,
     },
-    types::transaction::{EntryFunction, TransactionPayload},
+    types::{
+        serde_helper::bcs_utils::bcs_size_of_byte_array,
+        transaction::{EntryFunction, TransactionPayload},
+    },
 };
 use move_binary_format::{
     file_format::{FunctionHandleIndex, IdentifierIndex, SignatureToken},
@@ -90,6 +93,7 @@ pub enum MultiSigConfig {
     None,
     Random(usize),
     Publisher,
+    FeePayerPublisher,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -97,6 +101,15 @@ pub enum LoopType {
     NoOp,
     Arithmetic,
     BcsToBytes { len: u64 },
+}
+
+/// Automatic arguments function expects (i.e. signer, or multiple signers, etc)
+/// That execution can add before the call.
+#[derive(Debug, Copy, Clone)]
+pub enum AutomaticArgs {
+    None,
+    Signer,
+    SignerAndMultiSig,
 }
 
 //
@@ -107,6 +120,8 @@ pub enum LoopType {
 pub enum EntryPoints {
     /// Empty (NoOp) function
     Nop,
+    /// Empty (NoOp) function, signed by publisher as fee-payer
+    NopFeePayer,
     /// Empty (NoOp) function, signed by 2 accounts
     Nop2Signers,
     /// Empty (NoOp) function, signed by 5 accounts
@@ -206,8 +221,15 @@ pub enum EntryPoints {
     TokenV1MintAndTransferNFTSequential,
     TokenV1MintAndStoreFT,
     TokenV1MintAndTransferFT,
+    // register if not registered already
+    CoinInitAndMint,
+    FungibleAssetMint,
 
-    TokenV2AmbassadorMint,
+    TokenV2AmbassadorMint {
+        numbered: bool,
+    },
+    /// Burn an NFT token, only works with numbered=false tokens.
+    TokenV2AmbassadorBurn,
 
     InitializeVectorPicture {
         length: u64,
@@ -229,6 +251,7 @@ impl EntryPoints {
     pub fn package_name(&self) -> &'static str {
         match self {
             EntryPoints::Nop
+            | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
             | EntryPoints::Step
@@ -262,8 +285,12 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
-            | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "framework_usecases",
-            EntryPoints::TokenV2AmbassadorMint => "ambassador_token",
+            | EntryPoints::ResourceGroupsSenderMultiChange { .. }
+            | EntryPoints::CoinInitAndMint
+            | EntryPoints::FungibleAssetMint => "framework_usecases",
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                "ambassador_token"
+            },
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
@@ -275,6 +302,7 @@ impl EntryPoints {
     pub fn module_name(&self) -> &'static str {
         match self {
             EntryPoints::Nop
+            | EntryPoints::NopFeePayer
             | EntryPoints::Nop2Signers
             | EntryPoints::Nop5Signers
             | EntryPoints::Step
@@ -310,7 +338,11 @@ impl EntryPoints {
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. }
             | EntryPoints::ResourceGroupsSenderWriteTag { .. }
             | EntryPoints::ResourceGroupsSenderMultiChange { .. } => "resource_groups_example",
-            EntryPoints::TokenV2AmbassadorMint => "ambassador",
+            EntryPoints::CoinInitAndMint => "coin_example",
+            EntryPoints::FungibleAssetMint => "fungible_asset_example",
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                "ambassador"
+            },
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. } => "vector_picture",
@@ -328,7 +360,9 @@ impl EntryPoints {
     ) -> TransactionPayload {
         match self {
             // 0 args
-            EntryPoints::Nop => get_payload_void(module_id, ident_str!("nop").to_owned()),
+            EntryPoints::Nop | EntryPoints::NopFeePayer => {
+                get_payload_void(module_id, ident_str!("nop").to_owned())
+            },
             EntryPoints::Nop2Signers => {
                 get_payload_void(module_id, ident_str!("nop_2_signers").to_owned())
             },
@@ -521,7 +555,17 @@ impl EntryPoints {
                     bcs::to_bytes(&rand_string(rng, *string_length)).unwrap(), // name
                 ])
             },
-            EntryPoints::TokenV2AmbassadorMint => {
+            EntryPoints::CoinInitAndMint => {
+                get_payload(module_id, ident_str!("mint_p").to_owned(), vec![
+                    bcs::to_bytes(&1000u64).unwrap(), // amount
+                ])
+            },
+            EntryPoints::FungibleAssetMint => {
+                get_payload(module_id, ident_str!("mint_p").to_owned(), vec![
+                    bcs::to_bytes(&1000u64).unwrap(), // amount
+                ])
+            },
+            EntryPoints::TokenV2AmbassadorMint { numbered: true } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
                 get_payload(
                     module_id,
@@ -533,6 +577,22 @@ impl EntryPoints {
                     ],
                 )
             },
+            EntryPoints::TokenV2AmbassadorMint { numbered: false } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                get_payload(
+                    module_id,
+                    ident_str!("mint_ambassador_token_by_user").to_owned(),
+                    vec![
+                        bcs::to_bytes(&rand_string(rng, 100)).unwrap(), // description
+                        bcs::to_bytes(&rand_string(rng, 50)).unwrap(),  // uri
+                    ],
+                )
+            },
+            EntryPoints::TokenV2AmbassadorBurn => get_payload(
+                module_id,
+                ident_str!("burn_named_by_user").to_owned(),
+                vec![],
+            ),
             EntryPoints::InitializeVectorPicture { length } => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![
                     bcs::to_bytes(&length).unwrap(), // length
@@ -603,12 +663,73 @@ impl EntryPoints {
 
     pub fn multi_sig_additional_num(&self) -> MultiSigConfig {
         match self {
+            EntryPoints::NopFeePayer => MultiSigConfig::FeePayerPublisher,
             EntryPoints::Nop2Signers => MultiSigConfig::Random(1),
             EntryPoints::Nop5Signers => MultiSigConfig::Random(4),
             EntryPoints::ResourceGroupsGlobalWriteTag { .. }
             | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => MultiSigConfig::Publisher,
-            EntryPoints::TokenV2AmbassadorMint => MultiSigConfig::Publisher,
+            EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
+                MultiSigConfig::Publisher
+            },
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                MultiSigConfig::Publisher
+            },
             _ => MultiSigConfig::None,
+        }
+    }
+
+    pub fn automatic_args(&self) -> AutomaticArgs {
+        match self {
+            EntryPoints::Nop
+            | EntryPoints::NopFeePayer
+            | EntryPoints::Step
+            | EntryPoints::GetCounter
+            | EntryPoints::ResetData
+            | EntryPoints::Double
+            | EntryPoints::Half
+            | EntryPoints::Loop { .. }
+            | EntryPoints::GetFromConst { .. }
+            | EntryPoints::SetId
+            | EntryPoints::SetName
+            | EntryPoints::Maximize
+            | EntryPoints::Minimize
+            | EntryPoints::MakeOrChange { .. }
+            | EntryPoints::BytesMakeOrChange { .. }
+            | EntryPoints::EmitEvents { .. }
+            | EntryPoints::MakeOrChangeTable { .. }
+            | EntryPoints::MakeOrChangeTableRandom { .. } => AutomaticArgs::Signer,
+            EntryPoints::Nop2Signers | EntryPoints::Nop5Signers => AutomaticArgs::SignerAndMultiSig,
+            EntryPoints::IncGlobal
+            | EntryPoints::IncGlobalAggV2
+            | EntryPoints::ModifyGlobalBoundedAggV2 { .. } => AutomaticArgs::None,
+            EntryPoints::CreateObjects { .. } | EntryPoints::CreateObjectsConflict { .. } => {
+                AutomaticArgs::Signer
+            },
+            EntryPoints::TokenV1InitializeCollection
+            | EntryPoints::TokenV1MintAndStoreNFTParallel
+            | EntryPoints::TokenV1MintAndStoreNFTSequential
+            | EntryPoints::TokenV1MintAndTransferNFTParallel
+            | EntryPoints::TokenV1MintAndTransferNFTSequential
+            | EntryPoints::TokenV1MintAndStoreFT
+            | EntryPoints::TokenV1MintAndTransferFT => AutomaticArgs::Signer,
+            EntryPoints::ResourceGroupsGlobalWriteTag { .. }
+            | EntryPoints::ResourceGroupsGlobalWriteAndReadTag { .. } => {
+                AutomaticArgs::SignerAndMultiSig
+            },
+            EntryPoints::ResourceGroupsSenderWriteTag { .. }
+            | EntryPoints::ResourceGroupsSenderMultiChange { .. } => AutomaticArgs::Signer,
+            EntryPoints::CoinInitAndMint | EntryPoints::FungibleAssetMint => {
+                AutomaticArgs::SignerAndMultiSig
+            },
+            EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
+                AutomaticArgs::SignerAndMultiSig
+            },
+            EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
+            EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
+                AutomaticArgs::None
+            },
+            EntryPoints::InitializeSmartTablePicture => AutomaticArgs::Signer,
+            EntryPoints::SmartTablePicture { .. } => AutomaticArgs::None,
         }
     }
 }
@@ -727,10 +848,16 @@ fn mint_new_token(module_id: ModuleId, other: AccountAddress) -> TransactionPayl
 }
 
 fn rand_string(rng: &mut StdRng, len: usize) -> String {
-    rng.sample_iter(&Alphanumeric)
+    let res = rng
+        .sample_iter(&Alphanumeric)
         .take(len)
         .map(char::from)
-        .collect()
+        .collect();
+    assert_eq!(
+        bcs::serialized_size(&res).unwrap(),
+        bcs_size_of_byte_array(len)
+    );
+    res
 }
 
 fn make_or_change(

@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::dag::{anchor_election::AnchorElection, storage::CommitEvent};
+use super::CommitHistory;
+use crate::{
+    dag::{anchor_election::AnchorElection, storage::CommitEvent},
+    liveness::leader_reputation::VotingPowerRatio,
+};
 use aptos_consensus_types::common::{Author, Round};
 
 pub struct RoundRobinAnchorElection {
@@ -20,4 +24,10 @@ impl AnchorElection for RoundRobinAnchorElection {
     }
 
     fn update_reputation(&self, _event: CommitEvent) {}
+}
+
+impl CommitHistory for RoundRobinAnchorElection {
+    fn get_voting_power_participation_ratio(&self, _round: Round) -> VotingPowerRatio {
+        1.0
+    }
 }

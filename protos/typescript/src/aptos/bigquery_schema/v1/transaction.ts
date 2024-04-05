@@ -59,13 +59,13 @@ export const Transaction = {
   encode(message: Transaction, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.version !== undefined && message.version !== BigInt("0")) {
       if (BigInt.asIntN(64, message.version) !== message.version) {
-        throw new Error("value provided for field message.version of type int64 too large");
+        throw new globalThis.Error("value provided for field message.version of type int64 too large");
       }
       writer.uint32(8).int64(message.version.toString());
     }
     if (message.blockHeight !== undefined && message.blockHeight !== BigInt("0")) {
       if (BigInt.asIntN(64, message.blockHeight) !== message.blockHeight) {
-        throw new Error("value provided for field message.blockHeight of type int64 too large");
+        throw new globalThis.Error("value provided for field message.blockHeight of type int64 too large");
       }
       writer.uint32(16).int64(message.blockHeight.toString());
     }
@@ -89,7 +89,7 @@ export const Transaction = {
     }
     if (message.gasUsed !== undefined && message.gasUsed !== BigInt("0")) {
       if (BigInt.asUintN(64, message.gasUsed) !== message.gasUsed) {
-        throw new Error("value provided for field message.gasUsed of type uint64 too large");
+        throw new globalThis.Error("value provided for field message.gasUsed of type uint64 too large");
       }
       writer.uint32(72).uint64(message.gasUsed.toString());
     }
@@ -104,25 +104,25 @@ export const Transaction = {
     }
     if (message.numEvents !== undefined && message.numEvents !== BigInt("0")) {
       if (BigInt.asIntN(64, message.numEvents) !== message.numEvents) {
-        throw new Error("value provided for field message.numEvents of type int64 too large");
+        throw new globalThis.Error("value provided for field message.numEvents of type int64 too large");
       }
       writer.uint32(104).int64(message.numEvents.toString());
     }
     if (message.numWriteSetChanges !== undefined && message.numWriteSetChanges !== BigInt("0")) {
       if (BigInt.asIntN(64, message.numWriteSetChanges) !== message.numWriteSetChanges) {
-        throw new Error("value provided for field message.numWriteSetChanges of type int64 too large");
+        throw new globalThis.Error("value provided for field message.numWriteSetChanges of type int64 too large");
       }
       writer.uint32(112).int64(message.numWriteSetChanges.toString());
     }
     if (message.epoch !== undefined && message.epoch !== BigInt("0")) {
       if (BigInt.asIntN(64, message.epoch) !== message.epoch) {
-        throw new Error("value provided for field message.epoch of type int64 too large");
+        throw new globalThis.Error("value provided for field message.epoch of type int64 too large");
       }
       writer.uint32(120).int64(message.epoch.toString());
     }
     if (message.insertedAt !== undefined && message.insertedAt !== BigInt("0")) {
       if (BigInt.asIntN(64, message.insertedAt) !== message.insertedAt) {
-        throw new Error("value provided for field message.insertedAt of type int64 too large");
+        throw new globalThis.Error("value provided for field message.insertedAt of type int64 too large");
       }
       writer.uint32(128).int64(message.insertedAt.toString());
     }

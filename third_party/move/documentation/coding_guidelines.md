@@ -39,7 +39,7 @@ We require every PR to have approval by at least two reviewers. This is enforced
 - Don't forget to list any issues this PR fixes (if you mention 'closes #nnn' in the PR description the issue will be automatically closed).
 - If you have any significant TODOs in your code, please open an issue for them. Use `TODO(#nnn)` to link the TODO to the issue.
 - Respond to each comment of the reviewers. If you think you resolved a request for a change, just use 'done' as a response. If you disagree with the reviewer, explain why -- it is OK to pushback, but should be justified.
-- Once you are done with addressing comments, indicate this to the reviewers by adding a top-level comment to the PR. You can use 'PTLA' ('please take another look') as an acronym for this purpose.
+- Once you are done with addressing comments, indicate this to the reviewers by adding a top-level comment to the PR. You can use 'PTAL' ('please take another look') as an acronym for this purpose.
 - If possible, avoid force push so the reviewer can see how you changed code in comparison. There are exceptions to this, for example if you need to rebase.
 
 ### Guidelines for Reviewers of PRs

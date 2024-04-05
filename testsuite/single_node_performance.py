@@ -7,6 +7,7 @@ import re
 import os
 import tempfile
 import json
+import itertools
 from typing import Callable, Optional, Tuple, Mapping, Sequence, Any
 from tabulate import tabulate
 from subprocess import Popen, PIPE, CalledProcessError
@@ -85,67 +86,73 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=25300, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=3500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=16200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    # this was changed from 42000 to make landings not flaky, needs follow up
-    RunGroupConfig(expected_tps=35500, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=13500, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=33200, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=22000, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=4150, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=13000, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=140, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=2600, key=RunGroupKey(
+    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=31900, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=19200, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=4170, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=15400, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=155, key=RunGroupKey("publish-package"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=2450, key=RunGroupKey(
         "mix_publish_transfer",
         transaction_type_override="publish-package coin-transfer",
         transaction_weights_override="1 500",
     ), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=365, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=1100, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=353, key=RunGroupKey("batch100-transfer"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=995, key=RunGroupKey("batch100-transfer", executor_type="native"), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=165, key=RunGroupKey("vector-picture40"), included_in=Flow(0), waived=True),
     RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture40", module_working_set_size=20), included_in=Flow(0), waived=True),
-    RunGroupConfig(expected_tps=160, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=1000, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=17, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=82, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    # RunGroupConfig(expected_tps=3, key=RunGroupKey("smart-table-picture1-m-with1-k-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
-    # RunGroupConfig(expected_tps=12, key=RunGroupKey("smart-table-picture1-m-with1-k-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    # RunGroupConfig(expected_tps=5, key=RunGroupKey("smart-table-picture1-b-with1-k-change"), included_in=Flow(0), waived=True),
-    # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-b-with1-k-change", module_working_set_size=20), included_in=Flow(0), waived=True),
+    RunGroupConfig(expected_tps=151, key=RunGroupKey("vector-picture30k"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=895, key=RunGroupKey("vector-picture30k", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=23, key=RunGroupKey("smart-table-picture30-k-with200-change"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=126, key=RunGroupKey("smart-table-picture30-k-with200-change", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    # RunGroupConfig(expected_tps=10, key=RunGroupKey("smart-table-picture1-m-with256-change"), included_in=LAND_BLOCKING_AND_C, waived=True),
+    # RunGroupConfig(expected_tps=40, key=RunGroupKey("smart-table-picture1-m-with256-change", module_working_set_size=20), included_in=Flow.CONTINUOUS, waived=True),
 
-    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=20000, key=RunGroupKey("modify-global-resource-agg-v2"), included_in=Flow.AGG_V2 | LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-resource-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=7300, key=RunGroupKey("modify-global-flag-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-flag-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
-    RunGroupConfig(expected_tps=4050, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2),
+    RunGroupConfig(expected_tps=12600, key=RunGroupKey("modify-global-bounded-agg-v2"), included_in=Flow.AGG_V2 | Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=12500, key=RunGroupKey("modify-global-bounded-agg-v2", module_working_set_size=50), included_in=Flow.AGG_V2),
 
-    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=3600, key=RunGroupKey("resource-groups-global-write-tag1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=4000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=3300, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-global-write-and-read-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=16100, key=RunGroupKey("resource-groups-sender-write-tag1-kb"), included_in=Flow.CONTINUOUS | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-write-tag1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
-    RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS, waived=True),
+    RunGroupConfig(expected_tps=14000, key=RunGroupKey("resource-groups-sender-multi-change1-kb"), included_in=LAND_BLOCKING_AND_C | Flow.RESOURCE_GROUPS),
     RunGroupConfig(expected_tps=8000, key=RunGroupKey("resource-groups-sender-multi-change1-kb", module_working_set_size=20), included_in=Flow.RESOURCE_GROUPS, waived=True),
     
-    RunGroupConfig(expected_tps=1890, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=9250, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=1100, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
-    RunGroupConfig(expected_tps=5900, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=1777, key=RunGroupKey("token-v1ft-mint-and-transfer"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=8520, key=RunGroupKey("token-v1ft-mint-and-transfer", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=1081, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=5740, key=RunGroupKey("token-v1nft-mint-and-transfer-sequential", module_working_set_size=20), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
     RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0)),
+
+    RunGroupConfig(expected_tps=13800, key=RunGroupKey("coin-init-and-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=11400, key=RunGroupKey("coin-init-and-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=1500, key=RunGroupKey("fungible-asset-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=7500, key=RunGroupKey("fungible-asset-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1ft-mint-and-store"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
 
-    RunGroupConfig(expected_tps=25500, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
    
-    RunGroupConfig(expected_tps=1710, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=6900, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=7006, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=6946, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+
+    # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
+    RunGroupConfig(expected_tps=3120, key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
@@ -154,8 +161,7 @@ TESTS = [
     RunGroupConfig(expected_tps=29000 if NUM_ACCOUNTS < 5000000 else 20000, key=RunGroupKey("coin-transfer", smaller_working_set=True), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
     RunGroupConfig(expected_tps=23000 if NUM_ACCOUNTS < 5000000 else 15000, key=RunGroupKey("account-generation"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
     RunGroupConfig(expected_tps=130 if NUM_ACCOUNTS < 5000000 else 60, key=RunGroupKey("publish-package"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=1500 if NUM_ACCOUNTS < 5000000 else 1500, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
-    RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 7000, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=100), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
+    RunGroupConfig(expected_tps=12000 if NUM_ACCOUNTS < 5000000 else 6800, key=RunGroupKey("token-v2-ambassador-mint"), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB),
     RunGroupConfig(expected_tps=35000 if NUM_ACCOUNTS < 5000000 else 28000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
     RunGroupConfig(expected_tps=27000 if NUM_ACCOUNTS < 5000000 else 23000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.MAINNET | Flow.MAINNET_LARGE_DB, waived=True),
 ]
@@ -200,9 +206,17 @@ else:
     DB_PRUNER_FLAGS = ""
 
 HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
+SKIP_MOVE_E2E = os.environ.get("SKIP_MOVE_E2E")
 
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
+
+
+class CmdExecutionError(Exception):
+    def __init__(self, return_code, output):
+        super().__init__(f"CmdExecutionError with {return_code}")
+        self.return_code = return_code
+        self.output = output
 
 
 def execute_command(command):
@@ -229,7 +243,7 @@ def execute_command(command):
     if p.returncode != 0:
         if HIDE_OUTPUT:
             print(full_result)
-        raise CalledProcessError(p.returncode, p.args)
+        raise CmdExecutionError(p.returncode, full_result)
 
     if " ERROR " in full_result:
         print("ERROR log line in execution")
@@ -269,27 +283,9 @@ def get_only(values):
 
 
 def extract_run_results(
-    output: str, execution_only: bool, create_db: bool = False
+    output: str, prefix: str, create_db: bool = False
 ) -> RunResults:
-    if execution_only:
-        tps = float(re.findall(r"Overall execution TPS: (\d+\.?\d*) txn/s", output)[-1])
-        gps = float(re.findall(r"Overall execution GPS: (\d+\.?\d*) gas/s", output)[-1])
-        effective_gps = float(
-            re.findall(r"Overall execution effectiveGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        io_gps = float(
-            re.findall(r"Overall execution ioGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        execution_gps = float(
-            re.findall(r"Overall execution executionGPS: (\d+\.?\d*) gas/s", output)[-1]
-        )
-        gpt = float(
-            re.findall(r"Overall execution GPT: (\d+\.?\d*) gas/txn", output)[-1]
-        )
-        output_bps = float(
-            re.findall(r"Overall execution output: (\d+\.?\d*) bytes/s", output)[-1]
-        )
-    elif create_db:
+    if create_db:
         tps = float(
             get_only(
                 re.findall(
@@ -304,38 +300,37 @@ def extract_run_results(
         execution_gps = 0
         gpt = 0
         output_bps = 0
-    else:
-        tps = float(get_only(re.findall(r"Overall TPS: (\d+\.?\d*) txn/s", output)))
-        gps = float(get_only(re.findall(r"Overall GPS: (\d+\.?\d*) gas/s", output)))
-        effective_gps = float(
-            get_only(re.findall(r"Overall effectiveGPS: (\d+\.?\d*) gas/s", output))
-        )
-        io_gps = float(
-            get_only(re.findall(r"Overall ioGPS: (\d+\.?\d*) gas/s", output))
-        )
-        execution_gps = float(
-            get_only(re.findall(r"Overall executionGPS: (\d+\.?\d*) gas/s", output))
-        )
-        gpt = float(get_only(re.findall(r"Overall GPT: (\d+\.?\d*) gas/txn", output)))
-        output_bps = float(
-            re.findall(r"Overall output: (\d+\.?\d*) bytes/s", output)[-1]
-        )
-
-    if create_db:
         fraction_in_execution = 0
         fraction_of_execution_in_vm = 0
         fraction_in_commit = 0
     else:
+        tps = float(get_only(re.findall(prefix + r" TPS: (\d+\.?\d*) txn/s", output)))
+        gps = float(get_only(re.findall(prefix + r" GPS: (\d+\.?\d*) gas/s", output)))
+        effective_gps = float(
+            get_only(re.findall(prefix + r" effectiveGPS: (\d+\.?\d*) gas/s", output))
+        )
+        io_gps = float(
+            get_only(re.findall(prefix + r" ioGPS: (\d+\.?\d*) gas/s", output))
+        )
+        execution_gps = float(
+            get_only(re.findall(prefix + r" executionGPS: (\d+\.?\d*) gas/s", output))
+        )
+        gpt = float(get_only(re.findall(prefix + r" GPT: (\d+\.?\d*) gas/txn", output)))
+        output_bps = float(
+            get_only(re.findall(prefix + r" output: (\d+\.?\d*) bytes/s", output))
+        )
         fraction_in_execution = float(
-            re.findall(r"Overall fraction of total: (\d+\.?\d*) in execution", output)[
-                -1
-            ]
+            re.findall(
+                prefix + r" fraction of total: (\d+\.?\d*) in execution", output
+            )[-1]
         )
         fraction_of_execution_in_vm = float(
-            re.findall(r"Overall fraction of execution (\d+\.?\d*) in VM", output)[-1]
+            re.findall(prefix + r" fraction of execution (\d+\.?\d*) in VM", output)[-1]
         )
         fraction_in_commit = float(
-            re.findall(r"Overall fraction of total: (\d+\.?\d*) in commit", output)[-1]
+            re.findall(prefix + r" fraction of total: (\d+\.?\d*) in commit", output)[
+                -1
+            ]
         )
 
     return RunResults(
@@ -430,8 +425,20 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
+    move_e2e_benchmark_failed = False
+    if not SKIP_MOVE_E2E:
+        execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        try:
+            execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
+        except:
+            # for land-blocking (i.e. on PR), fail immediately, for speedy response.
+            # Otherwise run all tests, and fail in the end.
+            if SELECTED_FLOW == Flow.LAND_BLOCKING:
+                print("Move E2E benchmark failed, exiting")
+                exit(1)
+            move_e2e_benchmark_failed = True
 
+    execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")
     create_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --block-size {MAX_BLOCK_SIZE} --execution-threads {NUMBER_OF_EXECUTION_THREADS} {DB_CONFIG_FLAGS} {DB_PRUNER_FLAGS} create-db --data-dir {tmpdirname}/db --num-accounts {NUM_ACCOUNTS}"
     output = execute_command(create_db_command)
@@ -441,9 +448,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
     results.append(
         RunGroupInstance(
             key=RunGroupKey("warmup"),
-            single_node_result=extract_run_results(
-                output, execution_only=False, create_db=True
-            ),
+            single_node_result=extract_run_results(output, "Overall", create_db=True),
             number_of_threads_results={},
             block_size=MAX_BLOCK_SIZE,
             expected_tps=0,
@@ -494,13 +499,21 @@ with tempfile.TemporaryDirectory() as tmpdirname:
             output = execute_command(test_db_command)
 
             number_of_threads_results[execution_threads] = extract_run_results(
-                output, execution_only=True
+                output, "Overall execution"
             )
 
         test_db_command = f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-executor-benchmark --execution-threads {NUMBER_OF_EXECUTION_THREADS} {common_command_suffix} --blocks {NUM_BLOCKS}"
         output = execute_command(test_db_command)
 
-        single_node_result = extract_run_results(output, execution_only=False)
+        single_node_result = extract_run_results(output, "Overall")
+        stage_node_results = []
+
+        for i in itertools.count():
+            prefix = f"Staged execution: stage {i}:"
+            if prefix in output:
+                stage_node_results.append((i, extract_run_results(output, prefix)))
+            else:
+                break
 
         results.append(
             RunGroupInstance(
@@ -511,6 +524,22 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 expected_tps=test.expected_tps,
             )
         )
+
+        for stage, stage_node_result in stage_node_results:
+            results.append(
+                RunGroupInstance(
+                    key=RunGroupKey(
+                        transaction_type=test.key.transaction_type
+                        + f" [stage {stage}]",
+                        module_working_set_size=test.key.module_working_set_size,
+                        executor_type=test.key.executor_type,
+                    ),
+                    single_node_result=stage_node_result,
+                    number_of_threads_results=number_of_threads_results,
+                    block_size=cur_block_size,
+                    expected_tps=test.expected_tps,
+                )
+            )
 
         # line to be able to aggreate and visualize in Humio
         print(
@@ -599,6 +628,12 @@ if warnings:
 if errors:
     print("Errors: ")
     print("\n".join(errors))
+    exit(1)
+
+if move_e2e_benchmark_failed:
+    print(
+        "Move e2e benchmark failed, failing the job. See logs at the beginning for more details."
+    )
     exit(1)
 
 exit(0)

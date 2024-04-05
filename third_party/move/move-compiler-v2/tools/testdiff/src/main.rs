@@ -63,13 +63,57 @@ static IGNORED_UNIT_PATHS: Lazy<BTreeSet<String>> = Lazy::new(|| {
     set
 });
 
-/// Remapping of test directories between v2 and v1 tree. This are paths
+/// Remapping of test directories between v2 and v1 tree. These are paths
 /// relative to the according roots.
 static UNIT_PATH_REMAP: Lazy<BTreeMap<String, String>> = Lazy::new(|| {
     let mut map = BTreeMap::new();
     map.insert(
         "reference-safety/v1-tests".to_string(),
         "borrows".to_string(),
+    );
+    map.insert("friends/v1-tests".to_string(), "naming".to_string());
+    map.insert(
+        "uninit-use-checker/v1-commands".to_string(),
+        "commands".to_string(),
+    );
+    map.insert(
+        "uninit-use-checker/v1-locals".to_string(),
+        "locals".to_string(),
+    );
+    map.insert(
+        "uninit-use-checker/v1-borrows".to_string(),
+        "borrows".to_string(),
+    );
+    map.insert(
+        "uninit-use-checker/v1-borrow-tests".to_string(),
+        "borrow_tests".to_string(),
+    );
+    map.insert(
+        "bytecode-generator/v1-commands".to_string(),
+        "commands".to_string(),
+    );
+    map.insert(
+        "bytecode-generator/v1-typing".to_string(),
+        "typing".to_string(),
+    );
+    map.insert("typing/v1-commands".to_string(), "commands".to_string());
+    map.insert("typing/v1-naming".to_string(), "naming".to_string());
+    map.insert("typing/v1-operators".to_string(), "operators".to_string());
+    map.insert("typing/v1-signer".to_string(), "signer".to_string());
+    map.insert("live-var/v1-commands".to_string(), "commands".to_string());
+    map.insert("live-var/v1-liveness".to_string(), "liveness".to_string());
+    map.insert(
+        "visibility-checker/v1-typing".to_string(),
+        "typing".to_string(),
+    );
+    map.insert(
+        "cyclic-instantiation-checker/v1-tests".to_string(),
+        "instantiation_loops".to_string(),
+    );
+    map.insert("abilities/v1".to_string(), "typing".to_string());
+    map.insert(
+        "acquires-checker/v1-tests".to_string(),
+        "typing".to_string(),
     );
     map
 });

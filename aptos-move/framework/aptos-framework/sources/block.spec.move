@@ -44,6 +44,8 @@ spec aptos_framework::block {
         use aptos_framework::chain_status;
         // After genesis, `BlockResource` exist.
         invariant [suspendable] chain_status::is_operating() ==> exists<BlockResource>(@aptos_framework);
+        // After genesis, `CommitHistory` exist.
+        invariant [suspendable] chain_status::is_operating() ==> exists<CommitHistory>(@aptos_framework);
     }
 
     spec BlockResource {
@@ -51,27 +53,30 @@ spec aptos_framework::block {
         invariant epoch_interval > 0;
     }
 
+    spec CommitHistory {
+        invariant max_capacity > 0;
+    }
+
+    spec block_prologue_common {
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
+        include BlockRequirement;
+        aborts_if false;
+    }
+
     spec block_prologue {
-        use aptos_framework::chain_status;
-        use aptos_framework::coin::CoinInfo;
-        use aptos_framework::aptos_coin::AptosCoin;
-        use aptos_framework::transaction_fee;
-        use aptos_framework::staking_config;
 
-        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved)
-
-        requires chain_status::is_operating();
-        requires system_addresses::is_vm(vm);
-        /// [high-level-req-4]
-        requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
         requires timestamp >= reconfiguration::last_reconfiguration_time();
-        requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
-        requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
-        requires exists<stake::ValidatorFees>(@aptos_framework);
-        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
-        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
-        include staking_config::StakingRewardsConfigRequirement;
+        include BlockRequirement;
+        aborts_if false;
+    }
 
+    spec block_prologue_ext {
+        pragma verify_duration_estimate = 1000; // TODO: set because of timeout (property proved)
+        requires timestamp >= reconfiguration::last_reconfiguration_time();
+        include BlockRequirement;
+        include stake::ResourceRequirement;
+        include stake::GetReconfigStartTimeRequirement;
         aborts_if false;
     }
 
@@ -118,6 +123,34 @@ spec aptos_framework::block {
         aborts_if account.guid_creation_num + 2 >= account::MAX_GUID_CREATION_NUM;
     }
 
+    spec schema BlockRequirement {
+        use aptos_framework::chain_status;
+        use aptos_framework::coin::CoinInfo;
+        use aptos_framework::aptos_coin::AptosCoin;
+        use aptos_framework::transaction_fee;
+        use aptos_framework::staking_config;
+
+        vm: signer;
+        hash: address;
+        epoch: u64;
+        round: u64;
+        proposer: address;
+        failed_proposer_indices: vector<u64>;
+        previous_block_votes_bitvec: vector<u8>;
+        timestamp: u64;
+
+        requires chain_status::is_operating();
+        requires system_addresses::is_vm(vm);
+        /// [high-level-req-4]
+        requires proposer == @vm_reserved || stake::spec_is_current_epoch_validator(proposer);
+        requires (proposer == @vm_reserved) ==> (timestamp::spec_now_microseconds() == timestamp);
+        requires (proposer != @vm_reserved) ==> (timestamp::spec_now_microseconds() < timestamp);
+        requires exists<stake::ValidatorFees>(@aptos_framework);
+        requires exists<CoinInfo<AptosCoin>>(@aptos_framework);
+        include transaction_fee::RequiresCollectedFeesPerValueLeqBlockAptosSupply;
+        include staking_config::StakingRewardsConfigRequirement;
+    }
+
     spec schema Initialize {
         use std::signer;
         aptos_framework: signer;
@@ -128,7 +161,9 @@ spec aptos_framework::block {
         aborts_if addr != @aptos_framework;
         aborts_if epoch_interval_microsecs == 0;
         aborts_if exists<BlockResource>(addr);
+        aborts_if exists<CommitHistory>(addr);
         ensures exists<BlockResource>(addr);
+        ensures exists<CommitHistory>(addr);
         ensures global<BlockResource>(addr).height == 0;
     }
 
@@ -181,6 +216,8 @@ spec aptos_framework::block {
     /// The Configuration existed under the @aptos_framework.
     /// The CurrentTimeMicroseconds existed under the @aptos_framework.
     spec emit_writeset_block_event(vm_signer: &signer, fake_block_hash: address) {
+        use aptos_framework::chain_status;
+        requires chain_status::is_operating();
         include EmitWritesetBlockEvent;
     }
 

@@ -1,6 +1,6 @@
 provider "kubernetes" {
   host                   = aws_eks_cluster.aptos.endpoint
-  cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority.0.data)
+  cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority[0].data)
   token                  = data.aws_eks_cluster_auth.aptos.token
 }
 
@@ -72,69 +72,16 @@ resource "kubernetes_storage_class" "gp2" {
   depends_on = [null_resource.delete-gp2]
 }
 
-# FIXME: Remove when migrating to K8s 1.25
-resource "kubernetes_role_binding" "psp-kube-system" {
-  metadata {
-    name      = "eks:podsecuritypolicy:privileged"
-    namespace = "kube-system"
-  }
-
-  role_ref {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "ClusterRole"
-    name      = "eks:podsecuritypolicy:privileged"
-  }
-
-  subject {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "Group"
-    name      = "system:serviceaccounts:kube-system"
-  }
-}
-
 locals {
   kubeconfig = "/tmp/kube.config.${md5(timestamp())}"
-}
-
-# FIXME: Remove when migrating to K8s 1.25
-resource "null_resource" "delete-psp-authenticated" {
-  provisioner "local-exec" {
-    command = <<-EOT
-      aws --region ${var.region} eks update-kubeconfig --name ${aws_eks_cluster.aptos.name} --kubeconfig ${local.kubeconfig} &&
-      kubectl --kubeconfig ${local.kubeconfig} delete --ignore-not-found clusterrolebinding eks:podsecuritypolicy:authenticated
-    EOT
-  }
-
-  depends_on = [kubernetes_role_binding.psp-kube-system]
 }
 
 provider "helm" {
   kubernetes {
     host                   = aws_eks_cluster.aptos.endpoint
-    cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority.0.data)
+    cluster_ca_certificate = base64decode(aws_eks_cluster.aptos.certificate_authority[0].data)
     token                  = data.aws_eks_cluster_auth.aptos.token
   }
-}
-
-resource "kubernetes_namespace" "tigera-operator" {
-  metadata {
-    annotations = {
-      name = "tigera-operator"
-    }
-
-    name = "tigera-operator"
-  }
-}
-
-resource "helm_release" "calico" {
-  name       = "calico"
-  repository = "https://docs.projectcalico.org/charts"
-  chart      = "tigera-operator"
-  version    = "3.23.3"
-  namespace  = "tigera-operator"
-  depends_on = [
-    kubernetes_namespace.tigera-operator
-  ]
 }
 
 resource "kubernetes_cluster_role" "debug" {
@@ -247,7 +194,7 @@ resource "local_file" "kubernetes" {
   filename = "${local.workspace_name}-kubernetes.json"
   content = jsonencode({
     kubernetes_host        = aws_eks_cluster.aptos.endpoint
-    kubernetes_ca_cert     = base64decode(aws_eks_cluster.aptos.certificate_authority.0.data)
+    kubernetes_ca_cert     = base64decode(aws_eks_cluster.aptos.certificate_authority[0].data)
     issuer                 = aws_eks_cluster.aptos.identity[0].oidc[0].issuer
     service_account_prefix = "aptos-pfn"
     pod_cidrs              = aws_subnet.private[*].cidr_block

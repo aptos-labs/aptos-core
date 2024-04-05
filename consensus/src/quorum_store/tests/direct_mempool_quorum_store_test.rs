@@ -32,6 +32,8 @@ async fn test_block_request_no_txns() {
         .try_send(GetPayloadCommand::GetPayloadRequest(
             100,
             1000,
+            50,
+            500,
             true,
             PayloadFilter::DirectMempool(vec![]),
             consensus_callback,

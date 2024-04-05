@@ -61,6 +61,10 @@ impl FileStoreOperator for GcsFileStoreOperator {
         self.storage_format
     }
 
+    fn store_name(&self) -> &str {
+        "GCS"
+    }
+
     async fn get_raw_file(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key = FileEntry::build_key(version, self.storage_format).to_string();
         match Object::download(&self.bucket_name, file_entry_key.as_str()).await {
@@ -70,7 +74,7 @@ impl FileStoreOperator for GcsFileStoreOperator {
                     anyhow::bail!("[Indexer File] Transactions file not found. Gap might happen between cache and file store. {}", err)
                 } else {
                     anyhow::bail!(
-                        "[Indexer File] Error happens when transaction file. {}",
+                        "[Indexer File] Error happens when downloading transaction file. {}",
                         err
                     );
                 }

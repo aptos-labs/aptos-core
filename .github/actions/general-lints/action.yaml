@@ -8,10 +8,7 @@ inputs:
 runs:
   using: composite
   steps:
-    # Checkout the repository
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+    # The source code must be checkout out by the workflow that invokes this action.
 
     # Install shellcheck and run it on the dev_setup.sh script
     - name: Run shell lints

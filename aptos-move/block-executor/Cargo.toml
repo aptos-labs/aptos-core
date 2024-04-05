@@ -32,6 +32,7 @@ criterion = { workspace = true, optional = true }
 crossbeam = { workspace = true }
 dashmap = { workspace = true }
 derivative = { workspace = true }
+fail = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
@@ -43,11 +44,11 @@ proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 scopeguard = { workspace = true }
-serde = { workspace = true }
 
 [dev-dependencies]
 aptos-aggregator = { workspace = true, features = ["testing"] }
 criterion = { workspace = true }
+fail = { workspace = true, features = ["failpoints"] }
 itertools = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }

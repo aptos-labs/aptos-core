@@ -24,9 +24,33 @@ spec:
     port: 6182
   - name: metrics
     port: 9101
+  - name: admin
+    port: 9102
   - name: api
     port: 8080
 
+{{- if $.Values.migrations.enable_vfn_explicit_pvc }}
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
+  labels:
+    {{- include "aptos-validator.labels" $ | nindent 4 }}
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ $.Values.fullnode.storage.class }}
+  resources:
+    requests:
+      storage: {{ $.Values.fullnode.storage.size }}
+  {{- if $.Values.fullnode.storage.labels }}
+  selector:
+    matchLabels:
+      {{- toYaml $.Values.fullnode.storage.labels | nindent 6}}
+  {{- end }}
+{{- end }}
 ---
 {{ $fullnode_statefulset := lookup "apps/v1" "StatefulSet" $.Release.Namespace (printf "%s-%d-%s-e%s" (include "aptos-validator.fullname" $) $i .name (toYaml $.Values.chain.era)) }}
 apiVersion: apps/v1
@@ -49,6 +73,7 @@ spec:
       app.kubernetes.io/name: fullnode
       app.kubernetes.io/instance: fullnode-{{$i}}
       group: {{ .name }}
+  {{- if not $.Values.migrations.enable_vfn_explicit_pvc }}
   volumeClaimTemplates:
   - metadata:
       name: fn
@@ -64,6 +89,7 @@ spec:
         matchLabels:
           {{- toYaml $.Values.fullnode.storage.labels | nindent 10}}
       {{- end }}
+    {{- end }}
   template:
     metadata:
       labels:
@@ -78,6 +104,23 @@ spec:
         prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
+      initContainers:
+        - name: run-script
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              set -x
+              cp /opt/aptos/genesis_readonly/* /opt/aptos/genesis
+              signed_url=$(curl -s -X GET "{{ $.Values.genesis_blob_upload_url }}?cluster_name={{ $.Values.cluster_name }}&namespace={{ $.Release.Namespace }}&era={{ $.Values.chain.era }}&method=GET")
+              curl -o /opt/aptos/genesis/genesis.blob "$signed_url"
+              ls -l /opt/aptos/genesis
+          volumeMounts:
+            - name: genesis-config
+              mountPath: /opt/aptos/genesis_readonly
+            - name: writable-genesis
+              mountPath: /opt/aptos/genesis
       containers:
       - name: fullnode
         {{- if and $fullnode_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -86,7 +129,18 @@ spec:
         image: {{ $.Values.validator.image.repo }}:{{ $.Values.validator.image.tag | default $.Values.imageTag }}
         {{- end }}
         imagePullPolicy: {{ $.Values.validator.image.pullPolicy }}
-        command: ["/usr/local/bin/aptos-node", "-f", "/opt/aptos/etc/fullnode.yaml"]
+        command:
+          - /bin/bash
+          - -c
+          - |-
+            set -euxo pipefail
+            if [[ -f /opt/aptos/data/wipe-db ]]; then
+              # Wipe DB
+              rm -rf /opt/aptos/data/db
+              # Delete the command file so we only wipe the DB once
+              rm -vf /opt/aptos/data/wipe-db
+            fi
+            /usr/local/bin/aptos-node -f /opt/aptos/etc/fullnode.yaml
       {{- with $.Values.fullnode }}
         resources:
           {{- toYaml .resources | nindent 10 }}
@@ -111,9 +165,13 @@ spec:
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc
-        - name: genesis-config
+        - name: writable-genesis
           mountPath: /opt/aptos/genesis
+        {{- if $.Values.migrations.enable_vfn_explicit_pvc }}
+        - name: aptos-data
+        {{- else }}
         - name: fn
+        {{- end }}
           mountPath: /opt/aptos/data
         ports:
         - containerPort: 6181
@@ -122,6 +180,8 @@ spec:
           name: api
         - containerPort: 9101
           name: metrics
+        - containerPort: 9102
+          name: admin
         securityContext:
           {{- if $.Values.enablePrivilegedMode }}
           runAsUser: 0
@@ -165,6 +225,13 @@ spec:
       - name: genesis-config
         secret:
           secretName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-genesis-e{{ $.Values.chain.era }}
+      - name: writable-genesis
+        emptyDir: {}
+      {{- if $.Values.migrations.enable_vfn_explicit_pvc }}
+      - name: aptos-data
+        persistentVolumeClaim:
+          claimName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-{{ .name }}-e{{ $.Values.chain.era }}
+      {{- end }}
       serviceAccountName: {{ include "aptos-validator.fullname" $ }}-fullnode
       {{- if $.Values.imagePullSecret }}
       imagePullSecrets:

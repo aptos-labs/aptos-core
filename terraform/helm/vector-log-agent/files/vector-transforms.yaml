@@ -36,7 +36,6 @@ transforms:
       del(.k8s.annotations."kubectl.kubernetes.io/last-applied-configuration")
       del(.k8s.annotations."seccomp.security.alpha.kubernetes.io/pod")
       del(.k8s.annotations."checksum/validator.yaml")
-      del(.k8s.annotations."kubernetes.io/psp")
 
       del(.k8s.labels."app.kubernetes.io/managed-by")
       del(.k8s.labels."app.kubernetes.io/part-of")
@@ -75,7 +74,7 @@ transforms:
       if !exists(.message) && exists(.msg) {
         .message = del(.msg)
       }
-      parsed_timestamp, err = to_timestamp(.timestamp)
+      parsed_timestamp, err = parse_timestamp(.timestamp, "%+") # parse as ISO 8601 / RFC 3339 according to https://github.com/vectordotdev/vrl/blob/650547870a16c66dcfab01ec382cfdc23415d85b/lib/core/src/conversion.rs#L249C6-L249C8
       if err == null {
         .timestamp = parsed_timestamp
       }

@@ -364,17 +364,10 @@ pub(crate) mod test {
         fn set_bytes(&mut self, bytes: Bytes) {
             self.bytes = bytes;
         }
-
-        fn convert_read_to_modification(&self) -> Option<Self>
-        where
-            Self: Sized,
-        {
-            Some(self.clone())
-        }
     }
 
     // Generate a Vec deterministically based on txn_idx and incarnation.
-    pub(crate) fn value_for(txn_idx: TxnIndex, incarnation: Incarnation) -> TestValue {
+    fn value_for(txn_idx: TxnIndex, incarnation: Incarnation) -> TestValue {
         TestValue::new(vec![txn_idx * 5, txn_idx + incarnation, incarnation * 5])
     }
 

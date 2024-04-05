@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     error::MempoolError, payload_manager::PayloadManager, state_computer::ExecutionProxy,
@@ -8,7 +9,7 @@ use crate::{
 };
 use aptos_config::config::transaction_filter_type::Filter;
 use aptos_consensus_notifications::{ConsensusNotificationSender, Error};
-use aptos_consensus_types::{block::Block, block_data::BlockData, executed_block::ExecutedBlock};
+use aptos_consensus_types::{block::Block, block_data::BlockData, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::{
     state_checkpoint_output::StateCheckpointOutput, BlockExecutorTrait, ExecutorResult,
@@ -64,8 +65,8 @@ struct DummyTxnNotifier {}
 impl TxnNotifier for DummyTxnNotifier {
     async fn notify_failed_txn(
         &self,
-        _txns: Vec<SignedTransaction>,
-        _compute_results: &StateComputeResult,
+        _txns: &[SignedTransaction],
+        _statuses: &[TransactionStatus],
     ) -> anyhow::Result<(), MempoolError> {
         Ok(())
     }
@@ -145,8 +146,8 @@ async fn schedule_compute_should_discover_validator_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let validator_txn_0 = ValidatorTransaction::dummy1(vec![0xFF; 99]);
-    let validator_txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
@@ -198,8 +199,8 @@ async fn commit_should_discover_validator_txns() {
         TransactionFilter::new(Filter::empty()),
     );
 
-    let validator_txn_0 = ValidatorTransaction::dummy1(vec![0xFF; 99]);
-    let validator_txn_1 = ValidatorTransaction::dummy1(vec![0xFF; 999]);
+    let validator_txn_0 = ValidatorTransaction::dummy(vec![0xFF; 99]);
+    let validator_txn_1 = ValidatorTransaction::dummy(vec![0xFF; 999]);
 
     let block = Block::new_for_testing(
         HashValue::zero(),
@@ -218,7 +219,7 @@ async fn commit_should_discover_validator_txns() {
             3
         ]);
 
-    let blocks = vec![Arc::new(ExecutedBlock::new(
+    let blocks = vec![Arc::new(PipelinedBlock::new(
         block,
         vec![],
         state_compute_result,
@@ -237,7 +238,7 @@ async fn commit_should_discover_validator_txns() {
     let (tx, rx) = oneshot::channel::<()>();
 
     let callback = Box::new(
-        move |_a: &[Arc<ExecutedBlock>], _b: LedgerInfoWithSignatures| {
+        move |_a: &[Arc<PipelinedBlock>], _b: LedgerInfoWithSignatures| {
             tx.send(()).unwrap();
         },
     );

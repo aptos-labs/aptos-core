@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     aptos_vm::get_or_vm_startup_failure,
@@ -12,10 +13,10 @@ use crate::{
     AptosVM,
 };
 use aptos_types::{
-    dkg::{DKGNode, DKGState, DKGTrait, DefaultDKG},
+    dkg::{DKGState, DKGTrait, DKGTranscript, DefaultDKG},
     fee_statement::FeeStatement,
     move_utils::as_move_value::AsMoveValue,
-    on_chain_config::OnChainConfig,
+    on_chain_config::{ConfigurationResource, OnChainConfig},
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
@@ -27,6 +28,7 @@ use move_core_types::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 
+#[derive(Debug)]
 enum ExpectedFailure {
     // Move equivalent: `errors::invalid_argument(*)`
     EpochNotCurrent = 0x10001,
@@ -36,6 +38,7 @@ enum ExpectedFailure {
     // Move equivalent: `errors::invalid_state(*)`
     MissingResourceDKGState = 0x30001,
     MissingResourceInprogressDKGSession = 0x30002,
+    MissingResourceConfiguration = 0x30003,
 }
 
 enum ExecutionFailure {
@@ -49,9 +52,9 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
-        dkg_node: DKGNode,
+        dkg_transcript: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_node) {
+        match self.process_dkg_result_inner(resolver, log_context, session_id, dkg_transcript) {
             Ok((vm_status, vm_output)) => Ok((vm_status, vm_output)),
             Err(Expected(failure)) => {
                 // Pretend we are inside Move, and expected failures are like Move aborts.
@@ -69,17 +72,18 @@ impl AptosVM {
         resolver: &impl AptosMoveResolver,
         log_context: &AdapterLogSchema,
         session_id: SessionId,
-        dkg_node: DKGNode,
+        dkg_node: DKGTranscript,
     ) -> Result<(VMStatus, VMOutput), ExecutionFailure> {
         let dkg_state = OnChainConfig::fetch_config(resolver)
             .ok_or_else(|| Expected(MissingResourceDKGState))?;
-
+        let config_resource = ConfigurationResource::fetch_config(resolver)
+            .ok_or_else(|| Expected(MissingResourceConfiguration))?;
         let DKGState { in_progress, .. } = dkg_state;
         let in_progress_session_state =
             in_progress.ok_or_else(|| Expected(MissingResourceInprogressDKGSession))?;
 
         // Check epoch number.
-        if dkg_node.metadata.epoch != in_progress_session_state.metadata.dealer_epoch {
+        if dkg_node.metadata.epoch != config_resource.epoch() {
             return Err(Expected(EpochNotCurrent));
         }
 
@@ -114,7 +118,7 @@ impl AptosVM {
             })
             .map_err(|r| Unexpected(r.unwrap_err()))?;
 
-        let output = crate::aptos_vm::get_transaction_output(
+        let output = crate::aptos_vm::get_system_transaction_output(
             session,
             FeeStatement::zero(),
             ExecutionStatus::Success,

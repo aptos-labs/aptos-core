@@ -125,6 +125,8 @@ pub struct NetworkConfig {
     pub max_message_size: usize,
     /// The maximum number of parallel message deserialization tasks that can run (per application)
     pub max_parallel_deserialization_tasks: Option<usize>,
+    /// Whether or not to enable latency aware peer dialing
+    pub enable_latency_aware_dialing: bool,
 }
 
 impl Default for NetworkConfig {
@@ -166,6 +168,7 @@ impl NetworkConfig {
             outbound_rx_buffer_size_bytes: None,
             outbound_tx_buffer_size_bytes: None,
             max_parallel_deserialization_tasks: None,
+            enable_latency_aware_dialing: true,
         };
 
         // Configure the number of parallel deserialization tasks
@@ -278,7 +281,7 @@ impl NetworkConfig {
                 let mut rng = StdRng::from_seed(OsRng.gen());
                 let key = x25519::PrivateKey::generate(&mut rng);
                 let peer_id = from_identity_public_key(key.public_key());
-                self.identity = Identity::from_config(key, peer_id);
+                self.identity = Identity::from_config_auto_generated(key, peer_id);
             },
             Identity::FromConfig(config) => {
                 if config.peer_id == PeerId::ZERO {

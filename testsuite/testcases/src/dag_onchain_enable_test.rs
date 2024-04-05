@@ -47,7 +47,7 @@ impl NetworkLoadTest for DagOnChainEnableTest {
             .await
         });
 
-        std::thread::sleep(duration / 2);
+        std::thread::sleep(duration / 3);
 
         runtime.block_on(async {
 
@@ -68,7 +68,7 @@ impl NetworkLoadTest for DagOnChainEnableTest {
             )
             .unwrap();
 
-            assert!(matches!(current_consensus_config, OnChainConsensusConfig::V2(_)));
+            assert!(matches!(current_consensus_config, OnChainConsensusConfig::V3 { .. }));
 
             // Change to V2
             let new_consensus_config = OnChainConsensusConfig::V3 {
@@ -95,7 +95,98 @@ impl NetworkLoadTest for DagOnChainEnableTest {
                 .await
         })?;
 
-        std::thread::sleep(duration / 2);
+        std::thread::sleep(duration / 3);
+
+        let initial_consensus_config = runtime.block_on(async {
+
+            let root_cli_index = cli.add_account_with_address_to_cli(
+                swarm.chain_info().root_account().private_key().clone(),
+                swarm.chain_info().root_account().address(),
+            );
+
+            let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+                &rest_client
+                    .get_account_resource_bcs::<Vec<u8>>(
+                        CORE_CODE_ADDRESS,
+                        "0x1::consensus_config::ConsensusConfig",
+                    )
+                    .await
+                    .unwrap()
+                    .into_inner(),
+            )
+            .unwrap();
+
+            assert!(matches!(current_consensus_config, OnChainConsensusConfig::V3 { .. }));
+
+            // Change to DAG
+            let new_consensus_config = OnChainConsensusConfig::V3 {
+                alg: ConsensusAlgorithmConfig::DAG(DagConsensusConfigV1::default()),
+                vtxn: ValidatorTxnConfig::default_disabled(),
+            };
+
+            let update_consensus_config_script = format!(
+                r#"
+        script {{
+            use aptos_framework::aptos_governance;
+            use aptos_framework::consensus_config;
+            fun main(core_resources: &signer) {{
+                let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+                let config_bytes = {};
+                consensus_config::set(&framework_signer, config_bytes);
+            }}
+        }}
+        "#,
+                generate_onchain_config_blob(&bcs::to_bytes(&new_consensus_config).unwrap())
+            );
+
+            cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
+                .await?;
+
+            Ok(current_consensus_config)
+        })?;
+
+        std::thread::sleep(duration / 3);
+
+        runtime.block_on(async {
+
+            let root_cli_index = cli.add_account_with_address_to_cli(
+                swarm.chain_info().root_account().private_key().clone(),
+                swarm.chain_info().root_account().address(),
+            );
+
+            let current_consensus_config: OnChainConsensusConfig = bcs::from_bytes(
+                &rest_client
+                    .get_account_resource_bcs::<Vec<u8>>(
+                        CORE_CODE_ADDRESS,
+                        "0x1::consensus_config::ConsensusConfig",
+                    )
+                    .await
+                    .unwrap()
+                    .into_inner(),
+            )
+            .unwrap();
+
+            assert!(matches!(current_consensus_config, OnChainConsensusConfig::V3 { .. }));
+
+            // Change back to initial
+            let update_consensus_config_script = format!(
+                r#"
+        script {{
+            use aptos_framework::aptos_governance;
+            use aptos_framework::consensus_config;
+            fun main(core_resources: &signer) {{
+                let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+                let config_bytes = {};
+                consensus_config::set(&framework_signer, config_bytes);
+            }}
+        }}
+        "#,
+                generate_onchain_config_blob(&bcs::to_bytes(&initial_consensus_config).unwrap())
+            );
+
+            cli.run_script_with_default_framework(root_cli_index, &update_consensus_config_script)
+                .await
+        })?;
 
         // Wait for all nodes to synchronize and stabilize.
         info!("Waiting for the validators to be synchronized.");

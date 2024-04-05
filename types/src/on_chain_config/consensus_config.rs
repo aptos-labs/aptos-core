@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{block_info::Round, on_chain_config::OnChainConfig};
+use crate::{
+    block_info::Round,
+    on_chain_config::{ConsensusAlgorithmConfig::Jolteon, OnChainConfig},
+};
 use anyhow::{format_err, Result};
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
@@ -38,7 +41,7 @@ impl ConsensusAlgorithmConfig {
                 quorum_store_enabled,
                 ..
             } => *quorum_store_enabled,
-            ConsensusAlgorithmConfig::DAG(_) => false,
+            ConsensusAlgorithmConfig::DAG(_) => true,
         }
     }
 
@@ -237,6 +240,52 @@ impl OnChainConsensusConfig {
             OnChainConsensusConfig::V3 { vtxn, .. } => vtxn.clone(),
         }
     }
+
+    pub fn is_vtxn_enabled(&self) -> bool {
+        self.effective_validator_txn_config().enabled()
+    }
+
+    pub fn disable_validator_txns(&mut self) {
+        match self {
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
+                // vtxn not supported. No-op.
+            },
+            OnChainConsensusConfig::V3 { vtxn, .. } => {
+                *vtxn = ValidatorTxnConfig::V0;
+            },
+        }
+    }
+
+    pub fn enable_validator_txns(&mut self) {
+        let new_self = match std::mem::take(self) {
+            OnChainConsensusConfig::V1(config) => OnChainConsensusConfig::V3 {
+                alg: Jolteon {
+                    main: config,
+                    quorum_store_enabled: false,
+                },
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            OnChainConsensusConfig::V2(config) => OnChainConsensusConfig::V3 {
+                alg: Jolteon {
+                    main: config,
+                    quorum_store_enabled: true,
+                },
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            OnChainConsensusConfig::V3 {
+                vtxn: ValidatorTxnConfig::V0,
+                alg,
+            } => OnChainConsensusConfig::V3 {
+                alg,
+                vtxn: ValidatorTxnConfig::default_enabled(),
+            },
+            item @ OnChainConsensusConfig::V3 {
+                vtxn: ValidatorTxnConfig::V1 { .. },
+                ..
+            } => item,
+        };
+        *self = new_self;
+    }
 }
 
 /// This is used when on-chain config is not initialized.
@@ -374,9 +423,17 @@ pub struct ProposerAndVoterConfig {
     pub use_history_from_previous_epoch_max_count: u32,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnchorElectionMode {
+    RoundRobin,
+    LeaderReputation(LeaderReputationType),
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct DagConsensusConfigV1 {
     pub dag_ordering_causal_history_window: usize,
+    pub anchor_election_mode: AnchorElectionMode,
 }
 
 impl Default for DagConsensusConfigV1 {
@@ -384,6 +441,18 @@ impl Default for DagConsensusConfigV1 {
     fn default() -> Self {
         Self {
             dag_ordering_causal_history_window: 10,
+            anchor_election_mode: AnchorElectionMode::LeaderReputation(
+                LeaderReputationType::ProposerAndVoterV2(ProposerAndVoterConfig {
+                    active_weight: 1000,
+                    inactive_weight: 10,
+                    failed_weight: 1,
+                    failure_threshold_percent: 10,
+                    proposer_window_num_validators_multiplier: 10,
+                    voter_window_num_validators_multiplier: 1,
+                    weight_by_voting_power: true,
+                    use_history_from_previous_epoch_max_count: 5,
+                }),
+            ),
         }
     }
 }

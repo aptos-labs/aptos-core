@@ -9,12 +9,16 @@ use move_binary_format::file_format::CodeOffset;
 use move_core_types::{u256, value::MoveValue};
 use move_model::{
     ast,
-    ast::{Address, Exp, ExpData, MemoryLabel, TempIndex, TraceKind},
+    ast::{Address, Exp, ExpData, MemoryLabel, Spec, TempIndex, TraceKind},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     model::{FunId, GlobalEnv, ModuleId, NodeId, QualifiedInstId, SpecVarId, StructId},
     ty::{Type, TypeDisplayContext},
 };
-use std::{collections::BTreeMap, fmt, fmt::Formatter};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt,
+    fmt::Formatter,
+};
 
 /// A label for a branch destination.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
@@ -168,7 +172,7 @@ pub enum Operation {
 
     ReadRef,
     WriteRef,
-    FreezeRef,
+    FreezeRef(/*explicit*/ bool),
     Vector,
 
     // Unary
@@ -261,7 +265,7 @@ impl Operation {
             Operation::Release => false,
             Operation::ReadRef => false,
             Operation::WriteRef => false,
-            Operation::FreezeRef => false,
+            Operation::FreezeRef(_) => false,
             Operation::Vector => false,
             Operation::Havoc(_) => false,
             Operation::Stop => false,
@@ -413,7 +417,9 @@ pub enum Bytecode {
     Label(AttrId, Label),
     Abort(AttrId, TempIndex),
     Nop(AttrId),
+    SpecBlock(AttrId, Spec),
 
+    // Extended bytecode: spec-instrumentation only.
     SaveMem(AttrId, MemoryLabel, QualifiedInstId<StructId>),
     SaveSpecVar(AttrId, MemoryLabel, QualifiedInstId<SpecVarId>),
     Prop(AttrId, PropKind, Exp),
@@ -432,6 +438,7 @@ impl Bytecode {
             | Label(id, ..)
             | Abort(id, ..)
             | Nop(id)
+            | SpecBlock(id, ..)
             | SaveMem(id, ..)
             | SaveSpecVar(id, ..)
             | Prop(id, ..) => *id,
@@ -450,6 +457,7 @@ impl Bytecode {
             | Label(id, ..)
             | Abort(id, ..)
             | Nop(id)
+            | SpecBlock(id, ..)
             | SaveMem(id, ..)
             | SaveSpecVar(id, ..)
             | Prop(id, ..) => id,
@@ -468,25 +476,29 @@ impl Bytecode {
         matches!(self, Bytecode::Ret(..))
     }
 
-    pub fn is_unconditional_branch(&self) -> bool {
+    pub fn is_always_branching(&self) -> bool {
         matches!(
             self,
             Bytecode::Ret(..)
                 | Bytecode::Jump(..)
                 | Bytecode::Abort(..)
+                | Bytecode::Branch(..)
                 | Bytecode::Call(_, _, Operation::Stop, _, _)
         )
     }
 
-    pub fn is_conditional_branch(&self) -> bool {
-        matches!(
-            self,
-            Bytecode::Branch(..) | Bytecode::Call(_, _, _, _, Some(_))
-        )
+    pub fn is_possibly_branching(&self) -> bool {
+        matches!(self, Bytecode::Call(_, _, _, _, Some(_)))
     }
 
-    pub fn is_branch(&self) -> bool {
-        self.is_conditional_branch() || self.is_unconditional_branch()
+    pub fn is_branching(&self) -> bool {
+        self.is_possibly_branching() || self.is_always_branching()
+    }
+
+    /// Returns true if the bytecode is spec-only.
+    pub fn is_spec_only(&self) -> bool {
+        use Bytecode::*;
+        matches!(self, SaveMem(..) | SaveSpecVar(..) | Prop(..))
     }
 
     /// Return the sources of the instruction (for non-spec-only instructions).
@@ -508,6 +520,10 @@ impl Bytecode {
             | Bytecode::Jump(_, _)
             | Bytecode::Label(_, _)
             | Bytecode::Nop(_) => {
+                vec![]
+            },
+            Bytecode::SpecBlock(_, _) => {
+                // Specifications are not contributing to read variables
                 vec![]
             },
             // Note that for all spec-only instructions, we currently return no sources.
@@ -543,6 +559,7 @@ impl Bytecode {
             | Bytecode::Nop(_)
             | Bytecode::SaveMem(_, _, _)
             | Bytecode::SaveSpecVar(_, _, _)
+            | Bytecode::SpecBlock(..)
             | Bytecode::Prop(_, _, _) => Vec::new(),
         }
     }
@@ -569,6 +586,19 @@ impl Bytecode {
         res
     }
 
+    /// Returns the set of labels in `code`.
+    pub fn labels(code: &[Bytecode]) -> BTreeSet<Label> {
+        code.iter()
+            .filter_map(|code| {
+                if let Bytecode::Label(_, label) = code {
+                    Some(*label)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Return the successor offsets of this instruction. In addition to the code, a map
     /// of label to code offset need to be passed in.
     pub fn get_successors(
@@ -578,7 +608,7 @@ impl Bytecode {
     ) -> Vec<CodeOffset> {
         let bytecode = &code[pc as usize];
         let mut v = vec![];
-        if !bytecode.is_branch() {
+        if !bytecode.is_branching() {
             // Fall through situation, just return the next pc.
             v.push(pc + 1);
         } else {
@@ -947,6 +977,9 @@ impl<'env> fmt::Display for BytecodeDisplay<'env> {
             Nop(_) => {
                 write!(f, "nop")?;
             },
+            SpecBlock(_, spec) => {
+                write!(f, "{}", self.func_target.global_env().display(spec))?;
+            },
             SaveMem(_, label, qid) => {
                 let env = self.func_target.global_env();
                 write!(f, "@{} := save_mem({})", label.as_usize(), env.display(qid))?;
@@ -1133,8 +1166,12 @@ impl<'env> fmt::Display for OperationDisplay<'env> {
             WriteRef => {
                 write!(f, "write_ref")?;
             },
-            FreezeRef => {
-                write!(f, "freeze_ref")?;
+            FreezeRef(explicit) => {
+                if *explicit {
+                    write!(f, "freeze_ref")?;
+                } else {
+                    write!(f, "freeze_ref(implicit)")?;
+                }
             },
             Vector => {
                 write!(f, "vector")?;

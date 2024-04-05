@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: local `s` of type `assign::S` does not have the `drop` ability
+   ┌─ tests/ability-check/assign.move:17:9
+   │
+17 │         *s = S { f: 42, g: T { h: 42 } };
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ reference content dropped here

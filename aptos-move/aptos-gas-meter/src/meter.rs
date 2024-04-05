@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::traits::{AptosGasMeter, GasAlgebra};
-use aptos_gas_algebra::{Fee, FeePerGasUnit};
+use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
 use aptos_gas_schedule::gas_params::{instr::*, txn::*};
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
+use aptos_types::{
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
+};
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::CodeOffset,
@@ -12,6 +14,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes},
+    identifier::IdentStr,
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
@@ -458,6 +461,39 @@ where
     ) -> PartialVMResult<()> {
         Ok(())
     }
+
+    #[inline]
+    fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        if self.feature_version() < 14 {
+            return Ok(());
+        }
+
+        let cost = SUBST_TY_PER_NODE * num_nodes;
+
+        self.algebra.charge_execution(cost)
+    }
+
+    #[inline]
+    fn charge_dependency(
+        &mut self,
+        _is_new: bool,
+        addr: &AccountAddress,
+        _name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        // Modules under special addresses are considered system modules that should always
+        // be loaded, and are therefore excluded from gas charging.
+        //
+        // TODO: 0xA550C18 is a legacy system address we used, but it is currently not covered by
+        //       `.is_special()`. We should double check if this address still needs special
+        //       treatment.
+        if self.feature_version() >= 15 && !addr.is_special() {
+            self.algebra
+                .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
+            self.algebra.count_dependency(size)?;
+        }
+        Ok(())
+    }
 }
 
 impl<A> AptosGasMeter for StandardGasMeter<A>
@@ -483,6 +519,22 @@ where
         gas_unit_price: FeePerGasUnit,
     ) -> PartialVMResult<()> {
         self.algebra.charge_storage_fee(amount, gas_unit_price)
+    }
+
+    fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_transaction(txn_size);
+
+        self.algebra
+            .charge_io(cost)
+            .map_err(|e| e.finish(Location::Undefined))
+    }
+
+    fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()> {
+        let cost = self.io_pricing().io_gas_per_event(event);
+
+        self.algebra
+            .charge_io(cost)
+            .map_err(|e| e.finish(Location::Undefined))
     }
 
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op_size: &WriteOpSize) -> VMResult<()> {

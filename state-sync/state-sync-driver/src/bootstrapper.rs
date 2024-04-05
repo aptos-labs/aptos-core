@@ -597,11 +597,8 @@ impl<
 
     /// Processes any notifications already pending on the active stream
     async fn process_active_stream_notifications(&mut self) -> Result<(), Error> {
-        for _ in 0..self
-            .driver_configuration
-            .config
-            .max_consecutive_stream_notifications
-        {
+        let state_sync_driver_config = &self.driver_configuration.config;
+        for _ in 0..state_sync_driver_config.max_consecutive_stream_notifications {
             // Fetch and process any data notifications
             let data_notification = self.fetch_next_data_notification().await?;
             match data_notification.data_payload {
@@ -1030,6 +1027,7 @@ impl<
         if let Err(error) = self
             .storage_synchronizer
             .save_state_values(notification_id, state_value_chunk_with_proof)
+            .await
         {
             self.reset_active_stream(Some(NotificationAndFeedback::new(
                 notification_id,

@@ -1,12 +1,12 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     struct S {
         x: u64,
     }
     spec fun exists_in_vector(v: vector<M::S>): bool {
-        exists s: M::S: v: Gt(select M::S.x(s), 0)
+        exists s: M::S: v: Gt(select M::S.x<M::S>(s), 0)
     }
     spec fun some_in_vector(v: vector<M::S>): M::S {
-        choose s: M::S: v: Eq<u64>(select M::S.x(s), 0)
+        choose s: M::S: v: Eq<u64>(select M::S.x<M::S>(s), 0)
     }
 } // end 0x42::M

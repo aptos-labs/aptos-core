@@ -4,12 +4,13 @@
 use crate::compression_util::{
     FileEntry, FileStoreMetadata, StorageFormat, FILE_ENTRY_TRANSACTION_COUNT,
 };
-use anyhow::Result;
-use aptos_protos::{indexer::v1::TransactionsInStorage, transaction::v1::Transaction};
+use anyhow::{Context, Result};
+use aptos_protos::transaction::v1::Transaction;
 
 pub mod gcs;
 pub use gcs::*;
 pub mod local;
+use crate::counters::TRANSACTION_STORE_FETCH_RETRIES;
 pub use local::*;
 
 const METADATA_FILE_NAME: &str = "metadata.json";
@@ -22,24 +23,56 @@ pub trait FileStoreOperator: Send + Sync {
 
     fn storage_format(&self) -> StorageFormat;
 
+    /// The name of the store, for logging. Ex: "GCS", "Redis", etc
+    fn store_name(&self) -> &str;
+
     /// Gets the transactions files from the file store. version has to be a multiple of BLOB_STORAGE_SIZE.
-    async fn get_transactions(&self, version: u64) -> Result<Vec<Transaction>> {
-        let (transactions, _, _) = self.get_transactions_with_durations(version).await?;
+    async fn get_transactions(&self, version: u64, retries: u8) -> Result<Vec<Transaction>> {
+        let (transactions, _, _) = self
+            .get_transactions_with_durations(version, retries)
+            .await?;
         Ok(transactions)
     }
 
     async fn get_raw_file(&self, version: u64) -> Result<Vec<u8>>;
 
+    async fn get_raw_file_with_retries(&self, version: u64, retries: u8) -> Result<Vec<u8>> {
+        let mut retries = retries;
+        loop {
+            match self.get_raw_file(version).await {
+                Ok(bytes) => return Ok(bytes),
+                Err(err) => {
+                    TRANSACTION_STORE_FETCH_RETRIES
+                        .with_label_values(&[self.store_name()])
+                        .inc_by(1);
+
+                    if retries == 0 {
+                        return Err(err);
+                    }
+                    retries -= 1;
+                    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                },
+            }
+        }
+    }
+
     async fn get_transactions_with_durations(
         &self,
         version: u64,
+        retries: u8,
     ) -> Result<(Vec<Transaction>, f64, f64)> {
         let io_start_time = std::time::Instant::now();
-        let bytes = self.get_raw_file(version).await?;
+        let bytes = self.get_raw_file_with_retries(version, retries).await?;
         let io_duration = io_start_time.elapsed().as_secs_f64();
         let decoding_start_time = std::time::Instant::now();
-        let transactions_in_storage: TransactionsInStorage =
-            FileEntry::new(bytes, self.storage_format()).into_transactions_in_storage();
+        let storage_format = self.storage_format();
+
+        let transactions_in_storage = tokio::task::spawn_blocking(move || {
+            FileEntry::new(bytes, storage_format).into_transactions_in_storage()
+        })
+        .await
+        .context("Converting storage bytes to FileEntry transactions thread panicked")?;
+
         let decoding_duration = decoding_start_time.elapsed().as_secs_f64();
         Ok((
             transactions_in_storage

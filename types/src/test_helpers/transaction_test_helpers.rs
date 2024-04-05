@@ -11,7 +11,7 @@ use crate::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        Module, RawTransaction, RawTransactionWithData, Script, SignedTransaction, Transaction,
+        RawTransaction, RawTransactionWithData, Script, SignedTransaction, Transaction,
         TransactionPayload,
     },
 };
@@ -33,30 +33,6 @@ fn expiration_time(seconds: u64) -> u64 {
         .expect("System time is before the UNIX_EPOCH")
         .as_secs()
         + seconds
-}
-
-// Test helper for transaction creation
-pub fn get_test_signed_module_publishing_transaction(
-    sender: AccountAddress,
-    sequence_number: u64,
-    private_key: &Ed25519PrivateKey,
-    public_key: Ed25519PublicKey,
-    module: Module,
-) -> SignedTransaction {
-    let expiration_time = expiration_time(10);
-    let raw_txn = RawTransaction::new_module(
-        sender,
-        sequence_number,
-        module,
-        MAX_GAS_AMOUNT,
-        TEST_GAS_PRICE,
-        expiration_time,
-        ChainId::test(),
-    );
-
-    let signature = private_key.sign(&raw_txn).unwrap();
-
-    SignedTransaction::new(raw_txn, public_key, signature)
 }
 
 // Test helper for transaction creation

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_channels::aptos_channel;
 use aptos_crypto::{hash::CryptoHash, HashValue};
@@ -6,6 +7,7 @@ use aptos_infallible::Mutex;
 use aptos_types::validator_txn::{Topic, ValidatorTransaction};
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    fmt::{Debug, Formatter},
     sync::Arc,
     time::Instant,
 };
@@ -15,6 +17,16 @@ pub enum TransactionFilter {
 }
 
 impl TransactionFilter {
+    pub fn no_op() -> Self {
+        Self::PendingTxnHashSet(HashSet::new())
+    }
+}
+
+impl TransactionFilter {
+    pub fn empty() -> Self {
+        Self::PendingTxnHashSet(HashSet::new())
+    }
+
     pub fn should_exclude(&self, txn: &ValidatorTransaction) -> bool {
         match self {
             TransactionFilter::PendingTxnHashSet(set) => set.contains(&txn.hash()),
@@ -80,6 +92,14 @@ impl VTxnPoolState {
             .lock()
             .pull(deadline, max_items, max_bytes, filter)
     }
+
+    #[cfg(any(test, feature = "fuzzing"))]
+    pub fn dummy_txn_guard(&self) -> TxnGuard {
+        TxnGuard {
+            pool: self.inner.clone(),
+            seq_num: u64::MAX,
+        }
+    }
 }
 
 struct PoolItem {
@@ -107,9 +127,18 @@ pub struct PoolStateInner {
 /// If this is dropped, `txn` will be deleted from the pool (if it has not been).
 ///
 /// This allows the pool to be emptied on epoch boundaries.
+#[derive(Clone)]
 pub struct TxnGuard {
     pool: Arc<Mutex<PoolStateInner>>,
     seq_num: u64,
+}
+
+impl Debug for TxnGuard {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TxnGuard")
+            .field("seq_num", &self.seq_num)
+            .finish()
+    }
 }
 
 impl PoolStateInner {

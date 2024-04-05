@@ -13,7 +13,11 @@ use itertools::{Either, Itertools};
 use log::{debug, info};
 use move_model::model::{FunId, FunctionEnv, GlobalEnv, QualifiedId};
 use petgraph::graph::DiGraph;
-use std::{collections::BTreeMap, fmt::Formatter, fs};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Formatter,
+    fs,
+};
 
 /// A data structure which holds data for multiple function targets, and allows to
 /// manipulate them as part of a transformation pipeline.
@@ -148,6 +152,8 @@ impl<'a> fmt::Display for ProcessorResultDisplay<'a> {
 #[derive(Default)]
 pub struct FunctionTargetPipeline {
     processors: Vec<Box<dyn FunctionTargetProcessor>>,
+    /// Indices of processors which have been marked to not dump their target annotations.
+    no_annotation_dump_indices: BTreeSet<usize>,
 }
 
 impl FunctionTargetsHolder {
@@ -296,10 +302,44 @@ impl FunctionTargetPipeline {
         self.processors.is_empty()
     }
 
+    pub fn processor_count(&self) -> usize {
+        self.processors.len()
+    }
+
+    /// Cuts down the pipeline to stop after the given named processor
+    pub fn stop_after_for_testing(&mut self, name: &str) {
+        for i in 0..self.processor_count() {
+            if self.processors[i].name() == name {
+                for _ in i + 1..self.processor_count() {
+                    self.processors.remove(i + 1);
+                }
+                return;
+            }
+        }
+        panic!("no processor named `{}`", name)
+    }
+
     /// Adds a processor to this pipeline. Processor will be called in the order they have been
     /// added.
     pub fn add_processor(&mut self, processor: Box<dyn FunctionTargetProcessor>) {
         self.processors.push(processor)
+    }
+
+    /// Similar to `add_processor`,
+    /// but additionally records that we should not dump its target annotations.
+    pub fn add_processor_without_annotation_dump(
+        &mut self,
+        processor: Box<dyn FunctionTargetProcessor>,
+    ) {
+        self.no_annotation_dump_indices
+            .insert(self.processors.len());
+        self.processors.push(processor)
+    }
+
+    /// Returns true if the processor at `index` should not have its target annotations dumped.
+    /// `index` is 1-based, similar to `hook_after_each_processor`.
+    pub fn should_dump_target_annotations(&self, index: usize) -> bool {
+        !self.no_annotation_dump_indices.contains(&(index - 1))
     }
 
     /// Gets the last processor in the pipeline, for testing.
@@ -432,9 +472,9 @@ impl FunctionTargetPipeline {
         self.run_with_hook(env, targets, |_| {}, |_, _, _| {})
     }
 
-    /// Runs the pipeline on all functions in the targets holder, dump the bytecode before the
-    /// pipeline as well as after each processor pass. If `dump_cfg` is set, dump the per-function
-    /// control-flow graph (in dot format) too.
+    /// Runs the pipeline on all functions in the targets holder, and dump the bytecode via `log` before the
+    /// pipeline as well as after each processor pass, identifying it by `dump_base_name`. If `dump_cfg` is set,
+    /// dump the per-function control-flow graph (in dot format) to a file, using the given base name.
     pub fn run_with_dump(
         &self,
         env: &GlobalEnv,
@@ -447,20 +487,26 @@ impl FunctionTargetPipeline {
             env,
             targets,
             |holders| {
-                Self::dump_to_file(
+                Self::debug_dump(
                     dump_base_name,
                     0,
                     "stackless",
-                    &Self::get_pre_pipeline_dump(env, holders),
+                    &Self::get_pre_pipeline_dump(env, holders, /*verbose*/ true),
                 )
             },
             |step_count, processor, holders| {
                 let suffix = processor.name();
-                Self::dump_to_file(
+                Self::debug_dump(
                     dump_base_name,
                     step_count,
                     &suffix,
-                    &Self::get_per_processor_dump(env, holders, processor, register_annotations),
+                    &Self::get_per_processor_dump(
+                        env,
+                        holders,
+                        processor,
+                        register_annotations,
+                        /*verbose*/ true,
+                    ),
                 );
                 if dump_cfg {
                     Self::dump_cfg(env, holders, dump_base_name, step_count, &suffix);
@@ -474,17 +520,23 @@ impl FunctionTargetPipeline {
         name: &str,
         targets: &FunctionTargetsHolder,
         register_annotations: &impl Fn(&FunctionTarget),
+        verbose: bool,
     ) -> String {
         print_targets_with_annotations_for_test(
             env,
             &format!("after processor `{}`", name),
             targets,
             register_annotations,
+            verbose,
         )
     }
 
-    fn get_pre_pipeline_dump(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> String {
-        Self::print_targets(env, "stackless", targets, &|_| {})
+    fn get_pre_pipeline_dump(
+        env: &GlobalEnv,
+        targets: &FunctionTargetsHolder,
+        verbose: bool,
+    ) -> String {
+        Self::print_targets(env, "stackless", targets, &|_| {}, verbose)
     }
 
     fn get_per_processor_dump(
@@ -492,6 +544,7 @@ impl FunctionTargetPipeline {
         targets: &FunctionTargetsHolder,
         processor: &dyn FunctionTargetProcessor,
         register_annotations: &impl Fn(&FunctionTarget),
+        verbose: bool,
     ) -> String {
         let mut dump = format!("{}", ProcessorResultDisplay {
             env,
@@ -507,16 +560,15 @@ impl FunctionTargetPipeline {
                 &processor.name(),
                 targets,
                 register_annotations,
+                verbose,
             ));
         }
         dump
     }
 
-    fn dump_to_file(base_name: &str, step_count: usize, suffix: &str, content: &str) {
-        let dump = format!("{}\n", content.trim());
-        let file_name = format!("{}_{}_{}.bytecode", base_name, step_count, suffix);
-        debug!("dumping bytecode to `{}`", file_name);
-        fs::write(&file_name, dump).expect("dumping bytecode");
+    fn debug_dump(base_name: &str, step_count: usize, suffix: &str, content: &str) {
+        let name = format!("bytecode of {}_{}_{}", base_name, step_count, suffix);
+        debug!("{}:\n{}\n", name, content.trim())
     }
 
     /// Generate dot files for control-flow graphs.
@@ -539,7 +591,7 @@ impl FunctionTargetPipeline {
                     );
                     debug!("generating dot graph for cfg in `{}`", dot_file);
                     let func_target = FunctionTarget::new(&func_env, data);
-                    let dot_graph = generate_cfg_in_dot_format(&func_target);
+                    let dot_graph = generate_cfg_in_dot_format(&func_target, true);
                     fs::write(&dot_file, dot_graph).expect("generating dot file for CFG");
                 }
             }

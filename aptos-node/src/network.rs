@@ -10,7 +10,7 @@ use aptos_config::{
 use aptos_consensus::network_interface::ConsensusMsg;
 use aptos_dkg_runtime::DKGMessage;
 use aptos_event_notifications::EventSubscriptionService;
-use aptos_jwk_consensus::JWKConsensusMsg;
+use aptos_jwk_consensus::types::JWKConsensusMsg;
 use aptos_logger::debug;
 use aptos_mempool::network::MempoolSyncMsg;
 use aptos_network::{

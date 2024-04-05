@@ -8,32 +8,56 @@ use once_cell::sync::Lazy;
 use prometheus::{register_int_counter_vec, IntCounterVec};
 
 pub enum IndexerGrpcStep {
-    DataServiceNewRequestReceived,   // [Data Service] New request received.
-    DataServiceWaitingForCacheData,  // [Data Service] Waiting for data from cache.
-    DataServiceDataFetchedCache,     // [Data Service] Fetched data from Redis cache.
-    DataServiceDataFetchedFilestore, // [Data Service] Fetched data from Filestore.
-    DataServiceTxnsDecoded,          // [Data Service] Decoded transactions.
-    DataServiceChunkSent, // [Data Service] One chunk of transactions sent to GRPC response channel.
-    DataServiceAllChunksSent, // [Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.
+    // [Data Service] New request received.
+    DataServiceNewRequestReceived,
+    // [Data Service] Fetching data from in-memory cache.
+    DataServiceFetchingDataFromInMemoryCache,
+    // [Data Service] Waiting for data from cache.
+    DataServiceWaitingForCacheData,
+    // [Data Service] Fetched data from Redis cache.
+    DataServiceDataFetchedCache,
+    // [Data Service] Fetched data from Filestore.
+    DataServiceDataFetchedFilestore,
+    // [Data Service] Decoded transactions.
+    DataServiceTxnsDecoded,
+    // [Data Service] One chunk of transactions sent to GRPC response channel.
+    DataServiceChunkSent,
+    // [Data Service] All chunks of transactions sent to GRPC response channel. Current batch finished.
+    DataServiceAllChunksSent,
 
-    CacheWorkerReceivedTxns, // [Indexer Cache] Received transactions from fullnode.
-    CacheWorkerTxnEncoded,   // [Indexer Cache] Encoded transactions.
-    CacheWorkerTxnsProcessed, // [Indexer Cache] Processed transactions in a batch.
-    CacheWorkerBatchProcessed, // [Indexer Cache] Successfully process current batch.
+    // [Indexer Cache] Received transactions from fullnode.
+    CacheWorkerReceivedTxns,
+    // [Indexer Cache] Encoded transactions.
+    CacheWorkerTxnEncoded,
+    // [Indexer Cache] Processed transactions in a batch.
+    CacheWorkerTxnsProcessed,
+    // [Indexer Cache] Successfully process current batch.
+    CacheWorkerBatchProcessed,
 
-    FilestoreFetchTxns,      // [File worker] Fetch transactions from cache.
-    FilestoreUploadTxns,     // [File worker] Upload transactions to filestore.
-    FilestoreUpdateMetadata, // [File worker] Update metadata to filestore.
-    FilestoreProcessedBatch, // [File worker] Successfully process current batch.
-    FileStoreEncodedTxns,    // [File worker] Encoded transactions.
+    // [File worker] Fetch transactions from cache.
+    FilestoreFetchTxns,
+    // [File worker] Upload transactions to filestore.
+    FilestoreUploadTxns,
+    // [File worker] Update metadata to filestore.
+    FilestoreUpdateMetadata,
+    // [File worker] Successfully process current batch.
+    FilestoreProcessedBatch,
+    // [File worker] Encoded transactions.
+    FileStoreEncodedTxns,
 
-    FullnodeFetchedBatch, // [Indexer Fullnode] Fetched batch of transactions from fullnode
-    FullnodeDecodedBatch, // [Indexer Fullnode] Decoded batch of transactions from fullnode
-    FullnodeProcessedBatch, // [Indexer Fullnode] Processed batch of transactions from fullnode
-    FullnodeSentBatch,    // [Indexer Fullnode] Sent batch successfully
+    // [Indexer Fullnode] Fetched batch of transactions from fullnode
+    FullnodeFetchedBatch,
+    // [Indexer Fullnode] Decoded batch of transactions from fullnode
+    FullnodeDecodedBatch,
+    // [Indexer Fullnode] Processed batch of transactions from fullnode
+    FullnodeProcessedBatch,
+    // [Indexer Fullnode] Sent batch successfully
+    FullnodeSentBatch,
 
-    TableInfoProcessedBatch, // [Indexer Table Info] Processed batch of transactions from fullnode
-    TableInfoProcessed,      // [Indexer Table Info] Processed transactions from fullnode
+    // [Indexer Table Info] Processed batch of transactions from fullnode
+    TableInfoProcessedBatch,
+    // [Indexer Table Info] Processed transactions from fullnode
+    TableInfoProcessed,
 }
 
 impl IndexerGrpcStep {
@@ -41,6 +65,7 @@ impl IndexerGrpcStep {
         match self {
             // Data service steps
             IndexerGrpcStep::DataServiceNewRequestReceived => "1",
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache => "2.0.0",
             IndexerGrpcStep::DataServiceWaitingForCacheData => "2.0",
             IndexerGrpcStep::DataServiceDataFetchedCache => "2.1",
             IndexerGrpcStep::DataServiceDataFetchedFilestore => "2.2",
@@ -74,7 +99,10 @@ impl IndexerGrpcStep {
             // Data service steps
             IndexerGrpcStep::DataServiceNewRequestReceived => {
                 "[Data Service] New request received."
-            },
+            }
+            IndexerGrpcStep::DataServiceFetchingDataFromInMemoryCache => {
+                "[Data Service] Fetching data from in-memory cache."
+            }
             IndexerGrpcStep::DataServiceWaitingForCacheData => {
                 "[Data Service] Waiting for data from cache."
             }
@@ -104,10 +132,10 @@ impl IndexerGrpcStep {
             // Table info service steps
             IndexerGrpcStep::TableInfoProcessedBatch => {
                 "[Indexer Table Info] Processed batch successfully"
-            },
+            }
             IndexerGrpcStep::TableInfoProcessed => {
                 "[Indexer Table Info] Processed successfully"
-            },
+            }
         }
     }
 }
@@ -138,6 +166,26 @@ pub static NUM_TRANSACTIONS_COUNT: Lazy<IntCounterVec> = Lazy::new(|| {
         "indexer_grpc_num_transactions_count_v2",
         "Total count of transactions at this step",
         &["service_type", "step", "message"],
+    )
+    .unwrap()
+});
+
+/// Number of versions that were overlapped in a multi-task fetch pull
+pub static NUM_MULTI_FETCH_OVERLAPPED_VERSIONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_num_multi_thread_fetch_overlapped_versions",
+        "Number of versions that were overlapped in a multi-task fetch pull",
+        &["service_type", "overlap_type"],
+    )
+    .unwrap()
+});
+
+/// Number of times we internally retry fetching a transaction/block
+pub static TRANSACTION_STORE_FETCH_RETRIES: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "indexer_grpc_num_transaction_store_fetch_retries",
+        "Number of times we internally retry fetching a transaction/block",
+        &["store"],
     )
     .unwrap()
 });
@@ -174,7 +222,7 @@ pub fn log_grpc_step(
     duration_in_secs: Option<f64>,
     size_in_bytes: Option<usize>,
     num_transactions: Option<i64>,
-    request_metadata: Option<IndexerGrpcRequestMetadata>,
+    request_metadata: Option<&IndexerGrpcRequestMetadata>,
 ) {
     if let Some(duration_in_secs) = duration_in_secs {
         DURATION_IN_SECS
@@ -220,6 +268,7 @@ pub fn log_grpc_step(
             step.get_label(),
         );
     } else {
+        let request_metadata = request_metadata.unwrap();
         tracing::info!(
             start_version,
             end_version,
@@ -229,23 +278,12 @@ pub fn log_grpc_step(
             duration_in_secs,
             size_in_bytes,
             // Request metadata variables
-            request_name = request_metadata.clone().unwrap().processor_name.as_str(),
-            request_email = request_metadata.clone().unwrap().request_email.as_str(),
-            request_api_key_name = request_metadata
-                .clone()
-                .unwrap()
-                .request_api_key_name
-                .as_str(),
-            processor_name = request_metadata.clone().unwrap().processor_name.as_str(),
-            connection_id = request_metadata
-                .clone()
-                .unwrap()
-                .request_connection_id
-                .as_str(),
-            request_user_classification = request_metadata
-                .unwrap()
-                .request_user_classification
-                .as_str(),
+            request_name = &request_metadata.processor_name,
+            request_email = &request_metadata.request_email,
+            request_api_key_name = &request_metadata.request_api_key_name,
+            processor_name = &request_metadata.processor_name,
+            connection_id = &request_metadata.request_connection_id,
+            request_user_classification = &request_metadata.request_user_classification,
             service_type,
             step = step.get_step(),
             "{}",

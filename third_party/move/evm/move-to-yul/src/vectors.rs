@@ -370,7 +370,7 @@ fn define_empty_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &Qualifi
     );
     emitln!(ctx.writer, "() -> vector {");
     ctx.writer.indent();
-    let type_size = ctx.type_size(fun_id.inst.get(0).unwrap());
+    let type_size = ctx.type_size(fun_id.inst.first().unwrap());
     emitln!(
         ctx.writer,
         "vector := {}",
@@ -444,7 +444,7 @@ fn define_borrow_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &Qualif
         1,
         "vector instantiated with non-one type parameter"
     );
-    let elem_type = fun_id.inst.get(0).unwrap();
+    let elem_type = fun_id.inst.first().unwrap();
     let elem_type_size = ctx.type_size(elem_type);
 
     emitln!(ctx.writer, "(v_ref, i) -> e_ptr {");
@@ -543,7 +543,7 @@ fn define_pop_back_fun(
         1,
         "vector instantiated with non-one type parameter"
     );
-    let elem_type = fun_id.inst.get(0).unwrap();
+    let elem_type = fun_id.inst.first().unwrap();
     let elem_type_size = ctx.type_size(elem_type);
 
     emitln!(ctx.writer, "(v_ref) -> e {");
@@ -689,7 +689,7 @@ fn define_push_back_fun(
         1,
         "vector instantiated with non-one type parameter"
     );
-    let elem_type = fun_id.inst.get(0).unwrap();
+    let elem_type = fun_id.inst.first().unwrap();
     let elem_type_size = ctx.type_size(elem_type);
 
     emitln!(ctx.writer, "(v_ref, e) {");
@@ -864,7 +864,7 @@ fn define_push_back_fun(
 }
 
 fn define_swap_fun(gen: &mut FunctionGenerator, ctx: &Context, fun_id: &QualifiedInstId<FunId>) {
-    let elem_type = fun_id.inst.get(0).unwrap();
+    let elem_type = fun_id.inst.first().unwrap();
     let elem_type_size = ctx.type_size(elem_type);
     emitln!(ctx.writer, "(v_ref, i, j) {");
     ctx.writer.indent();
@@ -994,7 +994,7 @@ fn define_destroy_empty_fun(
     );
     emitln!(ctx.writer, "(v) {");
     ctx.writer.indent();
-    let type_size = ctx.type_size(fun_id.inst.get(0).unwrap());
+    let type_size = ctx.type_size(fun_id.inst.first().unwrap());
     emitln!(
         ctx.writer,
         "let size := {}",

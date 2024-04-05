@@ -37,6 +37,9 @@ pub enum AbstractMemoryUnit {}
 /// Unit for counting arguments.
 pub enum Arg {}
 
+/// Unit for counting the number of nodes in a type.
+pub enum TypeNode {}
+
 /// A derived unit resulted from the division of two given units.
 /// This is used to permit type-safe multiplications.
 ///
@@ -76,6 +79,10 @@ pub type InternalGasPerAbstractMemoryUnit =
     GasQuantity<UnitDiv<InternalGasUnit, AbstractMemoryUnit>>;
 
 pub type InternalGasPerArg = GasQuantity<UnitDiv<InternalGasUnit, Arg>>;
+
+pub type InternalGasPerTypeNode = GasQuantity<UnitDiv<InternalGasUnit, TypeNode>>;
+
+pub type NumTypeNodes = GasQuantity<TypeNode>;
 
 /***************************************************************************************************
  * Get Unit

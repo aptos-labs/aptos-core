@@ -154,6 +154,19 @@ impl StateKey {
     pub fn get_shard_id(&self) -> u8 {
         CryptoHash::hash(self).nibble(0)
     }
+
+    pub fn is_aptos_code(&self) -> bool {
+        use move_core_types::account_address::AccountAddress;
+        match self.inner() {
+            StateKeyInner::AccessPath(access_path) => {
+                access_path.is_code()
+                    && (access_path.address == AccountAddress::ONE
+                        || access_path.address == AccountAddress::THREE
+                        || access_path.address == AccountAddress::FOUR)
+            },
+            _ => false,
+        }
+    }
 }
 
 impl StateKeyInner {

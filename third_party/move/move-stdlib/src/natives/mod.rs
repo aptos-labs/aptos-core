@@ -6,14 +6,12 @@ pub mod bcs;
 pub mod debug;
 pub mod event;
 pub mod hash;
+mod helpers;
 pub mod signer;
 pub mod string;
 pub mod type_name;
 #[cfg(feature = "testing")]
 pub mod unit_test;
-pub mod vector;
-
-mod helpers;
 
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::{make_table_from_iter, NativeFunctionTable};
@@ -25,7 +23,6 @@ pub struct GasParameters {
     pub signer: signer::GasParameters,
     pub string: string::GasParameters,
     pub type_name: type_name::GasParameters,
-    pub vector: vector::GasParameters,
 
     #[cfg(feature = "testing")]
     pub unit_test: unit_test::GasParameters,
@@ -79,18 +76,6 @@ impl GasParameters {
                     per_byte_searched: 0.into(),
                 },
             },
-            vector: vector::GasParameters {
-                empty: vector::EmptyGasParameters { base: 0.into() },
-                length: vector::LengthGasParameters { base: 0.into() },
-                push_back: vector::PushBackGasParameters {
-                    base: 0.into(),
-                    legacy_per_abstract_memory_unit: 0.into(),
-                },
-                borrow: vector::BorrowGasParameters { base: 0.into() },
-                pop_back: vector::PopBackGasParameters { base: 0.into() },
-                destroy_empty: vector::DestroyEmptyGasParameters { base: 0.into() },
-                swap: vector::SwapGasParameters { base: 0.into() },
-            },
             #[cfg(feature = "testing")]
             unit_test: unit_test::GasParameters {
                 create_signers_for_testing: unit_test::CreateSignersForTestingGasParameters {
@@ -121,7 +106,6 @@ pub fn all_natives(
     add_natives!("signer", signer::make_all(gas_params.signer));
     add_natives!("string", string::make_all(gas_params.string));
     add_natives!("type_name", type_name::make_all(gas_params.type_name));
-    add_natives!("vector", vector::make_all(gas_params.vector));
     #[cfg(feature = "testing")]
     {
         add_natives!("unit_test", unit_test::make_all(gas_params.unit_test));

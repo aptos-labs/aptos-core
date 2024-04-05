@@ -404,6 +404,19 @@ impl TelemetrySender {
     }
 }
 
+async fn error_for_status_with_body(response: Response) -> Result<Response, anyhow::Error> {
+    if response.status().is_client_error() || response.status().is_server_error() {
+        Err(anyhow!(
+            "HTTP status error ({}) for url ({}): {}",
+            response.status(),
+            response.url().clone(),
+            response.text().await?,
+        ))
+    } else {
+        Ok(response)
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -658,18 +671,5 @@ mod tests {
         assert!(client.check_chain_access(ChainId::new(24)).await);
 
         mock.assert();
-    }
-}
-
-async fn error_for_status_with_body(response: Response) -> Result<Response, anyhow::Error> {
-    if response.status().is_client_error() || response.status().is_server_error() {
-        Err(anyhow!(
-            "HTTP status error ({}) for url ({}): {}",
-            response.status(),
-            response.url().clone(),
-            response.text().await?,
-        ))
-    } else {
-        Ok(response)
     }
 }

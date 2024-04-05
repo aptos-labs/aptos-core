@@ -31,8 +31,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionStatus,
+        Transaction, TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -454,7 +454,13 @@ fn transform_epoch_ending_stream_notifications() {
     // Create a single data client request
     let notification_id_generator = create_notification_id_generator();
     let data_client_request = stream_engine
-        .create_data_client_requests(1, &global_data_summary, notification_id_generator.clone())
+        .create_data_client_requests(
+            1,
+            1,
+            0,
+            &global_data_summary,
+            notification_id_generator.clone(),
+        )
         .unwrap();
     assert_eq!(data_client_request.len(), 1);
 
@@ -562,7 +568,13 @@ fn transform_state_values_stream_notifications() {
     // Create a single data client request
     let notification_id_generator = create_notification_id_generator();
     let data_client_request = stream_engine
-        .create_data_client_requests(1, &global_data_summary, notification_id_generator.clone())
+        .create_data_client_requests(
+            1,
+            1,
+            0,
+            &global_data_summary,
+            notification_id_generator.clone(),
+        )
         .unwrap();
     assert_eq!(data_client_request.len(), 1);
 
@@ -675,7 +687,13 @@ fn transform_transactions_stream_notifications() {
     // Create a single data client request
     let notification_id_generator = create_notification_id_generator();
     let data_client_request = stream_engine
-        .create_data_client_requests(1, &global_data_summary, notification_id_generator.clone())
+        .create_data_client_requests(
+            1,
+            1,
+            0,
+            &global_data_summary,
+            notification_id_generator.clone(),
+        )
         .unwrap();
     assert_eq!(data_client_request.len(), 1);
 
@@ -776,7 +794,13 @@ fn transform_continuous_outputs_stream_notifications() {
     // Create a single data client request
     let notification_id_generator = create_notification_id_generator();
     let data_client_request = stream_engine
-        .create_data_client_requests(1, &global_data_summary, notification_id_generator.clone())
+        .create_data_client_requests(
+            1,
+            1,
+            0,
+            &global_data_summary,
+            notification_id_generator.clone(),
+        )
         .unwrap();
     assert_eq!(data_client_request.len(), 1);
 
@@ -867,5 +891,11 @@ fn create_test_transaction() -> Transaction {
 
 /// Returns a dummy transaction output for testing purposes
 fn create_test_transaction_output() -> TransactionOutput {
-    TransactionOutput::new(WriteSet::default(), vec![], 0, TransactionStatus::Retry)
+    TransactionOutput::new(
+        WriteSet::default(),
+        vec![],
+        0,
+        TransactionStatus::Retry,
+        TransactionAuxiliaryData::default(),
+    )
 }

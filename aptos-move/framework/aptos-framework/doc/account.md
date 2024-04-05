@@ -29,6 +29,7 @@
 -  [Function `increment_sequence_number`](#0x1_account_increment_sequence_number)
 -  [Function `get_authentication_key`](#0x1_account_get_authentication_key)
 -  [Function `rotate_authentication_key_internal`](#0x1_account_rotate_authentication_key_internal)
+-  [Function `rotate_authentication_key_call`](#0x1_account_rotate_authentication_key_call)
 -  [Function `rotate_authentication_key`](#0x1_account_rotate_authentication_key)
 -  [Function `rotate_authentication_key_with_rotation_capability`](#0x1_account_rotate_authentication_key_with_rotation_capability)
 -  [Function `offer_rotation_capability`](#0x1_account_offer_rotation_capability)
@@ -66,6 +67,7 @@
     -  [Function `increment_sequence_number`](#@Specification_1_increment_sequence_number)
     -  [Function `get_authentication_key`](#@Specification_1_get_authentication_key)
     -  [Function `rotate_authentication_key_internal`](#@Specification_1_rotate_authentication_key_internal)
+    -  [Function `rotate_authentication_key_call`](#@Specification_1_rotate_authentication_key_call)
     -  [Function `rotate_authentication_key`](#@Specification_1_rotate_authentication_key)
     -  [Function `rotate_authentication_key_with_rotation_capability`](#@Specification_1_rotate_authentication_key_with_rotation_capability)
     -  [Function `offer_rotation_capability`](#@Specification_1_offer_rotation_capability)
@@ -1141,8 +1143,11 @@ is returned. This way, the caller of this function can publish additional resour
 
 ## Function `rotate_authentication_key_internal`
 
-This function is used to rotate a resource account's authentication key to 0, so that no private key can control
-the resource account.
+This function is used to rotate a resource account's authentication key to <code>new_auth_key</code>. This is done in
+many contexts:
+1. During normal key rotation via <code>rotate_authentication_key</code> or <code>rotate_authentication_key_call</code>
+2. During resource account initialization so that no private key can control the resource account
+3. During multisig_v2 account creation
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_internal">rotate_authentication_key_internal</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
@@ -1163,6 +1168,35 @@ the resource account.
     );
     <b>let</b> account_resource = <b>borrow_global_mut</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
     account_resource.authentication_key = new_auth_key;
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_account_rotate_authentication_key_call"></a>
+
+## Function `rotate_authentication_key_call`
+
+Private entry function for key rotation that allows the signer to update their authentication key.
+Note that this does not update the <code><a href="account.md#0x1_account_OriginatingAddress">OriginatingAddress</a></code> table because the <code>new_auth_key</code> is not "verified": it
+does not come with a proof-of-knowledge of the underlying SK. Nonetheless, we need this functionality due to
+the introduction of non-standard key algorithms, such as passkeys, which cannot produce proofs-of-knowledge in
+the format expected in <code>rotate_authentication_key</code>.
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;) <b>acquires</b> <a href="account.md#0x1_account_Account">Account</a> {
+    <a href="account.md#0x1_account_rotate_authentication_key_internal">rotate_authentication_key_internal</a>(<a href="account.md#0x1_account">account</a>, new_auth_key);
 }
 </code></pre>
 
@@ -2470,6 +2504,28 @@ The sequence_number of the Account is up to MAX_U64.
 
 The Account existed under the signer before the call.
 The length of new_auth_key is 32.
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+// This enforces <a id="high-level-req-10" href="#high-level-req">high-level requirement 10</a>:
+<b>let</b> <b>post</b> account_resource = <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(new_auth_key) != 32;
+<b>modifies</b> <b>global</b>&lt;<a href="account.md#0x1_account_Account">Account</a>&gt;(addr);
+<b>ensures</b> account_resource.authentication_key == new_auth_key;
+</code></pre>
+
+
+
+<a id="@Specification_1_rotate_authentication_key_call"></a>
+
+### Function `rotate_authentication_key_call`
+
+
+<pre><code>entry <b>fun</b> <a href="account.md#0x1_account_rotate_authentication_key_call">rotate_authentication_key_call</a>(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, new_auth_key: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
 
 
 <pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);

@@ -1,4 +1,4 @@
-error: undeclared `M::x`
+error: undeclared `x`
    ┌─ tests/sources/expressions_err.move:12:7
    │
 12 │       x
@@ -10,37 +10,37 @@ error: no function named `not_declared` found
 17 │       not_declared()
    │       ^^^^^^^^^^^^^^
 
-error: expected `num` but found `bool`
+error: cannot return `bool` from a function with result type `num`
    ┌─ tests/sources/expressions_err.move:22:7
    │
 22 │       false
    │       ^^^^^
 
-error: invalid call of `>`: expected `num` but found `vector<num>` for argument 1
+error: cannot use `vector<num>` with an operator which expects a value of type `num`
    ┌─ tests/sources/expressions_err.move:27:7
    │
 27 │       x > y
    │       ^
 
-error: expected `(num, bool)` but found `bool`
+error: cannot return `bool` from a function with result type `(num, bool)`
    ┌─ tests/sources/expressions_err.move:32:7
    │
 32 │       false
    │       ^^^^^
 
-error: invalid call of `M::wrongly_typed_callee`: expected `bool` but found `u256` for argument 2
+error: cannot pass `u256` to a function which expects argument of type `bool`
    ┌─ tests/sources/expressions_err.move:37:63
    │
 37 │     fun wrongly_typed_caller(): num { wrongly_typed_callee(1, 1) }
    │                                                               ^
 
-error: invalid call of `M::wrongly_typed_fun_arg_callee`: expected `num` but found `bool` for argument 1
+error: cannot pass `|num|bool` to a function which expects argument of type `|num|num`
    ┌─ tests/sources/expressions_err.move:41:76
    │
 41 │     fun wrongly_typed_fun_arg_caller(): num { wrongly_typed_fun_arg_callee(|x| false) }
    │                                                                            ^^^^^^^^^
 
-error: invalid call of `M::wrong_instantiation`: generic count mismatch (expected 2 but found 1)
+error: expected 2 type arguments but 1 were provided
    ┌─ tests/sources/expressions_err.move:46:7
    │
 46 │       wrong_instantiation<u64>(x)

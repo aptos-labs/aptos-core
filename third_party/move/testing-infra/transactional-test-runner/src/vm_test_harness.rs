@@ -12,6 +12,8 @@ use move_binary_format::{
     compatibility::Compatibility,
     errors::{PartialVMError, VMResult},
     file_format::CompiledScript,
+    file_format_common,
+    file_format_common::VERSION_MAX,
     CompiledModule,
 };
 use move_command_line_common::{
@@ -29,6 +31,7 @@ use move_core_types::{
     resolver::MoveResolver,
     value::MoveValue,
 };
+use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
 use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
@@ -71,7 +74,8 @@ pub fn view_resource_in_move_storage(
     match storage.get_resource(&address, &tag).unwrap() {
         None => Ok("[No Resource Exists]".to_owned()),
         Some(data) => {
-            let annotated = MoveValueAnnotator::new(storage).view_resource(&tag, &data)?;
+            let annotated = MoveValueAnnotator::new_with_max_bytecode_version(storage, VERSION_MAX)
+                .view_resource(&tag, &data)?;
             Ok(format!("{}", annotated))
         },
     }
@@ -127,7 +131,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     }
 
     fn run_config(&self) -> TestRunConfig {
-        self.run_config
+        self.run_config.clone()
     }
 
     fn init(
@@ -168,8 +172,12 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
                 |session, gas_status| {
                     for module in &*MOVE_STDLIB_COMPILED {
                         let mut module_bytes = vec![];
-                        module.serialize(&mut module_bytes).unwrap();
-
+                        module
+                            .serialize_for_version(
+                                Some(file_format_common::VERSION_MAX),
+                                &mut module_bytes,
+                            )
+                            .unwrap();
                         let id = module.self_id();
                         let sender = *id.address();
                         session
@@ -206,7 +214,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         extra_args: Self::ExtraPublishArgs,
     ) -> Result<(Option<String>, CompiledModule)> {
         let mut module_bytes = vec![];
-        module.serialize(&mut module_bytes)?;
+        module.serialize_for_version(Some(file_format_common::VERSION_MAX), &mut module_bytes)?;
 
         let id = module.self_id();
         let sender = *id.address();
@@ -249,14 +257,14 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
+    ) -> Result<Option<String>> {
         let signers: Vec<_> = signers
             .into_iter()
             .map(|addr| self.compiled_state().resolve_address(&addr))
             .collect();
 
         let mut script_bytes = vec![];
-        script.serialize(&mut script_bytes)?;
+        script.serialize_for_version(Some(file_format_common::VERSION_MAX), &mut script_bytes)?;
 
         let args = txn_args
             .iter()
@@ -269,24 +277,21 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
             .chain(args)
             .collect();
         let verbose = extra_args.verbose;
-        let serialized_return_values = self
-            .perform_session_action(
-                gas_budget,
-                |session, gas_status| {
-                    session.execute_script(script_bytes, type_args, args, gas_status)
-                },
-                VMConfig::from(extra_args),
-            )
-            .map_err(|vm_error| {
-                anyhow!(
-                    "Script execution failed with VMError: {}",
-                    vm_error.format_test_output(
-                        move_test_debug() || verbose,
-                        !move_test_debug() && self.comparison_mode
-                    )
+        self.perform_session_action(
+            gas_budget,
+            |session, gas_status| session.execute_script(script_bytes, type_args, args, gas_status),
+            VMConfig::from(extra_args),
+        )
+        .map_err(|vm_error| {
+            anyhow!(
+                "Script execution failed with VMError: {}",
+                vm_error.format_test_output(
+                    move_test_debug() || verbose,
+                    !move_test_debug() && self.comparison_mode
                 )
-            })?;
-        Ok((None, serialized_return_values))
+            )
+        })?;
+        Ok(None)
     }
 
     fn call_function(
@@ -441,11 +446,17 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
     }
 });
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum TestRunConfig {
     CompilerV1,
-    CompilerV2,
-    ComparisonV1V2,
+    CompilerV2 {
+        language_version: LanguageVersion,
+        v2_experiments: Vec<(String, bool)>,
+    },
+    ComparisonV1V2 {
+        language_version: LanguageVersion,
+        v2_experiments: Vec<(String, bool)>,
+    },
 }
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -456,7 +467,15 @@ pub fn run_test_with_config(
     config: TestRunConfig,
     path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB))
+    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB), &None)
+}
+
+pub fn run_test_with_config_and_exp_suffix(
+    config: TestRunConfig,
+    path: &Path,
+    exp_suffix: &Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB), exp_suffix)
 }
 
 impl From<AdapterExecuteArgs> for VMConfig {

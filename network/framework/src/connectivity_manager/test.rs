@@ -19,7 +19,7 @@ use aptos_time_service::{MockTimeService, TimeService};
 use aptos_types::{account_address::AccountAddress, network_address::NetworkAddress};
 use futures::{executor::block_on, future, SinkExt};
 use maplit::{hashmap, hashset};
-use rand::rngs::StdRng;
+use rand::{rngs::StdRng, SeedableRng};
 use std::{io, str::FromStr};
 use tokio_retry::strategy::FixedInterval;
 
@@ -106,6 +106,7 @@ impl TestHarness {
             MAX_CONNECTION_DELAY,
             Some(MAX_TEST_CONNECTIONS),
             true, /* mutual_authentication */
+            true, /* enable_latency_aware_dialing */
         );
         let mock = Self {
             network_context,

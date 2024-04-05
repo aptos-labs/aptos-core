@@ -6,6 +6,7 @@
 use crate::gas_schedule::VMGasParameters;
 use aptos_gas_algebra::{
     InternalGas, InternalGasPerAbstractValueUnit, InternalGasPerArg, InternalGasPerByte,
+    InternalGasPerTypeNode,
 };
 
 crate::gas_schedule::macros::define_gas_parameters!(
@@ -125,5 +126,6 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [vec_pack_per_elem: InternalGasPerArg, "vec_pack.per_elem", 147],
         [vec_unpack_base: InternalGas, "vec_unpack.base", 1838],
         [vec_unpack_per_expected_elem: InternalGasPerArg, "vec_unpack.per_expected_elem", 147],
+        [subst_ty_per_node: InternalGasPerTypeNode, { 14.. => "subst_ty_per_node" }, 400],
     ]
 );

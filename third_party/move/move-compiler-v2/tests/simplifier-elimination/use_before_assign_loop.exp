@@ -1,0 +1,65 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    private fun tborrow1() {
+        {
+          let x: u64;
+          loop {
+            {
+              let y: &u64 = Borrow(Immutable)(x);
+              _: &u64 = Move(y);
+              x: u64 = 0
+            }
+          }
+        }
+    }
+    private fun tborrow2(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            {
+              let y: &u64 = Borrow(Immutable)(x);
+              _: &u64 = Move(y);
+              if cond {
+                x: u64 = 0
+              } else {
+                Tuple()
+              };
+              break
+            }
+          };
+          x;
+          Tuple()
+        }
+    }
+    private fun tcopy(cond: bool) {
+        {
+          let x: u64;
+          loop {
+            {
+              let y: u64 = Add<u64>(x, 1);
+              if cond {
+                continue
+              } else {
+                Tuple()
+              };
+              x: u64 = 0;
+              y;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun tmove() {
+        {
+          let x: u64;
+          loop {
+            {
+              let y: u64 = Add<u64>(Move(x), 1);
+              x: u64 = 0;
+              y;
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x8675309::M

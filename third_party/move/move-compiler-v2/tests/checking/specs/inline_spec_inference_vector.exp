@@ -1,7 +1,7 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::bit_vector {
     use std::vector;
-    public fun new(length: u64) {
+    public fun new(_length: u64) {
         {
           let bit_field: vector<bool> = vector::empty<bool>();
           spec {
@@ -12,5 +12,4 @@ module 0x42::bit_vector {
           Tuple()
         }
     }
-    spec fun $new(length: u64);
 } // end 0x42::bit_vector

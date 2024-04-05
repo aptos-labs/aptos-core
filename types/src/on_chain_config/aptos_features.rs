@@ -2,10 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::on_chain_config::OnChainConfig;
+use move_core_types::{
+    effects::{ChangeSet, Op},
+    language_storage::CORE_CODE_ADDRESS,
+};
 use serde::{Deserialize, Serialize};
-
+use strum_macros::FromRepr;
 /// The feature flags define in the Move source. This must stay aligned with the constants there.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, FromRepr)]
 #[allow(non_camel_case_types)]
 pub enum FeatureFlag {
     CODE_DEPENDENCY_CHECK = 1,
@@ -44,17 +48,82 @@ pub enum FeatureFlag {
     SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION = 34,
     FEE_PAYER_ACCOUNT_OPTIONAL = 35,
     AGGREGATOR_V2_DELAYED_FIELDS = 36,
-    CONCURRENT_ASSETS = 37,
+    CONCURRENT_TOKEN_V2 = 37,
     LIMIT_MAX_IDENTIFIER_LENGTH = 38,
     OPERATOR_BENEFICIARY_CHANGE = 39,
     VM_BINARY_FORMAT_V7 = 40,
-    RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM = 41,
+    RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET = 41,
     COMMISSION_CHANGE_DELEGATION_POOL = 42,
     BN254_STRUCTURES = 43,
     WEBAUTHN_SIGNATURE = 44,
     RECONFIGURE_WITH_DKG = 45,
-    ZK_ID_SIGNATURE = 46,
-    OPEN_ID_SIGNATURE = 47,
+    KEYLESS_ACCOUNTS = 46,
+    KEYLESS_BUT_ZKLESS_ACCOUNTS = 47,
+    REMOVE_DETAILED_ERROR_FROM_HASH = 48,
+    JWK_CONSENSUS = 49,
+    CONCURRENT_FUNGIBLE_ASSETS = 50,
+    REFUNDABLE_BYTES = 51,
+    OBJECT_CODE_DEPLOYMENT = 52,
+    MAX_OBJECT_NESTING_CHECK = 53,
+    KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
+    MULTISIG_V2_ENHANCEMENT = 55,
+    DELEGATION_POOL_ALLOWLISTING = 56,
+}
+
+impl FeatureFlag {
+    pub fn default_features() -> Vec<Self> {
+        vec![
+            FeatureFlag::CODE_DEPENDENCY_CHECK,
+            FeatureFlag::TREAT_FRIEND_AS_PRIVATE,
+            FeatureFlag::SHA_512_AND_RIPEMD_160_NATIVES,
+            FeatureFlag::APTOS_STD_CHAIN_ID_NATIVES,
+            FeatureFlag::VM_BINARY_FORMAT_V6,
+            FeatureFlag::MULTI_ED25519_PK_VALIDATE_V2_NATIVES,
+            FeatureFlag::BLAKE2B_256_NATIVE,
+            FeatureFlag::RESOURCE_GROUPS,
+            FeatureFlag::MULTISIG_ACCOUNTS,
+            FeatureFlag::DELEGATION_POOLS,
+            FeatureFlag::CRYPTOGRAPHY_ALGEBRA_NATIVES,
+            FeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
+            FeatureFlag::STRUCT_CONSTRUCTORS,
+            FeatureFlag::SIGNATURE_CHECKER_V2,
+            FeatureFlag::STORAGE_SLOT_METADATA,
+            FeatureFlag::CHARGE_INVARIANT_VIOLATION,
+            FeatureFlag::APTOS_UNIQUE_IDENTIFIERS,
+            FeatureFlag::GAS_PAYER_ENABLED,
+            FeatureFlag::BULLETPROOFS_NATIVES,
+            FeatureFlag::SIGNER_NATIVE_FORMAT_FIX,
+            FeatureFlag::MODULE_EVENT,
+            FeatureFlag::EMIT_FEE_STATEMENT,
+            FeatureFlag::STORAGE_DELETION_REFUND,
+            FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX,
+            FeatureFlag::AGGREGATOR_V2_API,
+            FeatureFlag::SAFER_RESOURCE_GROUPS,
+            FeatureFlag::SAFER_METADATA,
+            FeatureFlag::SINGLE_SENDER_AUTHENTICATOR,
+            FeatureFlag::SPONSORED_AUTOMATIC_ACCOUNT_V1_CREATION,
+            FeatureFlag::FEE_PAYER_ACCOUNT_OPTIONAL,
+            FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS,
+            FeatureFlag::CONCURRENT_TOKEN_V2,
+            FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
+            FeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
+            FeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET,
+            FeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL,
+            FeatureFlag::WEBAUTHN_SIGNATURE,
+            // FeatureFlag::RECONFIGURE_WITH_DKG, //TODO: re-enable once randomness is ready.
+            FeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
+            FeatureFlag::JWK_CONSENSUS,
+            FeatureFlag::REFUNDABLE_BYTES,
+            FeatureFlag::OBJECT_CODE_DEPLOYMENT,
+            FeatureFlag::MAX_OBJECT_NESTING_CHECK,
+            FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS,
+            FeatureFlag::MULTISIG_V2_ENHANCEMENT,
+            FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
+        ]
+    }
 }
 
 /// Representation of features on chain as a bitset.
@@ -70,15 +139,9 @@ impl Default for Features {
             features: vec![0; 5],
         };
 
-        use FeatureFlag::*;
-        features.enable(VM_BINARY_FORMAT_V6);
-        features.enable(BLS12_381_STRUCTURES);
-        features.enable(SIGNATURE_CHECKER_V2);
-        features.enable(STORAGE_SLOT_METADATA);
-        features.enable(APTOS_UNIQUE_IDENTIFIERS);
-        features.enable(SIGNATURE_CHECKER_V2_SCRIPT_FIX);
-        features.enable(AGGREGATOR_V2_API);
-        features.enable(BN254_STRUCTURES);
+        for feature in FeatureFlag::default_features() {
+            features.enable(feature);
+        }
         features
     }
 }
@@ -89,14 +152,34 @@ impl OnChainConfig for Features {
 }
 
 impl Features {
-    pub fn enable(&mut self, flag: FeatureFlag) {
+    fn resize_for_flag(&mut self, flag: FeatureFlag) -> (usize, u8) {
         let byte_index = (flag as u64 / 8) as usize;
         let bit_mask = 1 << (flag as u64 % 8);
         while self.features.len() <= byte_index {
             self.features.push(0);
         }
+        (byte_index, bit_mask)
+    }
 
+    pub fn enable(&mut self, flag: FeatureFlag) {
+        let (byte_index, bit_mask) = self.resize_for_flag(flag);
         self.features[byte_index] |= bit_mask;
+    }
+
+    pub fn disable(&mut self, flag: FeatureFlag) {
+        let (byte_index, bit_mask) = self.resize_for_flag(flag);
+        self.features[byte_index] &= !bit_mask;
+    }
+
+    pub fn into_flag_vec(self) -> Vec<FeatureFlag> {
+        let Self { features } = self;
+        features
+            .into_iter()
+            .flat_map(|byte| (0..8).map(move |bit_idx| byte & (1 << bit_idx) != 0))
+            .enumerate()
+            .filter(|(_feature_idx, enabled)| *enabled)
+            .map(|(feature_idx, _)| FeatureFlag::from_repr(feature_idx).unwrap())
+            .collect()
     }
 
     pub fn is_enabled(&self, flag: FeatureFlag) -> bool {
@@ -139,23 +222,72 @@ impl Features {
     /// Once enabled, Aggregator V2 functions become parallel.
     pub fn is_aggregator_v2_delayed_fields_enabled(&self) -> bool {
         // This feature depends on resource groups being split inside VMChange set,
-        // which is gated by RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM feature, so
+        // which is gated by RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET feature, so
         // require that feature to be enabled as well.
         self.is_enabled(FeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS)
-            && self.is_resource_group_charge_as_size_sum_enabled()
+            && self.is_resource_groups_split_in_vm_change_set_enabled()
     }
 
-    pub fn is_resource_group_charge_as_size_sum_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM)
+    pub fn is_resource_groups_split_in_vm_change_set_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET)
     }
 
-    /// Whether the extra verification of TXN authenticators in the Move prologue is enabled.
-    /// (Necessary for fully-validating zkID transactions.)
-    pub fn is_zkid_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::ZK_ID_SIGNATURE)
+    /// Whether the keyless accounts feature is enabled, specifically the ZK path with ZKP-based signatures.
+    /// The ZK-less path is controlled via a different `FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS` flag.
+    pub fn is_zk_keyless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS)
     }
 
-    pub fn is_open_id_signature_enabled(&self) -> bool {
-        self.is_enabled(FeatureFlag::OPEN_ID_SIGNATURE)
+    /// If `FeatureFlag::KEYLESS_ACCOUNTS` is enabled, this feature additionally allows for a "ZK-less
+    /// path" where the blockchain can verify OpenID signatures directly. This ZK-less mode exists
+    /// for two reasons. First, it gives as a simpler way to test the feature. Second, it acts as a
+    /// safety precaution in case of emergency (e.g., if the ZK-based signatures must be temporarily
+    /// turned off due to a zeroday exploit, the ZK-less path will still allow users to transact,
+    /// but without privacy).
+    pub fn is_zkless_keyless_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS)
     }
+
+    pub fn is_keyless_with_passkeys_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS)
+    }
+
+    pub fn is_remove_detailed_error_from_hash_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH)
+    }
+
+    pub fn is_refundable_bytes_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::REFUNDABLE_BYTES)
+    }
+}
+
+pub fn aptos_test_feature_flags_genesis() -> ChangeSet {
+    let features_value = bcs::to_bytes(&Features::default()).unwrap();
+
+    let mut change_set = ChangeSet::new();
+    // we need to initialize features to their defaults.
+    change_set
+        .add_resource_op(
+            CORE_CODE_ADDRESS,
+            Features::struct_tag(),
+            Op::New(features_value.into()),
+        )
+        .expect("adding genesis Feature resource must succeed");
+
+    change_set
+}
+
+#[test]
+fn test_features_into_flag_vec() {
+    let mut features = Features { features: vec![] };
+    features.enable(FeatureFlag::BLS12_381_STRUCTURES);
+    features.enable(FeatureFlag::BN254_STRUCTURES);
+    let flag_vec = features.into_flag_vec();
+    assert_eq!(
+        vec![
+            FeatureFlag::BLS12_381_STRUCTURES,
+            FeatureFlag::BN254_STRUCTURES
+        ],
+        flag_vec
+    );
 }

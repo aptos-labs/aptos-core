@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::dkg::{DKGSessionMetadata, DKGTrait};
 use anyhow::{anyhow, ensure};
@@ -14,6 +15,7 @@ pub struct DummyDKG {}
 
 impl DKGTrait for DummyDKG {
     type DealerPrivateKey = bls12381::PrivateKey;
+    type DealtPubKeyShare = ();
     type DealtSecret = DummySecret;
     type DealtSecretShare = DummySecret;
     type InputSecret = DummySecret;
@@ -29,11 +31,14 @@ impl DKGTrait for DummyDKG {
         DummySecret::aggregate(secrets)
     }
 
-    fn dealt_secret_from_input(input: &Self::InputSecret) -> Self::DealtSecret {
+    fn dealt_secret_from_input(
+        _pub_params: &Self::PublicParams,
+        input: &Self::InputSecret,
+    ) -> Self::DealtSecret {
         *input
     }
 
-    fn generate_transcript<R: CryptoRng>(
+    fn generate_transcript<R: CryptoRng + RngCore>(
         _rng: &mut R,
         _params: &Self::PublicParams,
         input_secret: &Self::InputSecret,
@@ -63,22 +68,18 @@ impl DKGTrait for DummyDKG {
 
     fn aggregate_transcripts(
         _params: &Self::PublicParams,
-        transcripts: Vec<DummyDKGTranscript>,
-    ) -> DummyDKGTranscript {
-        let mut all_secrets = vec![];
-        let mut agg_contributions_by_dealer = BTreeMap::new();
-        for transcript in transcripts {
-            let DummyDKGTranscript {
-                secret,
-                contributions_by_dealer,
-            } = transcript;
-            all_secrets.push(secret);
-            agg_contributions_by_dealer.extend(contributions_by_dealer);
-        }
-        DummyDKGTranscript {
-            secret: DummySecret::aggregate(all_secrets),
-            contributions_by_dealer: agg_contributions_by_dealer,
-        }
+        accumulator: &mut Self::Transcript,
+        element: Self::Transcript,
+    ) {
+        let DummyDKGTranscript {
+            secret,
+            contributions_by_dealer,
+        } = element;
+        accumulator
+            .contributions_by_dealer
+            .extend(contributions_by_dealer);
+        accumulator.secret =
+            DummySecret::aggregate(vec![std::mem::take(&mut accumulator.secret), secret]);
     }
 
     fn decrypt_secret_share_from_transcript(
@@ -86,8 +87,8 @@ impl DKGTrait for DummyDKG {
         transcript: &DummyDKGTranscript,
         _player_idx: u64,
         _dk: &Self::NewValidatorDecryptKey,
-    ) -> anyhow::Result<DummySecret> {
-        Ok(transcript.secret)
+    ) -> anyhow::Result<(DummySecret, ())> {
+        Ok((transcript.secret, ()))
     }
 
     fn reconstruct_secret_from_shares(
@@ -107,15 +108,6 @@ impl DKGTrait for DummyDKG {
 
     fn get_dealers(transcript: &DummyDKGTranscript) -> BTreeSet<u64> {
         transcript.contributions_by_dealer.keys().copied().collect()
-    }
-
-    fn generate_predictable_input_secret_for_testing(
-        dealer_sk: &bls12381::PrivateKey,
-    ) -> DummySecret {
-        let bytes_8: [u8; 8] = dealer_sk.to_bytes()[0..8].try_into().unwrap();
-        DummySecret {
-            val: u64::from_be_bytes(bytes_8),
-        }
     }
 }
 

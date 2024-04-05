@@ -1,5 +1,5 @@
 // Test that warnings about unknown "#[testonly]" attribute is
-// suppressed in apts_std module.
+// suppressed in aptos_std module.
 module aptos_std::module_with_suppressed_warnings {
     #[a, a(x = 0)]
     fun foo() {}

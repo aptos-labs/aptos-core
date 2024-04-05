@@ -1,12 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{tests::common::test_dir_path, MoveHarness};
+use crate::{
+    tests::{
+        common::test_dir_path,
+        token_objects::{
+            create_mint_hero_payload, create_set_hero_description_payload,
+            publish_object_token_example,
+        },
+    },
+    MoveHarness,
+};
 use aptos_cached_packages::{aptos_stdlib, aptos_token_sdk_builder};
 use aptos_crypto::{bls12381, PrivateKey, Uniform};
 use aptos_gas_profiling::TransactionGasLog;
-use aptos_types::account_address::{default_stake_pool_address, AccountAddress};
+use aptos_types::{
+    account_address::{default_stake_pool_address, AccountAddress},
+    transaction::{EntryFunction, TransactionPayload},
+};
 use aptos_vm::AptosVM;
+use move_core_types::{identifier::Identifier, language_storage::ModuleId};
 use std::path::Path;
 
 fn save_profiling_results(name: &str, log: &TransactionGasLog) {
@@ -69,6 +82,13 @@ fn test_gas() {
 
     run(
         &mut harness,
+        "2ndTransfer",
+        account_1,
+        aptos_stdlib::aptos_coin_transfer(account_2_address, 1000),
+    );
+
+    run(
+        &mut harness,
         "CreateAccount",
         account_1,
         aptos_stdlib::aptos_account_create_account(
@@ -84,6 +104,34 @@ fn test_gas() {
             1000,
         ),
     );
+
+    publish_object_token_example(&mut harness, account_1_address, account_1);
+    run(
+        &mut harness,
+        "MintTokenV2",
+        account_1,
+        create_mint_hero_payload(&account_1_address, SHORT_STR),
+    );
+    run(
+        &mut harness,
+        "MutateTokenV2",
+        account_1,
+        create_set_hero_description_payload(&account_1_address, SHORT_STR),
+    );
+    publish_object_token_example(&mut harness, account_2_address, account_2);
+    run(
+        &mut harness,
+        "MintLargeTokenV2",
+        account_2,
+        create_mint_hero_payload(&account_2_address, LONG_STR),
+    );
+    run(
+        &mut harness,
+        "MutateLargeTokenV2",
+        account_2,
+        create_set_hero_description_payload(&account_2_address, LONG_STR),
+    );
+
     run(
         &mut harness,
         "CreateStakePool",
@@ -180,7 +228,7 @@ fn test_gas() {
     );
     run(
         &mut harness,
-        "MintToken",
+        "MintTokenV1",
         account_1,
         aptos_token_sdk_builder::token_mint_script(
             account_1_address,
@@ -191,7 +239,7 @@ fn test_gas() {
     );
     run(
         &mut harness,
-        "MutateToken",
+        "MutateTokenV1",
         account_1,
         aptos_token_sdk_builder::token_mutate_token_properties(
             account_1_address,
@@ -207,7 +255,7 @@ fn test_gas() {
     );
     run(
         &mut harness,
-        "MutateToken2ndTime",
+        "MutateTokenV12ndTime",
         account_1,
         aptos_token_sdk_builder::token_mutate_token_properties(
             account_1_address,
@@ -276,12 +324,77 @@ fn test_gas() {
         publisher,
         &test_dir_path("code_publishing.data/pack_upgrade_compat"),
     );
-    let publisher = &harness.aptos_framework_account();
     publish(
         &mut harness,
         "PublishLarge",
         publisher,
-        &test_dir_path("code_publishing.data/pack_stdlib"),
+        &test_dir_path("code_publishing.data/pack_large"),
+    );
+    publish(
+        &mut harness,
+        "UpgradeLarge",
+        publisher,
+        &test_dir_path("code_publishing.data/pack_large_upgrade"),
+    );
+    publish(
+        &mut harness,
+        "PublishDependencyChain-1",
+        publisher,
+        &test_dir_path("dependencies.data/p1"),
+    );
+    publish(
+        &mut harness,
+        "PublishDependencyChain-2",
+        publisher,
+        &test_dir_path("dependencies.data/p2"),
+    );
+    publish(
+        &mut harness,
+        "PublishDependencyChain-3",
+        publisher,
+        &test_dir_path("dependencies.data/p3"),
+    );
+    run(
+        &mut harness,
+        "UseDependencyChain-1",
+        publisher,
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::from_hex_literal("0xcafe").unwrap(),
+                Identifier::new("m1").unwrap(),
+            ),
+            Identifier::new("run").unwrap(),
+            vec![],
+            vec![],
+        )),
+    );
+    run(
+        &mut harness,
+        "UseDependencyChain-2",
+        publisher,
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::from_hex_literal("0xcafe").unwrap(),
+                Identifier::new("m2").unwrap(),
+            ),
+            Identifier::new("run").unwrap(),
+            vec![],
+            vec![],
+        )),
+    );
+    run(
+        &mut harness,
+        "UseDependencyChain-3",
+        publisher,
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(
+                AccountAddress::from_hex_literal("0xcafe").unwrap(),
+                Identifier::new("m3").unwrap(),
+            ),
+            Identifier::new("run").unwrap(),
+            vec![],
+            vec![],
+        )),
     );
 }
 
@@ -299,3 +412,39 @@ pub fn print_gas_cost(function: &str, gas_units: u64) {
         dollar_cost(gas_units, 30)
     );
 }
+
+const SHORT_STR: &str = "A hero.";
+const LONG_STR: &str = "\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\
+    ";

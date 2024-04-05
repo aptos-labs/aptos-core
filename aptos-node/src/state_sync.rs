@@ -53,7 +53,7 @@ pub fn create_event_subscription_service(
     Option<(
         ReconfigNotificationListener<DbBackedOnChainConfig>,
         EventNotificationListener,
-    )>, // (reconfig_events, jwk_map_updated_events) for JWK consensus
+    )>, // (reconfig_events, jwk_updated_events) for JWK consensus
 ) {
     // Create the event subscription service
     let mut event_subscription_service =
@@ -92,7 +92,7 @@ pub fn create_event_subscription_service(
             .subscribe_to_reconfigurations()
             .expect("JWK consensus must subscribe to reconfigurations");
         let jwk_updated_events = event_subscription_service
-            .subscribe_to_events(vec![], vec!["0x1::jwks::OnChainJWKMapUpdated".to_string()])
+            .subscribe_to_events(vec![], vec!["0x1::jwks::ObservedJWKsUpdated".to_string()])
             .expect("JWK consensus must subscribe to DKG events");
         Some((reconfig_events, jwk_updated_events))
     } else {

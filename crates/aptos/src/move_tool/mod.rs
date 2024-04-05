@@ -1,22 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod aptos_debug_natives;
-pub mod coverage;
-mod disassembler;
-mod manifest;
-pub mod package_hooks;
-mod show;
-pub mod stored_package;
-
 use crate::{
     account::derive_resource_account::ResourceAccountSeed,
     common::{
         types::{
             load_account_arg, ArgWithTypeJSON, CliConfig, CliError, CliTypedResult,
             ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
-            MoveManifestAccountWrapper, MovePackageDir, ProfileOptions, PromptOptions, RestOptions,
-            SaveFile, ScriptFunctionArguments, TransactionOptions, TransactionSummary,
+            MoveManifestAccountWrapper, MovePackageDir, OverrideSizeCheckOption, ProfileOptions,
+            PromptOptions, RestOptions, SaveFile, ScriptFunctionArguments, TransactionOptions,
+            TransactionSummary,
         },
         utils::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
@@ -25,8 +18,8 @@ use crate::{
     },
     governance::CompileScriptFunction,
     move_tool::{
+        bytecode::{Decompile, Disassemble},
         coverage::SummaryCoverage,
-        disassembler::Disassemble,
         manifest::{Dependency, ManifestNamedAddress, MovePackageManifest, PackageInfo},
     },
     CliCommand, CliResult,
@@ -42,6 +35,8 @@ use aptos_rest_client::aptos_api_types::{
 };
 use aptos_types::{
     account_address::{create_resource_address, AccountAddress},
+    object_address::create_object_code_deployment_address,
+    on_chain_config::aptos_test_feature_flags_genesis,
     transaction::{TransactionArgument, TransactionPayload},
 };
 use async_trait::async_trait;
@@ -50,9 +45,8 @@ use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_package::{
-    source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig, CompilerVersion,
-};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
@@ -65,6 +59,14 @@ use std::{
 };
 pub use stored_package::*;
 use tokio::task;
+
+mod aptos_debug_natives;
+mod bytecode;
+pub mod coverage;
+mod manifest;
+pub mod package_hooks;
+mod show;
+pub mod stored_package;
 
 /// Tool for Move related operations
 ///
@@ -79,8 +81,11 @@ pub enum MoveTool {
     CompileScript(CompileScript),
     #[clap(subcommand)]
     Coverage(coverage::CoveragePackage),
+    CreateObjectAndPublishPackage(CreateObjectAndPublishPackage),
+    UpgradeObjectPackage(UpgradeObjectPackage),
     CreateResourceAccountAndPublishPackage(CreateResourceAccountAndPublishPackage),
     Disassemble(Disassemble),
+    Decompile(Decompile),
     Document(DocumentPackage),
     Download(DownloadPackage),
     Init(InitPackage),
@@ -104,10 +109,15 @@ impl MoveTool {
             MoveTool::Compile(tool) => tool.execute_serialized().await,
             MoveTool::CompileScript(tool) => tool.execute_serialized().await,
             MoveTool::Coverage(tool) => tool.execute().await,
+            MoveTool::CreateObjectAndPublishPackage(tool) => {
+                tool.execute_serialized_success().await
+            },
+            MoveTool::UpgradeObjectPackage(tool) => tool.execute_serialized_success().await,
             MoveTool::CreateResourceAccountAndPublishPackage(tool) => {
                 tool.execute_serialized_success().await
             },
             MoveTool::Disassemble(tool) => tool.execute_serialized().await,
+            MoveTool::Decompile(tool) => tool.execute_serialized().await,
             MoveTool::Document(tool) => tool.execute_serialized().await,
             MoveTool::Download(tool) => tool.execute_serialized().await,
             MoveTool::Init(tool) => tool.execute_serialized_success().await,
@@ -245,7 +255,11 @@ pub struct InitPackage {
     /// Example: alice=0x1234,bob=0x5678,greg=_
     ///
     /// Note: This will fail if there are duplicates in the Move.toml file remove those first.
-    #[clap(long, value_parser = crate::common::utils::parse_map::<String, MoveManifestAccountWrapper>, default_value = "")]
+    #[clap(
+        long,
+        value_parser = crate::common::utils::parse_map::<String, MoveManifestAccountWrapper>,
+        default_value = ""
+    )]
     pub(crate) named_addresses: BTreeMap<String, MoveManifestAccountWrapper>,
 
     #[clap(flatten)]
@@ -312,6 +326,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,
                     self.move_options.compiler_version,
+                    self.move_options.language_version,
                     self.move_options.skip_attribute_checks,
                     self.move_options.check_test_code,
                 )
@@ -374,6 +389,7 @@ impl CompileScript {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
+                self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             )
@@ -481,6 +497,7 @@ impl CliCommand<&'static str> for TestPackage {
                 NativeGasParameters::zeros(),
                 MiscGasParameters::zeros(),
             ),
+            aptos_test_feature_flags_genesis(),
             None,
             self.compute_coverage,
             &mut std::io::stdout(),
@@ -540,6 +557,8 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
                 move_options.bytecode_version,
+                move_options.compiler_version,
+                move_options.language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
             )
@@ -589,6 +608,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
             bytecode_version: move_options.bytecode_version,
             compiler_version: move_options.compiler_version,
+            language_version: move_options.language_version,
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -616,9 +636,8 @@ pub struct IncludedArtifactsArgs {
 /// Publishes the modules in a Move package to the Aptos blockchain
 #[derive(Parser)]
 pub struct PublishPackage {
-    /// Whether to override the check for maximal size of published data
-    #[clap(long)]
-    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
 
     #[clap(flatten)]
     pub(crate) included_artifacts_args: IncludedArtifactsArgs,
@@ -658,6 +677,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
+                self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             );
@@ -672,7 +692,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
-        if !self.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include fewer artifacts via `--included-artifacts`. \
@@ -728,6 +748,7 @@ impl IncludedArtifacts {
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
         compiler_version: Option<CompilerVersion>,
+        language_version: Option<LanguageVersion>,
         skip_attribute_checks: bool,
         check_test_code: bool,
     ) -> BuildOptions {
@@ -744,6 +765,7 @@ impl IncludedArtifacts {
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
+                language_version,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -759,6 +781,7 @@ impl IncludedArtifacts {
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
+                language_version,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -774,6 +797,7 @@ impl IncludedArtifacts {
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
+                language_version,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -853,6 +877,187 @@ impl CliCommand<String> for BuildPublishPayload {
     }
 }
 
+/// Publishes the modules in a Move package to the Aptos blockchain, under an object.
+#[derive(Parser)]
+pub struct CreateObjectAndPublishPackage {
+    /// The named address for compiling and using in the contract
+    ///
+    /// This will take the derived account address for the object and put it in this location
+    #[clap(long)]
+    pub(crate) address_name: String,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
+    fn command_name(&self) -> &'static str {
+        "CreateObjectAndPublishPackage"
+    }
+
+    async fn execute(mut self) -> CliTypedResult<TransactionSummary> {
+        let sender_address = self.txn_options.get_public_key_and_address()?.1;
+        let sequence_number = self.txn_options.sequence_number(sender_address).await? + 1;
+        let object_address = create_object_code_deployment_address(sender_address, sequence_number);
+
+        self.move_options
+            .add_named_address(self.address_name, object_address.to_string());
+
+        let options = self
+            .included_artifacts_args
+            .included_artifacts
+            .build_options(
+                self.move_options.dev,
+                self.move_options.skip_fetch_latest_git_deps,
+                self.move_options.named_addresses(),
+                self.move_options.bytecode_version,
+                self.move_options.compiler_version,
+                self.move_options.language_version,
+                self.move_options.skip_attribute_checks,
+                self.move_options.check_test_code,
+            );
+        let package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let message = format!(
+            "Do you want to publish this package at object address {}",
+            object_address
+        );
+        prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
+
+        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_publish(
+            bcs::to_bytes(&package.extract_metadata()?)
+                .expect("Failed to serialize PackageMetadata"),
+            package.extract_code(),
+        );
+        let size = bcs::serialized_size(&payload)?;
+        println!("package size {} bytes", size);
+
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+            return Err(CliError::UnexpectedError(format!(
+                "The package is larger than {} bytes ({} bytes)! To lower the size \
+                you may want to include less artifacts via `--included-artifacts`. \
+                You can also override this check with `--override-size-check",
+                MAX_PUBLISH_PACKAGE_SIZE, size
+            )));
+        }
+        let result = self
+            .txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from);
+
+        if result.is_ok() {
+            println!(
+                "Code was successfully deployed to object address {}.",
+                object_address
+            );
+        }
+        result
+    }
+}
+
+#[derive(Parser)]
+pub struct UpgradeObjectPackage {
+    /// Address of the object the package was deployed to
+    ///
+    /// This must be an already deployed object containing the package
+    /// if the package is not already created, it will fail.
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    pub(crate) object_address: AccountAddress,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
+    #[clap(flatten)]
+    pub(crate) included_artifacts_args: IncludedArtifactsArgs,
+    #[clap(flatten)]
+    pub(crate) move_options: MovePackageDir,
+    #[clap(flatten)]
+    pub(crate) txn_options: TransactionOptions,
+}
+
+#[async_trait]
+impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
+    fn command_name(&self) -> &'static str {
+        "UpgradeObjectPackage"
+    }
+
+    async fn execute(self) -> CliTypedResult<TransactionSummary> {
+        let options = self
+            .included_artifacts_args
+            .included_artifacts
+            .build_options(
+                self.move_options.dev,
+                self.move_options.skip_fetch_latest_git_deps,
+                self.move_options.named_addresses(),
+                self.move_options.bytecode_version,
+                self.move_options.compiler_version,
+                self.move_options.language_version,
+                self.move_options.skip_attribute_checks,
+                self.move_options.check_test_code,
+            );
+        let built_package = BuiltPackage::build(self.move_options.get_package_path()?, options)?;
+        let url = self
+            .txn_options
+            .rest_options
+            .url(&self.txn_options.profile_options)?;
+
+        // Get the `PackageRegistry` at the given object address.
+        let registry = CachedPackageRegistry::create(url, self.object_address, false).await?;
+        let package = registry
+            .get_package(built_package.name())
+            .await
+            .map_err(|s| CliError::CommandArgumentError(s.to_string()))?;
+
+        if package.upgrade_policy() == UpgradePolicy::immutable() {
+            return Err(CliError::CommandArgumentError(
+                "A package with upgrade policy `immutable` cannot be upgraded".to_owned(),
+            ));
+        }
+
+        let message = format!(
+            "Do you want to upgrade the package '{}' at object address {}",
+            package.name(),
+            self.object_address
+        );
+        prompt_yes_with_override(&message, self.txn_options.prompt_options)?;
+
+        let payload = aptos_cached_packages::aptos_stdlib::object_code_deployment_upgrade(
+            bcs::to_bytes(&built_package.extract_metadata()?)
+                .expect("Failed to serialize PackageMetadata"),
+            built_package.extract_code(),
+            self.object_address,
+        );
+        let size = bcs::serialized_size(&payload)?;
+        println!("package size {} bytes", size);
+
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+            return Err(CliError::UnexpectedError(format!(
+                "The package is larger than {} bytes ({} bytes)! To lower the size \
+                you may want to include less artifacts via `--included-artifacts`. \
+                You can also override this check with `--override-size-check",
+                MAX_PUBLISH_PACKAGE_SIZE, size
+            )));
+        }
+        let result = self
+            .txn_options
+            .submit_transaction(payload)
+            .await
+            .map(TransactionSummary::from);
+
+        if result.is_ok() {
+            println!(
+                "Code was successfully upgraded at object address {}.",
+                self.object_address
+            );
+        }
+        result
+    }
+}
+
 /// Publishes the modules in a Move package to the Aptos blockchain under a resource account
 #[derive(Parser)]
 pub struct CreateResourceAccountAndPublishPackage {
@@ -862,12 +1067,8 @@ pub struct CreateResourceAccountAndPublishPackage {
     #[clap(long)]
     pub(crate) address_name: String,
 
-    /// Whether to override the check for maximal size of published data
-    ///
-    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
-    /// will still be blocked from publishing.
-    #[clap(long)]
-    pub(crate) override_size_check: bool,
+    #[clap(flatten)]
+    pub(crate) override_size_check_option: OverrideSizeCheckOption,
 
     #[clap(flatten)]
     pub(crate) seed_args: ResourceAccountSeed,
@@ -890,7 +1091,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             address_name,
             mut move_options,
             txn_options,
-            override_size_check,
+            override_size_check_option,
             included_artifacts_args,
             seed_args,
         } = self;
@@ -919,6 +1120,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.named_addresses(),
             move_options.bytecode_version,
             move_options.compiler_version,
+            move_options.language_version,
             move_options.skip_attribute_checks,
             move_options.check_test_code,
         );
@@ -941,7 +1143,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
-        if !override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
@@ -974,6 +1176,10 @@ pub struct DownloadPackage {
     #[clap(long, value_parser)]
     pub output_dir: Option<PathBuf>,
 
+    /// Whether to download the bytecode of the package.
+    #[clap(long, short)]
+    pub bytecode: bool,
+
     #[clap(flatten)]
     pub(crate) rest_options: RestOptions,
     #[clap(flatten)]
@@ -991,7 +1197,7 @@ impl CliCommand<&'static str> for DownloadPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let registry = CachedPackageRegistry::create(url, self.account, self.bytecode).await?;
         let output_dir = dir_default_to_current(self.output_dir)?;
 
         let package = registry
@@ -1012,6 +1218,13 @@ impl CliCommand<&'static str> for DownloadPackage {
         package
             .save_package_to_disk(package_path.as_path())
             .map_err(|e| CliError::UnexpectedError(format!("Failed to save package: {}", e)))?;
+        if self.bytecode {
+            for module in package.module_names() {
+                if let Some(bytecode) = registry.get_bytecode(module).await? {
+                    package.save_bytecode_to_disk(package_path.as_path(), module, bytecode)?
+                }
+            }
+        };
         println!(
             "Saved package with {} module(s) to `{}`",
             package.module_names().len(),
@@ -1059,6 +1272,7 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
+                self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             )
@@ -1069,7 +1283,7 @@ impl CliCommand<&'static str> for VerifyPackage {
 
         // Now pull the compiled package
         let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let registry = CachedPackageRegistry::create(url, self.account, false).await?;
         let package = registry
             .get_package(pack.name())
             .await
@@ -1142,7 +1356,7 @@ impl CliCommand<&'static str> for ListPackage {
 
     async fn execute(self) -> CliTypedResult<&'static str> {
         let url = self.rest_options.url(&self.profile_options)?;
-        let registry = CachedPackageRegistry::create(url, self.account).await?;
+        let registry = CachedPackageRegistry::create(url, self.account, false).await?;
         match self.query {
             MoveListQuery::Packages => {
                 for name in registry.package_names() {
@@ -1455,20 +1669,21 @@ impl FromStr for FunctionArgType {
             "u128" => Ok(FunctionArgType::U128),
             "u256" => Ok(FunctionArgType::U256),
             "raw" => Ok(FunctionArgType::Raw),
-            str => {Err(CliError::CommandArgumentError(format!(
-                "Invalid arg type '{}'.  Must be one of: ['{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}']",
-                str,
-                FunctionArgType::Address,
-                FunctionArgType::Bool,
-                FunctionArgType::Hex,
-                FunctionArgType::String,
-                FunctionArgType::U8,
-                FunctionArgType::U16,
-                FunctionArgType::U32,
-                FunctionArgType::U64,
-                FunctionArgType::U128,
-                FunctionArgType::U256,
-                FunctionArgType::Raw)))
+            str => {
+                Err(CliError::CommandArgumentError(format!(
+                    "Invalid arg type '{}'.  Must be one of: ['{}','{}','{}','{}','{}','{}','{}','{}','{}','{}','{}']",
+                    str,
+                    FunctionArgType::Address,
+                    FunctionArgType::Bool,
+                    FunctionArgType::Hex,
+                    FunctionArgType::String,
+                    FunctionArgType::U8,
+                    FunctionArgType::U16,
+                    FunctionArgType::U32,
+                    FunctionArgType::U64,
+                    FunctionArgType::U128,
+                    FunctionArgType::U256,
+                    FunctionArgType::Raw)))
             }
         }
     }

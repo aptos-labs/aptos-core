@@ -59,7 +59,7 @@ impl NativeFunctions {
                     attributes::extract_external_signature(fun),
                 )
             } else if self.is_emit_fun(fun) {
-                let elem_type = fun_id.inst.get(0).unwrap(); // obtain the event type
+                let elem_type = fun_id.inst.first().unwrap(); // obtain the event type
                 if let Type::Struct(mid, sid, inst) = elem_type {
                     let st_id = QualifiedInstId {
                         module_id: *mid,

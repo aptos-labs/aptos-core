@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, build_package, AptosPackageHooks};
-use anyhow::Error;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
@@ -26,7 +25,7 @@ use aptos_types::{
     },
     transaction::{
         EntryFunction, Script, SignedTransaction, TransactionArgument, TransactionOutput,
-        TransactionPayload, TransactionStatus,
+        TransactionPayload, TransactionStatus, ViewFunctionOutput,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
@@ -380,6 +379,56 @@ impl MoveHarness {
         )
     }
 
+    /// Creates a transaction which publishes the passed already-built Move Package to an object,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
+    pub fn create_object_code_deployment_built_package(
+        &mut self,
+        account: &Account,
+        package: &BuiltPackage,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let code = package.extract_code();
+        let mut metadata = package
+            .extract_metadata()
+            .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
+        self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_publish(
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+            ),
+        )
+    }
+
+    /// Creates a transaction which upgrades the passed already-built Move Package,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated for testing purposes.
+    pub fn create_object_code_upgrade_built_package(
+        &mut self,
+        account: &Account,
+        package: &BuiltPackage,
+        mut patch_metadata: impl FnMut(&mut PackageMetadata),
+        code_object: AccountAddress,
+    ) -> SignedTransaction {
+        let code = package.extract_code();
+        let mut metadata = package
+            .extract_metadata()
+            .expect("extracting package metadata must succeed");
+        patch_metadata(&mut metadata);
+        self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_upgrade(
+                bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
+                code,
+                code_object,
+            ),
+        )
+    }
+
     /// Creates a transaction which publishes the Move Package found at the given path on behalf
     /// of the given account.
     ///
@@ -394,6 +443,36 @@ impl MoveHarness {
         let package = build_package(path.to_owned(), options.unwrap_or_default())
             .expect("building package must succeed");
         self.create_publish_built_package(account, &package, patch_metadata)
+    }
+
+    pub fn create_object_code_upgrade_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+        code_object: AccountAddress,
+    ) -> SignedTransaction {
+        let package =
+            build_package(path.to_owned(), options).expect("building package must succeed");
+        self.create_object_code_upgrade_built_package(
+            account,
+            &package,
+            patch_metadata,
+            code_object,
+        )
+    }
+
+    pub fn create_object_code_deployment_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        patch_metadata: impl FnMut(&mut PackageMetadata),
+    ) -> SignedTransaction {
+        let package =
+            build_package(path.to_owned(), options).expect("building package must succeed");
+        self.create_object_code_deployment_built_package(account, &package, patch_metadata)
     }
 
     pub fn create_publish_package_cache_building(
@@ -429,6 +508,46 @@ impl MoveHarness {
     /// Runs transaction which publishes the Move Package.
     pub fn publish_package(&mut self, account: &Account, path: &Path) -> TransactionStatus {
         let txn = self.create_publish_package(account, path, None, |_| {});
+        self.run(txn)
+    }
+
+    /// Runs the transaction which publishes the Move Package to an object.
+    pub fn object_code_deployment_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+    ) -> TransactionStatus {
+        let txn = self.create_object_code_deployment_package(account, path, options, |_| {});
+        self.run(txn)
+    }
+
+    /// Creates a transaction which publishes the passed already-built Move Package to an object,
+    /// on behalf of the given account.
+    ///
+    /// The passed function allows to manipulate the generated metadata for testing purposes.
+    pub fn object_code_upgrade_package(
+        &mut self,
+        account: &Account,
+        path: &Path,
+        options: BuildOptions,
+        code_object: AccountAddress,
+    ) -> TransactionStatus {
+        let txn =
+            self.create_object_code_upgrade_package(account, path, options, |_| {}, code_object);
+        self.run(txn)
+    }
+
+    /// Marks all the packages in the `code_object` as immutable.
+    pub fn object_code_freeze_code_object(
+        &mut self,
+        account: &Account,
+        code_object: AccountAddress,
+    ) -> TransactionStatus {
+        let txn = self.create_transaction_payload(
+            account,
+            aptos_stdlib::object_code_deployment_freeze_code_object(code_object),
+        );
         self.run(txn)
     }
 
@@ -536,6 +655,7 @@ impl MoveHarness {
     }
 
     /// Reads the resource data `T`.
+    /// WARNING: Does not work with resource groups (because set_resource does not work?).
     pub fn read_resource<T: DeserializeOwned>(
         &self,
         addr: &AccountAddress,
@@ -595,6 +715,7 @@ impl MoveHarness {
     }
 
     /// Write the resource data `T`.
+    /// WARNING: Does not work with resource groups.
     pub fn set_resource<T: Serialize>(
         &mut self,
         addr: AccountAddress,
@@ -613,7 +734,7 @@ impl MoveHarness {
         let enabled = enabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         let disabled = disabled.into_iter().map(|f| f as u64).collect::<Vec<_>>();
         self.executor
-            .exec("features", "change_feature_flags", vec![], vec![
+            .exec("features", "change_feature_flags_internal", vec![], vec![
                 MoveValue::Signer(*acc.address())
                     .simple_serialize()
                     .unwrap(),
@@ -643,14 +764,19 @@ impl MoveHarness {
             entries,
         };
         let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
+        let core_signer_arg = MoveValue::Signer(AccountAddress::ONE)
+            .simple_serialize()
+            .unwrap();
         self.executor
-            .exec("gas_schedule", "set_gas_schedule", vec![], vec![
-                MoveValue::Signer(AccountAddress::ONE)
-                    .simple_serialize()
-                    .unwrap(),
+            .exec("gas_schedule", "set_for_next_epoch", vec![], vec![
+                core_signer_arg.clone(),
                 MoveValue::vector_u8(schedule_bytes)
                     .simple_serialize()
                     .unwrap(),
+            ]);
+        self.executor
+            .exec("aptos_governance", "force_end_epoch", vec![], vec![
+                core_signer_arg,
             ]);
     }
 
@@ -670,9 +796,7 @@ impl MoveHarness {
     }
 
     pub fn modify_gas_schedule_raw(&mut self, modify: impl FnOnce(&mut GasScheduleV2)) {
-        let mut gas_schedule: GasScheduleV2 = self
-            .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
-            .unwrap();
+        let mut gas_schedule = self.get_gas_schedule();
         modify(&mut gas_schedule);
         self.set_resource(
             CORE_CODE_ADDRESS,
@@ -682,15 +806,7 @@ impl MoveHarness {
     }
 
     pub fn modify_gas_schedule(&mut self, modify: impl FnOnce(&mut AptosGasParameters)) {
-        let gas_schedule: GasScheduleV2 = self
-            .read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
-            .unwrap();
-        let feature_version = gas_schedule.feature_version;
-        let mut gas_params = AptosGasParameters::from_on_chain_gas_schedule(
-            &gas_schedule.to_btree_map(),
-            feature_version,
-        )
-        .unwrap();
+        let (feature_version, mut gas_params) = self.get_gas_params();
         modify(&mut gas_params);
         self.set_resource(
             CORE_CODE_ADDRESS,
@@ -702,8 +818,27 @@ impl MoveHarness {
         );
     }
 
+    pub fn get_gas_params(&self) -> (u64, AptosGasParameters) {
+        let gas_schedule: GasScheduleV2 = self.get_gas_schedule();
+        let feature_version = gas_schedule.feature_version;
+        let params = AptosGasParameters::from_on_chain_gas_schedule(
+            &gas_schedule.to_btree_map(),
+            feature_version,
+        )
+        .unwrap();
+        (feature_version, params)
+    }
+
+    pub fn get_gas_schedule(&self) -> GasScheduleV2 {
+        self.read_resource(&CORE_CODE_ADDRESS, GasScheduleV2::struct_tag())
+            .unwrap()
+    }
+
     pub fn new_vm(&self) -> AptosVM {
-        AptosVM::new(&self.executor.data_store().as_move_resolver())
+        AptosVM::new(
+            &self.executor.data_store().as_move_resolver(),
+            /*override_is_delayed_field_optimization_capable=*/ None,
+        )
     }
 
     pub fn set_default_gas_unit_price(&mut self, gas_unit_price: u64) {
@@ -715,7 +850,7 @@ impl MoveHarness {
         fun: MemberId,
         type_args: Vec<TypeTag>,
         arguments: Vec<Vec<u8>>,
-    ) -> Result<Vec<Vec<u8>>, Error> {
+    ) -> ViewFunctionOutput {
         self.executor
             .execute_view_function(fun.module_id, fun.member_id, type_args, arguments)
     }
@@ -761,7 +896,7 @@ impl MoveHarness {
                     assert_abort_ref!(
                         output.status(),
                         error,
-                        "Error code missmatch on txn {} that should've failed, with block starting at {}. Expected {}, gotten {:?}",
+                        "Error code mismatch on txn {} that should've failed, with block starting at {}. Expected {}, got {:?}",
                         idx + offset,
                         offset,
                         error,

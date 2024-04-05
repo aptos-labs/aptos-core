@@ -50,15 +50,8 @@ pub async fn handle_cpu_profiling_request(req: Request<Body>) -> hyper::Result<R
         _ => true,
     };
 
-    info!(
-        seconds = seconds,
-        frequency = frequency,
-        use_proto = use_proto,
-        "Starting cpu profiling."
-    );
     match start_cpu_profiling(seconds, frequency, use_proto).await {
         Ok(body) => {
-            info!("Cpu profiling is done.");
             let content_type = if use_proto {
                 mime::APPLICATION_OCTET_STREAM
             } else {
@@ -84,11 +77,17 @@ pub async fn handle_cpu_profiling_request(req: Request<Body>) -> hyper::Result<R
     }
 }
 
-async fn start_cpu_profiling(
+pub async fn start_cpu_profiling(
     seconds: u64,
     frequency: i32,
     use_proto: bool,
 ) -> anyhow::Result<Vec<u8>> {
+    info!(
+        seconds = seconds,
+        frequency = frequency,
+        use_proto = use_proto,
+        "Starting cpu profiling."
+    );
     let lock = CPU_PROFILE_MUTEX.try_lock();
     ensure!(lock.is_some(), "A profiling task is already running.");
 
@@ -116,6 +115,8 @@ async fn start_cpu_profiling(
             .flamegraph(&mut body)
             .map_err(|e| anyhow!("Failed to generate flamegraph report: {e:?}."))?;
     }
+
+    info!("Cpu profiling is done.");
 
     Ok(body)
 }

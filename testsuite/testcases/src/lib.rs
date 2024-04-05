@@ -225,7 +225,7 @@ impl NetworkTest for dyn NetworkLoadTest {
 
         self.finish(ctx).context("finish NetworkLoadTest ")?;
 
-        for (_phase, phase_stats) in stats_by_phase.into_iter().enumerate() {
+        for phase_stats in stats_by_phase.into_iter() {
             ctx.check_for_success(
                 &phase_stats.emitter_stats,
                 phase_stats.actual_duration,

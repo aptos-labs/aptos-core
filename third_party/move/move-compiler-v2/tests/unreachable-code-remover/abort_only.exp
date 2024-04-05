@@ -1,0 +1,46 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+  0: $t0 := 0
+  1: abort($t0)
+  2: return ()
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+     # maybe
+  0: $t0 := 0
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+     # maybe
+  1: abort($t0)
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+     # no
+  2: return ()
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun m::test() {
+     var $t0: u64
+  0: $t0 := 0
+  1: abort($t0)
+}

@@ -5,7 +5,7 @@
 use crate::{pipeline::hashable::Hashable, state_replication::StateComputerCommitCallBackType};
 use anyhow::anyhow;
 use aptos_consensus_types::{
-    common::Author, executed_block::ExecutedBlock, pipeline::commit_vote::CommitVote,
+    common::Author, pipeline::commit_vote::CommitVote, pipelined_block::PipelinedBlock,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_executor_types::ExecutorResult;
@@ -54,7 +54,7 @@ fn verify_signatures(
 
 fn generate_executed_item_from_ordered(
     commit_info: BlockInfo,
-    executed_blocks: Vec<ExecutedBlock>,
+    executed_blocks: Vec<PipelinedBlock>,
     verified_signatures: PartialSignatures,
     callback: StateComputerCommitCallBackType,
     ordered_proof: LedgerInfoWithSignatures,
@@ -92,12 +92,12 @@ pub struct OrderedItem {
     // from peers.
     pub commit_proof: Option<LedgerInfoWithSignatures>,
     pub callback: StateComputerCommitCallBackType,
-    pub ordered_blocks: Vec<ExecutedBlock>,
+    pub ordered_blocks: Vec<PipelinedBlock>,
     pub ordered_proof: LedgerInfoWithSignatures,
 }
 
 pub struct ExecutedItem {
-    pub executed_blocks: Vec<ExecutedBlock>,
+    pub executed_blocks: Vec<PipelinedBlock>,
     pub partial_commit_proof: LedgerInfoWithPartialSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_info: BlockInfo,
@@ -105,7 +105,7 @@ pub struct ExecutedItem {
 }
 
 pub struct SignedItem {
-    pub executed_blocks: Vec<ExecutedBlock>,
+    pub executed_blocks: Vec<PipelinedBlock>,
     pub partial_commit_proof: LedgerInfoWithPartialSignatures,
     pub callback: StateComputerCommitCallBackType,
     pub commit_vote: CommitVote,
@@ -113,7 +113,7 @@ pub struct SignedItem {
 }
 
 pub struct AggregatedItem {
-    pub executed_blocks: Vec<ExecutedBlock>,
+    pub executed_blocks: Vec<PipelinedBlock>,
     pub commit_proof: LedgerInfoWithSignatures,
     pub callback: StateComputerCommitCallBackType,
 }
@@ -131,11 +131,11 @@ impl Hashable for BufferItem {
     }
 }
 
-pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<ExecutedBlock>>>;
+pub type ExecutionFut = BoxFuture<'static, ExecutorResult<Vec<PipelinedBlock>>>;
 
 impl BufferItem {
     pub fn new_ordered(
-        ordered_blocks: Vec<ExecutedBlock>,
+        ordered_blocks: Vec<PipelinedBlock>,
         ordered_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> Self {
@@ -151,7 +151,7 @@ impl BufferItem {
     // pipeline functions
     pub fn advance_to_executed_or_aggregated(
         self,
-        executed_blocks: Vec<ExecutedBlock>,
+        executed_blocks: Vec<PipelinedBlock>,
         validator: &ValidatorVerifier,
         epoch_end_timestamp: Option<u64>,
     ) -> Self {
@@ -371,7 +371,7 @@ impl BufferItem {
     }
 
     // generic functions
-    pub fn get_blocks(&self) -> &Vec<ExecutedBlock> {
+    pub fn get_blocks(&self) -> &Vec<PipelinedBlock> {
         match self {
             Self::Ordered(ordered) => &ordered.ordered_blocks,
             Self::Executed(executed) => &executed.executed_blocks,

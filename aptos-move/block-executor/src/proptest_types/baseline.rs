@@ -12,7 +12,7 @@
 /// number, and hence it is crucial for the baseline to know the final incarnation number
 /// of each transaction of the tested block executor execution.
 use crate::{
-    errors::{Error as BlockExecutorError, Result as BlockExecutorResult},
+    errors::{BlockExecutionError, BlockExecutionResult},
     proptest_types::types::{
         MockOutput, MockTransaction, ValueType, RESERVED_TAG, STORAGE_AGGREGATOR_VALUE,
     },
@@ -105,17 +105,21 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         let mut read_values = vec![];
         let mut resolved_deltas = vec![];
         let mut group_reads = vec![];
+
         for txn in txns.iter() {
             match txn {
                 MockTransaction::Abort => {
                     status = BaselineStatus::Aborted;
                     break;
                 },
-                MockTransaction::SkipRest => {
+                MockTransaction::SkipRest(gas) => {
                     // In executor, SkipRest skips from the next index. Test assumes it's an empty
                     // transaction, so create a successful empty reads and deltas.
                     read_values.push(Ok(vec![]));
                     resolved_deltas.push(Ok(HashMap::new()));
+
+                    // gas in SkipRest is used for unit tests for now (can generalize when needed).
+                    assert_eq!(*gas, 0);
 
                     status = BaselineStatus::SkipRest;
                     break;
@@ -218,157 +222,167 @@ impl<K: Debug + Hash + Clone + Eq> BaselineOutput<K> {
         }
     }
 
+    fn assert_success<E: Debug>(&self, block_output: &BlockOutput<MockOutput<K, E>>) {
+        let base_map: HashMap<u32, Bytes> = HashMap::from([(RESERVED_TAG, vec![0].into())]);
+        let mut group_world = HashMap::new();
+
+        let results = block_output.get_transaction_outputs_forced();
+        let committed = self.read_values.len();
+        assert_eq!(self.resolved_deltas.len(), committed);
+
+        // Check read values & delta writes.
+        izip!(
+            results.iter().take(committed),
+            self.read_values.iter(),
+            self.resolved_deltas.iter(),
+            self.group_reads.iter(),
+        )
+        .for_each(|(output, reads, resolved_deltas, group_reads)| {
+            // Compute group read results.
+            let group_read_results: Vec<Option<Bytes>> = group_reads
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|(group_key, resource_tag)| {
+                    let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+
+                    group_map.get(resource_tag).cloned()
+                })
+                .collect();
+            // Test group read results.
+            let read_len = reads.as_ref().unwrap().len();
+
+            assert_eq!(
+                group_read_results.len(),
+                output.read_results.len() - read_len
+            );
+            izip!(
+                output.read_results.iter().skip(read_len),
+                group_read_results.into_iter()
+            )
+            .for_each(|(result_group_read, baseline_group_read)| {
+                assert!(result_group_read.clone().map(Into::<Bytes>::into) == baseline_group_read);
+            });
+
+            for (group_key, size) in output.read_group_sizes.iter() {
+                let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+
+                assert_eq!(
+                    group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
+                        .unwrap()
+                        .get(),
+                    *size
+                );
+            }
+
+            // Test normal reads.
+            izip!(
+                reads
+                    .as_ref()
+                    .expect("Aggregator failures not yet tested")
+                    .iter(),
+                output.read_results.iter().take(read_len)
+            )
+            .for_each(|(baseline_read, result_read)| baseline_read.assert_read_result(result_read));
+
+            // Update group world.
+            for (group_key, _, updates) in output.group_writes.iter() {
+                for (tag, v) in updates {
+                    let group_map = group_world.entry(group_key).or_insert(base_map.clone());
+                    if v.is_deletion() {
+                        assert_some!(group_map.remove(tag));
+                    } else {
+                        let existed = group_map
+                            .insert(*tag, v.extract_raw_bytes().unwrap())
+                            .is_some();
+                        assert_eq!(existed, v.is_modification());
+                    }
+                }
+            }
+
+            // Test recorded finalized group writes: it should contain the whole group, and
+            // as such, correspond to the contents of the group_world.
+            // TODO: figure out what can still be tested here, e.g. RESERVED_TAG
+            // let groups_tested =
+            //     (output.group_writes.len() + group_reads.as_ref().unwrap().len()) > 0;
+            // for (group_key, _, finalized_updates) in output.recorded_groups.get().unwrap() {
+            //     let baseline_group_map =
+            //         group_world.entry(group_key).or_insert(base_map.clone());
+            //     assert_eq!(finalized_updates.len(), baseline_group_map.len());
+            //     if groups_tested {
+            //         // RESERVED_TAG should always be contained.
+            //         assert_ge!(finalized_updates.len(), 1);
+
+            //         for (tag, v) in finalized_updates.iter() {
+            //             assert_eq!(
+            //                 v.bytes().unwrap(),
+            //                 baseline_group_map.get(tag).unwrap(),
+            //             );
+            //         }
+            //     }
+            // }
+
+            let baseline_deltas = resolved_deltas
+                .as_ref()
+                .expect("Aggregator failures not yet tested");
+            output
+                .materialized_delta_writes
+                .get()
+                .expect("Delta writes must be set")
+                .iter()
+                .for_each(|(k, result_delta_write)| {
+                    assert_eq!(
+                        *baseline_deltas.get(k).expect("Baseline must contain delta"),
+                        result_delta_write
+                            .as_u128()
+                            .expect("Baseline must contain delta")
+                            .expect("Must deserialize aggregator write value")
+                    );
+                });
+        });
+
+        results.iter().skip(committed).for_each(|output| {
+            // Ensure the transaction is skipped based on the output.
+            assert!(output.skipped);
+
+            // Implies that materialize_delta_writes was never called, as should
+            // be for skipped transactions.
+            assert_none!(output.materialized_delta_writes.get());
+        });
+    }
+
     // Used for testing, hence the function asserts the correctness conditions within
     // itself to be easily traceable in case of an error.
     pub(crate) fn assert_output<E: Debug>(
         &self,
-        results: &BlockExecutorResult<BlockOutput<MockOutput<K, E>>, usize>,
+        results: &BlockExecutionResult<BlockOutput<MockOutput<K, E>>, usize>,
     ) {
-        let base_map: HashMap<u32, Bytes> = HashMap::from([(RESERVED_TAG, vec![0].into())]);
-        let mut group_world = HashMap::new();
-
         match results {
             Ok(block_output) => {
-                let results = block_output.get_transaction_outputs_forced();
-                let committed = self.read_values.len();
-                assert_eq!(self.resolved_deltas.len(), committed);
-
-                // Check read values & delta writes.
-                izip!(
-                    results.iter().take(committed),
-                    self.read_values.iter(),
-                    self.resolved_deltas.iter(),
-                    self.group_reads.iter(),
-                )
-                .for_each(|(output, reads, resolved_deltas, group_reads)| {
-                    // Compute group read results.
-                    let group_read_results: Vec<Option<Bytes>> = group_reads
-                        .as_ref()
-                        .unwrap()
-                        .iter()
-                        .map(|(group_key, resource_tag)| {
-                            let group_map =
-                                group_world.entry(group_key).or_insert(base_map.clone());
-
-                            group_map.get(resource_tag).cloned()
-                        })
-                        .collect();
-                    // Test group read results.
-                    let read_len = reads.as_ref().unwrap().len();
-                    assert_eq!(
-                        group_read_results.len(),
-                        output.read_results.len() - read_len
-                    );
-                    izip!(
-                        output.read_results.iter().skip(read_len),
-                        group_read_results.into_iter()
-                    )
-                    .for_each(|(result_group_read, baseline_group_read)| {
-                        assert!(
-                            result_group_read.clone().map(Into::<Bytes>::into)
-                                == baseline_group_read
-                        );
-                    });
-
-                    for (group_key, size) in output.read_group_sizes.iter() {
-                        let group_map = group_world.entry(group_key).or_insert(base_map.clone());
-
-                        assert_eq!(
-                            group_size_as_sum(group_map.iter().map(|(t, v)| (t, v.len())))
-                                .unwrap()
-                                .get(),
-                            *size
-                        );
-                    }
-
-                    // Test normal reads.
-                    izip!(
-                        reads
-                            .as_ref()
-                            .expect("Aggregator failures not yet tested")
-                            .iter(),
-                        output.read_results.iter().take(read_len)
-                    )
-                    .for_each(|(baseline_read, result_read)| {
-                        baseline_read.assert_read_result(result_read)
-                    });
-
-                    // Update group world.
-                    for (group_key, _, updates) in output.group_writes.iter() {
-                        for (tag, v) in updates {
-                            let group_map =
-                                group_world.entry(group_key).or_insert(base_map.clone());
-                            if v.is_deletion() {
-                                assert_some!(group_map.remove(tag));
-                            } else {
-                                let existed = group_map
-                                    .insert(*tag, v.extract_raw_bytes().unwrap())
-                                    .is_some();
-                                assert_eq!(existed, v.is_modification());
-                            }
-                        }
-                    }
-
-                    // Test recorded finalized group writes: it should contain the whole group, and
-                    // as such, correspond to the contents of the group_world.
-                    // TODO: figure out what can still be tested here, e.g. RESERVED_TAG
-                    // let groups_tested =
-                    //     (output.group_writes.len() + group_reads.as_ref().unwrap().len()) > 0;
-                    // for (group_key, _, finalized_updates) in output.recorded_groups.get().unwrap() {
-                    //     let baseline_group_map =
-                    //         group_world.entry(group_key).or_insert(base_map.clone());
-                    //     assert_eq!(finalized_updates.len(), baseline_group_map.len());
-                    //     if groups_tested {
-                    //         // RESERVED_TAG should always be contained.
-                    //         assert_ge!(finalized_updates.len(), 1);
-
-                    //         for (tag, v) in finalized_updates.iter() {
-                    //             assert_eq!(
-                    //                 v.bytes().unwrap(),
-                    //                 baseline_group_map.get(tag).unwrap(),
-                    //             );
-                    //         }
-                    //     }
-                    // }
-
-                    let baseline_deltas = resolved_deltas
-                        .as_ref()
-                        .expect("Aggregator failures not yet tested");
-                    output
-                        .materialized_delta_writes
-                        .get()
-                        .expect("Delta writes must be set")
-                        .iter()
-                        .for_each(|(k, result_delta_write)| {
-                            assert_eq!(
-                                *baseline_deltas.get(k).expect("Baseline must contain delta"),
-                                result_delta_write
-                                    .as_u128()
-                                    .expect("Baseline must contain delta")
-                                    .expect("Must deserialize aggregator write value")
-                            );
-                        });
-                });
-
-                results.iter().skip(committed).for_each(|output| {
-                    // Ensure the transaction is skipped based on the output.
-                    assert!(output.writes.is_empty());
-                    assert!(output.deltas.is_empty());
-                    assert!(output.read_results.is_empty());
-                    assert_eq!(output.total_gas, 0);
-
-                    // Implies that materialize_delta_writes was never called, as should
-                    // be for skipped transactions.
-                    assert_none!(output.materialized_delta_writes.get());
-                });
+                self.assert_success(block_output);
             },
-            Err(BlockExecutorError::UserError(idx)) => {
+            Err(BlockExecutionError::FatalVMError(idx)) => {
                 assert_matches!(&self.status, BaselineStatus::Aborted);
                 assert_eq!(*idx, self.read_values.len());
                 assert_eq!(*idx, self.resolved_deltas.len());
             },
-            Err(BlockExecutorError::FallbackToSequential(e)) => {
-                unimplemented!("not tested here FallbackToSequential({:?})", e)
+            Err(BlockExecutionError::FatalBlockExecutorError(e)) => {
+                unimplemented!("not tested here FallbackToSequential({:?})", e);
+            },
+        }
+    }
+
+    pub(crate) fn assert_parallel_output<E: Debug>(
+        &self,
+        results: &Result<BlockOutput<MockOutput<K, E>>, ()>,
+    ) {
+        match results {
+            Ok(block_output) => {
+                self.assert_success(block_output);
+            },
+            Err(()) => {
+                // Parallel execution currently returns an arbitrary error to fallback.
+                // TODO: adjust the logic to be able to test better.
             },
         }
     }

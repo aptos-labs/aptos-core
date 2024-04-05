@@ -21,6 +21,7 @@ module aptos_framework::transaction_validation {
         module_addr: address,
         module_name: vector<u8>,
         script_prologue_name: vector<u8>,
+        // module_prologue_name is deprecated and not used.
         module_prologue_name: vector<u8>,
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
@@ -51,6 +52,7 @@ module aptos_framework::transaction_validation {
     public(friend) fun initialize(
         aptos_framework: &signer,
         script_prologue_name: vector<u8>,
+        // module_prologue_name is deprecated and not used.
         module_prologue_name: vector<u8>,
         multi_agent_prologue_name: vector<u8>,
         user_epilogue_name: vector<u8>,
@@ -61,6 +63,7 @@ module aptos_framework::transaction_validation {
             module_addr: @aptos_framework,
             module_name: b"transaction_validation",
             script_prologue_name,
+            // module_prologue_name is deprecated and not used.
             module_prologue_name,
             multi_agent_prologue_name,
             user_epilogue_name,
@@ -133,19 +136,6 @@ module aptos_framework::transaction_validation {
         );
         let balance = coin::balance<AptosCoin>(gas_payer);
         assert!(balance >= max_transaction_fee, error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT));
-    }
-
-    fun module_prologue(
-        sender: signer,
-        txn_sequence_number: u64,
-        txn_public_key: vector<u8>,
-        txn_gas_price: u64,
-        txn_max_gas_units: u64,
-        txn_expiration_time: u64,
-        chain_id: u8,
-    ) {
-        let gas_payer = signer::address_of(&sender);
-        prologue_common(sender, gas_payer, txn_sequence_number, txn_public_key, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id)
     }
 
     fun script_prologue(

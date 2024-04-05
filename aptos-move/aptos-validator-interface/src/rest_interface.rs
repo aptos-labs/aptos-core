@@ -117,6 +117,14 @@ async fn check_and_obtain_source_code(
     addr: &AccountAddress,
     version: Version,
     transaction: &Transaction,
+    package_cache: &mut HashMap<
+        ModuleId,
+        (
+            AccountAddress,
+            String,
+            HashMap<(AccountAddress, String), PackageMetadata>,
+        ),
+    >,
     txns: &mut Vec<(
         u64,
         Transaction,
@@ -149,6 +157,14 @@ async fn check_and_obtain_source_code(
     if let Some(target_package) = target_package_opt {
         let mut map = HashMap::new();
         if APTOS_PACKAGES.contains(&target_package.name.as_str()) {
+            package_cache.insert(
+                m.clone(),
+                (
+                    AccountAddress::ONE,
+                    target_package.name.clone(), // all aptos packages are stored under 0x1
+                    HashMap::new(),
+                ),
+            );
             txns.push((
                 version,
                 transaction.clone(),
@@ -168,6 +184,7 @@ async fn check_and_obtain_source_code(
         .await
         {
             map.insert((*addr, target_package.clone().name), target_package.clone());
+            package_cache.insert(m.clone(), (*addr, target_package.name.clone(), map.clone()));
             txns.push((
                 version,
                 transaction.clone(),
@@ -252,6 +269,14 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         start: Version,
         limit: u64,
         filter_condition: FilterCondition,
+        package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
     ) -> Result<
         Vec<(
             u64,
@@ -298,16 +323,38 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 if let Some(entry_function) = extract_entry_fun(payload) {
                     let m = entry_function.module();
                     let addr = m.address();
-                    if filter_condition.skip_publish_txns
-                        && entry_function.function().as_str() == "publish_package_txn"
+                    if filter_condition.target_account.is_some()
+                        && filter_condition.target_account.unwrap() != *addr
                     {
                         continue;
                     }
+                    if entry_function.function().as_str() == "publish_package_txn" {
+                        if filter_condition.skip_publish_txns {
+                            continue;
+                        }
+                        // For publish txn, we remove all items in the package_cache where module_id.address is the sender of this txn
+                        // to update the new package in the cache.
+                        package_cache.retain(|k, _| k.address != signed_trans.sender());
+                    }
                     if !filter_condition.check_source_code {
                         txns.push((version, txn.clone(), None));
+                    } else if package_cache.contains_key(m) {
+                        txns.push((
+                            version,
+                            txn.clone(),
+                            Some(package_cache.get(m).unwrap().clone()),
+                        ));
                     } else {
-                        check_and_obtain_source_code(&self.0, m, addr, version, txn, &mut txns)
-                            .await?;
+                        check_and_obtain_source_code(
+                            &self.0,
+                            m,
+                            addr,
+                            version,
+                            txn,
+                            package_cache,
+                            &mut txns,
+                        )
+                        .await?;
                     }
                 }
             }

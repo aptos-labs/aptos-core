@@ -1,0 +1,33 @@
+
+Diagnostics:
+error: reference type `&u64` is not allowed as a type argument
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:4:24
+  │
+4 │         let v = vector<&u64>[];
+  │                        ^^^^
+  │
+  = required by instantiating vector type parameter
+
+error: reference type `&mut u64` is not allowed as a type argument
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:5:24
+  │
+5 │         let v = vector<&mut u64>[];
+  │                        ^^^^^^^^
+  │
+  = required by instantiating vector type parameter
+
+error: tuple type `()` is not allowed as a type argument
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:6:24
+  │
+6 │         let v = vector<()>[];
+  │                        ^^
+  │
+  = required by instantiating vector type parameter
+
+error: tuple type `(u64, bool)` is not allowed as a type argument
+  ┌─ tests/checking/typing/vector_with_non_base_type.move:7:24
+  │
+7 │         let v = vector<(u64, bool)>[];
+  │                        ^^^^^^^^^^^
+  │
+  = required by instantiating vector type parameter

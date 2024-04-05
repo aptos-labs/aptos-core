@@ -23,6 +23,8 @@ pub enum CommitMessage {
     Decision(CommitDecision),
     /// Ack on either vote or decision
     Ack(()),
+    /// Nack is non-acknowledgement, we got your message, but it was bad/we were bad
+    Nack,
 }
 
 impl CommitMessage {
@@ -32,6 +34,15 @@ impl CommitMessage {
             CommitMessage::Vote(vote) => vote.verify(verifier),
             CommitMessage::Decision(decision) => decision.verify(verifier),
             CommitMessage::Ack(_) => bail!("Unexpected ack in incoming commit message"),
+            CommitMessage::Nack => bail!("Unexpected NACK in incoming commit message"),
+        }
+    }
+
+    pub fn epoch(&self) -> Option<u64> {
+        match self {
+            CommitMessage::Vote(vote) => Some(vote.epoch()),
+            CommitMessage::Decision(decision) => Some(decision.epoch()),
+            _ => None,
         }
     }
 }
@@ -55,7 +66,21 @@ impl BroadcastStatus<CommitMessage> for Arc<AckState> {
     type Message = CommitMessage;
     type Response = CommitMessage;
 
-    fn add(&self, peer: Author, _ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
+    fn add(&self, peer: Author, ack: Self::Response) -> anyhow::Result<Option<Self::Aggregated>> {
+        match ack {
+            CommitMessage::Vote(_) => {
+                bail!("unexected Vote reply to broadcast");
+            },
+            CommitMessage::Decision(_) => {
+                bail!("unexected Decision reply to broadcast");
+            },
+            CommitMessage::Ack(_) => {
+                // okay! continue
+            },
+            CommitMessage::Nack => {
+                bail!("unexected Nack reply to broadcast");
+            },
+        }
         let mut validators = self.validators.lock();
         if validators.remove(&peer) {
             if validators.is_empty() {

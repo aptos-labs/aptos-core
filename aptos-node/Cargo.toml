@@ -1,7 +1,7 @@
 [package]
 name = "aptos-node"
 description = "Aptos node"
-version = "1.7.0"
+version = "0.0.0-main"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -28,10 +28,10 @@ aptos-crypto = { workspace = true }
 aptos-data-client = { workspace = true }
 aptos-data-streaming-service = { workspace = true }
 aptos-db = { workspace = true }
+aptos-db-indexer = { workspace = true }
 aptos-dkg-runtime = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
-aptos-executor-types = { workspace = true }
 aptos-framework = { workspace = true }
 aptos-genesis = { workspace = true }
 aptos-indexer = { workspace = true, optional = true }
@@ -51,7 +51,7 @@ aptos-peer-monitoring-service-client = { workspace = true }
 aptos-peer-monitoring-service-server = { workspace = true }
 aptos-peer-monitoring-service-types = { workspace = true }
 aptos-runtimes = { workspace = true }
-aptos-secure-storage = { workspace = true }
+aptos-safety-rules = { workspace = true }
 aptos-state-sync-driver = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-storage-service-client = { workspace = true }
@@ -70,14 +70,13 @@ either = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
-maplit = { workspace = true }
+num_cpus = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = { workspace = true }
 url = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
@@ -93,6 +92,8 @@ consensus-only-perf-test = ["aptos-executor/consensus-only-perf-test", "aptos-me
 default = []
 failpoints = ["fail/failpoints", "aptos-consensus/failpoints", "aptos-executor/failpoints", "aptos-mempool/failpoints", "aptos-api/failpoints", "aptos-config/failpoints"]
 indexer = ["aptos-indexer"]
-network-perf-test = ["aptos-peer-monitoring-service-client/network-perf-test", "aptos-peer-monitoring-service-server/network-perf-test", "aptos-peer-monitoring-service-types/network-perf-test", "aptos-config/network-perf-test"]
 tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
 smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
+
+[package.metadata.cargo-machete]
+ignored = ["aptos-crypto"]

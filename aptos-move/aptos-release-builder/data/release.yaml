@@ -1,6 +1,6 @@
 ---
 remote_endpoint: ~
-name: "v1.9"
+name: "v1.11"
 proposals:
   - name: step_1_increase_max_txn_gas
     metadata:
@@ -9,58 +9,18 @@ proposals:
     execution_mode: MultiStep
     update_sequence:
       - DefaultGasWithOverride:
-          - name: "txn.max_execution_gas"
-            value: 3676000000
+          feature_version: 13
+          overrides:
+            - name: "txn.max_execution_gas"
+              value: 3676000000
   - name: step_2_upgrade_framework
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework to v1.9"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.9"
+      title: "Multi-step proposal to upgrade mainnet framework to v1.11"
+      description: "This includes changes in https://github.com/aptos-labs/aptos-core/commits/aptos-release-v1.11"
     execution_mode: MultiStep
     update_sequence:
       - Framework:
           bytecode_version: 6
           git_hash: ~
-      - DefaultGas
-  - name: step_3_commission_change_delegation_pool
-    metadata:
-      title: "AIP-50: Change commission rates in delegation pools"
-      description: "AIP-50: This allows delegation pool owners to change operator commission rates after delegation pool creation."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/249"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - commission_change_delegation_pool
-  - name: step_4_enable_automatic_sponsored_account_creation
-    metadata:
-      title: "AIP-52: Automated Account Creation for Sponsored Transactions"
-      description: "AIP-52: Automated Account Creation for Sponsored Transactions."
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/258"
-    execution_mode: MultiStep
-    update_sequence:
-      - FeatureFlag:
-          enabled:
-            - sponsored_automatic_account_creation
-  - name: step_5_update_block_limits
-    metadata: 
-      title: "AIP-57: Block Output Size Limit and Conflict-Aware Block Gas Limit"  
-      description: "AIP-57: Block Output Size Limit and Conflict-Aware Block Gas Limit"  
-      discussion_url: "https://github.com/aptos-foundation/AIPs/issues/285" 
-    execution_mode: MultiStep 
-    update_sequence:  
-      - Execution:  
-          V4:  
-            transaction_shuffler_type:  
-              sender_aware_v2: 32  
-            block_gas_limit_type: 
-              complex_limit_v1:  
-                effective_block_gas_limit: 40000  
-                execution_gas_effective_multiplier: 1  
-                io_gas_effective_multiplier: 1  
-                conflict_penalty_window: 6  
-                use_granular_resource_group_conflicts: false  
-                use_module_publishing_block_conflict: false  
-                block_output_limit: 5242880
-                include_user_txn_size_in_block_output: true  
-                add_block_limit_outcome_onchain: false  
-            transaction_deduper_type: txn_hash_and_authenticator_v1
+      - DefaultGasWithOverride:
+          feature_version: 13

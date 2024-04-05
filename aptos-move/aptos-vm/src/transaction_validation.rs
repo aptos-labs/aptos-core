@@ -30,7 +30,6 @@ use move_core_types::{
 use move_vm_runtime::logging::expect_no_verification_errors;
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -38,20 +37,18 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         module_name: Identifier::new("transaction_validation").unwrap(),
         fee_payer_prologue_name: Identifier::new("fee_payer_script_prologue").unwrap(),
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
-        module_prologue_name: Identifier::new("module_prologue").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
     });
 
 /// On-chain functions used to validate transactions
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct TransactionValidation {
     pub module_addr: AccountAddress,
     pub module_name: Identifier,
     pub fee_payer_prologue_name: Identifier,
     pub script_prologue_name: Identifier,
-    pub module_prologue_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
@@ -143,40 +140,6 @@ pub(crate) fn run_script_prologue(
             prologue_function_name,
             vec![],
             serialize_values(&args),
-            &mut gas_meter,
-        )
-        .map(|_return_vals| ())
-        .map_err(expect_no_verification_errors)
-        .or_else(|err| convert_prologue_error(err, log_context))
-}
-
-// Deprecated (see ModuleBundle).
-pub(crate) fn run_module_prologue(
-    session: &mut SessionExt,
-    txn_data: &TransactionMetadata,
-    log_context: &AdapterLogSchema,
-) -> Result<(), VMStatus> {
-    let txn_sequence_number = txn_data.sequence_number();
-    let txn_authentication_key = txn_data.authentication_key();
-    let txn_gas_price = txn_data.gas_unit_price();
-    let txn_max_gas_units = txn_data.max_gas_amount();
-    let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
-    let chain_id = txn_data.chain_id();
-    let mut gas_meter = UnmeteredGasMeter;
-    session
-        .execute_function_bypass_visibility(
-            &APTOS_TRANSACTION_VALIDATION.module_id(),
-            &APTOS_TRANSACTION_VALIDATION.module_prologue_name,
-            vec![],
-            serialize_values(&vec![
-                MoveValue::Signer(txn_data.sender),
-                MoveValue::U64(txn_sequence_number),
-                MoveValue::vector_u8(txn_authentication_key.to_vec()),
-                MoveValue::U64(txn_gas_price.into()),
-                MoveValue::U64(txn_max_gas_units.into()),
-                MoveValue::U64(txn_expiration_timestamp_secs),
-                MoveValue::U8(chain_id.id()),
-            ]),
             &mut gas_meter,
         )
         .map(|_return_vals| ())

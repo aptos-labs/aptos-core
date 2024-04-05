@@ -7,6 +7,7 @@
 use crate::{
     ast::ModuleName,
     builder::{model_builder::ModelBuilder, module_builder::BytecodeModule},
+    metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, ModuleId, StructId},
     options::ModelBuilderOptions,
 };
@@ -30,7 +31,7 @@ use move_compiler::{
     diagnostics::{codes::Severity, Diagnostics},
     expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
     naming::ast as N,
-    parser::ast::{self as P, ModuleName as ParserModuleName},
+    parser::ast::{self as P, CallKind, ModuleName as ParserModuleName},
     shared::{
         parse_named_address, unique_map::UniqueMap, CompilationEnv, Identifier as IdentifierTrait,
         NumericalAddress, PackagePaths,
@@ -53,9 +54,11 @@ pub mod constant_folder;
 pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod intrinsics;
+pub mod metadata;
 pub mod model;
 pub mod options;
 pub mod pragmas;
+pub mod pureness_checker;
 pub mod spec_translator;
 pub mod symbol;
 pub mod ty;
@@ -81,6 +84,8 @@ pub fn run_model_builder_in_compiler_mode(
     deps: Vec<PackageInfo>,
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
+    language_version: LanguageVersion,
+    compile_test_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -95,9 +100,12 @@ pub fn run_model_builder_in_compiler_mode(
         deps.into_iter().map(to_package_paths).collect(),
         ModelBuilderOptions {
             compile_via_model: true,
+            language_version,
             ..ModelBuilderOptions::default()
         },
-        Flags::model_compilation().set_skip_attribute_checks(skip_attribute_checks),
+        Flags::model_compilation()
+            .set_skip_attribute_checks(skip_attribute_checks)
+            .set_keep_testing_functions(compile_test_code),
         known_attributes,
     )
 }
@@ -139,6 +147,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     known_attributes: &BTreeSet<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
+    env.set_language_version(options.language_version);
     let compile_via_model = options.compile_via_model;
     env.set_extension(options);
 
@@ -274,7 +283,12 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     let mut expansion_ast = {
         let E::Program { modules, scripts } = expansion_ast;
         let modules = modules.filter_map(|mident, mut mdef| {
-            visited_modules.contains(&mident.value).then(|| {
+            // Always need to include the vector module because it can be implicitly used.
+            // TODO(#12492): we can remove this once this bug is fixed
+            let is_vector = mident.value.address.into_addr_bytes().into_inner()
+                == AccountAddress::ONE
+                && mident.value.module.0.value.as_str() == "vector";
+            (is_vector || visited_modules.contains(&mident.value)).then(|| {
                 mdef.is_source_module = true;
                 mdef
             })
@@ -386,29 +400,93 @@ fn run_move_checker(env: &mut GlobalEnv, program: E::Program) {
         module_translator.translate(loc, module_def, None);
     }
 
+    // Populate GlobalEnv with model-level information
+    builder.populate_env();
+
+    // After all specs have been processed, warn about any unused schemas.
+    builder.warn_unused_schemas();
+
+    // Perform any remaining friend-declaration checks and update friend module id information.
+    check_and_update_friend_info(builder);
+}
+
+/// Checks if any friend declarations are invalid because:
+///     - they are self-friend declarations
+///     - they are out-of-address friend declarations
+///     - they refer to unbound modules
+/// If so, report errors.
+/// Also, update friend module id information: this function assumes all modules have been assigned ids.
+///
+/// Note: we assume (a) friend declarations creating cyclic dependencies (cycle size > 1),
+///                 (b) duplicate friend declarations
+/// have been reported already. Currently, these checks happen in the expansion phase.
+fn check_and_update_friend_info(mut builder: ModelBuilder) {
     let module_table = std::mem::take(&mut builder.module_table);
+    let env = builder.env;
+    // To save (loc, name) info about self friend decls.
+    let mut self_friends = vec![];
+    // To save (loc, friend_module_name, current_module_name) info about out-of-address friend decls.
+    let mut out_of_address_friends = vec![];
+    // To save (loc, friend_module_name) info about unbound modules in friend decls.
+    let mut unbound_friend_modules = vec![];
     // Patch up information about friend module ids, as all the modules have ids by now.
     for module in env.module_data.iter_mut() {
         let mut friend_modules = BTreeSet::new();
         for friend_decl in module.friend_decls.iter_mut() {
+            // Save information of out-of-address friend decls to report error later.
+            if friend_decl.module_name.addr() != module.name.addr() {
+                out_of_address_friends.push((
+                    friend_decl.loc.clone(),
+                    friend_decl.module_name.clone(),
+                    module.name.clone(),
+                ));
+            }
             if let Some(friend_mod_id) = module_table.get(&friend_decl.module_name) {
                 friend_decl.module_id = Some(*friend_mod_id);
                 friend_modules.insert(*friend_mod_id);
-            } // else: unresolved friend module, which should be reported elsewhere.
+                // Save information of self-friend decls to report error later.
+                if module.id == *friend_mod_id {
+                    self_friends.push((friend_decl.loc.clone(), friend_decl.module_name.clone()));
+                }
+            } else {
+                // Save information of unbound modules in friend decls to report error later.
+                unbound_friend_modules
+                    .push((friend_decl.loc.clone(), friend_decl.module_name.clone()));
+            }
         }
         module.friend_modules = friend_modules;
     }
-    // Compute information derived from AST (currently callgraph)
-    for module in env.module_data.iter_mut() {
-        for fun_data in module.function_data.values_mut() {
-            fun_data.called_funs = Some(
-                fun_data
-                    .def
-                    .as_ref()
-                    .map(|e| e.called_funs())
-                    .unwrap_or_default(),
-            )
-        }
+    // Report self-friend errors.
+    for (loc, module_name) in self_friends {
+        env.error(
+            &loc,
+            &format!(
+                "cannot declare module `{}` as a friend of itself",
+                module_name.display_full(env)
+            ),
+        );
+    }
+    // Report out-of-address friend errors.
+    for (loc, friend_mod_name, cur_mod_name) in out_of_address_friends {
+        env.error(
+            &loc,
+            &format!(
+                "friend modules of `{}` must have the same address, \
+                    but the declared friend module `{}` has a different address",
+                cur_mod_name.display_full(env),
+                friend_mod_name.display_full(env),
+            ),
+        );
+    }
+    // Report unbound friend errors.
+    for (loc, friend_mod_name) in unbound_friend_modules {
+        env.error(
+            &loc,
+            &format!(
+                "unbound module `{}` in friend declaration",
+                friend_mod_name.display_full(env)
+            ),
+        );
     }
 }
 
@@ -427,7 +505,7 @@ fn collect_related_modules_recursive<'a>(
     }
 }
 
-fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
+pub fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
     let mk_label = |is_primary: bool, (loc, msg): (move_ir_types::location::Loc, String)| {
         let style = if is_primary {
             LabelStyle::Primary
@@ -453,7 +531,7 @@ fn add_move_lang_diagnostics(env: &mut GlobalEnv, diags: Diagnostics) {
 }
 
 #[allow(deprecated)]
-fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
+pub fn script_into_module(compiled_script: CompiledScript, name: &str) -> CompiledModule {
     let mut script = compiled_script;
 
     // Add the "<SELF>" identifier if it isn't present.
@@ -463,14 +541,14 @@ fn script_into_module(compiled_script: CompiledScript) -> CompiledModule {
     let self_ident_idx = match script
         .identifiers
         .iter()
-        .position(|ident| ident.as_ident_str() == self_module_name())
+        .position(|ident| ident.as_ident_str().as_str() == name)
     {
         Some(idx) => IdentifierIndex::new(idx as u16),
         None => {
             let idx = IdentifierIndex::new(script.identifiers.len() as u16);
             script
                 .identifiers
-                .push(Identifier::new(self_module_name().to_string()).unwrap());
+                .push(Identifier::new(name.to_string()).unwrap());
             idx
         },
     };
@@ -631,7 +709,7 @@ fn run_spec_checker(env: &mut GlobalEnv, units: Vec<AnnotatedCompiledUnit>, mut 
                     .unwrap();
 
                 let expanded_module = expansion_script_to_module(expanded_script);
-                let module = script_into_module(script.script);
+                let module = script_into_module(script.script, self_module_name().as_str());
                 modules.push((
                     ident,
                     expanded_module,
@@ -977,7 +1055,11 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
                 .collect();
             Exp_::Call(
                 sp(name.loc(), access),
-                *is_macro,
+                if *is_macro {
+                    CallKind::Macro
+                } else {
+                    CallKind::Regular
+                },
                 if rewritten_ty_args.is_empty() {
                     None
                 } else {
@@ -995,7 +1077,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             };
             Exp_::Call(
                 sp(target.loc(), access),
-                false,
+                CallKind::Regular,
                 None,
                 sp(exp.exp.loc, rewritten_arguments),
             )
@@ -1012,7 +1094,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             };
             Exp_::Call(
                 sp(builtin.loc, access),
-                false,
+                CallKind::Regular,
                 None,
                 sp(exp.exp.loc, rewritten_arguments),
             )

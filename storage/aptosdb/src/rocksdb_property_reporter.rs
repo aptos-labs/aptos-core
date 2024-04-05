@@ -6,18 +6,22 @@ use crate::{
     common::NUM_STATE_SHARDS,
     db_options::{
         event_db_column_families, ledger_db_column_families, ledger_metadata_db_column_families,
-        state_kv_db_column_families, state_merkle_db_column_families,
+        skip_reporting_cf, state_kv_db_column_families, state_merkle_db_column_families,
         transaction_accumulator_db_column_families, transaction_db_column_families,
         transaction_info_db_column_families, write_set_db_column_families,
     },
     ledger_db::LedgerDb,
-    metrics::{OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES},
+    metrics::{
+        OTHER_TIMERS_SECONDS, ROCKSDB_PROPERTIES, STATE_KV_DB_PROPERTIES,
+        STATE_MERKLE_DB_PROPERTIES,
+    },
     state_kv_db::StateKvDb,
     state_merkle_db::StateMerkleDb,
 };
 use anyhow::Result;
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
+use aptos_metrics_core::IntGaugeVec;
 use aptos_schemadb::DB;
 use once_cell::sync::Lazy;
 use std::{
@@ -69,20 +73,32 @@ static ROCKSDB_PROPERTY_MAP: Lazy<HashMap<&str, String>> = Lazy::new(|| {
 });
 
 fn set_property(cf_name: &str, db: &DB) -> Result<()> {
-    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-        ROCKSDB_PROPERTIES
-            .with_label_values(&[cf_name, aptos_rocksdb_property_name])
-            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+    if !skip_reporting_cf(cf_name) {
+        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+            ROCKSDB_PROPERTIES
+                .with_label_values(&[cf_name, aptos_rocksdb_property_name])
+                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+        }
     }
     Ok(())
 }
 
-fn set_property_sharded(cf_name: &str, db: &DB, db_shard_id: usize) -> Result<()> {
-    for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
-        let cf_label = format!("{}_{}", cf_name, db_shard_id);
-        ROCKSDB_PROPERTIES
-            .with_label_values(&[&cf_label, aptos_rocksdb_property_name])
-            .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+fn set_shard_property(
+    cf_name: &str,
+    db: &DB,
+    db_shard_id: usize,
+    metrics: &Lazy<IntGaugeVec>,
+) -> Result<()> {
+    if !skip_reporting_cf(cf_name) {
+        for (rockdb_property_name, aptos_rocksdb_property_name) in &*ROCKSDB_PROPERTY_MAP {
+            metrics
+                .with_label_values(&[
+                    &format!("{db_shard_id}"),
+                    cf_name,
+                    aptos_rocksdb_property_name,
+                ])
+                .set(db.get_property(cf_name, rockdb_property_name)? as i64);
+        }
     }
     Ok(())
 }
@@ -127,7 +143,12 @@ fn update_rocksdb_properties(
             set_property(cf, state_kv_db.metadata_db())?;
             if state_kv_db.enabled_sharding() {
                 for shard in 0..NUM_STATE_SHARDS {
-                    set_property_sharded(cf, state_kv_db.db_shard(shard as u8), shard)?;
+                    set_shard_property(
+                        cf,
+                        state_kv_db.db_shard(shard as u8),
+                        shard,
+                        &STATE_KV_DB_PROPERTIES,
+                    )?;
                 }
             }
         }
@@ -141,7 +162,12 @@ fn update_rocksdb_properties(
         set_property(cf_name, state_merkle_db.metadata_db())?;
         if state_merkle_db.sharding_enabled() {
             for shard in 0..NUM_STATE_SHARDS {
-                set_property_sharded(cf_name, state_merkle_db.db_shard(shard as u8), shard)?;
+                set_shard_property(
+                    cf_name,
+                    state_merkle_db.db_shard(shard as u8),
+                    shard,
+                    &STATE_MERKLE_DB_PROPERTIES,
+                )?;
             }
         }
     }

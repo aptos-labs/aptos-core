@@ -1,0 +1,48 @@
+name: "Aptos Move Test for Compiler V2"
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - 'aptos-move/e2e-move-tests/**'
+      - 'aptos-move/framework/**'
+      - 'third_party/move/**'
+      - '.github/workflows/move-test-compiler-v2.yaml'
+      - '.github/actions/move-tests-compiler-v2/**'
+  pull_request:
+    types: [labeled, opened, synchronize, reopened, auto_merge_enabled]
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+# cancel redundant builds
+concurrency:
+  # cancel redundant builds on PRs (only on PR, not on branches)
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  # This job determines which files were changed
+  file_change_determinator:
+    runs-on: ubuntu-latest
+    outputs:
+      move_compiler_v2_changes: ${{ steps.determine_file_changes.outputs.move_compiler_v2_changes }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the file change determinator
+        id: determine_file_changes
+        uses: ./.github/actions/file-change-determinator
+
+  # Run Aptos Move Compiler v2 tests. This is a PR required job.
+  # TODO: fix this so that we skip the tests when appropriate.
+  rust-move-tests:
+    needs: file_change_determinator
+    runs-on: high-perf-docker
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run Aptos Move tests with compiler V2
+        uses: ./.github/actions/move-tests-compiler-v2
+        with:
+          GIT_CREDENTIALS: ${{ secrets.GIT_CREDENTIALS }}

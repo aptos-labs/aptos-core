@@ -23,7 +23,6 @@ use move_core_types::{
     transaction_argument::convert_txn_args,
     value::{serialize_values, MoveValue},
 };
-use move_vm_runtime::session::SerializedReturnValues;
 use move_vm_types::gas::UnmeteredGasMeter;
 
 pub struct GenesisSession<'r, 'l>(SessionExt<'r, 'l>);
@@ -57,11 +56,7 @@ impl<'r, 'l> GenesisSession<'r, 'l> {
             });
     }
 
-    pub fn exec_script(
-        &mut self,
-        sender: AccountAddress,
-        script: &Script,
-    ) -> SerializedReturnValues {
+    pub fn exec_script(&mut self, sender: AccountAddress, script: &Script) {
         let mut temp = vec![sender.to_vec()];
         temp.extend(convert_txn_args(script.args()));
         self.0
@@ -118,6 +113,7 @@ where
         Features::default(),
         TimedFeaturesBuilder::enable_all().build(),
         &resolver,
+        false,
     )
     .unwrap();
     let change_set = {

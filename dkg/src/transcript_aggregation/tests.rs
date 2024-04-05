@@ -1,14 +1,17 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::transcript_aggregation::TranscriptAggregationState;
 use aptos_crypto::{bls12381::bls12381_keys, Uniform};
+use aptos_infallible::duration_since_epoch;
 use aptos_reliable_broadcast::BroadcastStatus;
 use aptos_types::{
     dkg::{
         dummy_dkg::{DummyDKG, DummyDKGTranscript},
-        DKGNode, DKGSessionMetadata, DKGTrait, DKGTranscriptMetadata,
+        DKGSessionMetadata, DKGTrait, DKGTranscript, DKGTranscriptMetadata,
     },
     epoch_state::EpochState,
+    on_chain_config::OnChainRandomnessConfig,
     validator_verifier::{
         ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
     },
@@ -23,6 +26,7 @@ fn test_transcript_aggregation_state() {
     let addrs: Vec<AccountAddress> = (0..num_validators)
         .map(|_| AccountAddress::random())
         .collect();
+    let vfn_addr = AccountAddress::random();
     let private_keys: Vec<bls12381_keys::PrivateKey> = (0..num_validators)
         .map(|_| bls12381_keys::PrivateKey::generate_for_testing())
         .collect();
@@ -41,11 +45,14 @@ fn test_transcript_aggregation_state() {
     let verifier = ValidatorVerifier::new(validator_infos.clone());
     let pub_params = DummyDKG::new_public_params(&DKGSessionMetadata {
         dealer_epoch: 999,
+        randomness_config: OnChainRandomnessConfig::default_enabled().into(),
         dealer_validator_set: validator_consensus_info_move_structs.clone(),
         target_validator_set: validator_consensus_info_move_structs.clone(),
     });
     let epoch_state = Arc::new(EpochState { epoch, verifier });
     let trx_agg_state = Arc::new(TranscriptAggregationState::<DummyDKG>::new(
+        duration_since_epoch(),
+        addrs[0],
         pub_params,
         epoch_state,
     ));
@@ -54,7 +61,7 @@ fn test_transcript_aggregation_state() {
     let good_trx_bytes = bcs::to_bytes(&good_transcript).unwrap();
 
     // Node with incorrect epoch should be rejected.
-    let result = trx_agg_state.add(addrs[0], DKGNode {
+    let result = trx_agg_state.add(addrs[0], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 998,
             author: addrs[0],
@@ -64,7 +71,7 @@ fn test_transcript_aggregation_state() {
     assert!(result.is_err());
 
     // Node authored by X but sent by Y should be rejected.
-    let result = trx_agg_state.add(addrs[1], DKGNode {
+    let result = trx_agg_state.add(addrs[1], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[0],
@@ -73,10 +80,20 @@ fn test_transcript_aggregation_state() {
     });
     assert!(result.is_err());
 
+    // Node authored by non-active-validator should be rejected.
+    let result = trx_agg_state.add(vfn_addr, DKGTranscript {
+        metadata: DKGTranscriptMetadata {
+            epoch: 999,
+            author: vfn_addr,
+        },
+        transcript_bytes: good_trx_bytes.clone(),
+    });
+    assert!(result.is_err());
+
     // Node with invalid transcript should be rejected.
     let mut bad_trx_bytes = good_trx_bytes.clone();
     bad_trx_bytes[0] = 0xAB;
-    let result = trx_agg_state.add(addrs[2], DKGNode {
+    let result = trx_agg_state.add(addrs[2], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[2],
@@ -86,7 +103,7 @@ fn test_transcript_aggregation_state() {
     assert!(result.is_err());
 
     // Good node should be accepted.
-    let result = trx_agg_state.add(addrs[3], DKGNode {
+    let result = trx_agg_state.add(addrs[3], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[3],
@@ -96,7 +113,7 @@ fn test_transcript_aggregation_state() {
     assert!(matches!(result, Ok(None)));
 
     // Node from contributed author should be ignored.
-    let result = trx_agg_state.add(addrs[3], DKGNode {
+    let result = trx_agg_state.add(addrs[3], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[3],
@@ -106,7 +123,7 @@ fn test_transcript_aggregation_state() {
     assert!(matches!(result, Ok(None)));
 
     // Aggregated trx should be returned if after adding a node, the threshold is exceeded.
-    let result = trx_agg_state.add(addrs[4], DKGNode {
+    let result = trx_agg_state.add(addrs[4], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
             author: addrs[4],

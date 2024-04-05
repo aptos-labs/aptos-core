@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::error::QuorumStoreError;
 use aptos_consensus_types::common::{Payload, PayloadFilter};
@@ -18,6 +19,8 @@ pub trait UserPayloadClient: Send + Sync {
         max_poll_time: Duration,
         max_items: u64,
         max_bytes: u64,
+        max_inline_items: u64,
+        max_inline_bytes: u64,
         exclude: PayloadFilter,
         wait_callback: BoxFuture<'static, ()>,
         pending_ordering: bool,
@@ -47,6 +50,8 @@ impl UserPayloadClient for DummyClient {
         max_poll_time: Duration,
         mut max_items: u64,
         mut max_bytes: u64,
+        _max_inline_items: u64,
+        _max_inline_bytes: u64,
         _exclude: PayloadFilter,
         _wait_callback: BoxFuture<'static, ()>,
         _pending_ordering: bool,

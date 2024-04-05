@@ -21,8 +21,6 @@ aptos-id-generator = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-metrics-core = { workspace = true }
-aptos-network = { workspace = true }
-aptos-short-hex-str = { workspace = true }
 aptos-time-service = { workspace = true }
 aptos-types = { workspace = true }
 arc-swap = { workspace = true }

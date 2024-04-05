@@ -14,6 +14,8 @@ module aptos_framework::jwks {
     use aptos_std::comparator::{compare_u8_vector, is_greater_than, is_equal};
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
+    use aptos_framework::chain_status;
+    use aptos_framework::config_buffer;
     use aptos_framework::event::emit;
     use aptos_framework::reconfiguration;
     use aptos_framework::system_addresses;
@@ -21,6 +23,7 @@ module aptos_framework::jwks {
     use aptos_framework::account::create_account_for_test;
 
     friend aptos_framework::genesis;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     const EUNEXPECTED_EPOCH: u64 = 1;
     const EUNEXPECTED_VERSION: u64 = 2;
@@ -29,8 +32,14 @@ module aptos_framework::jwks {
     const EISSUER_NOT_FOUND: u64 = 5;
     const EJWK_ID_NOT_FOUND: u64 = 6;
 
+    const ENATIVE_MISSING_RESOURCE_VALIDATOR_SET: u64 = 0x0101;
+    const ENATIVE_MISSING_RESOURCE_OBSERVED_JWKS: u64 = 0x0102;
+    const ENATIVE_INCORRECT_VERSION: u64 = 0x0103;
+    const ENATIVE_MULTISIG_VERIFICATION_FAILED: u64 = 0x0104;
+    const ENATIVE_NOT_ENOUGH_VOTING_POWER: u64 = 0x0105;
+
     /// An OIDC provider.
-    struct OIDCProvider has drop, store {
+    struct OIDCProvider has copy, drop, store {
         /// The utf-8 encoded issuer string. E.g., b"https://www.facebook.com".
         name: vector<u8>,
 
@@ -40,7 +49,7 @@ module aptos_framework::jwks {
     }
 
     /// A list of OIDC providers whose JWKs should be watched by validators. Maintained by governance proposals.
-    struct SupportedOIDCProviders has key {
+    struct SupportedOIDCProviders has copy, drop, key, store {
         providers: vector<OIDCProvider>,
     }
 
@@ -165,11 +174,12 @@ module aptos_framework::jwks {
         try_get_jwk_by_issuer(jwks, issuer, jwk_id)
     }
 
-    /// Upsert an OIDC provider metadata into the `SupportedOIDCProviders` resource.
-    /// Can only be called in a governance proposal.
-    /// Returns the old config URL of the provider, if any, as an `Option`.
+    /// Deprecated by `upsert_oidc_provider_for_next_epoch()`.
+    ///
+    /// TODO: update all the tests that reference this function, then disable this function.
     public fun upsert_oidc_provider(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
         system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
 
         let provider_set = borrow_global_mut<SupportedOIDCProviders>(@aptos_framework);
 
@@ -178,14 +188,69 @@ module aptos_framework::jwks {
         old_config_url
     }
 
-    /// Remove an OIDC provider from the `SupportedOIDCProviders` resource.
-    /// Can only be called in a governance proposal.
-    /// Returns the old config URL of the provider, if any, as an `Option`.
+    /// Used in on-chain governances to update the supported OIDC providers, effective starting next epoch.
+    /// Example usage:
+    /// ```
+    /// aptos_framework::jwks::upsert_oidc_provider_for_next_epoch(
+    ///     &framework_signer,
+    ///     b"https://accounts.google.com",
+    ///     b"https://accounts.google.com/.well-known/openid-configuration"
+    /// );
+    /// aptos_framework::aptos_governance::reconfigure(&framework_signer);
+    /// ```
+    public fun upsert_oidc_provider_for_next_epoch(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
+        system_addresses::assert_aptos_framework(fx);
+
+        let provider_set = if (config_buffer::does_exist<SupportedOIDCProviders>()) {
+            config_buffer::extract<SupportedOIDCProviders>()
+        } else {
+            *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework)
+        };
+
+        let old_config_url = remove_oidc_provider_internal(&mut provider_set, name);
+        vector::push_back(&mut provider_set.providers, OIDCProvider { name, config_url });
+        config_buffer::upsert(provider_set);
+        old_config_url
+    }
+
+    /// Deprecated by `remove_oidc_provider_for_next_epoch()`.
+    ///
+    /// TODO: update all the tests that reference this function, then disable this function.
     public fun remove_oidc_provider(fx: &signer, name: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
         system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
 
         let provider_set = borrow_global_mut<SupportedOIDCProviders>(@aptos_framework);
         remove_oidc_provider_internal(provider_set, name)
+    }
+
+    /// Used in on-chain governances to update the supported OIDC providers, effective starting next epoch.
+    /// Example usage:
+    /// ```
+    /// aptos_framework::jwks::remove_oidc_provider_for_next_epoch(
+    ///     &framework_signer,
+    ///     b"https://accounts.google.com",
+    /// );
+    /// aptos_framework::aptos_governance::reconfigure(&framework_signer);
+    /// ```
+    public fun remove_oidc_provider_for_next_epoch(fx: &signer, name: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
+        system_addresses::assert_aptos_framework(fx);
+
+        let provider_set = if (config_buffer::does_exist<SupportedOIDCProviders>()) {
+            config_buffer::extract<SupportedOIDCProviders>()
+        } else {
+            *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework)
+        };
+        let ret = remove_oidc_provider_internal(&mut provider_set, name);
+        config_buffer::upsert(provider_set);
+        ret
+    }
+
+    /// Only used in reconfigurations to apply the pending `SupportedOIDCProviders`, if there is any.
+    public(friend) fun on_new_epoch() acquires SupportedOIDCProviders {
+        if (config_buffer::does_exist<SupportedOIDCProviders>()) {
+            *borrow_global_mut<SupportedOIDCProviders>(@aptos_framework) = config_buffer::extract();
+        }
     }
 
     /// Set the `Patches`. Only called in governance proposals.
@@ -244,7 +309,7 @@ module aptos_framework::jwks {
     }
 
     /// Initialize some JWK resources. Should only be invoked by genesis.
-    public(friend) fun initialize(fx: &signer) {
+    public fun initialize(fx: &signer) {
         system_addresses::assert_aptos_framework(fx);
         move_to(fx, SupportedOIDCProviders { providers: vector[] });
         move_to(fx, ObservedJWKs { jwks: AllProvidersJWKs { entries: vector[] } });
@@ -283,6 +348,21 @@ module aptos_framework::jwks {
         let epoch = reconfiguration::current_epoch();
         emit(ObservedJWKsUpdated { epoch, jwks: observed_jwks.jwks });
         regenerate_patched_jwks();
+    }
+
+    /// Only used by governance to delete an issuer from `ObservedJWKs`, if it exists.
+    ///
+    /// Return the potentially existing `ProviderJWKs` of the given issuer.
+    public fun remove_issuer_from_observed_jwks(fx: &signer, issuer: vector<u8>): Option<ProviderJWKs> acquires ObservedJWKs, PatchedJWKs, Patches {
+        system_addresses::assert_aptos_framework(fx);
+        let observed_jwks = borrow_global_mut<ObservedJWKs>(@aptos_framework);
+        let old_value = remove_issuer(&mut observed_jwks.jwks, issuer);
+
+        let epoch = reconfiguration::current_epoch();
+        emit(ObservedJWKsUpdated { epoch, jwks: observed_jwks.jwks });
+        regenerate_patched_jwks();
+
+        old_value
     }
 
     /// Regenerate `PatchedJWKs` from `ObservedJWKs` and `Patches` and save the result.
@@ -485,6 +565,52 @@ module aptos_framework::jwks {
         create_account_for_test(@aptos_framework);
         reconfiguration::initialize_for_test(aptos_framework);
         initialize(aptos_framework);
+    }
+
+    #[test(fx = @aptos_framework)]
+    fun test_observed_jwks_operations(fx: &signer) acquires ObservedJWKs, PatchedJWKs, Patches {
+        initialize_for_test(fx);
+        let jwk_0 = new_unsupported_jwk(b"key_id_0", b"key_payload_0");
+        let jwk_1 = new_unsupported_jwk(b"key_id_1", b"key_payload_1");
+        let jwk_2 = new_unsupported_jwk(b"key_id_2", b"key_payload_2");
+        let jwk_3 = new_unsupported_jwk(b"key_id_3", b"key_payload_3");
+        let jwk_4 = new_unsupported_jwk(b"key_id_4", b"key_payload_4");
+        let expected = AllProvidersJWKs{ entries: vector[] };
+        assert!(expected == borrow_global<ObservedJWKs>(@aptos_framework).jwks, 1);
+
+        let alice_jwks_v1 = ProviderJWKs {
+            issuer: b"alice",
+            version: 1,
+            jwks: vector[jwk_0, jwk_1],
+        };
+        let bob_jwks_v1 = ProviderJWKs{
+            issuer: b"bob",
+            version: 1,
+            jwks: vector[jwk_2, jwk_3],
+        };
+        upsert_into_observed_jwks(fx, vector[bob_jwks_v1]);
+        upsert_into_observed_jwks(fx, vector[alice_jwks_v1]);
+        let expected = AllProvidersJWKs{ entries: vector[
+            alice_jwks_v1,
+            bob_jwks_v1,
+        ] };
+        assert!(expected == borrow_global<ObservedJWKs>(@aptos_framework).jwks, 2);
+
+        let alice_jwks_v2 = ProviderJWKs {
+            issuer: b"alice",
+            version: 2,
+            jwks: vector[jwk_1, jwk_4],
+        };
+        upsert_into_observed_jwks(fx, vector[alice_jwks_v2]);
+        let expected = AllProvidersJWKs{ entries: vector[
+            alice_jwks_v2,
+            bob_jwks_v1,
+        ] };
+        assert!(expected == borrow_global<ObservedJWKs>(@aptos_framework).jwks, 3);
+
+        remove_issuer_from_observed_jwks(fx, b"alice");
+        let expected = AllProvidersJWKs{ entries: vector[bob_jwks_v1] };
+        assert!(expected == borrow_global<ObservedJWKs>(@aptos_framework).jwks, 4);
     }
 
     #[test]

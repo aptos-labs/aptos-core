@@ -569,7 +569,7 @@ For maps that cannot be dropped this is a utility to destroy them
 using lambdas to destroy the individual keys and values.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_destroy">destroy</a>&lt;Key: store, Value: store&gt;(map: <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, dk: |Key|(), dv: |Value|())
+<pre><code><b>public</b> <b>fun</b> <a href="simple_map.md#0x1_simple_map_destroy">destroy</a>&lt;Key: store, Value: store&gt;(map: <a href="simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;Key, Value&gt;, dk: |Key|, dv: |Value|)
 </code></pre>
 
 
@@ -734,6 +734,7 @@ Remove a key/value pair from the map. The key must exist.
 
 <pre><code><b>pragma</b> intrinsic;
 <b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_len">spec_len</a>(result) == 0;
 <b>ensures</b> [abstract] <b>forall</b> k: Key: !<a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(result, k);
 </code></pre>
@@ -753,6 +754,7 @@ Remove a key/value pair from the map. The key must exist.
 
 <pre><code><b>pragma</b> intrinsic;
 <b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_len">spec_len</a>(result) == len(keys);
 <b>ensures</b> [abstract] <b>forall</b> k: Key: <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(result, k) &lt;==&gt; <a href="../../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(keys, k);
 <b>ensures</b> [abstract] <b>forall</b> i in 0..len(keys):
@@ -887,6 +889,7 @@ Remove a key/value pair from the map. The key must exist.
 
 <pre><code><b>pragma</b> intrinsic;
 <b>pragma</b> opaque;
+<b>aborts_if</b> [abstract] <b>false</b>;
 <b>ensures</b> [abstract] !<a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(map), key) ==&gt; <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result_1);
 <b>ensures</b> [abstract] !<a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(map), key) ==&gt; <a href="../../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result_2);
 <b>ensures</b> [abstract] <a href="simple_map.md#0x1_simple_map_spec_contains_key">spec_contains_key</a>(map, key);

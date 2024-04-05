@@ -15,7 +15,6 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
-aptos-crypto-derive = { workspace = true }
 aptos-global-constants = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-secure-storage = { workspace = true }
@@ -26,10 +25,8 @@ arr_macro = { workspace = true }
 bcs = { workspace = true }
 byteorder = { workspace = true }
 cfg-if = { workspace = true }
-cfg_block = { workspace = true }
 get_if_addrs = { workspace = true }
 maplit = { workspace = true }
-mirai-annotations = { workspace = true }
 num_cpus = { workspace = true }
 number_range = { workspace = true }
 poem-openapi = { workspace = true }
@@ -44,11 +41,11 @@ url = { workspace = true }
 [dev-dependencies]
 aptos-crypto = { workspace = true }
 aptos-types = { workspace = true, features = ["fuzzing"] }
+tempfile = { workspace = true }
 
 [features]
 default = []
 failpoints = []
 fuzzing = ["aptos-crypto/fuzzing", "aptos-types/fuzzing"]
-network-perf-test = []
 testing = []
 tokio-console = []

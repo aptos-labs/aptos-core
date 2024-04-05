@@ -88,6 +88,7 @@ spec aptos_framework::storage_gas {
 
     /// A non decreasing curve must ensure that next is greater than cur.
     spec new_gas_curve(min_gas: u64, max_gas: u64, points: vector<Point>): GasCurve {
+        pragma verify_duration_estimate = 120; // TODO: set because of timeout (property proved).
         include NewGasCurveAbortsIf;
         include ValidatePointsAbortsIf;
         /// [high-level-req-3]
@@ -139,7 +140,7 @@ spec aptos_framework::storage_gas {
     /// A non decreasing curve must ensure that next is greater than cur.
     spec validate_points(points: &vector<Point>) {
         pragma aborts_if_is_strict = false;
-        pragma verify = false; // TODO: Disabled. Investigate why this fails.
+        pragma verify = false; // TODO: set because of timeout (property proved).
         pragma opaque;
         include ValidatePointsAbortsIf;
     }

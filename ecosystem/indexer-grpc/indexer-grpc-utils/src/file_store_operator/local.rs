@@ -51,6 +51,10 @@ impl FileStoreOperator for LocalFileStoreOperator {
         self.storage_format
     }
 
+    fn store_name(&self) -> &str {
+        "local"
+    }
+
     async fn get_raw_file(&self, version: u64) -> anyhow::Result<Vec<u8>> {
         let file_entry_key = FileEntry::build_key(version, self.storage_format).to_string();
         let file_path = self.path.join(file_entry_key);
@@ -167,8 +171,10 @@ impl FileStoreOperator for LocalFileStoreOperator {
             let file_entry_key =
                 FileEntry::build_key(starting_version, self.storage_format).to_string();
             let txns_path = self.path.join(file_entry_key.as_str());
-            if !txns_path.exists() {
-                tokio::fs::create_dir_all(txns_path.clone()).await?;
+            let parent_dir = txns_path.parent().unwrap();
+            if !parent_dir.exists() {
+                tracing::debug!("Creating parent dir: {parent_dir:?}.");
+                tokio::fs::create_dir_all(parent_dir).await?;
             }
 
             tracing::debug!(

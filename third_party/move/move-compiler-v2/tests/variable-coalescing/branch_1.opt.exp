@@ -1,0 +1,147 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::foo($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t3 := infer($t1)
+  1: if ($t0) goto 2 else goto 6
+  2: label L0
+  3: $t4 := 0
+  4: $t3 := infer($t4)
+  5: goto 7
+  6: label L1
+  7: label L2
+  8: $t5 := 1
+  9: $t2 := +($t3, $t5)
+ 10: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::foo($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t3 := move($t1)
+  1: if ($t0) goto 2 else goto 6
+  2: label L0
+  3: $t4 := 0
+  4: $t3 := move($t4)
+  5: goto 7
+  6: label L1
+  7: label L2
+  8: $t5 := 1
+  9: $t2 := +($t3, $t5)
+ 10: return $t2
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::foo($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0, $t1
+     # events: b:$t0, b:$t1, e:$t1, b:$t3
+  0: $t3 := move($t1)
+     # live vars: $t0, $t3
+     # events: e:$t0
+  1: if ($t0) goto 2 else goto 6
+     # live vars: $t3
+  2: label L0
+     # live vars:
+     # events: b:$t4
+  3: $t4 := 0
+     # live vars: $t4
+     # events: e:$t4
+  4: $t3 := move($t4)
+     # live vars: $t3
+  5: goto 7
+     # live vars: $t3
+  6: label L1
+     # live vars: $t3
+  7: label L2
+     # live vars: $t3
+     # events: b:$t5
+  8: $t5 := 1
+     # live vars: $t3, $t5
+     # events: e:$t3, e:$t5, b:$t2
+  9: $t2 := +($t3, $t5)
+     # live vars: $t2
+     # events: e:$t2
+ 10: return $t2
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::foo($t0: bool, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+  0: $t1 := move($t1)
+  1: if ($t0) goto 2 else goto 6
+  2: label L0
+  3: $t4 := 0
+  4: $t1 := move($t4)
+  5: goto 7
+  6: label L1
+  7: label L2
+  8: $t4 := 1
+  9: $t1 := +($t1, $t4)
+ 10: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::foo($t0: bool, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+  0: if ($t0) goto 1 else goto 5
+  1: label L0
+  2: $t4 := 0
+  3: $t1 := move($t4)
+  4: goto 6
+  5: label L1
+  6: label L2
+  7: $t4 := 1
+  8: $t1 := +($t1, $t4)
+  9: return $t1
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+foo(Arg0: bool, Arg1: u64): u64 /* def_idx: 0 */ {
+L2:	loc0: u64
+B0:
+	0: MoveLoc[0](Arg0: bool)
+	1: BrFalse(5)
+B1:
+	2: LdU64(0)
+	3: StLoc[1](Arg1: u64)
+	4: Branch(5)
+B2:
+	5: LdU64(1)
+	6: StLoc[2](loc0: u64)
+	7: MoveLoc[1](Arg1: u64)
+	8: MoveLoc[2](loc0: u64)
+	9: Add
+	10: Ret
+}
+}
+============ bytecode verification succeeded ========

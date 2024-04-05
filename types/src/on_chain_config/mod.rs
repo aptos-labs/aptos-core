@@ -23,9 +23,12 @@ mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
 mod chain_id;
+mod commit_history;
 mod consensus_config;
 mod execution_config;
 mod gas_schedule;
+mod jwk_consensus_config;
+mod randomness_config;
 mod timed_features;
 mod timestamp;
 mod transaction_fee;
@@ -37,15 +40,21 @@ pub use self::{
     aptos_version::{
         Version, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
     },
+    commit_history::CommitHistoryResource,
     consensus_config::{
-        ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1, LeaderReputationType,
-        OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType, ValidatorTxnConfig,
+        AnchorElectionMode, ConsensusAlgorithmConfig, ConsensusConfigV1, DagConsensusConfigV1,
+        LeaderReputationType, OnChainConsensusConfig, ProposerAndVoterConfig, ProposerElectionType,
+        ValidatorTxnConfig,
     },
     execution_config::{
-        BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, OnChainExecutionConfig,
-        TransactionDeduperType, TransactionShufflerType,
+        BlockGasLimitType, ExecutionConfigV1, ExecutionConfigV2, ExecutionConfigV4,
+        OnChainExecutionConfig, TransactionDeduperType, TransactionShufflerType,
     },
     gas_schedule::{GasSchedule, GasScheduleV2, StorageGasSchedule},
+    jwk_consensus_config::{
+        ConfigV1 as JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig,
+    },
+    randomness_config::{OnChainRandomnessConfig, RandomnessConfigMoveStruct},
     timed_features::{TimedFeatureFlag, TimedFeatureOverride, TimedFeatures, TimedFeaturesBuilder},
     timestamp::CurrentTimeMicroseconds,
     transaction_fee::TransactionFeeBurnCap,
@@ -160,6 +169,7 @@ pub trait OnChainConfig: Send + Sync + DeserializeOwned {
         Self::deserialize_default_impl(bytes)
     }
 
+    /// TODO: This does not work if `T`'s reflection on the Move side is using resource groups.
     fn fetch_config<T>(storage: &T) -> Option<Self>
     where
         T: ConfigStorage + ?Sized,

@@ -90,7 +90,13 @@ pub fn bootstrap(
     let node_config = config.clone();
 
     runtime.spawn(async move {
-        let context = Arc::new(Context::new(chain_id, db, mp_sender, node_config));
+        let context = Arc::new(Context::new(
+            chain_id,
+            db,
+            mp_sender,
+            node_config,
+            None, /* table info reader */
+        ));
         run_forever(indexer_config, context).await;
     });
 

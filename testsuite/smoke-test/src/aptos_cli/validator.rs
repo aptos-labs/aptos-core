@@ -27,8 +27,8 @@ use aptos_types::{
     network_address::DnsName,
     on_chain_config::{
         ConsensusAlgorithmConfig, ConsensusConfigV1, ExecutionConfigV1, LeaderReputationType,
-        OnChainConsensusConfig, OnChainExecutionConfig, ProposerAndVoterConfig,
-        ProposerElectionType, TransactionShufflerType, ValidatorSet,
+        OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
+        ProposerAndVoterConfig, ProposerElectionType, TransactionShufflerType, ValidatorSet,
     },
     PeerId,
 };
@@ -170,7 +170,7 @@ async fn check_vote_to_elected(swarm: &mut LocalSwarm) -> (Option<u64>, Option<u
         .validator_index;
     let mut first_vote = None;
     let mut first_elected = None;
-    for (_i, event) in info.blocks.iter().enumerate() {
+    for event in info.blocks.iter() {
         let previous_block_votes_bitvec: BitVec =
             event.event.previous_block_votes_bitvec().clone().into();
         if first_vote.is_none() && previous_block_votes_bitvec.is_set(off_index) {
@@ -555,6 +555,8 @@ async fn test_large_total_stake() {
             genesis_config.epoch_duration_secs = 4;
             genesis_config.recurring_lockup_duration_secs = 4;
             genesis_config.voting_duration_secs = 3;
+            genesis_config.randomness_config_override =
+                Some(OnChainRandomnessConfig::default_disabled());
         }))
         .build_with_cli(0)
         .await;
@@ -1055,6 +1057,7 @@ async fn test_join_and_leave_validator() {
             genesis_config.epoch_duration_secs = 5;
             genesis_config.recurring_lockup_duration_secs = 10;
             genesis_config.voting_duration_secs = 5;
+            genesis_config.randomness_config_override = Some(OnChainRandomnessConfig::Off);
         }))
         .build_with_cli(0)
         .await;
