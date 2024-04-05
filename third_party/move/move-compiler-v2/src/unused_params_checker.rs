@@ -3,22 +3,7 @@ use move_model::{
     model::{GlobalEnv, StructEnv, TypeParameter},
     ty::Type,
 };
-use std::collections::{
-    btree_map::Entry::{Occupied, Vacant},
-    BTreeMap, BTreeSet,
-};
-
-/// Checks all modules in the given environment for
-/// duplicate type parameters in struct definitions.
-pub fn duplicate_params_checker(env: &GlobalEnv) {
-    for module in env.get_modules() {
-        if module.is_target() {
-            for struct_env in module.get_structs() {
-                check_duplicate_params(&struct_env);
-            }
-        }
-    }
-}
+use std::collections::BTreeSet;
 
 /// Checks all modules in the given environment for
 /// unused type parameters in struct definitions.
@@ -28,26 +13,6 @@ pub fn unused_params_checker(env: &GlobalEnv) {
             for struct_env in module.get_structs() {
                 check_unused_params(&struct_env);
             }
-        }
-    }
-}
-
-/// Checks for duplicate type parameters in the struct definition, and reports errors if found.
-fn check_duplicate_params(struct_env: &StructEnv) {
-    let env = struct_env.module_env.env;
-    let mut param_to_loc = BTreeMap::new();
-    for TypeParameter(name, _kind, loc) in struct_env.get_type_parameters() {
-        match param_to_loc.entry(name) {
-            Vacant(e) => {
-                e.insert(loc.clone());
-            },
-            Occupied(e) => {
-                let prev_loc = e.get();
-                env.error_with_labels(loc, "duplicate type parameter", vec![(
-                    prev_loc.clone(),
-                    "previously defined here".to_string(),
-                )]);
-            },
         }
     }
 }
