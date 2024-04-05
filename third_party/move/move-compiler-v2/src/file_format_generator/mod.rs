@@ -27,10 +27,7 @@ pub fn generate_file_format(
         if !module_env.is_target() {
             continue;
         }
-        if !compile_test_code && module_env.is_test_only() {
-            assert!(false);
-            continue;
-        }
+        assert!(compile_test_code || !module_env.is_test_only());
         let (ff_module, source_map, main_handle) = ModuleGenerator::run(&ctx, &module_env);
         if module_env.is_script_module() {
             let FF::CompiledModule {
