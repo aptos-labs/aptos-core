@@ -23,7 +23,10 @@ impl Worker {
     }
 
     pub async fn run(&mut self) -> Result<()> {
-        tracing::info!("Running. Starting version: {}, ending version pending retrieval...", self.starting_version.unwrap_or(0));
+        tracing::info!(
+            "Running. Starting version: {}, ending version pending retrieval...",
+            self.starting_version.unwrap_or(0)
+        );
         let file_store_operator = self.file_store_config.create();
         let starting_version = self.starting_version.unwrap_or(0);
         let cursor = Arc::new(Mutex::new(starting_version));
@@ -31,12 +34,19 @@ impl Worker {
         let task_count = 32;
         let current_metadata = file_store_operator.get_file_store_metadata().await.unwrap();
         let ending_version = current_metadata.version;
-        tracing::info!("Run operation starting. Starting version: {}, ending version: {}", starting_version, ending_version);
+        tracing::info!(
+            "Run operation starting. Starting version: {}, ending version: {}",
+            starting_version,
+            ending_version
+        );
         for _ in 0..task_count {
             let file_store_operator = file_store_operator.clone_box();
             let cursor = cursor.clone();
             let data_to_process = data_to_process.clone();
-            tracing::info!("Preparing to spawn {} tasks for data processing.", task_count);
+            tracing::info!(
+                "Preparing to spawn {} tasks for data processing.",
+                task_count
+            );
 
             tokio::spawn(async move {
                 loop {
@@ -78,9 +88,17 @@ impl Worker {
             for transaction in transactions {
                 // Log the expected and actual version before the assertion
                 if transaction.version != version_to_check {
-                    tracing::error!("Version mismatch: expected {}, got {}", version_to_check, transaction.version);
+                    tracing::error!(
+                        "Version mismatch: expected {}, got {}",
+                        version_to_check,
+                        transaction.version
+                    );
                 }
-                assert_eq!(transaction.version, version_to_check, "Version mismatch: expected {}, got {}", version_to_check, transaction.version);
+                assert_eq!(
+                    transaction.version, version_to_check,
+                    "Version mismatch: expected {}, got {}",
+                    version_to_check, transaction.version
+                );
                 version_to_check += 1;
             }
         }
