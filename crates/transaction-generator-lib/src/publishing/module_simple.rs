@@ -231,6 +231,13 @@ pub enum EntryPoints {
     /// Burn an NFT token, only works with numbered=false tokens.
     TokenV2AmbassadorBurn,
 
+    LiquidityPoolSwapInit {
+        is_stable: bool,
+    },
+    LiquidityPoolSwap {
+        is_stable: bool,
+    },
+
     InitializeVectorPicture {
         length: u64,
     },
@@ -291,7 +298,9 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador_token"
             },
-            EntryPoints::InitializeVectorPicture { .. }
+            EntryPoints::LiquidityPoolSwapInit { .. }
+            | EntryPoints::LiquidityPoolSwap { .. }
+            | EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
             | EntryPoints::VectorPictureRead { .. }
             | EntryPoints::InitializeSmartTablePicture
@@ -342,6 +351,9 @@ impl EntryPoints {
             EntryPoints::FungibleAssetMint => "fungible_asset_example",
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 "ambassador"
+            },
+            EntryPoints::LiquidityPoolSwapInit { .. } | EntryPoints::LiquidityPoolSwap { .. } => {
+                "liquidity_pool_wrapper"
             },
             EntryPoints::InitializeVectorPicture { .. }
             | EntryPoints::VectorPicture { .. }
@@ -593,6 +605,20 @@ impl EntryPoints {
                 ident_str!("burn_named_by_user").to_owned(),
                 vec![],
             ),
+
+            EntryPoints::LiquidityPoolSwapInit { is_stable } => get_payload(
+                module_id,
+                ident_str!("initialize_liquid_pair").to_owned(),
+                vec![bcs::to_bytes(&is_stable).unwrap()],
+            ),
+            EntryPoints::LiquidityPoolSwap { is_stable } => {
+                let rng: &mut StdRng = rng.expect("Must provide RNG");
+                let from_1: bool = (rng.gen_range(0, 2) == 1);
+                get_payload(module_id, ident_str!("swap").to_owned(), vec![
+                    bcs::to_bytes(&rng.gen_range(1000u64, 2000u64)).unwrap(), // amount_in
+                    bcs::to_bytes(&from_1).unwrap(),                          // from_1
+                ])
+            },
             EntryPoints::InitializeVectorPicture { length } => {
                 get_payload(module_id, ident_str!("create").to_owned(), vec![
                     bcs::to_bytes(&length).unwrap(), // length
@@ -653,6 +679,11 @@ impl EntryPoints {
             | EntryPoints::TokenV1MintAndTransferFT => {
                 Some(EntryPoints::TokenV1InitializeCollection)
             },
+            EntryPoints::LiquidityPoolSwap { is_stable } => {
+                Some(EntryPoints::LiquidityPoolSwapInit {
+                    is_stable: *is_stable,
+                })
+            },
             EntryPoints::VectorPicture { length } | EntryPoints::VectorPictureRead { length } => {
                 Some(EntryPoints::InitializeVectorPicture { length: *length })
             },
@@ -674,6 +705,7 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 MultiSigConfig::Publisher
             },
+            EntryPoints::LiquidityPoolSwap { .. } => MultiSigConfig::Publisher,
             _ => MultiSigConfig::None,
         }
     }
@@ -724,6 +756,8 @@ impl EntryPoints {
             EntryPoints::TokenV2AmbassadorMint { .. } | EntryPoints::TokenV2AmbassadorBurn => {
                 AutomaticArgs::SignerAndMultiSig
             },
+            EntryPoints::LiquidityPoolSwapInit { .. } => AutomaticArgs::Signer,
+            EntryPoints::LiquidityPoolSwap { .. } => AutomaticArgs::SignerAndMultiSig,
             EntryPoints::InitializeVectorPicture { .. } => AutomaticArgs::Signer,
             EntryPoints::VectorPicture { .. } | EntryPoints::VectorPictureRead { .. } => {
                 AutomaticArgs::None

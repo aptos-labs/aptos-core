@@ -924,7 +924,7 @@ impl FakeExecutor {
             let elapsed = start.elapsed();
             if let Err(err) = result {
                 if !should_error {
-                    println!("Should error, but ignoring for now... {}", err);
+                    println!("Shouldn't error, but ignoring for now... {}", err);
                 }
             }
             times.push(elapsed.as_micros());
