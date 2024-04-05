@@ -1397,7 +1397,7 @@ module aptos_framework::coin {
     #[test(source = @0x1)]
     public entry fun test_burn_from_with_capability(
         source: signer,
-    ) acquires CoinInfo, CoinStore, CoinConversionMap {
+    ) acquires CoinInfo, CoinStore, CoinConversionMap, PairedFungibleAssetRefs {
         let source_addr = signer::address_of(&source);
         account::create_account_for_test(source_addr);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&source, 1, true);
@@ -1523,7 +1523,9 @@ module aptos_framework::coin {
     }
 
     #[test(account = @0x1)]
-    public entry fun burn_frozen(account: signer) acquires CoinInfo, CoinStore, CoinConversionMap {
+    public entry fun burn_frozen(
+        account: signer
+    ) acquires CoinInfo, CoinStore, CoinConversionMap, PairedFungibleAssetRefs {
         let account_addr = signer::address_of(&account);
         account::create_account_for_test(account_addr);
         let (burn_cap, freeze_cap, mint_cap) = initialize_and_register_fake_money(&account, 18, true);

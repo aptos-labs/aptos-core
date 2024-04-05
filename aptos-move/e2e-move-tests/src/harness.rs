@@ -19,6 +19,7 @@ use aptos_types::{
         fungible_store::FungibleStoreResource, object::ObjectGroupResource, AccountResource,
         CoinStoreResource, CORE_CODE_ADDRESS,
     },
+    chain_id::ChainId,
     contract_event::ContractEvent,
     move_utils::MemberId,
     on_chain_config::{FeatureFlag, GasScheduleV2, OnChainConfig},
