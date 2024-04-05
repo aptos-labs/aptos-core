@@ -107,6 +107,7 @@ pub enum FeatureFlag {
     KeylessAccountsWithPasskeys,
     MultisigV2Enhancement,
     CoinToFungibleAssetMigration,
+    DispatchableFungibleAsset,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -270,6 +271,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::CoinToFungibleAssetMigration => {
                 AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION
             },
+            FeatureFlag::DispatchableFungibleAsset => AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET,
         }
     }
 }
@@ -362,6 +364,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION => {
                 FeatureFlag::CoinToFungibleAssetMigration
             },
+            AptosFeatureFlag::DISPATCHABLE_FUNGIBLE_ASSET => FeatureFlag::DispatchableFungibleAsset,
         }
     }
 }

@@ -199,3 +199,13 @@ proposals:
                 config_url: "https://www.facebook.com/.well-known/openid-configuration"
               - name: "https://accounts.google.com"
                 config_url: "https://accounts.google.com/.well-known/openid-configuration"
+  - name: step_17_dispatchable_token
+    metadata:
+      title: "AIP-73: Dispatchable token standard"
+      description: "AIP-73: allows fungible asset issuer to implement hook functions upon deposit/withdraw"
+      discussion_url: "https://github.com/aptos-labs/aptos-core/issues/12490"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - dispatchable_fungible_asset

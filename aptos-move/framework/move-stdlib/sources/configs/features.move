@@ -447,6 +447,17 @@ module std::features {
         is_enabled(COIN_TO_FUNGIBLE_ASSET_MIGRATION)
     }
 
+    /// Whether the dispatchable fungible asset standard feature is enabled.
+    ///
+    /// Lifetime: transient
+    const DISPATCHABLE_FUNGIBLE_ASSET: u64 = 58;
+
+    public fun get_dispatchable_fungible_asset_feature(): u64 { DISPATCHABLE_FUNGIBLE_ASSET }
+
+    public fun dispatchable_fungible_asset_enabled(): bool acquires Features {
+        is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
