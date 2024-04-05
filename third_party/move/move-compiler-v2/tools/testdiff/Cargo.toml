@@ -14,3 +14,4 @@ anyhow = "1.0.62"
 clap = { version = "4.3.9", features = ["derive", "env"] }
 once_cell = "1.10.0"
 walkdir = "2.3.3"
+regex = "1.10.4"
