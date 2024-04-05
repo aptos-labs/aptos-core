@@ -35,6 +35,7 @@ use aptos_types::{
         TransactionAuxiliaryData, TransactionInfo, TransactionListWithProof, TransactionOutput,
         TransactionOutputListWithProof, TransactionPayload, TransactionStatus, Version,
     },
+    validator_verifier::ValidatorVerifier,
     waypoint::Waypoint,
     write_set::WriteSet,
 };
@@ -145,14 +146,15 @@ pub fn create_random_epoch_ending_ledger_info(
     version: Version,
     epoch: Epoch,
 ) -> LedgerInfoWithSignatures {
+    let next_epoch_state = EpochState::new(epoch + 1, ValidatorVerifier::new(vec![]));
     let block_info = BlockInfo::new(
         epoch,
         0,
         HashValue::zero(),
         HashValue::random(),
         version,
-        0,
-        Some(EpochState::empty()),
+        version,
+        Some(next_epoch_state),
     );
     let ledger_info = LedgerInfo::new(block_info, HashValue::random());
     LedgerInfoWithSignatures::new(ledger_info, AggregateSignature::empty())
