@@ -18,7 +18,7 @@ use std::{
     collections::{btree_set::Iter, BTreeMap, BTreeSet, HashMap},
     iter::Rev,
     ops::Bound,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime},
 };
 
 pub type AccountTransactions = BTreeMap<u64, MempoolTransaction>;
@@ -57,11 +57,7 @@ impl PriorityIndex {
     fn make_key(&self, txn: &MempoolTransaction) -> OrderedQueueKey {
         OrderedQueueKey {
             gas_ranking_score: txn.ranking_score,
-            expiration_time: txn
-                .insertion_info
-                .insertion_time
-                .duration_since(UNIX_EPOCH)
-                .unwrap(),
+            expiration_time: txn.expiration_time,
             address: txn.get_sender(),
             sequence_number: txn.sequence_info,
         }
