@@ -27,6 +27,27 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+#[derive(Debug)]
+enum LocalAccountAuthenticator {
+    PrivateKey(AccountKey),
+}
+
+impl LocalAccountAuthenticator {
+    pub fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction {
+        match self {
+            LocalAccountAuthenticator::PrivateKey(key) => txn
+                .sign(key.private_key(), key.public_key().clone())
+                .expect("Signing a txn can't fail")
+                .into_inner(),
+        }
+    }
+}
+impl<T: Into<AccountKey>> From<T> for LocalAccountAuthenticator {
+    fn from(key: T) -> Self {
+        Self::PrivateKey(key.into())
+    }
+}
+
 /// LocalAccount represents an account on the Aptos blockchain. Internally it
 /// holds the private / public key pair and the address of the account. You can
 /// use this struct to help transact with the blockchain, e.g. by generating a
@@ -35,8 +56,8 @@ use std::{
 pub struct LocalAccount {
     /// Address of the account.
     address: AccountAddress,
-    /// Authentication key of the account.
-    key: AccountKey,
+    /// Authenticator of the account
+    auth: LocalAccountAuthenticator,
     /// Latest known sequence number of the account, it can be different from validator.
     sequence_number: AtomicU64,
 }
@@ -48,7 +69,7 @@ impl LocalAccount {
     pub fn new<T: Into<AccountKey>>(address: AccountAddress, key: T, sequence_number: u64) -> Self {
         Self {
             address,
-            key: key.into(),
+            auth: LocalAccountAuthenticator::from(key),
             sequence_number: AtomicU64::new(sequence_number),
         }
     }
@@ -69,11 +90,7 @@ impl LocalAccount {
         let key = AccountKey::from(Ed25519PrivateKey::try_from(key.as_bytes().as_ref())?);
         let address = key.authentication_key().account_address();
 
-        Ok(Self {
-            address,
-            key,
-            sequence_number: AtomicU64::new(sequence_number),
-        })
+        Ok(Self::new(address, key, sequence_number))
     }
 
     /// Generate a new account locally. Note: This function does not actually
@@ -90,9 +107,7 @@ impl LocalAccount {
     }
 
     pub fn sign_transaction(&self, txn: RawTransaction) -> SignedTransaction {
-        txn.sign(self.private_key(), self.public_key().clone())
-            .expect("Signing a txn can't fail")
-            .into_inner()
+        self.auth.sign_transaction(txn)
     }
 
     pub fn sign_with_transaction_builder(&self, builder: TransactionBuilder) -> SignedTransaction {
@@ -165,15 +180,21 @@ impl LocalAccount {
     }
 
     pub fn private_key(&self) -> &Ed25519PrivateKey {
-        self.key.private_key()
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => key.private_key(),
+        }
     }
 
     pub fn public_key(&self) -> &Ed25519PublicKey {
-        self.key.public_key()
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => key.public_key(),
+        }
     }
 
     pub fn authentication_key(&self) -> AuthenticationKey {
-        self.key.authentication_key()
+        match &self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => key.authentication_key(),
+        }
     }
 
     pub fn sequence_number(&self) -> u64 {
@@ -194,7 +215,9 @@ impl LocalAccount {
     }
 
     pub fn rotate_key<T: Into<AccountKey>>(&mut self, new_key: T) -> AccountKey {
-        std::mem::replace(&mut self.key, new_key.into())
+        match &mut self.auth {
+            LocalAccountAuthenticator::PrivateKey(key) => std::mem::replace(key, new_key.into()),
+        }
     }
 
     pub fn received_event_key(&self) -> EventKey {
