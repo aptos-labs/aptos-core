@@ -3,6 +3,9 @@ module 0xcafe::m {
     struct S {
         x: u64,
     }
+    private fun map(x: u64,f: |u64|u64): u64 {
+        (f)(x)
+    }
     private fun assigns_local(x: u64,c: u64): u64 {
         {
           let z: u64 = 1;
@@ -37,9 +40,6 @@ module 0xcafe::m {
             Add<u64>(y, Deref(r))
           })
         }
-    }
-    private fun map(x: u64,f: |u64|u64): u64 {
-        (f)(x)
     }
 } // end 0xcafe::m
 

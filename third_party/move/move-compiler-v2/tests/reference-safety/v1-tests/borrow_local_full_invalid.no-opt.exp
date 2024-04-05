@@ -1,0 +1,23 @@
+
+Diagnostics:
+error: cannot mutably borrow since immutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:23:17
+   │
+22 │         let x = &v;
+   │                 -- previous local borrow
+23 │         let y = &mut v;
+   │                 ^^^^^^ mutable borrow attempted here
+24 │         *y = 0;
+   │         ------ requirement enforced here
+25 │         *x;
+   │         -- conflicting reference `x` used here
+
+error: cannot immutably borrow since mutable references exist
+   ┌─ tests/reference-safety/v1-tests/borrow_local_full_invalid.move:33:17
+   │
+32 │         let x = &mut v;
+   │                 ------ previous mutable local borrow
+33 │         let y = &v;
+   │                 ^^ immutable borrow attempted here
+34 │         *x;
+   │         -- requirement enforced here

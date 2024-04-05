@@ -1,0 +1,41 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct S {
+        f: u64,
+    }
+    private fun t0(s: &mut M::S) {
+        s = pack M::S(0);
+        Borrow(Immutable)(0) = 1;
+        {
+          let x: u64 = 0;
+          {
+            let x_ref: &mut u64 = Borrow(Mutable)(x);
+            {
+              let x_ref: &u64 = Freeze(false)(x_ref);
+              x_ref = 0;
+              Tuple()
+            }
+          }
+        }
+    }
+} // end 0x8675309::M
+
+
+Diagnostics:
+error: expected `&mut` but found `&M::S`
+  ┌─ tests/bytecode-generator/v1-typing/mutate_immutable.move:5:11
+  │
+5 │         *(s: &S) = S { f: 0 };
+  │           ^
+
+error: expected `&mut` but found `&u64`
+  ┌─ tests/bytecode-generator/v1-typing/mutate_immutable.move:6:10
+  │
+6 │         *&0 = 1;
+  │          ^^
+
+error: expected `&mut` but found `&u64`
+   ┌─ tests/bytecode-generator/v1-typing/mutate_immutable.move:10:10
+   │
+10 │         *x_ref = 0;
+   │          ^^^^^

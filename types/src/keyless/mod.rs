@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
     on_chain_config::CurrentTimeMicroseconds,
@@ -293,7 +294,7 @@ impl TryFrom<&[u8]> for IdCommitment {
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct KeylessPublicKey {
     /// The value of the `iss` field from the JWT, indicating the OIDC provider.
-    /// e.g., https://accounts.google.com
+    /// e.g., <https://accounts.google.com>
     pub iss_val: String,
 
     /// SNARK-friendly commitment to:

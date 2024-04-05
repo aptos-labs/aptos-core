@@ -49,6 +49,7 @@ on a proposal multiple times as long as the total voting power of these votes do
 -  [Function `remove_approved_hash`](#0x1_aptos_governance_remove_approved_hash)
 -  [Function `reconfigure`](#0x1_aptos_governance_reconfigure)
 -  [Function `force_end_epoch`](#0x1_aptos_governance_force_end_epoch)
+-  [Function `force_end_epoch_test_only`](#0x1_aptos_governance_force_end_epoch_test_only)
 -  [Function `toggle_features`](#0x1_aptos_governance_toggle_features)
 -  [Function `get_signer_testnet_only`](#0x1_aptos_governance_get_signer_testnet_only)
 -  [Function `get_voting_power`](#0x1_aptos_governance_get_voting_power)
@@ -81,6 +82,7 @@ on a proposal multiple times as long as the total voting power of these votes do
     -  [Function `remove_approved_hash`](#@Specification_1_remove_approved_hash)
     -  [Function `reconfigure`](#@Specification_1_reconfigure)
     -  [Function `force_end_epoch`](#@Specification_1_force_end_epoch)
+    -  [Function `force_end_epoch_test_only`](#@Specification_1_force_end_epoch_test_only)
     -  [Function `toggle_features`](#@Specification_1_toggle_features)
     -  [Function `get_signer_testnet_only`](#@Specification_1_get_signer_testnet_only)
     -  [Function `get_voting_power`](#@Specification_1_get_voting_power)
@@ -1475,7 +1477,7 @@ This behavior affects when an update of an on-chain config (e.g. <code>Consensus
 since such updates are applied whenever we enter an new epoch.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -1484,7 +1486,7 @@ since such updates are applied whenever we enter an new epoch.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <b>if</b> (<a href="consensus_config.md#0x1_consensus_config_validator_txn_enabled">consensus_config::validator_txn_enabled</a>() && <a href="randomness_config.md#0x1_randomness_config_enabled">randomness_config::enabled</a>()) {
         <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_try_start">reconfiguration_with_dkg::try_start</a>();
@@ -1510,7 +1512,7 @@ WARNING: currently only used by tests. In most cases you should use <code><a hre
 TODO: migrate these tests to be aware of async reconfiguration.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
@@ -1519,9 +1521,37 @@ TODO: migrate these tests to be aware of async reconfiguration.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
     <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">reconfiguration_with_dkg::finish</a>(aptos_framework);
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_governance_force_end_epoch_test_only"></a>
+
+## Function `force_end_epoch_test_only`
+
+<code><a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>()</code> equivalent but only called in testnet,
+where the core resources account exists and has been granted power to mint Aptos coins.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch_test_only">force_end_epoch_test_only</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch_test_only">force_end_epoch_test_only</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) <b>acquires</b> <a href="aptos_governance.md#0x1_aptos_governance_GovernanceResponsbility">GovernanceResponsbility</a> {
+    <b>let</b> core_signer = <a href="aptos_governance.md#0x1_aptos_governance_get_signer_testnet_only">get_signer_testnet_only</a>(aptos_framework, @0x1);
+    <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(&core_signer);
+    <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_finish">reconfiguration_with_dkg::finish</a>(&core_signer);
 }
 </code></pre>
 
@@ -2646,13 +2676,13 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 ### Function `reconfigure`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_reconfigure">reconfigure</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>aborts_if</b> !<a href="system_addresses.md#0x1_system_addresses_is_aptos_framework_address">system_addresses::is_aptos_framework_address</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework));
 <b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
     <a href="account.md#0x1_account">account</a>: aptos_framework
@@ -2673,13 +2703,13 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 ### Function `force_end_epoch`
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch">force_end_epoch</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
 </code></pre>
 
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> <b>address</b> = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {
     <a href="account.md#0x1_account">account</a>: aptos_framework
@@ -2699,6 +2729,22 @@ Address @aptos_framework must exist ApprovedExecutionHashes and GovernancePropos
 
 
 
+<a id="@Specification_1_force_end_epoch_test_only"></a>
+
+### Function `force_end_epoch_test_only`
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="aptos_governance.md#0x1_aptos_governance_force_end_epoch_test_only">force_end_epoch_test_only</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+</code></pre>
+
+
+
 <a id="@Specification_1_toggle_features"></a>
 
 ### Function `toggle_features`
@@ -2712,7 +2758,7 @@ Signer address must be @aptos_framework.
 Address @aptos_framework must exist GovernanceConfig and GovernanceEvents.
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 600;
+<pre><code><b>pragma</b> verify = <b>false</b>;
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> addr != @aptos_framework;
 <b>include</b> <a href="reconfiguration_with_dkg.md#0x1_reconfiguration_with_dkg_FinishRequirement">reconfiguration_with_dkg::FinishRequirement</a> {

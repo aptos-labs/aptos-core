@@ -45,9 +45,8 @@ use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::env::MOVE_HOME;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
-use move_package::{
-    source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig, CompilerVersion,
-};
+use move_model::metadata::{CompilerVersion, LanguageVersion};
+use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 pub use package_hooks::*;
 use serde::{Deserialize, Serialize};
@@ -327,6 +326,7 @@ impl CliCommand<Vec<String>> for CompilePackage {
                     self.move_options.named_addresses(),
                     self.move_options.bytecode_version,
                     self.move_options.compiler_version,
+                    self.move_options.language_version,
                     self.move_options.skip_attribute_checks,
                     self.move_options.check_test_code,
                 )
@@ -389,6 +389,7 @@ impl CompileScript {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
+                self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             )
@@ -556,6 +557,8 @@ impl CliCommand<&'static str> for ProvePackage {
                 move_options.get_package_path()?.as_path(),
                 move_options.named_addresses(),
                 move_options.bytecode_version,
+                move_options.compiler_version,
+                move_options.language_version,
                 move_options.skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
             )
@@ -605,6 +608,7 @@ impl CliCommand<&'static str> for DocumentPackage {
             skip_fetch_latest_git_deps: move_options.skip_fetch_latest_git_deps,
             bytecode_version: move_options.bytecode_version,
             compiler_version: move_options.compiler_version,
+            language_version: move_options.language_version,
             skip_attribute_checks: move_options.skip_attribute_checks,
             check_test_code: move_options.check_test_code,
             known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -673,6 +677,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
+                self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             );
@@ -687,7 +692,7 @@ impl TryInto<PackagePublicationData> for &PublishPackage {
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
-        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include fewer artifacts via `--included-artifacts`. \
@@ -743,6 +748,7 @@ impl IncludedArtifacts {
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
         compiler_version: Option<CompilerVersion>,
+        language_version: Option<LanguageVersion>,
         skip_attribute_checks: bool,
         check_test_code: bool,
     ) -> BuildOptions {
@@ -759,6 +765,7 @@ impl IncludedArtifacts {
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
+                language_version,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -774,6 +781,7 @@ impl IncludedArtifacts {
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
+                language_version,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -789,6 +797,7 @@ impl IncludedArtifacts {
                 skip_fetch_latest_git_deps,
                 bytecode_version,
                 compiler_version,
+                language_version,
                 skip_attribute_checks,
                 check_test_code,
                 known_attributes: extended_checks::get_all_attribute_names().clone(),
@@ -909,6 +918,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
+                self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             );
@@ -927,7 +937,7 @@ impl CliCommand<TransactionSummary> for CreateObjectAndPublishPackage {
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
 
-        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
@@ -985,6 +995,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
+                self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             );
@@ -1023,7 +1034,7 @@ impl CliCommand<TransactionSummary> for UpgradeObjectPackage {
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
 
-        if !self.override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !self.override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
@@ -1109,6 +1120,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
             move_options.named_addresses(),
             move_options.bytecode_version,
             move_options.compiler_version,
+            move_options.language_version,
             move_options.skip_attribute_checks,
             move_options.check_test_code,
         );
@@ -1131,7 +1143,7 @@ impl CliCommand<TransactionSummary> for CreateResourceAccountAndPublishPackage {
         );
         let size = bcs::serialized_size(&payload)?;
         println!("package size {} bytes", size);
-        if !override_size_check_option.value && size > MAX_PUBLISH_PACKAGE_SIZE {
+        if !override_size_check_option.override_size_check && size > MAX_PUBLISH_PACKAGE_SIZE {
             return Err(CliError::UnexpectedError(format!(
                 "The package is larger than {} bytes ({} bytes)! To lower the size \
                 you may want to include less artifacts via `--included-artifacts`. \
@@ -1260,6 +1272,7 @@ impl CliCommand<&'static str> for VerifyPackage {
                 self.move_options.named_addresses(),
                 self.move_options.bytecode_version,
                 self.move_options.compiler_version,
+                self.move_options.language_version,
                 self.move_options.skip_attribute_checks,
                 self.move_options.check_test_code,
             )

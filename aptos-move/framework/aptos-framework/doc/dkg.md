@@ -232,13 +232,15 @@ Called in genesis to initialize on-chain states.
 
 <pre><code><b>public</b> <b>fun</b> <a href="dkg.md#0x1_dkg_initialize">initialize</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
-    <b>move_to</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(
-        aptos_framework,
-        <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
-            last_completed: std::option::none(),
-            in_progress: std::option::none(),
-        }
-    );
+    <b>if</b> (!<b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework)) {
+        <b>move_to</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(
+            aptos_framework,
+            <a href="dkg.md#0x1_dkg_DKGState">DKGState</a> {
+                last_completed: std::option::none(),
+                in_progress: std::option::none(),
+            }
+        );
+    }
 }
 </code></pre>
 
@@ -433,7 +435,6 @@ Return the dealer epoch of a <code><a href="dkg.md#0x1_dkg_DKGSessionState">DKGS
 
 <pre><code><b>let</b> aptos_framework_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework);
 <b>aborts_if</b> aptos_framework_addr != @aptos_framework;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="dkg.md#0x1_dkg_DKGState">DKGState</a>&gt;(@aptos_framework);
 </code></pre>
 
 

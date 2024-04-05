@@ -1,9 +1,11 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    jwks::SupportedOIDCProviders,
     move_any::{Any as MoveAny, Any, AsMoveAny},
     move_utils::as_move_value::AsMoveValue,
-    on_chain_config::OnChainConfig,
+    on_chain_config::{FeatureFlag, Features, OnChainConfig},
 };
 use anyhow::anyhow;
 use move_core_types::value::{MoveStruct, MoveValue};
@@ -97,5 +99,28 @@ impl AsMoveValue for OnChainJWKConsensusConfig {
             OnChainJWKConsensusConfig::V1(v1) => v1.as_move_any(),
         };
         MoveValue::Struct(MoveStruct::Runtime(vec![packed_variant.as_move_value()]))
+    }
+}
+
+/// Before `JWKConsensusConfig` is initialized, convert from `Features` and `SupportedOIDCProviders` instead.
+impl From<(Option<Features>, Option<SupportedOIDCProviders>)> for OnChainJWKConsensusConfig {
+    fn from(
+        (features, supported_oidc_providers): (Option<Features>, Option<SupportedOIDCProviders>),
+    ) -> Self {
+        if let Some(features) = features {
+            if features.is_enabled(FeatureFlag::JWK_CONSENSUS) {
+                let oidc_providers = supported_oidc_providers
+                    .unwrap_or_default()
+                    .providers
+                    .into_iter()
+                    .filter_map(|deprecated| OIDCProvider::try_from(deprecated).ok())
+                    .collect();
+                OnChainJWKConsensusConfig::V1(ConfigV1 { oidc_providers })
+            } else {
+                OnChainJWKConsensusConfig::Off
+            }
+        } else {
+            OnChainJWKConsensusConfig::Off
+        }
     }
 }

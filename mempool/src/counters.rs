@@ -5,8 +5,9 @@
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_metrics_core::{
     exponential_buckets, histogram_opts, op_counters::DurationHistogram, register_histogram,
-    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge_vec,
-    Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    register_int_gauge_vec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec,
+    IntGauge, IntGaugeVec,
 };
 use aptos_short_hex_str::AsShortHexStr;
 use once_cell::sync::Lazy;
@@ -32,6 +33,8 @@ pub const CONSENSUS_READY_LABEL: &str = "consensus_ready";
 pub const CONSENSUS_PULLED_LABEL: &str = "consensus_pulled";
 pub const BROADCAST_READY_LABEL: &str = "broadcast_ready";
 pub const BROADCAST_BATCHED_LABEL: &str = "broadcast_batched";
+pub const PARKED_TIME_LABEL: &str = "parked_time";
+pub const NON_PARKED_COMMIT_ACCEPTED_LABEL: &str = "non_park_commit_accepted";
 
 // Core mempool GC type labels
 pub const GC_SYSTEM_TTL_LABEL: &str = "system_ttl";
@@ -427,6 +430,19 @@ pub fn shared_mempool_pending_broadcasts(peer: &PeerNetworkId) -> IntGauge {
         peer.network_id().as_str(),
         peer.peer_id().short_str().as_str(),
     ])
+}
+
+/// Counter tracking the number of peers that changed priority in shared mempool
+pub static SHARED_MEMPOOL_PRIORITY_CHANGE_COUNT: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_shared_mempool_priority_change_count",
+        "Number of peers that changed priority in shared mempool",
+    )
+    .unwrap()
+});
+
+pub fn shared_mempool_priority_change_count(change_count: i64) {
+    SHARED_MEMPOOL_PRIORITY_CHANGE_COUNT.set(change_count);
 }
 
 static SHARED_MEMPOOL_TRANSACTIONS_PROCESSED: Lazy<IntCounterVec> = Lazy::new(|| {

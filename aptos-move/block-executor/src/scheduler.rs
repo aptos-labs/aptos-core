@@ -854,7 +854,7 @@ impl Scheduler {
     }
 
     /// Grab an index to try and validate next (by fetch-and-incrementing validation_idx).
-    /// - If the index is out of bounds, return None (and invoke a check of whethre
+    /// - If the index is out of bounds, return None (and invoke a check of whether
     /// all txns can be committed).
     /// - If the transaction is ready for validation (EXECUTED state), return the version
     /// to the caller.

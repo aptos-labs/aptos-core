@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::keyless::{
     bn254_circom::get_public_inputs_hash,
@@ -6,6 +7,7 @@ use crate::keyless::{
     test_utils::{get_sample_groth16_sig_and_pk, get_sample_openid_sig_and_pk},
     Configuration, EphemeralCertificate, DEVNET_VERIFICATION_KEY,
 };
+use aptos_crypto::poseidon_bn254::fr_to_bytes_le;
 use std::ops::{AddAssign, Deref};
 
 // TODO(keyless): Add instructions on how to produce this test case.
@@ -23,7 +25,7 @@ fn test_keyless_groth16_proof_verification() {
 
     println!(
         "Keyless Groth16 test public inputs hash: {}",
-        public_inputs_hash
+        hex::encode(fr_to_bytes_le(&public_inputs_hash))
     );
 
     proof

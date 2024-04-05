@@ -1,0 +1,231 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t2 := 0
+  1: $t3 := 0
+  2: label L0
+  3: $t5 := 10
+  4: $t4 := <($t3, $t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L2
+  7: $t2 := infer($t0)
+  8: $t7 := 1
+  9: $t6 := +($t3, $t7)
+ 10: $t3 := infer($t6)
+ 11: goto 14
+ 12: label L3
+ 13: goto 16
+ 14: label L4
+ 15: goto 2
+ 16: label L1
+ 17: $t1 := infer($t2)
+ 18: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t2 := 0
+  1: $t3 := 0
+  2: label L0
+  3: $t5 := 10
+  4: $t4 := <($t3, $t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L2
+  7: $t2 := copy($t0)
+  8: $t7 := 1
+  9: $t6 := +($t3, $t7)
+ 10: $t3 := move($t6)
+ 11: goto 14
+ 12: label L3
+ 13: goto 16
+ 14: label L4
+ 15: goto 2
+ 16: label L1
+ 17: $t1 := move($t2)
+ 18: return $t1
+}
+
+============ after VariableCoalescingAnnotator: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0
+     # events: b:$t0, b:$t2
+  0: $t2 := 0
+     # live vars: $t0, $t2
+     # events: b:$t3
+  1: $t3 := 0
+     # live vars: $t0, $t2, $t3
+  2: label L0
+     # live vars: $t0, $t2, $t3
+     # events: b:$t5
+  3: $t5 := 10
+     # live vars: $t0, $t2, $t3, $t5
+     # events: e:$t5, b:$t4
+  4: $t4 := <($t3, $t5)
+     # live vars: $t0, $t2, $t3, $t4
+     # events: e:$t4
+  5: if ($t4) goto 6 else goto 12
+     # live vars: $t0, $t2, $t3
+  6: label L2
+     # live vars: $t0, $t3
+  7: $t2 := copy($t0)
+     # live vars: $t0, $t2, $t3
+     # events: b:$t7
+  8: $t7 := 1
+     # live vars: $t0, $t2, $t3, $t7
+     # events: e:$t7, b:$t6
+  9: $t6 := +($t3, $t7)
+     # live vars: $t0, $t2, $t6
+     # events: e:$t6
+ 10: $t3 := move($t6)
+     # live vars: $t0, $t2, $t3
+ 11: goto 14
+     # live vars: $t0, $t2, $t3
+ 12: label L3
+     # live vars: $t2
+ 13: goto 16
+     # live vars: $t0, $t2, $t3
+ 14: label L4
+     # live vars: $t0, $t2, $t3
+     # events: e:$t0, e:$t3
+ 15: goto 2
+     # live vars: $t2
+ 16: label L1
+     # live vars: $t2
+     # events: e:$t2, b:$t1
+ 17: $t1 := move($t2)
+     # live vars: $t1
+     # events: e:$t1
+ 18: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+  0: $t2 := 0
+  1: $t3 := 0
+  2: label L0
+  3: $t5 := 10
+  4: $t4 := <($t3, $t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L2
+  7: $t2 := copy($t0)
+  8: $t5 := 1
+  9: $t5 := +($t3, $t5)
+ 10: $t3 := move($t5)
+ 11: goto 14
+ 12: label L3
+ 13: goto 16
+ 14: label L4
+ 15: goto 2
+ 16: label L1
+ 17: $t2 := move($t2)
+ 18: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: bool
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+  0: $t2 := 0
+  1: $t3 := 0
+  2: label L0
+  3: $t5 := 10
+  4: $t4 := <($t3, $t5)
+  5: if ($t4) goto 6 else goto 12
+  6: label L2
+  7: $t2 := copy($t0)
+  8: $t5 := 1
+  9: $t5 := +($t3, $t5)
+ 10: $t3 := move($t5)
+ 11: goto 14
+ 12: label L3
+ 13: goto 16
+ 14: label L4
+ 15: goto 2
+ 16: label L1
+ 17: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v7
+module c0ffee.m {
+
+
+test(Arg0: u64): u64 /* def_idx: 0 */ {
+L1:	loc0: u64
+L2:	loc1: u64
+L3:	loc2: u64
+B0:
+	0: LdU64(0)
+	1: LdU64(0)
+	2: StLoc[1](loc0: u64)
+	3: StLoc[2](loc1: u64)
+B1:
+	4: LdU64(10)
+	5: StLoc[3](loc2: u64)
+	6: CopyLoc[1](loc0: u64)
+	7: MoveLoc[3](loc2: u64)
+	8: Lt
+	9: BrFalse(19)
+B2:
+	10: CopyLoc[0](Arg0: u64)
+	11: StLoc[2](loc1: u64)
+	12: LdU64(1)
+	13: StLoc[3](loc2: u64)
+	14: MoveLoc[1](loc0: u64)
+	15: MoveLoc[3](loc2: u64)
+	16: Add
+	17: StLoc[1](loc0: u64)
+	18: Branch(20)
+B3:
+	19: Branch(21)
+B4:
+	20: Branch(4)
+B5:
+	21: MoveLoc[2](loc1: u64)
+	22: Ret
+}
+}
+============ bytecode verification succeeded ========

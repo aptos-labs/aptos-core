@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::log::{
-    CallFrame, Dependency, EventStorage, ExecutionAndIOCosts, ExecutionGasEvent, FrameName,
-    StorageFees, TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
+    CallFrame, Dependency, EventStorage, EventTransient, ExecutionAndIOCosts, ExecutionGasEvent,
+    FrameName, StorageFees, TransactionGasLog, WriteOpType, WriteStorage, WriteTransient,
 };
 use aptos_gas_algebra::{Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
-use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
+use aptos_types::{
+    contract_event::ContractEvent, state_store::state_key::StateKey, write_set::WriteOpSize,
+};
 use aptos_vm_types::{
     change_set::VMChangeSet, resolver::ExecutorView, storage::space_pricing::ChargeAndRefund,
 };
@@ -34,6 +36,8 @@ pub struct GasProfiler<G> {
     intrinsic_cost: Option<InternalGas>,
     dependencies: Vec<Dependency>,
     frames: Vec<CallFrame>,
+    transaction_transient: Option<InternalGas>,
+    events_transient: Vec<EventTransient>,
     write_set_transient: Vec<WriteTransient>,
     storage_fees: Option<StorageFees>,
 }
@@ -88,6 +92,8 @@ impl<G> GasProfiler<G> {
             intrinsic_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_script()],
+            transaction_transient: None,
+            events_transient: vec![],
             write_set_transient: vec![],
             storage_fees: None,
         }
@@ -105,6 +111,8 @@ impl<G> GasProfiler<G> {
             intrinsic_cost: None,
             dependencies: vec![],
             frames: vec![CallFrame::new_function(module_id, func_name, ty_args)],
+            transaction_transient: None,
+            events_transient: vec![],
             write_set_transient: vec![],
             storage_fees: None,
         }
@@ -524,6 +532,25 @@ where
         ) -> PartialVMResult<()>;
     }
 
+    fn charge_io_gas_for_transaction(&mut self, txn_size: NumBytes) -> VMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_io_gas_for_transaction(txn_size));
+
+        self.transaction_transient = Some(cost);
+
+        res
+    }
+
+    fn charge_io_gas_for_event(&mut self, event: &ContractEvent) -> VMResult<()> {
+        let (cost, res) = self.delegate_charge(|base| base.charge_io_gas_for_event(event));
+
+        self.events_transient.push(EventTransient {
+            ty: event.type_tag().clone(),
+            cost,
+        });
+
+        res
+    }
+
     fn charge_io_gas_for_write(&mut self, key: &StateKey, op: &WriteOpSize) -> VMResult<()> {
         let (cost, res) = self.delegate_charge(|base| base.charge_io_gas_for_write(key, op));
 
@@ -642,6 +669,8 @@ where
             intrinsic_cost: self.intrinsic_cost.unwrap_or_else(|| 0.into()),
             dependencies: self.dependencies,
             call_graph: self.frames.pop().expect("frame must exist"),
+            transaction_transient: self.transaction_transient,
+            events_transient: self.events_transient,
             write_set_transient: self.write_set_transient,
         };
         exec_io.assert_consistency();

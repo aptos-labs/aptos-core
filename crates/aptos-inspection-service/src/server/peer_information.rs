@@ -47,7 +47,7 @@ fn get_peer_information(
         peers_and_metadata.get_registered_networks().collect();
 
     // Get all peers (sorted by peer ID)
-    let mut all_peers = peers_and_metadata.get_all_peers().unwrap_or_default();
+    let mut all_peers = peers_and_metadata.get_all_peers();
     all_peers.sort();
 
     // Display a summary of all peers and networks

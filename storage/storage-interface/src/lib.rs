@@ -248,7 +248,7 @@ pub trait DbReader: Send + Sync {
         /// ../aptosdb/struct.AptosDB.html#method.get_block_timestamp
         fn get_block_timestamp(&self, version: Version) -> Result<u64>;
 
-        /// See [AptosDB::get_latest_block_events].
+        /// See `AptosDB::get_latest_block_events`.
         fn get_latest_block_events(&self, num_events: usize) -> Result<Vec<EventWithVersion>>;
 
         /// Returns the start_version, end_version and NewBlockEvent of the block containing the input

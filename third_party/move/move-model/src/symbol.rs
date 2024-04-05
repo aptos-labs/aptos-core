@@ -23,6 +23,12 @@ impl Symbol {
     }
 }
 
+impl AsRef<Symbol> for Symbol {
+    fn as_ref(&self) -> &Symbol {
+        self
+    }
+}
+
 /// A helper to support symbols in formatting.
 pub struct SymbolDisplay<'a> {
     sym: &'a Symbol,

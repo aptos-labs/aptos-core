@@ -48,7 +48,7 @@ use async_trait::async_trait;
 use clap::{Parser, ValueEnum};
 use hex::FromHexError;
 use move_core_types::{account_address::AccountAddress, language_storage::TypeTag};
-use move_package::CompilerVersion;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
@@ -679,8 +679,8 @@ pub struct HardwareWalletOptions {
 
     /// Index of your account in hardware wallet
     ///
-    /// This is the simpler version of derivation path e.g format - [0]
-    /// we will translate this index into [m/44'/637'/0'/0'/0]
+    /// This is the simpler version of derivation path e.g `format - [0]`
+    /// we will translate this index into `[m/44'/637'/0'/0'/0]`
     #[clap(long)]
     pub derivation_index: Option<String>,
 }
@@ -1059,8 +1059,14 @@ pub struct MovePackageDir {
     /// Specify the version of the compiler.
     ///
     /// Currently hidden until the official launch of Compiler V2
-    #[clap(long, hide = true)]
+    #[clap(long, hide = true, value_parser = clap::value_parser!(CompilerVersion))]
     pub compiler_version: Option<CompilerVersion>,
+
+    /// Specify the language version to be supported.
+    ///
+    /// Currently hidden until the official launch of Compiler V2
+    #[clap(long, hide = true, value_parser = clap::value_parser!(LanguageVersion))]
+    pub language_version: Option<LanguageVersion>,
 
     /// Do not complain about unknown attributes in Move code.
     #[clap(long)]
@@ -1068,7 +1074,7 @@ pub struct MovePackageDir {
 
     /// Do apply extended checks for Aptos (e.g. `#[view]` attribute) also on test code.
     /// NOTE: this behavior will become the default in the future.
-    /// See https://github.com/aptos-labs/aptos-core/issues/10335
+    /// See <https://github.com/aptos-labs/aptos-core/issues/10335>
     #[clap(long, env = "APTOS_CHECK_TEST_CODE")]
     pub check_test_code: bool,
 }
@@ -1083,6 +1089,7 @@ impl MovePackageDir {
             skip_fetch_latest_git_deps: true,
             bytecode_version: None,
             compiler_version: None,
+            language_version: None,
             skip_attribute_checks: false,
             check_test_code: false,
         }
@@ -2148,5 +2155,5 @@ pub struct OverrideSizeCheckOption {
     /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
     /// will still be blocked from publishing.
     #[clap(long)]
-    pub(crate) value: bool,
+    pub(crate) override_size_check: bool,
 }

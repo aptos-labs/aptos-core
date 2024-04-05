@@ -14,6 +14,7 @@ module aptos_framework::jwks {
     use aptos_std::comparator::{compare_u8_vector, is_greater_than, is_equal};
     use aptos_std::copyable_any;
     use aptos_std::copyable_any::Any;
+    use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
     use aptos_framework::event::emit;
     use aptos_framework::reconfiguration;
@@ -178,6 +179,7 @@ module aptos_framework::jwks {
     /// TODO: update all the tests that reference this function, then disable this function.
     public fun upsert_oidc_provider(fx: &signer, name: vector<u8>, config_url: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
         system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
 
         let provider_set = borrow_global_mut<SupportedOIDCProviders>(@aptos_framework);
 
@@ -216,6 +218,7 @@ module aptos_framework::jwks {
     /// TODO: update all the tests that reference this function, then disable this function.
     public fun remove_oidc_provider(fx: &signer, name: vector<u8>): Option<vector<u8>> acquires SupportedOIDCProviders {
         system_addresses::assert_aptos_framework(fx);
+        chain_status::assert_genesis();
 
         let provider_set = borrow_global_mut<SupportedOIDCProviders>(@aptos_framework);
         remove_oidc_provider_internal(provider_set, name)

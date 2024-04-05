@@ -59,7 +59,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     ops::{Bound::Included, Deref},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc, RwLock, RwLockWriteGuard,
     },
     time::Instant,
@@ -78,6 +78,7 @@ pub struct Context {
     view_function_stats: Arc<FunctionStats>,
     simulate_txn_stats: Arc<FunctionStats>,
     pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
+    pub wait_for_hash_active_connections: Arc<AtomicUsize>,
 }
 
 impl std::fmt::Debug for Context {
@@ -130,6 +131,7 @@ impl Context {
             view_function_stats,
             simulate_txn_stats,
             table_info_reader,
+            wait_for_hash_active_connections: Arc::new(AtomicUsize::new(0)),
         }
     }
 

@@ -22,9 +22,6 @@ move-vm-test-utils = { path = "../../../move-vm/test-utils" }
 move-vm-types = { path = "../../../move-vm/types" }
 sha3 = "0.9.1"
 smallvec = "1.6.1"
-walkdir = "2.3.1"
-
-bcs = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = "0.1.1"

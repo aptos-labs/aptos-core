@@ -1,7 +1,7 @@
 [package]
 name = "aptos"
 description = "Aptos tool for management of nodes and interacting with the blockchain"
-version = "3.0.2"
+version = "3.1.0"
 
 # Workspace inherited keys
 authors = { workspace = true }
@@ -53,7 +53,6 @@ bollard = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["env", "unstable-styles"] }
 clap_complete = { workspace = true }
-codespan-reporting = { workspace = true }
 dashmap = { workspace = true }
 diesel = { workspace = true, features = [
     "postgres_backend",
@@ -73,6 +72,7 @@ move-core-types = { workspace = true }
 move-coverage = { workspace = true }
 move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
+move-model = { workspace = true }
 move-package = { workspace = true }
 move-symbol-pool = { workspace = true }
 move-unit-test = { workspace = true, features = ["debugging"] }
@@ -80,17 +80,17 @@ move-vm-runtime = { workspace = true, features = ["testing"] }
 once_cell = { workspace = true }
 pathsearch = { workspace = true }
 poem = { workspace = true }
-processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "d44b2d209f57872ac593299c34751a5531b51352" }
+# We set default-features to false so we don't onboard the libpq dep. See more here:
+# https://github.com/aptos-labs/aptos-core/pull/12568
+processor = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "a11f0b6532349aa6b9a80c9a1d77524f02d8a013", default-features = false }
 rand = { workspace = true }
-regex = { workspace = true }
 reqwest = { workspace = true }
-self_update = { git = "https://github.com/banool/self_update.git", rev = "65916eade8b37e90ea5778c62592f20614b56627", features = ["archive-zip", "compression-zip-deflate"] }
+self_update = { git = "https://github.com/banool/self_update.git", rev = "8306158ad0fd5b9d4766a3c6bf967e7ef0ea5c4b", features = ["archive-zip", "compression-zip-deflate"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
-server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "d44b2d209f57872ac593299c34751a5531b51352" }
+server-framework = { git = "https://github.com/aptos-labs/aptos-indexer-processors.git", rev = "a11f0b6532349aa6b9a80c9a1d77524f02d8a013" }
 tempfile = { workspace = true }
-termcolor = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
@@ -98,7 +98,6 @@ tonic = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 version-compare = { workspace = true }
-walkdir = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 jemallocator = { workspace = true }

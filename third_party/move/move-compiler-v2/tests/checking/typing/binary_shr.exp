@@ -13,8 +13,8 @@ module 0x8675309::M {
         0;
         0;
         Shr<u64>(Copy(x), Copy(b));
-        Shr<u64>(select M::R.f(r), select M::R.b(r));
-        Shr<u64>(Shr<u64>(Shr<u64>(1, select M::R.b(r)), select M::R.b(r)), 0);
+        Shr<u64>(select M::R.f<M::R>(r), select M::R.b<M::R>(r));
+        Shr<u64>(Shr<u64>(Shr<u64>(1, select M::R.b<M::R>(r)), select M::R.b<M::R>(r)), 0);
         M::R{ f: _, b: _ }: M::R = r
     }
 } // end 0x8675309::M

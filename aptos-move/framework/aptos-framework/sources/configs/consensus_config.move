@@ -3,6 +3,7 @@
 module aptos_framework::consensus_config {
     use std::error;
     use std::vector;
+    use aptos_framework::chain_status;
     use aptos_framework::config_buffer;
 
     use aptos_framework::reconfiguration;
@@ -32,6 +33,7 @@ module aptos_framework::consensus_config {
     /// TODO: update all the tests that reference this function, then disable this function.
     public fun set(account: &signer, config: vector<u8>) acquires ConsensusConfig {
         system_addresses::assert_aptos_framework(account);
+        chain_status::assert_genesis();
         assert!(vector::length(&config) > 0, error::invalid_argument(EINVALID_CONFIG));
 
         let config_ref = &mut borrow_global_mut<ConsensusConfig>(@aptos_framework).config;

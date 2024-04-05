@@ -2762,7 +2762,7 @@ module aptos_framework::stake {
             genesis_time_in_secs,
             fixed_point64::create_from_rational(50, 100),
         );
-        features::change_feature_flags(aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
+        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
 
         // For some reason, this epoch is very long. It has been 1 year since genesis when the epoch ends.
         timestamp::fast_forward_seconds(one_year_in_secs - EPOCH_DURATION * 3);
@@ -3027,7 +3027,7 @@ module aptos_framework::stake {
         validator_3: &signer,
     ) acquires AllowedValidators, AptosCoinCapabilities, OwnerCapability, StakePool, ValidatorConfig, ValidatorPerformance, ValidatorSet, ValidatorFees {
         // Make sure that fees collection and distribution is enabled.
-        features::change_feature_flags(aptos_framework, vector[COLLECT_AND_DISTRIBUTE_GAS_FEES], vector[]);
+        features::change_feature_flags_for_testing(aptos_framework, vector[COLLECT_AND_DISTRIBUTE_GAS_FEES], vector[]);
         assert!(features::collect_and_distribute_gas_fees(), 0);
 
         // Initialize staking and validator fees table.

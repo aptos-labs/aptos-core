@@ -355,7 +355,7 @@ impl<TMessage> NetworkSender<TMessage> {
     }
 }
 
-impl<TMessage: Message> NetworkSender<TMessage> {
+impl<TMessage: Message + Send + 'static> NetworkSender<TMessage> {
     /// Send a protobuf message to a single recipient. Provides a wrapper over
     /// `[peer_manager::PeerManagerRequestSender::send_to]`.
     pub fn send_to(
@@ -394,13 +394,19 @@ impl<TMessage: Message> NetworkSender<TMessage> {
         req_msg: TMessage,
         timeout: Duration,
     ) -> Result<TMessage, RpcError> {
-        // serialize request
-        let req_data = protocol.to_bytes(&req_msg)?.into();
+        // Serialize the request using a blocking task
+        let req_data = tokio::task::spawn_blocking(move || protocol.to_bytes(&req_msg))
+            .await??
+            .into();
+
+        // Send the request and wait for the response
         let res_data = self
             .peer_mgr_reqs_tx
             .send_rpc(recipient, protocol, req_data, timeout)
             .await?;
-        let res_msg: TMessage = protocol.from_bytes(&res_data)?;
+
+        // Deserialize the response using a blocking task
+        let res_msg = tokio::task::spawn_blocking(move || protocol.from_bytes(&res_data)).await??;
         Ok(res_msg)
     }
 }

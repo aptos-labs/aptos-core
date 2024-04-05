@@ -18,11 +18,11 @@ error: expected expression with no value but found `address`
 11 │         loop { @0x0 }
    │                ^^^^
 
-error: expected expression with no value but found `integer`
-   ┌─ tests/checking/typing/loop_body_invalid.move:15:27
+error: tuple type `()` is not allowed
+   ┌─ tests/checking/typing/loop_body_invalid.move:15:20
    │
 15 │         loop { let x = 0; x }
-   │                           ^
+   │                    ^
 
 error: expected expression with no value but found `integer`
    ┌─ tests/checking/typing/loop_body_invalid.move:19:26

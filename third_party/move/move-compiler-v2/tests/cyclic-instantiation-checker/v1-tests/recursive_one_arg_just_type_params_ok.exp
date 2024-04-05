@@ -1,0 +1,6 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    public fun f<T>(x: #0) {
+        M::f<T>(x)
+    }
+} // end 0x8675309::M

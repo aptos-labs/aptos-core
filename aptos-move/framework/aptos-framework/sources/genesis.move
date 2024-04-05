@@ -422,7 +422,7 @@ module aptos_framework::genesis {
             rewards_rate_denominator,
             voting_power_increase_limit
         );
-        features::change_feature_flags(aptos_framework, vector[1, 2], vector[]);
+        features::change_feature_flags_for_verification(aptos_framework, vector[1, 2], vector[]);
         initialize_aptos_coin(aptos_framework);
         aptos_governance::initialize_for_verification(
             aptos_framework,

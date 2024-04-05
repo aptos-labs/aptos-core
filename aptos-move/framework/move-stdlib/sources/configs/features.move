@@ -28,6 +28,7 @@ module std::features {
     use std::vector;
 
     const EINVALID_FEATURE: u64 = 1;
+    const EAPI_DISABLED: u64 = 2;
 
     // --------------------------------------------------------------------------------------------
     // Code Publishing
@@ -435,6 +436,16 @@ module std::features {
         is_enabled(MULTISIG_V2_ENHANCEMENT)
     }
 
+    /// Whether delegators allowlisting for delegation pools is supported.
+    /// Lifetime: transient
+    const DELEGATION_POOL_ALLOWLISTING: u64 = 56;
+
+    public fun get_delegation_pool_allowlisting_feature(): u64 { DELEGATION_POOL_ALLOWLISTING }
+
+    public fun delegation_pool_allowlisting_enabled(): bool acquires Features {
+        is_enabled(DELEGATION_POOL_ALLOWLISTING)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 
@@ -452,9 +463,17 @@ module std::features {
         features: vector<u8>,
     }
 
-    /// Function to enable and disable features. Can only be called by a signer of @std.
-    public fun change_feature_flags(framework: &signer, enable: vector<u64>, disable: vector<u64>)
-    acquires Features {
+    /// Deprecated to prevent validator set changes during DKG.
+    ///
+    /// Genesis/tests should use `change_feature_flags_internal()` for feature vec initialization.
+    ///
+    /// Governance proposals should use `change_feature_flags_for_next_epoch()` to enable/disable features.
+    public fun change_feature_flags(_framework: &signer, _enable: vector<u64>, _disable: vector<u64>) {
+        abort(error::invalid_state(EAPI_DISABLED))
+    }
+
+    /// Update feature flags directly. Only used in genesis/tests.
+    fun change_feature_flags_internal(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
         if (!exists<Features>(@std)) {
             move_to<Features>(framework, Features { features: vector[] })
@@ -468,12 +487,7 @@ module std::features {
         });
     }
 
-    /// Enable and disable features *for the next epoch*.
-    ///
-    /// NOTE: when it takes effects depend on feature `RECONFIGURE_WITH_DKG`.
-    /// See `aptos_framework::aptos_governance::reconfigure()` for more details.
-    ///
-    /// Can only be called by a signer of @std.
+    /// Enable and disable features for the next epoch.
     public fun change_feature_flags_for_next_epoch(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires PendingFeatures, Features {
         assert!(signer::address_of(framework) == @std, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
 
@@ -549,6 +563,16 @@ module std::features {
         assert!(addr == @std || addr == @vm, error::permission_denied(EFRAMEWORK_SIGNER_NEEDED));
     }
 
+    #[verify_only]
+    public fun change_feature_flags_for_verification(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+        change_feature_flags_internal(framework, enable, disable)
+    }
+
+    #[test_only]
+    public fun change_feature_flags_for_testing(framework: &signer, enable: vector<u64>, disable: vector<u64>) acquires Features {
+        change_feature_flags_internal(framework, enable, disable)
+    }
+
     #[test]
     fun test_feature_sets() {
         let features = vector[];
@@ -570,11 +594,11 @@ module std::features {
 
     #[test(fx = @std)]
     fun test_change_feature_txn(fx: signer) acquires Features {
-        change_feature_flags(&fx, vector[1, 9, 23], vector[]);
+        change_feature_flags_for_testing(&fx, vector[1, 9, 23], vector[]);
         assert!(is_enabled(1), 1);
         assert!(is_enabled(9), 2);
         assert!(is_enabled(23), 3);
-        change_feature_flags(&fx, vector[17], vector[9]);
+        change_feature_flags_for_testing(&fx, vector[17], vector[9]);
         assert!(is_enabled(1), 1);
         assert!(!is_enabled(9), 2);
         assert!(is_enabled(17), 3);

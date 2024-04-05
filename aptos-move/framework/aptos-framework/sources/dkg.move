@@ -45,13 +45,15 @@ module aptos_framework::dkg {
     /// Called in genesis to initialize on-chain states.
     public fun initialize(aptos_framework: &signer) {
         system_addresses::assert_aptos_framework(aptos_framework);
-        move_to<DKGState>(
-            aptos_framework,
-            DKGState {
-                last_completed: std::option::none(),
-                in_progress: std::option::none(),
-            }
-        );
+        if (!exists<DKGState>(@aptos_framework)) {
+            move_to<DKGState>(
+                aptos_framework,
+                DKGState {
+                    last_completed: std::option::none(),
+                    in_progress: std::option::none(),
+                }
+            );
+        }
     }
 
     /// Mark on-chain DKG state as in-progress. Notify validators to start DKG.

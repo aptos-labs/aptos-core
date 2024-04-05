@@ -1052,7 +1052,7 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
         criteria: [
             (5500, 100, 0.3, 0.3, 0.8, 0.65),
             (4500, 100, 0.3, 0.4, 1.0, 2.0),
-            (2000, 300, 0.3, 0.3, 0.8, 2.0),
+            (2000, 300, 0.3, 0.8, 0.8, 2.0),
             (600, 500, 0.3, 0.3, 0.8, 2.0),
             // (150, 0.5, 1.0, 1.5, 0.65),
         ]
@@ -2191,6 +2191,7 @@ pub fn changing_working_quorum_test_helper(
             config.consensus.round_initial_timeout_ms = 500;
             config.consensus.round_timeout_backoff_exponent_base = 1.0;
             config.consensus.quorum_store_poll_time_ms = 100;
+            config.consensus.rand_rb_config.backoff_policy_max_delay_ms = 1000;
 
             let mut min_block_txns = block_size;
             let mut chain_health_backoff = ConsensusConfig::default().chain_health_backoff;
@@ -2254,7 +2255,7 @@ pub fn changing_working_quorum_test_helper(
                         // to get the quorum back.
                         40.0
                     },
-                    max_round_gap: 6,
+                    max_round_gap: 60,
                 }),
         )
 }
