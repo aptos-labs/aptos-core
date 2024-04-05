@@ -76,7 +76,11 @@ impl Worker {
                 data_to_process_now.remove(&version_to_check).unwrap()
             };
             for transaction in transactions {
-                assert_eq!(transaction.version, version_to_check);
+                // Log the expected and actual version before the assertion
+                if transaction.version != version_to_check {
+                    tracing::error!("Version mismatch: expected {}, got {}", version_to_check, transaction.version);
+                }
+                assert_eq!(transaction.version, version_to_check, "Version mismatch: expected {}, got {}", version_to_check, transaction.version);
                 version_to_check += 1;
             }
         }
