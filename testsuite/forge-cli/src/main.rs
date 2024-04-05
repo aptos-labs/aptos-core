@@ -1948,6 +1948,7 @@ fn realistic_env_max_load_test(
             helm_values["chain"]["on_chain_execution_config"] =
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
+            println!("20240406 - jwk_consensus_config_override");
             helm_values["chain"]["jwk_consensus_config_override"] =
                 serde_yaml::to_value(OnChainJWKConsensusConfig::default_enabled())
                     .unwrap();
