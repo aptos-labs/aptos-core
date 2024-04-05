@@ -256,9 +256,7 @@ impl DagFetcherService {
 
             let latest_committed_round = self
                 .ledger_info_provider
-                .get_latest_ledger_info()
-                .commit_info()
-                .round();
+                .get_highest_committed_anchor_round();
             let target_round = node.round().saturating_sub(1);
 
             ensure!(

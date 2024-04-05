@@ -28,10 +28,11 @@ pub trait ProposerElection {
     fn get_valid_proposer_and_voting_power_participation_ratio(
         &self,
         round: Round,
-    ) -> (Author, f64) {
+    ) -> (Author, f64, Vec<Author>) {
         (
             self.get_valid_proposer(round),
             self.get_voting_power_participation_ratio(round),
+            vec![self.get_valid_proposer(round)],
         )
     }
 }

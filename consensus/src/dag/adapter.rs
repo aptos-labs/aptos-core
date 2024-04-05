@@ -7,9 +7,10 @@ use super::{
 };
 use crate::{
     block_storage::tracing::{observe_block, BlockStage},
-    consensusdb::{CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema},
-    counters,
-    counters::update_counters_for_committed_blocks,
+    consensusdb::{
+        CertifiedNodeSchema, ConsensusDB, DagVoteSchema, NodeSchema, RocksdbPropertyReporter,
+    },
+    counters::{self, update_counters_for_committed_blocks},
     dag::{
         storage::{CommitEvent, DAGStorage},
         CertifiedNode, Node, NodeId, Vote,
@@ -27,8 +28,8 @@ use aptos_consensus_types::{
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::StateComputeResult;
-use aptos_infallible::RwLock;
-use aptos_logger::{error, info};
+use aptos_infallible::{Mutex, RwLock};
+use aptos_logger::{debug, error, info};
 use aptos_storage_interface::DbReader;
 use aptos_types::{
     account_config::NewBlockEvent,
@@ -94,6 +95,24 @@ pub(crate) fn compute_initial_block_and_ledger_info(
     }
 }
 
+struct RoundIndexGenerator {
+    current_round: Round,
+    current_idx: u64,
+}
+
+impl RoundIndexGenerator {
+    fn next(&mut self, anchor_round: Round) -> Round {
+        assert!(self.current_round <= anchor_round);
+        if anchor_round == self.current_round {
+            self.current_idx += 1;
+        } else {
+            self.current_idx = 0;
+            self.current_round = anchor_round;
+        }
+        self.current_idx
+    }
+}
+
 pub(super) struct OrderedNotifierAdapter {
     executor_channel: UnboundedSender<OrderedBlocks>,
     dag: Arc<DagStore>,
@@ -102,6 +121,8 @@ pub(super) struct OrderedNotifierAdapter {
     ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
     block_ordered_ts: Arc<RwLock<BTreeMap<Round, Instant>>>,
     allow_batches_without_pos_in_proposal: bool,
+    author_to_index: HashMap<Author, usize>,
+    idx_gen: Mutex<RoundIndexGenerator>,
 }
 
 impl OrderedNotifierAdapter {
@@ -113,6 +134,11 @@ impl OrderedNotifierAdapter {
         ledger_info_provider: Arc<RwLock<LedgerInfoProvider>>,
         allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
+        let author_to_index = epoch_state.verifier.address_to_validator_index().clone();
+        let current_round = ledger_info_provider.get_highest_committed_anchor_round()
+            / epoch_state.verifier.len() as u64;
+        let current_idx = ledger_info_provider.get_highest_committed_anchor_round()
+            % epoch_state.verifier.len() as u64;
         Self {
             executor_channel,
             dag,
@@ -121,6 +147,11 @@ impl OrderedNotifierAdapter {
             ledger_info_provider,
             block_ordered_ts: Arc::new(RwLock::new(BTreeMap::new())),
             allow_batches_without_pos_in_proposal,
+            author_to_index,
+            idx_gen: Mutex::new(RoundIndexGenerator {
+                current_round,
+                current_idx,
+            }),
         }
     }
 
@@ -181,10 +212,18 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         };
         NUM_ROUNDS_PER_BLOCK.observe((rounds_between + 1) as f64);
 
+        let idx = self.idx_gen.lock().next(round);
+        assert!(idx < (self.epoch_state.verifier.len() as u64));
+        if idx > 0 && payload.is_empty() {
+            debug!("payload is empty. not producing block ({}, {})", round, idx);
+            return;
+        }
+        let block_round = (round * self.epoch_state.verifier.len() as Round) + idx;
+
         let block = PipelinedBlock::new(
             Block::new_for_dag(
                 epoch,
-                round,
+                block_round,
                 block_timestamp,
                 validator_txns,
                 payload,
@@ -200,6 +239,7 @@ impl OrderedNotifier for OrderedNotifierAdapter {
         let block_info = block.block_info();
         let ledger_info_provider = self.ledger_info_provider.clone();
         let dag = self.dag.clone();
+        let num_peers = self.epoch_state.verifier.len();
         *self.parent_block_info.write() = block_info.clone();
 
         self.block_ordered_ts
@@ -219,10 +259,12 @@ impl OrderedNotifier for OrderedNotifierAdapter {
                 move |committed_blocks: &[Arc<PipelinedBlock>],
                       commit_decision: LedgerInfoWithSignatures| {
                     monitor!("dag_block_commit_callback", {
+                        let anchor_round =
+                            commit_decision.commit_info().round() / (num_peers as u64);
                         block_created_ts
                             .write()
                             .retain(|&round, _| round > commit_decision.commit_info().round());
-                        dag.commit_callback(commit_decision.commit_info().round());
+                        dag.commit_callback(anchor_round);
                         ledger_info_provider
                             .write()
                             .notify_commit_proof(commit_decision);
@@ -246,6 +288,7 @@ pub struct StorageAdapter {
     epoch_to_validators: HashMap<u64, Vec<Author>>,
     consensus_db: Arc<ConsensusDB>,
     aptos_db: Arc<dyn DbReader>,
+    _reporter: RocksdbPropertyReporter,
 }
 
 impl StorageAdapter {
@@ -256,6 +299,7 @@ impl StorageAdapter {
         aptos_db: Arc<dyn DbReader>,
     ) -> Self {
         Self {
+            _reporter: RocksdbPropertyReporter::new(consensus_db.clone()),
             epoch,
             epoch_to_validators,
             consensus_db,
@@ -428,15 +472,26 @@ pub(crate) trait TLedgerInfoProvider: Send + Sync {
 
 pub(super) struct LedgerInfoProvider {
     latest_ledger_info: LedgerInfoWithSignatures,
+    epoch_state: Arc<EpochState>,
 }
 
 impl LedgerInfoProvider {
-    pub(super) fn new(latest_ledger_info: LedgerInfoWithSignatures) -> Self {
-        Self { latest_ledger_info }
+    pub(super) fn new(
+        epoch_state: Arc<EpochState>,
+        latest_ledger_info: LedgerInfoWithSignatures,
+    ) -> Self {
+        Self {
+            latest_ledger_info,
+            epoch_state,
+        }
     }
 
     pub(super) fn notify_commit_proof(&mut self, ledger_info: LedgerInfoWithSignatures) {
         self.latest_ledger_info = ledger_info;
+    }
+
+    fn get_highest_committed_anchor_round(&self) -> Round {
+        self.latest_ledger_info.ledger_info().round() / self.epoch_state.verifier.len() as u64
     }
 }
 
@@ -446,6 +501,6 @@ impl TLedgerInfoProvider for RwLock<LedgerInfoProvider> {
     }
 
     fn get_highest_committed_anchor_round(&self) -> Round {
-        self.read().latest_ledger_info.ledger_info().round()
+        self.read().get_highest_committed_anchor_round()
     }
 }

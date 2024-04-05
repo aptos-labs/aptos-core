@@ -658,7 +658,7 @@ pub fn setup_environment_and_start_node(
             mempool_network_interfaces,
             mempool_listener,
             mempool_client_receiver,
-            peers_and_metadata,
+            peers_and_metadata.clone(),
         );
 
     // Ensure consensus key in secure DB.
@@ -748,6 +748,7 @@ pub fn setup_environment_and_start_node(
             consensus_notifier,
             consensus_to_mempool_sender,
             vtxn_pool,
+            peers_and_metadata,
         );
         admin_service.set_consensus_dbs(consensus_db, quorum_store_db);
         runtime
