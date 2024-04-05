@@ -23,6 +23,7 @@ impl Worker {
     }
 
     pub async fn run(&mut self) -> Result<()> {
+        tracing::info!("Running. Starting version: {}, ending version pending retrieval...", self.starting_version.unwrap_or(0));
         let file_store_operator = self.file_store_config.create();
         let starting_version = self.starting_version.unwrap_or(0);
         let cursor = Arc::new(Mutex::new(starting_version));
@@ -30,10 +31,13 @@ impl Worker {
         let task_count = 32;
         let current_metadata = file_store_operator.get_file_store_metadata().await.unwrap();
         let ending_version = current_metadata.version;
+        tracing::info!("Run operation starting. Starting version: {}, ending version: {}", starting_version, ending_version);
         for _ in 0..task_count {
             let file_store_operator = file_store_operator.clone_box();
             let cursor = cursor.clone();
             let data_to_process = data_to_process.clone();
+            tracing::info!("Preparing to spawn {} tasks for data processing.", task_count);
+
             tokio::spawn(async move {
                 loop {
                     let version_to_process = {
@@ -45,13 +49,14 @@ impl Worker {
                     if version_to_process >= ending_version {
                         break;
                     }
-
+                    tracing::info!("Task for version {} started.", version_to_process);
                     let transactions = file_store_operator
                         .get_transactions(version_to_process, 3)
                         .await
                         .unwrap();
                     let mut data_to_process_now = data_to_process.lock().await;
                     data_to_process_now.insert(version_to_process, transactions);
+                    tracing::info!("Task for version {} completed.", version_to_process);
                 }
             });
         }
