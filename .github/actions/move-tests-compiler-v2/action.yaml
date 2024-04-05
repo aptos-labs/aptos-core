@@ -37,6 +37,7 @@ runs:
       run: cargo x targeted-compiler-v2-tests -vv --release --profile ci --locked --no-fail-fast
       shell: bash
       env:
+        DISABLE_GEN_BINARY_V7: true
         MOVE_COMPILER_V2: true
         RUST_MIN_STACK: 4297152
         MVP_TEST_ON_CI: true

@@ -16,7 +16,11 @@ use aptos_types::{
     on_chain_config::{FeatureFlag, OnChainConfig},
     transaction::TransactionStatus,
 };
-use move_binary_format::CompiledModule;
+use move_binary_format::{
+    deserializer::DeserializerConfig,
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_MAX},
+    CompiledModule,
+};
 use move_core_types::{
     account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS, metadata::Metadata,
     vm_status::StatusCode,
@@ -185,7 +189,9 @@ fn test_compilation_metadata_with_changes(
     )
     .expect("building package must succeed");
     let origin_code = package.extract_code();
-    let mut compiled_module = CompiledModule::deserialize(&origin_code[0]).unwrap();
+    let config = DeserializerConfig::new(VERSION_MAX, IDENTIFIER_SIZE_MAX);
+    let mut compiled_module =
+        CompiledModule::deserialize_with_config(&origin_code[0], &config).unwrap();
     let metadata = f();
     let mut invalid_code = vec![];
     compiled_module.metadata.push(metadata);
