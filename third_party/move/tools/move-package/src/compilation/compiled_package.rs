@@ -682,6 +682,7 @@ impl CompiledPackage {
                     skip_attribute_checks,
                     known_attributes: known_attributes.clone(),
                     language_version: Some(effective_language_version),
+                    compile_test_code: flags.keep_testing_functions(),
                     ..Default::default()
                 };
                 compiler_driver_v2(options)?

@@ -156,7 +156,7 @@ B1:
 B2:
 	9: LdU64(1)
 	10: StLoc[3](loc2: u64)
-	11: CopyLoc[1](loc0: u64)
+	11: MoveLoc[1](loc0: u64)
 	12: MoveLoc[3](loc2: u64)
 	13: Add
 	14: StLoc[2](loc1: u64)

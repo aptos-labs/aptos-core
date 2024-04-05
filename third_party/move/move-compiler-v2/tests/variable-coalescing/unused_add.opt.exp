@@ -13,6 +13,13 @@ public fun m::test() {
   0: return ()
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun m::test() {
+  0: return ()
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -22,6 +29,13 @@ public fun m::test() {
 }
 
 ============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun m::test() {
+  0: return ()
+}
+
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 public fun m::test() {
