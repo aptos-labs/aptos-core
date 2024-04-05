@@ -19,6 +19,27 @@ fun m::foo($t0: bool, $t1: u64): u64 {
  10: return $t2
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::foo($t0: bool, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t3 := move($t1)
+  1: if ($t0) goto 2 else goto 6
+  2: label L0
+  3: $t4 := 0
+  4: $t3 := move($t4)
+  5: goto 7
+  6: label L1
+  7: label L2
+  8: $t5 := 1
+  9: $t2 := +($t3, $t5)
+ 10: return $t2
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -79,6 +100,26 @@ fun m::foo($t0: bool, $t1: u64): u64 {
  10: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::foo($t0: bool, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64 [unused]
+  0: if ($t0) goto 1 else goto 5
+  1: label L0
+  2: $t4 := 0
+  3: $t1 := move($t4)
+  4: goto 6
+  5: label L1
+  6: label L2
+  7: $t4 := 1
+  8: $t1 := +($t1, $t4)
+  9: return $t1
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -97,7 +138,7 @@ B1:
 B2:
 	5: LdU64(1)
 	6: StLoc[2](loc0: u64)
-	7: CopyLoc[1](Arg1: u64)
+	7: MoveLoc[1](Arg1: u64)
 	8: MoveLoc[2](loc0: u64)
 	9: Add
 	10: Ret

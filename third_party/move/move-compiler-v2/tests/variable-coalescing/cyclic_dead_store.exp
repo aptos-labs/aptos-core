@@ -325,7 +325,7 @@ B2:
 	10: LdU64(1)
 	11: StLoc[1](Arg1: u64)
 	12: MoveLoc[3](loc0: u64)
-	13: CopyLoc[1](Arg1: u64)
+	13: MoveLoc[1](Arg1: u64)
 	14: Add
 	15: StLoc[3](loc0: u64)
 	16: Branch(18)
@@ -350,7 +350,7 @@ B2:
 	6: LdU64(1)
 	7: StLoc[2](loc0: u64)
 	8: MoveLoc[1](Arg1: u64)
-	9: CopyLoc[2](loc0: u64)
+	9: MoveLoc[2](loc0: u64)
 	10: Add
 	11: StLoc[1](Arg1: u64)
 	12: Branch(14)

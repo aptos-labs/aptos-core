@@ -215,7 +215,7 @@ B2:
 	12: LdU64(1)
 	13: StLoc[3](loc2: u64)
 	14: MoveLoc[1](loc0: u64)
-	15: CopyLoc[3](loc2: u64)
+	15: MoveLoc[3](loc2: u64)
 	16: Add
 	17: StLoc[1](loc0: u64)
 	18: Branch(20)

@@ -18,6 +18,25 @@ fun m::test($t0: u64): bool {
   7: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := copy($t0)
+  1: $t3 := copy($t2)
+  2: $t4 := move($t3)
+  3: $t6 := 1
+  4: $t5 := +($t0, $t6)
+  5: $t1 := ==($t2, $t4)
+  6: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -68,6 +87,24 @@ fun m::test($t0: u64): bool {
   4: $t0 := +($t0, $t6)
   5: $t1 := ==($t2, $t3)
   6: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): bool {
+     var $t1: bool
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64
+  0: $t2 := copy($t0)
+  1: $t3 := copy($t2)
+  2: $t6 := 1
+  3: $t0 := +($t0, $t6)
+  4: $t1 := ==($t2, $t3)
+  5: return $t1
 }
 
 

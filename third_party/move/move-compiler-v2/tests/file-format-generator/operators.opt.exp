@@ -12,39 +12,32 @@ B0:
 	2: Sub
 	3: StLoc[2](loc0: u64)
 	4: CopyLoc[1](Arg1: u64)
-	5: CopyLoc[2](loc0: u64)
+	5: MoveLoc[2](loc0: u64)
 	6: Div
-	7: CopyLoc[1](Arg1: u64)
+	7: MoveLoc[1](Arg1: u64)
 	8: Mul
-	9: StLoc[1](Arg1: u64)
-	10: CopyLoc[1](Arg1: u64)
-	11: CopyLoc[0](Arg0: u64)
-	12: Mod
-	13: StLoc[1](Arg1: u64)
-	14: CopyLoc[0](Arg0: u64)
-	15: MoveLoc[1](Arg1: u64)
-	16: Add
-	17: Ret
+	9: CopyLoc[0](Arg0: u64)
+	10: Mod
+	11: StLoc[1](Arg1: u64)
+	12: MoveLoc[0](Arg0: u64)
+	13: MoveLoc[1](Arg1: u64)
+	14: Add
+	15: Ret
 }
 bits(Arg0: u64, Arg1: u8): u64 /* def_idx: 1 */ {
-L2:	loc0: u64
 B0:
 	0: CopyLoc[0](Arg0: u64)
 	1: CopyLoc[1](Arg1: u8)
 	2: Shl
-	3: StLoc[2](loc0: u64)
-	4: CopyLoc[2](loc0: u64)
+	3: CopyLoc[0](Arg0: u64)
+	4: BitAnd
 	5: CopyLoc[0](Arg0: u64)
-	6: BitAnd
-	7: CopyLoc[0](Arg0: u64)
-	8: MoveLoc[1](Arg1: u8)
-	9: Shr
-	10: CopyLoc[0](Arg0: u64)
-	11: Xor
-	12: StLoc[0](Arg0: u64)
-	13: CopyLoc[0](Arg0: u64)
-	14: BitOr
-	15: Ret
+	6: MoveLoc[1](Arg1: u8)
+	7: Shr
+	8: MoveLoc[0](Arg0: u64)
+	9: Xor
+	10: BitOr
+	11: Ret
 }
 bools(Arg0: bool, Arg1: bool): bool /* def_idx: 2 */ {
 L2:	loc0: bool
@@ -102,7 +95,7 @@ B14:
 	36: StLoc[2](loc0: bool)
 	37: Branch(47)
 B15:
-	38: CopyLoc[0](Arg0: bool)
+	38: MoveLoc[0](Arg0: bool)
 	39: Not
 	40: BrFalse(45)
 B16:
@@ -149,37 +142,33 @@ B2:
 	10: StLoc[2](loc0: bool)
 B3:
 	11: MoveLoc[2](loc0: bool)
-	12: BrFalse(21)
+	12: BrFalse(19)
 B4:
 	13: CopyLoc[0](Arg0: u64)
 	14: CopyLoc[1](Arg1: u64)
 	15: Gt
-	16: StLoc[2](loc0: bool)
-	17: CopyLoc[2](loc0: bool)
-	18: Not
-	19: StLoc[2](loc0: bool)
-	20: Branch(23)
+	16: Not
+	17: StLoc[2](loc0: bool)
+	18: Branch(21)
 B5:
-	21: LdFalse
-	22: StLoc[2](loc0: bool)
+	19: LdFalse
+	20: StLoc[2](loc0: bool)
 B6:
-	23: MoveLoc[2](loc0: bool)
-	24: BrFalse(33)
+	21: MoveLoc[2](loc0: bool)
+	22: BrFalse(29)
 B7:
-	25: MoveLoc[0](Arg0: u64)
-	26: MoveLoc[1](Arg1: u64)
-	27: Ge
-	28: StLoc[2](loc0: bool)
-	29: CopyLoc[2](loc0: bool)
-	30: Not
-	31: StLoc[2](loc0: bool)
-	32: Branch(35)
+	23: MoveLoc[0](Arg0: u64)
+	24: MoveLoc[1](Arg1: u64)
+	25: Ge
+	26: Not
+	27: StLoc[2](loc0: bool)
+	28: Branch(31)
 B8:
-	33: LdFalse
-	34: StLoc[2](loc0: bool)
+	29: LdFalse
+	30: StLoc[2](loc0: bool)
 B9:
-	35: MoveLoc[2](loc0: bool)
-	36: Ret
+	31: MoveLoc[2](loc0: bool)
+	32: Ret
 }
 }
 ============ bytecode verification succeeded ========
