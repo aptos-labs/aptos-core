@@ -9,7 +9,6 @@ use aptos_framework::RuntimeModuleMetadataV1;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::session::LoadedFunctionInstantiation;
-use move_vm_types::loaded_data::runtime_types::Type::{MutableReference, Reference, Signer};
 
 /// Based on the function attributes in the module metadata, determine whether a
 /// function is a view function.
@@ -52,28 +51,6 @@ pub(crate) fn validate_view_function(
             PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
                 .with_message("view function must return values".to_string()),
         );
-    }
-
-    for par in fun_inst.parameters.iter() {
-        match par {
-            &Signer => {
-                return Err(
-                    PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                        .with_message("view function cannot use the signer paremter".to_string()),
-                )
-            },
-            Reference(inner) | MutableReference(inner) => {
-                if inner.as_ref() == &Signer {
-                    return Err(
-                        PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                            .with_message(
-                                "view function cannot use the & signer paremter".to_string(),
-                            ),
-                    );
-                }
-            },
-            _ => (),
-        }
     }
 
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
