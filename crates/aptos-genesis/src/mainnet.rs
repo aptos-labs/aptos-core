@@ -120,6 +120,7 @@ impl MainnetGenesisInfo {
     }
 
     fn generate_genesis_txn(&self) -> Transaction {
+        println!("20240405 - checkpoint 5");
         aptos_vm_genesis::encode_aptos_mainnet_genesis_transaction(
             &self.accounts,
             &self.employee_vesting_accounts,

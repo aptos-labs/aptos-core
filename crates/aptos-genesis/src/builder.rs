@@ -636,7 +636,7 @@ impl Builder {
         for validator in validators.iter() {
             configs.push(validator.try_into()?);
         }
-
+        println!("20240405 - checkpoint 1");
         let mut genesis_config = GenesisConfiguration {
             allow_new_validators: false,
             epoch_duration_secs: ONE_DAY,

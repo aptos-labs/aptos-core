@@ -92,6 +92,7 @@ impl GenesisInfo {
             validators.push(config.try_into()?)
         }
 
+        println!("20240405 - checkpoint 4");
         Ok(GenesisInfo {
             chain_id,
             root_key,
@@ -128,6 +129,7 @@ impl GenesisInfo {
     }
 
     fn generate_genesis_txn(&self) -> Transaction {
+        println!("20240405 - checkpoint 6");
         aptos_vm_genesis::encode_genesis_transaction(
             self.root_key.clone(),
             &self.validators,

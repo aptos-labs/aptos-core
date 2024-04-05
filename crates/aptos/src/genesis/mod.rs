@@ -234,6 +234,7 @@ pub fn fetch_mainnet_genesis_info(git_options: GitOptions) -> CliTypedResult<Mai
     )?;
 
     let framework = client.get_framework()?;
+    println!("20240405 - checkpoint 3");
     Ok(MainnetGenesisInfo::new(
         layout.chain_id,
         accounts,
@@ -278,6 +279,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
 
     let validators = get_validator_configs(&client, &layout, false).map_err(parse_error)?;
     let framework = client.get_framework()?;
+    println!("20240405 - checkpoint 2");
     Ok(GenesisInfo::new(
         layout.chain_id,
         layout.root_key.unwrap(),
