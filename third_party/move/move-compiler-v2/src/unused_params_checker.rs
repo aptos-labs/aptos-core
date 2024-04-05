@@ -1,3 +1,8 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+//! Implements a environment pipeline which checks for unused type parameters in struct definitions.
+
 use codespan_reporting::diagnostic::Severity;
 use move_model::{
     model::{GlobalEnv, StructEnv, TypeParameter},
