@@ -290,6 +290,8 @@ pub fn encode_genesis_change_set(
         .jwk_consensus_config_override
         .clone()
         .unwrap_or_else(OnChainJWKConsensusConfig::default_for_genesis);
+    println!("20240405 - genesis_config.jwk_consensus_config_override={:?}", genesis_config.jwk_consensus_config_override);
+    println!("20240405 - final_jwk_consensus_config={:?}", jwk_consensus_config);
     initialize_jwk_consensus_config(&mut session, &jwk_consensus_config);
     initialize_jwks_resources(&mut session);
     initialize_keyless_accounts(&mut session, chain_id);
