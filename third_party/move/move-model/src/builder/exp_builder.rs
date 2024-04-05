@@ -495,7 +495,7 @@ impl<'env, 'translator, 'module_translator> ExpTranslator<'env, 'translator, 'mo
                     );
                 self.error_with_labels(
                     loc,
-                    &format!("deplicate declaration of type parameter `{}`", param_name),
+                    &format!("duplicate declaration of type parameter `{}`", param_name),
                     vec![(
                         prev_loc.expect("location").clone(),
                         "previously declared here".to_string(),
