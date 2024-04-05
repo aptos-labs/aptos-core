@@ -230,5 +230,9 @@ fn main() {
     }
 
     // Assert there were no error log lines in the run.
-    assert_eq!(0, aptos_logger::ERROR_LOG_COUNT.get());
+    assert_eq!(
+        0,
+        aptos_logger::ERROR_LOG_COUNT.get(),
+        "Error logs were found in the run."
+    );
 }
