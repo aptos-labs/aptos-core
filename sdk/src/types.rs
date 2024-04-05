@@ -30,6 +30,7 @@ use std::{
 #[derive(Debug)]
 enum LocalAccountAuthenticator {
     PrivateKey(AccountKey),
+    // TODO: Add support for keyless authentication
 }
 
 impl LocalAccountAuthenticator {
