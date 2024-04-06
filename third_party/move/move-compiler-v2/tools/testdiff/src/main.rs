@@ -90,6 +90,8 @@ static UNIT_PATH_REMAP: Lazy<Vec<(&'static str, &'static str)>> = Lazy::new(|| {
         ("acquires-checker/v1-tests", "typing"),
         ("attributes", "parser"),
         ("unit_test/notest", "unit_test"),
+        // Map file v2../unit_test/test/foo.move
+        //   to file v1../unit_test/foo.unit_test.move.
         ("unit_test/test", "unit_test.unit_test"),
         ("checking-lang-v1/v1-typing", "typing"),
     ]
@@ -227,6 +229,10 @@ fn classify_tests(
             let parent_str = parent_name.to_string_lossy().to_string();
             let (parent_str, file_name_str) =
                 if let Some(captures) = split_match.captures(&parent_str) {
+                    // Treat a parent_str="base.ext"  as a directive
+                    // to map a file "foo.move" to "foo.unit_test.move"
+                    // with new_parent="base".
+                    // See "unit_test.unit_test" for an example.
                     let base = captures.get(1).unwrap().as_str();
                     let ext = captures.get(2).unwrap().as_str();
                     let new_parent = base.to_string();
