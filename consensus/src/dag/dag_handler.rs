@@ -90,7 +90,7 @@ impl NetworkHandler {
             ..
         } = self;
 
-        let executor = BoundedExecutor::new(200, Handle::current());
+        let executor = BoundedExecutor::new(500, Handle::current());
         let monitor = tokio_metrics_collector::TaskMonitor::new();
         tokio_metrics_collector::default_task_collector()
             .add("dag_handler", monitor.clone())
