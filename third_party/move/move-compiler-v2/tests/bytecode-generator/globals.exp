@@ -83,3 +83,6 @@ fun globals::write($t0: address, $t1: u64): u64 {
   4: $t2 := 9
   5: return $t2
 }
+
+
+============ bytecode verification succeeded ========
