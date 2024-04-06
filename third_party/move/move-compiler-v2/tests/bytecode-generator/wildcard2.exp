@@ -1,0 +1,23 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    public fun baz() {
+        {
+          let x: u64;
+          {
+            let _: u64 = x;
+            Tuple()
+          }
+        }
+    }
+} // end 0xc0ffee::m
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::baz() {
+     var $t0: u64 [unused]
+  0: return ()
+}
+
+
+============ bytecode verification succeeded ========

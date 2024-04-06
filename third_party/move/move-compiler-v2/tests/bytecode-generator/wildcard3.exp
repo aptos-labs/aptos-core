@@ -1,0 +1,52 @@
+// -- Model dump before bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        dummy_field: bool,
+    }
+    public fun bar() {
+        {
+          let s: m::S = pack m::S(false);
+          {
+            let _: m::S = s;
+            Tuple()
+          }
+        }
+    }
+    public fun foo(s: m::S) {
+        {
+          let _: m::S = s;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::m
+
+============ initial bytecode ================
+
+[variant baseline]
+public fun m::bar() {
+     var $t0: m::S
+     var $t1: bool
+  0: $t1 := false
+  1: $t0 := pack m::S($t1)
+  2: return ()
+}
+
+
+[variant baseline]
+public fun m::foo($t0: m::S) {
+  0: return ()
+}
+
+
+Diagnostics:
+error: local `s` of type `m::S` does not have the `drop` ability
+  ┌─ tests/bytecode-generator/wildcard3.move:5:18
+  │
+5 │         let _ = s;
+  │                  ^ implicitly dropped here since it is no longer used
+
+error: local `s` of type `m::S` does not have the `drop` ability
+  ┌─ tests/bytecode-generator/wildcard3.move:9:17
+  │
+9 │         let s = S{};
+  │                 ^^^ implicitly dropped here since it is no longer used
