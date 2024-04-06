@@ -19,7 +19,7 @@ use move_core_types::{
     account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS, metadata::Metadata,
     vm_status::StatusCode,
 };
-use move_model::metadata::CompilerVersion;
+use move_model::metadata::{CompilationMetadata, CompilerVersion, COMPILATION_METADATA_KEY};
 use std::collections::BTreeMap;
 
 #[test]
@@ -125,6 +125,68 @@ fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatu
     let metadata = f();
     let mut invalid_code = vec![];
     compiled_module.metadata = metadata;
+    compiled_module.serialize(&mut invalid_code).unwrap();
+
+    let package_metadata = package
+        .extract_metadata()
+        .expect("extracting package metadata must succeed");
+    h.run_transaction_payload(
+        &account,
+        aptos_stdlib::code_publish_package_txn(
+            bcs::to_bytes(&package_metadata).expect("PackageMetadata has BCS"),
+            vec![invalid_code],
+        ),
+    )
+}
+
+#[test]
+fn test_duplicate_compilation_metadata_entries() {
+    let duplicate_compilation_metatdata = || Metadata {
+        key: COMPILATION_METADATA_KEY.to_vec(),
+        value: bcs::to_bytes(&CompilationMetadata::default()).unwrap(),
+    };
+    let result = test_compilation_metadata_with_changes(
+        duplicate_compilation_metatdata,
+        CompilerVersion::V2_0,
+    );
+    assert_vm_status!(result, StatusCode::CONSTRAINT_NOT_SATISFIED);
+    let result = test_compilation_metadata_with_changes(
+        duplicate_compilation_metatdata,
+        CompilerVersion::V1,
+    );
+    assert_success!(result);
+}
+
+fn test_compilation_metadata_with_changes(
+    f: impl Fn() -> Metadata,
+    compiler_version: CompilerVersion,
+) -> TransactionStatus {
+    let mut h = MoveHarness::new();
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source(
+        "m.move",
+        r#"
+        module 0xf00d::M {
+            #[view]
+            fun foo(value: u64): u64 { value }
+        }
+        "#,
+    );
+    let path = builder.write_to_temp().unwrap();
+
+    let package = build_package_with_compiler_version(
+        path.path().to_path_buf(),
+        BuildOptions::default(),
+        compiler_version,
+    )
+    .expect("building package must succeed");
+    let origin_code = package.extract_code();
+    let mut compiled_module = CompiledModule::deserialize(&origin_code[0]).unwrap();
+    let metadata = f();
+    let mut invalid_code = vec![];
+    compiled_module.metadata.push(metadata);
     compiled_module.serialize(&mut invalid_code).unwrap();
 
     let package_metadata = package
