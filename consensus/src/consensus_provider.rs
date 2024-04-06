@@ -71,7 +71,7 @@ pub fn start_consensus(
         aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
-    let bounded_executor = BoundedExecutor::new(200, runtime.handle().clone());
+    let bounded_executor = BoundedExecutor::new(1000, runtime.handle().clone());
 
     let execution_client = Arc::new(ExecutionProxyClient::new(
         node_config.consensus.clone(),
