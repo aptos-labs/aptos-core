@@ -26,14 +26,16 @@ fun m::test() {
      var $t1: &mut u64
      var $t2: &mut u64
      var $t3: &u64
-     var $t4: u64
+     var $t4: &u64
+     var $t5: u64
   0: $t0 := 3
   1: $t1 := borrow_local($t0)
   2: $t2 := borrow_local($t0)
   3: $t3 := freeze_ref($t2)
-  4: $t4 := 4
-  5: write_ref($t1, $t4)
-  6: return ()
+  4: $t4 := infer($t3)
+  5: $t5 := 4
+  6: write_ref($t1, $t5)
+  7: return ()
 }
 
 

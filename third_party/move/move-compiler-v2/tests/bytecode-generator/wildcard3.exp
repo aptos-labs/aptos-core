@@ -26,27 +26,31 @@ module 0xc0ffee::m {
 public fun m::bar() {
      var $t0: m::S
      var $t1: bool
+     var $t2: m::S
   0: $t1 := false
   1: $t0 := pack m::S($t1)
-  2: return ()
+  2: $t2 := infer($t0)
+  3: return ()
 }
 
 
 [variant baseline]
 public fun m::foo($t0: m::S) {
-  0: return ()
+     var $t1: m::S
+  0: $t1 := infer($t0)
+  1: return ()
 }
 
 
 Diagnostics:
-error: local `s` of type `m::S` does not have the `drop` ability
-  ┌─ tests/bytecode-generator/wildcard3.move:5:18
+error: value of type `m::S` does not have the `drop` ability
+  ┌─ tests/bytecode-generator/wildcard3.move:5:13
   │
 5 │         let _ = s;
-  │                  ^ implicitly dropped here since it is no longer used
+  │             ^ implicitly dropped here since it is no longer used
 
-error: local `s` of type `m::S` does not have the `drop` ability
-  ┌─ tests/bytecode-generator/wildcard3.move:9:17
-  │
-9 │         let s = S{};
-  │                 ^^^ implicitly dropped here since it is no longer used
+error: value of type `m::S` does not have the `drop` ability
+   ┌─ tests/bytecode-generator/wildcard3.move:10:13
+   │
+10 │         let _ = s;
+   │             ^ implicitly dropped here since it is no longer used
