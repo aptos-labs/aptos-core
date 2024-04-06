@@ -1,16 +1,25 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{assert_vm_status, build_package, MoveHarness};
+use crate::{
+    assert_success, assert_vm_status, build_package, build_package_with_compiler_version,
+    MoveHarness,
+};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{
     BuildOptions, RuntimeModuleMetadata, RuntimeModuleMetadataV1, APTOS_METADATA_KEY,
     APTOS_METADATA_KEY_V1,
 };
 use aptos_package_builder::PackageBuilder;
-use aptos_types::transaction::TransactionStatus;
+use aptos_types::{
+    chain_id::ChainId, on_chain_config::OnChainConfig, transaction::TransactionStatus,
+};
 use move_binary_format::CompiledModule;
-use move_core_types::{account_address::AccountAddress, metadata::Metadata, vm_status::StatusCode};
+use move_core_types::{
+    account_address::AccountAddress, language_storage::CORE_CODE_ADDRESS, metadata::Metadata,
+    vm_status::StatusCode,
+};
+use move_model::metadata::CompilerVersion;
 use std::collections::BTreeMap;
 
 #[test]
@@ -128,4 +137,74 @@ fn test_metadata_with_changes(f: impl Fn() -> Vec<Metadata>) -> TransactionStatu
             vec![invalid_code],
         ),
     )
+}
+
+fn test_compilation_metadata_internal(mainnet_flag: bool, v2_flag: bool) -> TransactionStatus {
+    let mut h = MoveHarness::new();
+    let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
+    let mut builder = PackageBuilder::new("Package");
+    builder.add_source(
+        "m.move",
+        r#"
+        module 0xf00d::M {
+            #[view]
+            fun foo(value: u64): u64 { value }
+        }
+        "#,
+    );
+    let path = builder.write_to_temp().unwrap();
+
+    let compiler_version = if v2_flag {
+        CompilerVersion::V2_0
+    } else {
+        CompilerVersion::V1
+    };
+    let package = build_package_with_compiler_version(
+        path.path().to_path_buf(),
+        BuildOptions::default(),
+        compiler_version,
+    )
+    .expect("building package must succeed");
+
+    let package_metadata = package
+        .extract_metadata()
+        .expect("extracting package metadata must succeed");
+
+    if mainnet_flag {
+        h.set_resource(
+            CORE_CODE_ADDRESS,
+            ChainId::struct_tag(),
+            &ChainId::mainnet().id(),
+        );
+        h.run_transaction_payload_mainnet(
+            &account,
+            aptos_stdlib::code_publish_package_txn(
+                bcs::to_bytes(&package_metadata).expect("PackageMetadata has BCS"),
+                package.extract_code(),
+            ),
+        )
+    } else {
+        h.run_transaction_payload(
+            &account,
+            aptos_stdlib::code_publish_package_txn(
+                bcs::to_bytes(&package_metadata).expect("PackageMetadata has BCS"),
+                package.extract_code(),
+            ),
+        )
+    }
+}
+
+#[test]
+fn test_compilation_metadata() {
+    // publish compiler v2 code to mainnet
+    assert_vm_status!(
+        test_compilation_metadata_internal(true, true),
+        StatusCode::UNSTABLE_BYTECODE
+    );
+    // publish compiler v2 code to test
+    assert_success!(test_compilation_metadata_internal(false, true));
+    // publish compiler v1 code to mainnet
+    assert_success!(test_compilation_metadata_internal(true, false));
+    // publish compiler v1 code to test
+    assert_success!(test_compilation_metadata_internal(false, false));
 }
