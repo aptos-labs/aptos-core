@@ -7,7 +7,7 @@ use crate::{
         tracing::{observe_block, BlockStage},
         BlockStore,
     },
-    counters,
+    counters::{self},
     dag::{DagBootstrapper, DagCommitSigner, StorageAdapter},
     error::{error_kind, DbError},
     liveness::{
@@ -115,6 +115,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use tokio_metrics_collector::TaskCollector;
 
 /// Range of rounds (window) that we might be calling proposer election
 /// functions with at any given time, in addition to the proposer history length.
@@ -1648,6 +1649,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         mut round_timeout_sender_rx: aptos_channels::Receiver<Round>,
         mut network_receivers: NetworkReceivers,
     ) {
+        aptos_metrics_core::default_registry()
+            .register(Box::new(
+                tokio_metrics_collector::default_runtime_collector(),
+            ))
+            .unwrap();
+        let task_collector = tokio_metrics_collector::default_task_collector();
+        aptos_metrics_core::default_registry()
+            .register(Box::new(task_collector.clone()))
+            .unwrap();
+
         // initial start of the processor
         self.await_reconfig_notification().await;
         loop {

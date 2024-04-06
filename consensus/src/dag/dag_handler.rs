@@ -91,12 +91,16 @@ impl NetworkHandler {
         } = self;
 
         let executor = BoundedExecutor::new(200, Handle::current());
+        let monitor = tokio_metrics_collector::TaskMonitor::new();
+        tokio_metrics_collector::default_task_collector()
+            .add("dag_handler", monitor.clone())
+            .unwrap();
         // TODO: feed in the executor based on verification Runtime
         let mut verified_msg_stream =
             dag_rpc_rx.concurrent_map(executor, move |rpc_request: IncomingDAGRequest| {
                 let timer = INCOMING_MSG_PROCESSING.start_timer();
                 let epoch_state = epoch_state.clone();
-                async move {
+                monitor.instrument(async move {
                     defer!({ drop(timer) });
                     let epoch = rpc_request.req.epoch();
                     let result = rpc_request
@@ -110,7 +114,7 @@ impl NetworkHandler {
                             Ok(dag_message)
                         });
                     (result, epoch, rpc_request.sender, rpc_request.responder)
-                }
+                })
             });
 
         let dag_driver_clone = dag_driver.clone();

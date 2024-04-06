@@ -4,11 +4,11 @@
 
 // Re-export counter types from prometheus crate
 pub use prometheus::{
-    exponential_buckets, gather, histogram_opts, register_counter, register_gauge,
-    register_gauge_vec, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, Counter, Encoder, Gauge,
-    GaugeVec, Histogram, HistogramTimer, HistogramVec, IntCounter, IntCounterVec, IntGauge,
-    IntGaugeVec, TextEncoder,
+    default_registry, exponential_buckets, gather, histogram_opts, register_counter,
+    register_gauge, register_gauge_vec, register_histogram, register_histogram_vec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
+    Counter, Encoder, Gauge, GaugeVec, Histogram, HistogramTimer, HistogramVec, IntCounter,
+    IntCounterVec, IntGauge, IntGaugeVec, TextEncoder,
 };
 
 mod avg_counter;
