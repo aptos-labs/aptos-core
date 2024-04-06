@@ -14,7 +14,14 @@ use crate::{
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_types::{
-    jwks::{jwk::{JWKMoveStruct, JWK}, rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, ProviderJWKs}, keyless::test_utils::get_sample_iss, on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig}
+    jwks::{
+        jwk::{JWKMoveStruct, JWK},
+        rsa::RSA_JWK,
+        unsupported::UnsupportedJWK,
+        AllProvidersJWKs, ProviderJWKs,
+    },
+    keyless::test_utils::get_sample_iss,
+    on_chain_config::{JWKConsensusConfigV1, OIDCProvider, OnChainJWKConsensusConfig},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::time::sleep;
