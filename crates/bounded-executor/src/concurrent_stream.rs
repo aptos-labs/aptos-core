@@ -21,15 +21,9 @@ where
     stream
         .flat_map_unordered(None, move |item| {
             let future = mapper(item);
-            let executor = executor.clone();
-            stream::once(
-                #[allow(clippy::async_yields_async)]
-                async move { executor.spawn(future).await }.boxed(),
-            )
-            .boxed()
-        })
-        .flat_map_unordered(None, |handle| {
-            stream::once(async move { handle.await.expect("result") }.boxed()).boxed()
+            // let executor = executor.clone();
+            stream::once(async move { tokio::spawn(future).await.expect("task must finish") })
+                .boxed()
         })
         .fuse()
 }
