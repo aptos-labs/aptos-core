@@ -47,7 +47,7 @@ fn test_view_attribute_with_signer() {
         "#,
     );
     let path = builder.write_to_temp().unwrap();
-    assert_success!(h.publish_package(&account, path.path()));
+    h.create_publish_package(&account, path.path(), None, |_| {});
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn test_view_attribute_with_ref_signer() {
         "#,
     );
     let path = builder.write_to_temp().unwrap();
-    assert_success!(h.publish_package(&account, path.path()));
+    h.create_publish_package(&account, path.path(), None, |_| {});
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn test_view_attribute_with_mut_ref_signer() {
         "#,
     );
     let path = builder.write_to_temp().unwrap();
-    assert_success!(h.publish_package(&account, path.path()));
+    h.create_publish_package(&account, path.path(), None, |_| {});
 }
 
 #[test]
