@@ -170,7 +170,7 @@ impl NetworkHandler {
                                 if let Err(e) = dag_driver_clone.process(certified_node).await {
                                     warn!(error = ?e, "error processing certified node fetch notification");
                                 } else {
-                                    dag_driver_clone.fetch_callback();
+                                    tokio::task::spawn_blocking(move || dag_driver_clone.fetch_callback());
                                 }
                             },
                             Err(e) => {
@@ -188,7 +188,7 @@ impl NetworkHandler {
                                 if let Err(e) = node_receiver_clone.process(node).await {
                                     warn!(error = ?e, "error processing node fetch notification");
                                 } else {
-                                    dag_driver_clone.fetch_callback();
+                                    tokio::task::spawn_blocking(move || dag_driver_clone.fetch_callback());
                                 }
                             },
                             Err(e) => {
