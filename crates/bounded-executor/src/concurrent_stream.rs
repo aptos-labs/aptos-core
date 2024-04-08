@@ -28,6 +28,29 @@ where
         .fuse()
 }
 
+pub fn concurrent_map_blocking<St, F, Output>(
+    stream: St,
+    mapper: F,
+) -> impl FusedStream<Item = Output>
+where
+    St: Stream,
+    St::Item: Send + 'static,
+    F: FnMut(St::Item) -> Output + Send + 'static + Clone,
+    Output: Send + 'static,
+{
+    stream
+        .flat_map_unordered(None, move |item| {
+            let mut mapper = mapper.clone();
+            stream::once(async move {
+                tokio::task::spawn_blocking(move || mapper(item))
+                    .await
+                    .expect("task must finish")
+            })
+            .boxed()
+        })
+        .fuse()
+}
+
 #[rustversion::since(1.75)]
 pub trait ConcurrentStream: Stream {
     fn concurrent_map<Fut, F>(
@@ -42,6 +65,16 @@ pub trait ConcurrentStream: Stream {
         Self: Sized,
     {
         concurrent_map(self, executor, mapper)
+    }
+
+    fn concurrent_map_blocking<F, Output>(self, mapper: F) -> impl FusedStream<Item = Output>
+    where
+        F: FnMut(Self::Item) -> Output + Send + 'static + Clone,
+        Self::Item: Send + 'static,
+        Output: Send + 'static,
+        Self: Sized,
+    {
+        concurrent_map_blocking(self, mapper)
     }
 }
 

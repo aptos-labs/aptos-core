@@ -97,24 +97,21 @@ impl NetworkHandler {
             .unwrap();
         // TODO: feed in the executor based on verification Runtime
         let mut verified_msg_stream =
-            dag_rpc_rx.concurrent_map(executor, move |rpc_request: IncomingDAGRequest| {
+            dag_rpc_rx.concurrent_map_blocking(move |rpc_request: IncomingDAGRequest| {
                 let timer = INCOMING_MSG_PROCESSING.start_timer();
-                let epoch_state = epoch_state.clone();
-                monitor.instrument(async move {
-                    defer!({ drop(timer) });
-                    let epoch = rpc_request.req.epoch();
-                    let result = rpc_request
-                        .req
-                        .try_into()
-                        .and_then(|dag_message: DAGMessage| {
-                            monitor!(
-                                "dag_message_verify",
-                                dag_message.verify(rpc_request.sender, &epoch_state.verifier)
-                            )?;
-                            Ok(dag_message)
-                        });
-                    (result, epoch, rpc_request.sender, rpc_request.responder)
-                })
+                defer!({ drop(timer) });
+                let epoch = rpc_request.req.epoch();
+                let result = rpc_request
+                    .req
+                    .try_into()
+                    .and_then(|dag_message: DAGMessage| {
+                        monitor!(
+                            "dag_message_verify",
+                            dag_message.verify(rpc_request.sender, &epoch_state.verifier)
+                        )?;
+                        Ok(dag_message)
+                    });
+                (result, epoch, rpc_request.sender, rpc_request.responder)
             });
 
         let dag_driver_clone = dag_driver.clone();
