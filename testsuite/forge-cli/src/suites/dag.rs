@@ -150,6 +150,7 @@ fn dag_changing_working_quorum_test() -> ForgeConfig {
         70,
         true,
         true,
+        false,
         ChangingWorkingQuorumTest {
             min_tps: 15,
             always_healthy_nodes: 0,
