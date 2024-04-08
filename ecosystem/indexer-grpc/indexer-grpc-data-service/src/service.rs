@@ -62,9 +62,9 @@ const RESPONSE_CHANNEL_SEND_TIMEOUT: Duration = Duration::from_secs(120);
 
 const SHORT_CONNECTION_DURATION_IN_SECS: u64 = 10;
 
-const REQUEST_HEADER_APTOS_EMAIL_HEADER: &str = "x-aptos-email";
-const REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER: &str = "x-aptos-user-classification";
-const REQUEST_HEADER_APTOS_API_KEY_NAME: &str = "x-aptos-api-key-name";
+/// This comes from API Gateway. The identifier uniquely identifies the requester, which
+/// in the case of indexer-grpc is always an application.
+const REQUEST_HEADER_APTOS_IDENTIFIER: &str = "x-aptos-identifier";
 const RESPONSE_HEADER_APTOS_CONNECTION_ID_HEADER: &str = "x-aptos-connection-id";
 const SERVICE_TYPE: &str = "data_service";
 
@@ -141,8 +141,7 @@ impl RawData for RawDataServerWrapper {
         };
         CONNECTION_COUNT
             .with_label_values(&[
-                &request_metadata.request_api_key_name,
-                &request_metadata.request_email,
+                &request_metadata.request_identifier,
                 &request_metadata.processor_name,
             ])
             .inc();
@@ -349,12 +348,9 @@ async fn get_data_in_task(
         Ok(TransactionsDataStatus::AheadOfCache) => {
             info!(
                 start_version = start_version,
-                request_name = request_metadata.processor_name.as_str(),
-                request_email = request_metadata.request_email.as_str(),
-                request_api_key_name = request_metadata.request_api_key_name.as_str(),
+                request_identifier = request_metadata.request_identifier.as_str(),
                 processor_name = request_metadata.processor_name.as_str(),
                 connection_id = request_metadata.request_connection_id.as_str(),
-                request_user_classification = request_metadata.request_user_classification.as_str(),
                 duration_in_secs = current_batch_start_time.elapsed().as_secs_f64(),
                 service_type = SERVICE_TYPE,
                 "[Data Service] Requested data is ahead of cache. Sleeping for {} ms.",
@@ -513,8 +509,7 @@ async fn data_fetcher_task(
             .sum::<usize>();
         BYTES_READY_TO_TRANSFER_FROM_SERVER
             .with_label_values(&[
-                &request_metadata.request_api_key_name,
-                &request_metadata.request_email,
+                &request_metadata.request_identifier,
                 &request_metadata.processor_name,
             ])
             .inc_by(bytes_ready_to_transfer as u64);
@@ -542,36 +537,32 @@ async fn data_fetcher_task(
             Ok(_) => {
                 PROCESSED_BATCH_SIZE
                     .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
+                        request_metadata.request_identifier.as_str(),
                         request_metadata.processor_name.as_str(),
                     ])
                     .set(current_batch_size as i64);
                 // TODO: Reasses whether this metric useful
                 LATEST_PROCESSED_VERSION_OLD
                     .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
+                        request_metadata.request_identifier.as_str(),
                         request_metadata.processor_name.as_str(),
                     ])
                     .set(end_of_batch_version as i64);
                 PROCESSED_VERSIONS_COUNT
                     .with_label_values(&[
-                        request_metadata.request_api_key_name.as_str(),
-                        request_metadata.request_email.as_str(),
+                        request_metadata.request_identifier.as_str(),
                         request_metadata.processor_name.as_str(),
                     ])
                     .inc_by(current_batch_size as u64);
                 if let Some(data_latency_in_secs) = data_latency_in_secs {
                     PROCESSED_LATENCY_IN_SECS
                         .with_label_values(&[
-                            request_metadata.request_api_key_name.as_str(),
-                            request_metadata.request_email.as_str(),
+                            request_metadata.request_identifier.as_str(),
                             request_metadata.processor_name.as_str(),
                         ])
                         .set(data_latency_in_secs);
                     PROCESSED_LATENCY_IN_SECS_ALL
-                        .with_label_values(&[request_metadata.request_user_classification.as_str()])
+                        .with_label_values(&[])
                         .observe(data_latency_in_secs);
                 }
             },
@@ -589,13 +580,9 @@ async fn data_fetcher_task(
         current_version = end_of_batch_version + 1;
     }
     info!(
-        request_name = request_metadata.processor_name.as_str(),
-        request_email = request_metadata.request_email.as_str(),
-        request_api_key_name = request_metadata.request_api_key_name.as_str(),
+        request_identifier = request_metadata.request_identifier.as_str(),
         processor_name = request_metadata.processor_name.as_str(),
         connection_id = request_metadata.request_connection_id.as_str(),
-        request_user_classification = request_metadata.request_user_classification.as_str(),
-        request_user_classification = request_metadata.request_user_classification.as_str(),
         service_type = SERVICE_TYPE,
         "[Data Service] Client disconnected."
     );
@@ -603,8 +590,7 @@ async fn data_fetcher_task(
         if start_time.elapsed().as_secs() < SHORT_CONNECTION_DURATION_IN_SECS {
             SHORT_CONNECTION_COUNT
                 .with_label_values(&[
-                    request_metadata.request_api_key_name.as_str(),
-                    request_metadata.request_email.as_str(),
+                    request_metadata.request_identifier.as_str(),
                     request_metadata.processor_name.as_str(),
                 ])
                 .inc();
@@ -869,12 +855,7 @@ fn get_request_metadata(
     req: &Request<GetTransactionsRequest>,
 ) -> tonic::Result<IndexerGrpcRequestMetadata> {
     let request_metadata_pairs = vec![
-        ("request_api_key_name", REQUEST_HEADER_APTOS_API_KEY_NAME),
-        ("request_email", REQUEST_HEADER_APTOS_EMAIL_HEADER),
-        (
-            "request_user_classification",
-            REQUEST_HEADER_APTOS_USER_CLASSIFICATION_HEADER,
-        ),
+        ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
         ("request_token", GRPC_AUTH_TOKEN_HEADER),
         ("processor_name", GRPC_REQUEST_NAME_HEADER),
     ];
