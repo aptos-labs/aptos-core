@@ -280,10 +280,12 @@ impl RpcHandler for NodeBroadcastHandler {
 
         let node = self.validate(node)?;
 
-        self.dag.write().update_votes(&node, false);
+        let dag = self.dag.clone();
         let order_rule = self.order_rule.clone();
         let metadata = node.metadata().clone();
+        let parents_metadata = node.parents_metadata().cloned().collect();
         tokio::task::spawn_blocking(move || {
+            dag.write().update_votes(&metadata, parents_metadata, false);
             order_rule.process_new_node(&metadata);
         });
 

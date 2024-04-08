@@ -131,7 +131,11 @@ impl InMemDag {
             aggregated_weak_voting_power: 0,
             aggregated_strong_voting_power: 0,
         });
-        self.update_votes(&node, true);
+        self.update_votes(
+            node.metadata(),
+            node.parents_metadata().cloned().collect(),
+            true,
+        );
         Ok(())
     }
 
@@ -173,18 +177,23 @@ impl InMemDag {
         Ok(())
     }
 
-    pub fn update_votes(&mut self, node: &Node, update_link_power: bool) {
-        if node.round() <= self.lowest_round() {
+    pub fn update_votes(
+        &mut self,
+        node_metadata: &NodeMetadata,
+        parents_metadata: Vec<NodeMetadata>,
+        update_link_power: bool,
+    ) {
+        if node_metadata.round() <= self.lowest_round() {
             return;
         }
 
         let voting_power = self
             .epoch_state
             .verifier
-            .get_voting_power(node.author())
+            .get_voting_power(node_metadata.author())
             .expect("must exist");
 
-        for parent in node.parents_metadata() {
+        for parent in parents_metadata {
             let node_status = self
                 .get_node_ref_mut(parent.round(), parent.author())
                 .expect("must exist");
