@@ -8,7 +8,7 @@ use crate::{
         dag_network::RpcHandler,
         errors::NodeBroadcastHandleError,
         observability::{
-            counters::{FETCH_ENQUEUE_FAILURES, RB_HANDLE_ACKS},
+            counters::{FETCH_ENQUEUE_FAILURES, RB_HANDLER_PROCESS_DURATION, RB_HANDLE_ACKS},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, NodeStage},
         },
@@ -35,7 +35,12 @@ use claims::assert_some;
 use dashmap::DashSet;
 use futures::executor::block_on;
 use mini_moka::sync::Cache;
-use std::{collections::BTreeMap, mem, sync::Arc};
+use std::{
+    collections::BTreeMap,
+    mem,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::task::JoinHandle;
 
 pub(crate) struct NodeBroadcastHandler {
@@ -253,6 +258,8 @@ impl RpcHandler for NodeBroadcastHandler {
     type Response = Vote;
 
     async fn process(&self, node: Self::Request) -> anyhow::Result<Self::Response> {
+        let start = Instant::now();
+
         ensure!(
             !self.health_backoff.stop_voting(),
             NodeBroadcastHandleError::VoteRefused
@@ -267,6 +274,10 @@ impl RpcHandler for NodeBroadcastHandler {
             assert_some!(self.votes_fine_grained_lock.remove(&key));
         });
 
+        RB_HANDLER_PROCESS_DURATION
+            .with_label_values(&[&"lock"])
+            .observe(start.elapsed().as_secs_f64());
+
         if let Some(ack) = self
             .votes_by_round_peer
             .lock()
@@ -278,7 +289,15 @@ impl RpcHandler for NodeBroadcastHandler {
             return Ok(ack.clone());
         }
 
+        RB_HANDLER_PROCESS_DURATION
+            .with_label_values(&[&"vote_check"])
+            .observe(start.elapsed().as_secs_f64());
+
         let node = self.validate(node)?;
+
+        RB_HANDLER_PROCESS_DURATION
+            .with_label_values(&[&"validate"])
+            .observe(start.elapsed().as_secs_f64());
 
         let dag = self.dag.clone();
         let order_rule = self.order_rule.clone();
@@ -289,19 +308,37 @@ impl RpcHandler for NodeBroadcastHandler {
             order_rule.process_new_node(&metadata);
         });
 
+        RB_HANDLER_PROCESS_DURATION
+            .with_label_values(&[&"order_spawn"])
+            .observe(start.elapsed().as_secs_f64());
+
         observe_node(node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)
             .remote_peer(*node.author())
             .round(node.round()));
 
         let signature = node.sign_vote(&self.signer)?;
+
+        RB_HANDLER_PROCESS_DURATION
+            .with_label_values(&[&"sign"])
+            .observe(start.elapsed().as_secs_f64());
+
         let vote = Vote::new(node.metadata().clone(), signature);
         self.storage.save_vote(&node.id(), &vote)?;
+
+        RB_HANDLER_PROCESS_DURATION
+            .with_label_values(&[&"save_db"])
+            .observe(start.elapsed().as_secs_f64());
+
         self.votes_by_round_peer
             .lock()
             .get_mut(&node.round())
             .expect("must exist")
             .insert(*node.author(), vote.clone());
+
+        RB_HANDLER_PROCESS_DURATION
+            .with_label_values(&[&"save_mem"])
+            .observe(start.elapsed().as_secs_f64());
 
         debug!(LogSchema::new(LogEvent::Vote)
             .remote_peer(*node.author())
