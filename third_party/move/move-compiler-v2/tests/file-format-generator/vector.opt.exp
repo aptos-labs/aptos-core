@@ -30,7 +30,7 @@ B2:
 	12: LdU64(1)
 	13: StLoc[3](loc1: u64)
 	14: MoveLoc[2](loc0: u64)
-	15: CopyLoc[3](loc1: u64)
+	15: MoveLoc[3](loc1: u64)
 	16: Sub
 	17: StLoc[2](loc0: u64)
 B3:
@@ -46,7 +46,7 @@ B4:
 	26: LdU64(1)
 	27: StLoc[5](loc3: u64)
 	28: MoveLoc[1](Arg1: u64)
-	29: CopyLoc[5](loc3: u64)
+	29: MoveLoc[5](loc3: u64)
 	30: Add
 	31: StLoc[1](Arg1: u64)
 	32: CopyLoc[1](Arg1: u64)
@@ -73,8 +73,7 @@ B0:
 test_fold() /* def_idx: 2 */ {
 L0:	loc0: vector<u64>
 L1:	loc1: u64
-L2:	loc2: bool
-L3:	loc3: u64
+L2:	loc2: u64
 B0:
 	0: LdU64(0)
 	1: LdConst[1](Vector(U64): [1, 1, 0, 0, 0, 0, 0, 0, 0])
@@ -85,35 +84,33 @@ B0:
 B1:
 	6: ImmBorrowLoc[0](loc0: vector<u64>)
 	7: Call 1vector::is_empty<u64>(&vector<u64>): bool
-	8: StLoc[2](loc2: bool)
-	9: CopyLoc[2](loc2: bool)
-	10: Not
-	11: BrFalse(18)
+	8: Not
+	9: BrFalse(16)
 B2:
-	12: MutBorrowLoc[0](loc0: vector<u64>)
-	13: VecPopBack(5)
-	14: LdU64(0)
-	15: StLoc[1](loc1: u64)
-	16: Pop
-	17: Branch(19)
+	10: MutBorrowLoc[0](loc0: vector<u64>)
+	11: VecPopBack(5)
+	12: LdU64(0)
+	13: StLoc[1](loc1: u64)
+	14: Pop
+	15: Branch(17)
 B3:
-	18: Branch(20)
+	16: Branch(18)
 B4:
-	19: Branch(6)
+	17: Branch(6)
 B5:
-	20: LdU64(0)
-	21: StLoc[3](loc3: u64)
-	22: MoveLoc[1](loc1: u64)
-	23: MoveLoc[3](loc3: u64)
-	24: Eq
-	25: BrFalse(27)
+	18: LdU64(0)
+	19: StLoc[2](loc2: u64)
+	20: MoveLoc[1](loc1: u64)
+	21: MoveLoc[2](loc2: u64)
+	22: Eq
+	23: BrFalse(25)
 B6:
-	26: Branch(29)
+	24: Branch(27)
 B7:
-	27: LdU64(0)
-	28: Abort
+	25: LdU64(0)
+	26: Abort
 B8:
-	29: Ret
+	27: Ret
 }
 }
 ============ bytecode verification succeeded ========

@@ -37,6 +37,7 @@ CompiledPackageInfo {
             compiler_version: Some(
                 V1,
             ),
+            language_version: None,
         },
     },
 }

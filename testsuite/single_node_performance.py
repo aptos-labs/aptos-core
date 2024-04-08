@@ -91,7 +91,7 @@ TESTS = [
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
-    RunGroupConfig(expected_tps=30443, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=31900, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=19200, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=4170, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=15400, key=RunGroupKey("modify-global-resource", module_working_set_size=10), included_in=Flow.CONTINUOUS),
@@ -136,6 +136,11 @@ TESTS = [
     RunGroupConfig(expected_tps=1300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
     RunGroupConfig(expected_tps=5300, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel", module_working_set_size=20), included_in=Flow(0)),
 
+    RunGroupConfig(expected_tps=13800, key=RunGroupKey("coin-init-and-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=11400, key=RunGroupKey("coin-init-and-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=1500, key=RunGroupKey("fungible-asset-mint", module_working_set_size=1), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=7500, key=RunGroupKey("fungible-asset-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1ft-mint-and-store"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
@@ -145,8 +150,14 @@ TESTS = [
     RunGroupConfig(expected_tps=7006, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=6946, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
+    RunGroupConfig(expected_tps=1030, key=RunGroupKey("liquidity-pool-swap"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=4520, key=RunGroupKey("liquidity-pool-swap", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+
+    RunGroupConfig(expected_tps=970, key=RunGroupKey("liquidity-pool-swap-stable"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=4350, key=RunGroupKey("liquidity-pool-swap-stable", module_working_set_size=20), included_in=Flow.CONTINUOUS),
+
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
-    RunGroupConfig(expected_tps=3000, key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=3120, key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
@@ -201,6 +212,7 @@ else:
     DB_PRUNER_FLAGS = ""
 
 HIDE_OUTPUT = os.environ.get("HIDE_OUTPUT")
+SKIP_MOVE_E2E = os.environ.get("SKIP_MOVE_E2E")
 
 # Run the single node with performance optimizations enabled
 target_directory = "execution/executor-benchmark/src"
@@ -419,17 +431,18 @@ errors = []
 warnings = []
 
 with tempfile.TemporaryDirectory() as tmpdirname:
-    execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
-    try:
-        execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
-        move_e2e_benchmark_failed = False
-    except:
-        # for land-blocking (i.e. on PR), fail immediately, for speedy response.
-        # Otherwise run all tests, and fail in the end.
-        if SELECTED_FLOW == Flow.LAND_BLOCKING:
-            print("Move E2E benchmark failed, exiting")
-            exit(1)
-        move_e2e_benchmark_failed = True
+    move_e2e_benchmark_failed = False
+    if not SKIP_MOVE_E2E:
+        execute_command(f"cargo build {BUILD_FLAG} --package aptos-move-e2e-benchmark")
+        try:
+            execute_command(f"RUST_BACKTRACE=1 {BUILD_FOLDER}/aptos-move-e2e-benchmark")
+        except:
+            # for land-blocking (i.e. on PR), fail immediately, for speedy response.
+            # Otherwise run all tests, and fail in the end.
+            if SELECTED_FLOW == Flow.LAND_BLOCKING:
+                print("Move E2E benchmark failed, exiting")
+                exit(1)
+            move_e2e_benchmark_failed = True
 
     execute_command(f"cargo build {BUILD_FLAG} --package aptos-executor-benchmark")
     print(f"Warmup - creating DB with {NUM_ACCOUNTS} accounts")

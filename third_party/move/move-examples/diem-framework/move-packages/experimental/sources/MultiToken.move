@@ -157,12 +157,12 @@ module ExperimentalFramework::MultiToken {
     /// Finds the index of token with the given id in the gallery.
     fun index_of_token<TokenType: store>(gallery: &vector<TokenData<TokenType>>, id: &guid::ID): Option<u64> {
         let i = 0;
-        let len = vector::length(gallery);
+        let len1 = vector::length(gallery);
         while ({spec {
             invariant i >= 0;
-            invariant i <= ::len(gallery);
+            invariant i <= len(gallery);
             invariant forall k in 0..i: gallery[k].token_id.id != id;
-        };(i < len)}) {
+        };(i < len1)}) {
             if (guid::eq_id(&vector::borrow(gallery, i).token_id, id)) {
                 return option::some(i)
             };

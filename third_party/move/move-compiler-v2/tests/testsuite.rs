@@ -10,7 +10,7 @@ use move_compiler_v2::{
     annotate_units, disassemble_compiled_units, env_pipeline::rewrite_target::RewritingScope,
     logging, pipeline, run_bytecode_verifier, run_file_format_gen, Experiment, Options,
 };
-use move_model::model::GlobalEnv;
+use move_model::{metadata::LanguageVersion, model::GlobalEnv};
 use move_prover_test_utils::{baseline_test, extract_test_directives};
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetPipeline;
 use once_cell::unsync::Lazy;
@@ -103,7 +103,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
         // Spec rewriter is always on, so we test it, even though it's not part of regular compiler.
         .set_experiment(Experiment::SPEC_REWRITE, true)
         // Turn optimization on by default. Some configs below may turn it off.
-        .set_experiment(Experiment::OPTIMIZE, true);
+        .set_experiment(Experiment::OPTIMIZE, true)
+        .set_language_version(LanguageVersion::V2_0);
     opts.testing = true;
     let configs = vec![
         // --- Tests for checking and ast processing
@@ -121,7 +122,23 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             // TODO: move `inlining` tests to top-level test directory
             exclude: vec!["/inlining/"],
             exp_suffix: None,
-            options: opts.clone(),
+            options: opts
+                .clone()
+                .set_experiment(Experiment::ACQUIRES_CHECK, false),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
+        // Tests for checking v2 language features only supported if v2
+        // language is selected
+        TestConfig {
+            name: "checking-lang-v1",
+            runner: |p| run_test(p, get_config_by_name("checking-lang-v1")),
+            include: vec!["/checking-lang-v1/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone().set_language_version(LanguageVersion::V1),
             stop_after: StopAfter::AstPipeline,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None,
@@ -236,14 +253,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter:
             // For debugging:
-            // Some(vec![
-            //   INITIAL_BYTECODE_STAGE,
-            //   "ReferenceSafetyProcessor",
-            //   "DeadStoreElimination",
-            //   FILE_FORMAT_STAGE,
-            //]),
+             Some(vec![
+               INITIAL_BYTECODE_STAGE,
+               "ReferenceSafetyProcessor",
+               "DeadStoreElimination",
+               FILE_FORMAT_STAGE,
+            ]),
         },
         // Reference safety tests (without optimizations on)
         TestConfig {
@@ -258,7 +275,14 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
-            dump_bytecode_filter: None,
+            dump_bytecode_filter:
+            // For debugging:
+            Some(vec![
+                INITIAL_BYTECODE_STAGE,
+                "ReferenceSafetyProcessor",
+                "DeadStoreElimination",
+                FILE_FORMAT_STAGE,
+            ]),
         },
         // Abort analysis tests
         TestConfig {
@@ -304,6 +328,18 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 "ReferenceSafetyProcessor",
                 "AbilityProcessor",
             ]),
+        },
+        TestConfig {
+            name: "acquires-checker",
+            runner: |p| run_test(p, get_config_by_name("acquires-checker")),
+            include: vec!["/acquires-checker/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts.clone(),
+            stop_after: StopAfter::AstPipeline,
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
         },
         // Bytecode verifier tests
         TestConfig {
@@ -386,6 +422,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 INITIAL_BYTECODE_STAGE,
                 "VariableCoalescingAnnotator",
                 "VariableCoalescingTransformer",
+                "DeadStoreElimination",
                 FILE_FORMAT_STAGE,
             ]),
         },
@@ -453,6 +490,52 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             dump_bytecode: DumpLevel::EndStage,
             dump_bytecode_filter: Some(vec![FILE_FORMAT_STAGE]),
         },
+        // Test for unit tests on and off
+        TestConfig {
+            name: "unit-test-on",
+            runner: |p| run_test(p, get_config_by_name("unit-test-on")),
+            include: vec!["/unit_test/test/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts
+                .clone()
+                .set_experiment(Experiment::AST_SIMPLIFY, true)
+                .set_compile_test_code(true),
+            stop_after: StopAfter::BytecodePipeline(None),
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
+        TestConfig {
+            name: "unit-test-off",
+            runner: |p| run_test(p, get_config_by_name("unit-test-off")),
+            include: vec!["/unit_test/notest/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts
+                .clone()
+                .set_experiment(Experiment::AST_SIMPLIFY, true)
+                .set_compile_test_code(false),
+            stop_after: StopAfter::BytecodePipeline(None),
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
+        TestConfig {
+            name: "skip-attribute-checks",
+            runner: |p| run_test(p, get_config_by_name("skip-attribute-checks")),
+            include: vec!["/skip_attribute_checks/"],
+            exclude: vec![],
+            exp_suffix: None,
+            options: opts
+                .clone()
+                .set_experiment(Experiment::AST_SIMPLIFY, true)
+                .set_skip_attribute_checks(true),
+            stop_after: StopAfter::BytecodePipeline(None),
+            dump_ast: DumpLevel::None,
+            dump_bytecode: DumpLevel::None,
+            dump_bytecode_filter: None,
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });
@@ -479,7 +562,15 @@ fn run_test(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
     } else {
         vec![]
     };
-    options.named_address_mapping = vec!["std=0x1".to_string()];
+    options.named_address_mapping = vec![
+        "std=0x1".to_string(),
+        "aptos_std=0x1".to_string(),
+        "M=0x1".to_string(),
+        "A=0x42".to_string(),
+        "B=0x42".to_string(),
+        "K=0x19".to_string(),
+        "Async=0x20".to_string(),
+    ];
 
     // Putting the generated test baseline into a Refcell to avoid problems with mut borrow
     // in closures.

@@ -26,7 +26,6 @@ use move_prover_bytecode_pipeline::{
 };
 use move_stackless_bytecode::function_target_pipeline::FunctionTargetsHolder;
 use std::{
-    cell::RefCell,
     fs,
     path::{Path, PathBuf},
     time::Instant,
@@ -76,14 +75,16 @@ pub fn run_move_prover_v2<W: WriteColor>(
         dependencies: cloned_options.move_deps,
         named_address_mapping: cloned_options.move_named_address_values,
         output_dir: cloned_options.output_path,
+        language_version: cloned_options.language_version,
         skip_attribute_checks: true,
         known_attributes: Default::default(),
         testing: cloned_options.backend.stable_test_output,
         experiments: vec![],
-        experiment_cache: RefCell::new(Default::default()),
+        experiment_cache: Default::default(),
         sources: cloned_options.move_sources,
         warn_unused: false,
         whole_program: false,
+        compile_test_code: false,
     };
 
     let mut env = move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)?;

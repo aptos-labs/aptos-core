@@ -259,6 +259,9 @@ struct Opt {
 
     #[clap(flatten)]
     profiler_opt: ProfilerOpt,
+
+    #[clap(long)]
+    skip_paranoid_checks: bool,
 }
 
 impl Opt {
@@ -487,6 +490,9 @@ fn main() {
         execution_threads_per_shard = execution_threads;
     }
 
+    if opt.skip_paranoid_checks {
+        AptosVM::set_paranoid_type_checks(false);
+    }
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeExecutor::set_concurrency_level_once(execution_threads_per_shard);

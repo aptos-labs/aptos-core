@@ -14,11 +14,9 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-base64 = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true }
-fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 hyper = { workspace = true }
@@ -72,6 +70,3 @@ aptos-secure-storage = { workspace = true }
 aptos-temppath = { workspace = true }
 aptos-vm = { workspace = true }
 aptos-vm-validator = { workspace = true }
-
-[features]
-failpoints = ["fail/failpoints"]

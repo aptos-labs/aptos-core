@@ -872,6 +872,10 @@ impl AptosVM {
         txn_data: &TransactionMetadata,
         resolver: &impl AptosMoveResolver,
     ) -> Result<GasQuantity<Octa>, VMStatus> {
+        gas_meter.charge_io_gas_for_transaction(txn_data.transaction_size())?;
+        for (event, _layout) in change_set.events() {
+            gas_meter.charge_io_gas_for_event(event)?;
+        }
         for (key, op_size) in change_set.write_set_size_iter() {
             gas_meter.charge_io_gas_for_write(key, &op_size)?;
         }

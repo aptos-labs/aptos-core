@@ -40,6 +40,12 @@ impl AsMoveValue for JWKMoveStruct {
     }
 }
 
+impl From<RSA_JWK> for JWKMoveStruct {
+    fn from(rsa_jwk: RSA_JWK) -> Self {
+        JWKMoveStruct::from(JWK::RSA(rsa_jwk))
+    }
+}
+
 /// The JWK type that can be converted from/to `JWKMoveStruct` but easier to use in rust.
 #[derive(Debug, PartialEq, Eq)]
 pub enum JWK {

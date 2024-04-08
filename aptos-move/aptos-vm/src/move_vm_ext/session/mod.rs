@@ -107,7 +107,7 @@ impl<'r, 'l> SessionExt<'r, 'l> {
         let aggregator_context: NativeAggregatorContext = extensions.remove();
         let aggregator_change_set = aggregator_context
             .into_change_set()
-            .map_err(|e| PartialVMError::from(e).finish(Location::Undefined))?;
+            .map_err(|e| e.finish(Location::Undefined))?;
 
         let event_context: NativeEventContext = extensions.remove();
         let events = event_context.into_events();

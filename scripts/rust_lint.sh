@@ -1,7 +1,8 @@
 #!/bin/sh
 
-# This assumes you have already installed cargo-sort:
+# This assumes you have already installed cargo-sort and cargo machete:
 # cargo install cargo-sort
+# cargo install cargo-machete
 #
 # The best way to do this however is to run scripts/dev_setup.sh
 #
@@ -22,18 +23,21 @@ if [ "$1" = "--check" ]; then
     CHECK_ARG="--check"
 fi
 
-# Set appropriate script flags
+# Set appropriate script flags.
 set -e
 set -x
 
 # Run clippy with the aptos-core specific configuration.
 cargo xclippy
 
-# We require the nightly build of cargo fmt
-# to provide stricter rust formatting.
+# Run the formatter. Note: we require the nightly
+# build of cargo fmt to provide stricter rust formatting.
 cargo +nightly fmt $CHECK_ARG
 
 # Once cargo-sort correctly handles workspace dependencies,
 # we can move to cleaner workspace dependency notation.
 # See: https://github.com/DevinR528/cargo-sort/issues/47
 cargo sort --grouped --workspace $CHECK_ARG
+
+# Check for unused rust dependencies.
+cargo machete

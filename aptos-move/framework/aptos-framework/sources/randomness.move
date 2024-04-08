@@ -167,11 +167,6 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u128 = 0;
         while (i < 16) {
-            spec {
-                // TODO: Prove these with proper loop invaraints.
-                assume ret * 256 + 255 <= MAX_U256;
-                assume len(raw) > 0;
-            };
             ret = ret * 256 + (vector::pop_back(&mut raw) as u128);
             i = i + 1;
         };
@@ -193,11 +188,6 @@ module aptos_framework::randomness {
         let i = 0;
         let ret: u256 = 0;
         while (i < 32) {
-            spec {
-                // TODO: Prove these with proper loop invaraints.
-                assume ret * 256 + 255 <= MAX_U256;
-                assume len(raw) > 0;
-            };
             ret = ret * 256 + (vector::pop_back(&mut raw) as u256);
             i = i + 1;
         };
