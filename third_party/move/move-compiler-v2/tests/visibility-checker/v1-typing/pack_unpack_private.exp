@@ -1,0 +1,17 @@
+
+Diagnostics:
+error: Invalid pack operation on external type C::T
+  ┌─ tests/visibility-checker/v1-typing/pack_unpack_private.move:7:16
+  │
+7 │     public fun foo(): C::T {
+  │                ^^^
+8 │         C::T {}
+  │         ------- packed here
+
+error: Invalid unpack operation on external type C::T
+   ┌─ tests/visibility-checker/v1-typing/pack_unpack_private.move:10:16
+   │
+10 │     public fun bar(c: C::T) {
+   │                ^^^
+11 │         let C::T {} = c;
+   │             ------- unpacked here

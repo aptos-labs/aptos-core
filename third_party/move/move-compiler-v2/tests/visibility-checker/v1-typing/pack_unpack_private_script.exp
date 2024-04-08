@@ -1,0 +1,18 @@
+
+Diagnostics:
+error: Invalid pack operation on external type M::T
+   ┌─ tests/visibility-checker/v1-typing/pack_unpack_private_script.move:11:9
+   │
+11 │     fun main() {
+   │         ^^^^
+12 │         let t = T {  };
+   │                 ------ packed here
+
+error: Invalid unpack operation on external type M::T
+   ┌─ tests/visibility-checker/v1-typing/pack_unpack_private_script.move:11:9
+   │
+11 │     fun main() {
+   │         ^^^^
+12 │         let t = T {  };
+13 │         let T {} = t;
+   │             ---- unpacked here
