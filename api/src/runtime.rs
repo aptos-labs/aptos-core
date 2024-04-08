@@ -95,6 +95,48 @@ pub fn bootstrap(
 // TODO: https://github.com/poem-web/poem/issues/332
 // TODO: https://github.com/poem-web/poem/issues/333
 
+pub struct Apis {
+    pub accounts: AccountsApi,
+    pub basic: BasicApi,
+    pub blocks: BlocksApi,
+    pub events: EventsApi,
+    pub index: IndexApi,
+    pub state: StateApi,
+    pub transactions: TransactionsApi,
+    pub view_function: ViewFunctionApi,
+}
+
+pub fn get_apis(context : Arc<Context>) -> Apis {
+
+    Apis {
+        accounts: AccountsApi {
+            context: context.clone(),
+        },
+        basic: BasicApi {
+            context: context.clone(),
+        },
+        blocks: BlocksApi {
+            context: context.clone(),
+        },
+        events: EventsApi {
+            context: context.clone(),
+        },
+        index: IndexApi {
+            context: context.clone(),
+        },
+        state: StateApi {
+            context: context.clone(),
+        },
+        transactions: TransactionsApi {
+            context: context.clone(),
+        },
+        view_function: ViewFunctionApi {
+            context: context.clone(),
+        },
+    }
+
+}
+
 /// Generate the top level API service
 pub fn get_api_service(
     context: Arc<Context>,
