@@ -91,9 +91,9 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 TESTS = [
     RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
     RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
     # RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
+    RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE | Flow.CUSTOM_TEST),
     # RunGroupConfig(expected_tps=30443, key=RunGroupKey("account-generation", executor_type="native"), included_in=Flow.CONTINUOUS),
     RunGroupConfig(expected_tps=19200, key=RunGroupKey("account-resource32-b"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=4170, key=RunGroupKey("modify-global-resource"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
@@ -143,8 +143,8 @@ TESTS = [
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
 
-    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
-    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers", module_working_set_size=20), included_in=Flow.CONTINUOUS),
    
     RunGroupConfig(expected_tps=7006, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=6946, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
