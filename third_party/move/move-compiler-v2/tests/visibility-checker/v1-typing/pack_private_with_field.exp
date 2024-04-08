@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Invalid pack operation on external type m::S
+error: Invalid operation: pack of `m::S` can only be done within the defining module `0x42::m`
    ┌─ tests/visibility-checker/v1-typing/pack_private_with_field.move:18:5
    │
 18 │   fun f() {

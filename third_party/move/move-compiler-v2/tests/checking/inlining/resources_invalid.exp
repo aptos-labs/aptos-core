@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Invalid access of field `addr` on external type `objects::ReaderRef`
+error: Invalid operation: access of the field `addr` on type `objects::ReaderRef` can only be done within the defining module `0x42::objects`
    ┌─ tests/checking/inlining/resources_invalid.move:17:16
    │
  8 │         borrow_global<T>(ref.addr)

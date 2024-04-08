@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Invalid pack operation on external type D::G
+error: Invalid operation: pack of `D::G` can only be done within the defining module `0x41::D`
    ┌─ tests/visibility-checker/pack_unpack_structs.move:13:16
    │
 13 │     public fun foo(): C::T {
@@ -8,7 +8,7 @@ error: Invalid pack operation on external type D::G
 14 │         C::T {g: G{}}
    │                  --- packed here
 
-error: Invalid pack operation on external type C::T
+error: Invalid operation: pack of `C::T` can only be done within the defining module `0x43::C`
    ┌─ tests/visibility-checker/pack_unpack_structs.move:13:16
    │
 13 │     public fun foo(): C::T {
@@ -16,7 +16,7 @@ error: Invalid pack operation on external type C::T
 14 │         C::T {g: G{}}
    │         ------------- packed here
 
-error: Invalid unpack operation on external type C::T
+error: Invalid operation: unpack of `C::T` can only be done within the defining module `0x43::C`
    ┌─ tests/visibility-checker/pack_unpack_structs.move:16:16
    │
 16 │     public fun bar(c: C::T) {
@@ -24,7 +24,7 @@ error: Invalid unpack operation on external type C::T
 17 │         let C::T { g } = c;
    │             ---------- unpacked here
 
-error: Invalid unpack operation on external type D::G
+error: Invalid operation: unpack of `D::G` can only be done within the defining module `0x41::D`
    ┌─ tests/visibility-checker/pack_unpack_structs.move:16:16
    │
 16 │     public fun bar(c: C::T) {
@@ -33,7 +33,7 @@ error: Invalid unpack operation on external type D::G
 18 │         let G {} = g;
    │             ---- unpacked here
 
-error: Invalid unpack operation on external type C::T
+error: Invalid operation: unpack of `C::T` can only be done within the defining module `0x43::C`
    ┌─ tests/visibility-checker/pack_unpack_structs.move:20:16
    │
 20 │     public fun bar_ref(c: &C::T) {
@@ -41,7 +41,7 @@ error: Invalid unpack operation on external type C::T
 21 │         let C::T { g } = c;
    │             ---------- unpacked here
 
-error: Invalid unpack operation on external type D::G
+error: Invalid operation: unpack of `D::G` can only be done within the defining module `0x41::D`
    ┌─ tests/visibility-checker/pack_unpack_structs.move:20:16
    │
 20 │     public fun bar_ref(c: &C::T) {

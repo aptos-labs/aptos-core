@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Invalid access of field `f` on external type `X::S`
+error: Invalid operation: access of the field `f` on type `X::S` can only be done within the defining module `0x2::X`
    ┌─ tests/checking/typing/mutate_field_internal.move:12:9
    │
 12 │     fun t0() {
@@ -8,7 +8,7 @@ error: Invalid access of field `f` on external type `X::S`
 13 │         X::s().f = 0;
    │         -------- accessed here
 
-error: Invalid access of field `f` on external type `X::S`
+error: Invalid operation: access of the field `f` on type `X::S` can only be done within the defining module `0x2::X`
    ┌─ tests/checking/typing/mutate_field_internal.move:12:9
    │
 12 │     fun t0() {

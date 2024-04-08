@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: Invalid pack operation on external type M::T
+error: Invalid operation: pack of `M::T` can only be done within the defining module `0x42::M`
    ┌─ tests/visibility-checker/v1-typing/pack_unpack_private_script.move:11:9
    │
 11 │     fun main() {
@@ -8,7 +8,7 @@ error: Invalid pack operation on external type M::T
 12 │         let t = T {  };
    │                 ------ packed here
 
-error: Invalid unpack operation on external type M::T
+error: Invalid operation: unpack of `M::T` can only be done within the defining module `0x42::M`
    ┌─ tests/visibility-checker/v1-typing/pack_unpack_private_script.move:11:9
    │
 11 │     fun main() {
