@@ -312,7 +312,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
         let hash = state_key.hash().to_hex_literal();
-        let state_key = state_key.into_inner();
+        let state_key = state_key.inner().clone();
         match state_key {
             StateKeyInner::AccessPath(access_path) => {
                 self.try_access_path_into_write_set_changes(hash, access_path, op)

@@ -173,8 +173,8 @@ mod tests {
             let result = fetcher
                 .fetch_state_value_with_version_and_schedule_proof_read(&state_key, 0, None)
                 .expect("Should not fail.");
-            let expected_value = StateValue::from(match state_key.into_inner() {
-                StateKeyInner::Raw(key) => key,
+            let expected_value = StateValue::from(match state_key.inner() {
+                StateKeyInner::Raw(key) => key.to_vec(),
                 _ => unreachable!(),
             });
             assert_eq!(result, Some((0, expected_value)));

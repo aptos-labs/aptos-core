@@ -21,6 +21,7 @@ use std::{
     fmt::{Debug, Formatter},
     hash::Hash,
     ops::Deref,
+    sync::Arc,
 };
 use thiserror::Error;
 
@@ -28,7 +29,7 @@ use thiserror::Error;
 #[derivative(PartialEq, PartialOrd, Hash, Ord)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
 pub struct StateKey {
-    inner: StateKeyInner,
+    inner: Arc<StateKeyInner>,
     #[derivative(
         Hash = "ignore",
         Ord = "ignore",
@@ -86,7 +87,7 @@ pub enum StateKeyTag {
 impl StateKey {
     pub fn new(inner: StateKeyInner) -> Self {
         Self {
-            inner,
+            inner: Arc::new(inner),
             hash: OnceCell::new(),
         }
     }
@@ -124,7 +125,7 @@ impl StateKey {
     }
 
     pub fn size(&self) -> usize {
-        match &self.inner {
+        match self.inner.as_ref() {
             StateKeyInner::AccessPath(access_path) => access_path.size(),
             StateKeyInner::TableItem { handle, key } => handle.size() + key.len(),
             StateKeyInner::Raw(bytes) => bytes.len(),
@@ -145,10 +146,6 @@ impl StateKey {
 
     pub fn inner(&self) -> &StateKeyInner {
         &self.inner
-    }
-
-    pub fn into_inner(self) -> StateKeyInner {
-        self.inner
     }
 
     pub fn get_shard_id(&self) -> u8 {
@@ -195,7 +192,9 @@ impl CryptoHash for StateKey {
     type Hasher = DummyHasher;
 
     fn hash(&self) -> HashValue {
-        *self.hash.get_or_init(|| CryptoHash::hash(&self.inner))
+        *self
+            .hash
+            .get_or_init(|| CryptoHash::hash(self.inner.as_ref()))
     }
 }
 
@@ -272,6 +271,7 @@ mod tests {
     use crate::state_store::state_key::{AccessPath, StateKey};
     use aptos_crypto::hash::CryptoHash;
     use move_core_types::language_storage::ModuleId;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn test_access_path_hash() {
@@ -344,6 +344,23 @@ mod tests {
         assert_eq!(
             &format!("{:?}", key),
             "StateKey { inner: Raw(010203), hash: OnceCell(HashValue(655ab5766bc87318e18d9287f32d318e15535d3db9d21a6e5a2b41a51b535aff)) }"
+        );
+    }
+
+    #[test]
+    fn alden_test_size() {
+        println!("size_of<StateKey>(): {}", std::mem::size_of::<StateKey>());
+        println!(
+            "size_of<Arc<StateKey>>(): {}",
+            std::mem::size_of::<Arc<StateKey>>()
+        );
+        println!(
+            "size_of<Mutex<StateKey>>(): {}",
+            std::mem::size_of::<Mutex<StateKey>>()
+        );
+        println!(
+            "size_of<Mutex<Arc<StateKey>>>(): {}",
+            std::mem::size_of::<Mutex<Arc<StateKey>>>()
         );
     }
 }
