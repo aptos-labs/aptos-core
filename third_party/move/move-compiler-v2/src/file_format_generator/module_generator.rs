@@ -111,7 +111,8 @@ impl ModuleGenerator {
             CompilationMetadata::new(CompilerVersion::V2_0, language_version);
         let metadata = Metadata {
             key: COMPILATION_METADATA_KEY.to_vec(),
-            value: bcs::to_bytes(&compilation_metadata).expect("BCS for COMPILATION_METADATA"),
+            value: bcs::to_bytes(&compilation_metadata)
+                .expect("Serialization of CompilationMetadata should succeed"),
         };
         let module = move_binary_format::CompiledModule {
             version: file_format_common::VERSION_NEXT,

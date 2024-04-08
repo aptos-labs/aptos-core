@@ -261,7 +261,7 @@ fn test_compilation_metadata() {
     // publish compiler v2 code to mainnet
     assert_vm_status!(
         test_compilation_metadata_internal(true, true),
-        StatusCode::UNSTABLE_BYTECODE
+        StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
     // publish compiler v2 code to test
     assert_success!(test_compilation_metadata_internal(false, true));
