@@ -26,10 +26,10 @@ use std::{
 use thiserror::Error;
 
 #[derive(Clone, Debug, Derivative)]
-#[derivative(PartialEq, PartialOrd, Hash, Ord)]
+#[derivative(Eq, PartialEq, PartialOrd, Hash, Ord)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub struct StateKey {
-    inner: Arc<StateKeyInner>,
+pub struct StateKey_ {
+    inner: StateKeyInner,
     #[derivative(
         Hash = "ignore",
         Ord = "ignore",
@@ -39,6 +39,10 @@ pub struct StateKey {
     #[cfg_attr(any(test, feature = "fuzzing"), proptest(value = "OnceCell::new()"))]
     hash: OnceCell<HashValue>,
 }
+
+#[derive(Clone, Debug, PartialEq, PartialOrd, Hash, Ord)]
+#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
+pub struct StateKey(Arc<StateKey_>);
 
 #[derive(Clone, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
@@ -86,10 +90,10 @@ pub enum StateKeyTag {
 
 impl StateKey {
     pub fn new(inner: StateKeyInner) -> Self {
-        Self {
-            inner: Arc::new(inner),
+        Self(Arc::new(StateKey_ {
+            inner,
             hash: OnceCell::new(),
-        }
+        }))
     }
 
     /// Recovers from serialized bytes in physical storage.
@@ -125,7 +129,7 @@ impl StateKey {
     }
 
     pub fn size(&self) -> usize {
-        match self.inner.as_ref() {
+        match self.inner() {
             StateKeyInner::AccessPath(access_path) => access_path.size(),
             StateKeyInner::TableItem { handle, key } => handle.size() + key.len(),
             StateKeyInner::Raw(bytes) => bytes.len(),
@@ -145,7 +149,7 @@ impl StateKey {
     }
 
     pub fn inner(&self) -> &StateKeyInner {
-        &self.inner
+        &self.0.inner
     }
 
     pub fn get_shard_id(&self) -> u8 {
@@ -192,9 +196,7 @@ impl CryptoHash for StateKey {
     type Hasher = DummyHasher;
 
     fn hash(&self) -> HashValue {
-        *self
-            .hash
-            .get_or_init(|| CryptoHash::hash(self.inner.as_ref()))
+        *self.0.hash.get_or_init(|| CryptoHash::hash(&self.0.inner))
     }
 }
 
@@ -203,7 +205,7 @@ impl Serialize for StateKey {
     where
         S: Serializer,
     {
-        self.inner.serialize(serializer)
+        self.0.inner.serialize(serializer)
     }
 }
 
@@ -221,7 +223,7 @@ impl Deref for StateKey {
     type Target = StateKeyInner;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.0.inner
     }
 }
 
