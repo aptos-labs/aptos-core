@@ -281,7 +281,11 @@ impl RpcHandler for NodeBroadcastHandler {
         let node = self.validate(node)?;
 
         self.dag.write().update_votes(&node, false);
-        self.order_rule.process_new_node(node.metadata());
+        let order_rule = self.order_rule.clone();
+        let metadata = node.metadata().clone();
+        tokio::task::spawn_blocking(move || {
+            order_rule.process_new_node(&metadata);
+        });
 
         observe_node(node.timestamp(), NodeStage::NodeReceived);
         debug!(LogSchema::new(LogEvent::ReceiveNode)

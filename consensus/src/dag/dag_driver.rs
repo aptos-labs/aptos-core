@@ -420,8 +420,10 @@ impl RpcHandler for DagDriver {
         NODE_PAYLOAD_SIZE.observe(certified_node.payload().size() as f64);
 
         let node_metadata = certified_node.metadata().clone();
-        self.add_node(certified_node)
-            .map(|_| self.order_rule.process_new_node(&node_metadata))?;
+        self.add_node(certified_node)?;
+
+        let order_rule = self.order_rule.clone();
+        tokio::task::spawn_blocking(move || order_rule.process_new_node(&node_metadata));
 
         Ok(CertifiedAck::new(epoch))
     }
