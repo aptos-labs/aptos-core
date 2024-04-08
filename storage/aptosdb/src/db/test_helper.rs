@@ -32,16 +32,12 @@ use aptos_types::{
     ledger_info::{generate_ledger_info_with_sig, LedgerInfo, LedgerInfoWithSignatures},
     proof::accumulator::{InMemoryEventAccumulator, InMemoryTransactionAccumulator},
     proptest_types::{AccountInfoUniverse, BlockGen},
-    state_store::{
-        create_empty_sharded_state_updates, state_key::StateKey, state_value::StateValue,
-        ShardedStateUpdates,
-    },
+    state_store::{state_key::StateKey, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, TransactionToCommit, Version},
 };
 #[cfg(test)]
 use arr_macro::arr;
 use proptest::{collection::vec, prelude::*, sample::Index};
-use rayon::prelude::*;
 use std::{collections::HashMap, fmt::Debug};
 
 prop_compose! {
