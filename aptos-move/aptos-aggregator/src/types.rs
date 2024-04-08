@@ -3,20 +3,22 @@
 
 use crate::bounded_math::SignedU128;
 use aptos_logger::error;
-use aptos_types::delayed_fields::{
-    bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
-    is_derived_string_struct_layout,
-};
-// TODO[agg_v2](cleanup): After aggregators_v2 branch land, consolidate these, instead of using alias here
-pub use aptos_types::delayed_fields::{
-    DelayedFieldID, PanicError, TryFromMoveValue, TryIntoMoveValue,
-};
+use aptos_types::delayed_fields::PanicError;
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{
     value::{IdentifierMappingKind, MoveTypeLayout},
     vm_status::StatusCode,
 };
-use move_vm_types::values::{Struct, Value};
+use move_vm_types::{
+    delayed_values::{
+        delayed_field_id::{DelayedFieldID, TryFromMoveValue},
+        derived_string_snapshot::{
+            bytes_and_width_to_derived_string_struct, derived_string_struct_to_bytes_and_length,
+            is_derived_string_struct_layout,
+        },
+    },
+    values::{Struct, Value},
+};
 
 // Wrapping another error, to add a variant that represents
 // something that should never happen - i.e. a code invariant error,
@@ -39,7 +41,7 @@ impl<T: std::fmt::Debug> PanicOr<T> {
 
 pub fn code_invariant_error<M: std::fmt::Debug>(message: M) -> PanicError {
     let msg = format!(
-        "Delayed field / resource group code invariant broken (a bug in the code), {:?}",
+        "Delayed materialization code invariant broken (there is a bug in the code), {:?}",
         message
     );
     error!("{}", msg);
@@ -75,7 +77,9 @@ impl From<DelayedFieldsSpeculativeError> for PartialVMError {
 impl<T: std::fmt::Debug> From<&PanicOr<T>> for StatusCode {
     fn from(err: &PanicOr<T>) -> Self {
         match err {
-            PanicOr::CodeInvariantError(_) => StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR,
+            PanicOr::CodeInvariantError(_) => {
+                StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR
+            },
             PanicOr::Or(_) => StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR,
         }
     }
@@ -85,7 +89,7 @@ impl<T: std::fmt::Debug> From<PanicOr<T>> for PartialVMError {
     fn from(err: PanicOr<T>) -> Self {
         match err {
             PanicOr::CodeInvariantError(msg) => {
-                PartialVMError::new(StatusCode::DELAYED_FIELDS_CODE_INVARIANT_ERROR)
+                PartialVMError::new(StatusCode::DELAYED_MATERIALIZATION_CODE_INVARIANT_ERROR)
                     .with_message(msg)
             },
             PanicOr::Or(err) => PartialVMError::new(StatusCode::SPECULATIVE_EXECUTION_ABORT_ERROR)
@@ -239,6 +243,17 @@ impl DelayedFieldValue {
                 )
             },
         })
+    }
+
+    /// Approximate memory consumption of current DelayedFieldValue
+    pub fn get_approximate_memory_size(&self) -> usize {
+        // 32 + len
+        std::mem::size_of::<DelayedFieldValue>()
+            + match &self {
+                DelayedFieldValue::Aggregator(_) | DelayedFieldValue::Snapshot(_) => 0,
+                // additional allocated memory for the data:
+                DelayedFieldValue::Derived(v) => v.len(),
+            }
     }
 }
 

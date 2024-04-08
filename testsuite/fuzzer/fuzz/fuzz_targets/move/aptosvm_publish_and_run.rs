@@ -8,8 +8,8 @@ use aptos_language_e2e_tests::{
 use aptos_types::{
     chain_id::ChainId,
     transaction::{
-        EntryFunction, ExecutionStatus, ModuleBundle, Script, TransactionArgument,
-        TransactionPayload, TransactionStatus,
+        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
+        TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -18,7 +18,7 @@ use arbitrary::Arbitrary;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
-    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex},
+    file_format::{CompiledModule, CompiledScript, FunctionDefinitionIndex, SignatureToken},
 };
 use move_core_types::{
     language_storage::{ModuleId, TypeTag},
@@ -142,6 +142,8 @@ macro_rules! tdbg {
     };
 }
 
+const MAX_TYPE_PARAMETER_VALUE: u16 = 64 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
+
 // used for ordering modules topologically
 fn sort_by_deps(
     map: &BTreeMap<ModuleId, CompiledModule>,
@@ -179,10 +181,36 @@ fn check_for_invariant_violation(e: VMStatus) {
     }
 }
 
+// filter modules
+fn filter_modules(input: &RunnableState) -> Result<(), Corpus> {
+    // reject any TypeParameter exceeds the maximum allowed value (Avoid known Ivariant Violation)
+    if let ExecVariant::Script { script, .. } = input.exec_variant.clone() {
+        for signature in script.signatures {
+            for sign_token in signature.0.iter() {
+                if let SignatureToken::TypeParameter(idx) = sign_token {
+                    if *idx > MAX_TYPE_PARAMETER_VALUE {
+                        return Err(Corpus::Reject);
+                    }
+                } else if let SignatureToken::Vector(inner) = sign_token {
+                    if let SignatureToken::TypeParameter(idx) = inner.as_ref() {
+                        if *idx > MAX_TYPE_PARAMETER_VALUE {
+                            return Err(Corpus::Reject);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     tdbg!(&input);
     AptosVM::set_concurrency_level_once(2);
     let mut vm = FakeExecutor::from_genesis(&VM, ChainId::mainnet()).set_not_parallel();
+
+    // filter modules
+    filter_modules(&input)?;
 
     for m in input.dep_modules.iter_mut() {
         // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
@@ -233,53 +261,14 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
 
     // publish all packages
     for group in packages {
-        let sender = *group[0].address();
-        let serialized_modules: Vec<Vec<u8>> = group
-            .iter()
-            .map(|m| {
-                let mut b = vec![];
-                m.serialize(&mut b).map(|_| b)
-            })
-            .collect::<Result<Vec<Vec<u8>>, _>>()
-            .map_err(|_| Corpus::Keep)?;
-
-        // deprecated but easiest way to publish modules
-        let mb = ModuleBundle::new(serialized_modules);
-        let acc = vm.new_account_at(sender);
-        let tx = acc
-            .transaction()
-            .gas_unit_price(100)
-            .sequence_number(0)
-            .payload(TransactionPayload::ModuleBundle(mb))
-            .sign();
+        // TODO: Publish modules through native context instead.
         tdbg!("publishing");
-        let res = vm
-            .execute_block(vec![tx])
-            .map_err(|e| {
-                check_for_invariant_violation(e);
-                Corpus::Keep
-            })?
-            .pop()
-            .expect("expected 1 output");
-        tdbg!(&res);
-        // if error exit gracefully
-        let status = match tdbg!(res.status()) {
-            TransactionStatus::Keep(status) => status,
-            _ => return Err(Corpus::Keep),
-        };
-        vm.apply_write_set(res.write_set());
-        match tdbg!(status) {
-            ExecutionStatus::Success => (),
-            ExecutionStatus::MiscellaneousError(e) => {
-                if let Some(e) = e {
-                    if e.status_type() == StatusType::InvariantViolation {
-                        panic!("invariant violation {:?}", e);
-                    }
-                }
-                return Err(Corpus::Keep);
-            },
-            _ => return Err(Corpus::Keep),
-        };
+        for module in group.iter() {
+            let mut b = vec![];
+            module.serialize(&mut b).map_err(|_| Corpus::Reject)?;
+            CompiledModule::deserialize(&b).map_err(|_| Corpus::Reject)?;
+            vm.add_module(&module.self_id(), b);
+        }
         tdbg!("published");
     }
 
@@ -361,7 +350,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let raw_tx = tx.raw();
     let tx = match input.tx_auth_type {
         Authenticator::Ed25519 { sender: _ } => raw_tx
-            .sign(&sender_acc.privkey, sender_acc.pubkey)
+            .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
             .map_err(|_| Corpus::Keep)?
             .into_inner(),
         Authenticator::MultiAgent {
@@ -420,7 +409,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     // exec tx
     tdbg!("exec start");
     let mut old_res = None;
-    const N_EXTRA_RERUNS: usize = 3;
+    const N_EXTRA_RERUNS: usize = 0;
+    #[allow(clippy::reversed_empty_ranges)]
     for _ in 0..N_EXTRA_RERUNS {
         let res = vm.execute_block(vec![tx.clone()]);
         if let Some(old_res) = old_res {

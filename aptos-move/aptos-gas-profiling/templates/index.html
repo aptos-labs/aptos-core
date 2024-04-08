@@ -82,6 +82,27 @@
         {{#if intrinsic-percentage}}
         , {{intrinsic-percentage}} of the total cost for execution & IO.
         {{/if}}
+        <h4>Dependencies</h4>
+        {{#if deps}}
+        <table>
+            <tr>
+                <th><b>Name</b></th>
+                <th style="text-align: right"><b>Size in Bytes</th>
+                <th style="text-align: right"><b>Cost in Gas Units</b></th>
+                <th style="text-align: right"><b>Percentage</b></th>
+            </tr>
+            {{#each deps}}
+            <tr>
+                <td>{{name}}</td>
+                <td style="text-align: right">{{size}}</td>
+                <td style="text-align: right">{{cost}}</td>
+                <td style="text-align: right">{{percentage}}</td>
+            </tr>
+            {{/each}}
+        </table>
+        {{else}}
+        (No dependencies to show. System dependencies are excluded.)
+        {{/if}}
         <h4>Execution</h4>
         {{#if ops}}
         <table>

@@ -130,7 +130,6 @@ pub fn new_test_context(
                 false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-                false, /* indexer async v2 */
             )
             .unwrap(),
         )
@@ -146,6 +145,7 @@ pub fn new_test_context(
         db.clone(),
         mempool.ac_client.clone(),
         node_config.clone(),
+        None, /* table info reader */
     );
 
     // Configure the testing depending on which API version we're testing.
@@ -397,6 +397,7 @@ impl TestContext {
                 "type": "multisig_payload",
                 "multisig_address": multisig_account.to_hex_literal(),
                 "transaction_payload": {
+                    "type": "entry_function_payload",
                     "function": function,
                     "type_arguments": type_args,
                     "arguments": args
@@ -822,6 +823,7 @@ impl TestContext {
                 "type": "multisig_payload",
                 "multisig_address": multisig_account.to_hex_literal(),
                 "transaction_payload": {
+                    "type": "entry_function_payload",
                     "function": function,
                     "type_arguments": type_args,
                     "arguments": args

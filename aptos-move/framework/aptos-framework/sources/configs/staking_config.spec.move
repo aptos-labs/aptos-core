@@ -133,6 +133,7 @@ spec aptos_framework::staking_config {
         rewards_rate_decrease_rate: FixedPoint64,
     ) {
         use std::signer;
+        pragma verify_duration_estimate = 120;
         requires exists<timestamp::CurrentTimeMicroseconds>(@aptos_framework);
         let addr = signer::address_of(aptos_framework);
         /// [high-level-req-1.2]

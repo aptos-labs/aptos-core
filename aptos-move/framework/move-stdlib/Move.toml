@@ -3,4 +3,5 @@ name = "MoveStdlib"
 version = "1.5.0"
 
 [addresses]
+vm = "0x0"
 std = "0x1"

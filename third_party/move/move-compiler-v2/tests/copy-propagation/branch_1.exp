@@ -28,7 +28,7 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t4: u64
      var $t5: u64
      # before: {}, after: {$t3 := $t1}
-  0: $t3 := infer($t1)
+  0: $t3 := move($t1)
      # before: {$t3 := $t1}, after: {$t3 := $t1}
   1: if ($t0) goto 2 else goto 6
      # before: {$t3 := $t1}, after: {$t3 := $t1}
@@ -36,7 +36,7 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      # before: {$t3 := $t1}, after: {$t3 := $t1}
   3: $t4 := 0
      # before: {$t3 := $t1}, after: {$t3 := $t4}
-  4: $t3 := infer($t4)
+  4: $t3 := move($t4)
      # before: {$t3 := $t4}, after: {$t3 := $t4}
   5: goto 7
      # before: {$t3 := $t1}, after: {$t3 := $t1}
@@ -59,11 +59,11 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t3: u64
      var $t4: u64
      var $t5: u64
-  0: $t3 := infer($t1)
+  0: $t3 := move($t1)
   1: if ($t0) goto 2 else goto 6
   2: label L0
   3: $t4 := 0
-  4: $t3 := infer($t4)
+  4: $t3 := move($t4)
   5: goto 7
   6: label L1
   7: label L2
@@ -80,11 +80,11 @@ fun m::foo($t0: bool, $t1: u64): u64 {
      var $t3: u64
      var $t4: u64
      var $t5: u64
-  0: $t3 := infer($t1)
+  0: $t3 := move($t1)
   1: if ($t0) goto 2 else goto 6
   2: label L0
   3: $t4 := 0
-  4: $t3 := infer($t4)
+  4: $t3 := move($t4)
   5: goto 7
   6: label L1
   7: label L2

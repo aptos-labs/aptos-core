@@ -19,6 +19,7 @@ aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-infallible = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-short-hex-str = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }

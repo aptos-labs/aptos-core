@@ -27,7 +27,7 @@ use move_stackless_bytecode::{
     dataflow_domains::{AbstractDomain, JoinResult},
     function_target::{FunctionData, FunctionTarget},
     function_target_pipeline::{FunctionTargetProcessor, FunctionTargetsHolder},
-    stackless_bytecode::{Bytecode, Operation},
+    stackless_bytecode::Bytecode,
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -152,11 +152,9 @@ pub struct AvailCopiesAnalysis {
 
 impl AvailCopiesAnalysis {
     /// Create a new instance of definitely available copies analysis.
-    /// `code` is the bytecode of the function being analyzed.
-    pub fn new(code: &[Bytecode]) -> Self {
-        Self {
-            borrowed_locals: Self::get_borrowed_locals(code),
-        }
+    /// `borrowed_locals` is the set of locals that have been borrowed in function being analyzed.
+    pub fn new(borrowed_locals: BTreeSet<TempIndex>) -> Self {
+        Self { borrowed_locals }
     }
 
     /// Analyze the given function and return the definitely available copies annotation.
@@ -172,20 +170,6 @@ impl AvailCopiesAnalysis {
                 }
             });
         AvailCopiesAnnotation(per_bytecode_state)
-    }
-
-    /// Get the set of locals that have been borrowed in the function being analyzed.
-    fn get_borrowed_locals(code: &[Bytecode]) -> BTreeSet<TempIndex> {
-        code.iter()
-            .filter_map(|bc| {
-                if let Bytecode::Call(_, _, Operation::BorrowLoc, srcs, _) = bc {
-                    // BorrowLoc should have only one source.
-                    srcs.first().cloned()
-                } else {
-                    None
-                }
-            })
-            .collect()
     }
 }
 
@@ -231,7 +215,7 @@ impl FunctionTargetProcessor for AvailCopiesAnalysisProcessor {
             return data;
         }
         let target = FunctionTarget::new(func_env, &data);
-        let analysis = AvailCopiesAnalysis::new(target.get_bytecode());
+        let analysis = AvailCopiesAnalysis::new(target.get_borrowed_locals());
         let annotation = analysis.analyze(&target);
         data.annotations.set(annotation, true);
         data

@@ -5,7 +5,8 @@ use crate::{
     args::{ClusterArgs, EmitArgs},
     cluster::Cluster,
     emitter::{
-        create_accounts, parse_seed, stats::TxnStats, EmitJobMode, EmitJobRequest, TxnEmitter,
+        create_accounts, parse_seed, stats::TxnStats, EmitJobMode, EmitJobRequest, NumAccountsMode,
+        TxnEmitter,
     },
     instance::Instance,
     CreateAccountsArgs,
@@ -14,7 +15,7 @@ use anyhow::{bail, Context, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
 use aptos_logger::{error, info};
 use aptos_sdk::transaction_builder::TransactionFactory;
-use aptos_transaction_generator_lib::args::TransactionTypeArg;
+use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use std::time::{Duration, Instant};
 
@@ -73,7 +74,7 @@ pub async fn emit_transactions_with_cluster(
 
     let duration = Duration::from_secs(args.duration);
     let client = cluster.random_instance().rest_client();
-    let mut coin_source_account = cluster.load_coin_source_account(&client).await?;
+    let coin_source_account = cluster.load_coin_source_account(&client).await?;
     let emitter = TxnEmitter::new(
         TransactionFactory::new(cluster.chain_id)
             .with_transaction_expiration_time(args.txn_expiration_time_secs)
@@ -87,6 +88,7 @@ pub async fn emit_transactions_with_cluster(
         &args.transaction_phases,
         args.module_working_set_size.unwrap_or(1),
         args.sender_use_account_pool.unwrap_or(false),
+        WorkflowProgress::when_done_default(),
     );
     let mut emit_job_request =
         EmitJobRequest::new(cluster.all_instances().map(Instance::rest_client).collect())
@@ -97,10 +99,10 @@ pub async fn emit_transactions_with_cluster(
                 args.coordination_delay_between_instances.unwrap_or(0),
             ));
 
-    if let Some(max_transactions_per_account) = args.max_transactions_per_account {
-        emit_job_request =
-            emit_job_request.max_transactions_per_account(max_transactions_per_account);
-    }
+    let num_accounts =
+        NumAccountsMode::create(args.num_accounts, args.max_transactions_per_account);
+
+    emit_job_request = emit_job_request.num_accounts_mode(num_accounts);
 
     if let Some(gas_price) = args.gas_price {
         emit_job_request = emit_job_request.gas_price(gas_price);
@@ -108,6 +110,10 @@ pub async fn emit_transactions_with_cluster(
 
     if let Some(max_gas_per_txn) = args.max_gas_per_txn {
         emit_job_request = emit_job_request.max_gas_per_txn(max_gas_per_txn);
+    }
+
+    if let Some(init_max_gas_per_txn) = args.init_max_gas_per_txn {
+        emit_job_request = emit_job_request.init_max_gas_per_txn(init_max_gas_per_txn);
     }
 
     if let Some(init_gas_price_multiplier) = args.init_gas_price_multiplier {
@@ -120,6 +126,14 @@ pub async fn emit_transactions_with_cluster(
     if let Some(expected_gas_per_txn) = args.expected_gas_per_txn {
         emit_job_request = emit_job_request.expected_gas_per_txn(expected_gas_per_txn);
     }
+    if let Some(expected_gas_per_transfer) = args.expected_gas_per_transfer {
+        emit_job_request = emit_job_request.expected_gas_per_transfer(expected_gas_per_transfer);
+    }
+    if let Some(expected_gas_per_account_create) = args.expected_gas_per_account_create {
+        emit_job_request =
+            emit_job_request.expected_gas_per_account_create(expected_gas_per_account_create);
+    }
+
     if cluster.coin_source_is_root {
         emit_job_request = emit_job_request.set_mint_to_root();
     } else {
@@ -139,9 +153,13 @@ pub async fn emit_transactions_with_cluster(
             .latency_polling_interval(Duration::from_secs_f32(latency_polling_interval_s));
     }
 
+    if args.skip_minting_accounts {
+        emit_job_request = emit_job_request.skip_minting_accounts();
+    }
+
     let stats = emitter
         .emit_txn_for_with_stats(
-            &mut coin_source_account,
+            &coin_source_account,
             emit_job_request,
             duration,
             (args.duration / 10).clamp(1, 10),
@@ -158,7 +176,7 @@ pub async fn create_accounts_command(
         .await
         .context("Failed to build cluster")?;
     let client = cluster.random_instance().rest_client();
-    let mut coin_source_account = cluster.load_coin_source_account(&client).await?;
+    let coin_source_account = cluster.load_coin_source_account(&client).await?;
     let txn_factory = TransactionFactory::new(cluster.chain_id)
         .with_transaction_expiration_time(60)
         .with_max_gas_amount(create_accounts_args.max_gas_per_txn);
@@ -174,11 +192,13 @@ pub async fn create_accounts_command(
         Some(str) => parse_seed(str),
         None => StdRng::from_entropy().gen(),
     };
+
     create_accounts(
-        &mut coin_source_account,
+        &coin_source_account,
         &txn_factory,
         &emit_job_request,
         DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE,
+        false,
         seed,
         create_accounts_args.count,
         4,

@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: cannot copy local `s` which is still mutable borrowed
+error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_field_invalid.move:13:9
    │
 12 │         let f = &mut s.f;
@@ -10,8 +10,10 @@ error: cannot copy local `s` which is still mutable borrowed
    │                 used by mutable field borrow
 13 │         copy s;
    │         ^^^^^^ copied here
+14 │         *f;
+   │         -- conflicting reference `f` used here
 
-error: cannot copy local `s` which is still mutable borrowed
+error: cannot copy local `s` which is still mutably borrowed
    ┌─ tests/reference-safety/v1-tests/copy_field_invalid.move:19:9
    │
 18 │         let f = id_mut(&mut s.f);
@@ -21,3 +23,5 @@ error: cannot copy local `s` which is still mutable borrowed
    │                        used by mutable field borrow
 19 │         copy s;
    │         ^^^^^^ copied here
+20 │         *f;
+   │         -- conflicting reference `f` used here

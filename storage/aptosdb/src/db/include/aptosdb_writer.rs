@@ -82,7 +82,6 @@ impl DbWriter for AptosDB {
         })
     }
 
-    // TODO(bowu): populate the flag indicating the fast_sync is done.
     fn finalize_state_snapshot(
         &self,
         version: Version,
@@ -196,47 +195,6 @@ impl DbWriter for AptosDB {
             self.state_store.reset();
 
             Ok(())
-        })
-    }
-
-    /// Open up dbwriter for table info indexing on indexer async v2 rocksdb
-    fn index_table_info(
-        &self,
-        db_reader: Arc<dyn DbReader>,
-        first_version: Version,
-        write_sets: &[&WriteSet],
-        end_early_if_pending_on_empty: bool,
-    ) -> Result<()> {
-        gauged_api("index_table_info", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| {
-                    indexer.index_table_info(
-                        db_reader,
-                        first_version,
-                        write_sets,
-                        end_early_if_pending_on_empty,
-                    )
-                })
-                .unwrap_or(Ok(()))
-        })
-    }
-
-    fn cleanup_pending_on_items(&self) -> Result<()> {
-        gauged_api("cleanup_pending_on_items", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.cleanup_pending_on_items())
-                .unwrap_or(Ok(()))
-        })
-    }
-
-    fn update_next_version(&self, end_version: u64) -> Result<()> {
-        gauged_api("update_next_version", || {
-            self.indexer_async_v2
-                .as_ref()
-                .map(|indexer| indexer.update_next_version(end_version))
-                .unwrap_or(Ok(()))
         })
     }
 }
@@ -358,6 +316,10 @@ impl AptosDB {
             s.spawn(|_| {
                 new_root_hash = self
                     .commit_transaction_accumulator(txns_to_commit, first_version)
+                    .unwrap()
+            });
+            s.spawn(|_| {
+                self.commit_transaction_auxiliary_data(txns_to_commit, first_version)
                     .unwrap()
             });
         });
@@ -514,6 +476,38 @@ impl AptosDB {
             .write_schemas(batch)?;
 
         Ok(root_hash)
+    }
+
+    fn commit_transaction_auxiliary_data(
+        &self,
+        txns_to_commit: &[TransactionToCommit],
+        first_version: u64,
+    ) -> Result<()> {
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_auxiliary_data"])
+            .start_timer();
+
+        let batch = SchemaBatch::new();
+        txns_to_commit
+            .iter()
+            .enumerate()
+            .try_for_each(|(i, txn_to_commit)| -> Result<()> {
+                TransactionAuxiliaryDataDb::put_transaction_auxiliary_data(
+                    first_version + i as u64,
+                    txn_to_commit.transaction_auxiliary_data(),
+                    &batch,
+                )?;
+
+
+            Ok(())
+        })?;
+
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["commit_transaction_auxiliary_data___commit"])
+            .start_timer();
+        self.ledger_db
+            .transaction_auxiliary_data_db()
+            .write_schemas(batch)
     }
 
     fn commit_transaction_infos(

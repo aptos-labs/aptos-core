@@ -1,21 +1,24 @@
 // Copyright © Aptos Foundation
 
 use self::jwk::JWK;
-use crate::{move_utils::as_move_value::AsMoveValue, on_chain_config::OnChainConfig};
+use crate::{
+    aggregate_signature::AggregateSignature, move_utils::as_move_value::AsMoveValue,
+    on_chain_config::OnChainConfig,
+};
 use anyhow::{bail, Context};
-use aptos_crypto::bls12381;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use jwk::JWKMoveStruct;
 use move_core_types::{
-    account_address::AccountAddress,
     ident_str,
     identifier::IdentStr,
+    language_storage::TypeTag,
     move_resource::MoveStructType,
     value::{MoveStruct, MoveValue},
 };
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeSet, HashMap},
+    collections::HashMap,
     fmt::{Debug, Formatter},
 };
 
@@ -29,6 +32,11 @@ pub fn issuer_from_str(s: &str) -> Issuer {
     s.as_bytes().to_vec()
 }
 
+#[cfg(any(test, feature = "fuzzing"))]
+pub fn dummy_issuer() -> Issuer {
+    issuer_from_str("https:://dummy.issuer")
+}
+
 /// Move type `0x1::jwks::OIDCProvider` in rust.
 /// See its doc in Move for more details.
 #[derive(Default, Serialize, Deserialize)]
@@ -37,9 +45,46 @@ pub struct OIDCProvider {
     pub config_url: Vec<u8>,
 }
 
+impl OIDCProvider {
+    pub fn new(name: String, config_url: String) -> Self {
+        Self {
+            name: name.as_bytes().to_vec(),
+            config_url: config_url.as_bytes().to_vec(),
+        }
+    }
+}
+
+impl From<crate::on_chain_config::OIDCProvider> for OIDCProvider {
+    fn from(value: crate::on_chain_config::OIDCProvider) -> Self {
+        OIDCProvider {
+            name: value.name.as_bytes().to_vec(),
+            config_url: value.config_url.as_bytes().to_vec(),
+        }
+    }
+}
+
+impl TryFrom<OIDCProvider> for crate::on_chain_config::OIDCProvider {
+    type Error = anyhow::Error;
+
+    fn try_from(value: OIDCProvider) -> Result<Self, Self::Error> {
+        let OIDCProvider { name, config_url } = value;
+        let name = String::from_utf8(name)?;
+        let config_url = String::from_utf8(config_url)?;
+        Ok(crate::on_chain_config::OIDCProvider { name, config_url })
+    }
+}
+
+impl Debug for OIDCProvider {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OIDCProvider")
+            .field("name", &String::from_utf8(self.name.clone()))
+            .field("config_url", &String::from_utf8(self.config_url.clone()))
+            .finish()
+    }
+}
 /// Move type `0x1::jwks::SupportedOIDCProviders` in rust.
 /// See its doc in Move for more details.
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct SupportedOIDCProviders {
     pub providers: Vec<OIDCProvider>,
 }
@@ -59,6 +104,7 @@ impl OnChainConfig for SupportedOIDCProviders {
 /// See its doc in Move for more details.
 #[derive(Clone, Default, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct ProviderJWKs {
+    #[serde(with = "serde_bytes")]
     pub issuer: Issuer,
     pub version: u64,
     pub jwks: Vec<JWKMoveStruct>,
@@ -177,26 +223,24 @@ impl PatchedJWKs {
     }
 }
 
-impl MoveStructType for PatchedJWKs {
-    const MODULE_NAME: &'static IdentStr = ident_str!("jwks");
-    const STRUCT_NAME: &'static IdentStr = ident_str!("PatchedJWKs");
+impl OnChainConfig for PatchedJWKs {
+    const MODULE_IDENTIFIER: &'static str = "jwks";
+    const TYPE_IDENTIFIER: &'static str = "PatchedJWKs";
 }
 
 /// A JWK update in format of `ProviderJWKs` and a multi-signature of it as a quorum certificate.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct QuorumCertifiedUpdate {
-    pub authors: BTreeSet<AccountAddress>,
     pub update: ProviderJWKs,
-    pub multi_sig: bls12381::Signature,
+    pub multi_sig: AggregateSignature,
 }
 
 impl QuorumCertifiedUpdate {
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy() -> Self {
         Self {
-            authors: Default::default(),
-            update: Default::default(),
-            multi_sig: bls12381::Signature::dummy_signature(),
+            update: ProviderJWKs::new(dummy_issuer()),
+            multi_sig: AggregateSignature::empty(),
         }
     }
 }
@@ -213,3 +257,6 @@ impl MoveStructType for ObservedJWKsUpdated {
     const MODULE_NAME: &'static IdentStr = ident_str!("jwks");
     const STRUCT_NAME: &'static IdentStr = ident_str!("ObservedJWKsUpdated");
 }
+
+pub static OBSERVED_JWK_UPDATED_MOVE_TYPE_TAG: Lazy<TypeTag> =
+    Lazy::new(|| TypeTag::Struct(Box::new(ObservedJWKsUpdated::struct_tag())));

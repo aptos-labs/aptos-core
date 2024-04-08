@@ -22,7 +22,8 @@ use aptos_types::{
     dkg::{DKGStartEvent, DKGState, DKGTrait, DefaultDKG},
     epoch_state::EpochState,
     on_chain_config::{
-        FeatureFlag, Features, OnChainConfigPayload, OnChainConfigProvider, ValidatorSet,
+        OnChainConfigPayload, OnChainConfigProvider, OnChainConsensusConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, ValidatorSet,
     },
 };
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -45,7 +46,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dkg_rpc_msg_tx:
         Option<aptos_channel::Sender<AccountAddress, (AccountAddress, IncomingRpcRequest)>>,
     dkg_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
-    dkg_start_event_tx: Option<oneshot::Sender<DKGStartEvent>>,
+    dkg_start_event_tx: Option<aptos_channel::Sender<(), DKGStartEvent>>,
     vtxn_pool: VTxnPoolState,
 
     // Network utils
@@ -93,13 +94,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
     }
 
     fn on_dkg_start_notification(&mut self, notification: EventNotification) -> Result<()> {
-        if let Some(tx) = self.dkg_start_event_tx.take() {
+        if let Some(tx) = self.dkg_start_event_tx.as_ref() {
             let EventNotification {
                 subscribed_events, ..
             } = notification;
             for event in subscribed_events {
                 if let Ok(dkg_start_event) = DKGStartEvent::try_from(&event) {
-                    let _ = tx.send(dkg_start_event);
+                    let _ = tx.push((), dkg_start_event);
                     return Ok(());
                 } else {
                     debug!("[DKG] on_dkg_start_notification: failed in converting a contract event to a dkg start event!");
@@ -156,12 +157,21 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .get(&self.my_addr)
             .copied();
 
-        let features = payload.get::<Features>().unwrap_or_default();
+        let onchain_randomness_config = payload
+            .get::<RandomnessConfigMoveStruct>()
+            .and_then(OnChainRandomnessConfig::try_from)
+            .unwrap_or_else(|_| OnChainRandomnessConfig::default_if_missing());
 
-        if let (true, Some(my_index)) = (
-            features.is_enabled(FeatureFlag::RECONFIGURE_WITH_DKG),
-            my_index,
-        ) {
+        let onchain_consensus_config: anyhow::Result<OnChainConsensusConfig> = payload.get();
+        if let Err(error) = &onchain_consensus_config {
+            error!("Failed to read on-chain consensus config {}", error);
+        }
+        let consensus_config = onchain_consensus_config.unwrap_or_default();
+
+        // Check both validator txn and randomness features are enabled
+        let randomness_enabled =
+            consensus_config.is_vtxn_enabled() && onchain_randomness_config.randomness_enabled();
+        if let (true, Some(my_index)) = (randomness_enabled, my_index) {
             let DKGState {
                 in_progress: in_progress_session,
                 ..
@@ -178,7 +188,8 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             );
             let agg_trx_producer = AggTranscriptProducer::new(rb);
 
-            let (dkg_start_event_tx, dkg_start_event_rx) = oneshot::channel();
+            let (dkg_start_event_tx, dkg_start_event_rx) =
+                aptos_channel::new(QueueStyle::KLAST, 1, None);
             self.dkg_start_event_tx = Some(dkg_start_event_tx);
 
             let (dkg_rpc_msg_tx, dkg_rpc_msg_rx) = aptos_channel::new::<

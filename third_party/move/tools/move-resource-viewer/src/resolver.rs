@@ -9,10 +9,12 @@ use crate::{
 use anyhow::{anyhow, Error, Result};
 use move_binary_format::{
     access::ModuleAccess,
+    deserializer::DeserializerConfig,
     errors::PartialVMError,
     file_format::{
         SignatureToken, StructDefinitionIndex, StructFieldInformation, StructHandleIndex,
     },
+    file_format_common::{IDENTIFIER_SIZE_MAX, VERSION_DEFAULT},
     views::FunctionHandleView,
     CompiledModule,
 };
@@ -28,6 +30,7 @@ use std::rc::Rc;
 pub(crate) struct Resolver<'a, T: ?Sized> {
     pub state: &'a T,
     cache: ModuleCache,
+    max_bytecode_version: u32,
 }
 
 impl<'a, T: ModuleResolver + ?Sized> GetModule for Resolver<'a, T> {
@@ -43,13 +46,15 @@ impl<'a, T: ModuleResolver + ?Sized> GetModule for Resolver<'a, T> {
             .get_module(module_id)
             .map_err(|e| anyhow!("Error retrieving module {:?}: {:?}", module_id, e))?
             .ok_or_else(|| anyhow!("Module {:?} can't be found", module_id))?;
-        let compiled_module = CompiledModule::deserialize(&blob).map_err(|status| {
-            anyhow!(
-                "Module {:?} deserialize with error code {:?}",
-                module_id,
-                status
-            )
-        })?;
+        let config = DeserializerConfig::new(self.max_bytecode_version, IDENTIFIER_SIZE_MAX);
+        let compiled_module =
+            CompiledModule::deserialize_with_config(&blob, &config).map_err(|status| {
+                anyhow!(
+                    "Module {:?} deserialize with error code {:?}",
+                    module_id,
+                    status
+                )
+            })?;
         Ok(Some(self.cache.insert(module_id.clone(), compiled_module)))
     }
 }
@@ -59,6 +64,15 @@ impl<'a, T: ModuleResolver + ?Sized> Resolver<'a, T> {
         Resolver {
             state,
             cache: ModuleCache::new(),
+            max_bytecode_version: VERSION_DEFAULT,
+        }
+    }
+
+    pub fn new_with_max_bytecode_version(state: &'a T, max_bytecode_version: u32) -> Self {
+        Resolver {
+            state,
+            cache: ModuleCache::new(),
+            max_bytecode_version,
         }
     }
 

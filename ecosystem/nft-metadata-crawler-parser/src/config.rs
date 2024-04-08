@@ -2,6 +2,10 @@
 
 use crate::{
     utils::{
+        constants::{
+            DEFAULT_IMAGE_QUALITY, DEFAULT_MAX_FILE_SIZE_BYTES, DEFAULT_MAX_IMAGE_DIMENSIONS,
+            DEFAULT_MAX_NUM_PARSE_RETRIES,
+        },
         counters::{
             GOT_CONNECTION_COUNT, PARSER_FAIL_COUNT, PARSER_INVOCATIONS_COUNT,
             PUBSUB_ACK_SUCCESS_COUNT, SKIP_URI_COUNT, UNABLE_TO_GET_CONNECTION_COUNT,
@@ -32,12 +36,37 @@ pub struct ParserConfig {
     pub cdn_prefix: String,
     pub ipfs_prefix: String,
     pub ipfs_auth_key: Option<String>,
-    pub max_file_size_bytes: Option<u32>,
-    pub image_quality: Option<u8>, // Quality up to 100
-    pub max_image_dimensions: Option<u32>,
-    pub ack_parsed_uris: Option<bool>,
-    pub uri_blacklist: Option<Vec<String>>,
+    #[serde(default = "ParserConfig::default_max_file_size_bytes")]
+    pub max_file_size_bytes: u32,
+    #[serde(default = "ParserConfig::default_image_quality")]
+    pub image_quality: u8, // Quality up to 100
+    #[serde(default = "ParserConfig::default_max_image_dimensions")]
+    pub max_image_dimensions: u32,
+    #[serde(default = "ParserConfig::default_max_num_parse_retries")]
+    pub max_num_parse_retries: i32,
+    #[serde(default)]
+    pub ack_parsed_uris: bool,
+    #[serde(default)]
+    pub uri_blacklist: Vec<String>,
     pub server_port: u16,
+}
+
+impl ParserConfig {
+    pub const fn default_max_file_size_bytes() -> u32 {
+        DEFAULT_MAX_FILE_SIZE_BYTES
+    }
+
+    pub const fn default_image_quality() -> u8 {
+        DEFAULT_IMAGE_QUALITY
+    }
+
+    pub const fn default_max_image_dimensions() -> u32 {
+        DEFAULT_MAX_IMAGE_DIMENSIONS
+    }
+
+    pub const fn default_max_num_parse_retries() -> i32 {
+        DEFAULT_MAX_NUM_PARSE_RETRIES
+    }
 }
 
 #[async_trait::async_trait]
@@ -50,14 +79,17 @@ impl RunnableConfig for ParserConfig {
         );
 
         info!("[NFT Metadata Crawler] Connecting to database");
-        let pool = establish_connection_pool(self.database_url.clone());
+        let pool = establish_connection_pool(&self.database_url);
         info!("[NFT Metadata Crawler] Database connection successful");
 
         info!("[NFT Metadata Crawler] Running migrations");
         run_migrations(&pool);
         info!("[NFT Metadata Crawler] Finished migrations");
 
-        if let Some(google_application_credentials) = self.google_application_credentials.clone() {
+        if let Some(google_application_credentials) = &self.google_application_credentials {
+            info!(
+                "[NFT Metadata Crawler] Google Application Credentials path found, setting env var"
+            );
             std::env::set_var(
                 "GOOGLE_APPLICATION_CREDENTIALS",
                 google_application_credentials,
@@ -78,9 +110,9 @@ impl RunnableConfig for ParserConfig {
 
         // Create request context
         let context = Arc::new(ServerContext {
-            parser_config: self.clone(),
+            parser_config: Arc::new(self.clone()),
             pool,
-            gcs_client: GCSClient::new(gcs_config),
+            gcs_client: Arc::new(GCSClient::new(gcs_config)),
         });
 
         // Create web server
@@ -103,26 +135,29 @@ impl RunnableConfig for ParserConfig {
 /// Struct to hold context required for parsing
 #[derive(Clone)]
 pub struct ServerContext {
-    pub parser_config: ParserConfig,
+    pub parser_config: Arc<ParserConfig>,
     pub pool: Pool<ConnectionManager<PgConnection>>,
-    pub gcs_client: GCSClient,
+    pub gcs_client: Arc<GCSClient>,
 }
 
 /// Repeatedly pulls workers from Channel and perform parsing operations
 async fn spawn_parser(
-    parser_config: ParserConfig,
+    parser_config: Arc<ParserConfig>,
     msg_base64: Bytes,
     pool: Pool<ConnectionManager<PgConnection>>,
-    gcs_client: GCSClient,
+    gcs_client: Arc<GCSClient>,
 ) {
     PARSER_INVOCATIONS_COUNT.inc();
-    let pubsub_message = String::from_utf8(msg_base64.to_vec()).unwrap_or_else(|e| {
-        error!(
-            error = ?e,
-            "[NFT Metadata Crawler] Failed to parse PubSub message"
-        );
-        panic!();
-    });
+    let pubsub_message = String::from_utf8(msg_base64.to_vec())
+        .unwrap_or_else(|e| {
+            error!(
+                error = ?e,
+                "[NFT Metadata Crawler] Failed to parse PubSub message"
+            );
+            panic!();
+        })
+        .replace('\u{0000}', "")
+        .replace("\\u0000", "");
 
     info!(
         pubsub_message = pubsub_message,
@@ -132,7 +167,10 @@ async fn spawn_parser(
     // Skips message if it does not have 5 commas (likely malformed URI)
     if pubsub_message.matches(',').count() != 5 {
         // Sends ack to PubSub only if ack_parsed_uris flag is true
-        info!("[NFT Metadata Crawler] More than 5 commas, skipping message");
+        info!(
+            pubsub_message = pubsub_message,
+            "[NFT Metadata Crawler] Number of commans != 5, skipping message"
+        );
         SKIP_URI_COUNT.with_label_values(&["invalid"]).inc();
         return;
     }
@@ -164,33 +202,35 @@ async fn spawn_parser(
     check_or_update_chain_id(&mut conn, grpc_chain_id as i64).expect("Chain id should match");
 
     // Spawn worker
-    let mut worker = Worker::new(
-            parser_config.clone(),
-            conn,
-        gcs_client.clone(),
-            pubsub_message.clone(),
-            parts[0].to_string(),
-            parts[1].to_string(),
-            parts[2].to_string().parse().unwrap_or_else(|e|{
-                error!(
-                    error = ?e,
-                    "[NFT Metadata Crawler] Failed to parse last transaction version from PubSub message"
-                );
-                panic!();
-            }),
-            chrono::NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
-                chrono::NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z").unwrap_or_else(
-                    |e| {
-                        error!(
-                            error = ?e,
-                            "[NFT Metadata Crawler] Failed to parse timestamp from PubSub message"
-                        );
-                        panic!();
-                    },
-                ),
-            ),
-            parts[5].parse::<bool>().unwrap_or(false),
+    let last_transaction_version = parts[2].to_string().parse().unwrap_or_else(|e| {
+        error!(
+            error = ?e,
+            "[NFT Metadata Crawler] Failed to parse last transaction version from PubSub message"
         );
+        panic!();
+    });
+    let last_transaction_timestamp =
+        chrono::NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S %Z").unwrap_or(
+            chrono::NaiveDateTime::parse_from_str(parts[3], "%Y-%m-%d %H:%M:%S%.f %Z")
+                .unwrap_or_else(|e| {
+                    error!(
+                        error = ?e,
+                        "[NFT Metadata Crawler] Failed to parse timestamp from PubSub message"
+                    );
+                    panic!();
+                }),
+        );
+    let mut worker = Worker::new(
+        parser_config.clone(),
+        conn,
+        gcs_client.clone(),
+        &pubsub_message,
+        parts[0],
+        parts[1],
+        last_transaction_version,
+        last_transaction_timestamp,
+        parts[5].parse::<bool>().unwrap_or(false),
+    );
 
     info!(
         pubsub_message = pubsub_message,
@@ -217,8 +257,6 @@ async fn handle_root(
     msg: Bytes,
     context: Arc<ServerContext>,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let to_ack = context.parser_config.ack_parsed_uris.unwrap_or(false);
-
     // Use spawn_blocking to run the function on a separate thread.
     let _ = tokio::spawn(spawn_parser(
         context.parser_config.clone(),
@@ -228,7 +266,7 @@ async fn handle_root(
     ))
     .await;
 
-    if !to_ack {
+    if !context.parser_config.ack_parsed_uris {
         return Ok(warp::reply::with_status(
             warp::reply(),
             warp::http::StatusCode::BAD_REQUEST,

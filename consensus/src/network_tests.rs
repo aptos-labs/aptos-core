@@ -584,7 +584,7 @@ mod tests {
             let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
+            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(1024);
             let (_, conn_status_rx) = conn_notifs_channel::new();
 
             add_peer_to_storage(&peers_and_metadata, peer, &[
@@ -611,7 +611,7 @@ mod tests {
             };
             playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
-            let (self_sender, self_receiver) = aptos_channels::new_test(8);
+            let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
             let node = NetworkSender::new(
                 *peer,
                 consensus_network_client,
@@ -641,7 +641,7 @@ mod tests {
         let previous_qc = certificate_for_genesis();
         let proposal = ProposalMsg::new(
             Block::new_proposal(
-                Payload::empty(false),
+                Payload::empty(false, true),
                 1,
                 1,
                 previous_qc.clone(),
@@ -697,7 +697,7 @@ mod tests {
             let (network_reqs_tx, network_reqs_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (connection_reqs_tx, _) = aptos_channel::new(QueueStyle::FIFO, 8, None);
             let (consensus_tx, consensus_rx) = aptos_channel::new(QueueStyle::FIFO, 8, None);
-            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(8);
+            let (_conn_mgr_reqs_tx, conn_mgr_reqs_rx) = aptos_channels::new_test(1024);
             let (_, conn_status_rx) = conn_notifs_channel::new();
             let network_sender = network::NetworkSender::new(
                 PeerManagerRequestSender::new(network_reqs_tx),
@@ -724,7 +724,7 @@ mod tests {
             };
             playground.add_node(twin_id, consensus_tx, network_reqs_rx, conn_mgr_reqs_rx);
 
-            let (self_sender, self_receiver) = aptos_channels::new_test(8);
+            let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
             let node = NetworkSender::new(
                 *peer,
                 consensus_network_client.clone(),
@@ -807,7 +807,7 @@ mod tests {
         let network_events = NetworkEvents::new(peer_mgr_notifs_rx, connection_notifs_rx, None);
         let network_service_events =
             NetworkServiceEvents::new(hashmap! {NetworkId::Validator => network_events});
-        let (self_sender, self_receiver) = aptos_channels::new_test(8);
+        let (self_sender, self_receiver) = aptos_channels::new_unbounded_test();
 
         let (network_task, mut network_receivers) =
             NetworkTask::new(network_service_events, self_receiver);

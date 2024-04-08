@@ -10,28 +10,63 @@ use crate::{
     BlockSplit, SUCCESS,
 };
 use aptos_language_e2e_tests::executor::ExecutorMode;
+use aptos_types::{transaction::ExecutionStatus, vm_status::StatusCode};
+use claims::assert_ok_eq;
 use proptest::prelude::*;
+use test_case::test_case;
 
 const STRESSTEST_MODE: bool = false;
 
-const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
+pub(crate) const EAGGREGATOR_OVERFLOW: u64 = 0x02_0001;
 const EAGGREGATOR_UNDERFLOW: u64 = 0x02_0002;
 
 const DEFAULT_EXECUTOR_MODE: ExecutorMode = ExecutorMode::SequentialOnly;
 
-fn setup(
+fn _setup(
+    executor_mode: ExecutorMode,
+    aggregator_execution_mode: AggregatorMode,
+    txns: usize,
+    allow_block_executor_fallback: bool,
+) -> AggV2TestHarness {
+    let path = common::test_dir_path("aggregator_v2.data/pack");
+    match aggregator_execution_mode {
+        AggregatorMode::EnabledOnly => initialize(
+            path,
+            executor_mode,
+            true,
+            txns,
+            allow_block_executor_fallback,
+        ),
+        AggregatorMode::DisabledOnly => initialize(
+            path,
+            executor_mode,
+            false,
+            txns,
+            allow_block_executor_fallback,
+        ),
+        AggregatorMode::BothComparison => initialize_enabled_disabled_comparison(
+            path,
+            executor_mode,
+            txns,
+            allow_block_executor_fallback,
+        ),
+    }
+}
+
+pub(crate) fn setup(
     executor_mode: ExecutorMode,
     aggregator_execution_mode: AggregatorMode,
     txns: usize,
 ) -> AggV2TestHarness {
-    let path = common::test_dir_path("aggregator_v2.data/pack");
-    match aggregator_execution_mode {
-        AggregatorMode::EnabledOnly => initialize(path, executor_mode, true, txns),
-        AggregatorMode::DisabledOnly => initialize(path, executor_mode, false, txns),
-        AggregatorMode::BothComparison => {
-            initialize_enabled_disabled_comparison(path, executor_mode, txns)
-        },
-    }
+    _setup(executor_mode, aggregator_execution_mode, txns, false)
+}
+
+fn setup_allow_fallback(
+    executor_mode: ExecutorMode,
+    aggregator_execution_mode: AggregatorMode,
+    txns: usize,
+) -> AggV2TestHarness {
+    _setup(executor_mode, aggregator_execution_mode, txns, true)
 }
 
 #[cfg(test)]
@@ -116,8 +151,7 @@ mod test_cases {
     }
 }
 
-#[allow(dead_code)]
-fn arb_block_split(len: usize) -> BoxedStrategy<BlockSplit> {
+pub fn arb_block_split(len: usize) -> BoxedStrategy<BlockSplit> {
     (0..3)
         .prop_flat_map(move |enum_type| {
             // making running a test with a full block likely
@@ -206,6 +240,15 @@ fn arb_use_type() -> BoxedStrategy<UseType> {
     .boxed()
 }
 
+fn arb_droppable_use_type() -> BoxedStrategy<UseType> {
+    prop_oneof![
+        Just(UseType::UseResourceType),
+        // Just(UseType::UseTableType),
+        Just(UseType::UseResourceGroupType),
+    ]
+    .boxed()
+}
+
 proptest! {
     #![proptest_config(ProptestConfig {
         // Cases are expensive, few cases is enough.
@@ -254,7 +297,7 @@ proptest! {
         is_3_collocated in any::<bool>(),
     ) {
         println!("Testing test_multiple_aggregators_and_collocation {:?}", test_env);
-        let mut h = setup(test_env.executor_mode, if use_type == UseType::UseResourceGroupType { AggregatorMode::EnabledOnly } else { test_env.aggregator_execution_mode}, 24);
+        let mut h = setup(test_env.executor_mode, test_env.aggregator_execution_mode, 24);
         let acc_2 = h.new_account_with_key_pair();
         let acc_3 = h.new_account_with_key_pair();
 
@@ -407,6 +450,57 @@ proptest! {
     }
 
     #[test]
+    fn test_aggregator_with_republish(test_env in arb_test_env(6), element_type in arb_agg_type(), use_type in arb_use_type()) {
+        println!("Testing test_aggregator_with_republish {:?}", test_env);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 3);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 600, 400)),
+            (SUCCESS, h.add(&agg_loc, 1)),
+            (SUCCESS, h.republish()),
+            (EAGGREGATOR_OVERFLOW, h.add(&agg_loc, 200)),
+            (SUCCESS, h.add(&agg_loc, 1)),
+        ];
+
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
+    fn test_aggregator_recreate(test_env in arb_test_env(13), element_type in arb_agg_type(), use_type in arb_droppable_use_type()) {
+        println!("Testing test_aggregator_recreate {:?}", test_env);
+        let mut h = setup_allow_fallback(test_env.executor_mode, test_env.aggregator_execution_mode, 13);
+
+        let agg_loc = AggregatorLocation::new(*h.account.address(), element_type, use_type, 0);
+
+        let txns = vec![
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add(&agg_loc, 4)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add(&agg_loc, 4)),
+            (SUCCESS, h.delete(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 3)),
+            (SUCCESS, h.add_delete(&agg_loc, 4)),
+            (SUCCESS, h.init(None, use_type, element_type, StructType::Aggregator)),
+            (SUCCESS, h.new_add(&agg_loc, 10, 5)),
+            (EAGGREGATOR_OVERFLOW, h.add_delete(&agg_loc, 7)),
+            (SUCCESS, h.add_delete(&agg_loc, 3)),
+        ];
+
+        h.run_block_in_parts_and_check(
+            test_env.block_split,
+            txns,
+        );
+    }
+
+    #[test]
     fn test_aggregator_snapshot(test_env in arb_test_env_non_equivalent(10)) {
         println!("Testing test_aggregator_snapshot {:?}", test_env);
         let element_type = ElementType::U64;
@@ -494,4 +588,48 @@ fn test_aggregator_snapshot_equivalent_gas() {
     ];
 
     h.run_block_in_parts_and_check(test_env.block_split, txns);
+}
+
+// Table splits into multiple resources, so test is not as straightforward
+#[test_case(UseType::UseResourceGroupType)]
+#[test_case(UseType::UseResourceType)]
+fn test_too_many_aggregators_in_a_resource(use_type: UseType) {
+    let test_env = TestEnvConfig {
+        executor_mode: ExecutorMode::BothComparison,
+        aggregator_execution_mode: AggregatorMode::EnabledOnly,
+        block_split: BlockSplit::Whole,
+    };
+    println!(
+        "Testing test_too_many_aggregators_in_a_resource {:?}",
+        test_env
+    );
+
+    let element_type = ElementType::U64;
+
+    let mut h = setup(
+        test_env.executor_mode,
+        test_env.aggregator_execution_mode,
+        12,
+    );
+
+    let agg_locs = (0..15)
+        .map(|i| AggregatorLocation::new(*h.account.address(), element_type, use_type, i))
+        .collect::<Vec<_>>();
+
+    let mut txns = vec![(
+        SUCCESS,
+        h.init(None, use_type, element_type, StructType::Aggregator),
+    )];
+    for i in 0..10 {
+        txns.push((SUCCESS, h.new(agg_locs.get(i).unwrap(), 10)));
+    }
+    h.run_block_in_parts_and_check(test_env.block_split, txns);
+
+    let failed_txns = vec![h.new(agg_locs.get(10).unwrap(), 10)];
+    let output = h.run_block(failed_txns);
+    assert_eq!(output.len(), 1);
+    assert_ok_eq!(
+        output[0].status().status(),
+        ExecutionStatus::MiscellaneousError(Some(StatusCode::TOO_MANY_DELAYED_FIELDS))
+    );
 }

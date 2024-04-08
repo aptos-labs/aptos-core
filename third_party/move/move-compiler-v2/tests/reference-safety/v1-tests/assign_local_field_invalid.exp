@@ -10,6 +10,8 @@ error: cannot assign to borrowed local `s`
    │                 used by field borrow
 13 │         s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
+14 │         *f;
+   │         -- conflicting reference `f` used here
 
 error: cannot assign to borrowed local `s`
    ┌─ tests/reference-safety/v1-tests/assign_local_field_invalid.move:19:9
@@ -21,6 +23,8 @@ error: cannot assign to borrowed local `s`
    │                 used by mutable field borrow
 19 │         s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
+20 │         *f;
+   │         -- conflicting reference `f` used here
 
 error: cannot assign to borrowed local `s`
    ┌─ tests/reference-safety/v1-tests/assign_local_field_invalid.move:25:9
@@ -32,6 +36,8 @@ error: cannot assign to borrowed local `s`
    │                    used by field borrow
 25 │         s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
+26 │         *f;
+   │         -- conflicting reference `f` used here
 
 error: cannot assign to borrowed local `s`
    ┌─ tests/reference-safety/v1-tests/assign_local_field_invalid.move:31:9
@@ -43,3 +49,5 @@ error: cannot assign to borrowed local `s`
    │                        used by mutable field borrow
 31 │         s = S { f: 0, g: 0 };
    │         ^^^^^^^^^^^^^^^^^^^^ attempted to assign here
+32 │         *f;
+   │         -- conflicting reference `f` used here

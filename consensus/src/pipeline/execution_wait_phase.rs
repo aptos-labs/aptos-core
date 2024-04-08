@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::pipeline::{buffer_item::ExecutionFut, pipeline_phase::StatelessPipeline};
-use aptos_consensus_types::executed_block::ExecutedBlock;
+use aptos_consensus_types::pipelined_block::PipelinedBlock;
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use async_trait::async_trait;
@@ -32,7 +32,7 @@ impl Display for ExecutionWaitRequest {
 
 pub struct ExecutionResponse {
     pub block_id: HashValue,
-    pub inner: ExecutorResult<Vec<ExecutedBlock>>,
+    pub inner: ExecutorResult<Vec<PipelinedBlock>>,
 }
 
 pub struct ExecutionWaitPhase;

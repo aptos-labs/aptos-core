@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::M {
     struct S {
         x: #0,
@@ -22,13 +22,4 @@ module 0x42::M {
       requires Gt($t0, $t1);
     }
 
-    spec fun $add(x: u64): u64 {
-        Add(x, 1)
-    }
-    spec fun $id(x: u64): u64 {
-        x
-    }
-    spec fun $multiple(_x: u64,_y: u64) {
-        Tuple()
-    }
 } // end 0x42::M

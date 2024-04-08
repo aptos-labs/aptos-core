@@ -10,7 +10,7 @@ module 0x8675309::M {
 
     fun t0(outer: &mut Outer) {
         let inner = &mut outer.s1;
-        let c = inner; // error in v2
+        let c = inner;
         let f1 = &inner.f1;
         *c;
         *inner;

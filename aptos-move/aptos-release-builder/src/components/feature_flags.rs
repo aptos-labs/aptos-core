@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::*;
+use crate::{components::get_signer_arg, utils::*};
 use anyhow::Result;
 use aptos_types::on_chain_config::{FeatureFlag as AptosFeatureFlag, Features as AptosFeatures};
 use move_model::{code_writer::CodeWriter, emit, emitln, model::Loc};
@@ -87,19 +87,25 @@ pub enum FeatureFlag {
     SponsoredAutomaticAccountCreation,
     FeePayerAccountOptional,
     AggregatorV2DelayedFields,
-    ConcurrentAssets,
+    ConcurrentTokenV2,
     LimitMaxIdentifierLength,
     OperatorBeneficiaryChange,
     VMBinaryFormatV7,
-    ResourceGroupsChargeAsSizeSum,
+    ResourceGroupsSplitInVmChangeSet,
     CommissionChangeDelegationPool,
-    BN254Structures,
+    Bn254Structures,
     WebAuthnSignature,
-    ReconfigureWithDKG,
-    ZkIdSignature,
-    ZkIdZkLessSignature,
+    ReconfigureWithDkg,
+    KeylessAccounts,
+    KeylessButZklessAccounts,
     RemoveDetailedError,
-    JWKConsensus,
+    JwkConsensus,
+    ConcurrentFungibleAssets,
+    RefundableBytes,
+    ObjectCodeDeployment,
+    MaxObjectNestingCheck,
+    KeylessAccountsWithPasskeys,
+    MultisigV2Enhancement,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -125,6 +131,7 @@ pub fn generate_feature_upgrade_proposal(
     is_testnet: bool,
     next_execution_hash: Vec<u8>,
 ) -> Result<Vec<(String, String)>> {
+    let signer_arg = get_signer_arg(is_testnet, &next_execution_hash);
     let mut result = vec![];
 
     let enabled = features
@@ -162,19 +169,12 @@ pub fn generate_feature_upgrade_proposal(
             generate_features_blob(writer, &disabled);
             emitln!(writer, ";\n");
 
-            if is_testnet && next_execution_hash.is_empty() {
-                emitln!(
-                    writer,
-                    "features::change_feature_flags(framework_signer, enabled_blob, disabled_blob);"
-                );
-                emitln!(writer, "aptos_governance::reconfigure(framework_signer);");
-            } else {
-                emitln!(
-                    writer,
-                    "features::change_feature_flags(&framework_signer, enabled_blob, disabled_blob);"
-                );
-                emitln!(writer, "aptos_governance::reconfigure(&framework_signer);");
-            }
+            emitln!(
+                writer,
+                "features::change_feature_flags_for_next_epoch({}, enabled_blob, disabled_blob);",
+                signer_arg
+            );
+            emitln!(writer, "aptos_governance::reconfigure({});", signer_arg);
         },
     );
 
@@ -242,22 +242,30 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::AggregatorV2DelayedFields => {
                 AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS
             },
-            FeatureFlag::ConcurrentAssets => AptosFeatureFlag::CONCURRENT_ASSETS,
+            FeatureFlag::ConcurrentTokenV2 => AptosFeatureFlag::CONCURRENT_TOKEN_V2,
             FeatureFlag::LimitMaxIdentifierLength => AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH,
             FeatureFlag::OperatorBeneficiaryChange => AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE,
-            FeatureFlag::ResourceGroupsChargeAsSizeSum => {
-                AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM
+            FeatureFlag::ResourceGroupsSplitInVmChangeSet => {
+                AptosFeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET
             },
             FeatureFlag::CommissionChangeDelegationPool => {
                 AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL
             },
-            FeatureFlag::BN254Structures => AptosFeatureFlag::BN254_STRUCTURES,
+            FeatureFlag::Bn254Structures => AptosFeatureFlag::BN254_STRUCTURES,
             FeatureFlag::WebAuthnSignature => AptosFeatureFlag::WEBAUTHN_SIGNATURE,
-            FeatureFlag::ReconfigureWithDKG => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
-            FeatureFlag::ZkIdSignature => AptosFeatureFlag::ZK_ID_SIGNATURES,
-            FeatureFlag::ZkIdZkLessSignature => AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE,
+            FeatureFlag::ReconfigureWithDkg => AptosFeatureFlag::RECONFIGURE_WITH_DKG,
+            FeatureFlag::KeylessAccounts => AptosFeatureFlag::KEYLESS_ACCOUNTS,
+            FeatureFlag::KeylessButZklessAccounts => AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS,
             FeatureFlag::RemoveDetailedError => AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH,
-            FeatureFlag::JWKConsensus => AptosFeatureFlag::JWK_CONSENSUS,
+            FeatureFlag::JwkConsensus => AptosFeatureFlag::JWK_CONSENSUS,
+            FeatureFlag::ConcurrentFungibleAssets => AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
+            FeatureFlag::RefundableBytes => AptosFeatureFlag::REFUNDABLE_BYTES,
+            FeatureFlag::ObjectCodeDeployment => AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT,
+            FeatureFlag::MaxObjectNestingCheck => AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK,
+            FeatureFlag::KeylessAccountsWithPasskeys => {
+                AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS
+            },
+            FeatureFlag::MultisigV2Enhancement => AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT,
         }
     }
 }
@@ -323,22 +331,30 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::AGGREGATOR_V2_DELAYED_FIELDS => {
                 FeatureFlag::AggregatorV2DelayedFields
             },
-            AptosFeatureFlag::CONCURRENT_ASSETS => FeatureFlag::ConcurrentAssets,
+            AptosFeatureFlag::CONCURRENT_TOKEN_V2 => FeatureFlag::ConcurrentTokenV2,
             AptosFeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH => FeatureFlag::LimitMaxIdentifierLength,
             AptosFeatureFlag::OPERATOR_BENEFICIARY_CHANGE => FeatureFlag::OperatorBeneficiaryChange,
-            AptosFeatureFlag::RESOURCE_GROUPS_CHARGE_AS_SIZE_SUM => {
-                FeatureFlag::ResourceGroupsChargeAsSizeSum
+            AptosFeatureFlag::RESOURCE_GROUPS_SPLIT_IN_VM_CHANGE_SET => {
+                FeatureFlag::ResourceGroupsSplitInVmChangeSet
             },
             AptosFeatureFlag::COMMISSION_CHANGE_DELEGATION_POOL => {
                 FeatureFlag::CommissionChangeDelegationPool
             },
-            AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::BN254Structures,
+            AptosFeatureFlag::BN254_STRUCTURES => FeatureFlag::Bn254Structures,
             AptosFeatureFlag::WEBAUTHN_SIGNATURE => FeatureFlag::WebAuthnSignature,
-            AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDKG,
-            AptosFeatureFlag::ZK_ID_SIGNATURES => FeatureFlag::ZkIdSignature,
-            AptosFeatureFlag::ZK_ID_ZKLESS_SIGNATURE => FeatureFlag::ZkIdZkLessSignature,
+            AptosFeatureFlag::RECONFIGURE_WITH_DKG => FeatureFlag::ReconfigureWithDkg,
+            AptosFeatureFlag::KEYLESS_ACCOUNTS => FeatureFlag::KeylessAccounts,
+            AptosFeatureFlag::KEYLESS_BUT_ZKLESS_ACCOUNTS => FeatureFlag::KeylessButZklessAccounts,
             AptosFeatureFlag::REMOVE_DETAILED_ERROR_FROM_HASH => FeatureFlag::RemoveDetailedError,
-            AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JWKConsensus,
+            AptosFeatureFlag::JWK_CONSENSUS => FeatureFlag::JwkConsensus,
+            AptosFeatureFlag::CONCURRENT_FUNGIBLE_ASSETS => FeatureFlag::ConcurrentFungibleAssets,
+            AptosFeatureFlag::REFUNDABLE_BYTES => FeatureFlag::RefundableBytes,
+            AptosFeatureFlag::OBJECT_CODE_DEPLOYMENT => FeatureFlag::ObjectCodeDeployment,
+            AptosFeatureFlag::MAX_OBJECT_NESTING_CHECK => FeatureFlag::MaxObjectNestingCheck,
+            AptosFeatureFlag::KEYLESS_ACCOUNTS_WITH_PASSKEYS => {
+                FeatureFlag::KeylessAccountsWithPasskeys
+            },
+            AptosFeatureFlag::MULTISIG_V2_ENHANCEMENT => FeatureFlag::MultisigV2Enhancement,
         }
     }
 }

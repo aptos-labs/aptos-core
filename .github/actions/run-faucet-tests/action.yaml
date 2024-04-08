@@ -50,7 +50,7 @@ runs:
     # we don't pass the image tag.
     - name: Run integration tests
       if: ${{ inputs.NETWORK != 'custom' }}
-      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} ${{ endif }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
+      run: poetry run python main.py --base-network ${{ inputs.NETWORK }} --external-test-dir ${{ runner.temp }}/testnet --image-repo-with-project ${{ inputs.GCP_DOCKER_ARTIFACT_REPO }}
       working-directory: crates/aptos-faucet/integration-tests
       shell: bash
 

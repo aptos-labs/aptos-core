@@ -5,6 +5,7 @@ pub mod aggregator;
 pub mod aggregator_v2;
 pub mod aptos_governance;
 pub mod harness;
+pub mod resource_groups;
 pub mod stake;
 pub mod transaction_fee;
 

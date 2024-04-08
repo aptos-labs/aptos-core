@@ -8,7 +8,7 @@ use aptos_crypto::{
     test_utils::KeyPair,
 };
 use aptos_logger::{info, warn};
-use aptos_rest_client::Client as RestClient;
+use aptos_rest_client::{Client as RestClient, State};
 use aptos_sdk::types::{
     account_config::aptos_test_root_address, chain_id::ChainId, AccountKey, LocalAccount,
 };
@@ -37,8 +37,8 @@ impl Cluster {
         peers: Vec<Url>,
         coin_source_key: Ed25519PrivateKey,
         coin_source_is_root: bool,
-        chain_id: ChainId,
-        api_key: Option<String>,
+        maybe_chain_id: Option<ChainId>,
+        maybe_api_key: Option<String>,
     ) -> Result<Self> {
         let num_peers = peers.len();
 
@@ -55,7 +55,7 @@ impl Cluster {
                 ), /* short_hash */
                 url.clone(),
                 None,
-                api_key.clone(),
+                maybe_api_key.clone(),
             );
             futures.push(async move {
                 let result = instance.rest_client().get_ledger_information().await;
@@ -92,13 +92,26 @@ impl Cluster {
             .max()
             .unwrap();
 
+        let chain_id_from_instances = get_chain_id_from_instances(instance_states.clone())?;
+        let chain_id: ChainId = match maybe_chain_id {
+            Some(c) => c,
+            None => {
+                warn!(
+                    "Chain ID not provided, using the chain ID derived from the rest endpoints: {}",
+                    chain_id_from_instances
+                );
+                chain_id_from_instances
+            },
+        };
+
         for (instance, state) in instance_states.into_iter() {
             let state_timestamp = state.timestamp_usecs / 1000000;
             if state.chain_id != chain_id.id() {
                 warn!(
-                    "Excluding client {} running wrong chain {}",
+                    "Excluding client {} running wrong chain {}, instead of {}",
                     instance.peer_name(),
-                    state.chain_id
+                    state.chain_id,
+                    chain_id.id(),
                 );
             } else if state_timestamp + 20 + fetch_time_s < max_timestamp {
                 warn!(
@@ -215,5 +228,145 @@ impl Cluster {
 
     pub fn all_instances(&self) -> impl Iterator<Item = &Instance> {
         self.instances.iter()
+    }
+}
+
+/// In the case that the chain_id is not provided, we can derive it from the instances
+/// Error if there there is a mix of chain_ids from the instances
+fn get_chain_id_from_instances(instance_states: Vec<(Instance, State)>) -> Result<ChainId> {
+    let num_instances = instance_states.len();
+    let mut chain_id_counts = std::collections::HashMap::new();
+    for (_, state) in instance_states {
+        *chain_id_counts.entry(state.chain_id).or_insert(0) += 1;
+    }
+    let (max_chain_id, num_instances_with_max_chain_id) = chain_id_counts
+        .into_iter()
+        .max_by_key(|&(_, count)| count)
+        .expect("Failed to get the most frequent chain ID from the instances");
+    if num_instances_with_max_chain_id < num_instances {
+        bail!(
+            "The most frequent chain ID {} is only present in {}/{} instances",
+            max_chain_id,
+            num_instances_with_max_chain_id,
+            num_instances
+        );
+    }
+    Ok(ChainId::new(max_chain_id))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use aptos_sdk::types::chain_id::ChainId;
+
+    fn create_dummy_rest_api_state(chain_id: u8) -> State {
+        State {
+            chain_id,
+            epoch: 0,
+            version: 0,
+            timestamp_usecs: 0,
+            oldest_ledger_version: 0,
+            oldest_block_height: 0,
+            block_height: 0,
+            cursor: None,
+        }
+    }
+
+    #[test]
+    fn test_get_chain_id_from_instances_mix() {
+        let chain_id_1 = ChainId::new(1);
+        let chain_id_2 = ChainId::new(2);
+        let chain_id_3 = ChainId::new(3);
+
+        // some dummy instances with a mix of chain_ids
+        // expect this to fail
+        let instance_states = vec![
+            (
+                Instance::new(
+                    "peer1".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_1.id()),
+            ),
+            (
+                Instance::new(
+                    "peer2".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_1.id()),
+            ),
+            (
+                Instance::new(
+                    "peer3".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_2.id()),
+            ),
+            (
+                Instance::new(
+                    "peer4".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+        ];
+
+        assert!(get_chain_id_from_instances(instance_states).is_err());
+    }
+
+    #[test]
+    fn test_get_chain_id_from_instances_ok() {
+        let chain_id_3 = ChainId::new(3);
+
+        // some dummy instances with a mix of chain_ids
+        // expect this to fail
+        let instance_states = vec![
+            (
+                Instance::new(
+                    "peer1".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+            (
+                Instance::new(
+                    "peer2".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+            (
+                Instance::new(
+                    "peer3".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+            (
+                Instance::new(
+                    "peer4".to_string(),
+                    Url::parse("http://localhost:8080").unwrap(),
+                    None,
+                    None,
+                ),
+                create_dummy_rest_api_state(chain_id_3.id()),
+            ),
+        ];
+
+        assert!(get_chain_id_from_instances(instance_states).is_ok_and(|x| x == chain_id_3),);
     }
 }

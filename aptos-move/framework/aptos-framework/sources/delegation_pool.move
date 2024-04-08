@@ -1870,7 +1870,7 @@ module aptos_framework::delegation_pool {
             voting_power_increase_limit,
         );
         reconfiguration::initialize_for_test(aptos_framework);
-        features::change_feature_flags(aptos_framework, vector[DELEGATION_POOLS, MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE, COMMISSION_CHANGE_DELEGATION_POOL], vector[]);
+        features::change_feature_flags_for_testing(aptos_framework, vector[DELEGATION_POOLS, MODULE_EVENT, OPERATOR_BENEFICIARY_CHANGE, COMMISSION_CHANGE_DELEGATION_POOL], vector[]);
     }
 
     #[test_only]
@@ -1938,7 +1938,7 @@ module aptos_framework::delegation_pool {
         validator: &signer,
     ) acquires DelegationPool, GovernanceRecords, BeneficiaryForOperator, NextCommissionPercentage {
         initialize_for_test(aptos_framework);
-        features::change_feature_flags(aptos_framework, vector[], vector[DELEGATION_POOLS]);
+        features::change_feature_flags_for_testing(aptos_framework, vector[], vector[DELEGATION_POOLS]);
 
         initialize_delegation_pool(validator, 0, vector::empty<u8>());
     }
@@ -2153,7 +2153,7 @@ module aptos_framework::delegation_pool {
             reward_period_start_time_in_sec,
             fixed_point64::create_from_rational(50, 100),
         );
-        features::change_feature_flags(aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
+        features::change_feature_flags_for_testing(aptos_framework, vector[features::get_periodical_reward_rate_decrease_feature()], vector[]);
 
         // add more stake from delegator 1
         stake::mint(delegator1, 20000 * ONE_APT);
@@ -3707,7 +3707,7 @@ module aptos_framework::delegation_pool {
             1000,
         );
         aptos_governance::initialize_partial_voting(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
             vector[]);
@@ -3752,7 +3752,7 @@ module aptos_framework::delegation_pool {
             1000,
         );
         aptos_governance::initialize_partial_voting(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
             vector[]);
@@ -3800,7 +3800,7 @@ module aptos_framework::delegation_pool {
             1000,
         );
         aptos_governance::initialize_partial_voting(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
             vector[]
@@ -3969,7 +3969,7 @@ module aptos_framework::delegation_pool {
         add_stake(delegator1, pool_address, 10 * ONE_APT);
 
         // Enable partial governance voting feature flag.
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
             vector[]
@@ -4024,7 +4024,7 @@ module aptos_framework::delegation_pool {
             1000,
         );
         aptos_governance::initialize_partial_voting(aptos_framework);
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
             vector[]
@@ -4131,7 +4131,7 @@ module aptos_framework::delegation_pool {
         aptos_governance::vote(validator, pool_address, proposal1_id, true);
 
         // Enable partial governance voting feature flag.
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
             vector[]
@@ -4191,7 +4191,7 @@ module aptos_framework::delegation_pool {
         aptos_governance::vote(validator, pool_address, proposal1_id, true);
 
         // Enable partial governance voting feature flag.
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
             vector[]
@@ -4225,7 +4225,7 @@ module aptos_framework::delegation_pool {
         end_aptos_epoch();
 
         // Enable partial governance voting feature flag.
-        features::change_feature_flags(
+        features::change_feature_flags_for_testing(
             aptos_framework,
             vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
             vector[]
@@ -4373,7 +4373,7 @@ module aptos_framework::delegation_pool {
             true,
         );
         if (enable_partial_voting) {
-            features::change_feature_flags(
+            features::change_feature_flags_for_testing(
                 aptos_framework,
                 vector[features::get_partial_governance_voting(), features::get_delegation_pool_partial_governance_voting()],
                 vector[]);

@@ -20,11 +20,14 @@ use anyhow::anyhow;
 use aptos_admin_service::AdminService;
 use aptos_api::bootstrap as bootstrap_api;
 use aptos_build_info::build_information;
-use aptos_config::config::{merge_node_config, NodeConfig, PersistableConfig};
+use aptos_config::config::{
+    merge_node_config, InitialSafetyRulesConfig, NodeConfig, PersistableConfig,
+};
 use aptos_dkg_runtime::start_dkg_runtime;
 use aptos_framework::ReleaseBundle;
 use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
+use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
 use aptos_types::chain_id::ChainId;
 use aptos_validator_transaction_pool::VTxnPoolState;
@@ -657,17 +660,24 @@ pub fn setup_environment_and_start_node(
             mempool_client_receiver,
             peers_and_metadata,
         );
-    let vtxn_pool = VTxnPoolState::default();
-    let maybe_dkg_dealer_sk = node_config
-        .consensus
-        .safety_rules
-        .initial_safety_rules_config
-        .identity_blob()
-        .ok()
-        .and_then(|blob| blob.try_into_dkg_dealer_private_key());
 
+    // Ensure consensus key in secure DB.
+    if !matches!(
+        node_config
+            .consensus
+            .safety_rules
+            .initial_safety_rules_config,
+        InitialSafetyRulesConfig::None
+    ) {
+        aptos_safety_rules::safety_rules_manager::storage(&node_config.consensus.safety_rules);
+    }
+
+    let vtxn_pool = VTxnPoolState::default();
+    let maybe_dkg_dealer_sk =
+        load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
+    debug!("maybe_dkg_dealer_sk={:?}", maybe_dkg_dealer_sk);
     let dkg_runtime = match (dkg_network_interfaces, maybe_dkg_dealer_sk) {
-        (Some(interfaces), Some(dkg_dealer_sk)) => {
+        (Some(interfaces), Ok(dkg_dealer_sk)) => {
             let ApplicationNetworkInterfaces {
                 network_client,
                 network_service_events,
@@ -689,24 +699,35 @@ pub fn setup_environment_and_start_node(
         _ => None,
     };
 
-    let jwk_consensus_runtime = if let Some(obj) = jwk_consensus_network_interfaces {
-        let ApplicationNetworkInterfaces {
-            network_client,
-            network_service_events,
-        } = obj;
-        let (reconfig_events, onchain_jwk_updated_events) = jwk_consensus_subscriptions.expect(
-            "JWK consensus needs to listen to NewEpochEvents and OnChainJWKMapUpdated events.",
-        );
-        let jwk_consensus_runtime = start_jwk_consensus_runtime(
-            network_client,
-            network_service_events,
-            vtxn_pool.clone(),
-            reconfig_events,
-            onchain_jwk_updated_events,
-        );
-        Some(jwk_consensus_runtime)
-    } else {
-        None
+    let maybe_jwk_consensus_key =
+        load_consensus_key_from_secure_storage(&node_config.consensus.safety_rules);
+    debug!(
+        "jwk_consensus_key_err={:?}",
+        maybe_jwk_consensus_key.as_ref().err()
+    );
+
+    let jwk_consensus_runtime = match (jwk_consensus_network_interfaces, maybe_jwk_consensus_key) {
+        (Some(interfaces), Ok(consensus_key)) => {
+            let ApplicationNetworkInterfaces {
+                network_client,
+                network_service_events,
+            } = interfaces;
+            let (reconfig_events, onchain_jwk_updated_events) = jwk_consensus_subscriptions.expect(
+                "JWK consensus needs to listen to NewEpochEvents and OnChainJWKMapUpdated events.",
+            );
+            let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
+            let jwk_consensus_runtime = start_jwk_consensus_runtime(
+                my_addr,
+                consensus_key,
+                network_client,
+                network_service_events,
+                reconfig_events,
+                onchain_jwk_updated_events,
+                vtxn_pool.clone(),
+            );
+            Some(jwk_consensus_runtime)
+        },
+        _ => None,
     };
 
     // Create the consensus runtime (this blocks on state sync first)

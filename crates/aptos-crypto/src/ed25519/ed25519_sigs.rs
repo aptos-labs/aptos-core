@@ -20,7 +20,7 @@ pub struct Ed25519Signature(pub(crate) ed25519_dalek::Signature);
 
 impl Ed25519Signature {
     /// The length of the Ed25519Signature
-    pub const LENGTH: usize = ed25519_dalek::SIGNATURE_LENGTH;
+    pub const LENGTH: usize = ED25519_SIGNATURE_LENGTH;
 
     /// Serialize an Ed25519Signature.
     pub fn to_bytes(&self) -> [u8; ED25519_SIGNATURE_LENGTH] {

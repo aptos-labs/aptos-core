@@ -32,7 +32,6 @@ make it so that a reference to a global object can be returned from a function.
 -  [Struct `LinearTransferRef`](#0x1_object_LinearTransferRef)
 -  [Struct `DeriveRef`](#0x1_object_DeriveRef)
 -  [Struct `TransferEvent`](#0x1_object_TransferEvent)
--  [Resource `Ghost$g_roll`](#0x1_object_Ghost$g_roll)
 -  [Constants](#@Constants_0)
 -  [Function `is_burnt`](#0x1_object_is_burnt)
 -  [Function `address_to_object`](#0x1_object_address_to_object)
@@ -129,6 +128,7 @@ make it so that a reference to a global object can be returned from a function.
 <b>use</b> <a href="create_signer.md#0x1_create_signer">0x1::create_signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs">0x1::from_bcs</a>;
 <b>use</b> <a href="guid.md#0x1_guid">0x1::guid</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
@@ -489,33 +489,6 @@ Emitted whenever the object's owner field is changed.
 </dd>
 <dt>
 <code><b>to</b>: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x1_object_Ghost$g_roll"></a>
-
-## Resource `Ghost$g_roll`
-
-
-
-<pre><code><b>struct</b> Ghost$<a href="object.md#0x1_object_g_roll">g_roll</a> <b>has</b> <b>copy</b>, drop, store, key
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>v: u8</code>
 </dt>
 <dd>
 
@@ -1913,18 +1886,11 @@ objects may have cyclic dependencies.
 
     <b>let</b> current_address = <a href="object.md#0x1_object">object</a>.owner;
     <b>let</b> count = 0;
-    <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>;
-            <b>invariant</b> <b>forall</b> i in 0..count:
-                <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address) && <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address).allow_ungated_transfer;
-            // <b>invariant</b> <b>forall</b> i in 0..count:
-            //     current_address == get_transfer_address(<b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(destination).owner, i);
+    <b>while</b> (owner != current_address) {
+        count = count + 1;
+        <b>if</b> (std::features::max_object_nesting_check_enabled()) {
+            <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>))
         };
-        owner != current_address
-    }) {
-        <b>let</b> count = count + 1;
-        <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
         // At this point, the first <a href="object.md#0x1_object">object</a> <b>exists</b> and so the more likely case is that the
         // <a href="object.md#0x1_object">object</a>'s owner is not an <a href="object.md#0x1_object">object</a>. So we <b>return</b> a more sensible <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">error</a>.
         <b>assert</b>!(
@@ -2124,16 +2090,11 @@ Return true if the provided address has indirect or direct ownership of the prov
     <b>let</b> current_address = <a href="object.md#0x1_object">object</a>.owner;
 
     <b>let</b> count = 0;
-    <b>while</b> ({
-        <b>spec</b> {
-            <b>invariant</b> count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>;
-            <b>invariant</b> <b>forall</b> i in 0..count:
-                owner != current_address && <b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address);
+    <b>while</b> (owner != current_address) {
+        count = count + 1;
+        <b>if</b> (std::features::max_object_nesting_check_enabled()) {
+            <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>))
         };
-        owner != current_address
-    }) {
-        <b>let</b> count = count + 1;
-        <b>assert</b>!(count &lt; <a href="object.md#0x1_object_MAXIMUM_OBJECT_NESTING">MAXIMUM_OBJECT_NESTING</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_out_of_range">error::out_of_range</a>(<a href="object.md#0x1_object_EMAXIMUM_NESTING">EMAXIMUM_NESTING</a>));
         <b>if</b> (!<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address)) {
             <b>return</b> <b>false</b>
         };
@@ -2224,8 +2185,6 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 <pre><code><b>pragma</b> aborts_if_is_strict;
-<a id="0x1_object_g_roll"></a>
-<b>global</b> <a href="object.md#0x1_object_g_roll">g_roll</a>: u8;
 </code></pre>
 
 
@@ -3058,7 +3017,8 @@ Return true if the provided address has indirect or direct ownership of the prov
 
 
 
-<pre><code><b>let</b> current_address_0 = <a href="object.md#0x1_object">object</a>.inner;
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> current_address_0 = <a href="object.md#0x1_object">object</a>.inner;
 <b>let</b> object_0 = <b>global</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(current_address_0);
 <b>let</b> current_address = object_0.owner;
 <b>aborts_if</b> <a href="object.md#0x1_object">object</a>.inner != owner && !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">ObjectCore</a>&gt;(<a href="object.md#0x1_object">object</a>.inner);

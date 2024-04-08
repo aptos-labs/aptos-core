@@ -31,13 +31,13 @@ impl ImageOptimizer {
     /// Resizes and optimizes image from input URI.
     /// Returns new image as a byte array and its format.
     pub async fn optimize(
-        uri: String,
+        uri: &str,
         max_file_size_bytes: u32,
         image_quality: u8,
         max_image_dimensions: u32,
     ) -> anyhow::Result<(Vec<u8>, ImageFormat)> {
         OPTIMIZE_IMAGE_INVOCATION_COUNT.inc();
-        let (_, size) = get_uri_metadata(uri.clone()).await?;
+        let (_, size) = get_uri_metadata(uri).await?;
         if size > max_file_size_bytes {
             FAILED_TO_OPTIMIZE_IMAGE_COUNT
                 .with_label_values(&["Image file too large"])

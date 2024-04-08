@@ -47,7 +47,7 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{fmt, ops::BitOr};
+use std::{fmt, fmt::Formatter, ops::BitOr};
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -441,6 +441,13 @@ pub enum Visibility {
 
 impl Visibility {
     pub const DEPRECATED_SCRIPT: u8 = 0x2;
+
+    pub fn is_public(&self) -> bool {
+        match self {
+            Self::Public => true,
+            Self::Private | Self::Friend => false,
+        }
+    }
 }
 
 impl std::convert::TryFrom<u8> for Visibility {
@@ -633,6 +640,17 @@ impl Ability {
     }
 }
 
+impl fmt::Display for Ability {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Ability::Copy => write!(f, "copy"),
+            Ability::Drop => write!(f, "drop"),
+            Ability::Store => write!(f, "store"),
+            Ability::Key => write!(f, "key"),
+        }
+    }
+}
+
 /// A set of `Ability`s
 #[derive(Clone, Eq, Copy, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
@@ -700,6 +718,10 @@ impl AbilitySet {
 
     pub fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
+    }
+
+    pub fn setminus(self, other: Self) -> Self {
+        Self(self.0 & !other.0)
     }
 
     pub fn requires(self) -> Self {
@@ -785,6 +807,22 @@ impl AbilitySet {
 
     pub fn into_u8(self) -> u8 {
         self.0
+    }
+}
+
+impl fmt::Display for AbilitySet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let v = Ability::all().filter_map(|a| {
+            if self.has_ability(a) {
+                Some(a.to_string())
+            } else {
+                None
+            }
+        });
+        f.write_str(
+            &v.reduce(|l, r| format!("{} & {}", l, r))
+                .unwrap_or_default(),
+        )
     }
 }
 
@@ -1259,6 +1297,10 @@ impl SignatureToken {
         SignatureTokenPreorderTraversalIterWithDepth {
             stack: vec![(self, 1)],
         }
+    }
+
+    pub fn num_nodes(&self) -> usize {
+        self.preorder_traversal().count()
     }
 }
 
@@ -2193,6 +2235,14 @@ impl CompiledModule {
     /// Returns the code key of `self`
     pub fn self_id(&self) -> ModuleId {
         self.module_id_for_handle(self.self_handle())
+    }
+
+    pub fn self_addr(&self) -> &AccountAddress {
+        self.address_identifier_at(self.self_handle().address)
+    }
+
+    pub fn self_name(&self) -> &IdentStr {
+        self.identifier_at(self.self_handle().name)
     }
 }
 

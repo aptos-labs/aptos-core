@@ -5,7 +5,7 @@ use crate::{
     block_storage::tracing::{observe_block, BlockStage},
     rand::rand_gen::{
         rand_manager::Sender,
-        types::{RandConfig, RandShare, Share},
+        types::{RandConfig, RandShare, TShare},
     },
 };
 use anyhow::ensure;
@@ -22,7 +22,7 @@ pub struct ShareAggregator<S> {
     total_weight: u64,
 }
 
-impl<S: Share> ShareAggregator<S> {
+impl<S: TShare> ShareAggregator<S> {
     pub fn new(author: Author) -> Self {
         Self {
             author,
@@ -32,9 +32,7 @@ impl<S: Share> ShareAggregator<S> {
     }
 
     pub fn add_share(&mut self, weight: u64, share: RandShare<S>) {
-        let timestamp = share.metadata().timestamp;
         if self.shares.insert(*share.author(), share).is_none() {
-            observe_block(timestamp, BlockStage::RAND_ADD_SHARE);
             self.total_weight += weight;
         }
     }
@@ -45,15 +43,17 @@ impl<S: Share> ShareAggregator<S> {
         rand_metadata: RandMetadata,
         decision_tx: Sender<Randomness>,
     ) -> Either<Self, RandShare<S>> {
-        if self.total_weight < rand_config.threshold_weight() {
+        if self.total_weight < rand_config.threshold() {
             return Either::Left(self);
         }
+        // timestamp records the time when the block is created
+        observe_block(rand_metadata.timestamp, BlockStage::RAND_ADD_ENOUGH_SHARE);
         let rand_config = rand_config.clone();
         let self_share = self
             .get_self_share()
             .expect("Aggregated item should have self share");
         tokio::task::spawn_blocking(move || {
-            decision_tx.send(S::aggregate(
+            decision_tx.unbounded_send(S::aggregate(
                 self.shares.values(),
                 &rand_config,
                 rand_metadata,
@@ -92,7 +92,7 @@ enum RandItem<S> {
     },
 }
 
-impl<S: Share> RandItem<S> {
+impl<S: TShare> RandItem<S> {
     fn new(author: Author) -> Self {
         Self::PendingMetadata(ShareAggregator::new(author))
     }
@@ -198,7 +198,7 @@ pub struct RandStore<S> {
     decision_tx: Sender<Randomness>,
 }
 
-impl<S: Share> RandStore<S> {
+impl<S: TShare> RandStore<S> {
     pub fn new(
         epoch: u64,
         author: Author,
@@ -215,12 +215,11 @@ impl<S: Share> RandStore<S> {
         }
     }
 
-    pub fn reset(&mut self, target_round: u64) {
-        self.highest_known_round = std::cmp::max(self.highest_known_round, target_round);
+    pub fn update_highest_known_round(&mut self, round: u64) {
+        self.highest_known_round = std::cmp::max(self.highest_known_round, round);
     }
 
     pub fn add_rand_metadata(&mut self, rand_metadata: RandMetadata) {
-        self.highest_known_round = std::cmp::max(self.highest_known_round, rand_metadata.round());
         let rand_item = self
             .rand_map
             .entry(rand_metadata.round())
@@ -283,30 +282,143 @@ mod tests {
         types::{MockShare, RandConfig},
     };
     use aptos_consensus_types::common::Author;
-    use aptos_types::randomness::RandMetadata;
-    use std::{collections::HashMap, str::FromStr};
-    use tokio::sync::mpsc::unbounded_channel;
+    use aptos_crypto::{bls12381, HashValue, Uniform};
+    use aptos_dkg::{
+        pvss::{traits::Transcript, Player, WeightedConfig},
+        weighted_vuf::traits::WeightedVUF,
+    };
+    use aptos_types::{
+        dkg::{real_dkg::maybe_dk_from_bls_sk, DKGSessionMetadata, DKGTrait, DefaultDKG},
+        on_chain_config::OnChainRandomnessConfig,
+        randomness::{RandKeys, RandMetadata, WvufPP, WVUF},
+        validator_verifier::{
+            ValidatorConsensusInfo, ValidatorConsensusInfoMoveStruct, ValidatorVerifier,
+        },
+    };
+    use futures::StreamExt;
+    use futures_channel::mpsc::unbounded;
+    use rand::thread_rng;
+    use std::str::FromStr;
+
+    /// Captures important data items across the whole DKG-WVUF flow.
+    struct TestContext {
+        authors: Vec<Author>,
+        dealer_epoch: u64,
+        target_epoch: u64,
+        rand_config: RandConfig,
+    }
+
+    impl TestContext {
+        fn new(weights: Vec<u64>, my_index: usize) -> Self {
+            let dealer_epoch = 0;
+            let target_epoch = 1;
+            let num_validators = weights.len();
+            let mut rng = thread_rng();
+            let authors: Vec<_> = (0..num_validators)
+                .map(|i| Author::from_str(&format!("{:x}", i)).unwrap())
+                .collect();
+            let private_keys: Vec<bls12381::PrivateKey> = (0..num_validators)
+                .map(|_| bls12381::PrivateKey::generate_for_testing())
+                .collect();
+            let public_keys: Vec<bls12381::PublicKey> =
+                private_keys.iter().map(bls12381::PublicKey::from).collect();
+            let dkg_decrypt_keys: Vec<<DefaultDKG as DKGTrait>::NewValidatorDecryptKey> =
+                private_keys
+                    .iter()
+                    .map(|sk| maybe_dk_from_bls_sk(sk).unwrap())
+                    .collect();
+            let consensus_infos: Vec<ValidatorConsensusInfo> = (0..num_validators)
+                .map(|idx| {
+                    ValidatorConsensusInfo::new(
+                        authors[idx],
+                        public_keys[idx].clone(),
+                        weights[idx],
+                    )
+                })
+                .collect();
+            let consensus_info_move_structs = consensus_infos
+                .clone()
+                .into_iter()
+                .map(ValidatorConsensusInfoMoveStruct::from)
+                .collect::<Vec<_>>();
+            let verifier = ValidatorVerifier::new(consensus_infos.clone());
+            let dkg_session_metadata = DKGSessionMetadata {
+                dealer_epoch: 999,
+                randomness_config: OnChainRandomnessConfig::default_enabled().into(),
+                dealer_validator_set: consensus_info_move_structs.clone(),
+                target_validator_set: consensus_info_move_structs.clone(),
+            };
+            let dkg_pub_params = DefaultDKG::new_public_params(&dkg_session_metadata);
+            let input_secret = <DefaultDKG as DKGTrait>::InputSecret::generate_for_testing();
+            let transcript = DefaultDKG::generate_transcript(
+                &mut rng,
+                &dkg_pub_params,
+                &input_secret,
+                0,
+                &private_keys[0],
+            );
+            let (sk, pk) = DefaultDKG::decrypt_secret_share_from_transcript(
+                &dkg_pub_params,
+                &transcript,
+                my_index as u64,
+                &dkg_decrypt_keys[my_index],
+            )
+            .unwrap();
+
+            let pk_shares = (0..num_validators)
+                .map(|id| {
+                    transcript
+                        .get_public_key_share(&dkg_pub_params.pvss_config.wconfig, &Player { id })
+                })
+                .collect::<Vec<_>>();
+            let vuf_pub_params = WvufPP::from(&dkg_pub_params.pvss_config.pp);
+
+            let (ask, apk) = WVUF::augment_key_pair(&vuf_pub_params, sk, pk, &mut rng);
+
+            let rand_keys = RandKeys::new(ask, apk, pk_shares, num_validators);
+            let weights: Vec<usize> = weights.into_iter().map(|x| x as usize).collect();
+            let half_total_weights = weights.clone().into_iter().sum::<usize>() / 2;
+            let weighted_config = WeightedConfig::new(half_total_weights, weights).unwrap();
+            let rand_config = RandConfig::new(
+                authors[my_index],
+                target_epoch,
+                verifier,
+                vuf_pub_params,
+                rand_keys,
+                weighted_config,
+            );
+
+            Self {
+                authors,
+                dealer_epoch,
+                target_epoch,
+                rand_config,
+            }
+        }
+    }
 
     #[test]
     fn test_share_aggregator() {
-        let mut aggr = ShareAggregator::new(Author::ONE);
-        let weights = HashMap::from([(Author::ONE, 1), (Author::TWO, 2), (Author::ZERO, 3)]);
-        let shares = vec![
-            create_share_for_round(1, Author::ONE),
-            create_share_for_round(2, Author::TWO),
-            create_share_for_round(1, Author::ZERO),
-        ];
-        for share in shares.iter() {
-            aggr.add_share(*weights.get(share.author()).unwrap(), share.clone());
-            // double add should be no op to the total weight
-            aggr.add_share(*weights.get(share.author()).unwrap(), share.clone());
-        }
+        let ctxt = TestContext::new(vec![1, 2, 3], 0);
+        let mut aggr = ShareAggregator::new(ctxt.authors[0]);
+        aggr.add_share(
+            1,
+            create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[0]),
+        );
+        aggr.add_share(
+            2,
+            create_share_for_round(ctxt.target_epoch, 2, ctxt.authors[1]),
+        );
+        aggr.add_share(
+            3,
+            create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[2]),
+        );
         assert_eq!(aggr.shares.len(), 3);
         assert_eq!(aggr.total_weight, 6);
         // retain the shares with the same metadata
         aggr.retain(
-            &RandConfig::new(1, Author::ZERO, weights),
-            &RandMetadata::new_for_testing(1),
+            &ctxt.rand_config,
+            &RandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000),
         );
         assert_eq!(aggr.shares.len(), 2);
         assert_eq!(aggr.total_weight, 4);
@@ -314,42 +426,48 @@ mod tests {
 
     #[tokio::test]
     async fn test_rand_item() {
-        let weights = HashMap::from([(Author::ONE, 1), (Author::TWO, 2), (Author::ZERO, 3)]);
-        let config = RandConfig::new(1, Author::ZERO, weights);
-        let (tx, _rx) = unbounded_channel();
+        let ctxt = TestContext::new(vec![1, 2, 3], 1);
+        let (tx, _rx) = unbounded();
         let shares = vec![
-            create_share_for_round(2, Author::ONE),
-            create_share_for_round(1, Author::TWO),
-            create_share_for_round(1, Author::ZERO),
+            create_share_for_round(ctxt.target_epoch, 2, ctxt.authors[0]),
+            create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[1]),
+            create_share_for_round(ctxt.target_epoch, 1, ctxt.authors[2]),
         ];
 
-        let mut item = RandItem::<MockShare>::new(Author::TWO);
+        let mut item = RandItem::<MockShare>::new(ctxt.authors[1]);
         for share in shares.iter() {
-            item.add_share(share.clone(), &config).unwrap();
+            item.add_share(share.clone(), &ctxt.rand_config).unwrap();
         }
         assert_eq!(item.total_weights().unwrap(), 6);
-        item.add_metadata(&config, RandMetadata::new_for_testing(1));
+        item.add_metadata(
+            &ctxt.rand_config,
+            RandMetadata::new(ctxt.target_epoch, 1, HashValue::zero(), 1700000000),
+        );
         assert_eq!(item.total_weights().unwrap(), 5);
-        item.try_aggregate(&config, tx);
+        item.try_aggregate(&ctxt.rand_config, tx);
         assert!(item.has_decision());
 
-        let mut item = RandItem::<MockShare>::new(Author::ONE);
-        item.add_metadata(&config, RandMetadata::new_for_testing(2));
+        let mut item = RandItem::<MockShare>::new(ctxt.authors[0]);
+        item.add_metadata(
+            &ctxt.rand_config,
+            RandMetadata::new(ctxt.target_epoch, 2, HashValue::zero(), 1700000000),
+        );
         for share in shares[1..].iter() {
-            item.add_share(share.clone(), &config).unwrap_err();
+            item.add_share(share.clone(), &ctxt.rand_config)
+                .unwrap_err();
         }
     }
 
     #[tokio::test]
     async fn test_rand_store() {
-        let authors: Vec<_> = (0..7)
-            .map(|i| Author::from_str(&format!("{:x}", i)).unwrap())
-            .collect();
-        let weights: HashMap<Author, u64> = authors.iter().map(|addr| (*addr, 1)).collect();
-        let authors: Vec<Author> = weights.keys().cloned().collect();
-        let config = RandConfig::new(1, Author::ZERO, weights);
-        let (decision_tx, mut decision_rx) = unbounded_channel();
-        let mut rand_store = RandStore::new(1, authors[1], config, decision_tx);
+        let ctxt = TestContext::new(vec![100; 7], 0);
+        let (decision_tx, mut decision_rx) = unbounded();
+        let mut rand_store = RandStore::new(
+            ctxt.target_epoch,
+            ctxt.authors[1],
+            ctxt.rand_config.clone(),
+            decision_tx,
+        );
 
         let rounds = vec![vec![1], vec![2, 3], vec![5, 8, 13]];
         let blocks_1 = QueueItem::new(create_ordered_blocks(rounds[0].clone()), None);
@@ -358,29 +476,30 @@ mod tests {
         let metadata_2 = blocks_2.all_rand_metadata();
 
         // shares come before metadata
-        for share in authors[0..5]
+        for share in ctxt.authors[0..5]
             .iter()
             .map(|author| create_share(metadata_1[0].clone(), *author))
         {
             rand_store.add_share(share).unwrap();
         }
-        assert!(decision_rx.try_recv().is_err());
+        assert!(decision_rx.try_next().is_err());
         for metadata in blocks_1.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata);
         }
-        assert!(decision_rx.recv().await.is_some());
+        assert!(decision_rx.next().await.is_some());
+
         // metadata come after shares
         for metadata in blocks_2.all_rand_metadata() {
             rand_store.add_rand_metadata(metadata);
         }
-        assert!(decision_rx.try_recv().is_err());
+        assert!(decision_rx.try_next().is_err());
 
-        for share in authors[1..6]
+        for share in ctxt.authors[1..6]
             .iter()
             .map(|author| create_share(metadata_2[0].clone(), *author))
         {
             rand_store.add_share(share).unwrap();
         }
-        assert!(decision_rx.recv().await.is_some());
+        assert!(decision_rx.next().await.is_some());
     }
 }

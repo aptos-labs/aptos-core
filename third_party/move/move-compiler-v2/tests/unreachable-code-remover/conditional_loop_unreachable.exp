@@ -117,14 +117,14 @@ fun m::test($t0: bool, $t1: bool) {
 
 [variant baseline]
 fun m::test($t0: bool, $t1: bool) {
-     var $t2: u64
-     var $t3: u64
-     var $t4: u64
-     var $t5: u64
-     var $t6: u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
   0: label L0
   1: if ($t0) goto 2 else goto 9
   2: label L2

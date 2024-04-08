@@ -1,12 +1,9 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x2::X {
     struct S {
         f: u64,
     }
     public fun s(): X::S {
-        pack X::S(0)
-    }
-    spec fun $s(): X::S {
         pack X::S(0)
     }
 } // end 0x2::X
@@ -20,5 +17,4 @@ module 0x2::M {
           Abort(0)
         }
     }
-    spec fun $t0();
 } // end 0x2::M

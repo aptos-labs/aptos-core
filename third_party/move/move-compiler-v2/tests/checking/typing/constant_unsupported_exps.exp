@@ -30,13 +30,13 @@ error: no function named `X::f_private` found
 27 │         0x42::X::f_private();
    │         ^^^^^^^^^^^^^^^^^^^^
 
-error: invalid call of `move_to`: expected `&signer` but found `signer` for argument 1
+error: cannot use `signer` with an operator which expects a value of type `&signer`
    ┌─ tests/checking/typing/constant_unsupported_exps.move:30:17
    │
 30 │         move_to(s, R{});
    │                 ^
 
-error: expected `()` but found `integer`
+error: cannot return `integer` from a function which returns nothing
    ┌─ tests/checking/typing/constant_unsupported_exps.move:39:16
    │
 39 │         return 0;

@@ -2,44 +2,57 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod ast_simplifier;
 mod bytecode_generator;
+pub mod cyclic_instantiation_checker;
+pub mod env_pipeline;
 mod experiments;
 mod file_format_generator;
 pub mod flow_insensitive_checkers;
 pub mod function_checker;
 pub mod inliner;
 pub mod logging;
-mod options;
+pub mod options;
 pub mod pipeline;
+pub mod recursive_struct_checker;
 
-use crate::pipeline::{
-    ability_checker::AbilityChecker, avail_copies_analysis::AvailCopiesAnalysisProcessor,
-    copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
-    explicit_drop::ExplicitDrop, livevar_analysis_processor::LiveVarAnalysisProcessor,
-    reference_safety_processor::ReferenceSafetyProcessor,
-    uninitialized_use_checker::UninitializedUseChecker,
-    unreachable_code_analysis::UnreachableCodeProcessor,
-    unreachable_code_remover::UnreachableCodeRemover, visibility_checker::VisibilityChecker,
+use crate::{
+    env_pipeline::{rewrite_target::RewritingScope, spec_checker, EnvProcessorPipeline},
+    pipeline::{
+        ability_processor::AbilityProcessor, avail_copies_analysis::AvailCopiesAnalysisProcessor,
+        copy_propagation::CopyPropagation, dead_store_elimination::DeadStoreElimination,
+        exit_state_analysis::ExitStateAnalysisProcessor,
+        livevar_analysis_processor::LiveVarAnalysisProcessor,
+        reference_safety_processor::ReferenceSafetyProcessor,
+        split_critical_edges_processor::SplitCriticalEdgesProcessor,
+        uninitialized_use_checker::UninitializedUseChecker,
+        unreachable_code_analysis::UnreachableCodeProcessor,
+        unreachable_code_remover::UnreachableCodeRemover, variable_coalescing::VariableCoalescing,
+    },
 };
 use anyhow::bail;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream, WriteColor};
 pub use experiments::*;
-use log::{debug, info, log_enabled, trace, Level};
+use log::{debug, info, log_enabled, Level};
+use move_binary_format::binary_views::BinaryIndexedView;
+use move_command_line_common::files::FileHash;
 use move_compiler::{
     compiled_unit::{
-        AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit, CompiledUnit,
-        FunctionInfo,
+        verify_units, AnnotatedCompiledModule, AnnotatedCompiledScript, AnnotatedCompiledUnit,
+        CompiledUnit, FunctionInfo,
     },
     diagnostics::FilesSourceText,
     shared::{known_attributes::KnownAttribute, unique_map::UniqueMap},
 };
-use move_model::{model::GlobalEnv, PackageInfo};
+use move_disassembler::disassembler::Disassembler;
+use move_ir_types::location;
+use move_model::{add_move_lang_diagnostics, model::GlobalEnv, PackageInfo};
 use move_stackless_bytecode::function_target_pipeline::{
     FunctionTargetPipeline, FunctionTargetsHolder, FunctionVariant,
 };
 use move_symbol_pool::Symbol;
 pub use options::*;
-use std::{collections::BTreeSet, path::Path};
+use std::{collections::BTreeSet, io::Write, path::Path};
 
 /// Run Move compiler and print errors to stderr.
 pub fn run_move_compiler_to_stderr(
@@ -50,38 +63,24 @@ pub fn run_move_compiler_to_stderr(
 }
 
 /// Run move compiler and print errors to given writer.
-pub fn run_move_compiler(
-    error_writer: &mut impl WriteColor,
+pub fn run_move_compiler<W>(
+    error_writer: &mut W,
     options: Options,
-) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)> {
+) -> anyhow::Result<(GlobalEnv, Vec<AnnotatedCompiledUnit>)>
+where
+    W: WriteColor + Write,
+{
     logging::setup_logging();
     info!("Move Compiler v2");
+
     // Run context check.
-    let mut env = run_checker(options.clone())?;
+    let mut env = run_checker_and_rewriters(options.clone(), RewritingScope::CompilationTarget)?;
     check_errors(&env, error_writer, "checking errors")?;
-
-    trace!("After context check, GlobalEnv={}", env.dump_env());
-
-    // Flow-insensitive checks on AST
-    flow_insensitive_checkers::check_for_unused_vars_and_params(&mut env);
-    function_checker::check_for_function_typed_parameters(&mut env);
-    function_checker::check_access_and_use(&mut env);
-    check_errors(&env, error_writer, "checking errors")?;
-
-    trace!(
-        "After flow-insensitive checks, GlobalEnv={}",
-        env.dump_env()
-    );
-
-    // Run inlining.
-    inliner::run_inlining(&mut env);
-    check_errors(&env, error_writer, "inlining")?;
-
-    debug!("After inlining, GlobalEnv={}", env.dump_env());
 
     // Run code generator
     let mut targets = run_bytecode_gen(&env);
     check_errors(&env, error_writer, "code generation errors")?;
+    debug!("After bytecode_gen, GlobalEnv={}", env.dump_env());
 
     // Run transformation pipeline
     let pipeline = bytecode_pipeline(&env);
@@ -110,8 +109,17 @@ pub fn run_move_compiler(
 
     let modules_and_scripts = run_file_format_gen(&env, &targets);
     check_errors(&env, error_writer, "assembling errors")?;
-    let annotated = annotate_units(modules_and_scripts);
-    Ok((env, annotated))
+
+    debug!(
+        "File format bytecode:\n{}",
+        disassemble_compiled_units(&modules_and_scripts)?
+    );
+
+    let annotated_units = annotate_units(modules_and_scripts);
+    run_bytecode_verifier(&annotated_units, &mut env);
+    check_errors(&env, error_writer, "bytecode verification errors")?;
+
+    Ok((env, annotated_units))
 }
 
 /// Run the type checker and return the global env (with errors if encountered). The result
@@ -147,11 +155,35 @@ pub fn run_checker(options: Options) -> anyhow::Result<GlobalEnv> {
     Ok(env)
 }
 
+/// Run the type checker as well as the AST rewriting pipeline and related additional
+/// checks, returning the global env (with errors if encountered). The result
+/// fails not on context checking errors, but possibly on i/o errors.
+pub fn run_checker_and_rewriters(
+    options: Options,
+    scope: RewritingScope,
+) -> anyhow::Result<GlobalEnv> {
+    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
+    let mut env_pipeline = check_and_rewrite_pipeline(&options, false, scope);
+    env_pipeline.add("simplifier", {
+        move |env: &mut GlobalEnv| {
+            ast_simplifier::run_simplifier(
+                env,
+                optimize_on, // eliminate code only if optimize is on
+            )
+        }
+    });
+    let mut env = run_checker(options)?;
+    if !env.has_errors() {
+        env_pipeline.run(&mut env);
+    }
+    Ok(env)
+}
+
 // Run the (stackless) bytecode generator. For each function which is target of the
 // compilation, create an entry in the functions target holder which encapsulate info
 // like the generated bytecode.
 pub fn run_bytecode_gen(env: &GlobalEnv) -> FunctionTargetsHolder {
-    info!("Bytecode Generation");
+    info!("Stackless bytecode Generation");
     let mut targets = FunctionTargetsHolder::default();
     let mut todo = BTreeSet::new();
     let mut done = BTreeSet::new();
@@ -185,31 +217,79 @@ pub fn run_file_format_gen(env: &GlobalEnv, targets: &FunctionTargetsHolder) -> 
     file_format_generator::generate_file_format(env, targets)
 }
 
+/// Constructs the env checking and rewriting processing pipeline. `inlining_scope` can be set to
+/// `Everything` for use with the Move Prover, otherwise `CompilationTarget`
+/// should be used.
+pub fn check_and_rewrite_pipeline<'a>(
+    _options: &Options,
+    for_v1_model: bool,
+    inlining_scope: RewritingScope,
+) -> EnvProcessorPipeline<'a> {
+    // The default transformation pipeline on the GlobalEnv
+    let mut env_pipeline = EnvProcessorPipeline::default();
+    env_pipeline.add(
+        "unused checks",
+        flow_insensitive_checkers::check_for_unused_vars_and_params,
+    );
+    env_pipeline.add(
+        "type parameter check",
+        function_checker::check_for_function_typed_parameters,
+    );
+    if !for_v1_model {
+        // Currently when coming via the v1 model building path friend info is
+        // not populated, so skip those tests. They are anyway run already by
+        // the v1 compiler.
+        env_pipeline.add(
+            "access and use check before inlining",
+            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, true),
+        );
+    }
+    env_pipeline.add("inlining", {
+        move |env| {
+            inliner::run_inlining(env, inlining_scope, /*keep_inline_functions*/ false)
+        }
+    });
+    if !for_v1_model {
+        env_pipeline.add(
+            "access and use check after inlining",
+            |env: &mut GlobalEnv| function_checker::check_access_and_use(env, false),
+        );
+    }
+    env_pipeline.add("specification checker", |env| {
+        let env: &GlobalEnv = env;
+        spec_checker::run_spec_checker(env)
+    });
+    env_pipeline.add("check recursive struct definition", |env| {
+        recursive_struct_checker::check_recursive_struct(env)
+    });
+    env_pipeline.add("check cyclic type instantiation", |env| {
+        cyclic_instantiation_checker::check_cyclic_instantiations(env)
+    });
+    env_pipeline
+}
+
 /// Returns the bytecode processing pipeline.
 pub fn bytecode_pipeline(env: &GlobalEnv) -> FunctionTargetPipeline {
     let options = env.get_extension::<Options>().expect("options");
     let safety_on = !options.experiment_on(Experiment::NO_SAFETY);
+    let optimize_on = options.experiment_on(Experiment::OPTIMIZE);
     let mut pipeline = FunctionTargetPipeline::default();
+    if options.experiment_on(Experiment::SPLIT_CRITICAL_EDGES) {
+        pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
+    }
     if safety_on {
         pipeline.add_processor(Box::new(UninitializedUseChecker {}));
-        pipeline.add_processor(Box::new(VisibilityChecker()));
     }
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-        with_copy_inference: true,
-    }));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline.add_processor(Box::new(ReferenceSafetyProcessor {}));
-    pipeline.add_processor(Box::new(ExplicitDrop {}));
-    if safety_on {
-        // Ability checker is functionally not relevant so can be completely skipped if safety is off
-        pipeline.add_processor(Box::new(AbilityChecker {}));
+    pipeline.add_processor(Box::new(ExitStateAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(AbilityProcessor {}));
+    if optimize_on {
+        add_default_optimization_pipeline(&mut pipeline);
     }
-    // The default optimization pipeline is currently always run by the compiler.
-    add_default_optimization_pipeline(&mut pipeline);
     // Run live var analysis again because it could be invalidated by previous pipeline steps,
     // but it is needed by file format generator.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-        with_copy_inference: false,
-    }));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline
 }
 
@@ -224,20 +304,48 @@ fn add_default_optimization_pipeline(pipeline: &mut FunctionTargetPipeline) {
     pipeline.add_processor(Box::new(AvailCopiesAnalysisProcessor {}));
     pipeline.add_processor(Box::new(CopyPropagation {}));
     // Live var analysis is needed by dead store elimination.
-    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {
-        with_copy_inference: false,
-    }));
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
     pipeline.add_processor(Box::new(DeadStoreElimination {}));
     pipeline.add_processor(Box::new(UnreachableCodeProcessor {}));
     pipeline.add_processor(Box::new(UnreachableCodeRemover {}));
+    // Live var analysis is needed by variable coalescing.
+    pipeline.add_processor(Box::new(LiveVarAnalysisProcessor {}));
+    pipeline.add_processor(Box::new(VariableCoalescing {}));
+}
+
+/// Disassemble the given compiled units and return the disassembled code as a string.
+pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<String> {
+    let disassembled_units: anyhow::Result<Vec<_>> = units
+        .iter()
+        .map(|unit| {
+            let view = match unit {
+                CompiledUnit::Module(module) => BinaryIndexedView::Module(&module.module),
+                CompiledUnit::Script(script) => BinaryIndexedView::Script(&script.script),
+            };
+            Disassembler::from_view(view, location::Loc::new(FileHash::empty(), 0, 0))
+                .and_then(|d| d.disassemble())
+        })
+        .collect();
+    Ok(disassembled_units?.concat())
+}
+
+/// Run the bytecode verifier on the given compiled units and add any diagnostics to the global env.
+pub fn run_bytecode_verifier(units: &[AnnotatedCompiledUnit], env: &mut GlobalEnv) {
+    let diags = verify_units(units);
+    if !diags.is_empty() {
+        add_move_lang_diagnostics(env, diags);
+    }
 }
 
 /// Report any diags in the env to the writer and fail if there are errors.
-pub fn check_errors<W: WriteColor>(
+pub fn check_errors<W>(
     env: &GlobalEnv,
     error_writer: &mut W,
     msg: &'static str,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    W: WriteColor + Write,
+{
     let options = env.get_extension::<Options>().unwrap_or_default();
     env.report_diag(error_writer, options.report_severity());
     if env.has_errors() {

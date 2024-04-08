@@ -1,0 +1,283 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := infer($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: &mut u64
+     var $t5: &u64
+     var $t6: &u64
+  0: $t1 := 22
+  1: $t0 := infer($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := infer($t3)
+  4: $t4 := m::f($t2)
+  5: $t2 := infer($t4)
+  6: $t6 := borrow_local($t0)
+  7: $t5 := infer($t6)
+  8: return ()
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: &mut u64
+     var $t5: &u64
+     var $t6: &u64
+     # live vars:
+  0: $t1 := 22
+     # live vars: $t1
+  1: $t0 := infer($t1)
+     # live vars: $t0
+  2: $t3 := borrow_local($t0)
+     # live vars: $t0, $t3
+  3: $t2 := infer($t3)
+     # live vars: $t0, $t2
+  4: $t4 := m::f($t2)
+     # live vars: $t0, $t4
+  5: $t2 := infer($t4)
+     # live vars: $t0
+  6: $t6 := borrow_local($t0)
+     # live vars: $t6
+  7: $t5 := infer($t6)
+     # live vars:
+  8: return ()
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+     # live vars: $t0
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
+     #
+  0: $t1 := infer($t0)
+     # live vars: $t1
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t1=@2000000}
+     # globals: {}
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: &mut u64
+     var $t5: &u64
+     var $t6: &u64
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  0: $t1 := 22
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  1: $t0 := infer($t1)
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  2: $t3 := borrow_local($t0)
+     # live vars: $t0, $t3
+     # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
+     # locals: {$t0=@200,$t3=@201}
+     # globals: {}
+     #
+  3: $t2 := infer($t3)
+     # live vars: $t0, $t2
+     # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
+     # locals: {$t0=@200,$t2=@201}
+     # globals: {}
+     #
+  4: $t4 := m::f($t2)
+     # live vars: $t0, $t4
+     # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[call(true) -> @400],@400=derived[]}
+     # locals: {$t0=@200,$t4=@400}
+     # globals: {}
+     #
+  5: $t2 := infer($t4)
+     # live vars: $t0
+     # graph: {@200=local($t0)[]}
+     # locals: {$t0=@200}
+     # globals: {}
+     #
+  6: $t6 := borrow_local($t0)
+     # live vars: $t6
+     # graph: {@200=local($t0)[borrow(false) -> @601],@601=derived[]}
+     # locals: {$t0=@200,$t6=@601}
+     # globals: {}
+     #
+  7: $t5 := infer($t6)
+     # live vars:
+     # graph: {@200=local($t0)[]}
+     # locals: {$t0=@200}
+     # globals: {}
+     #
+  8: return ()
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+     # abort state: {returns}
+     # live vars: $t0
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t0=@2000000}
+     # globals: {}
+     #
+  0: $t1 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t1
+     # graph: {@1000000=external[borrow(true) -> @2000000],@2000000=derived[]}
+     # locals: {$t1=@2000000}
+     # globals: {}
+     #
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: &mut u64
+     var $t5: &u64
+     var $t6: &u64
+     # abort state: {returns,aborts}
+     # live vars:
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  0: $t1 := 22
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  1: $t0 := infer($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # graph: {}
+     # locals: {}
+     # globals: {}
+     #
+  2: $t3 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
+     # locals: {$t0=@200,$t3=@201}
+     # globals: {}
+     #
+  3: $t2 := infer($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[]}
+     # locals: {$t0=@200,$t2=@201}
+     # globals: {}
+     #
+  4: $t4 := m::f($t2)
+     # abort state: {returns}
+     # live vars: $t0, $t4
+     # graph: {@200=local($t0)[borrow(true) -> @201],@201=derived[call(true) -> @400],@400=derived[]}
+     # locals: {$t0=@200,$t4=@400}
+     # globals: {}
+     #
+  5: $t2 := infer($t4)
+     # abort state: {returns}
+     # live vars: $t0
+     # graph: {@200=local($t0)[]}
+     # locals: {$t0=@200}
+     # globals: {}
+     #
+  6: $t6 := borrow_local($t0)
+     # abort state: {returns}
+     # live vars: $t6
+     # graph: {@200=local($t0)[borrow(false) -> @601],@601=derived[]}
+     # locals: {$t0=@200,$t6=@601}
+     # globals: {}
+     #
+  7: $t5 := infer($t6)
+     # abort state: {returns}
+     # live vars:
+     # graph: {@200=local($t0)[]}
+     # locals: {$t0=@200}
+     # globals: {}
+     #
+  8: return ()
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun m::f($t0: &mut u64): &mut u64 {
+     var $t1: &mut u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::g() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut u64
+     var $t4: &mut u64
+     var $t5: &u64
+     var $t6: &u64
+  0: $t1 := 22
+  1: $t0 := move($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := move($t3)
+  4: $t4 := m::f($t2)
+  5: $t2 := move($t4)
+  6: drop($t2)
+  7: $t6 := borrow_local($t0)
+  8: $t5 := move($t6)
+  9: drop($t5)
+ 10: return ()
+}

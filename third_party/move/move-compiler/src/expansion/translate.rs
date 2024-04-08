@@ -746,7 +746,7 @@ fn unique_attributes(
                             .add_diag(diag!(Declarations::UnknownAttribute, (nloc, msg)));
                     } else if is_nested && known_attributes.contains(sym.as_str()) {
                         let msg = format!(
-                            "Known attribute '{}' is not expected in a nested attribute position.",
+                            "Attribute '{}' is not expected in a nested attribute position.",
                             sym.as_str()
                         );
                         context
@@ -760,7 +760,7 @@ fn unique_attributes(
                 debug_assert!(known.name() == sym.as_str());
                 if is_nested {
                     let msg = format!(
-                        "Known attribute '{}' is not expected in a nested attribute position",
+                        "Attribute '{}' is not expected in a nested attribute position",
                         sym.as_str()
                     );
                     context
@@ -772,7 +772,7 @@ fn unique_attributes(
                 let expected_positions = known.expected_positions();
                 if !expected_positions.contains(&attr_position) {
                     let msg = format!(
-                        "Known attribute '{}' is not expected with a {}",
+                        "Attribute '{}' is not expected with a {}",
                         known.name(),
                         attr_position
                     );

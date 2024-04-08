@@ -12,6 +12,7 @@ move-abigen = { path = "move-abigen" }
 move-binary-format = { path = "../move-binary-format" }
 move-command-line-common = { path = "../move-command-line-common" }
 move-compiler = { path = "../move-compiler" }
+move-compiler-v2 = { path = "../move-compiler-v2" }
 move-core-types = { path = "../move-core/types" }
 move-docgen = { path = "move-docgen" }
 move-errmapgen = { path = "move-errmapgen" }

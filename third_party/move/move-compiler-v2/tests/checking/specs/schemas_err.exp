@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: undeclared `M::x`
+error: undeclared `x`
   ┌─ tests/checking/specs/schemas_err.move:4:17
   │
 4 │         ensures x > 0;
@@ -24,25 +24,25 @@ error: `wrong` not declared in schema
 19 │         include WrongTypeArgsIncluded<num>{wrong: 1};
    │                                            ^^^^^
 
-error: expected `num` but found `bool`
+error: expected `num` but found a value of type `bool`
    ┌─ tests/checking/specs/schemas_err.move:24:47
    │
 24 │         include WrongTypeArgsIncluded<num>{x: y};
    │                                               ^
 
-error: expected `bool` but found `num`
+error: expected `bool` but found a value of type `num`
    ┌─ tests/checking/specs/schemas_err.move:28:48
    │
 28 │         include WrongTypeArgsIncluded<bool>{x: 1 + 2};
    │                                                ^^^^^
 
-error: expected `bool` but found `num` (for `x` included from schema)
+error: variable `x` bound by schema inclusion expected to have type `bool` but provided was `num`
    ┌─ tests/checking/specs/schemas_err.move:33:17
    │
 33 │         include WronglyTypedVarIncluded;
    │                 ^^^^^^^^^^^^^^^^^^^^^^^
 
-error: expected `bool` but found `num` (for `x` included from schema)
+error: variable `x` bound by schema inclusion expected to have type `bool` but provided was `num`
    ┌─ tests/checking/specs/schemas_err.move:41:17
    │
 41 │         include WronglyTypedInstantiationIncluded<num>;
@@ -66,7 +66,7 @@ error: cyclic schema dependency: Cycle1 -> Cycle2 -> Cycle3 -> Cycle1
 80 │         include Cycle1;
    │                 ^^^^^^
 
-error: expected `bool` but found `u256`
+error: expected `bool` but found a value of type `u256`
    ┌─ tests/checking/specs/schemas_err.move:84:17
    │
 84 │         include 22 ==> Condition;

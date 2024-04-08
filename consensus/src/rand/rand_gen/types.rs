@@ -1,17 +1,28 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::bls12381::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use aptos_dkg::{
+    pvss::{Player, WeightedConfig},
+    weighted_vuf::traits::WeightedVUF,
+};
+use aptos_logger::debug;
+use aptos_runtimes::spawn_rayon_thread_pool;
 use aptos_types::{
     aggregate_signature::AggregateSignature,
-    randomness::{RandMetadata, Randomness},
+    randomness::{
+        Delta, PKShare, ProofShare, RandKeys, RandMetadata, Randomness, WvufPP, APK, WVUF,
+    },
     validator_verifier::ValidatorVerifier,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug};
+use sha3::{Digest, Sha3_256};
+use std::{fmt::Debug, sync::Arc};
+
+const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockShare;
@@ -19,7 +30,129 @@ pub(super) struct MockShare;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct MockAugData;
 
-impl Share for MockShare {
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Share {
+    share: ProofShare,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AugmentedData {
+    delta: Delta,
+}
+
+impl TShare for Share {
+    fn verify(
+        &self,
+        rand_config: &RandConfig,
+        rand_metadata: &RandMetadata,
+        author: &Author,
+    ) -> anyhow::Result<()> {
+        let index = *rand_config
+            .validator
+            .address_to_validator_index()
+            .get(author)
+            .unwrap();
+        let maybe_apk = &rand_config.keys.certified_apks[index];
+        if let Some(apk) = maybe_apk.get() {
+            WVUF::verify_share(
+                &rand_config.vuf_pp,
+                apk,
+                rand_metadata.to_bytes().as_slice(),
+                &self.share,
+            )?;
+        } else {
+            bail!(
+                "[RandShare] No augmented public key for validator id {}, {}",
+                index,
+                author
+            );
+        }
+        Ok(())
+    }
+
+    fn generate(rand_config: &RandConfig, rand_metadata: RandMetadata) -> RandShare<Self>
+    where
+        Self: Sized,
+    {
+        let share = Share {
+            share: WVUF::create_share(&rand_config.keys.ask, rand_metadata.to_bytes().as_slice()),
+        };
+        RandShare::new(rand_config.author(), rand_metadata, share)
+    }
+
+    fn aggregate<'a>(
+        shares: impl Iterator<Item = &'a RandShare<Self>>,
+        rand_config: &RandConfig,
+        rand_metadata: RandMetadata,
+    ) -> Randomness
+    where
+        Self: Sized,
+    {
+        let timer = std::time::Instant::now();
+        let mut apks_and_proofs = vec![];
+        for share in shares {
+            let id = *rand_config
+                .validator
+                .address_to_validator_index()
+                .get(share.author())
+                .unwrap();
+            let apk = rand_config.get_certified_apk(share.author()).unwrap(); // needs to have apk to verify the share
+            apks_and_proofs.push((Player { id }, apk.clone(), share.share().share));
+        }
+
+        let proof = WVUF::aggregate_shares(&rand_config.wconfig, &apks_and_proofs);
+        let pool =
+            spawn_rayon_thread_pool("wvuf".to_string(), Some(NUM_THREADS_FOR_WVUF_DERIVATION));
+        let eval = WVUF::derive_eval(
+            &rand_config.wconfig,
+            &rand_config.vuf_pp,
+            rand_metadata.to_bytes().as_slice(),
+            &rand_config.get_all_certified_apk(),
+            &proof,
+            &pool,
+        )
+        .expect("All APK should exist");
+        debug!(
+            "WVUF derivation time: {} ms, number of threads: {}",
+            timer.elapsed().as_millis(),
+            NUM_THREADS_FOR_WVUF_DERIVATION
+        );
+        let eval_bytes = bcs::to_bytes(&eval).unwrap();
+        let rand_bytes = Sha3_256::digest(eval_bytes.as_slice()).to_vec();
+        Randomness::new(rand_metadata.clone(), rand_bytes)
+    }
+}
+
+impl TAugmentedData for AugmentedData {
+    fn generate(rand_config: &RandConfig) -> AugData<Self>
+    where
+        Self: Sized,
+    {
+        let delta = rand_config.get_my_delta().clone();
+        rand_config
+            .add_certified_delta(&rand_config.author(), delta.clone())
+            .expect("Add self delta should succeed");
+        let data = AugmentedData {
+            delta: delta.clone(),
+        };
+        AugData::new(rand_config.epoch(), rand_config.author(), data)
+    }
+
+    fn augment(&self, rand_config: &RandConfig, author: &Author) {
+        let AugmentedData { delta } = self;
+        rand_config
+            .add_certified_delta(author, delta.clone())
+            .expect("Add delta should succeed")
+    }
+
+    fn verify(&self, rand_config: &RandConfig, author: &Author) -> anyhow::Result<()> {
+        rand_config
+            .derive_apk(author, self.delta.clone())
+            .map(|_| ())
+    }
+}
+
+impl TShare for MockShare {
     fn verify(
         &self,
         _rand_config: &RandConfig,
@@ -33,7 +166,7 @@ impl Share for MockShare {
     where
         Self: Sized,
     {
-        RandShare::new(*rand_config.author(), rand_metadata, Self)
+        RandShare::new(rand_config.author(), rand_metadata, Self)
     }
 
     fn aggregate<'a>(
@@ -48,12 +181,12 @@ impl Share for MockShare {
     }
 }
 
-impl AugmentedData for MockAugData {
+impl TAugmentedData for MockAugData {
     fn generate(rand_config: &RandConfig) -> AugData<Self>
     where
         Self: Sized,
     {
-        AugData::new(rand_config.epoch(), *rand_config.author(), Self)
+        AugData::new(rand_config.epoch(), rand_config.author(), Self)
     }
 
     fn augment(&self, _rand_config: &RandConfig, _author: &Author) {}
@@ -63,7 +196,7 @@ impl AugmentedData for MockAugData {
     }
 }
 
-pub trait Share:
+pub trait TShare:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
     fn verify(
@@ -86,7 +219,7 @@ pub trait Share:
         Self: Sized;
 }
 
-pub trait AugmentedData:
+pub trait TAugmentedData:
     Clone + Debug + PartialEq + Send + Sync + Serialize + DeserializeOwned + 'static
 {
     fn generate(rand_config: &RandConfig) -> AugData<Self>
@@ -112,7 +245,7 @@ pub struct RandShare<S> {
     share: S,
 }
 
-impl<S: Share> RandShare<S> {
+impl<S: TShare> RandShare<S> {
     pub fn new(author: Author, metadata: RandMetadata, share: S) -> Self {
         Self {
             author,
@@ -123,6 +256,10 @@ impl<S: Share> RandShare<S> {
 
     pub fn author(&self) -> &Author {
         &self.author
+    }
+
+    pub fn share(&self) -> &S {
+        &self.share
     }
 
     pub fn metadata(&self) -> &RandMetadata {
@@ -200,7 +337,7 @@ pub struct AugData<D> {
     data: D,
 }
 
-impl<D: AugmentedData> AugData<D> {
+impl<D: TAugmentedData> AugData<D> {
     pub fn new(epoch: u64, author: Author, data: D) -> Self {
         Self {
             epoch,
@@ -246,7 +383,7 @@ impl AugDataSignature {
         self.epoch
     }
 
-    pub fn verify<D: AugmentedData>(
+    pub fn verify<D: TAugmentedData>(
         &self,
         author: Author,
         verifier: &ValidatorVerifier,
@@ -266,7 +403,7 @@ pub struct CertifiedAugData<D> {
     signatures: AggregateSignature,
 }
 
-impl<D: AugmentedData> CertifiedAugData<D> {
+impl<D: TAugmentedData> CertifiedAugData<D> {
     pub fn new(aug_data: AugData<D>, signatures: AggregateSignature) -> Self {
         Self {
             aug_data,
@@ -313,20 +450,43 @@ impl CertifiedAugDataAck {
 
 #[derive(Clone)]
 pub struct RandConfig {
-    epoch: u64,
-    author: Author,
-    threshold: u64,
-    weights: HashMap<Author, u64>,
+    pub author: Author,
+    pub epoch: u64,
+    pub validator: ValidatorVerifier,
+    // public parameters of the weighted VUF
+    pub vuf_pp: WvufPP,
+    // key shares for weighted VUF
+    pub keys: Arc<RandKeys>,
+    // weighted config for weighted VUF
+    pub wconfig: WeightedConfig,
+}
+
+impl Debug for RandConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "RandConfig {{ epoch: {}, author: {}, wconfig: {:?} }}",
+            self.epoch, self.author, self.wconfig
+        )
+    }
 }
 
 impl RandConfig {
-    pub fn new(epoch: u64, author: Author, weights: HashMap<Author, u64>) -> Self {
-        let sum = weights.values().sum::<u64>();
+    pub fn new(
+        author: Author,
+        epoch: u64,
+        validator: ValidatorVerifier,
+        vuf_pp: WvufPP,
+        keys: RandKeys,
+        wconfig: WeightedConfig,
+    ) -> Self {
         Self {
-            epoch,
             author,
-            weights,
-            threshold: sum * 2 / 3 + 1,
+            epoch,
+            validator,
+            vuf_pp,
+            keys: Arc::new(keys),
+            wconfig,
         }
     }
 
@@ -334,18 +494,64 @@ impl RandConfig {
         self.epoch
     }
 
-    pub fn author(&self) -> &Author {
-        &self.author
+    pub fn author(&self) -> Author {
+        self.author
     }
 
-    pub fn get_peer_weight(&self, author: &Author) -> u64 {
+    pub fn get_id(&self, peer: &Author) -> usize {
         *self
-            .weights
-            .get(author)
-            .expect("Author should exist after verify")
+            .validator
+            .address_to_validator_index()
+            .get(peer)
+            .unwrap()
     }
 
-    pub fn threshold_weight(&self) -> u64 {
-        self.threshold
+    pub fn get_certified_apk(&self, peer: &Author) -> Option<&APK> {
+        let index = self.get_id(peer);
+        self.keys.certified_apks[index].get()
+    }
+
+    pub fn get_all_certified_apk(&self) -> Vec<Option<APK>> {
+        self.keys
+            .certified_apks
+            .iter()
+            .map(|cell| cell.get().cloned())
+            .collect()
+    }
+
+    pub fn add_certified_apk(&self, peer: &Author, apk: APK) -> anyhow::Result<()> {
+        let index = self.get_id(peer);
+        self.keys.add_certified_apk(index, apk)
+    }
+
+    fn derive_apk(&self, peer: &Author, delta: Delta) -> anyhow::Result<APK> {
+        let apk = WVUF::augment_pubkey(&self.vuf_pp, self.get_pk_share(peer).clone(), delta)?;
+        Ok(apk)
+    }
+
+    pub fn add_certified_delta(&self, peer: &Author, delta: Delta) -> anyhow::Result<()> {
+        let apk = self.derive_apk(peer, delta)?;
+        self.add_certified_apk(peer, apk)?;
+        Ok(())
+    }
+
+    pub fn get_my_delta(&self) -> &Delta {
+        WVUF::get_public_delta(&self.keys.apk)
+    }
+
+    pub fn get_pk_share(&self, peer: &Author) -> &PKShare {
+        let index = self.get_id(peer);
+        &self.keys.pk_shares[index]
+    }
+
+    pub fn get_peer_weight(&self, peer: &Author) -> u64 {
+        let player = Player {
+            id: self.get_id(peer),
+        };
+        self.wconfig.get_player_weight(&player) as u64
+    }
+
+    pub fn threshold(&self) -> u64 {
+        self.wconfig.get_threshold_weight() as u64
     }
 }

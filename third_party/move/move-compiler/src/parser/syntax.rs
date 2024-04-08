@@ -947,8 +947,8 @@ fn parse_term(context: &mut Context) -> Result<Exp, Box<Diagnostic>> {
         },
         Tok::Identifier
             if context.tokens.content() == FOR_IDENT
-                && matches!(context.tokens.lookahead_nth(1), Ok(Tok::LParen))
-                && matches!(context.tokens.lookahead_nth(3), Ok(Tok::Identifier)) =>
+                && matches!(context.tokens.lookahead_nth(0), Ok(Tok::LParen))
+                && matches!(context.tokens.lookahead_nth(2), Ok(Tok::Identifier)) =>
         {
             let (control_exp, _) = parse_for_loop(context)?;
             // for loop isn't useful in an expression, so we ignore second result from

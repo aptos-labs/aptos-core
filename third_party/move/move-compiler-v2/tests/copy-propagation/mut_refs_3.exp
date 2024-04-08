@@ -31,11 +31,11 @@ fun m::test($t0: u64): u64 {
      # before: {}, after: {}
   0: $t3 := borrow_local($t0)
      # before: {}, after: {$t2 := $t3}
-  1: $t2 := infer($t3)
+  1: $t2 := move($t3)
      # before: {$t2 := $t3}, after: {$t2 := $t3, $t4 := $t2}
-  2: $t4 := infer($t2)
+  2: $t4 := copy($t2)
      # before: {$t2 := $t3, $t4 := $t2}, after: {$t2 := $t3, $t4 := $t2, $t5 := $t4}
-  3: $t5 := infer($t4)
+  3: $t5 := move($t4)
      # before: {$t2 := $t3, $t4 := $t2, $t5 := $t4}, after: {$t2 := $t3, $t4 := $t2, $t5 := $t4}
   4: $t6 := 0
      # before: {$t2 := $t3, $t4 := $t2, $t5 := $t4}, after: {$t2 := $t3, $t4 := $t2, $t5 := $t4}
@@ -57,9 +57,9 @@ fun m::test($t0: u64): u64 {
      var $t5: &mut u64
      var $t6: u64
   0: $t3 := borrow_local($t0)
-  1: $t2 := infer($t3)
-  2: $t4 := infer($t3)
-  3: $t5 := infer($t3)
+  1: $t2 := move($t3)
+  2: $t4 := copy($t3)
+  3: $t5 := move($t3)
   4: $t6 := 0
   5: write_ref($t3, $t6)
   6: $t1 := read_ref($t3)
@@ -71,10 +71,10 @@ fun m::test($t0: u64): u64 {
 [variant baseline]
 fun m::test($t0: u64): u64 {
      var $t1: u64
-     var $t2: &mut u64
+     var $t2: &mut u64 [unused]
      var $t3: &mut u64
-     var $t4: &mut u64
-     var $t5: &mut u64
+     var $t4: &mut u64 [unused]
+     var $t5: &mut u64 [unused]
      var $t6: u64
   0: $t3 := borrow_local($t0)
   1: $t6 := 0

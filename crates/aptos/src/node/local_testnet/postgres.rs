@@ -25,7 +25,7 @@ use tracing::{info, warn};
 
 pub const POSTGRES_CONTAINER_NAME: &str = "local-testnet-postgres";
 const POSTGRES_VOLUME_NAME: &str = "local-testnet-postgres-data";
-const POSTGRES_IMAGE: &str = "postgres:14.9";
+const POSTGRES_IMAGE: &str = "postgres:14.11";
 const DATA_PATH_IN_CONTAINER: &str = "/var/lib/mydata";
 const POSTGRES_DEFAULT_PORT: u16 = 5432;
 
@@ -271,6 +271,23 @@ impl ServiceManager for PostgresManager {
                 // directory inside the container that is mounted from the host system.
                 format!("PGDATA={}", DATA_PATH_IN_CONTAINER),
             ]),
+            cmd: Some(
+                vec![
+                    "postgres",
+                    "-c",
+                    // The default is 100 as of Postgres 14.11. Given the local testnet
+                    // can be composed of many different processors all with their own
+                    // connection pools, 100 is insufficient.
+                    "max_connections=200",
+                    "-c",
+                    // The default is 128MB as of Postgres 14.11. We 2x that value to
+                    // match the fact that we 2x'd max_connections.
+                    "shared_buffers=256MB",
+                ]
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
+            ),
             ..Default::default()
         };
 

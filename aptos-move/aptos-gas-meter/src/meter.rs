@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::traits::{AptosGasMeter, GasAlgebra};
-use aptos_gas_algebra::{Fee, FeePerGasUnit};
+use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
 use aptos_gas_schedule::gas_params::{instr::*, txn::*};
 use aptos_types::{state_store::state_key::StateKey, write_set::WriteOpSize};
 use move_binary_format::{
@@ -12,6 +12,7 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress,
     gas_algebra::{InternalGas, NumArgs, NumBytes},
+    identifier::IdentStr,
     language_storage::ModuleId,
     vm_status::StatusCode,
 };
@@ -456,6 +457,39 @@ where
         &mut self,
         _locals: impl Iterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    #[inline]
+    fn charge_create_ty(&mut self, num_nodes: NumTypeNodes) -> PartialVMResult<()> {
+        if self.feature_version() < 14 {
+            return Ok(());
+        }
+
+        let cost = SUBST_TY_PER_NODE * num_nodes;
+
+        self.algebra.charge_execution(cost)
+    }
+
+    #[inline]
+    fn charge_dependency(
+        &mut self,
+        _is_new: bool,
+        addr: &AccountAddress,
+        _name: &IdentStr,
+        size: NumBytes,
+    ) -> PartialVMResult<()> {
+        // Modules under special addresses are considered system modules that should always
+        // be loaded, and are therefore excluded from gas charging.
+        //
+        // TODO: 0xA550C18 is a legacy system address we used, but it is currently not covered by
+        //       `.is_special()`. We should double check if this address still needs special
+        //       treatment.
+        if self.feature_version() >= 15 && !addr.is_special() {
+            self.algebra
+                .charge_execution(DEPENDENCY_PER_MODULE + DEPENDENCY_PER_BYTE * size)?;
+            self.algebra.count_dependency(size)?;
+        }
         Ok(())
     }
 }

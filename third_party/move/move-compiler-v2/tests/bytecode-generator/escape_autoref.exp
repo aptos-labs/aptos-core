@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::m {
     struct Object {
         inner: address,
@@ -20,21 +20,6 @@ module 0x42::m {
     }
     private fun will_autoref(): address {
         select m::Object.inner(m::make())
-    }
-    spec fun $make(): m::Object {
-        Abort(0)
-    }
-    spec fun $owner_correct(o: m::Object): address {
-        {
-          let addr: address = select m::Object.inner(o);
-          select m::ObjectCore.owner(global<m::ObjectCore>(addr))
-        }
-    }
-    spec fun $owner_read_ref_missing(o: m::Object): address {
-        select m::ObjectCore.owner(global<m::ObjectCore>(select m::Object.inner(o)))
-    }
-    spec fun $will_autoref(): address {
-        select m::Object.inner(m::$make())
     }
 } // end 0x42::m
 

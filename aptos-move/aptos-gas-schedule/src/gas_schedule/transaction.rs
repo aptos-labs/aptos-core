@@ -7,7 +7,7 @@
 use crate::gas_schedule::VMGasParameters;
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerByte, FeePerGasUnit, FeePerSlot, Gas, GasExpression,
-    GasScalingFactor, GasUnit, NumSlots,
+    GasScalingFactor, GasUnit, NumModules, NumSlots,
 };
 use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, InternalGasUnit, NumBytes, ToUnitWithParams,
@@ -65,7 +65,7 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [
             max_transaction_size_in_bytes: NumBytes,
             "max_transaction_size_in_bytes",
-            64 * 1024
+            512 * 1024
         ],
         [
             gas_unit_scaling_factor: GasScalingFactor,
@@ -124,8 +124,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
             1024, // 1KB free per state write
         ],
         [
-            free_event_bytes_quota: NumBytes,
-            { 7.. => "free_event_bytes_quota" },
+            legacy_free_event_bytes_quota: NumBytes,
+            { 7..=13 => "free_event_bytes_quota", 14.. => "legacy_free_event_bytes_quota" },
             1024, // 1KB free event bytes per transaction
         ],
         [
@@ -154,23 +154,35 @@ crate::gas_schedule::macros::define_gas_parameters!(
             8192,
         ],
         [
-            storage_fee_per_state_slot_create: FeePerSlot,
-            { 7.. => "storage_fee_per_state_slot_create" },
+            legacy_storage_fee_per_state_slot_create: FeePerSlot,
+            { 7..=13 => "storage_fee_per_state_slot_create", 14.. => "legacy_storage_fee_per_state_slot_create" },
             50000,
         ],
         [
-            storage_fee_per_excess_state_byte: FeePerByte,
-            { 7.. => "storage_fee_per_excess_state_byte" },
+            storage_fee_per_state_slot: FeePerSlot,
+            { 14.. => "storage_fee_per_state_slot" },
+            // 0.8 million APT for 2 billion state slots
+            40_000,
+        ],
+        [
+            legacy_storage_fee_per_excess_state_byte: FeePerByte,
+            { 7..=13 => "storage_fee_per_excess_state_byte", 14.. => "legacy_storage_fee_per_excess_state_byte" },
             50,
         ],
         [
-            storage_fee_per_event_byte: FeePerByte,
-            { 7.. => "storage_fee_per_event_byte" },
+            storage_fee_per_state_byte: FeePerByte,
+            { 14.. => "storage_fee_per_state_byte" },
+            // 0.8 million APT for 2 TB state bytes
+            40,
+        ],
+        [
+            legacy_storage_fee_per_event_byte: FeePerByte,
+            { 7..=13 => "storage_fee_per_event_byte", 14.. => "legacy_storage_fee_per_event_byte" },
             20,
         ],
         [
-            storage_fee_per_transaction_byte: FeePerByte,
-            { 7.. => "storage_fee_per_transaction_byte" },
+            legacy_storage_fee_per_transaction_byte: FeePerByte,
+            { 7..=13 => "storage_fee_per_transaction_byte", 14.. => "legacy_storage_fee_per_transaction_byte" },
             20,
         ],
         [
@@ -187,7 +199,27 @@ crate::gas_schedule::macros::define_gas_parameters!(
             max_storage_fee: Fee,
             { 7.. => "max_storage_fee" },
             2_0000_0000, // 2 APT
-        ]
+        ],
+        [
+            dependency_per_module: InternalGas,
+            { 15.. => "dependency_per_module" },
+            4_000,
+        ],
+        [
+            dependency_per_byte: InternalGasPerByte,
+            { 15.. => "dependency_per_byte" },
+            100,
+        ],
+        [
+            max_num_dependencies: NumModules,
+            { 15.. => "max_num_dependencies" },
+            420,
+        ],
+        [
+            max_total_dependency_size: NumBytes,
+            { 15.. => "max_total_dependency_size" },
+            1024 * 1024 * 12 / 10, // 1.2 MB
+        ],
     ]
 );
 

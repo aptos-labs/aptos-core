@@ -26,7 +26,6 @@ runs:
       run: cargo nextest run --release -E 'not (test(test_smart_data_structures_gas))' --profile ci --locked -p e2e-move-tests -p aptos-framework --retries 3 --no-fail-fast
       shell: bash
       env:
-        MOVE_COMPILER_EXP: no-safety
         MOVE_COMPILER_V2: true
         RUST_MIN_STACK: 4297152
         MVP_TEST_ON_CI: true

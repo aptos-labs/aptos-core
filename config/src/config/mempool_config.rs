@@ -58,7 +58,7 @@ pub struct MempoolConfig {
 impl Default for MempoolConfig {
     fn default() -> MempoolConfig {
         MempoolConfig {
-            shared_mempool_tick_interval_ms: 50,
+            shared_mempool_tick_interval_ms: 10,
             shared_mempool_backoff_interval_ms: 30_000,
             shared_mempool_batch_size: 300,
             shared_mempool_max_batch_bytes: MAX_APPLICATION_MESSAGE_SIZE as u64,
@@ -125,12 +125,6 @@ impl ConfigOptimizer for MempoolConfig {
             // Set the default_failovers to 0 (default is 1)
             if local_mempool_config_yaml["default_failovers"].is_null() {
                 mempool_config.default_failovers = 0;
-                modified_config = true;
-            }
-
-            // Set the shared_mempool_tick_interval_ms to 10 (default is 50)
-            if local_mempool_config_yaml["shared_mempool_tick_interval_ms"].is_null() {
-                mempool_config.shared_mempool_tick_interval_ms = 10;
                 modified_config = true;
             }
         }
@@ -239,7 +233,6 @@ mod tests {
 
         // Verify that only the relevant fields are modified
         let mempool_config = &node_config.mempool;
-        let default_mempool_config = MempoolConfig::default();
         assert_eq!(
             mempool_config.shared_mempool_max_concurrent_inbound_syncs,
             local_shared_mempool_max_concurrent_inbound_syncs
@@ -247,10 +240,6 @@ mod tests {
         assert_eq!(
             mempool_config.max_broadcasts_per_peer,
             local_max_broadcasts_per_peer
-        );
-        assert_ne!(
-            mempool_config.shared_mempool_tick_interval_ms,
-            default_mempool_config.shared_mempool_tick_interval_ms
         );
     }
 }

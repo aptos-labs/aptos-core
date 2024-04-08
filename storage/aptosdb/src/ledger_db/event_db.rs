@@ -19,7 +19,9 @@ use aptos_crypto::{
 };
 use aptos_schemadb::{ReadOptions, SchemaBatch, DB};
 use aptos_storage_interface::{AptosDbError, Result};
-use aptos_types::{contract_event::ContractEvent, transaction::Version};
+use aptos_types::{
+    account_config::new_block_event_key, contract_event::ContractEvent, transaction::Version,
+};
 use std::{path::Path, sync::Arc};
 
 #[derive(Debug)]
@@ -72,6 +74,21 @@ impl EventDb {
         }
 
         Ok(events)
+    }
+
+    pub(crate) fn expect_new_block_event(&self, version: Version) -> Result<ContractEvent> {
+        for event in self.get_events_by_version(version)? {
+            if let Some(key) = event.event_key() {
+                if *key == new_block_event_key() {
+                    return Ok(event);
+                }
+            }
+        }
+
+        Err(AptosDbError::NotFound(format!(
+            "NewBlockEvent at version {}",
+            version,
+        )))
     }
 
     /// Returns an iterator that yields at most `num_versions` versions' events starting from

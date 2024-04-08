@@ -78,12 +78,13 @@ pub struct KnownAttribute {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum KnownAttributeKind {
     // An older compiler placed view functions at 0. This was then published to
-    // Testnet and now we need to recognize this as a legacy index.
+    // Testnet, and now we need to recognize this as a legacy index.
     LegacyViewFunction = 0,
     ViewFunction = 1,
     ResourceGroup = 2,
     ResourceGroupMember = 3,
     Event = 4,
+    Randomness = 5,
 }
 
 impl KnownAttribute {
@@ -146,6 +147,17 @@ impl KnownAttribute {
 
     pub fn is_event(&self) -> bool {
         self.kind == KnownAttributeKind::Event as u8
+    }
+
+    pub fn randomness() -> Self {
+        Self {
+            kind: KnownAttributeKind::Randomness as u8,
+            args: vec![],
+        }
+    }
+
+    pub fn is_randomness(&self) -> bool {
+        self.kind == KnownAttributeKind::Randomness as u8
     }
 }
 
@@ -333,6 +345,24 @@ pub struct AttributeValidationError {
     pub attribute: u8,
 }
 
+pub fn is_valid_unbiasable_function(
+    functions: &BTreeMap<Identifier, Function>,
+    fun: &str,
+) -> Result<(), AttributeValidationError> {
+    if let Ok(ident_fun) = Identifier::new(fun) {
+        if let Some(f) = functions.get(&ident_fun) {
+            if f.is_entry && !f.visibility.is_public() {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(AttributeValidationError {
+        key: fun.to_string(),
+        attribute: KnownAttributeKind::Randomness as u8,
+    })
+}
+
 pub fn is_valid_view_function(
     functions: &BTreeMap<Identifier, Function>,
     fun: &str,
@@ -417,7 +447,9 @@ pub fn verify_module_metadata(
     for (fun, attrs) in &metadata.fun_attributes {
         for attr in attrs {
             if attr.is_view_function() {
-                is_valid_view_function(&functions, fun)?
+                is_valid_view_function(&functions, fun)?;
+            } else if attr.is_randomness() {
+                is_valid_unbiasable_function(&functions, fun)?;
             } else {
                 return Err(AttributeValidationError {
                     key: fun.clone(),

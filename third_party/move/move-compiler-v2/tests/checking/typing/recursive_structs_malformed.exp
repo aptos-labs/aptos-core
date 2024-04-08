@@ -1,0 +1,7 @@
+
+Diagnostics:
+error: invalid type instantiation `(&Baz, &mut Baz)`: only structs, vectors, and primitive types allowed
+  ┌─ tests/checking/typing/recursive_structs_malformed.move:6:28
+  │
+6 │     struct Baz { f: vector<(&Baz, &mut Baz)> }
+  │                            ^^^^^^^^^^^^^^^^

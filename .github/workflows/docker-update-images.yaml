@@ -30,7 +30,7 @@ jobs:
 
       - name: Create Pull Request
         if: ${{ steps.check_update.outputs.NEED_UPDATE == 'True' }}
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@a4f52f8033a6168103c2538976c07b467e8163bc # pin@v6.0.1
         with:
           token: ${{ secrets.REPO_TOKEN }}
           commit-message: "Update Docker images"

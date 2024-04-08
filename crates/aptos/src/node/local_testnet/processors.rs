@@ -36,6 +36,7 @@ pub struct ProcessorArgs {
             ProcessorName::DefaultProcessor,
             ProcessorName::EventsProcessor,
             ProcessorName::FungibleAssetProcessor,
+            ProcessorName::ObjectsProcessor,
             ProcessorName::StakeProcessor,
             ProcessorName::TokenProcessor,
             ProcessorName::TokenV2Processor,
@@ -82,6 +83,10 @@ impl ProcessorManager {
             },
             ProcessorName::TokenV2Processor => ProcessorConfig::TokenV2Processor,
             ProcessorName::UserTransactionProcessor => ProcessorConfig::UserTransactionProcessor,
+            ProcessorName::MonitoringProcessor => {
+                bail!("Monitoring processor is not supported in the local testnet")
+            },
+            ProcessorName::ObjectsProcessor => ProcessorConfig::ObjectsProcessor,
         };
         let config = IndexerGrpcProcessorConfig {
             processor_config,
@@ -93,6 +98,10 @@ impl ProcessorManager {
             ending_version: None,
             number_concurrent_processing_tasks: None,
             enable_verbose_logging: None,
+            // The default at the time of writing is 30 but we don't need that
+            // many in a local testnet environment.
+            db_pool_size: Some(8),
+            gap_detection_batch_size: 50,
         };
         let manager = Self {
             config,

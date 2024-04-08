@@ -381,7 +381,14 @@ impl ValidatorVerifier {
         check_super_majority: bool,
     ) -> std::result::Result<u128, VerifyError> {
         let aggregated_voting_power = self.sum_voting_power(authors)?;
+        self.check_aggregated_voting_power(aggregated_voting_power, check_super_majority)
+    }
 
+    pub fn check_aggregated_voting_power(
+        &self,
+        aggregated_voting_power: u128,
+        check_super_majority: bool,
+    ) -> std::result::Result<u128, VerifyError> {
         let target = if check_super_majority {
             self.quorum_voting_power
         } else {

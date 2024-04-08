@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    counters::RAND_QUEUE_SIZE,
+    logging::{LogEvent, LogSchema},
     network::{IncomingRandGenRequest, NetworkSender, TConsensusMsg},
     pipeline::buffer_manager::{OrderedBlocks, ResetAck, ResetRequest, ResetSignal},
     rand::rand_gen::{
@@ -12,11 +14,12 @@ use crate::{
         reliable_broadcast_state::{
             AugDataCertBuilder, CertifiedAugDataAckState, ShareAggregateState,
         },
-        storage::interface::AugDataStorage,
-        types::{AugmentedData, CertifiedAugData, RandConfig, RequestShare, Share},
+        storage::interface::RandStorage,
+        types::{RandConfig, RequestShare, TAugmentedData, TShare},
     },
 };
 use aptos_bounded_executor::BoundedExecutor;
+use aptos_channels::aptos_channel;
 use aptos_consensus_types::common::Author;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, spawn_named, warn};
@@ -29,16 +32,21 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
 };
 use bytes::Bytes;
-use futures::future::{AbortHandle, Abortable};
-use futures_channel::oneshot;
+use futures::{
+    future::{AbortHandle, Abortable},
+    FutureExt, StreamExt,
+};
+use futures_channel::{
+    mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 use std::{sync::Arc, time::Duration};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
 pub type Receiver<T> = UnboundedReceiver<T>;
 
-pub struct RandManager<S: Share, D: AugmentedData, Storage> {
+pub struct RandManager<S: TShare, D: TAugmentedData> {
     author: Author,
     epoch_state: Arc<EpochState>,
     stop: bool,
@@ -52,11 +60,11 @@ pub struct RandManager<S: Share, D: AugmentedData, Storage> {
     outgoing_blocks: Sender<OrderedBlocks>,
     // local state
     rand_store: Arc<Mutex<RandStore<S>>>,
-    aug_data_store: AugDataStore<D, Storage>,
+    aug_data_store: AugDataStore<D>,
     block_queue: BlockQueue,
 }
 
-impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, Storage> {
+impl<S: TShare, D: TAugmentedData> RandManager<S, D> {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
@@ -64,7 +72,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
         config: RandConfig,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
-        db: Arc<Storage>,
+        db: Arc<dyn RandStorage<D>>,
         bounded_executor: BoundedExecutor,
     ) -> Self {
         let rb_backoff_policy = ExponentialBackoff::from_millis(2)
@@ -78,7 +86,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             Duration::from_secs(10),
             bounded_executor,
         ));
-        let (decision_tx, decision_rx) = unbounded_channel();
+        let (decision_tx, decision_rx) = unbounded();
         let rand_store = Arc::new(Mutex::new(RandStore::new(
             epoch_state.epoch,
             author,
@@ -105,6 +113,8 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     }
 
     fn process_incoming_blocks(&mut self, blocks: OrderedBlocks) {
+        let rounds: Vec<u64> = blocks.ordered_blocks.iter().map(|b| b.round()).collect();
+        info!(rounds = rounds, "Processing incoming blocks.");
         let broadcast_handles: Vec<_> = blocks
             .ordered_blocks
             .iter()
@@ -117,19 +127,30 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
 
     fn process_incoming_metadata(&self, metadata: RandMetadata) -> DropGuard {
         let self_share = S::generate(&self.config, metadata.clone());
+        info!(LogSchema::new(LogEvent::BroadcastRandShare)
+            .epoch(self.epoch_state.epoch)
+            .author(self.author)
+            .round(metadata.round()));
         let mut rand_store = self.rand_store.lock();
-        rand_store.add_rand_metadata(metadata.clone());
+        rand_store.update_highest_known_round(metadata.round());
         rand_store
             .add_share(self_share.clone())
             .expect("Add self share should succeed");
+        rand_store.add_rand_metadata(metadata.clone());
         self.network_sender
             .broadcast_without_self(RandMessage::<S, D>::Share(self_share).into_network_message());
         self.spawn_aggregate_shares_task(metadata)
     }
 
     fn process_ready_blocks(&mut self, ready_blocks: Vec<OrderedBlocks>) {
+        let rounds: Vec<u64> = ready_blocks
+            .iter()
+            .flat_map(|b| b.ordered_blocks.iter().map(|b3| b3.round()))
+            .collect();
+        info!(rounds = rounds, "Processing rand-ready blocks.");
+
         for blocks in ready_blocks {
-            let _ = self.outgoing_blocks.send(blocks);
+            let _ = self.outgoing_blocks.unbounded_send(blocks);
         }
     }
 
@@ -140,12 +161,18 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             ResetSignal::TargetRound(round) => round,
         };
         self.block_queue = BlockQueue::new();
-        self.rand_store.lock().reset(target_round);
+        self.rand_store
+            .lock()
+            .update_highest_known_round(target_round);
         self.stop = matches!(signal, ResetSignal::Stop);
         let _ = tx.send(ResetAck::default());
     }
 
     fn process_randomness(&mut self, randomness: Randomness) {
+        info!(
+            metadata = randomness.metadata().metadata_to_sign,
+            "Processing decisioned randomness."
+        );
         if let Some(block) = self.block_queue.item_mut(randomness.round()) {
             block.set_randomness(randomness.round(), randomness);
         }
@@ -163,12 +190,12 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
 
     async fn verification_task(
         epoch_state: Arc<EpochState>,
-        mut incoming_rpc_request: Receiver<IncomingRandGenRequest>,
+        mut incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         verified_msg_tx: UnboundedSender<RpcRequest<S, D>>,
         rand_config: RandConfig,
         bounded_executor: BoundedExecutor,
     ) {
-        while let Some(rand_gen_msg) = incoming_rpc_request.recv().await {
+        while let Some(rand_gen_msg) = incoming_rpc_request.next().await {
             let tx = verified_msg_tx.clone();
             let epoch_state_clone = epoch_state.clone();
             let config_clone = rand_config.clone();
@@ -180,7 +207,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
                                 .verify(&epoch_state_clone, &config_clone, rand_gen_msg.sender)
                                 .is_ok()
                             {
-                                let _ = tx.send(RpcRequest {
+                                let _ = tx.unbounded_send(RpcRequest {
                                     req: msg,
                                     protocol: rand_gen_msg.protocol,
                                     response_sender: rand_gen_msg.response_sender,
@@ -236,11 +263,7 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
         DropGuard::new(abort_handle)
     }
 
-    async fn broadcast_aug_data(&mut self) -> CertifiedAugData<D> {
-        if let Some(certified_data) = self.aug_data_store.get_my_certified_aug_data() {
-            info!("[RandManager] Already have certified aug data");
-            return certified_data;
-        }
+    async fn broadcast_aug_data(&mut self) -> DropGuard {
         let data = self
             .aug_data_store
             .get_my_aug_data()
@@ -251,25 +274,31 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             .expect("Add self aug data should succeed");
         let aug_ack = AugDataCertBuilder::new(data.clone(), self.epoch_state.clone());
         let rb = self.reliable_broadcast.clone();
-        info!("[RandManager] Start broadcasting aug data");
-        let certified_data = rb.broadcast(data, aug_ack).await;
-        info!("[RandManager] Finish broadcasting aug data");
-        certified_data
-    }
-
-    fn broadcast_certified_aug_data(&mut self, certified_data: CertifiedAugData<D>) -> DropGuard {
-        let rb = self.reliable_broadcast.clone();
+        let rb2 = self.reliable_broadcast.clone();
         let validators = self.epoch_state.verifier.get_ordered_account_addresses();
-        // Add it synchronously to be able to sign without a race that we get to sign before the broadcast reaches aug store.
-        self.aug_data_store
-            .add_certified_aug_data(certified_data.clone())
-            .expect("Add self aug data should succeed");
-        let task = async move {
-            let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
-            info!("[RandManager] Start broadcasting certified aug data");
-            rb.broadcast(certified_data, ack_state).await;
-            info!("[RandManager] Finish broadcasting certified aug data");
+        let maybe_existing_certified_data = self.aug_data_store.get_my_certified_aug_data();
+        let phase1 = async move {
+            if let Some(certified_data) = maybe_existing_certified_data {
+                info!("[RandManager] Already have certified aug data");
+                return certified_data;
+            }
+            info!("[RandManager] Start broadcasting aug data");
+            info!(LogSchema::new(LogEvent::BroadcastAugData)
+                .author(*data.author())
+                .epoch(data.epoch()));
+            let certified_data = rb.broadcast(data, aug_ack).await;
+            info!("[RandManager] Finish broadcasting aug data");
+            certified_data
         };
+        let ack_state = Arc::new(CertifiedAugDataAckState::new(validators.into_iter()));
+        let task = phase1.then(|certified_data| async move {
+            info!(LogSchema::new(LogEvent::BroadcastCertifiedAugData)
+                .author(*certified_data.author())
+                .epoch(certified_data.epoch()));
+            info!("[RandManager] Start broadcasting certified aug data");
+            rb2.broadcast(certified_data, ack_state).await;
+            info!("[RandManager] Finish broadcasting certified aug data");
+        });
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
         tokio::spawn(Abortable::new(task, abort_registration));
         DropGuard::new(abort_handle)
@@ -278,12 +307,12 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
     pub async fn start(
         mut self,
         mut incoming_blocks: Receiver<OrderedBlocks>,
-        incoming_rpc_request: Receiver<IncomingRandGenRequest>,
+        incoming_rpc_request: aptos_channel::Receiver<Author, IncomingRandGenRequest>,
         mut reset_rx: Receiver<ResetRequest>,
         bounded_executor: BoundedExecutor,
     ) {
         info!("RandManager started");
-        let (verified_msg_tx, mut verified_msg_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (verified_msg_tx, mut verified_msg_rx) = unbounded();
         let epoch_state = self.epoch_state.clone();
         let rand_config = self.config.clone();
         spawn_named!(
@@ -297,22 +326,21 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             )
         );
 
-        let certified_data = self.broadcast_aug_data().await;
-        let _guard = self.broadcast_certified_aug_data(certified_data);
-
+        let _guard = self.broadcast_aug_data().await;
+        let mut interval = tokio::time::interval(Duration::from_millis(5000));
         while !self.stop {
             tokio::select! {
-                Some(blocks) = incoming_blocks.recv() => {
+                Some(blocks) = incoming_blocks.next() => {
                     self.process_incoming_blocks(blocks);
                 }
-                Some(reset) = reset_rx.recv() => {
-                    while incoming_blocks.try_recv().is_ok() {}
+                Some(reset) = reset_rx.next() => {
+                    while matches!(incoming_blocks.try_next(), Ok(Some(_))) {}
                     self.process_reset(reset);
                 }
-                Some(randomness) = self.decision_rx.recv()  => {
+                Some(randomness) = self.decision_rx.next()  => {
                     self.process_randomness(randomness);
                 }
-                Some(request) = verified_msg_rx.recv() => {
+                Some(request) = verified_msg_rx.next() => {
                     let RpcRequest {
                         req: rand_gen_msg,
                         protocol,
@@ -337,17 +365,31 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
                             }
                         }
                         RandMessage::Share(share) => {
+                            info!(LogSchema::new(LogEvent::ReceiveProactiveRandShare)
+                                .author(self.author)
+                                .epoch(share.epoch())
+                                .round(share.metadata().round())
+                                .remote_peer(*share.author()));
+
                             if let Err(e) = self.rand_store.lock().add_share(share) {
                                 warn!("[RandManager] Failed to add share: {}", e);
                             }
                         }
                         RandMessage::AugData(aug_data) => {
+                            info!(LogSchema::new(LogEvent::ReceiveAugData)
+                                .author(self.author)
+                                .epoch(aug_data.epoch())
+                                .remote_peer(*aug_data.author()));
                             match self.aug_data_store.add_aug_data(aug_data) {
                                 Ok(sig) => self.process_response(protocol, response_sender, RandMessage::AugDataSignature(sig)),
                                 Err(e) => error!("[RandManager] Failed to add aug data: {}", e),
                             }
                         }
                         RandMessage::CertifiedAugData(certified_aug_data) => {
+                            info!(LogSchema::new(LogEvent::ReceiveCertifiedAugData)
+                                .author(self.author)
+                                .epoch(certified_aug_data.epoch())
+                                .remote_peer(*certified_aug_data.author()));
                             match self.aug_data_store.add_certified_aug_data(certified_aug_data) {
                                 Ok(ack) => self.process_response(protocol, response_sender, RandMessage::CertifiedAugDataAck(ack)),
                                 Err(e) => error!("[RandManager] Failed to add certified aug data: {}", e),
@@ -356,6 +398,10 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
                         _ => unreachable!("[RandManager] Unexpected message type after verification"),
                     }
                 }
+                _ = interval.tick().fuse() => {
+                    self.observe_queue();
+                },
+
             }
             let maybe_ready_blocks = self.block_queue.dequeue_rand_ready_prefix();
             if !maybe_ready_blocks.is_empty() {
@@ -363,5 +409,10 @@ impl<S: Share, D: AugmentedData, Storage: AugDataStorage<D>> RandManager<S, D, S
             }
         }
         info!("RandManager stopped");
+    }
+
+    pub fn observe_queue(&self) {
+        let queue = &self.block_queue.queue();
+        RAND_QUEUE_SIZE.set(queue.len() as i64);
     }
 }

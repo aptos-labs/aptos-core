@@ -12,7 +12,7 @@ warning: Unused parameter `param`. Consider removing or prefixing with an unders
 29 │     fun mut_local(param: u64): u64 {
    │                   ^^^^^
 
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::borrow {
     struct S {
         f: u64,
@@ -25,11 +25,8 @@ module 0x42::borrow {
     }
     private fun local(param: u64): u64 {
         {
-          let local: u64 = 33;
-          {
-            let r: &u64 = Borrow(Immutable)(local);
-            Deref(r)
-          }
+          let r: &u64 = Borrow(Immutable)(33);
+          Deref(r)
         }
     }
     private fun param(param: u64): u64 {
@@ -62,30 +59,6 @@ module 0x42::borrow {
           Deref(r)
         }
     }
-    spec fun $field(s: borrow::S): u64 {
-        {
-          let r: u64 = select borrow::S.f(s);
-          r
-        }
-    }
-    spec fun $local(param: u64): u64 {
-        {
-          let local: u64 = 33;
-          {
-            let r: u64 = local;
-            r
-          }
-        }
-    }
-    spec fun $mut_field(s: &mut borrow::S): u64;
-    spec fun $mut_local(param: u64): u64;
-    spec fun $mut_param(param: u64): u64;
-    spec fun $param(param: u64): u64 {
-        {
-          let r: u64 = param;
-          r
-        }
-    }
 } // end 0x42::borrow
 
 ============ initial bytecode ================
@@ -105,16 +78,14 @@ fun borrow::field($t0: &borrow::S): u64 {
 [variant baseline]
 fun borrow::local($t0: u64): u64 {
      var $t1: u64
-     var $t2: u64
-     var $t3: u64
-     var $t4: &u64
-     var $t5: &u64
-  0: $t3 := 33
-  1: $t2 := infer($t3)
-  2: $t5 := borrow_local($t2)
-  3: $t4 := infer($t5)
-  4: $t1 := read_ref($t4)
-  5: return $t1
+     var $t2: &u64
+     var $t3: &u64
+     var $t4: u64
+  0: $t4 := 33
+  1: $t3 := borrow_local($t4)
+  2: $t2 := infer($t3)
+  3: $t1 := read_ref($t2)
+  4: return $t1
 }
 
 

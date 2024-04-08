@@ -1,3 +1,5 @@
+# -- Used to toggle on and off the automatic genesis job
+enabled: true
 chain:
   # -- Internal: name of the testnet to connect to
   name: testnet
@@ -31,6 +33,10 @@ chain:
   rewards_apy_percentage: 10
   # -- Minimum price per gas unit
   min_price_per_gas_unit: 1
+  # -- Onchain Consensus Config
+  on_chain_consensus_config:
+  # -- Onchain Execution Config
+  on_chain_execution_config:
 
 # -- Default image tag to use for all tools images
 imageTag: testnet
@@ -74,6 +80,8 @@ genesis:
     enabled: false
     # comma separated list of cluster names
     domain_suffixes: ""
+  genesis_blob_upload_url: "https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url"
+  cluster_name: "unknown"
 
 serviceAccount:
   # -- Specifies whether a service account should be created

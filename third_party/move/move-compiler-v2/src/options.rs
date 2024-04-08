@@ -92,8 +92,13 @@ impl Options {
 
 fn compiler_exp_var() -> Vec<String> {
     static EXP_VAR: Lazy<Vec<String>> = Lazy::new(|| {
-        let s = read_env_var("MOVE_COMPILER_EXP");
-        s.split(',').map(|s| s.to_string()).collect()
+        for s in ["MVC_EXP", "MOVE_COMPILER_EXP"] {
+            let s = read_env_var(s);
+            if !s.is_empty() {
+                return s.split(',').map(|s| s.to_string()).collect();
+            }
+        }
+        vec![]
     });
     (*EXP_VAR).clone()
 }

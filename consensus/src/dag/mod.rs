@@ -13,6 +13,7 @@ mod dag_network;
 mod dag_state_sync;
 mod dag_store;
 mod errors;
+mod health;
 mod observability;
 mod order_rule;
 mod rb_handler;

@@ -762,7 +762,10 @@ impl TransactionsApi {
                         let timestamp =
                             self.context.get_block_timestamp(ledger_info, txn.version)?;
                         resolver
-                            .as_converter(self.context.db.clone())
+                            .as_converter(
+                                self.context.db.clone(),
+                                self.context.table_info_reader.clone(),
+                            )
                             .try_into_onchain_transaction(timestamp, txn)
                             .context("Failed to convert on chain transaction to Transaction")
                             .map_err(|err| {
@@ -774,7 +777,10 @@ impl TransactionsApi {
                             })?
                     },
                     TransactionData::Pending(txn) => resolver
-                        .as_converter(self.context.db.clone())
+                        .as_converter(
+                            self.context.db.clone(),
+                            self.context.table_info_reader.clone(),
+                        )
                         .try_into_pending_transaction(*txn)
                         .context("Failed to convert on pending transaction to Transaction")
                         .map_err(|err| {
@@ -935,8 +941,15 @@ impl TransactionsApi {
                         }
                     },
 
-                    // Deprecated. Will be removed in the future.
-                    TransactionPayload::ModuleBundle(_) => {},
+                    // Deprecated. To avoid panics when malicios users submit this
+                    // payload, return an error.
+                    TransactionPayload::ModuleBundle(_) => {
+                        return Err(SubmitTransactionError::bad_request_with_code(
+                            "Module bundle payload has been removed",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        ))
+                    },
                 }
                 // TODO: Verify script args?
 
@@ -946,7 +959,10 @@ impl TransactionsApi {
                 .context
                 .latest_state_view_poem(ledger_info)?
                 .as_move_resolver()
-                .as_converter(self.context.db.clone())
+                .as_converter(
+                    self.context.db.clone(),
+                    self.context.table_info_reader.clone(),
+                )
                 .try_into_signed_transaction_poem(data.0, self.context.chain_id())
                 .context("Failed to create SignedTransaction from SubmitTransactionRequest")
                 .map_err(|err| {
@@ -1025,7 +1041,7 @@ impl TransactionsApi {
                 .map(|(index, txn)| {
                     self.context
                         .latest_state_view_poem(ledger_info)?.as_move_resolver()
-                        .as_converter(self.context.db.clone())
+                        .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
                         .try_into_signed_transaction_poem(txn, self.context.chain_id())
                         .context(format!("Failed to create SignedTransaction from SubmitTransactionRequest at position {}", index))
                         .map_err(|err| {
@@ -1117,7 +1133,7 @@ impl TransactionsApi {
 
                     // We provide the pending transaction so that users have the hash associated
                     let pending_txn = resolver
-                            .as_converter(self.context.db.clone())
+                            .as_converter(self.context.db.clone(), self.context.table_info_reader.clone())
                             .try_into_pending_transaction_poem(txn)
                             .context("Failed to build PendingTransaction from mempool response, even though it said the request was accepted")
                             .map_err(|err| SubmitTransactionError::internal_with_code(
@@ -1350,7 +1366,10 @@ impl TransactionsApi {
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let resolver = state_view.as_move_resolver();
         let raw_txn: RawTransaction = resolver
-            .as_converter(self.context.db.clone())
+            .as_converter(
+                self.context.db.clone(),
+                self.context.table_info_reader.clone(),
+            )
             .try_into_raw_transaction_poem(request.transaction, self.context.chain_id())
             .context("The given transaction is invalid")
             .map_err(|err| {

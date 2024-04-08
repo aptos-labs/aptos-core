@@ -245,7 +245,7 @@ public fun Collection::make_collection<#0>(): Collection::Collection<#0> {
 [variant baseline]
 public fun Test::foo<#0>($t0|i: u64) {
      var $t1|c: Collection::Collection<Test::Token<#0>>
-     var $t2|t: &mut Test::Token<#0>
+     var $t2|t: &mut Test::Token<#0> [unused]
      var $t3: &mut Collection::Collection<Test::Token<#0>>
      var $t4: &mut Test::Token<#0>
      var $t5: u64

@@ -6,6 +6,7 @@ use crate::{
     account_config::{DepositEvent, NewBlockEvent, NewEpochEvent, WithdrawEvent},
     dkg::DKGStartEvent,
     event::EventKey,
+    jwks::ObservedJWKsUpdated,
     on_chain_config::new_epoch_event_key,
     transaction::Version,
 };
@@ -159,6 +160,10 @@ impl ContractEvent {
             ContractEvent::V1(event) => *event.key() == new_epoch_event_key(),
             ContractEvent::V2(_event) => false,
         }
+    }
+
+    pub fn expect_new_block_event(&self) -> Result<NewBlockEvent> {
+        NewBlockEvent::try_from_bytes(self.event_data())
     }
 }
 
@@ -356,6 +361,24 @@ impl TryFrom<&ContractEvent> for DepositEvent {
                 Self::try_from_bytes(&event.event_data)
             },
             ContractEvent::V2(_) => bail!("This is a module event"),
+        }
+    }
+}
+
+impl TryFrom<&ContractEvent> for ObservedJWKsUpdated {
+    type Error = Error;
+
+    fn try_from(event: &ContractEvent) -> Result<Self> {
+        match event {
+            ContractEvent::V1(_) => {
+                bail!("conversion to `ObservedJWKsUpdated` failed with wrong event version")
+            },
+            ContractEvent::V2(v2) => {
+                if v2.type_tag != TypeTag::Struct(Box::new(Self::struct_tag())) {
+                    bail!("conversion to `ObservedJWKsUpdated` failed with wrong type tag");
+                }
+                bcs::from_bytes(&v2.event_data).map_err(Into::into)
+            },
         }
     }
 }

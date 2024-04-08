@@ -69,6 +69,30 @@ variable "helm_values_file" {
   default     = ""
 }
 
+variable "enable_monitoring" {
+  description = "Enable monitoring helm chart"
+  type        = bool
+  default     = false
+}
+
+variable "monitoring_helm_values" {
+  description = "Map of values to pass to monitoring Helm"
+  type        = any
+  default     = {}
+}
+
+variable "enable_prometheus_node_exporter" {
+  description = "Enable prometheus-node-exporter within monitoring helm chart"
+  type        = bool
+  default     = false
+}
+
+variable "enable_kube_state_metrics" {
+  description = "Enable kube-state-metrics within monitoring helm chart"
+  type        = bool
+  default     = false
+}
+
 variable "k8s_api_sources" {
   description = "List of CIDR subnets which can access the Kubernetes API endpoint"
   type        = list(string)

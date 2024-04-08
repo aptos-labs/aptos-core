@@ -119,6 +119,28 @@ module aptos_token_objects::collection {
         token: address,
     }
 
+    struct MintEvent has drop, store {
+        index: u64,
+        token: address,
+    }
+
+    #[event]
+    struct Burn has drop, store {
+        collection: address,
+        index: u64,
+        token: address,
+        previous_owner: address,
+    }
+
+    #[event]
+    struct Mint has drop, store {
+        collection: address,
+        index: AggregatorSnapshot<u64>,
+        token: address,
+    }
+
+    // DEPRECATED, NEVER USED
+    #[deprecated]
     #[event]
     struct ConcurrentBurnEvent has drop, store {
         collection_addr: address,
@@ -126,11 +148,8 @@ module aptos_token_objects::collection {
         token: address,
     }
 
-    struct MintEvent has drop, store {
-        index: u64,
-        token: address,
-    }
-
+    // DEPRECATED, NEVER USED
+    #[deprecated]
     #[event]
     struct ConcurrentMintEvent has drop, store {
         collection_addr: address,
@@ -156,7 +175,7 @@ module aptos_token_objects::collection {
         let constructor_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&constructor_ref);
 
-        if (features::concurrent_assets_enabled()) {
+        if (features::concurrent_token_v2_enabled()) {
             let supply = ConcurrentSupply {
                 current_supply: aggregator_v2::create_aggregator(max_supply),
                 total_minted: aggregator_v2::create_unbounded_aggregator(),
@@ -205,7 +224,7 @@ module aptos_token_objects::collection {
         let constructor_ref = object::create_named_object(creator, collection_seed);
         let object_signer = object::generate_signer(&constructor_ref);
 
-        if (features::concurrent_assets_enabled()) {
+        if (features::concurrent_token_v2_enabled()) {
             let supply = ConcurrentSupply {
                 current_supply: aggregator_v2::create_unbounded_aggregator(),
                 total_minted: aggregator_v2::create_unbounded_aggregator(),
@@ -350,6 +369,8 @@ module aptos_token_objects::collection {
                 },
             );
             option::some(supply.total_minted)
+        } else if (exists<ConcurrentSupply>(collection_addr)) {
+            abort error::invalid_argument(ECONCURRENT_NOT_ENABLED)
         } else {
             option::none()
         }
@@ -369,8 +390,8 @@ module aptos_token_objects::collection {
             );
             aggregator_v2::add(&mut supply.total_minted, 1);
             event::emit(
-                ConcurrentMintEvent {
-                    collection_addr,
+                Mint {
+                    collection: collection_addr,
                     index: aggregator_v2::snapshot(&supply.total_minted),
                     token,
                 },
@@ -384,6 +405,7 @@ module aptos_token_objects::collection {
                 supply.current_supply <= supply.max_supply,
                 error::out_of_range(ECOLLECTION_SUPPLY_EXCEEDED),
             );
+            // TODO[agg_v2](cleanup): Update to Mint in the future release
             event::emit_event(&mut supply.mint_events,
                 MintEvent {
                     index: supply.total_minted,
@@ -395,6 +417,7 @@ module aptos_token_objects::collection {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply + 1;
             supply.total_minted = supply.total_minted + 1;
+            // TODO[agg_v2](cleanup): Update to Mint in the future release
             event::emit_event(
                 &mut supply.mint_events,
                 MintEvent {
@@ -413,21 +436,25 @@ module aptos_token_objects::collection {
         collection: &Object<Collection>,
         token: address,
         index: Option<u64>,
+        previous_owner: address,
     ) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
         let collection_addr = object::object_address(collection);
         if (exists<ConcurrentSupply>(collection_addr)) {
             let supply = borrow_global_mut<ConcurrentSupply>(collection_addr);
             aggregator_v2::sub(&mut supply.current_supply, 1);
+
             event::emit(
-                ConcurrentBurnEvent {
-                    collection_addr,
+                Burn {
+                    collection: collection_addr,
                     index: *option::borrow(&index),
                     token,
+                    previous_owner,
                 },
             );
         } else if (exists<FixedSupply>(collection_addr)) {
             let supply = borrow_global_mut<FixedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
+            // TODO[agg_v2](cleanup): Update to Burn in the future release
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {
@@ -438,6 +465,7 @@ module aptos_token_objects::collection {
         } else if (exists<UnlimitedSupply>(collection_addr)) {
             let supply = borrow_global_mut<UnlimitedSupply>(collection_addr);
             supply.current_supply = supply.current_supply - 1;
+            // TODO[agg_v2](cleanup): Update to Burn in the future release
             event::emit_event(
                 &mut supply.burn_events,
                 BurnEvent {
@@ -459,7 +487,7 @@ module aptos_token_objects::collection {
     ) acquires FixedSupply, UnlimitedSupply {
         let metadata_object_address = object::address_from_extend_ref(ref);
         let metadata_object_signer = object::generate_signer_for_extending(ref);
-        assert!(features::concurrent_assets_enabled(), error::invalid_argument(ECONCURRENT_NOT_ENABLED));
+        assert!(features::concurrent_token_v2_enabled(), error::invalid_argument(ECONCURRENT_NOT_ENABLED));
 
         let (supply, current_supply, total_minted, burn_events, mint_events) = if (exists<FixedSupply>(metadata_object_address)) {
             let FixedSupply {
@@ -589,36 +617,71 @@ module aptos_token_objects::collection {
 
     // Tests
 
-    #[test(creator = @0x123)]
-    fun test_create_mint_burn_for_unlimited(creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    #[test(fx = @aptos_framework, creator = @0x123)]
+    fun test_create_mint_burn_for_unlimited(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let feature = features::get_concurrent_token_v2_feature();
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
+
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         create_unlimited_collection(creator, string::utf8(b""), name, option::none(), string::utf8(b""));
         let collection_address = create_collection_address(&creator_address, &name);
         let collection = object::address_to_object<Collection>(collection_address);
         assert!(count(collection) == option::some(0), 0);
-        let cid = increment_supply(&collection, creator_address);
+        let cid = aggregator_v2::read_snapshot(&option::destroy_some(increment_concurrent_supply(&collection, creator_address)));
         assert!(count(collection) == option::some(1), 0);
         assert!(event::counter(&borrow_global<UnlimitedSupply>(collection_address).mint_events) == 1, 0);
-        decrement_supply(&collection, creator_address, cid);
+        decrement_supply(&collection, creator_address, option::some(cid), creator_address);
         assert!(count(collection) == option::some(0), 0);
         assert!(event::counter(&borrow_global<UnlimitedSupply>(collection_address).burn_events) == 1, 0);
     }
 
-    #[test(creator = @0x123)]
-    fun test_create_mint_burn_for_fixed(creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+    #[test(fx = @aptos_framework, creator = @0x123)]
+    fun test_create_mint_burn_for_fixed(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let feature = features::get_concurrent_token_v2_feature();
+        features::change_feature_flags_for_testing(fx, vector[], vector[feature]);
+
         let creator_address = signer::address_of(creator);
         let name = string::utf8(b"collection name");
         create_fixed_collection(creator, string::utf8(b""), 1, name, option::none(), string::utf8(b""));
         let collection_address = create_collection_address(&creator_address, &name);
         let collection = object::address_to_object<Collection>(collection_address);
         assert!(count(collection) == option::some(0), 0);
-        let cid = increment_supply(&collection, creator_address);
+        let cid = aggregator_v2::read_snapshot(&option::destroy_some(increment_concurrent_supply(&collection, creator_address)));
         assert!(count(collection) == option::some(1), 0);
         assert!(event::counter(&borrow_global<FixedSupply>(collection_address).mint_events) == 1, 0);
-        decrement_supply(&collection, creator_address, cid);
+        decrement_supply(&collection, creator_address, option::some(cid), creator_address);
         assert!(count(collection) == option::some(0), 0);
         assert!(event::counter(&borrow_global<FixedSupply>(collection_address).burn_events) == 1, 0);
+    }
+
+    #[test(fx = @aptos_framework, creator = @0x123)]
+    fun test_create_mint_burn_for_concurrent(fx: &signer, creator: &signer) acquires FixedSupply, UnlimitedSupply, ConcurrentSupply {
+        let feature = features::get_concurrent_token_v2_feature();
+        features::change_feature_flags_for_testing(fx, vector[feature], vector[]);
+
+        let creator_address = signer::address_of(creator);
+        let name = string::utf8(b"collection name");
+        create_fixed_collection(creator, string::utf8(b""), 1, name, option::none(), string::utf8(b""));
+        let collection_address = create_collection_address(&creator_address, &name);
+        let collection = object::address_to_object<Collection>(collection_address);
+        assert!(count(collection) == option::some(0), 0);
+        let cid = increment_concurrent_supply(&collection, creator_address);
+        event::was_event_emitted<Mint>(&Mint {
+            collection: collection_address,
+            index: aggregator_v2::create_snapshot(0),
+            token: creator_address,
+        });
+        assert!(cid == option::some(aggregator_v2::create_snapshot(1)), 1);
+        assert!(count(collection) == option::some(1), 0);
+        decrement_supply(&collection, creator_address, option::some(1), creator_address);
+        event::was_event_emitted<Burn>(&Burn {
+            collection: collection_address,
+            index: 1,
+            token: creator_address,
+            previous_owner: creator_address,
+        });
+        assert!(count(collection) == option::some(0), 0);
     }
 
     #[test(creator = @0x123, trader = @0x456)]

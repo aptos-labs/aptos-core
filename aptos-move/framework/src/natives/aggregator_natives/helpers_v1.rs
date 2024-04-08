@@ -39,16 +39,6 @@ pub(crate) fn get_struct_field(value: &StructRef, index: usize) -> PartialVMResu
     field_ref.read_ref()
 }
 
-/// Given a reference to `Aggregator` Move struct, updates a field value at `index`.
-pub(crate) fn set_aggregator_field(
-    aggregator: &StructRef,
-    index: usize,
-    value: Value,
-) -> PartialVMResult<()> {
-    let field_ref = aggregator.borrow_field(index)?.value_as::<Reference>()?;
-    field_ref.write_ref(value)
-}
-
 /// Returns ID and a limit of aggregator based on a reference to `Aggregator` Move struct.
 pub(crate) fn aggregator_info(aggregator: &StructRef) -> PartialVMResult<(AggregatorID, u128)> {
     let handle = get_struct_field(aggregator, HANDLE_FIELD_INDEX)?.value_as::<AccountAddress>()?;

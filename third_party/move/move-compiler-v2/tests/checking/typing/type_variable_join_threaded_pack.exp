@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x2::Container {
     struct T {
         f: #0,
@@ -10,15 +10,6 @@ module 0x2::Container {
         Abort(0)
     }
     public fun put<V>(_self: &mut Container::T<#0>,_item: #0) {
-        Abort(0)
-    }
-    spec fun $get<V>(_self: Container::T<#0>): #0 {
-        Abort(0)
-    }
-    spec fun $new<V>(): Container::T<#0> {
-        Abort(0)
-    }
-    spec fun $put<V>(_self: Container::T<#0>,_item: #0) {
         Abort(0)
     }
 } // end 0x2::Container
@@ -41,5 +32,4 @@ module 0x2::M {
           }
         }
     }
-    spec fun $t0(): M::Box<u64>;
 } // end 0x2::M

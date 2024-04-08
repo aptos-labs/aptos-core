@@ -1,0 +1,28 @@
+============ initial bytecode ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: $t0 := 6
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 6
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after VariableCoalescing: ================
+
+[variant baseline]
+fun m::test(): u64 {
+     var $t0: u64
+  0: $t0 := 6
+  1: return $t0
+}

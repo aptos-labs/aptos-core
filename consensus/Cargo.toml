@@ -17,11 +17,13 @@ anyhow = { workspace = true }
 aptos-bitvec = { workspace = true }
 aptos-bounded-executor = { workspace = true }
 aptos-channels = { workspace = true }
+aptos-collections = { workspace = true }
 aptos-config = { workspace = true }
 aptos-consensus-notifications = { workspace = true }
 aptos-consensus-types = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
+aptos-dkg = { workspace = true }
 aptos-enum-conversion-derive = { workspace = true }
 aptos-event-notifications = { workspace = true }
 aptos-executor = { workspace = true }
@@ -74,6 +76,7 @@ serde = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
+sha3 = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -89,6 +92,7 @@ aptos-keygen = { workspace = true }
 aptos-mempool = { workspace = true, features = ["fuzzing"] }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-safety-rules = { workspace = true, features = ["testing"] }
+aptos-vm = { workspace = true, features = ["fuzzing"] }
 aptos-vm-validator = { workspace = true }
 claims = { workspace = true }
 move-core-types = { workspace = true }
@@ -97,5 +101,12 @@ tempfile = { workspace = true }
 
 [features]
 default = []
-fuzzing = ["aptos-consensus-types/fuzzing", "aptos-config/fuzzing", "aptos-crypto/fuzzing", "aptos-mempool/fuzzing", "aptos-types/fuzzing", "aptos-safety-rules/testing"]
+fuzzing = [
+    "aptos-consensus-types/fuzzing",
+    "aptos-config/fuzzing",
+    "aptos-crypto/fuzzing",
+    "aptos-mempool/fuzzing",
+    "aptos-types/fuzzing",
+    "aptos-safety-rules/testing",
+]
 failpoints = ["fail/failpoints"]

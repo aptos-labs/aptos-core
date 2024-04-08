@@ -1,0 +1,1290 @@
+processed 2 tasks
+
+task 0 'publish'. lines 1-141:
+
+
+
+task 1 'run'. lines 143-143:
+Error: Function execution failed with VMError: {
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0xcafe::ConstantFailure,
+    indices: redacted,
+    offsets: redacted,
+}
+
+==> Compiler v2 delivered same results!
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module cafe.ConstantFailure {
+
+
+main() /* def_idx: 0 */ {
+L0:	loc0: vector<u128>
+L1:	loc1: vector<u16>
+L2:	loc2: vector<u256>
+L3:	loc3: vector<u32>
+L4:	loc4: vector<u64>
+L5:	loc5: vector<u8>
+L6:	loc6: u128
+L7:	loc7: u16
+L8:	loc8: u256
+L9:	loc9: u32
+L10:	loc10: u64
+L11:	loc11: u8
+B0:
+	0: LdU8(1)
+	1: LdU8(8)
+	2: Shl
+	3: LdU8(0)
+	4: LdU8(8)
+	5: Shr
+	6: LdU8(1)
+	7: LdU8(0)
+	8: Div
+	9: LdU8(1)
+	10: LdU8(0)
+	11: Mod
+	12: LdU8(255)
+	13: LdU8(255)
+	14: Add
+	15: LdU8(0)
+	16: LdU8(1)
+	17: Sub
+	18: LdU64(256)
+	19: CastU8
+	20: VecPack(12, 7)
+	21: StLoc[5](loc5: vector<u8>)
+	22: LdU16(1)
+	23: LdU8(16)
+	24: Shl
+	25: LdU16(0)
+	26: LdU8(16)
+	27: Shr
+	28: LdU16(1)
+	29: LdU16(0)
+	30: Div
+	31: LdU16(1)
+	32: LdU16(0)
+	33: Mod
+	34: LdU16(65535)
+	35: LdU16(65535)
+	36: Add
+	37: LdU16(0)
+	38: LdU16(1)
+	39: Sub
+	40: LdU64(65536)
+	41: CastU16
+	42: VecPack(4, 7)
+	43: StLoc[1](loc1: vector<u16>)
+	44: LdU32(1)
+	45: LdU8(32)
+	46: Shl
+	47: LdU8(1)
+	48: LdU8(8)
+	49: Shl
+	50: CastU32
+	51: LdU16(1)
+	52: LdU8(16)
+	53: Shl
+	54: CastU32
+	55: LdU32(0)
+	56: LdU8(32)
+	57: Shr
+	58: LdU8(0)
+	59: LdU8(8)
+	60: Shr
+	61: CastU32
+	62: LdU16(0)
+	63: LdU8(16)
+	64: Shr
+	65: CastU32
+	66: LdU32(1)
+	67: LdU32(0)
+	68: Div
+	69: LdU32(1)
+	70: LdU32(0)
+	71: Mod
+	72: LdU32(4294967295)
+	73: LdU32(4294967295)
+	74: Add
+	75: LdU16(65535)
+	76: LdU16(65535)
+	77: Add
+	78: CastU32
+	79: LdU16(65535)
+	80: LdU16(65535)
+	81: Add
+	82: CastU32
+	83: LdU16(65535)
+	84: LdU16(65535)
+	85: Add
+	86: CastU32
+	87: LdU32(0)
+	88: LdU32(1)
+	89: Sub
+	90: LdU128(4294967296)
+	91: CastU32
+	92: VecPack(8, 14)
+	93: StLoc[3](loc3: vector<u32>)
+	94: LdU64(1)
+	95: LdU8(64)
+	96: Shl
+	97: LdU32(1)
+	98: LdU8(32)
+	99: Shl
+	100: CastU64
+	101: LdU64(0)
+	102: LdU8(64)
+	103: Shr
+	104: LdU32(0)
+	105: LdU8(32)
+	106: Shr
+	107: CastU64
+	108: LdU64(1)
+	109: LdU64(0)
+	110: Div
+	111: LdU64(1)
+	112: LdU64(0)
+	113: Mod
+	114: LdU64(18446744073709551615)
+	115: LdU64(18446744073709551615)
+	116: Add
+	117: LdU8(255)
+	118: LdU8(255)
+	119: Add
+	120: CastU64
+	121: LdU8(255)
+	122: LdU8(255)
+	123: Add
+	124: CastU64
+	125: LdU8(255)
+	126: LdU8(255)
+	127: Add
+	128: CastU64
+	129: LdU32(4294967295)
+	130: LdU32(4294967295)
+	131: Add
+	132: CastU64
+	133: LdU32(4294967295)
+	134: LdU32(4294967295)
+	135: Add
+	136: CastU64
+	137: LdU32(4294967295)
+	138: LdU32(4294967295)
+	139: Add
+	140: CastU64
+	141: LdU64(0)
+	142: LdU64(1)
+	143: Sub
+	144: LdU128(340282366920938463463374607431768211450)
+	145: CastU64
+	146: VecPack(10, 15)
+	147: StLoc[4](loc4: vector<u64>)
+	148: LdU128(1)
+	149: LdU8(128)
+	150: Shl
+	151: LdU64(1)
+	152: LdU8(64)
+	153: Shl
+	154: CastU128
+	155: LdU128(0)
+	156: LdU8(128)
+	157: Shr
+	158: LdU64(0)
+	159: LdU8(64)
+	160: Shr
+	161: CastU128
+	162: LdU128(1)
+	163: LdU128(0)
+	164: Div
+	165: LdU128(1)
+	166: LdU128(0)
+	167: Mod
+	168: LdU128(340282366920938463463374607431768211450)
+	169: LdU128(340282366920938463463374607431768211450)
+	170: Add
+	171: LdU64(18446744073709551615)
+	172: LdU64(18446744073709551615)
+	173: Add
+	174: CastU128
+	175: LdU64(18446744073709551615)
+	176: LdU64(18446744073709551615)
+	177: Add
+	178: CastU128
+	179: LdU64(18446744073709551615)
+	180: LdU64(18446744073709551615)
+	181: Add
+	182: CastU128
+	183: LdU128(0)
+	184: LdU128(1)
+	185: Sub
+	186: LdU256(340282366920938463463374607431768211456)
+	187: CastU128
+	188: VecPack(2, 12)
+	189: StLoc[0](loc0: vector<u128>)
+	190: LdU128(1)
+	191: LdU8(128)
+	192: Shl
+	193: CastU256
+	194: LdU128(0)
+	195: LdU8(128)
+	196: Shr
+	197: CastU256
+	198: LdU256(1)
+	199: LdU256(0)
+	200: Div
+	201: LdU256(1)
+	202: LdU256(0)
+	203: Mod
+	204: LdU256(115792089237316195423570985008687907853269984665640564039457584007913129639935)
+	205: LdU256(115792089237316195423570985008687907853269984665640564039457584007913129639935)
+	206: Add
+	207: LdU128(340282366920938463463374607431768211450)
+	208: LdU128(340282366920938463463374607431768211450)
+	209: Add
+	210: CastU256
+	211: LdU128(340282366920938463463374607431768211450)
+	212: LdU128(340282366920938463463374607431768211450)
+	213: Add
+	214: CastU256
+	215: LdU128(340282366920938463463374607431768211450)
+	216: LdU128(340282366920938463463374607431768211450)
+	217: Add
+	218: CastU256
+	219: LdU256(0)
+	220: LdU256(1)
+	221: Sub
+	222: VecPack(6, 9)
+	223: StLoc[2](loc2: vector<u256>)
+	224: ImmBorrowLoc[5](loc5: vector<u8>)
+	225: Call sum_u8(&vector<u8>): u8
+	226: StLoc[11](loc11: u8)
+	227: ImmBorrowLoc[1](loc1: vector<u16>)
+	228: Call sum_u16(&vector<u16>): u16
+	229: StLoc[7](loc7: u16)
+	230: ImmBorrowLoc[3](loc3: vector<u32>)
+	231: Call sum_u32(&vector<u32>): u32
+	232: StLoc[9](loc9: u32)
+	233: ImmBorrowLoc[4](loc4: vector<u64>)
+	234: Call sum_u64(&vector<u64>): u64
+	235: StLoc[10](loc10: u64)
+	236: ImmBorrowLoc[0](loc0: vector<u128>)
+	237: Call sum_u128(&vector<u128>): u128
+	238: StLoc[6](loc6: u128)
+	239: ImmBorrowLoc[2](loc2: vector<u256>)
+	240: Call sum_u256(&vector<u256>): u256
+	241: StLoc[8](loc8: u256)
+	242: MoveLoc[11](loc11: u8)
+	243: LdU8(0)
+	244: Neq
+	245: BrFalse(247)
+B1:
+	246: Branch(249)
+B2:
+	247: LdU64(1)
+	248: Abort
+B3:
+	249: MoveLoc[7](loc7: u16)
+	250: LdU16(0)
+	251: Neq
+	252: BrFalse(254)
+B4:
+	253: Branch(256)
+B5:
+	254: LdU64(1)
+	255: Abort
+B6:
+	256: MoveLoc[9](loc9: u32)
+	257: LdU32(0)
+	258: Neq
+	259: BrFalse(261)
+B7:
+	260: Branch(263)
+B8:
+	261: LdU64(1)
+	262: Abort
+B9:
+	263: MoveLoc[10](loc10: u64)
+	264: LdU64(0)
+	265: Neq
+	266: BrFalse(268)
+B10:
+	267: Branch(270)
+B11:
+	268: LdU64(1)
+	269: Abort
+B12:
+	270: MoveLoc[6](loc6: u128)
+	271: LdU128(0)
+	272: Neq
+	273: BrFalse(275)
+B13:
+	274: Branch(277)
+B14:
+	275: LdU64(1)
+	276: Abort
+B15:
+	277: MoveLoc[8](loc8: u256)
+	278: LdU256(0)
+	279: Neq
+	280: BrFalse(282)
+B16:
+	281: Branch(284)
+B17:
+	282: LdU64(1)
+	283: Abort
+B18:
+	284: Ret
+}
+sum_u128(Arg0: &vector<u128>): u128 /* def_idx: 1 */ {
+L0:	loc1: u64
+L1:	loc2: u128
+L2:	loc3: &vector<u128>
+B0:
+	0: LdU128(0)
+	1: StLoc[3](loc2: u128)
+	2: MoveLoc[0](Arg0: &vector<u128>)
+	3: StLoc[4](loc3: &vector<u128>)
+	4: LdU64(0)
+	5: StLoc[2](loc1: u64)
+B1:
+	6: CopyLoc[2](loc1: u64)
+	7: CopyLoc[4](loc3: &vector<u128>)
+	8: VecLen(2)
+	9: Lt
+	10: BrFalse(26)
+B2:
+	11: Branch(12)
+B3:
+	12: CopyLoc[4](loc3: &vector<u128>)
+	13: CopyLoc[2](loc1: u64)
+	14: VecImmBorrow(2)
+	15: StLoc[1](loc0: &u128)
+	16: MoveLoc[3](loc2: u128)
+	17: MoveLoc[1](loc0: &u128)
+	18: ReadRef
+	19: Add
+	20: StLoc[3](loc2: u128)
+	21: MoveLoc[2](loc1: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[2](loc1: u64)
+	25: Branch(6)
+B4:
+	26: MoveLoc[4](loc3: &vector<u128>)
+	27: Pop
+	28: MoveLoc[3](loc2: u128)
+	29: Ret
+}
+sum_u16(Arg0: &vector<u16>): u16 /* def_idx: 2 */ {
+L0:	loc1: u64
+L1:	loc2: u16
+L2:	loc3: &vector<u16>
+B0:
+	0: LdU16(0)
+	1: StLoc[3](loc2: u16)
+	2: MoveLoc[0](Arg0: &vector<u16>)
+	3: StLoc[4](loc3: &vector<u16>)
+	4: LdU64(0)
+	5: StLoc[2](loc1: u64)
+B1:
+	6: CopyLoc[2](loc1: u64)
+	7: CopyLoc[4](loc3: &vector<u16>)
+	8: VecLen(4)
+	9: Lt
+	10: BrFalse(26)
+B2:
+	11: Branch(12)
+B3:
+	12: CopyLoc[4](loc3: &vector<u16>)
+	13: CopyLoc[2](loc1: u64)
+	14: VecImmBorrow(4)
+	15: StLoc[1](loc0: &u16)
+	16: MoveLoc[3](loc2: u16)
+	17: MoveLoc[1](loc0: &u16)
+	18: ReadRef
+	19: Add
+	20: StLoc[3](loc2: u16)
+	21: MoveLoc[2](loc1: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[2](loc1: u64)
+	25: Branch(6)
+B4:
+	26: MoveLoc[4](loc3: &vector<u16>)
+	27: Pop
+	28: MoveLoc[3](loc2: u16)
+	29: Ret
+}
+sum_u256(Arg0: &vector<u256>): u256 /* def_idx: 3 */ {
+L0:	loc1: u64
+L1:	loc2: u256
+L2:	loc3: &vector<u256>
+B0:
+	0: LdU256(0)
+	1: StLoc[3](loc2: u256)
+	2: MoveLoc[0](Arg0: &vector<u256>)
+	3: StLoc[4](loc3: &vector<u256>)
+	4: LdU64(0)
+	5: StLoc[2](loc1: u64)
+B1:
+	6: CopyLoc[2](loc1: u64)
+	7: CopyLoc[4](loc3: &vector<u256>)
+	8: VecLen(6)
+	9: Lt
+	10: BrFalse(26)
+B2:
+	11: Branch(12)
+B3:
+	12: CopyLoc[4](loc3: &vector<u256>)
+	13: CopyLoc[2](loc1: u64)
+	14: VecImmBorrow(6)
+	15: StLoc[1](loc0: &u256)
+	16: MoveLoc[3](loc2: u256)
+	17: MoveLoc[1](loc0: &u256)
+	18: ReadRef
+	19: Add
+	20: StLoc[3](loc2: u256)
+	21: MoveLoc[2](loc1: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[2](loc1: u64)
+	25: Branch(6)
+B4:
+	26: MoveLoc[4](loc3: &vector<u256>)
+	27: Pop
+	28: MoveLoc[3](loc2: u256)
+	29: Ret
+}
+sum_u32(Arg0: &vector<u32>): u32 /* def_idx: 4 */ {
+L0:	loc1: u64
+L1:	loc2: u32
+L2:	loc3: &vector<u32>
+B0:
+	0: LdU32(0)
+	1: StLoc[3](loc2: u32)
+	2: MoveLoc[0](Arg0: &vector<u32>)
+	3: StLoc[4](loc3: &vector<u32>)
+	4: LdU64(0)
+	5: StLoc[2](loc1: u64)
+B1:
+	6: CopyLoc[2](loc1: u64)
+	7: CopyLoc[4](loc3: &vector<u32>)
+	8: VecLen(8)
+	9: Lt
+	10: BrFalse(26)
+B2:
+	11: Branch(12)
+B3:
+	12: CopyLoc[4](loc3: &vector<u32>)
+	13: CopyLoc[2](loc1: u64)
+	14: VecImmBorrow(8)
+	15: StLoc[1](loc0: &u32)
+	16: MoveLoc[3](loc2: u32)
+	17: MoveLoc[1](loc0: &u32)
+	18: ReadRef
+	19: Add
+	20: StLoc[3](loc2: u32)
+	21: MoveLoc[2](loc1: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[2](loc1: u64)
+	25: Branch(6)
+B4:
+	26: MoveLoc[4](loc3: &vector<u32>)
+	27: Pop
+	28: MoveLoc[3](loc2: u32)
+	29: Ret
+}
+sum_u64(Arg0: &vector<u64>): u64 /* def_idx: 5 */ {
+L0:	loc1: u64
+L1:	loc2: u64
+L2:	loc3: &vector<u64>
+B0:
+	0: LdU64(0)
+	1: StLoc[3](loc2: u64)
+	2: MoveLoc[0](Arg0: &vector<u64>)
+	3: StLoc[4](loc3: &vector<u64>)
+	4: LdU64(0)
+	5: StLoc[2](loc1: u64)
+B1:
+	6: CopyLoc[2](loc1: u64)
+	7: CopyLoc[4](loc3: &vector<u64>)
+	8: VecLen(10)
+	9: Lt
+	10: BrFalse(26)
+B2:
+	11: Branch(12)
+B3:
+	12: CopyLoc[4](loc3: &vector<u64>)
+	13: CopyLoc[2](loc1: u64)
+	14: VecImmBorrow(10)
+	15: StLoc[1](loc0: &u64)
+	16: MoveLoc[3](loc2: u64)
+	17: MoveLoc[1](loc0: &u64)
+	18: ReadRef
+	19: Add
+	20: StLoc[3](loc2: u64)
+	21: MoveLoc[2](loc1: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[2](loc1: u64)
+	25: Branch(6)
+B4:
+	26: MoveLoc[4](loc3: &vector<u64>)
+	27: Pop
+	28: MoveLoc[3](loc2: u64)
+	29: Ret
+}
+sum_u8(Arg0: &vector<u8>): u8 /* def_idx: 6 */ {
+L0:	loc1: u64
+L1:	loc2: u8
+L2:	loc3: &vector<u8>
+B0:
+	0: LdU8(0)
+	1: StLoc[3](loc2: u8)
+	2: MoveLoc[0](Arg0: &vector<u8>)
+	3: StLoc[4](loc3: &vector<u8>)
+	4: LdU64(0)
+	5: StLoc[2](loc1: u64)
+B1:
+	6: CopyLoc[2](loc1: u64)
+	7: CopyLoc[4](loc3: &vector<u8>)
+	8: VecLen(12)
+	9: Lt
+	10: BrFalse(26)
+B2:
+	11: Branch(12)
+B3:
+	12: CopyLoc[4](loc3: &vector<u8>)
+	13: CopyLoc[2](loc1: u64)
+	14: VecImmBorrow(12)
+	15: StLoc[1](loc0: &u8)
+	16: MoveLoc[3](loc2: u8)
+	17: MoveLoc[1](loc0: &u8)
+	18: ReadRef
+	19: Add
+	20: StLoc[3](loc2: u8)
+	21: MoveLoc[2](loc1: u64)
+	22: LdU64(1)
+	23: Add
+	24: StLoc[2](loc1: u64)
+	25: Branch(6)
+B4:
+	26: MoveLoc[4](loc3: &vector<u8>)
+	27: Pop
+	28: MoveLoc[3](loc2: u8)
+	29: Ret
+}
+}
+== END Bytecode ==
+}
+
+>>> V2 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v7
+module cafe.ConstantFailure {
+
+
+main() /* def_idx: 0 */ {
+L0:	loc0: vector<u8>
+L1:	loc1: vector<u16>
+L2:	loc2: vector<u32>
+L3:	loc3: vector<u64>
+L4:	loc4: vector<u128>
+L5:	loc5: vector<u256>
+L6:	loc6: u8
+L7:	loc7: u16
+L8:	loc8: u32
+L9:	loc9: u64
+L10:	loc10: u128
+L11:	loc11: u256
+L12:	loc12: u8
+L13:	loc13: u16
+L14:	loc14: u32
+L15:	loc15: u64
+L16:	loc16: u128
+L17:	loc17: u256
+B0:
+	0: LdU8(1)
+	1: LdU8(8)
+	2: Shl
+	3: LdU8(0)
+	4: LdU8(8)
+	5: Shr
+	6: LdU8(1)
+	7: LdU8(0)
+	8: Div
+	9: LdU8(1)
+	10: LdU8(0)
+	11: Mod
+	12: LdU8(255)
+	13: LdU8(255)
+	14: Add
+	15: LdU8(0)
+	16: LdU8(1)
+	17: Sub
+	18: LdU64(256)
+	19: CastU8
+	20: VecPack(1, 7)
+	21: StLoc[0](loc0: vector<u8>)
+	22: LdU16(1)
+	23: LdU8(16)
+	24: Shl
+	25: LdU16(0)
+	26: LdU8(16)
+	27: Shr
+	28: LdU16(1)
+	29: LdU16(0)
+	30: Div
+	31: LdU16(1)
+	32: LdU16(0)
+	33: Mod
+	34: LdU16(65535)
+	35: LdU16(65535)
+	36: Add
+	37: LdU16(0)
+	38: LdU16(1)
+	39: Sub
+	40: LdU64(65536)
+	41: CastU16
+	42: VecPack(2, 7)
+	43: StLoc[1](loc1: vector<u16>)
+	44: LdU32(1)
+	45: LdU8(32)
+	46: Shl
+	47: LdU8(1)
+	48: LdU8(8)
+	49: Shl
+	50: CastU32
+	51: LdU16(1)
+	52: LdU8(16)
+	53: Shl
+	54: CastU32
+	55: LdU32(0)
+	56: LdU8(32)
+	57: Shr
+	58: LdU8(0)
+	59: LdU8(8)
+	60: Shr
+	61: CastU32
+	62: LdU16(0)
+	63: LdU8(16)
+	64: Shr
+	65: CastU32
+	66: LdU32(1)
+	67: LdU32(0)
+	68: Div
+	69: LdU32(1)
+	70: LdU32(0)
+	71: Mod
+	72: LdU32(4294967295)
+	73: LdU32(4294967295)
+	74: Add
+	75: LdU16(65535)
+	76: LdU16(65535)
+	77: Add
+	78: CastU32
+	79: LdU16(65535)
+	80: LdU16(65535)
+	81: Add
+	82: CastU32
+	83: LdU16(65535)
+	84: LdU16(65535)
+	85: Add
+	86: CastU32
+	87: LdU32(0)
+	88: LdU32(1)
+	89: Sub
+	90: LdU128(4294967296)
+	91: CastU32
+	92: VecPack(3, 14)
+	93: StLoc[2](loc2: vector<u32>)
+	94: LdU64(1)
+	95: LdU8(64)
+	96: Shl
+	97: LdU32(1)
+	98: LdU8(32)
+	99: Shl
+	100: CastU64
+	101: LdU64(0)
+	102: LdU8(64)
+	103: Shr
+	104: LdU32(0)
+	105: LdU8(32)
+	106: Shr
+	107: CastU64
+	108: LdU64(1)
+	109: LdU64(0)
+	110: Div
+	111: LdU64(1)
+	112: LdU64(0)
+	113: Mod
+	114: LdU64(18446744073709551615)
+	115: LdU64(18446744073709551615)
+	116: Add
+	117: LdU8(255)
+	118: LdU8(255)
+	119: Add
+	120: CastU64
+	121: LdU8(255)
+	122: LdU8(255)
+	123: Add
+	124: CastU64
+	125: LdU8(255)
+	126: LdU8(255)
+	127: Add
+	128: CastU64
+	129: LdU32(4294967295)
+	130: LdU32(4294967295)
+	131: Add
+	132: CastU64
+	133: LdU32(4294967295)
+	134: LdU32(4294967295)
+	135: Add
+	136: CastU64
+	137: LdU32(4294967295)
+	138: LdU32(4294967295)
+	139: Add
+	140: CastU64
+	141: LdU64(0)
+	142: LdU64(1)
+	143: Sub
+	144: LdU128(340282366920938463463374607431768211450)
+	145: CastU64
+	146: VecPack(4, 15)
+	147: StLoc[3](loc3: vector<u64>)
+	148: LdU128(1)
+	149: LdU8(128)
+	150: Shl
+	151: LdU64(1)
+	152: LdU8(64)
+	153: Shl
+	154: CastU128
+	155: LdU128(0)
+	156: LdU8(128)
+	157: Shr
+	158: LdU64(0)
+	159: LdU8(64)
+	160: Shr
+	161: CastU128
+	162: LdU128(1)
+	163: LdU128(0)
+	164: Div
+	165: LdU128(1)
+	166: LdU128(0)
+	167: Mod
+	168: LdU128(340282366920938463463374607431768211450)
+	169: LdU128(340282366920938463463374607431768211450)
+	170: Add
+	171: LdU64(18446744073709551615)
+	172: LdU64(18446744073709551615)
+	173: Add
+	174: CastU128
+	175: LdU64(18446744073709551615)
+	176: LdU64(18446744073709551615)
+	177: Add
+	178: CastU128
+	179: LdU64(18446744073709551615)
+	180: LdU64(18446744073709551615)
+	181: Add
+	182: CastU128
+	183: LdU128(0)
+	184: LdU128(1)
+	185: Sub
+	186: LdU256(340282366920938463463374607431768211456)
+	187: CastU128
+	188: VecPack(5, 12)
+	189: StLoc[4](loc4: vector<u128>)
+	190: LdU128(1)
+	191: LdU8(128)
+	192: Shl
+	193: CastU256
+	194: LdU128(0)
+	195: LdU8(128)
+	196: Shr
+	197: CastU256
+	198: LdU256(1)
+	199: LdU256(0)
+	200: Div
+	201: LdU256(1)
+	202: LdU256(0)
+	203: Mod
+	204: LdU256(115792089237316195423570985008687907853269984665640564039457584007913129639935)
+	205: LdU256(115792089237316195423570985008687907853269984665640564039457584007913129639935)
+	206: Add
+	207: LdU128(340282366920938463463374607431768211450)
+	208: LdU128(340282366920938463463374607431768211450)
+	209: Add
+	210: CastU256
+	211: LdU128(340282366920938463463374607431768211450)
+	212: LdU128(340282366920938463463374607431768211450)
+	213: Add
+	214: CastU256
+	215: LdU128(340282366920938463463374607431768211450)
+	216: LdU128(340282366920938463463374607431768211450)
+	217: Add
+	218: CastU256
+	219: LdU256(0)
+	220: LdU256(1)
+	221: Sub
+	222: VecPack(6, 9)
+	223: StLoc[5](loc5: vector<u256>)
+	224: ImmBorrowLoc[0](loc0: vector<u8>)
+	225: Call sum_u8(&vector<u8>): u8
+	226: StLoc[6](loc6: u8)
+	227: ImmBorrowLoc[1](loc1: vector<u16>)
+	228: Call sum_u16(&vector<u16>): u16
+	229: StLoc[7](loc7: u16)
+	230: ImmBorrowLoc[2](loc2: vector<u32>)
+	231: Call sum_u32(&vector<u32>): u32
+	232: StLoc[8](loc8: u32)
+	233: ImmBorrowLoc[3](loc3: vector<u64>)
+	234: Call sum_u64(&vector<u64>): u64
+	235: StLoc[9](loc9: u64)
+	236: ImmBorrowLoc[4](loc4: vector<u128>)
+	237: Call sum_u128(&vector<u128>): u128
+	238: StLoc[10](loc10: u128)
+	239: ImmBorrowLoc[5](loc5: vector<u256>)
+	240: Call sum_u256(&vector<u256>): u256
+	241: StLoc[11](loc11: u256)
+	242: LdU8(0)
+	243: StLoc[12](loc12: u8)
+	244: MoveLoc[6](loc6: u8)
+	245: MoveLoc[12](loc12: u8)
+	246: Neq
+	247: BrFalse(249)
+B1:
+	248: Branch(251)
+B2:
+	249: LdU64(1)
+	250: Abort
+B3:
+	251: LdU16(0)
+	252: StLoc[13](loc13: u16)
+	253: MoveLoc[7](loc7: u16)
+	254: MoveLoc[13](loc13: u16)
+	255: Neq
+	256: BrFalse(258)
+B4:
+	257: Branch(260)
+B5:
+	258: LdU64(1)
+	259: Abort
+B6:
+	260: LdU32(0)
+	261: StLoc[14](loc14: u32)
+	262: MoveLoc[8](loc8: u32)
+	263: MoveLoc[14](loc14: u32)
+	264: Neq
+	265: BrFalse(267)
+B7:
+	266: Branch(269)
+B8:
+	267: LdU64(1)
+	268: Abort
+B9:
+	269: LdU64(0)
+	270: StLoc[15](loc15: u64)
+	271: MoveLoc[9](loc9: u64)
+	272: MoveLoc[15](loc15: u64)
+	273: Neq
+	274: BrFalse(276)
+B10:
+	275: Branch(278)
+B11:
+	276: LdU64(1)
+	277: Abort
+B12:
+	278: LdU128(0)
+	279: StLoc[16](loc16: u128)
+	280: MoveLoc[10](loc10: u128)
+	281: MoveLoc[16](loc16: u128)
+	282: Neq
+	283: BrFalse(285)
+B13:
+	284: Branch(287)
+B14:
+	285: LdU64(1)
+	286: Abort
+B15:
+	287: LdU256(0)
+	288: StLoc[17](loc17: u256)
+	289: MoveLoc[11](loc11: u256)
+	290: MoveLoc[17](loc17: u256)
+	291: Neq
+	292: BrFalse(294)
+B16:
+	293: Branch(296)
+B17:
+	294: LdU64(1)
+	295: Abort
+B18:
+	296: Ret
+}
+sum_u128(Arg0: &vector<u128>): u128 /* def_idx: 1 */ {
+L0:	loc1: &vector<u128>
+L1:	loc2: u64
+L2:	loc3: &vector<u128>
+L3:	loc4: u64
+L4:	loc5: &vector<u128>
+L5:	loc6: &u128
+L6:	loc7: u128
+L7:	loc8: u64
+L8:	loc9: u128
+B0:
+	0: LdU128(0)
+	1: StLoc[1](loc0: u128)
+	2: MoveLoc[0](Arg0: &vector<u128>)
+	3: StLoc[2](loc1: &vector<u128>)
+	4: LdU64(0)
+	5: StLoc[3](loc2: u64)
+B1:
+	6: CopyLoc[2](loc1: &vector<u128>)
+	7: StLoc[4](loc3: &vector<u128>)
+	8: MoveLoc[4](loc3: &vector<u128>)
+	9: VecLen(5)
+	10: StLoc[5](loc4: u64)
+	11: CopyLoc[3](loc2: u64)
+	12: MoveLoc[5](loc4: u64)
+	13: Lt
+	14: BrFalse(35)
+B2:
+	15: CopyLoc[2](loc1: &vector<u128>)
+	16: StLoc[6](loc5: &vector<u128>)
+	17: MoveLoc[6](loc5: &vector<u128>)
+	18: CopyLoc[3](loc2: u64)
+	19: VecImmBorrow(5)
+	20: StLoc[7](loc6: &u128)
+	21: MoveLoc[7](loc6: &u128)
+	22: ReadRef
+	23: StLoc[8](loc7: u128)
+	24: MoveLoc[1](loc0: u128)
+	25: MoveLoc[8](loc7: u128)
+	26: Add
+	27: StLoc[1](loc0: u128)
+	28: LdU64(1)
+	29: StLoc[9](loc8: u64)
+	30: MoveLoc[3](loc2: u64)
+	31: MoveLoc[9](loc8: u64)
+	32: Add
+	33: StLoc[3](loc2: u64)
+	34: Branch(38)
+B3:
+	35: MoveLoc[2](loc1: &vector<u128>)
+	36: Pop
+	37: Branch(39)
+B4:
+	38: Branch(6)
+B5:
+	39: MoveLoc[1](loc0: u128)
+	40: StLoc[10](loc9: u128)
+	41: MoveLoc[10](loc9: u128)
+	42: Ret
+}
+sum_u16(Arg0: &vector<u16>): u16 /* def_idx: 2 */ {
+L0:	loc1: &vector<u16>
+L1:	loc2: u64
+L2:	loc3: &vector<u16>
+L3:	loc4: u64
+L4:	loc5: &vector<u16>
+L5:	loc6: &u16
+L6:	loc7: u16
+L7:	loc8: u64
+L8:	loc9: u16
+B0:
+	0: LdU16(0)
+	1: StLoc[1](loc0: u16)
+	2: MoveLoc[0](Arg0: &vector<u16>)
+	3: StLoc[2](loc1: &vector<u16>)
+	4: LdU64(0)
+	5: StLoc[3](loc2: u64)
+B1:
+	6: CopyLoc[2](loc1: &vector<u16>)
+	7: StLoc[4](loc3: &vector<u16>)
+	8: MoveLoc[4](loc3: &vector<u16>)
+	9: VecLen(2)
+	10: StLoc[5](loc4: u64)
+	11: CopyLoc[3](loc2: u64)
+	12: MoveLoc[5](loc4: u64)
+	13: Lt
+	14: BrFalse(35)
+B2:
+	15: CopyLoc[2](loc1: &vector<u16>)
+	16: StLoc[6](loc5: &vector<u16>)
+	17: MoveLoc[6](loc5: &vector<u16>)
+	18: CopyLoc[3](loc2: u64)
+	19: VecImmBorrow(2)
+	20: StLoc[7](loc6: &u16)
+	21: MoveLoc[7](loc6: &u16)
+	22: ReadRef
+	23: StLoc[8](loc7: u16)
+	24: MoveLoc[1](loc0: u16)
+	25: MoveLoc[8](loc7: u16)
+	26: Add
+	27: StLoc[1](loc0: u16)
+	28: LdU64(1)
+	29: StLoc[9](loc8: u64)
+	30: MoveLoc[3](loc2: u64)
+	31: MoveLoc[9](loc8: u64)
+	32: Add
+	33: StLoc[3](loc2: u64)
+	34: Branch(38)
+B3:
+	35: MoveLoc[2](loc1: &vector<u16>)
+	36: Pop
+	37: Branch(39)
+B4:
+	38: Branch(6)
+B5:
+	39: MoveLoc[1](loc0: u16)
+	40: StLoc[10](loc9: u16)
+	41: MoveLoc[10](loc9: u16)
+	42: Ret
+}
+sum_u256(Arg0: &vector<u256>): u256 /* def_idx: 3 */ {
+L0:	loc1: &vector<u256>
+L1:	loc2: u64
+L2:	loc3: &vector<u256>
+L3:	loc4: u64
+L4:	loc5: &vector<u256>
+L5:	loc6: &u256
+L6:	loc7: u256
+L7:	loc8: u64
+L8:	loc9: u256
+B0:
+	0: LdU256(0)
+	1: StLoc[1](loc0: u256)
+	2: MoveLoc[0](Arg0: &vector<u256>)
+	3: StLoc[2](loc1: &vector<u256>)
+	4: LdU64(0)
+	5: StLoc[3](loc2: u64)
+B1:
+	6: CopyLoc[2](loc1: &vector<u256>)
+	7: StLoc[4](loc3: &vector<u256>)
+	8: MoveLoc[4](loc3: &vector<u256>)
+	9: VecLen(6)
+	10: StLoc[5](loc4: u64)
+	11: CopyLoc[3](loc2: u64)
+	12: MoveLoc[5](loc4: u64)
+	13: Lt
+	14: BrFalse(35)
+B2:
+	15: CopyLoc[2](loc1: &vector<u256>)
+	16: StLoc[6](loc5: &vector<u256>)
+	17: MoveLoc[6](loc5: &vector<u256>)
+	18: CopyLoc[3](loc2: u64)
+	19: VecImmBorrow(6)
+	20: StLoc[7](loc6: &u256)
+	21: MoveLoc[7](loc6: &u256)
+	22: ReadRef
+	23: StLoc[8](loc7: u256)
+	24: MoveLoc[1](loc0: u256)
+	25: MoveLoc[8](loc7: u256)
+	26: Add
+	27: StLoc[1](loc0: u256)
+	28: LdU64(1)
+	29: StLoc[9](loc8: u64)
+	30: MoveLoc[3](loc2: u64)
+	31: MoveLoc[9](loc8: u64)
+	32: Add
+	33: StLoc[3](loc2: u64)
+	34: Branch(38)
+B3:
+	35: MoveLoc[2](loc1: &vector<u256>)
+	36: Pop
+	37: Branch(39)
+B4:
+	38: Branch(6)
+B5:
+	39: MoveLoc[1](loc0: u256)
+	40: StLoc[10](loc9: u256)
+	41: MoveLoc[10](loc9: u256)
+	42: Ret
+}
+sum_u32(Arg0: &vector<u32>): u32 /* def_idx: 4 */ {
+L0:	loc1: &vector<u32>
+L1:	loc2: u64
+L2:	loc3: &vector<u32>
+L3:	loc4: u64
+L4:	loc5: &vector<u32>
+L5:	loc6: &u32
+L6:	loc7: u32
+L7:	loc8: u64
+L8:	loc9: u32
+B0:
+	0: LdU32(0)
+	1: StLoc[1](loc0: u32)
+	2: MoveLoc[0](Arg0: &vector<u32>)
+	3: StLoc[2](loc1: &vector<u32>)
+	4: LdU64(0)
+	5: StLoc[3](loc2: u64)
+B1:
+	6: CopyLoc[2](loc1: &vector<u32>)
+	7: StLoc[4](loc3: &vector<u32>)
+	8: MoveLoc[4](loc3: &vector<u32>)
+	9: VecLen(3)
+	10: StLoc[5](loc4: u64)
+	11: CopyLoc[3](loc2: u64)
+	12: MoveLoc[5](loc4: u64)
+	13: Lt
+	14: BrFalse(35)
+B2:
+	15: CopyLoc[2](loc1: &vector<u32>)
+	16: StLoc[6](loc5: &vector<u32>)
+	17: MoveLoc[6](loc5: &vector<u32>)
+	18: CopyLoc[3](loc2: u64)
+	19: VecImmBorrow(3)
+	20: StLoc[7](loc6: &u32)
+	21: MoveLoc[7](loc6: &u32)
+	22: ReadRef
+	23: StLoc[8](loc7: u32)
+	24: MoveLoc[1](loc0: u32)
+	25: MoveLoc[8](loc7: u32)
+	26: Add
+	27: StLoc[1](loc0: u32)
+	28: LdU64(1)
+	29: StLoc[9](loc8: u64)
+	30: MoveLoc[3](loc2: u64)
+	31: MoveLoc[9](loc8: u64)
+	32: Add
+	33: StLoc[3](loc2: u64)
+	34: Branch(38)
+B3:
+	35: MoveLoc[2](loc1: &vector<u32>)
+	36: Pop
+	37: Branch(39)
+B4:
+	38: Branch(6)
+B5:
+	39: MoveLoc[1](loc0: u32)
+	40: StLoc[10](loc9: u32)
+	41: MoveLoc[10](loc9: u32)
+	42: Ret
+}
+sum_u64(Arg0: &vector<u64>): u64 /* def_idx: 5 */ {
+L0:	loc1: &vector<u64>
+L1:	loc2: u64
+L2:	loc3: &vector<u64>
+L3:	loc4: u64
+L4:	loc5: &vector<u64>
+L5:	loc6: &u64
+L6:	loc7: u64
+L7:	loc8: u64
+L8:	loc9: u64
+B0:
+	0: LdU64(0)
+	1: StLoc[1](loc0: u64)
+	2: MoveLoc[0](Arg0: &vector<u64>)
+	3: StLoc[2](loc1: &vector<u64>)
+	4: LdU64(0)
+	5: StLoc[3](loc2: u64)
+B1:
+	6: CopyLoc[2](loc1: &vector<u64>)
+	7: StLoc[4](loc3: &vector<u64>)
+	8: MoveLoc[4](loc3: &vector<u64>)
+	9: VecLen(4)
+	10: StLoc[5](loc4: u64)
+	11: CopyLoc[3](loc2: u64)
+	12: MoveLoc[5](loc4: u64)
+	13: Lt
+	14: BrFalse(35)
+B2:
+	15: CopyLoc[2](loc1: &vector<u64>)
+	16: StLoc[6](loc5: &vector<u64>)
+	17: MoveLoc[6](loc5: &vector<u64>)
+	18: CopyLoc[3](loc2: u64)
+	19: VecImmBorrow(4)
+	20: StLoc[7](loc6: &u64)
+	21: MoveLoc[7](loc6: &u64)
+	22: ReadRef
+	23: StLoc[8](loc7: u64)
+	24: MoveLoc[1](loc0: u64)
+	25: MoveLoc[8](loc7: u64)
+	26: Add
+	27: StLoc[1](loc0: u64)
+	28: LdU64(1)
+	29: StLoc[9](loc8: u64)
+	30: MoveLoc[3](loc2: u64)
+	31: MoveLoc[9](loc8: u64)
+	32: Add
+	33: StLoc[3](loc2: u64)
+	34: Branch(38)
+B3:
+	35: MoveLoc[2](loc1: &vector<u64>)
+	36: Pop
+	37: Branch(39)
+B4:
+	38: Branch(6)
+B5:
+	39: MoveLoc[1](loc0: u64)
+	40: StLoc[10](loc9: u64)
+	41: MoveLoc[10](loc9: u64)
+	42: Ret
+}
+sum_u8(Arg0: &vector<u8>): u8 /* def_idx: 6 */ {
+L0:	loc1: &vector<u8>
+L1:	loc2: u64
+L2:	loc3: &vector<u8>
+L3:	loc4: u64
+L4:	loc5: &vector<u8>
+L5:	loc6: &u8
+L6:	loc7: u8
+L7:	loc8: u64
+L8:	loc9: u8
+B0:
+	0: LdU8(0)
+	1: StLoc[1](loc0: u8)
+	2: MoveLoc[0](Arg0: &vector<u8>)
+	3: StLoc[2](loc1: &vector<u8>)
+	4: LdU64(0)
+	5: StLoc[3](loc2: u64)
+B1:
+	6: CopyLoc[2](loc1: &vector<u8>)
+	7: StLoc[4](loc3: &vector<u8>)
+	8: MoveLoc[4](loc3: &vector<u8>)
+	9: VecLen(1)
+	10: StLoc[5](loc4: u64)
+	11: CopyLoc[3](loc2: u64)
+	12: MoveLoc[5](loc4: u64)
+	13: Lt
+	14: BrFalse(35)
+B2:
+	15: CopyLoc[2](loc1: &vector<u8>)
+	16: StLoc[6](loc5: &vector<u8>)
+	17: MoveLoc[6](loc5: &vector<u8>)
+	18: CopyLoc[3](loc2: u64)
+	19: VecImmBorrow(1)
+	20: StLoc[7](loc6: &u8)
+	21: MoveLoc[7](loc6: &u8)
+	22: ReadRef
+	23: StLoc[8](loc7: u8)
+	24: MoveLoc[1](loc0: u8)
+	25: MoveLoc[8](loc7: u8)
+	26: Add
+	27: StLoc[1](loc0: u8)
+	28: LdU64(1)
+	29: StLoc[9](loc8: u64)
+	30: MoveLoc[3](loc2: u64)
+	31: MoveLoc[9](loc8: u64)
+	32: Add
+	33: StLoc[3](loc2: u64)
+	34: Branch(38)
+B3:
+	35: MoveLoc[2](loc1: &vector<u8>)
+	36: Pop
+	37: Branch(39)
+B4:
+	38: Branch(6)
+B5:
+	39: MoveLoc[1](loc0: u8)
+	40: StLoc[10](loc9: u8)
+	41: MoveLoc[10](loc9: u8)
+	42: Ret
+}
+}
+== END Bytecode ==
+}

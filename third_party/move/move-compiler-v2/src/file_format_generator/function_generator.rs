@@ -1,5 +1,4 @@
 // Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
@@ -92,7 +91,7 @@ impl<'a> FunctionGenerator<'a> {
         fun_env: FunctionEnv<'b>,
         acquires_list: &BTreeSet<StructId>,
     ) {
-        let loc = fun_env.get_loc();
+        let loc = fun_env.get_id_loc();
         let function = gen.function_index(ctx, &loc, &fun_env);
         let visibility = fun_env.visibility();
         let fun_count = gen.module.function_defs.len();
@@ -164,7 +163,7 @@ impl<'a> FunctionGenerator<'a> {
                 let bc = &bytecode[i];
                 let next_bc = &bytecode[i + 1];
                 self.gen_bytecode(&bytecode_ctx, &bytecode[i], Some(next_bc));
-                if !bc.is_branch() && matches!(next_bc, Bytecode::Label(..)) {
+                if !bc.is_branching() && matches!(next_bc, Bytecode::Label(..)) {
                     // At block boundaries without a preceding branch, need to flush stack
                     // TODO: to avoid this, we should use the CFG for code generation.
                     self.abstract_flush_stack_after(&bytecode_ctx, 0);

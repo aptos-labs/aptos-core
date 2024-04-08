@@ -18,11 +18,14 @@ use aptos_protos::{
     internal::fullnode::v1::{
         transactions_from_node_response, TransactionsFromNodeResponse, TransactionsOutput,
     },
-    transaction::v1::Transaction as TransactionPB,
+    transaction::v1::{
+        EventSizeInfo, Transaction as TransactionPB, TransactionSizeInfo, WriteOpSizeInfo,
+    },
     util::timestamp::Timestamp,
 };
 use aptos_vm::data_cache::AsMoveResolver;
 use itertools::Itertools;
+use serde::Serialize;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 use tonic::Status;
@@ -329,7 +332,7 @@ impl IndexerStreamCoordinator {
     fn convert_to_api_txns(
         context: Arc<Context>,
         raw_txns: Vec<TransactionOnChainData>,
-    ) -> Vec<APITransaction> {
+    ) -> Vec<(APITransaction, TransactionSizeInfo)> {
         if raw_txns.is_empty() {
             return vec![];
         }
@@ -338,7 +341,8 @@ impl IndexerStreamCoordinator {
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
         let state_view = context.latest_state_view().unwrap();
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(context.db.clone());
+        let converter =
+            resolver.as_converter(context.db.clone(), context.table_info_reader.clone());
 
         // Enrich data with block metadata
         let (_, _, block_event) = context
@@ -362,7 +366,13 @@ impl IndexerStreamCoordinator {
             // Do not update block_height if first block is block metadata
             if ind > 0 {
                 // Update the timestamp if the next block occurs
-                if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
+                if let Some(txn) = raw_txn.transaction.try_as_block_metadata_ext() {
+                    timestamp = txn.timestamp_usecs();
+                    epoch = txn.epoch();
+                    epoch_bcs = aptos_api_types::U64::from(epoch);
+                    block_height += 1;
+                    block_height_bcs = aptos_api_types::U64::from(block_height);
+                } else if let Some(txn) = raw_txn.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                     epoch = txn.epoch();
                     epoch_bcs = aptos_api_types::U64::from(epoch);
@@ -370,6 +380,7 @@ impl IndexerStreamCoordinator {
                     block_height_bcs = aptos_api_types::U64::from(block_height);
                 }
             }
+            let size_info = Self::get_size_info(&raw_txn);
             match converter
                 .try_into_onchain_transaction(timestamp, raw_txn)
                 .map(|mut txn| {
@@ -402,7 +413,7 @@ impl IndexerStreamCoordinator {
                     };
                     txn
                 }) {
-                Ok(transaction) => transactions.push(transaction),
+                Ok(transaction) => transactions.push((transaction, size_info)),
                 Err(err) => {
                     UNABLE_TO_FETCH_TRANSACTION.inc();
                     error!(
@@ -430,7 +441,7 @@ impl IndexerStreamCoordinator {
             start_version = first_version,
             end_version = transactions
                 .last()
-                .map(|txn| txn.version().unwrap())
+                .map(|(txn, _size_info)| txn.version().unwrap())
                 .unwrap_or(0),
             num_of_transactions = transactions.len(),
             fetch_duration_in_ms = fetch_millis,
@@ -442,12 +453,45 @@ impl IndexerStreamCoordinator {
         transactions
     }
 
-    fn convert_to_pb_txns(api_txns: Vec<APITransaction>) -> Vec<TransactionPB> {
+    fn ser_size_u32<T: Serialize>(t: &T) -> u32 {
+        bcs::serialized_size(t).expect("serialized_size() failed") as u32
+    }
+
+    fn get_size_info(raw_txn: &TransactionOnChainData) -> TransactionSizeInfo {
+        TransactionSizeInfo {
+            transaction_bytes: Self::ser_size_u32(&raw_txn.transaction),
+            event_size_info: raw_txn
+                .events
+                .iter()
+                .map(|event| EventSizeInfo {
+                    type_tag_bytes: Self::ser_size_u32(event.type_tag()),
+                    total_bytes: event.size() as u32,
+                })
+                .collect(),
+            write_op_size_info: raw_txn
+                .changes
+                .iter()
+                .map(|(state_key, write_op)| WriteOpSizeInfo {
+                    key_bytes: Self::ser_size_u32(state_key),
+                    value_bytes: write_op.size() as u32,
+                })
+                .collect(),
+        }
+    }
+
+    fn convert_to_pb_txns(
+        api_txns: Vec<(APITransaction, TransactionSizeInfo)>,
+    ) -> Vec<TransactionPB> {
         api_txns
-            .iter()
-            .map(|txn| {
+            .into_iter()
+            .map(|(txn, size_info)| {
                 let info = txn.transaction_info().unwrap();
-                convert_transaction(txn, info.block_height.unwrap().0, info.epoch.unwrap().0)
+                convert_transaction(
+                    &txn,
+                    info.block_height.unwrap().0,
+                    info.epoch.unwrap().0,
+                    size_info,
+                )
             })
             .collect()
     }

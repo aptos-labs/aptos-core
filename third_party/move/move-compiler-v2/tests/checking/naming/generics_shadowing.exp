@@ -1,12 +1,4 @@
-
-Diagnostics:
-warning: Unused parameter `s`. Consider removing or prefixing with an underscore: `_s`
-  ┌─ tests/checking/naming/generics_shadowing.move:6:29
-  │
-6 │     fun foo<S: copy + drop>(s: S): S {
-  │                             ^
-
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x2::M {
     struct S {
         dummy_field: bool,
@@ -16,15 +8,6 @@ module 0x2::M {
           let s: S = s;
           {
             let s: S = s;
-            s
-          }
-        }
-    }
-    spec fun $foo<S>(s: #0): #0 {
-        {
-          let s: #0 = s;
-          {
-            let s: #0 = s;
             s
           }
         }

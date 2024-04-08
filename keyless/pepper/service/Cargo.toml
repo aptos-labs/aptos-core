@@ -1,0 +1,39 @@
+[package]
+name = "aptos-keyless-pepper-service"
+description = "Aptos Keyless pepper service"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+aptos-keyless-pepper-common = { workspace = true }
+aptos-types = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-serialize = { workspace = true }
+bcs = { workspace = true }
+byteorder = { workspace = true }
+dashmap = { workspace = true }
+env_logger = { workspace = true }
+group = { workspace = true }
+hex = { workspace = true }
+hyper = { workspace = true }
+jsonwebtoken = { workspace = true }
+jwt = { workspace = true }
+log = { workspace = true }
+once_cell = { workspace = true }
+rand = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha3 = { workspace = true }
+tokio = { workspace = true }

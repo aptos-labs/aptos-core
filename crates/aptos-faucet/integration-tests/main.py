@@ -97,7 +97,9 @@ def main():
     else:
         logging.getLogger().setLevel(logging.INFO)
 
-    if platform.system() == "Darwin" and platform.processor().startswith("arm"):
+    # If we're on Mac and DOCKER_DEFAULT_PLATFORM is not already set, set it to
+    # linux/amd64 since we only publish images for that platform.
+    if platform.system().lower() == "darwin" and platform.processor().lower().startswith("arm"):
         if not os.environ.get("DOCKER_DEFAULT_PLATFORM"):
             os.environ["DOCKER_DEFAULT_PLATFORM"] = "linux/amd64"
             LOG.info(

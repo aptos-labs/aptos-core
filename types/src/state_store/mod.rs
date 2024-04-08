@@ -19,7 +19,6 @@ use arr_macro::arr;
 use bytes::Bytes;
 use std::{collections::HashMap, ops::Deref};
 
-pub mod account_with_state_cache;
 pub mod account_with_state_view;
 pub mod errors;
 pub mod in_memory_state_view;

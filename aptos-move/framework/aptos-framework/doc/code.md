@@ -11,6 +11,7 @@ This module supports functionality related to code management.
 -  [Struct `PackageDep`](#0x1_code_PackageDep)
 -  [Struct `ModuleMetadata`](#0x1_code_ModuleMetadata)
 -  [Struct `UpgradePolicy`](#0x1_code_UpgradePolicy)
+-  [Struct `PublishPackage`](#0x1_code_PublishPackage)
 -  [Struct `AllowedDep`](#0x1_code_AllowedDep)
 -  [Constants](#@Constants_0)
 -  [Function `upgrade_policy_arbitrary`](#0x1_code_upgrade_policy_arbitrary)
@@ -19,6 +20,7 @@ This module supports functionality related to code management.
 -  [Function `can_change_upgrade_policy_to`](#0x1_code_can_change_upgrade_policy_to)
 -  [Function `initialize`](#0x1_code_initialize)
 -  [Function `publish_package`](#0x1_code_publish_package)
+-  [Function `freeze_code_object`](#0x1_code_freeze_code_object)
 -  [Function `publish_package_txn`](#0x1_code_publish_package_txn)
 -  [Function `check_upgradability`](#0x1_code_check_upgradability)
 -  [Function `check_coexistence`](#0x1_code_check_coexistence)
@@ -32,6 +34,7 @@ This module supports functionality related to code management.
     -  [Module-level Specification](#module-level-spec)
     -  [Function `initialize`](#@Specification_1_initialize)
     -  [Function `publish_package`](#@Specification_1_publish_package)
+    -  [Function `freeze_code_object`](#@Specification_1_freeze_code_object)
     -  [Function `publish_package_txn`](#@Specification_1_publish_package_txn)
     -  [Function `check_upgradability`](#@Specification_1_check_upgradability)
     -  [Function `check_coexistence`](#@Specification_1_check_coexistence)
@@ -43,7 +46,9 @@ This module supports functionality related to code management.
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/doc/copyable_any.md#0x1_copyable_any">0x1::copyable_any</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="event.md#0x1_event">0x1::event</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<b>use</b> <a href="object.md#0x1_object">0x1::object</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
@@ -262,6 +267,41 @@ Describes an upgrade policy
 
 </details>
 
+<a id="0x1_code_PublishPackage"></a>
+
+## Struct `PublishPackage`
+
+Event emitted when code is published to an address.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="code.md#0x1_code_PublishPackage">PublishPackage</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>code_address: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>is_upgrade: bool</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
 <a id="0x1_code_AllowedDep"></a>
 
 ## Struct `AllowedDep`
@@ -301,6 +341,16 @@ A helper type for request_publish_with_allowed_deps
 <a id="@Constants_0"></a>
 
 ## Constants
+
+
+<a id="0x1_code_ECODE_OBJECT_DOES_NOT_EXIST"></a>
+
+<code>code_object</code> does not exist.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>: u64 = 10;
+</code></pre>
+
 
 
 <a id="0x1_code_EDEP_ARBITRARY_NOT_SAME_ADDRESS"></a>
@@ -349,6 +399,16 @@ Package contains duplicate module names with existing modules publised in other 
 
 
 <pre><code><b>const</b> <a href="code.md#0x1_code_EMODULE_NAME_CLASH">EMODULE_NAME_CLASH</a>: u64 = 1;
+</code></pre>
+
+
+
+<a id="0x1_code_ENOT_PACKAGE_OWNER"></a>
+
+Not the owner of the package registry.
+
+
+<pre><code><b>const</b> <a href="code.md#0x1_code_ENOT_PACKAGE_OWNER">ENOT_PACKAGE_OWNER</a>: u64 = 9;
 </code></pre>
 
 
@@ -584,6 +644,11 @@ package.
         <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(packages, pack)
     };
 
+    <a href="event.md#0x1_event_emit">event::emit</a>(<a href="code.md#0x1_code_PublishPackage">PublishPackage</a> {
+        code_address: addr,
+        is_upgrade: upgrade_number &gt; 0
+    });
+
     // Request publish
     <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_code_dependency_check_enabled">features::code_dependency_check_enabled</a>())
         <a href="code.md#0x1_code_request_publish_with_allowed_deps">request_publish_with_allowed_deps</a>(addr, module_names, allowed_deps, <a href="code.md#0x1_code">code</a>, policy.policy)
@@ -591,6 +656,41 @@ package.
     // The new `request_publish_with_allowed_deps` <b>has</b> not yet rolled out, so call downwards
     // compatible <a href="code.md#0x1_code">code</a>.
         <a href="code.md#0x1_code_request_publish">request_publish</a>(addr, module_names, <a href="code.md#0x1_code">code</a>, policy.policy)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_code_freeze_code_object"></a>
+
+## Function `freeze_code_object`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="code.md#0x1_code_PackageRegistry">code::PackageRegistry</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: Object&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;) <b>acquires</b> <a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a> {
+    <b>let</b> code_object_addr = <a href="object.md#0x1_object_object_address">object::object_address</a>(&code_object);
+    <b>assert</b>!(<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="code.md#0x1_code_ECODE_OBJECT_DOES_NOT_EXIST">ECODE_OBJECT_DOES_NOT_EXIST</a>));
+    <b>assert</b>!(
+        <a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher)),
+        <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="code.md#0x1_code_ENOT_PACKAGE_OWNER">ENOT_PACKAGE_OWNER</a>)
+    );
+
+    <b>let</b> registry = <b>borrow_global_mut</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr);
+    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each_mut">vector::for_each_mut</a>&lt;<a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a>&gt;(&<b>mut</b> registry.packages, |pack| {
+        <b>let</b> package: &<b>mut</b> <a href="code.md#0x1_code_PackageMetadata">PackageMetadata</a> = pack;
+        package.upgrade_policy = <a href="code.md#0x1_code_upgrade_policy_immutable">upgrade_policy_immutable</a>();
+    });
 }
 </code></pre>
 
@@ -1004,6 +1104,27 @@ Native function to initiate module loading, including a list of allowed dependen
 <b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(owner);
 <b>modifies</b> <b>global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(addr);
 <b>aborts_if</b> pack.upgrade_policy.policy &lt;= <a href="code.md#0x1_code_upgrade_policy_arbitrary">upgrade_policy_arbitrary</a>().policy;
+</code></pre>
+
+
+
+<a id="@Specification_1_freeze_code_object"></a>
+
+### Function `freeze_code_object`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="code.md#0x1_code_freeze_code_object">freeze_code_object</a>(publisher: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, code_object: <a href="object.md#0x1_object_Object">object::Object</a>&lt;<a href="code.md#0x1_code_PackageRegistry">code::PackageRegistry</a>&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial;
+<b>let</b> code_object_addr = code_object.inner;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="object.md#0x1_object_ObjectCore">object::ObjectCore</a>&gt;(code_object_addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr);
+<b>aborts_if</b> !<a href="object.md#0x1_object_is_owner">object::is_owner</a>(code_object, <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(publisher));
+<b>modifies</b> <b>global</b>&lt;<a href="code.md#0x1_code_PackageRegistry">PackageRegistry</a>&gt;(code_object_addr);
 </code></pre>
 
 

@@ -24,10 +24,12 @@ pub mod jwks;
 pub mod ledger_info;
 pub mod mempool_status;
 pub mod move_any;
+pub mod move_fixed_point;
 pub mod move_resource;
 pub mod move_utils;
 pub mod network_address;
 pub mod nibble;
+pub mod object_address;
 pub mod on_chain_config;
 pub mod proof;
 #[cfg(any(test, feature = "fuzzing"))]
@@ -60,10 +62,9 @@ pub use utility_coin::*;
 pub mod account_view;
 pub mod aggregate_signature;
 pub mod block_executor;
-pub mod bn254_circom;
 pub mod bytes;
 pub mod delayed_fields;
+pub mod keyless;
 pub mod state_store;
 #[cfg(test)]
 mod unit_tests;
-pub mod zkid;

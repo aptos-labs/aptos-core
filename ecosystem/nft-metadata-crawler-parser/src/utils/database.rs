@@ -16,7 +16,7 @@ use tracing::{debug, info};
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
 
 /// Establishes a connection pool to Postgres
-pub fn establish_connection_pool(database_url: String) -> Pool<ConnectionManager<PgConnection>> {
+pub fn establish_connection_pool(database_url: &str) -> Pool<ConnectionManager<PgConnection>> {
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     Pool::builder()
         .build(manager)
@@ -35,6 +35,7 @@ pub fn run_migrations(pool: &Pool<ConnectionManager<PgConnection>>) {
 pub fn upsert_uris(
     conn: &mut PooledConnection<ConnectionManager<PgConnection>>,
     entry: &NFTMetadataCrawlerURIs,
+    ltv: i64,
 ) -> anyhow::Result<usize> {
     use schema::nft_metadata_crawler::parsed_asset_uris::dsl::*;
 
@@ -51,7 +52,9 @@ pub fn upsert_uris(
             image_optimizer_retry_count.eq(excluded(image_optimizer_retry_count)),
             json_parser_retry_count.eq(excluded(json_parser_retry_count)),
             animation_optimizer_retry_count.eq(excluded(animation_optimizer_retry_count)),
+            inserted_at.eq(excluded(inserted_at)),
             do_not_parse.eq(excluded(do_not_parse)),
+            last_transaction_version.eq(ltv),
         ));
 
     let debug_query = diesel::debug_query::<diesel::pg::Pg, _>(&query).to_string();

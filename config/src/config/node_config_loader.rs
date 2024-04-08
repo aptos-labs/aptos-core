@@ -77,12 +77,15 @@ impl<P: AsRef<Path>> NodeConfigLoader<P> {
         let input_dir = RootPath::new(&self.node_config_path);
         node_config.execution.load_from_path(&input_dir)?;
 
+        // Update the data directory. This needs to be done before
+        // we optimize and sanitize the node configs (because some optimizers
+        // rely on the data directory for file reading/writing).
+        node_config.set_data_dir(node_config.get_data_dir().to_path_buf());
+
         // Optimize and sanitize the node config
         let local_config_yaml = get_local_config_yaml(&self.node_config_path)?;
         optimize_and_sanitize_node_config(&mut node_config, local_config_yaml)?;
 
-        // Update the data directory
-        node_config.set_data_dir(node_config.get_data_dir().to_path_buf());
         Ok(node_config)
     }
 }

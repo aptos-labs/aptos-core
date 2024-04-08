@@ -7,13 +7,22 @@
 
 use aptos_dkg::{
     pvss::{
-        das, insecure_field,
+        das,
+        dealt_secret_key::g1::DealtSecretKey,
+        insecure_field,
         test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux},
         traits::{SecretSharingConfig, Transcript},
         GenericWeighting, Player, WeightedConfig,
     },
-    weighted_vuf::{bls, pinkas::PinkasWUF, traits::WeightedVUF},
+    utils::random::{random_g1_points, random_g2_points},
+    weighted_vuf::{
+        bls,
+        pinkas::{PinkasWUF, PublicParameters, RandomizedPKs},
+        traits::WeightedVUF,
+    },
 };
+use aptos_runtimes::spawn_rayon_thread_pool;
+use blstrs::{G1Projective, G2Projective, Scalar};
 use core::iter::zip;
 use criterion::{
     criterion_group, criterion_main,
@@ -26,12 +35,85 @@ const BENCH_MSG: &[u8; 36] = b"some dummy message for the benchmark";
 
 pub fn all_groups(c: &mut Criterion) {
     let mut group = c.benchmark_group("wvuf/das-pinkas-sk-in-g1");
-    wvuf_benches::<das::WeightedTranscript, PinkasWUF, WallTime>(&mut group);
+    let bench_cases = wvuf_benches::<das::WeightedTranscript, PinkasWUF, WallTime>(&mut group);
+    group.finish();
+
+    let mut group = c.benchmark_group("wvuf/das-pinkas-sk-in-g1");
+    pinkas_wvuf_derive_eval_micro_benches(bench_cases, &mut group);
     group.finish();
 
     let mut group = c.benchmark_group("wvuf/insecure-field-bls");
     wvuf_benches::<GenericWeighting<insecure_field::Transcript>, bls::BlsWUF, WallTime>(&mut group);
     group.finish();
+}
+
+fn pinkas_wvuf_derive_eval_micro_benches(
+    bench_cases: Vec<(
+        WeightedConfig,
+        PublicParameters,
+        DealtSecretKey,
+        <das::WeightedTranscript as Transcript>::DealtPubKey,
+        Vec<<das::WeightedTranscript as Transcript>::DealtSecretKeyShare>,
+        Vec<<das::WeightedTranscript as Transcript>::DealtPubKeyShare>,
+        Vec<(
+            Scalar,
+            <das::WeightedTranscript as Transcript>::DealtSecretKeyShare,
+        )>,
+        Vec<(
+            RandomizedPKs,
+            <das::WeightedTranscript as Transcript>::DealtPubKeyShare,
+        )>,
+        Vec<RandomizedPKs>,
+    )>,
+    mut group: &mut BenchmarkGroup<WallTime>,
+) {
+    let mut max_cpus = num_cpus::get();
+    println!("Max # of threads: {}", max_cpus);
+    let mut num_threads_cases = vec![1usize];
+    while max_cpus > 1 {
+        num_threads_cases.push(num_threads_cases.last().unwrap() * 2);
+        max_cpus /= 2;
+    }
+    println!("Benchmarking with num threads in {:?}", num_threads_cases);
+
+    let mut rng = thread_rng();
+
+    // bench_cases.reverse();
+    for (wc, _vuf_pp, _sk, _pk, _sks, _pks, asks, apks, _deltas) in bench_cases {
+        let worst_case_size = wc.get_worst_case_eligible_subset_of_players(&mut rng).len();
+        println!("Worst case size for {} is {}", wc, worst_case_size);
+        pinkas_wvuf_derive_eval_collect_lagrange_shares_and_rks(
+            &wc,
+            &asks,
+            &apks,
+            &mut group,
+            &mut rng,
+            WeightedConfig::get_worst_case_eligible_subset_of_players,
+            "worst_case",
+        );
+
+        for num_threads in &num_threads_cases {
+            pinkas_wvuf_derive_eval_rks_multiexps(
+                &wc,
+                &asks,
+                &apks,
+                &mut group,
+                &mut rng,
+                WeightedConfig::get_worst_case_eligible_subset_of_players,
+                "worst_case",
+                *num_threads,
+            );
+
+            pinkas_wvuf_derive_eval_multipairing(
+                &wc,
+                &mut group,
+                &mut rng,
+                WeightedConfig::get_worst_case_eligible_subset_of_players,
+                "worst_case",
+                *num_threads,
+            );
+        }
+    }
 }
 
 pub fn wvuf_benches<
@@ -45,7 +127,18 @@ pub fn wvuf_benches<
     M: Measurement,
 >(
     group: &mut BenchmarkGroup<M>,
-) where
+) -> Vec<(
+    WeightedConfig,
+    <WVUF as WeightedVUF>::PublicParameters,
+    <WT as Transcript>::DealtSecretKey,
+    <WT as Transcript>::DealtPubKey,
+    Vec<<WT as Transcript>::DealtSecretKeyShare>,
+    Vec<<WT as Transcript>::DealtPubKeyShare>,
+    Vec<<WVUF as WeightedVUF>::AugmentedSecretKeyShare>,
+    Vec<<WVUF as WeightedVUF>::AugmentedPubKeyShare>,
+    Vec<<WVUF as WeightedVUF>::Delta>,
+)>
+where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
     let mut rng = thread_rng();
@@ -97,12 +190,13 @@ pub fn wvuf_benches<
             asks.push(ask);
             apks.push(apk);
         }
+
         println!();
 
         bench_cases.push((wc, vuf_pp, d.dsk, d.dpk, sks, pks, asks, apks, deltas));
     }
 
-    for (wc, vuf_pp, sk, pk, sks, pks, asks, apks, deltas) in bench_cases {
+    for (wc, vuf_pp, sk, pk, sks, pks, asks, apks, deltas) in &bench_cases {
         wvuf_augment_random_keypair::<WT, WVUF, ThreadRng, M>(
             &wc, &vuf_pp, &sks, &pks, group, &mut rng,
         );
@@ -156,20 +250,25 @@ pub fn wvuf_benches<
                 &subset_type,
             );
 
-            wvuf_derive_eval::<WT, WVUF, ThreadRng, M>(
-                &wc,
-                &vuf_pp,
-                &asks,
-                &apks,
-                group,
-                &mut rng,
-                pick_subset_fn,
-                &subset_type,
-            );
+            for num_threads in [1, 2, 4, 8, 16, 32] {
+                wvuf_derive_eval::<WT, WVUF, ThreadRng, M>(
+                    &wc,
+                    &vuf_pp,
+                    &asks,
+                    &apks,
+                    group,
+                    &mut rng,
+                    pick_subset_fn,
+                    &subset_type,
+                    num_threads,
+                );
+            }
         }
 
         wvuf_eval::<WT, WVUF, M>(&wc, &sk, group);
     }
+
+    bench_cases
 }
 
 fn wvuf_augment_random_keypair<
@@ -430,11 +529,17 @@ fn wvuf_derive_eval<
     rng: &mut R,
     pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
     subset_type: &String,
+    num_threads: usize,
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
 {
+    let pool = spawn_rayon_thread_pool("bench-wvuf".to_string(), Some(num_threads));
+
     group.bench_function(
-        format!("derive_eval/{}-subset/{}", subset_type, wc),
+        format!(
+            "derive_eval/{}-subset/{}-thread/{}",
+            subset_type, num_threads, wc
+        ),
         move |b| {
             b.iter_with_setup(
                 || {
@@ -447,7 +552,151 @@ fn wvuf_derive_eval<
                         .iter()
                         .map(|apk| Some(apk.clone()))
                         .collect::<Vec<Option<WVUF::AugmentedPubKeyShare>>>();
-                    assert!(WVUF::derive_eval(wc, pp, BENCH_MSG, apks.as_slice(), &proof).is_ok())
+                    assert!(
+                        WVUF::derive_eval(wc, pp, BENCH_MSG, apks.as_slice(), &proof, &pool)
+                            .is_ok()
+                    )
+                },
+            )
+        },
+    );
+}
+
+fn pinkas_wvuf_derive_eval_collect_lagrange_shares_and_rks<
+    R: rand_core::RngCore + rand_core::CryptoRng,
+    M: Measurement,
+>(
+    // For efficiency, we re-use the PVSS transcript
+    wc: &WeightedConfig,
+    asks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedSecretKeyShare>,
+    apks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedPubKeyShare>,
+    group: &mut BenchmarkGroup<M>,
+    rng: &mut R,
+    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    subset_type: &str,
+) {
+    group.bench_function(
+        format!("derive_eval_lagr/{}-subset/{}", subset_type, wc),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let apks_and_proofs = get_apks_and_proofs::<
+                        das::WeightedTranscript,
+                        PinkasWUF,
+                        R,
+                    >(
+                        &wc, &asks, apks, rng, pick_subset_fn
+                    );
+                    PinkasWUF::aggregate_shares(&wc, apks_and_proofs.as_slice())
+                },
+                |proof| {
+                    let apks = apks
+                        .iter()
+                        .map(|apk| Some(apk.clone()))
+                        .collect::<Vec<Option<<PinkasWUF as WeightedVUF>::AugmentedPubKeyShare>>>();
+
+                    assert!(
+                        PinkasWUF::collect_lagrange_coeffs_shares_and_rks(wc, &apks, &proof)
+                            .is_ok()
+                    );
+                },
+            )
+        },
+    );
+}
+
+fn pinkas_wvuf_derive_eval_rks_multiexps<
+    R: rand_core::RngCore + rand_core::CryptoRng,
+    M: Measurement,
+>(
+    // For efficiency, we re-use the PVSS transcript
+    wc: &WeightedConfig,
+    asks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedSecretKeyShare>,
+    apks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedPubKeyShare>,
+    group: &mut BenchmarkGroup<M>,
+    rng: &mut R,
+    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    subset_type: &str,
+    num_threads: usize,
+) {
+    let pool = spawn_rayon_thread_pool("bench-wvuf".to_string(), Some(num_threads));
+
+    group.bench_function(
+        format!(
+            "derive_eval_multiexps/{}-subset/{}-thread/{}",
+            subset_type, num_threads, wc
+        ),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let apks_and_proofs = get_apks_and_proofs::<
+                        das::WeightedTranscript,
+                        PinkasWUF,
+                        R,
+                    >(
+                        &wc, &asks, apks, rng, pick_subset_fn
+                    );
+
+                    let apks = apks
+                        .iter()
+                        .map(|apk| Some(apk.clone()))
+                        .collect::<Vec<Option<<PinkasWUF as WeightedVUF>::AugmentedPubKeyShare>>>();
+
+                    let proof = PinkasWUF::aggregate_shares(&wc, apks_and_proofs.as_slice());
+                    let (_, rks, lagr, ranges) = PinkasWUF::collect_lagrange_coeffs_shares_and_rks(
+                        wc,
+                        apks.as_slice(),
+                        &proof,
+                    )
+                    .unwrap();
+
+                    (
+                        proof.clone(),
+                        rks.into_iter().cloned().collect::<Vec<Vec<G1Projective>>>(),
+                        lagr,
+                        ranges,
+                    )
+                },
+                |(proof, rks, lagr, ranges)| {
+                    let rks = rks.iter().map(|e| e).collect::<Vec<&Vec<G1Projective>>>();
+                    let _ = PinkasWUF::rk_multiexps(&proof, rks, &lagr, &ranges, &pool);
+                },
+            )
+        },
+    );
+}
+
+fn pinkas_wvuf_derive_eval_multipairing<
+    R: rand_core::RngCore + rand_core::CryptoRng,
+    M: Measurement,
+>(
+    // For efficiency, we re-use the PVSS transcript
+    wc: &WeightedConfig,
+    group: &mut BenchmarkGroup<M>,
+    rng: &mut R,
+    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    subset_type: &str,
+    num_threads: usize,
+) {
+    let pool = spawn_rayon_thread_pool("bench-wvuf".to_string(), Some(num_threads));
+    let n = pick_subset_fn(wc, rng).len();
+
+    group.bench_function(
+        format!(
+            "derive_eval_multipairing/{}-subset/{}-thread/{}",
+            subset_type, num_threads, wc
+        ),
+        move |b| {
+            b.iter_with_setup(
+                || {
+                    let g1 = random_g1_points(n, rng);
+                    let g2 = random_g2_points(n, rng);
+
+                    (g1, g2)
+                },
+                |(vec_g1, vec_g2)| {
+                    let vec_ref_g2 = vec_g2.iter().collect::<Vec<&G2Projective>>();
+                    let _ = PinkasWUF::multi_pairing(vec_g1, vec_ref_g2, &pool);
                 },
             )
         },

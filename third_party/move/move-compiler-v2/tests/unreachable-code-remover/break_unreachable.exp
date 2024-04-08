@@ -125,12 +125,12 @@ fun m::test() {
      var $t3: u64
      var $t4: bool
      var $t5: u64
-     var $t6: u64
-     var $t7: u64
-     var $t8: u64
-     var $t9: u64
-     var $t10: u64
-     var $t11: u64
+     var $t6: u64 [unused]
+     var $t7: u64 [unused]
+     var $t8: u64 [unused]
+     var $t9: u64 [unused]
+     var $t10: u64 [unused]
+     var $t11: u64 [unused]
   0: $t1 := 0
   1: $t0 := infer($t1)
   2: label L0

@@ -4,6 +4,7 @@ use crate::{
     monitor,
     network::{NetworkSender, QuorumStoreSender},
     quorum_store::{
+        batch_store::BatchWriter,
         counters,
         quorum_store_db::QuorumStoreStorage,
         types::Batch,
@@ -44,6 +45,7 @@ pub struct BatchGenerator {
     my_peer_id: PeerId,
     batch_id: BatchId,
     db: Arc<dyn QuorumStoreStorage>,
+    batch_writer: Arc<dyn BatchWriter>,
     config: QuorumStoreConfig,
     mempool_proxy: MempoolProxy,
     batches_in_progress: HashMap<BatchId, Vec<TransactionSummary>>,
@@ -61,6 +63,7 @@ impl BatchGenerator {
         my_peer_id: PeerId,
         config: QuorumStoreConfig,
         db: Arc<dyn QuorumStoreStorage>,
+        batch_writer: Arc<dyn BatchWriter>,
         mempool_tx: Sender<QuorumStoreRequest>,
         mempool_txn_pull_timeout_ms: u64,
     ) -> Self {
@@ -85,6 +88,7 @@ impl BatchGenerator {
             my_peer_id,
             batch_id,
             db,
+            batch_writer,
             config,
             mempool_proxy: MempoolProxy::new(mempool_tx, mempool_txn_pull_timeout_ms),
             batches_in_progress: HashMap::new(),
@@ -401,9 +405,22 @@ impl BatchGenerator {
 
                         let dynamic_pull_max_txn = std::cmp::max(
                             (since_last_non_empty_pull_ms as f64 / 1000.0 * dynamic_pull_txn_per_s as f64) as u64, 1);
-                        let batches = self.handle_scheduled_pull(dynamic_pull_max_txn).await;
+                        let pull_max_txn = std::cmp::min(
+                            dynamic_pull_max_txn,
+                            self.config.sender_max_total_txns as u64,
+                        );
+                        let batches = self.handle_scheduled_pull(pull_max_txn).await;
                         if !batches.is_empty() {
                             last_non_empty_pull = tick_start;
+
+                            let persist_start = Instant::now();
+                            let mut persist_requests = vec![];
+                            for batch in batches.clone().into_iter() {
+                                persist_requests.push(batch.into());
+                            }
+                            self.batch_writer.persist(persist_requests);
+                            counters::BATCH_CREATION_PERSIST_LATENCY.observe_duration(persist_start.elapsed());
+
                             network_sender.broadcast_batch_msg(batches).await;
                         } else if tick_start.elapsed() > interval.period().checked_div(2).unwrap_or(Duration::ZERO) {
                             // If the pull takes too long, it's also accounted as a non-empty pull to avoid pulling too often.

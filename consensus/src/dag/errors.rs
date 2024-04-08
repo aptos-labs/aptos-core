@@ -7,6 +7,14 @@ use std::ops::Deref;
 use thiserror::Error as ThisError;
 
 #[derive(Clone, ThisError, Debug, Serialize, Deserialize)]
+pub enum DagFetchError {
+    #[error("fetch failed")]
+    Failed,
+    #[error("already exists")]
+    AlreadyExists,
+}
+
+#[derive(Clone, ThisError, Debug, Serialize, Deserialize)]
 pub enum NodeBroadcastHandleError {
     #[error("invalid parent in node")]
     InvalidParent,
@@ -14,6 +22,8 @@ pub enum NodeBroadcastHandleError {
     MissingParents,
     #[error("stale round number")]
     StaleRound(Round),
+    #[error("refused to vote")]
+    VoteRefused,
 }
 
 #[derive(Clone, Debug, ThisError, Serialize, Deserialize)]

@@ -2140,3 +2140,13 @@ impl TryInto<ScriptFunctionArguments> for ScriptFunctionArgumentsJSON {
         })
     }
 }
+
+#[derive(Parser)]
+pub struct OverrideSizeCheckOption {
+    /// Whether to override the check for maximal size of published data
+    ///
+    /// This won't bypass on chain checks, so if you are not allowed to go over the size check, it
+    /// will still be blocked from publishing.
+    #[clap(long)]
+    pub(crate) value: bool,
+}

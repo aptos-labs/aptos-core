@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x42::fields {
     struct T {
         h: u64,
@@ -57,23 +57,6 @@ module 0x42::fields {
         select fields::T.h(select fields::S.g(x)) = 42;
         x
     }
-    spec fun $read_generic_val(x: fields::G<u64>): u64 {
-        select fields::G.f(x)
-    }
-    spec fun $read_ref(x: fields::S): u64 {
-        select fields::T.h(select fields::S.g(x))
-    }
-    spec fun $read_val(x: fields::S): u64 {
-        select fields::T.h(select fields::S.g(x))
-    }
-    spec fun $write_generic_val(x: fields::G<u64>,v: u64) {
-        select fields::G.f(x) = v
-    }
-    spec fun $write_local_direct(): fields::S;
-    spec fun $write_local_via_ref(): fields::S;
-    spec fun $write_local_via_ref_2(): fields::S;
-    spec fun $write_param(x: &mut fields::S);
-    spec fun $write_val(x: fields::S): fields::S;
 } // end 0x42::fields
 
 ============ initial bytecode ================

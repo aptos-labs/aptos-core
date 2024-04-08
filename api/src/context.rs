@@ -18,8 +18,9 @@ use aptos_api_types::{
 };
 use aptos_config::config::{NodeConfig, RoleType};
 use aptos_crypto::HashValue;
+use aptos_db_indexer::table_info_reader::TableInfoReader;
 use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule};
-use aptos_logger::{error, info, warn, Schema};
+use aptos_logger::{error, info, Schema};
 use aptos_mempool::{MempoolClientRequest, MempoolClientSender, SubmissionStatus};
 use aptos_storage_interface::{
     state_view::{DbStateView, DbStateViewAtVersion, LatestDbStateCheckpointView},
@@ -76,6 +77,7 @@ pub struct Context {
     gas_limit_cache: Arc<RwLock<GasLimitCache>>,
     view_function_stats: Arc<FunctionStats>,
     simulate_txn_stats: Arc<FunctionStats>,
+    pub table_info_reader: Option<Arc<dyn TableInfoReader>>,
 }
 
 impl std::fmt::Debug for Context {
@@ -90,6 +92,7 @@ impl Context {
         db: Arc<dyn DbReader>,
         mp_sender: MempoolClientSender,
         node_config: NodeConfig,
+        table_info_reader: Option<Arc<dyn TableInfoReader>>,
     ) -> Self {
         let (view_function_stats, simulate_txn_stats) = {
             let log_per_call_stats = node_config.api.periodic_function_stats_sec.is_some();
@@ -126,6 +129,7 @@ impl Context {
             })),
             view_function_stats,
             simulate_txn_stats,
+            table_info_reader,
         }
     }
 
@@ -217,55 +221,33 @@ impl Context {
     }
 
     pub fn get_latest_ledger_info<E: ServiceUnavailableError>(&self) -> Result<LedgerInfo, E> {
-        let maybe_oldest_version = self
-            .db
-            .get_first_viable_txn_version()
-            .context("Failed to retrieve oldest version in DB")
-            .map_err(|e| {
-                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-            })?;
         let ledger_info = self
             .get_latest_ledger_info_with_signatures()
             .context("Failed to retrieve latest ledger info")
             .map_err(|e| {
                 E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
             })?;
-
-        let (oldest_version, oldest_block_height, block_height) = match self
+        let (oldest_version, oldest_block_height) = self
             .db
-            .get_next_block_event(maybe_oldest_version)
-        {
-            Ok((version, oldest_block_event)) => {
-                let (_, _, newest_block_event) = self
-                    .db
-                    .get_block_info_by_version(ledger_info.ledger_info().version())
-                    .context("Failed to retrieve latest block information")
-                    .map_err(|e| {
-                        E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
-                    })?;
-                (
-                    version,
-                    oldest_block_event.height(),
-                    newest_block_event.height(),
-                )
-            },
-            Err(err) => {
-                // when event index is disabled, we won't be able to search the NewBlock event stream.
-                // TODO(grao): evaluate adding dedicated block_height_by_version index
-                warn!(
-                    error = ?err,
-                    "Failed to query event indices, might be turned off. Ignoring.",
-                );
-                (maybe_oldest_version, 0, 0)
-            },
-        };
+            .get_first_viable_block()
+            .context("Failed to retrieve oldest block information")
+            .map_err(|e| {
+                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+            })?;
+        let (_, _, newest_block_event) = self
+            .db
+            .get_block_info_by_version(ledger_info.ledger_info().version())
+            .context("Failed to retrieve latest block information")
+            .map_err(|e| {
+                E::service_unavailable_with_code_no_info(e, AptosErrorCode::InternalError)
+            })?;
 
         Ok(LedgerInfo::new(
             &self.chain_id(),
             &ledger_info,
             oldest_version,
             oldest_block_height,
-            block_height,
+            newest_block_event.height(),
         ))
     }
 
@@ -661,12 +643,14 @@ impl Context {
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone());
+        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
                 // Update the timestamp if the next block occurs
-                if let Some(txn) = t.transaction.try_as_block_metadata() {
+                if let Some(txn) = t.transaction.try_as_block_metadata_ext() {
+                    timestamp = txn.timestamp_usecs();
+                } else if let Some(txn) = t.transaction.try_as_block_metadata() {
                     timestamp = txn.timestamp_usecs();
                 }
                 let txn = converter.try_into_onchain_transaction(timestamp, t)?;
@@ -692,7 +676,7 @@ impl Context {
 
         let state_view = self.latest_state_view_poem(ledger_info)?;
         let resolver = state_view.as_move_resolver();
-        let converter = resolver.as_converter(self.db.clone());
+        let converter = resolver.as_converter(self.db.clone(), self.table_info_reader.clone());
         let txns: Vec<aptos_api_types::Transaction> = data
             .into_iter()
             .map(|t| {
@@ -745,7 +729,7 @@ impl Context {
             .enumerate()
             .map(|(i, ((txn, txn_output), info))| {
                 let version = start_version + i as u64;
-                let (write_set, events, _, _) = txn_output.unpack();
+                let (write_set, events, _, _, _) = txn_output.unpack();
                 self.get_accumulator_root_hash(version)
                     .map(|h| (version, txn, info, events, h, write_set).into())
             })

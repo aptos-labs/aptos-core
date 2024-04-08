@@ -1,3 +1,156 @@
 processed 2 tasks
 
+task 0 'publish'. lines 1-11:
+
+
+
 ==> Compiler v2 delivered same results!
+
+>>> V1 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v6
+module cafe.vectors {
+
+
+test_for_each_mut() /* def_idx: 0 */ {
+L0:	loc0: &mut u64
+L1:	loc1: u64
+L2:	loc2: u64
+L3:	loc3: vector<u64>
+L4:	loc4: &mut vector<u64>
+B0:
+	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[3](loc3: vector<u64>)
+	2: LdU64(2)
+	3: StLoc[2](loc2: u64)
+	4: MutBorrowLoc[3](loc3: vector<u64>)
+	5: StLoc[4](loc4: &mut vector<u64>)
+	6: LdU64(0)
+	7: StLoc[1](loc1: u64)
+B1:
+	8: CopyLoc[1](loc1: u64)
+	9: CopyLoc[4](loc4: &mut vector<u64>)
+	10: FreezeRef
+	11: VecLen(2)
+	12: Lt
+	13: BrFalse(31)
+B2:
+	14: Branch(15)
+B3:
+	15: CopyLoc[4](loc4: &mut vector<u64>)
+	16: CopyLoc[1](loc1: u64)
+	17: VecMutBorrow(2)
+	18: StLoc[0](loc0: &mut u64)
+	19: CopyLoc[2](loc2: u64)
+	20: MoveLoc[0](loc0: &mut u64)
+	21: WriteRef
+	22: MoveLoc[2](loc2: u64)
+	23: LdU64(1)
+	24: Add
+	25: StLoc[2](loc2: u64)
+	26: MoveLoc[1](loc1: u64)
+	27: LdU64(1)
+	28: Add
+	29: StLoc[1](loc1: u64)
+	30: Branch(8)
+B4:
+	31: MoveLoc[4](loc4: &mut vector<u64>)
+	32: Pop
+	33: MoveLoc[3](loc3: vector<u64>)
+	34: LdConst[1](Vector(U64): [3, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0])
+	35: Eq
+	36: BrFalse(38)
+B5:
+	37: Branch(40)
+B6:
+	38: LdU64(0)
+	39: Abort
+B7:
+	40: Ret
+}
+}
+== END Bytecode ==
+}
+
+>>> V2 Compiler {
+== BEGIN Bytecode ==
+// Move bytecode v7
+module cafe.vectors {
+
+
+test_for_each_mut() /* def_idx: 0 */ {
+L0:	loc0: vector<u64>
+L1:	loc1: u64
+L2:	loc2: &mut vector<u64>
+L3:	loc3: u64
+L4:	loc4: u64
+L5:	loc5: &mut vector<u64>
+L6:	loc6: &mut u64
+L7:	loc7: u64
+L8:	loc8: u64
+L9:	loc9: vector<u64>
+B0:
+	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
+	1: StLoc[0](loc0: vector<u64>)
+	2: LdU64(2)
+	3: StLoc[1](loc1: u64)
+	4: MutBorrowLoc[0](loc0: vector<u64>)
+	5: StLoc[2](loc2: &mut vector<u64>)
+	6: LdU64(0)
+	7: StLoc[3](loc3: u64)
+B1:
+	8: CopyLoc[2](loc2: &mut vector<u64>)
+	9: FreezeRef
+	10: VecLen(1)
+	11: StLoc[4](loc4: u64)
+	12: CopyLoc[3](loc3: u64)
+	13: MoveLoc[4](loc4: u64)
+	14: Lt
+	15: BrFalse(38)
+B2:
+	16: CopyLoc[2](loc2: &mut vector<u64>)
+	17: StLoc[5](loc5: &mut vector<u64>)
+	18: MoveLoc[5](loc5: &mut vector<u64>)
+	19: CopyLoc[3](loc3: u64)
+	20: VecMutBorrow(1)
+	21: StLoc[6](loc6: &mut u64)
+	22: CopyLoc[1](loc1: u64)
+	23: MoveLoc[6](loc6: &mut u64)
+	24: WriteRef
+	25: LdU64(1)
+	26: StLoc[7](loc7: u64)
+	27: MoveLoc[1](loc1: u64)
+	28: MoveLoc[7](loc7: u64)
+	29: Add
+	30: StLoc[1](loc1: u64)
+	31: LdU64(1)
+	32: StLoc[8](loc8: u64)
+	33: MoveLoc[3](loc3: u64)
+	34: MoveLoc[8](loc8: u64)
+	35: Add
+	36: StLoc[3](loc3: u64)
+	37: Branch(41)
+B3:
+	38: MoveLoc[2](loc2: &mut vector<u64>)
+	39: Pop
+	40: Branch(42)
+B4:
+	41: Branch(8)
+B5:
+	42: LdConst[1](Vector(U64): [3, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0])
+	43: StLoc[9](loc9: vector<u64>)
+	44: MoveLoc[0](loc0: vector<u64>)
+	45: MoveLoc[9](loc9: vector<u64>)
+	46: Eq
+	47: BrFalse(49)
+B6:
+	48: Branch(51)
+B7:
+	49: LdU64(0)
+	50: Abort
+B8:
+	51: Ret
+}
+}
+== END Bytecode ==
+}

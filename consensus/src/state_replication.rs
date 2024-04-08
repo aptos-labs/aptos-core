@@ -10,7 +10,7 @@ use crate::{
     transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
-use aptos_consensus_types::{block::Block, executed_block::ExecutedBlock};
+use aptos_consensus_types::{block::Block, pipelined_block::PipelinedBlock};
 use aptos_crypto::HashValue;
 use aptos_executor_types::ExecutorResult;
 use aptos_types::{
@@ -20,7 +20,7 @@ use aptos_types::{
 use std::sync::Arc;
 
 pub type StateComputerCommitCallBackType =
-    Box<dyn FnOnce(&[Arc<ExecutedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
+    Box<dyn FnOnce(&[Arc<PipelinedBlock>], LedgerInfoWithSignatures) + Send + Sync>;
 
 /// While Consensus is managing proposed blocks, `StateComputer` is managing the results of the
 /// (speculative) execution of their payload.
@@ -57,7 +57,7 @@ pub trait StateComputer: Send + Sync {
     /// Send a successful commit. A future is fulfilled when the state is finalized.
     async fn commit(
         &self,
-        blocks: &[Arc<ExecutedBlock>],
+        blocks: &[Arc<PipelinedBlock>],
         finality_proof: LedgerInfoWithSignatures,
         callback: StateComputerCommitCallBackType,
     ) -> ExecutorResult<()>;

@@ -10,6 +10,6 @@ script {
         aptos_governance::reconfigure(&framework_signer);
 
         // Then, disable the feature.
-        features::change_feature_flags(&framework_signer, vector[], vector[feature]);
+        features::change_feature_flags_for_next_epoch(&framework_signer, vector[], vector[feature]);
     }
 }

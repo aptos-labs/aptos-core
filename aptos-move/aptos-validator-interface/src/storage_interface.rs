@@ -17,6 +17,7 @@ use aptos_types::{
     state_store::{state_key::StateKey, state_key_prefix::StateKeyPrefix, state_value::StateValue},
     transaction::{Transaction, TransactionInfo, Version},
 };
+use move_core_types::language_storage::ModuleId;
 use std::{collections::HashMap, path::Path, sync::Arc};
 
 pub struct DBDebuggerInterface(Arc<dyn DbReader>);
@@ -32,7 +33,6 @@ impl DBDebuggerInterface {
                 false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
-                false, /* indexer async v2 */
             )
             .map_err(anyhow::Error::from)?,
         )))
@@ -96,6 +96,14 @@ impl AptosValidatorInterface for DBDebuggerInterface {
         _start: Version,
         _limit: u64,
         _filter_condition: FilterCondition,
+        _package_cache: &mut HashMap<
+            ModuleId,
+            (
+                AccountAddress,
+                String,
+                HashMap<(AccountAddress, String), PackageMetadata>,
+            ),
+        >,
     ) -> Result<
         Vec<(
             u64,

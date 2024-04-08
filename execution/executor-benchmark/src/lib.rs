@@ -39,8 +39,8 @@ use aptos_metrics_core::Histogram;
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter};
 use aptos_transaction_generator_lib::{
-    create_txn_generator_creator, TransactionGeneratorCreator, TransactionType,
-    TransactionType::NonConflictingCoinTransfer,
+    create_txn_generator_creator, AlwaysApproveRootAccountHandle, TransactionGeneratorCreator,
+    TransactionType::{self, NonConflictingCoinTransfer},
 };
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use pipeline::PipelineConfig;
@@ -66,7 +66,6 @@ where
             false,
             config.storage.buffered_state_target_items,
             config.storage.max_num_nodes_per_lru_cache_shard,
-            false,
         )
         .expect("DB should open."),
     );
@@ -197,14 +196,14 @@ pub fn run_benchmark<V>(
 
     let mut overall_measuring = OverallMeasuring::start();
 
-    if let Some((transaction_generators, phase)) = transaction_generators {
+    let num_blocks_created = if let Some((transaction_generators, phase)) = transaction_generators {
         generator.run_workload(
             block_size,
             num_blocks,
             transaction_generators,
             phase,
             transactions_per_sender,
-        );
+        )
     } else {
         generator.run_transfer(
             block_size,
@@ -213,8 +212,8 @@ pub fn run_benchmark<V>(
             connected_tx_grps,
             shuffle_connected_txns,
             hotspot_probability,
-        );
-    }
+        )
+    };
     if pipeline_config.delay_execution_start {
         overall_measuring.start_time = Instant::now();
     }
@@ -231,7 +230,7 @@ pub fn run_benchmark<V>(
         }
     );
 
-    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks as u64;
+    let num_txns = db.reader.get_latest_version().unwrap() - version - num_blocks_created as u64;
     overall_measuring.print_end("Overall", num_txns);
 
     if verify_sequence_numbers {
@@ -271,7 +270,7 @@ where
 
         create_txn_generator_creator(
             &[transaction_mix],
-            root_account,
+            AlwaysApproveRootAccountHandle { root_account },
             &mut main_signer_accounts,
             burner_accounts,
             &db_gen_init_transaction_executor,
@@ -415,6 +414,8 @@ struct GasMeasurement {
     pub approx_block_output: f64,
 
     pub gas_count: u64,
+
+    pub speculative_abort_count: u64,
 }
 
 impl GasMeasurement {
@@ -453,6 +454,8 @@ impl GasMeasurement {
                 .with_label_values(&[block_executor_counters::Mode::PARALLEL])
                 .get_sample_sum();
 
+        let speculative_abort_count = block_executor_counters::SPECULATIVE_ABORT_COUNT.get();
+
         Self {
             gas,
             effective_block_gas,
@@ -460,6 +463,7 @@ impl GasMeasurement {
             execution_gas,
             approx_block_output,
             gas_count,
+            speculative_abort_count,
         }
     }
 
@@ -473,6 +477,7 @@ impl GasMeasurement {
             execution_gas: end.execution_gas - self.execution_gas,
             approx_block_output: end.approx_block_output - self.approx_block_output,
             gas_count: end.gas_count - self.gas_count,
+            speculative_abort_count: end.speculative_abort_count - self.speculative_abort_count,
         }
     }
 }
@@ -602,6 +607,13 @@ impl OverallMeasuring {
             delta_gas.effective_block_gas,
             elapsed
         );
+        info!(
+            "{} speculative aborts: {} aborts/txn ({} aborts over {} txns)",
+            prefix,
+            delta_gas.speculative_abort_count as f64 / num_txns,
+            delta_gas.speculative_abort_count,
+            num_txns
+        );
         info!("{} ioGPS: {} gas/s", prefix, delta_gas.io_gas / elapsed);
         info!(
             "{} executionGPS: {} gas/s",
@@ -685,7 +697,7 @@ mod tests {
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_executor::block_executor::TransactionBlockExecutor;
     use aptos_temppath::TempPath;
-    use aptos_transaction_generator_lib::args::TransactionTypeArg;
+    use aptos_transaction_generator_lib::{args::TransactionTypeArg, WorkflowProgress};
     use aptos_vm::AptosVM;
 
     fn test_generic_benchmark<E>(
@@ -718,7 +730,8 @@ mod tests {
         super::run_benchmark::<E>(
             10, /* block_size */
             30, /* num_blocks */
-            transaction_type.map(|t| vec![(t.materialize(1, true), 1)]),
+            transaction_type
+                .map(|t| vec![(t.materialize(1, true, WorkflowProgress::MoveByPhases), 1)]),
             2,     /* transactions per sender */
             0,     /* connected txn groups in a block */
             false, /* shuffle the connected txns in a block */
@@ -746,7 +759,7 @@ mod tests {
         AptosVM::set_processed_transactions_detailed_counters();
         NativeExecutor::set_concurrency_level_once(4);
         test_generic_benchmark::<AptosVM>(
-            Some(TransactionTypeArg::ModifyGlobalResourceAggV2),
+            Some(TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB),
             true,
         );
     }

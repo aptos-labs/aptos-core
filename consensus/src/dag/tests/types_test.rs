@@ -23,7 +23,7 @@ fn test_node_verify() {
 
     let invalid_node = Node::new_for_test(
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
-        Payload::empty(false),
+        Payload::empty(false, true),
         vec![],
         Extensions::empty(),
     );
@@ -72,7 +72,7 @@ fn test_certified_node_verify() {
 
     let invalid_node = Node::new_for_test(
         NodeMetadata::new_for_test(0, 0, signers[0].author(), 0, HashValue::random()),
-        Payload::empty(false),
+        Payload::empty(false, true),
         vec![],
         Extensions::empty(),
     );
@@ -168,20 +168,14 @@ fn test_dag_network_message() {
     let short_data = vec![10; 10];
     let long_data = vec![20; 30];
 
-    let short_message = DAGNetworkMessage {
-        epoch: 1,
-        data: short_data,
-    };
+    let short_message = DAGNetworkMessage::new(1, short_data);
 
     assert_eq!(
         format!("{:?}", short_message),
         "DAGNetworkMessage { epoch: 1, data: \"0a0a0a0a0a0a0a0a0a0a\" }"
     );
 
-    let long_message = DAGNetworkMessage {
-        epoch: 2,
-        data: long_data,
-    };
+    let long_message = DAGNetworkMessage::new(2, long_data);
 
     assert_eq!(
         format!("{:?}", long_message),

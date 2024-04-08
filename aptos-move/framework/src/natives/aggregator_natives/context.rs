@@ -8,13 +8,14 @@ use aptos_aggregator::{
     delayed_field_extension::DelayedFieldData,
     delta_change_set::DeltaOp,
     resolver::{AggregatorV1Resolver, DelayedFieldResolver},
-    types::DelayedFieldID,
 };
 use aptos_types::{
-    delayed_fields::PanicError, state_store::state_key::StateKey, write_set::WriteOp,
+    delayed_fields::PanicError,
+    state_store::{state_key::StateKey, state_value::StateValueMetadata},
 };
 use better_any::{Tid, TidAble};
 use move_core_types::value::MoveTypeLayout;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashSet},
@@ -38,8 +39,8 @@ pub enum AggregatorChangeV1 {
 pub struct AggregatorChangeSet {
     pub aggregator_v1_changes: BTreeMap<StateKey, AggregatorChangeV1>,
     pub delayed_field_changes: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
-    pub reads_needing_exchange: BTreeMap<StateKey, (WriteOp, Arc<MoveTypeLayout>)>,
-    pub group_reads_needing_exchange: BTreeMap<StateKey, (WriteOp, u64)>,
+    pub reads_needing_exchange: BTreeMap<StateKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+    pub group_reads_needing_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
 }
 
 /// Native context that can be attached to VM `NativeContextExtensions`.
@@ -116,7 +117,7 @@ impl<'a> NativeAggregatorContext<'a> {
         }
 
         let delayed_field_changes = delayed_field_data.into_inner().into();
-        let delayed_write_set_keys = delayed_field_changes
+        let delayed_write_set_ids = delayed_field_changes
             .keys()
             .cloned()
             .collect::<HashSet<_>>();
@@ -126,17 +127,17 @@ impl<'a> NativeAggregatorContext<'a> {
             // is_empty check covers both whether delayed fields are enabled or not, as well as whether there
             // are any changes that would require computing reads needing exchange.
             // TODO[agg_v2](optimize) we only later compute the the write set, so cannot pass the correct skip values here.
-            reads_needing_exchange: if delayed_write_set_keys.is_empty() {
+            reads_needing_exchange: if delayed_write_set_ids.is_empty() {
                 BTreeMap::new()
             } else {
                 self.delayed_field_resolver
-                    .get_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())?
+                    .get_reads_needing_exchange(&delayed_write_set_ids, &HashSet::new())?
             },
-            group_reads_needing_exchange: if delayed_write_set_keys.is_empty() {
+            group_reads_needing_exchange: if delayed_write_set_ids.is_empty() {
                 BTreeMap::new()
             } else {
                 self.delayed_field_resolver
-                    .get_group_reads_needing_exchange(&delayed_write_set_keys, &HashSet::new())?
+                    .get_group_reads_needing_exchange(&delayed_write_set_ids, &HashSet::new())?
             },
         })
     }
@@ -160,7 +161,7 @@ mod test {
         types::DelayedFieldValue, FakeAggregatorView,
     };
     use aptos_types::delayed_fields::{
-        calculate_width_for_integer_embeded_string, SnapshotToStringFormula,
+        calculate_width_for_integer_embedded_string, SnapshotToStringFormula,
     };
     use claims::{assert_matches, assert_ok, assert_ok_eq, assert_some_eq};
 
@@ -411,7 +412,7 @@ mod test {
             id_from_fake_idx(2, 8)
         );
 
-        let derived_width = assert_ok!(calculate_width_for_integer_embeded_string(
+        let derived_width = assert_ok!(calculate_width_for_integer_embedded_string(
             "prefixsuffix".as_bytes().len(),
             id_from_fake_idx(0, 8)
         )) as u32;
@@ -497,7 +498,7 @@ mod test {
             &DelayedChange::Create(DelayedFieldValue::Snapshot(500)),
         );
 
-        let derived_width = assert_ok!(calculate_width_for_integer_embeded_string(
+        let derived_width = assert_ok!(calculate_width_for_integer_embedded_string(
             "prefixsuffix".as_bytes().len(),
             id_from_fake_idx(0, 8)
         )) as u32;

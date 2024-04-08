@@ -1,0 +1,45 @@
+
+Diagnostics:
+error: cyclic data
+  ┌─ tests/checking/typing/recursive_structs.move:4:5
+  │
+4 │     struct Foo { f: Foo }
+  │     ^^^^^^^^^^^^^^^^^^^^^
+  │
+  = field `f` of `Foo` contains `Foo`, which forms a cycle.
+
+error: cyclic data
+  ┌─ tests/checking/typing/recursive_structs.move:7:5
+  │
+7 │     struct Bar { f: Cup<Bar> }
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  │                  │
+  │                  invalid field `f` of `Bar` containing `Bar` itself
+
+error: cyclic data
+  ┌─ tests/checking/typing/recursive_structs.move:9:5
+  │
+9 │     struct X { y: vector<Y> }
+  │     ^^^^^^^^^^^^^^^^^^^^^^^^^
+  │
+  = field `y` of `X` contains `Y`
+  = field `x` of `Y` contains `X`, which forms a cycle.
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_structs.move:17:5
+   │
+17 │     struct Foo { f: M0::Cup<Foo> }
+   │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                  │
+   │                  invalid field `f` of `Foo` containing `Foo` itself
+
+error: cyclic data
+   ┌─ tests/checking/typing/recursive_structs.move:19:5
+   │
+19 │     struct A { b: B }
+   │     ^^^^^^^^^^^^^^^^^
+   │
+   = field `b` of `A` contains `B`
+   = field `c` of `B` contains `C`
+   = field `d` of `C` contains `D`
+   = field `x` of `D` contains `A`, which forms a cycle.

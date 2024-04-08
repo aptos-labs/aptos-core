@@ -19,6 +19,7 @@ either = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-types = { workspace = true }
 paste = { workspace = true }
+rand = { workspace = true }
 
 [features]
 testing = ["aptos-global-constants/testing"]

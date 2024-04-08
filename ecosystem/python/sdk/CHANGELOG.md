@@ -2,6 +2,11 @@
 
 All notable changes to the Aptos Python SDK will be captured in this file. This changelog is written by hand for now.
 
+## 0.8.1
+- Improve TypeTag parsing for nested types
+- Add BCS and String-based (JSON) view functions
+- Added thorough documentation
+
 ## 0.8.0
 - Add support for SingleKeyAuthenicatoin component of AIP-55
 - Add support for Secp256k1 Ecdsa of AIP-49

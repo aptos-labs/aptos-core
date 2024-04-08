@@ -38,17 +38,19 @@ fun m::test($t0: u64): u64 {
      # before: {}, after: {}
   0: $t3 := borrow_local($t0)
      # before: {}, after: {$t2 := $t3}
-  1: $t2 := infer($t3)
+  1: $t2 := move($t3)
      # before: {$t2 := $t3}, after: {$t2 := $t3}
-  2: $t4 := infer($t0)
+  2: drop($t2)
+     # before: {$t2 := $t3}, after: {$t2 := $t3}
+  3: $t4 := move($t0)
      # before: {$t2 := $t3}, after: {$t2 := $t3, $t5 := $t4}
-  3: $t5 := infer($t4)
+  4: $t5 := move($t4)
      # before: {$t2 := $t3, $t5 := $t4}, after: {$t2 := $t3, $t5 := $t4, $t6 := $t5}
-  4: $t6 := infer($t5)
+  5: $t6 := move($t5)
      # before: {$t2 := $t3, $t5 := $t4, $t6 := $t5}, after: {$t1 := $t6, $t2 := $t3, $t5 := $t4, $t6 := $t5}
-  5: $t1 := infer($t6)
+  6: $t1 := move($t6)
      # before: {$t1 := $t6, $t2 := $t3, $t5 := $t4, $t6 := $t5}, after: {$t1 := $t6, $t2 := $t3, $t5 := $t4, $t6 := $t5}
-  6: return $t1
+  7: return $t1
 }
 
 ============ after CopyPropagation: ================
@@ -62,25 +64,27 @@ fun m::test($t0: u64): u64 {
      var $t5: u64
      var $t6: u64
   0: $t3 := borrow_local($t0)
-  1: $t2 := infer($t3)
-  2: $t4 := infer($t0)
-  3: $t5 := infer($t4)
-  4: $t6 := infer($t4)
-  5: $t1 := infer($t4)
-  6: return $t4
+  1: $t2 := move($t3)
+  2: drop($t3)
+  3: $t4 := move($t0)
+  4: $t5 := move($t4)
+  5: $t6 := move($t4)
+  6: $t1 := move($t4)
+  7: return $t4
 }
 
 ============ after DeadStoreElimination: ================
 
 [variant baseline]
 fun m::test($t0: u64): u64 {
-     var $t1: u64
-     var $t2: &u64
+     var $t1: u64 [unused]
+     var $t2: &u64 [unused]
      var $t3: &u64
      var $t4: u64
-     var $t5: u64
-     var $t6: u64
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
   0: $t3 := borrow_local($t0)
-  1: $t4 := infer($t0)
-  2: return $t4
+  1: drop($t3)
+  2: $t4 := move($t0)
+  3: return $t4
 }

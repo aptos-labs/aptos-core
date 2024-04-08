@@ -31,8 +31,8 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        Transaction, TransactionListWithProof, TransactionOutput, TransactionOutputListWithProof,
-        TransactionStatus,
+        Transaction, TransactionAuxiliaryData, TransactionListWithProof, TransactionOutput,
+        TransactionOutputListWithProof, TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -867,5 +867,11 @@ fn create_test_transaction() -> Transaction {
 
 /// Returns a dummy transaction output for testing purposes
 fn create_test_transaction_output() -> TransactionOutput {
-    TransactionOutput::new(WriteSet::default(), vec![], 0, TransactionStatus::Retry)
+    TransactionOutput::new(
+        WriteSet::default(),
+        vec![],
+        0,
+        TransactionStatus::Retry,
+        TransactionAuxiliaryData::default(),
+    )
 }

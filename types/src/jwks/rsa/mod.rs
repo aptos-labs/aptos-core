@@ -1,14 +1,12 @@
 // Copyright © Aptos Foundation
 
-use crate::{move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue, zkid::Claims};
+use crate::{keyless::Claims, move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use anyhow::{anyhow, bail, ensure, Result};
 use aptos_crypto::poseidon_bn254;
 use base64::URL_SAFE_NO_PAD;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
 use serde::{Deserialize, Serialize};
-
-pub const RSA_MODULUS_BYTES: usize = 256;
 
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.
@@ -23,6 +21,9 @@ pub struct RSA_JWK {
 }
 
 impl RSA_JWK {
+    /// The circuit-supported RSA modulus size.
+    pub const RSA_MODULUS_BYTES: usize = 256;
+
     /// Make an `RSA_JWK` from `kty="RSA", alg="RS256", e="AQAB"` (a popular setting)
     /// and caller-specified `kid` and `n`.
     pub fn new_256_aqab(kid: &str, n: &str) -> Self {
@@ -57,22 +58,28 @@ impl RSA_JWK {
         self.kid.as_bytes().to_vec()
     }
 
-    // TODO(zkid): Move this to aptos-crypto so other services can use this
+    // TODO(keyless): Move this to aptos-crypto so other services can use this
     pub fn to_poseidon_scalar(&self) -> Result<ark_bn254::Fr> {
         let mut modulus = base64::decode_config(&self.n, URL_SAFE_NO_PAD)?;
         // The circuit only supports RSA256
-        if modulus.len() != RSA_MODULUS_BYTES {
-            bail!("Wrong modulus size, must be {} bytes", RSA_MODULUS_BYTES);
+        if modulus.len() != Self::RSA_MODULUS_BYTES {
+            bail!(
+                "Wrong modulus size, must be {} bytes",
+                Self::RSA_MODULUS_BYTES
+            );
         }
-        modulus.reverse(); // This is done to match the circuit, which requires the modulus in a verify specific format due to how RSA verification is implemented
-                           // TODO(zkid): finalize the jwk hashing scheme.
+
+        // This is done to match the circuit, which requires the modulus in a verify specific format
+        // due to how RSA verification is implemented
+        modulus.reverse();
+
         let mut scalars = modulus
             .chunks(24) // Pack 3 64 bit limbs per scalar, so chunk into 24 bytes per scalar
             .map(|chunk| {
                 poseidon_bn254::pack_bytes_to_one_scalar(chunk).expect("chunk converts to scalar")
             })
             .collect::<Vec<ark_bn254::Fr>>();
-        scalars.push(ark_bn254::Fr::from(RSA_MODULUS_BYTES as i32));
+        scalars.push(ark_bn254::Fr::from(Self::RSA_MODULUS_BYTES as i32));
         poseidon_bn254::hash_scalars(scalars)
     }
 }

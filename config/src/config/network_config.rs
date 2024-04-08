@@ -281,7 +281,7 @@ impl NetworkConfig {
                 let mut rng = StdRng::from_seed(OsRng.gen());
                 let key = x25519::PrivateKey::generate(&mut rng);
                 let peer_id = from_identity_public_key(key.public_key());
-                self.identity = Identity::from_config(key, peer_id);
+                self.identity = Identity::from_config_auto_generated(key, peer_id);
             },
             Identity::FromConfig(config) => {
                 if config.peer_id == PeerId::ZERO {

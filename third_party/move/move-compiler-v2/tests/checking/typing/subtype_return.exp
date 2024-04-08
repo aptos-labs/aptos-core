@@ -1,4 +1,4 @@
-// ---- Model Dump
+// -- Model dump before bytecode pipeline
 module 0x8675309::M {
     struct S {
         dummy_field: bool,
@@ -16,21 +16,6 @@ module 0x8675309::M {
         Tuple(u1, u2)
     }
     private fun t4(u1: &mut u64,u2: &mut u64): (&u64, &u64) {
-        Tuple(u1, u2)
-    }
-    spec fun $t0(u: u64): u64 {
-        u
-    }
-    spec fun $t1(s: M::S): M::S {
-        s
-    }
-    spec fun $t2(u1: u64,u2: u64): (&u64, &mut u64) {
-        Tuple(u1, u2)
-    }
-    spec fun $t3(u1: u64,u2: u64): (&mut u64, &u64) {
-        Tuple(u1, u2)
-    }
-    spec fun $t4(u1: u64,u2: u64): (&u64, &u64) {
         Tuple(u1, u2)
     }
 } // end 0x8675309::M

@@ -44,14 +44,14 @@ module aptos_token_objects::token {
         /// The collection from which this token resides.
         collection: Object<Collection>,
         /// Deprecated in favor of `index` inside TokenIdentifiers.
-        /// Will be populated until concurrent_assets_enabled feature flag is enabled.
+        /// Will be populated until concurrent_token_v2_enabled feature flag is enabled.
         ///
         /// Unique identifier within the collection, optional, 0 means unassigned
         index: u64, // DEPRECATED
         /// A brief description of the token.
         description: String,
         /// Deprecated in favor of `name` inside TokenIdentifiers.
-        /// Will be populated until concurrent_assets_enabled feature flag is enabled.
+        /// Will be populated until concurrent_token_v2_enabled feature flag is enabled.
         ///
         /// The name of the token, which should be unique within the collection; the length of name
         /// should be smaller than 128, characters, eg: "Aptos Animal #1234"
@@ -78,8 +78,8 @@ module aptos_token_objects::token {
     #[deprecated]
     #[resource_group_member(group = aptos_framework::object::ObjectGroup)]
     struct ConcurrentTokenIdentifiers has key {
-        _1: AggregatorSnapshot<u64>,
-        _2: AggregatorSnapshot<String>,
+        index: AggregatorSnapshot<u64>,
+        name: AggregatorSnapshot<String>,
     }
 
     /// This enables burning an NFT, if possible, it will also delete the object. Note, the data
@@ -133,7 +133,7 @@ module aptos_token_objects::token {
         // Flag which controls whether any functions from aggregator_v2 module can be called.
         let aggregator_api_enabled = features::aggregator_v2_api_enabled();
         // Flag which controls whether we are going to still continue writing to deprecated fields.
-        let concurrent_assets_enabled = features::concurrent_assets_enabled();
+        let concurrent_token_v2_enabled = features::concurrent_token_v2_enabled();
 
         let (deprecated_index, deprecated_name) = if (aggregator_api_enabled) {
             let index = option::destroy_with_default(
@@ -148,15 +148,15 @@ module aptos_token_objects::token {
                 aggregator_v2::create_derived_string(name_prefix)
             };
 
-            // Until concurrent_assets_enabled is enabled, we still need to write to deprecated fields.
+            // Until concurrent_token_v2_enabled is enabled, we still need to write to deprecated fields.
             // Otherwise we put empty values there.
             // (we need to do these calls before creating token_concurrent, to avoid copying objects)
-            let deprecated_index = if (concurrent_assets_enabled) {
+            let deprecated_index = if (concurrent_token_v2_enabled) {
                 0
             } else {
                 aggregator_v2::read_snapshot(&index)
             };
-            let deprecated_name = if (concurrent_assets_enabled) {
+            let deprecated_name = if (concurrent_token_v2_enabled) {
                 string::utf8(b"")
             } else {
                 aggregator_v2::read_derived_string(&name)
@@ -223,7 +223,7 @@ module aptos_token_objects::token {
     /// Creates a new token object with a unique address and returns the ConstructorRef
     /// for additional specialization.
     /// The name is created by concatenating the (name_prefix, index, name_suffix).
-    /// After flag concurrent_assets_enabled is enabled, this function will allow
+    /// After flag concurrent_token_v2_enabled is enabled, this function will allow
     /// creating tokens in parallel, from the same collection, while providing sequential names.
     public fun create_numbered_token(
         creator: &signer,
@@ -430,13 +430,16 @@ module aptos_token_objects::token {
     }
 
     public fun burn(burn_ref: BurnRef) acquires Token, TokenIdentifiers {
-        let addr = if (option::is_some(&burn_ref.inner)) {
+        let (addr, previous_owner) = if (option::is_some(&burn_ref.inner)) {
             let delete_ref = option::extract(&mut burn_ref.inner);
             let addr = object::address_from_delete_ref(&delete_ref);
+            let previous_owner = object::owner(object::address_to_object<Token>(addr));
             object::delete(delete_ref);
-            addr
+            (addr, previous_owner)
         } else {
-            option::extract(&mut burn_ref.self)
+            let addr = option::extract(&mut burn_ref.self);
+            let previous_owner = object::owner(object::address_to_object<Token>(addr));
+            (addr, previous_owner)
         };
 
         if (royalty::exists_at(addr)) {
@@ -463,7 +466,7 @@ module aptos_token_objects::token {
         };
 
         event::destroy_handle(mutation_events);
-        collection::decrement_supply(&collection, addr, option::some(index));
+        collection::decrement_supply(&collection, addr, option::some(index), previous_owner);
     }
 
     public fun set_description(mutator_ref: &MutatorRef, description: String) acquires Token {
@@ -748,7 +751,7 @@ module aptos_token_objects::token {
         use std::features;
 
         let feature = features::get_auids();
-        features::change_feature_flags(&fx, vector[feature], vector[]);
+        features::change_feature_flags_for_testing(&fx, vector[feature], vector[]);
 
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -771,15 +774,15 @@ module aptos_token_objects::token {
         assert!(!object::is_object(token_addr), 2);
     }
 
-    #[test(fx = @aptos_framework, creator = @0x123, trader = @0x456)]
+    #[test(fx = @aptos_framework, creator = @0x123)]
     fun test_upgrade_to_concurrent_and_numbered_tokens(fx: &signer, creator: &signer) acquires Token, TokenIdentifiers {
         use std::debug;
 
-        let feature = features::get_concurrent_assets_feature();
+        let feature = features::get_concurrent_token_v2_feature();
         let agg_feature = features::get_aggregator_v2_api_feature();
         let auid_feature = features::get_auids();
         let module_event_feature = features::get_module_event_feature();
-        features::change_feature_flags(fx, vector[auid_feature, module_event_feature], vector[feature, agg_feature]);
+        features::change_feature_flags_for_testing(fx, vector[auid_feature, module_event_feature], vector[feature, agg_feature]);
 
         let collection_name = string::utf8(b"collection name");
         let token_name = string::utf8(b"token name");
@@ -790,11 +793,18 @@ module aptos_token_objects::token {
         debug::print(&token_1_name);
         assert!(token_1_name == std::string::utf8(b"token name1"), 1);
 
-        features::change_feature_flags(fx, vector[feature, agg_feature], vector[]);
+        features::change_feature_flags_for_testing(fx, vector[feature, agg_feature], vector[]);
         collection::upgrade_to_concurrent(&extend_ref);
 
         let token_2_ref = create_numbered_token_helper(creator, collection_name, token_name);
         assert!(name(object::object_from_constructor_ref<Token>(&token_2_ref)) == std::string::utf8(b"token name2"), 1);
+        assert!(vector::length(&event::emitted_events<collection::Mint>()) == 1, 0);
+
+        let burn_ref = generate_burn_ref(&token_2_ref);
+        let token_addr = object::address_from_constructor_ref(&token_2_ref);
+        assert!(exists<Token>(token_addr), 0);
+        burn(burn_ref);
+        assert!(vector::length(&event::emitted_events<collection::Burn>()) == 1, 0);
     }
 
     #[test_only]

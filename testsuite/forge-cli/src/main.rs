@@ -7,10 +7,11 @@
 use anyhow::{format_err, Context, Result};
 use aptos_config::config::{
     BootstrappingMode, ConsensusConfig, ContinuousSyncingMode, MempoolConfig, NetbenchConfig,
-    NodeConfig, QcAggregatorType, StateSyncConfig,
+    NodeConfig, StateSyncConfig,
 };
 use aptos_forge::{
     args::TransactionTypeArg,
+    emitter::NumAccountsMode,
     prometheus_metrics::LatencyBreakdownSlice,
     success_criteria::{
         LatencyBreakdownThreshold, LatencyType, MetricsThreshold, StateProgressThreshold,
@@ -30,12 +31,13 @@ use aptos_sdk::{
 use aptos_testcases::{
     compatibility_test::SimpleValidatorUpgrade,
     consensus_reliability_tests::ChangingWorkingQuorumTest,
-    dag_onchain_enable_test::DagOnChainEnableTest,
     forge_setup_test::ForgeSetupTest,
     framework_upgrade::FrameworkUpgrade,
     fullnode_reboot_stress_test::FullNodeRebootStressTest,
     generate_traffic,
-    load_vs_perf_benchmark::{LoadVsPerfBenchmark, TransactionWorkload, Workloads},
+    load_vs_perf_benchmark::{
+        ContinuousTraffic, LoadVsPerfBenchmark, TransactionWorkload, Workloads,
+    },
     modifiers::{CpuChaosTest, ExecutionDelayConfig, ExecutionDelayTest},
     multi_region_network_test::{
         MultiRegionNetworkEmulationConfig, MultiRegionNetworkEmulationTest,
@@ -74,8 +76,11 @@ use std::{
     thread,
     time::Duration,
 };
+use suites::dag::get_dag_test;
 use tokio::{runtime::Runtime, select};
 use url::Url;
+
+mod suites;
 
 // Useful constants
 const KILOBYTE: usize = 1000;
@@ -518,6 +523,8 @@ fn get_test_suite(
         return Ok(test_suite);
     } else if let Some(test_suite) = get_state_sync_test(test_name) {
         return Ok(test_suite);
+    } else if let Some(test_suite) = get_dag_test(test_name, duration, test_cmd) {
+        return Ok(test_suite);
     }
 
     // Otherwise, check the test name against the ungrouped test suites
@@ -554,7 +561,6 @@ fn get_test_suite(
         "consensus_only_realistic_env_max_tps" => run_consensus_only_realistic_env_max_tps(),
         "quorum_store_reconfig_enable_test" => quorum_store_reconfig_enable_test(),
         "mainnet_like_simulation_test" => mainnet_like_simulation_test(),
-        "dag_reconfig_enable_test" => dag_reconfig_enable_test(),
         "gather_metrics" => gather_metrics(),
         _ => return Err(format_err!("Invalid --suite given: {:?}", test_name)),
     };
@@ -675,6 +681,7 @@ fn get_realistic_env_test(
         "realistic_env_max_load_large" => realistic_env_max_load_test(duration, test_cmd, 20, 10),
         "realistic_env_load_sweep" => realistic_env_load_sweep_test(),
         "realistic_env_workload_sweep" => realistic_env_workload_sweep_test(),
+        "realistic_env_graceful_workload_sweep" => realistic_env_graceful_workload_sweep(),
         "realistic_env_graceful_overload" => realistic_env_graceful_overload(),
         "realistic_network_tuned_for_throughput" => realistic_network_tuned_for_throughput_test(),
         _ => return None, // The test name does not match a realistic-env test
@@ -774,7 +781,7 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
             helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
-            optimize_for_maximum_throughput(config);
+            optimize_for_maximum_throughput(config, 20_000, 4_500, 3.0);
         }))
         // TODO(ibalajiarun): tune these success critiera after we have a better idea of the test behavior
         .with_success_criteria(
@@ -788,55 +795,50 @@ fn run_consensus_only_realistic_env_max_tps() -> ForgeConfig {
         )
 }
 
-fn optimize_for_maximum_throughput(config: &mut NodeConfig) {
+fn quorum_store_backlog_txn_limit_count(
+    config: &mut NodeConfig,
+    target_tps: usize,
+    vn_latency: f64,
+) {
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .backlog_txn_limit_count = (target_tps as f64 * vn_latency) as u64;
+    config
+        .consensus
+        .quorum_store
+        .back_pressure
+        .dynamic_max_txn_per_s = 4000;
+}
+
+fn optimize_for_maximum_throughput(
+    config: &mut NodeConfig,
+    target_tps: usize,
+    max_txns_per_block: usize,
+    vn_latency: f64,
+) {
     mempool_config_practically_non_expiring(&mut config.mempool);
 
-    config
-        .consensus
-        .max_sending_block_txns_quorum_store_override = 30000;
-    config
-        .consensus
-        .max_receiving_block_txns_quorum_store_override = 40000;
-    config
-        .consensus
-        .max_sending_block_bytes_quorum_store_override = 10 * 1024 * 1024;
-    config
-        .consensus
-        .max_receiving_block_bytes_quorum_store_override = 12 * 1024 * 1024;
+    config.consensus.max_sending_block_txns = max_txns_per_block as u64;
+    config.consensus.max_receiving_block_txns = (max_txns_per_block as f64 * 4.0 / 3.0) as u64;
+    config.consensus.max_sending_block_bytes = 10 * 1024 * 1024;
+    config.consensus.max_receiving_block_bytes = 12 * 1024 * 1024;
     config.consensus.pipeline_backpressure = vec![];
     config.consensus.chain_health_backoff = vec![];
 
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_txn_limit_count = 200000;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .backlog_per_validator_batch_limit_count = 50;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .dynamic_min_txn_per_s = 2000;
-    config
-        .consensus
-        .quorum_store
-        .back_pressure
-        .dynamic_max_txn_per_s = 8000;
+    quorum_store_backlog_txn_limit_count(config, target_tps, vn_latency);
 
-    config.consensus.quorum_store.sender_max_batch_txns = 1000;
+    config.consensus.quorum_store.sender_max_batch_txns = 500;
     config.consensus.quorum_store.sender_max_batch_bytes = 4 * 1024 * 1024;
     config.consensus.quorum_store.sender_max_num_batches = 100;
     config.consensus.quorum_store.sender_max_total_txns = 4000;
     config.consensus.quorum_store.sender_max_total_bytes = 8 * 1024 * 1024;
     config.consensus.quorum_store.receiver_max_batch_txns = 1000;
-    config.consensus.quorum_store.receiver_max_batch_bytes = 4 * 1024 * 1024;
-    config.consensus.quorum_store.receiver_max_num_batches = 100;
-    config.consensus.quorum_store.receiver_max_total_txns = 4000;
-    config.consensus.quorum_store.receiver_max_total_bytes = 8 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_batch_bytes = 8 * 1024 * 1024;
+    config.consensus.quorum_store.receiver_max_num_batches = 200;
+    config.consensus.quorum_store.receiver_max_total_txns = 8000;
+    config.consensus.quorum_store.receiver_max_total_bytes = 16 * 1024 * 1024;
 }
 
 fn large_db_simple_test() -> ForgeConfig {
@@ -1006,6 +1008,7 @@ fn realistic_env_load_sweep_test() -> ForgeConfig {
             },
         )
         .collect(),
+        continuous_traffic: None,
     })
 }
 
@@ -1081,7 +1084,123 @@ fn realistic_env_workload_sweep_test() -> ForgeConfig {
             },
         )
         .collect(),
+        continuous_traffic: None,
     })
+}
+
+fn realistic_env_graceful_workload_sweep() -> ForgeConfig {
+    realistic_env_sweep_wrap(7, 3, LoadVsPerfBenchmark {
+        test: Box::new(PerformanceBenchmark),
+        workloads: Workloads::TRANSACTIONS(vec![
+            // do account generation first, to fill up a storage a bit.
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::AccountGeneration,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 100000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::CoinTransfer,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 100000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::ModifyGlobalResource,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 50000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::CreateObjects10WithPayload10k,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 10000,
+            },
+            // very low gas/s
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::CreateObjectsConflict100WithPayload10k,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 2000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::TokenV2AmbassadorMint,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 20000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::VectorPicture40,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 50000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::VectorPictureRead40,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 50000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::VectorPicture30k,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 10000,
+            },
+            // very high gas/s
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::VectorPicture30k,
+                num_modules: 20,
+                unique_senders: false,
+                mempool_backlog: 10000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::SmartTablePicture30KWith200Change,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 2000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::SmartTablePicture1MWith256Change,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 2000,
+            },
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::SmartTablePicture1MWith1KChangeExceedsLimit,
+                num_modules: 1,
+                unique_senders: false,
+                mempool_backlog: 2000,
+            },
+            // publishing package - executes sequentially, but conflict_multiplier is 1
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::PublishPackage,
+                num_modules: 1,
+                unique_senders: true,
+                mempool_backlog: 20000,
+            },
+            // module loading
+            TransactionWorkload {
+                transaction_type: TransactionTypeArg::NoOp,
+                num_modules: 1000,
+                unique_senders: false,
+                mempool_backlog: 50000,
+            },
+        ]),
+        criteria: Vec::new(),
+        continuous_traffic: Some(ContinuousTraffic {
+            traffic: EmitJobRequest::default()
+                .num_accounts_mode(NumAccountsMode::TransactionsPerAccount(1))
+                .mode(EmitJobMode::ConstTps { tps: 10 })
+                .gas_price(5 * aptos_global_constants::GAS_UNIT_PRICE),
+            criteria: Some(SuccessCriteria::new(8)),
+        }),
+    })
+    .with_genesis_helm_config_fn(Arc::new(|helm_values| {
+        // no epoch change.
+        helm_values["chain"]["epoch_duration_secs"] = (24 * 3600).into();
+    }))
 }
 
 fn load_vs_perf_benchmark() -> ForgeConfig {
@@ -1094,6 +1213,7 @@ fn load_vs_perf_benchmark() -> ForgeConfig {
                 200, 1000, 3000, 5000, 7000, 7500, 8000, 9000, 10000, 12000, 15000,
             ]),
             criteria: Vec::new(),
+            continuous_traffic: None,
         })
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -1170,6 +1290,7 @@ fn workload_vs_perf_benchmark() -> ForgeConfig {
                 },
             ]),
             criteria: Vec::new(),
+            continuous_traffic: None,
         })
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
             // no epoch change.
@@ -1293,54 +1414,76 @@ fn workload_mix_test() -> ForgeConfig {
                     mempool_backlog: 10000,
                 })
                 .transaction_mix(vec![
+                    // To test both variants, make module publish with such frequency, so that there are
+                    // similar number of sequential and parallel blocks.
+                    // For other transactions, make more expensive transactions somewhat rarer.
                     (
                         TransactionTypeArg::AccountGeneration.materialize_default(),
-                        5,
+                        10000,
                     ),
-                    (TransactionTypeArg::NoOp5Signers.materialize_default(), 1),
-                    (TransactionTypeArg::CoinTransfer.materialize_default(), 1),
-                    (TransactionTypeArg::PublishPackage.materialize_default(), 1),
                     (
-                        TransactionTypeArg::AccountResource32B.materialize(1, true),
-                        1,
+                        TransactionTypeArg::CoinTransfer.materialize_default(),
+                        10000,
                     ),
-                    // (
-                    //     TransactionTypeArg::AccountResource10KB.materialize(1, true),
-                    //     1,
-                    // ),
-                    (
-                        TransactionTypeArg::ModifyGlobalResource.materialize(1, false),
-                        1,
-                    ),
-                    // (
-                    //     TransactionTypeArg::ModifyGlobalResource.materialize(10, false),
-                    //     1,
-                    // ),
+                    (TransactionTypeArg::PublishPackage.materialize_default(), 3),
                     (
                         TransactionTypeArg::Batch100Transfer.materialize_default(),
-                        1,
+                        100,
                     ),
-                    // (
-                    //     TransactionTypeArg::TokenV1NFTMintAndTransferSequential
-                    //         .materialize_default(),
-                    //     1,
-                    // ),
-                    // (
-                    //     TransactionTypeArg::TokenV1NFTMintAndTransferParallel.materialize_default(),
-                    //     1,
-                    // ),
-                    // (
-                    //     TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
-                    //     1,
-                    // ),
+                    (
+                        TransactionTypeArg::VectorPicture30k.materialize_default(),
+                        100,
+                    ),
+                    (
+                        TransactionTypeArg::SmartTablePicture30KWith200Change.materialize(
+                            1,
+                            true,
+                            WorkflowProgress::when_done_default(),
+                        ),
+                        100,
+                    ),
                     (
                         TransactionTypeArg::TokenV2AmbassadorMint.materialize_default(),
-                        1,
+                        10000,
+                    ),
+                    (
+                        TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ModifyGlobalResourceAggV2.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ModifyGlobalFlagAggV2.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ModifyGlobalBoundedAggV2.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ResourceGroupsGlobalWriteTag1KB.materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::ResourceGroupsGlobalWriteAndReadTag1KB
+                            .materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::TokenV1NFTMintAndTransferSequential
+                            .materialize_default(),
+                        1000,
+                    ),
+                    (
+                        TransactionTypeArg::TokenV1FTMintAndTransfer.materialize_default(),
+                        10000,
                     ),
                 ]),
         )
         .with_success_criteria(
-            SuccessCriteria::new(100)
+            SuccessCriteria::new(3000)
                 .add_no_restarts()
                 .add_wait_for_catchup_s(240)
                 .add_chain_progress(StateProgressThreshold {
@@ -1392,7 +1535,11 @@ fn individual_workload_tests(test_name: String) -> ForgeConfig {
                         TransactionTypeArg::AccountGeneration.materialize_default()
                     },
                     "publishing" => TransactionTypeArg::PublishPackage.materialize_default(),
-                    "module_loading" => TransactionTypeArg::NoOp.materialize(1000, false),
+                    "module_loading" => TransactionTypeArg::NoOp.materialize(
+                        1000,
+                        false,
+                        WorkflowProgress::when_done_default(),
+                    ),
                     _ => unreachable!("{}", test_name),
                 })
             },
@@ -1786,7 +1933,7 @@ fn realistic_env_max_load_test(
                     7000
                 } else {
                     // During land time we want to be less strict, otherwise we flaky fail
-                    6000
+                    6500
                 },
             ),
         }))
@@ -1848,31 +1995,37 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
     const ENABLE_VFNS: bool = true;
     const VALIDATOR_COUNT: usize = 12;
 
+    // Config is based on these values. The target TPS should be a slight overestimate of
+    // the actual throughput to be able to have reasonable queueing but also so throughput
+    // will improve as performance improves.
+    // Overestimate: causes mempool and/or batch queueing. Underestimate: not enough txns in blocks.
+    const TARGET_TPS: usize = 15_000;
+    // Overestimate: causes blocks to be too small. Underestimate: causes blocks that are too large.
+    // Ideally, want the block size to take 200-250ms of execution time to match broadcast RTT.
+    const MAX_TXNS_PER_BLOCK: usize = 3500;
+    // Overestimate: causes batch queueing. Underestimate: not enough txns in quorum store.
+    // This is validator latency, minus mempool queueing time.
+    const VN_LATENCY_S: f64 = 2.5;
+    // Overestimate: causes mempool queueing. Underestimate: not enough txns incoming.
+    const VFN_LATENCY_S: f64 = 4.0;
+
     let mut forge_config = ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(VALIDATOR_COUNT).unwrap())
         .add_network_test(MultiRegionNetworkEmulationTest::default())
         .with_emit_job(EmitJobRequest::default().mode(EmitJobMode::MaxLoad {
-            mempool_backlog: 500_000,
+            mempool_backlog: (TARGET_TPS as f64 * VFN_LATENCY_S) as usize,
         }))
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             // Increase the state sync chunk sizes (consensus blocks are much larger than 1k)
             optimize_state_sync_for_throughput(config);
 
-            // consensus and quorum store configs copied from the consensus-only suite
-            optimize_for_maximum_throughput(config);
+            optimize_for_maximum_throughput(config, TARGET_TPS, MAX_TXNS_PER_BLOCK, VN_LATENCY_S);
 
             // Other consensus / Quroum store configs
-            config
-                .consensus
-                .wait_for_full_blocks_above_recent_fill_threshold = 0.2;
-            config.consensus.wait_for_full_blocks_above_pending_blocks = 8;
             config.consensus.quorum_store_pull_timeout_ms = 200;
 
             // Experimental storage optimizations
             config.storage.rocksdb_configs.enable_storage_sharding = true;
-
-            // Experimental delayed QC aggregation
-            config.consensus.qc_aggregator_type = QcAggregatorType::default_delayed();
 
             // Increase the concurrency level
             if USE_CRAZY_MACHINES {
@@ -1891,7 +2044,11 @@ fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 }
                 OnChainExecutionConfig::V4(config_v4) => {
                     config_v4.block_gas_limit_type = BlockGasLimitType::NoLimit;
-                    config_v4.transaction_shuffler_type = TransactionShufflerType::SenderAwareV2(256);
+                    config_v4.transaction_shuffler_type = TransactionShufflerType::Fairness {
+                        sender_conflict_window_size: 256,
+                        module_conflict_window_size: 2,
+                        entry_fun_conflict_window_size: 3,
+                    };
                 }
             }
             helm_values["chain"]["on_chain_execution_config"] =
@@ -1998,7 +2155,7 @@ fn chaos_test_suite(duration: Duration) -> ForgeConfig {
         )
 }
 
-fn changing_working_quorum_test_helper(
+pub fn changing_working_quorum_test_helper(
     num_validators: usize,
     epoch_duration: usize,
     target_tps: usize,
@@ -2030,12 +2187,7 @@ fn changing_working_quorum_test_helper(
             let block_size = (target_tps / 4) as u64;
 
             config.consensus.max_sending_block_txns = block_size;
-            config
-                .consensus
-                .max_sending_block_txns_quorum_store_override = block_size;
-            config
-                .consensus
-                .max_receiving_block_txns_quorum_store_override = block_size;
+            config.consensus.max_receiving_block_txns = block_size;
             config.consensus.round_initial_timeout_ms = 500;
             config.consensus.round_timeout_backoff_exponent_base = 1.0;
             config.consensus.quorum_store_poll_time_ms = 100;
@@ -2157,23 +2309,6 @@ fn quorum_store_reconfig_enable_test() -> ForgeConfig {
         .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
         .with_initial_fullnode_count(20)
         .add_network_test(QuorumStoreOnChainEnableTest {})
-        .with_success_criteria(
-            SuccessCriteria::new(5000)
-                .add_no_restarts()
-                .add_wait_for_catchup_s(240)
-                .add_system_metrics_threshold(SYSTEM_12_CORES_10GB_THRESHOLD.clone())
-                .add_chain_progress(StateProgressThreshold {
-                    max_no_progress_secs: 10.0,
-                    max_round_gap: 4,
-                }),
-        )
-}
-
-fn dag_reconfig_enable_test() -> ForgeConfig {
-    ForgeConfig::default()
-        .with_initial_validator_count(NonZeroUsize::new(20).unwrap())
-        .with_initial_fullnode_count(20)
-        .add_network_test(DagOnChainEnableTest {})
         .with_success_criteria(
             SuccessCriteria::new(5000)
                 .add_no_restarts()

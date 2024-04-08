@@ -58,6 +58,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 14,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "14"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -80,6 +98,31 @@
           }
         },
         "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x0d000000",
+        "value": "0x8c9a041f736278db6559cb7f1de04381d82258dc80fa9e128d9e44bc47487682010000000000000001000000000000000d00000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef00a02e630000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0x8c9a041f736278db6559cb7f1de04381d82258dc80fa9e128d9e44bc47487682",
@@ -119,7 +162,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "5",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -285,7 +328,7 @@
           "io_gas_units": "1",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "5"
         }
       }
     ],
@@ -351,6 +394,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 15,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "15"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -373,6 +434,31 @@
           }
         },
         "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x0e000000",
+        "value": "0x9ebb53fc221a6fc07f89f8048c6071e6460792b92ffe078247a77e73abc5297c010000000000000001000000000000000e00000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef00c0cf6a0000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0x9ebb53fc221a6fc07f89f8048c6071e6460792b92ffe078247a77e73abc5297c",
@@ -412,7 +498,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "5",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -578,7 +664,7 @@
           "io_gas_units": "1",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "5"
         }
       }
     ],
@@ -644,6 +730,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 16,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "16"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -666,6 +770,31 @@
           }
         },
         "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x0f000000",
+        "value": "0x3ddcb6c382270184cb1c0e7044b272ba0b2382d21b06966dd5ff00f5fa36dbef010000000000000001000000000000000f00000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef00e070720000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0x3ddcb6c382270184cb1c0e7044b272ba0b2382d21b06966dd5ff00f5fa36dbef",
@@ -705,7 +834,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "5",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -871,7 +1000,7 @@
           "io_gas_units": "1",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "5"
         }
       }
     ],
@@ -937,6 +1066,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 17,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "17"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -959,6 +1106,31 @@
           }
         },
         "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x10000000",
+        "value": "0x5d05da6e72c49bf2791775d0465453e709d3d46d8aae837610781514ae1b0ee6010000000000000001000000000000001000000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef0000127a0000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0x5d05da6e72c49bf2791775d0465453e709d3d46d8aae837610781514ae1b0ee6",
@@ -998,7 +1170,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "5",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1164,7 +1336,7 @@
           "io_gas_units": "1",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "5"
         }
       }
     ],
@@ -1230,6 +1402,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 18,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "18"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -1252,6 +1442,31 @@
           }
         },
         "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x11000000",
+        "value": "0xd2d00107d2f0b1323b9e27213f8b003f78a5cdd081007bd11f09b7e6fa232b0a010000000000000001000000000000001100000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef0020b3810000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0xd2d00107d2f0b1323b9e27213f8b003f78a5cdd081007bd11f09b7e6fa232b0a",
@@ -1291,7 +1506,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "5",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1457,7 +1672,7 @@
           "io_gas_units": "1",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "5"
         }
       }
     ],
@@ -1523,6 +1738,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 19,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "19"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -1545,6 +1778,31 @@
           }
         },
         "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x12000000",
+        "value": "0xa8d6521a26daafda96dacf7f582cb1dbdc84c06e7953e5f1c769ef8a93dcbeb3010000000000000001000000000000001200000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef004054890000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0xa8d6521a26daafda96dacf7f582cb1dbdc84c06e7953e5f1c769ef8a93dcbeb3",
@@ -1584,7 +1842,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "5",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -1750,7 +2008,7 @@
           "io_gas_units": "1",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "5"
         }
       }
     ],
@@ -1816,6 +2074,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 20,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "20"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -1838,6 +2114,31 @@
           }
         },
         "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x13000000",
+        "value": "0x142c31e08bfca525c34fa8a59ebcb300e72586225d613eb0af32ce80b0e9529f010000000000000001000000000000001300000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef0060f5900000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0x142c31e08bfca525c34fa8a59ebcb300e72586225d613eb0af32ce80b0e9529f",
@@ -1877,7 +2178,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "5",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2043,7 +2344,7 @@
           "io_gas_units": "1",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "5"
         }
       }
     ],
@@ -2109,6 +2410,24 @@
         "address": "0x1",
         "state_key_hash": "",
         "data": {
+          "type": "0x1::block::CommitHistory",
+          "data": {
+            "max_capacity": 2000,
+            "next_idx": 21,
+            "table": {
+              "inner": {
+                "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97"
+              },
+              "length": "21"
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
           "type": "0x1::stake::ValidatorPerformance",
           "data": {
             "validators": [
@@ -2131,6 +2450,31 @@
           }
         },
         "type": "write_resource"
+      },
+      {
+        "address": "0x1",
+        "state_key_hash": "",
+        "data": {
+          "type": "0x1::randomness::PerBlockRandomness",
+          "data": {
+            "epoch": "1",
+            "round": "1",
+            "seed": {
+              "vec": []
+            }
+          }
+        },
+        "type": "write_resource"
+      },
+      {
+        "state_key_hash": "",
+        "handle": "0x38ff67f17cf7998cd41ed5267b52cff7af37d06a22e8b390ce44b69680fc0e97",
+        "key": "0x14000000",
+        "value": "0xf6ce4988f3b078f37f863539358646c46f14aa24caa8745bf26f63f76d85fdbd010000000000000001000000000000001400000000000000010066b22b7465af92a9dc8d07d2878716d9dffbbb280830a7d8cf80334b5da812ef008096980000000000",
+        "data": {
+          "data": null
+        },
+        "type": "write_table_item"
       }
     ],
     "id": "0xf6ce4988f3b078f37f863539358646c46f14aa24caa8745bf26f63f76d85fdbd",
@@ -2170,7 +2514,7 @@
     "state_change_hash": "",
     "event_root_hash": "",
     "state_checkpoint_hash": null,
-    "gas_used": "4",
+    "gas_used": "5",
     "success": true,
     "vm_status": "Executed successfully",
     "accumulator_root_hash": "",
@@ -2336,7 +2680,7 @@
           "io_gas_units": "1",
           "storage_fee_octas": "0",
           "storage_fee_refund_octas": "0",
-          "total_charge_gas_units": "4"
+          "total_charge_gas_units": "5"
         }
       }
     ],

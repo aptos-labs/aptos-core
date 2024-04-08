@@ -93,3 +93,10 @@ impl Default for SymbolPool {
         Self::new()
     }
 }
+
+#[cfg(test)]
+impl Symbol {
+    pub fn new(val: usize) -> Symbol {
+        Symbol(val)
+    }
+}

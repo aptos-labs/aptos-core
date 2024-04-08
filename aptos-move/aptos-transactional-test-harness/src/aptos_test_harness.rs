@@ -22,15 +22,15 @@ use aptos_types::{
     state_store::{state_key::StateKey, table::TableHandle, TStateView},
     transaction::{
         signature_verified_transaction::into_signature_verified_block,
-        EntryFunction as TransactionEntryFunction, ExecutionStatus, Module as TransactionModule,
-        RawTransaction, Script as TransactionScript, Transaction, TransactionOutput,
-        TransactionStatus,
+        EntryFunction as TransactionEntryFunction, ExecutionStatus, RawTransaction,
+        Script as TransactionScript, Transaction, TransactionOutput, TransactionStatus,
     },
 };
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM, VMExecutor};
 use aptos_vm_genesis::GENESIS_KEYPAIR;
 use clap::Parser;
 use move_binary_format::file_format::{CompiledModule, CompiledScript};
+use move_bytecode_verifier::verify_module;
 use move_command_line_common::{
     address::ParsedAddress, files::verify_and_create_named_address_mapping,
 };
@@ -449,20 +449,17 @@ impl<'a> AptosTestAdapter<'a> {
         let max_number_of_gas_units =
             TransactionGasParameters::initial().maximum_number_of_gas_units;
         let gas_unit_price = gas_unit_price.unwrap_or(1000);
-        let max_gas_amount = match max_gas_amount {
-            Some(max_gas_amount) => max_gas_amount,
-            None => {
-                if gas_unit_price == 0 {
-                    u64::from(max_number_of_gas_units)
-                } else {
-                    let account_balance = self.fetch_account_balance(signer_addr).unwrap();
-                    std::cmp::min(
-                        u64::from(max_number_of_gas_units),
-                        account_balance / gas_unit_price,
-                    )
-                }
-            },
-        };
+        let max_gas_amount = max_gas_amount.unwrap_or_else(|| {
+            if gas_unit_price == 0 {
+                u64::from(max_number_of_gas_units)
+            } else {
+                let account_balance = self.fetch_account_balance(signer_addr).unwrap();
+                std::cmp::min(
+                    u64::from(max_number_of_gas_units),
+                    account_balance / gas_unit_price,
+                )
+            }
+        });
         let expiration_timestamp_secs = expiration_time.unwrap_or(40000);
 
         Ok(TransactionParameters {
@@ -653,35 +650,27 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         &mut self,
         module: CompiledModule,
         mut named_addr_opt: Option<Identifier>,
-        gas_budget: Option<u64>,
+        _gas_budget: Option<u64>,
         extra_args: Self::ExtraPublishArgs,
     ) -> Result<(Option<String>, CompiledModule)> {
-        let module_id = module.self_id();
-
         // TODO: hack to allow the signer to be overridden.
         // See if we can implement it in a cleaner way.
-        let signer = match extra_args.override_signer {
+        let address = match extra_args.override_signer {
             Some(addr) => {
                 if let ParsedAddress::Named(named_addr) = &addr {
                     named_addr_opt = Some(Identifier::new(named_addr.clone()).unwrap())
                 }
                 self.compiled_state().resolve_address(&addr)
             },
-            None => *module_id.address(),
+            None => *module.self_id().address(),
         };
-
-        let params = self.fetch_transaction_parameters(
-            &signer,
-            extra_args.sequence_number,
-            extra_args.expiration_time,
-            extra_args.gas_unit_price,
-            gas_budget,
-        )?;
+        let module_id = ModuleId::new(address, module.self_id().name().to_owned());
 
         let mut module_blob = vec![];
         module.serialize(&mut module_blob).unwrap();
 
-        let private_key = match (extra_args.private_key, named_addr_opt) {
+        // TODO: Do we still need this?
+        let _private_key = match (extra_args.private_key, named_addr_opt) {
             (Some(private_key), _) => self.resolve_private_key(&private_key),
             (None, Some(named_addr)) => match self
                 .private_key_mapping
@@ -693,20 +682,11 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             (None, None) => panic_missing_private_key("publish"),
         };
 
-        let txn = RawTransaction::new_module(
-            signer,
-            params.sequence_number,
-            TransactionModule::new(module_blob),
-            params.max_gas_amount,
-            params.gas_unit_price,
-            params.expiration_timestamp_secs,
-            ChainId::test(),
-        )
-        .sign(&private_key, Ed25519PublicKey::from(&private_key))?
-        .into_inner();
-
-        self.run_transaction(Transaction::UserTransaction(txn))?;
-
+        // TODO: HACK! This allows us to publish a module without any checks and bypassing publishing
+        //  through native context. Implement in a cleaner way, and simply run the bytecode verifier
+        //  for now.
+        verify_module(&module)?;
+        self.storage.add_module(&module_id, module_blob);
         Ok((None, module))
     }
 
@@ -718,7 +698,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         txn_args: Vec<MoveValue>,
         gas_budget: Option<u64>,
         extra_args: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
+    ) -> Result<Option<String>> {
         let signer0 = self.compiled_state().resolve_address(&signers[0]);
 
         if gas_budget.is_some() {
@@ -783,14 +763,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
         } else {
             None
         };
-
-        //TODO: replace this dummy value with actual txn return value
-        let a = SerializedReturnValues {
-            mutable_reference_outputs: vec![(0, vec![0], MoveTypeLayout::U8)],
-            return_values: vec![(vec![0], MoveTypeLayout::U8)],
-        };
-
-        Ok((output, a))
+        Ok(output)
     }
 
     fn call_function(
@@ -919,7 +892,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
             },
             AptosSubCommand::ViewTableCommand(view_table_cmd) => {
                 let resolver = self.storage.as_move_resolver();
-                let converter = resolver.as_converter(Arc::new(FakeDbReader {}));
+                let converter = resolver.as_converter(Arc::new(FakeDbReader {}), None);
 
                 let vm_key = converter
                     .try_into_vm_value(&view_table_cmd.key_type, view_table_cmd.key_value)
@@ -995,7 +968,5 @@ pub fn run_aptos_test_with_config(
     path: &Path,
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // TODO: remove once bundles removed
-    aptos_vm::aptos_vm::allow_module_bundle_for_test();
     run_test_impl::<AptosTestAdapter>(config, path, Some(&*PRECOMPILED_APTOS_FRAMEWORK))
 }

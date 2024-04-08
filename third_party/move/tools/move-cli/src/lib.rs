@@ -24,7 +24,8 @@ const BCS_EXTENSION: &str = "bcs";
 use anyhow::Result;
 use clap::Parser;
 use move_core_types::{
-    account_address::AccountAddress, errmap::ErrorMapping, identifier::Identifier,
+    account_address::AccountAddress, effects::ChangeSet, errmap::ErrorMapping,
+    identifier::Identifier,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_test_utils::gas_schedule::CostTable;
@@ -87,6 +88,7 @@ pub enum Command {
 
 pub fn run_cli(
     natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
     cost_table: &CostTable,
     error_descriptions: &ErrorMapping,
     move_args: Move,
@@ -108,6 +110,7 @@ pub fn run_cli(
             move_args.package_path,
             move_args.build_config,
             natives,
+            genesis,
             Some(cost_table.clone()),
         ),
         Command::Sandbox { storage_dir, cmd } => cmd.handle_command(
@@ -123,12 +126,14 @@ pub fn run_cli(
 
 pub fn move_cli(
     natives: Vec<NativeFunctionRecord>,
+    genesis: ChangeSet,
     cost_table: &CostTable,
     error_descriptions: &ErrorMapping,
 ) -> Result<()> {
     let args = MoveCLI::parse();
     run_cli(
         natives,
+        genesis,
         cost_table,
         error_descriptions,
         args.move_args,

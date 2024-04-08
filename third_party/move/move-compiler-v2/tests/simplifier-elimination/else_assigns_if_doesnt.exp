@@ -1,0 +1,25 @@
+// -- Model dump before bytecode pipeline
+module <SELF>_0 {
+    private fun main() {
+        {
+          let x: u64;
+          {
+            let y: u64;
+            if true {
+              y: u64 = 0;
+              Tuple()
+            } else {
+              x: u64 = 42;
+              x;
+              Tuple()
+            };
+            if Eq<u64>(y, 0) {
+              Tuple()
+            } else {
+              Abort(42)
+            };
+            Tuple()
+          }
+        }
+    }
+} // end <SELF>_0

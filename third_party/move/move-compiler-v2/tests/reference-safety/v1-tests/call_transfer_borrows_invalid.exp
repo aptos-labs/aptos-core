@@ -9,6 +9,8 @@ error: cannot move local `y` which is still borrowed
    │                 --------------------------------------------- used by mutable call result
 16 │         move y;
    │         ^^^^^^ moved here
+17 │         *r = 1;
+   │         ------ conflicting reference `r` used here
 
 error: cannot move local `x` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/call_transfer_borrows_invalid.move:26:9
@@ -20,6 +22,9 @@ error: cannot move local `x` which is still borrowed
    │                 --------------------------------------------- used by call result
 26 │         move x;
    │         ^^^^^^ moved here
+27 │         move y;
+28 │         *r;
+   │         -- conflicting reference `r` used here
 
 error: cannot move local `y` which is still borrowed
    ┌─ tests/reference-safety/v1-tests/call_transfer_borrows_invalid.move:27:9
@@ -31,3 +36,5 @@ error: cannot move local `y` which is still borrowed
 26 │         move x;
 27 │         move y;
    │         ^^^^^^ moved here
+28 │         *r;
+   │         -- conflicting reference `r` used here

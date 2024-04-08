@@ -8,10 +8,8 @@ inputs:
 runs:
   using: composite
   steps:
-    # Checkout the repository and setup the rust toolchain
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0 # get all the history because cargo xtest --change-since origin/main requires it.
+    # The source code must be checkout out by the workflow that invokes this action.
+
     - uses: aptos-labs/aptos-core/.github/actions/rust-setup@main
       with:
         GIT_CREDENTIALS: ${{ inputs.GIT_CREDENTIALS }}
@@ -42,8 +40,8 @@ runs:
       shell: bash
       env:
         INDEXER_DATABASE_URL: postgresql://postgres@localhost/postgres
-        RUST_MIN_STACK: 4297152
-        MVP_TEST_ON_CI: true
+        RUST_MIN_STACK: "4297152"
+        MVP_TEST_ON_CI: "true"
         SOLC_EXE: /home/runner/bin/solc
         Z3_EXE: /home/runner/bin/z3
         CVC5_EXE: /home/runner/bin/cvc5

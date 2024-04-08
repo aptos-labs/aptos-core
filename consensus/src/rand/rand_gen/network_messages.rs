@@ -5,8 +5,8 @@ use crate::{
     network::TConsensusMsg,
     network_interface::ConsensusMsg,
     rand::rand_gen::types::{
-        AugData, AugDataSignature, AugmentedData, CertifiedAugData, CertifiedAugDataAck,
-        RandConfig, RandShare, RequestShare, Share,
+        AugData, AugDataSignature, CertifiedAugData, CertifiedAugDataAck, RandConfig, RandShare,
+        RequestShare, TAugmentedData, TShare,
     },
 };
 use anyhow::bail;
@@ -30,7 +30,7 @@ pub enum RandMessage<S, D> {
     CertifiedAugDataAck(CertifiedAugDataAck),
 }
 
-impl<S: Share, D: AugmentedData> RandMessage<S, D> {
+impl<S: TShare, D: TAugmentedData> RandMessage<S, D> {
     pub fn verify(
         &self,
         epoch_state: &EpochState,
@@ -49,9 +49,9 @@ impl<S: Share, D: AugmentedData> RandMessage<S, D> {
     }
 }
 
-impl<S: Share, D: AugmentedData> RBMessage for RandMessage<S, D> {}
+impl<S: TShare, D: TAugmentedData> RBMessage for RandMessage<S, D> {}
 
-impl<S: Share, D: AugmentedData> TConsensusMsg for RandMessage<S, D> {
+impl<S: TShare, D: TAugmentedData> TConsensusMsg for RandMessage<S, D> {
     fn epoch(&self) -> u64 {
         match self {
             RandMessage::RequestShare(request) => request.epoch(),
@@ -92,6 +92,10 @@ impl RandGenMessage {
 
     pub fn data(&self) -> &[u8] {
         &self.data
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
     }
 }
 

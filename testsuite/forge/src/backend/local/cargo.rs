@@ -171,9 +171,9 @@ pub fn git_merge_base<R: AsRef<str>>(rev: R) -> Result<String> {
 
 pub fn cargo_build_common_args() -> Vec<&'static str> {
     let mut args = if build_aptos_node_without_indexer() {
-        vec!["build", "--features=failpoints"]
+        vec!["build", "--features=failpoints,smoke-test"]
     } else {
-        vec!["build", "--features=failpoints,indexer"]
+        vec!["build", "--features=failpoints,indexer,smoke-test"]
     };
     if build_consensus_only_node() {
         args.push("--features=consensus-only-perf-test");

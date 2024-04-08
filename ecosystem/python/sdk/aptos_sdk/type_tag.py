@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import typing
-from typing import List
+import unittest
+from typing import List, Tuple
 
 from .account_address import AccountAddress
 from .bcs import Deserializer, Serializer
@@ -308,19 +309,45 @@ class StructTag:
 
     @staticmethod
     def from_str(type_tag: str) -> StructTag:
+        return StructTag._from_str_internal(type_tag, 0)[0][0]
+
+    @staticmethod
+    def _from_str_internal(type_tag: str, index: int) -> Tuple[List[StructTag], int]:
         name = ""
-        index = 0
+        tags = []
+        inner_tags: List[StructTag] = []
+
         while index < len(type_tag):
             letter = type_tag[index]
             index += 1
 
+            if letter == " ":
+                continue
+
             if letter == "<":
-                raise NotImplementedError
+                (inner_tags, index) = StructTag._from_str_internal(type_tag, index)
+            elif letter == ",":
+                split = name.split("::")
+                tag = StructTag(
+                    AccountAddress.from_str_relaxed(split[0]),
+                    split[1],
+                    split[2],
+                    inner_tags,
+                )
+                tags.append(tag)
+                name = ""
+                inner_tags = []
+            elif letter == ">":
+                break
             else:
                 name += letter
 
         split = name.split("::")
-        return StructTag(AccountAddress.from_str(split[0]), split[1], split[2], [])
+        tag = StructTag(
+            AccountAddress.from_str_relaxed(split[0]), split[1], split[2], inner_tags
+        )
+        tags.append(tag)
+        return (tags, index)
 
     def variant(self):
         return TypeTag.STRUCT
@@ -338,3 +365,18 @@ class StructTag:
         serializer.str(self.module)
         serializer.str(self.name)
         serializer.sequence(self.type_args, Serializer.struct)
+
+
+class Test(unittest.TestCase):
+    def test_nested_structs(self):
+        l0 = "0x0::l0::L0"
+        l10 = "0x1::l10::L10"
+        l20 = "0x2::l20::L20"
+        l11 = "0x1::l11::L11"
+        composite = f"{l0}<{l10}<{l20}>, {l11}>"
+
+        self.assertEqual(composite, f"{StructTag.from_str(composite)}")
+
+
+if __name__ == "__main__":
+    unittest.main()

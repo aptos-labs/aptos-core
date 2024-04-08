@@ -4,7 +4,7 @@
 
 /// Container for experiments in the compiler. Those can be activated
 /// via the `--experiment=<name>` flag. One can also use the env var
-/// `MOVE_COMPILER_EXP=<comma list>` to activate those flags.
+/// `MVC_EXP=<comma list>` to activate those flags.
 ///
 /// Moreover, one can activate an experiment in a test source by using a
 /// comment as such in a unit test:
@@ -23,7 +23,14 @@
 pub struct Experiment();
 
 impl Experiment {
-    /// A flag which allows to turn off safety checks, like reference safety.
+    /// A flag which allows to turn off safety checks, or suppress any error messages
+    /// they produce.
     /// Retention: permanent.
     pub const NO_SAFETY: &'static str = "no-safety";
+    /// A flag to turn on optimizations. Currently off by default.
+    /// Retention: temporary (to be removed when optimization is the default)
+    pub const OPTIMIZE: &'static str = "optimize";
+    /// A flag which allows to turn on the critical edge splitting pass.
+    /// Retention: temporary. This should be removed after the pass can be tested.
+    pub const SPLIT_CRITICAL_EDGES: &'static str = "split-critical-edges";
 }

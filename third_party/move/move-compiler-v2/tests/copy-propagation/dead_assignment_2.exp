@@ -14,9 +14,9 @@ fun m::dead($t0: u64): u64 {
 fun m::dead($t0: u64): u64 {
      var $t1: u64
      # before: {}, after: {}
-  0: $t0 := infer($t0)
+  0: $t0 := move($t0)
      # before: {}, after: {$t1 := $t0}
-  1: $t1 := infer($t0)
+  1: $t1 := move($t0)
      # before: {$t1 := $t0}, after: {$t1 := $t0}
   2: return $t1
 }
@@ -26,8 +26,8 @@ fun m::dead($t0: u64): u64 {
 [variant baseline]
 fun m::dead($t0: u64): u64 {
      var $t1: u64
-  0: $t0 := infer($t0)
-  1: $t1 := infer($t0)
+  0: $t0 := move($t0)
+  1: $t1 := move($t0)
   2: return $t0
 }
 
@@ -35,6 +35,6 @@ fun m::dead($t0: u64): u64 {
 
 [variant baseline]
 fun m::dead($t0: u64): u64 {
-     var $t1: u64
+     var $t1: u64 [unused]
   0: return $t0
 }

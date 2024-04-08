@@ -166,6 +166,10 @@ pub struct ProposalGenerator {
     max_block_txns: u64,
     // Max number of bytes to be added to a proposed block.
     max_block_bytes: u64,
+    // Max number of inline transactions to be added to a proposed block.
+    max_inline_txns: u64,
+    // Max number of inline bytes to be added to a proposed block.
+    max_inline_bytes: u64,
     // Max number of failed authors to be added to a proposed block.
     max_failed_authors_to_store: usize,
 
@@ -176,9 +180,12 @@ pub struct ProposalGenerator {
     last_round_generated: Round,
     quorum_store_enabled: bool,
     vtxn_config: ValidatorTxnConfig,
+
+    allow_batches_without_pos_in_proposal: bool,
 }
 
 impl ProposalGenerator {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         author: Author,
         block_store: Arc<dyn BlockReader + Send + Sync>,
@@ -187,11 +194,14 @@ impl ProposalGenerator {
         quorum_store_poll_time: Duration,
         max_block_txns: u64,
         max_block_bytes: u64,
+        max_inline_txns: u64,
+        max_inline_bytes: u64,
         max_failed_authors_to_store: usize,
         pipeline_backpressure_config: PipelineBackpressureConfig,
         chain_health_backoff_config: ChainHealthBackoffConfig,
         quorum_store_enabled: bool,
         vtxn_config: ValidatorTxnConfig,
+        allow_batches_without_pos_in_proposal: bool,
     ) -> Self {
         Self {
             author,
@@ -201,12 +211,15 @@ impl ProposalGenerator {
             quorum_store_poll_time,
             max_block_txns,
             max_block_bytes,
+            max_inline_txns,
+            max_inline_bytes,
             max_failed_authors_to_store,
             pipeline_backpressure_config,
             chain_health_backoff_config,
             last_round_generated: 0,
             quorum_store_enabled,
             vtxn_config,
+            allow_batches_without_pos_in_proposal,
         }
     }
 
@@ -260,7 +273,10 @@ impl ProposalGenerator {
             // after reconfiguration until it's committed
             (
                 vec![],
-                Payload::empty(self.quorum_store_enabled),
+                Payload::empty(
+                    self.quorum_store_enabled,
+                    self.allow_batches_without_pos_in_proposal,
+                ),
                 hqc.certified_block().timestamp_usecs(),
             )
         } else {
@@ -296,9 +312,9 @@ impl ProposalGenerator {
 
             let voting_power_ratio = proposer_election.get_voting_power_participation_ratio(round);
 
-            let (max_block_txns, max_block_bytes, proposal_delay) = self
-                .calculate_max_block_sizes(voting_power_ratio, timestamp, round)
-                .await;
+            let (max_block_txns, max_block_bytes, max_txns_from_block_to_execute, proposal_delay) =
+                self.calculate_max_block_sizes(voting_power_ratio, timestamp, round)
+                    .await;
 
             PROPOSER_DELAY_PROPOSAL.set(proposal_delay.as_secs_f64());
             if !proposal_delay.is_zero() {
@@ -329,12 +345,15 @@ impl ProposalGenerator {
                 .collect();
             let validator_txn_filter =
                 vtxn_pool::TransactionFilter::PendingTxnHashSet(pending_validator_txn_hashes);
-            let (validator_txns, payload) = self
+            let (validator_txns, mut payload) = self
                 .payload_client
                 .pull_payload(
                     self.quorum_store_poll_time.saturating_sub(proposal_delay),
                     max_block_txns,
                     max_block_bytes,
+                    // TODO: Set max_inline_txns and max_inline_bytes correctly
+                    self.max_inline_txns,
+                    self.max_inline_bytes,
                     validator_txn_filter,
                     payload_filter,
                     wait_callback,
@@ -345,6 +364,12 @@ impl ProposalGenerator {
                 .await
                 .context("Fail to retrieve payload")?;
 
+            if !payload.is_direct()
+                && max_txns_from_block_to_execute.is_some()
+                && payload.len() > max_txns_from_block_to_execute.unwrap()
+            {
+                payload = payload.transform_to_quorum_store_v2(max_txns_from_block_to_execute);
+            }
             (validator_txns, payload, timestamp.as_micros() as u64)
         };
 
@@ -385,10 +410,11 @@ impl ProposalGenerator {
         voting_power_ratio: f64,
         timestamp: Duration,
         round: Round,
-    ) -> (u64, u64, Duration) {
+    ) -> (u64, u64, Option<usize>, Duration) {
         let mut values_max_block_txns = vec![self.max_block_txns];
         let mut values_max_block_bytes = vec![self.max_block_bytes];
         let mut values_proposal_delay = vec![Duration::ZERO];
+        let mut max_txns_from_block_to_execute = None;
 
         let chain_health_backoff = self
             .chain_health_backoff_config
@@ -408,6 +434,7 @@ impl ProposalGenerator {
         if let Some(value) = pipeline_backpressure {
             values_max_block_txns.push(value.max_sending_block_txns_override);
             values_max_block_bytes.push(value.max_sending_block_bytes_override);
+            max_txns_from_block_to_execute = value.max_txns_from_block_to_execute;
             values_proposal_delay.push(Duration::from_millis(value.backpressure_proposal_delay_ms));
             PIPELINE_BACKPRESSURE_ON_PROPOSAL_TRIGGERED.observe(1.0);
         } else {
@@ -429,7 +456,12 @@ impl ProposalGenerator {
                 round,
             );
         }
-        (max_block_txns, max_block_bytes, proposal_delay)
+        (
+            max_block_txns,
+            max_block_bytes,
+            max_txns_from_block_to_execute,
+            proposal_delay,
+        )
     }
 
     fn ensure_highest_quorum_cert(&self, round: Round) -> anyhow::Result<Arc<QuorumCert>> {

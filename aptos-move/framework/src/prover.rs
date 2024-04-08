@@ -123,7 +123,7 @@ impl ProverOptions {
     ) -> anyhow::Result<()> {
         let now = Instant::now();
         let for_test = self.for_test;
-        let model = build_model(
+        let mut model = build_model(
             dev_mode,
             package_path,
             named_addresses,
@@ -162,7 +162,7 @@ impl ProverOptions {
                 )],
             });
         let mut writer = StandardStream::stderr(ColorChoice::Auto);
-        move_prover::run_move_prover_with_model(&model, &mut writer, options, Some(now))?;
+        move_prover::run_move_prover_with_model(&mut model, &mut writer, options, Some(now))?;
         Ok(())
     }
 

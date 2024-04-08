@@ -208,14 +208,14 @@ impl ResourceKey {
 }
 
 /// Represents the initial key into global storage where we first index by the address, and then
-/// the struct tag
+/// the struct tag. The struct fields are public to support pattern matching.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
 #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
 pub struct ModuleId {
-    address: AccountAddress,
-    name: Identifier,
+    pub address: AccountAddress,
+    pub name: Identifier,
 }
 
 impl From<ModuleId> for (AccountAddress, Identifier) {
@@ -241,6 +241,22 @@ impl ModuleId {
         let mut key = vec![CODE_TAG];
         key.append(&mut bcs::to_bytes(self).unwrap());
         key
+    }
+
+    pub fn as_refs(&self) -> (&AccountAddress, &IdentStr) {
+        (&self.address, self.name.as_ident_str())
+    }
+}
+
+impl<'a> hashbrown::Equivalent<(&'a AccountAddress, &'a IdentStr)> for ModuleId {
+    fn equivalent(&self, other: &(&'a AccountAddress, &'a IdentStr)) -> bool {
+        &self.address == other.0 && self.name.as_ident_str() == other.1
+    }
+}
+
+impl<'a> hashbrown::Equivalent<ModuleId> for (&'a AccountAddress, &'a IdentStr) {
+    fn equivalent(&self, other: &ModuleId) -> bool {
+        self.0 == &other.address && self.1 == other.name.as_ident_str()
     }
 }
 
@@ -313,10 +329,18 @@ impl From<StructTag> for TypeTag {
 mod tests {
     use super::TypeTag;
     use crate::{
-        account_address::AccountAddress, identifier::Identifier, language_storage::StructTag,
+        account_address::AccountAddress,
+        identifier::Identifier,
+        language_storage::{ModuleId, StructTag},
         safe_serialize::MAX_TYPE_TAG_NESTING,
     };
-    use std::mem;
+    use hashbrown::Equivalent;
+    use proptest::prelude::*;
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+        mem,
+    };
 
     #[test]
     fn test_type_tag_serde() {
@@ -391,5 +415,28 @@ mod tests {
             name: Identifier::new("a").unwrap(),
             type_params: vec![type_param],
         }))
+    }
+
+    proptest! {
+        #[test]
+        fn module_id_ref_equivalence(module_id in any::<ModuleId>()) {
+            let module_id_ref = module_id.as_refs();
+
+            assert!(module_id.equivalent(&module_id_ref));
+            assert!(module_id_ref.equivalent(&module_id));
+        }
+
+        #[test]
+        fn module_id_ref_hash_equivalence(module_id in any::<ModuleId>()) {
+            fn calculate_hash<T: Hash>(t: &T) -> u64 {
+                let mut s = DefaultHasher::new();
+                t.hash(&mut s);
+                s.finish()
+            }
+
+            let module_id_ref = module_id.as_refs();
+
+            assert_eq!(calculate_hash(&module_id), calculate_hash(&module_id_ref))
+        }
     }
 }

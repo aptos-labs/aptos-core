@@ -11,6 +11,7 @@ module aptos_framework::reconfiguration {
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
     use aptos_framework::chain_status;
+    use aptos_framework::reconfiguration_state;
     use aptos_framework::storage_gas;
     use aptos_framework::transaction_fee;
 
@@ -21,6 +22,7 @@ module aptos_framework::reconfiguration {
     friend aptos_framework::gas_schedule;
     friend aptos_framework::genesis;
     friend aptos_framework::version;
+    friend aptos_framework::reconfiguration_with_dkg;
 
     /// Event that signals consensus to start a new epoch,
     /// with new configuration information. This is also called a
@@ -118,6 +120,8 @@ module aptos_framework::reconfiguration {
             return
         };
 
+        reconfiguration_state::on_reconfig_start();
+
         // Reconfiguration "forces the block" to end, as mentioned above. Therefore, we must process the collected fees
         // explicitly so that staking can distribute them.
         //
@@ -149,6 +153,8 @@ module aptos_framework::reconfiguration {
                 epoch: config_ref.epoch,
             },
         );
+
+        reconfiguration_state::on_reconfig_finish();
     }
 
     public fun last_reconfiguration_time(): u64 acquires Configuration {

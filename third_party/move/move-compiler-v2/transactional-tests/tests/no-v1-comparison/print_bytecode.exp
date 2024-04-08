@@ -20,5 +20,7 @@ entry public ex(Arg0: signer, Arg1: u64) /* def_idx: 0 */ {
 B0:
 	0: LdU64(0)
 	1: Abort
+B1:
+	2: Ret
 }
 }

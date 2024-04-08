@@ -97,7 +97,7 @@ fn view_request(
         ViewFunctionRequest::Json(data) => {
             let resolver = state_view.as_move_resolver();
             resolver
-                .as_converter(context.db.clone())
+                .as_converter(context.db.clone(), context.table_info_reader.clone())
                 .convert_view_function(data.0)
                 .map_err(|err| {
                     BasicErrorWith404::bad_request_with_code(
@@ -171,7 +171,7 @@ fn view_request(
         AcceptType::Json => {
             let resolver = state_view.as_move_resolver();
             let return_types = resolver
-                .as_converter(context.db.clone())
+                .as_converter(context.db.clone(), context.table_info_reader.clone())
                 .function_return_types(&view_function)
                 .and_then(|tys| {
                     tys.into_iter()
@@ -191,7 +191,7 @@ fn view_request(
                 .zip(return_types.into_iter())
                 .map(|(v, ty)| {
                     resolver
-                        .as_converter(context.db.clone())
+                        .as_converter(context.db.clone(), context.table_info_reader.clone())
                         .try_into_move_value(&ty, &v)
                 })
                 .collect::<anyhow::Result<Vec<_>>>()

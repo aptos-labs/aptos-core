@@ -41,7 +41,7 @@ impl Default for VMConfig {
             type_max_cost: 0,
             type_base_cost: 0,
             type_byte_cost: 0,
-            aggregator_v2_type_tagging: true,
+            aggregator_v2_type_tagging: false,
         }
     }
 }

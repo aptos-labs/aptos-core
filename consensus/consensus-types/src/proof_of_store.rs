@@ -132,6 +132,10 @@ impl BatchInfo {
     pub fn gas_bucket_start(&self) -> u64 {
         self.gas_bucket_start
     }
+
+    pub fn is_expired(&self) -> bool {
+        self.expiration() < aptos_infallible::duration_since_epoch().as_micros() as u64
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -148,6 +152,7 @@ impl SignedBatchInfoMsg {
         &self,
         sender: PeerId,
         max_num_batches: usize,
+        max_batch_expiry_gap_usecs: u64,
         validator: &ValidatorVerifier,
     ) -> anyhow::Result<()> {
         ensure!(!self.signed_infos.is_empty(), "Empty message");
@@ -158,7 +163,7 @@ impl SignedBatchInfoMsg {
             max_num_batches
         );
         for signed_info in &self.signed_infos {
-            signed_info.verify(sender, validator)?
+            signed_info.verify(sender, max_batch_expiry_gap_usecs, validator)?
         }
         Ok(())
     }
@@ -207,12 +212,29 @@ impl SignedBatchInfo {
         self.signer
     }
 
-    pub fn verify(&self, sender: PeerId, validator: &ValidatorVerifier) -> anyhow::Result<()> {
-        if sender == self.signer {
-            Ok(validator.verify(self.signer, &self.info, &self.signature)?)
-        } else {
+    pub fn verify(
+        &self,
+        sender: PeerId,
+        max_batch_expiry_gap_usecs: u64,
+        validator: &ValidatorVerifier,
+    ) -> anyhow::Result<()> {
+        if sender != self.signer {
             bail!("Sender {} mismatch signer {}", sender, self.signer);
         }
+
+        if self.expiration()
+            > aptos_infallible::duration_since_epoch().as_micros() as u64
+                + max_batch_expiry_gap_usecs
+        {
+            bail!(
+                "Batch expiration too far in future: {} > {}",
+                self.expiration(),
+                aptos_infallible::duration_since_epoch().as_micros() as u64
+                    + max_batch_expiry_gap_usecs
+            );
+        }
+
+        Ok(validator.verify(self.signer, &self.info, &self.signature)?)
     }
 
     pub fn signature(self) -> bls12381::Signature {
@@ -238,6 +260,8 @@ pub enum SignedBatchInfoError {
     WrongInfo((u64, u64)),
     DuplicatedSignature,
     InvalidAuthor,
+    NotFound,
+    AlreadyCommitted,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]

@@ -8,7 +8,7 @@
 
 use codespan_reporting::diagnostic::Severity;
 use move_model::{
-    ast::{ExpData, TempIndex},
+    ast::{ExpData, TempIndex, VisitorPosition},
     model::{GlobalEnv, Loc, NodeId, Parameter},
     symbol::Symbol,
 };
@@ -30,7 +30,7 @@ pub fn check_for_unused_vars_and_params(env: &mut GlobalEnv) {
 
 fn find_unused_params_and_vars(env: &GlobalEnv, params: &[Parameter], exp: &ExpData) {
     let mut visitor = SymbolVisitor::new(env, params);
-    exp.visit_pre_post(&mut |post, exp_data| visitor.entry(post, exp_data));
+    exp.visit_positions(&mut |position, exp_data| visitor.entry(position, exp_data));
     visitor.check_parameter_usage();
 }
 
@@ -99,52 +99,67 @@ impl<'env, 'params> SymbolVisitor<'env, 'params> {
         }
     }
 
-    fn entry(&mut self, post: bool, e: &ExpData) -> bool {
+    fn entry(&mut self, position: VisitorPosition, e: &ExpData) -> bool {
         use ExpData::*;
+        use VisitorPosition::*;
         match e {
             Block(_, pat, _, _) => {
-                if !post {
-                    self.seen_uses.enter_scope();
-                } else {
-                    // postorder
-                    for (id, var) in pat.vars() {
-                        self.node_symbol_decl_visitor(post, &id, &var, "local variable");
-                    }
-                    self.seen_uses.exit_scope();
-                }
+                match position {
+                    BeforeBody => self.seen_uses.enter_scope(),
+                    Post => {
+                        for (id, var) in pat.vars() {
+                            self.node_symbol_decl_visitor(true, &id, &var, "local variable");
+                        }
+                        self.seen_uses.exit_scope();
+                    },
+                    Pre | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                };
             },
             Lambda(_, pat, _) => {
-                if !post {
-                    self.seen_uses.enter_scope();
-                } else {
-                    // postorder
-                    for (id, var) in pat.vars() {
-                        self.node_symbol_decl_visitor(post, &id, &var, "parameter");
-                    }
-                    self.seen_uses.exit_scope();
-                }
+                match position {
+                    Pre => self.seen_uses.enter_scope(),
+                    Post => {
+                        for (id, var) in pat.vars() {
+                            self.node_symbol_decl_visitor(
+                                true,
+                                &id,
+                                &var,
+                                "anonymous function parameter",
+                            );
+                        }
+                        self.seen_uses.exit_scope();
+                    },
+                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                };
             },
             Quant(_, _, ranges, ..) => {
-                if !post {
-                    self.seen_uses.enter_scope();
-                } else {
-                    // postorder
-                    for (id, var) in ranges.iter().flat_map(|(pat, _)| pat.vars().into_iter()) {
-                        self.node_symbol_decl_visitor(post, &id, &var, "range parameter");
-                    }
-                    self.seen_uses.exit_scope();
-                }
+                match position {
+                    Pre => self.seen_uses.enter_scope(),
+                    Post => {
+                        for (id, var) in ranges.iter().flat_map(|(pat, _)| pat.vars().into_iter()) {
+                            self.node_symbol_decl_visitor(true, &id, &var, "range parameter");
+                        }
+                        self.seen_uses.exit_scope();
+                    },
+                    BeforeBody | MidMutate | BeforeThen | BeforeElse | PreSequenceValue => {},
+                };
             },
             Assign(_, pat, _) => {
-                for (id, sym) in pat.vars().iter() {
-                    self.node_symbol_use_visitor(post, id, sym);
+                if let Post = position {
+                    for (id, sym) in pat.vars().iter() {
+                        self.node_symbol_use_visitor(true, id, sym);
+                    }
                 }
             },
             LocalVar(id, sym) => {
-                self.node_symbol_use_visitor(post, id, sym);
+                if let Post = position {
+                    self.node_symbol_use_visitor(true, id, sym);
+                }
             },
             Temporary(id, idx) => {
-                self.node_tmp_use_visitor(post, id, idx);
+                if let Post = position {
+                    self.node_tmp_use_visitor(true, id, idx);
+                }
             },
             _ => {},
         }

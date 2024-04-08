@@ -130,7 +130,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
         let code = std::mem::take(&mut self.code);
         for bytecode in code.into_iter() {
             if let Bytecode::Label(attr_id, label) = bytecode {
-                if !self.code.is_empty() && !self.code[self.code.len() - 1].is_branch() {
+                if !self.code.is_empty() && !self.code[self.code.len() - 1].is_branching() {
                     self.code.push(Bytecode::Jump(attr_id, label));
                 }
             }

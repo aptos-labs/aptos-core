@@ -160,7 +160,7 @@ impl RawData for RawDataServerWrapper {
             SERVICE_TYPE,
             IndexerGrpcStep::DataServiceNewRequestReceived,
             Some(current_version as i64),
-            None,
+            transactions_count.map(|v| (v as i64 + current_version as i64 - 1)),
             None,
             None,
             None,
@@ -224,8 +224,18 @@ async fn get_data_with_tasks(
         Ok(CacheCoverageStatus::CacheHit(_)) => 1,
         Ok(CacheCoverageStatus::CacheEvicted) => match transactions_count {
             None => MAX_FETCH_TASKS_PER_REQUEST,
-            Some(transactions_count) => (transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK)
-                .max(MAX_FETCH_TASKS_PER_REQUEST),
+            Some(transactions_count) => {
+                let num_tasks = transactions_count / TRANSACTIONS_PER_STORAGE_BLOCK;
+                if num_tasks >= MAX_FETCH_TASKS_PER_REQUEST {
+                    // Limit the max tasks to MAX_FETCH_TASKS_PER_REQUEST
+                    MAX_FETCH_TASKS_PER_REQUEST
+                } else if num_tasks < 1 {
+                    // Limit the min tasks to 1
+                    1
+                } else {
+                    num_tasks
+                }
+            },
         },
         Err(_) => {
             error!("[Data Service] Failed to get cache coverage status.");

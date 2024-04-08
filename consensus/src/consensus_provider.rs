@@ -8,7 +8,9 @@ use crate::{
     network::NetworkTask,
     network_interface::{ConsensusMsg, ConsensusNetworkClient},
     persistent_liveness_storage::StorageWriteProxy,
+    pipeline::execution_client::ExecutionProxyClient,
     quorum_store::quorum_store_db::QuorumStoreDB,
+    rand::rand_gen::storage::db::RandDb,
     state_computer::ExecutionProxy,
     transaction_filter::TransactionFilter,
     txn_notifier::MempoolNotifier,
@@ -49,22 +51,34 @@ pub fn start_consensus(
         node_config.consensus.mempool_executed_txn_timeout_ms,
     ));
 
-    let state_computer = Arc::new(ExecutionProxy::new(
+    let execution_proxy = ExecutionProxy::new(
         Arc::new(BlockExecutor::<AptosVM>::new(aptos_db)),
         txn_notifier,
         state_sync_notifier,
         runtime.handle(),
         TransactionFilter::new(node_config.execution.transaction_filter.clone()),
-    ));
+    );
 
     let time_service = Arc::new(ClockTimeService::new(runtime.handle().clone()));
 
     let (timeout_sender, timeout_receiver) =
         aptos_channels::new(1_024, &counters::PENDING_ROUND_TIMEOUTS);
-    let (self_sender, self_receiver) = aptos_channels::new(1_024, &counters::PENDING_SELF_MESSAGES);
-
+    let (self_sender, self_receiver) =
+        aptos_channels::new_unbounded(&counters::PENDING_SELF_MESSAGES);
     let consensus_network_client = ConsensusNetworkClient::new(network_client);
     let bounded_executor = BoundedExecutor::new(8, runtime.handle().clone());
+    let rand_storage = Arc::new(RandDb::new(node_config.storage.dir()));
+
+    let execution_client = Arc::new(ExecutionProxyClient::new(
+        node_config.consensus.clone(),
+        Arc::new(execution_proxy),
+        node_config.validator_network.as_ref().unwrap().peer_id(),
+        self_sender.clone(),
+        consensus_network_client.clone(),
+        bounded_executor.clone(),
+        rand_storage.clone(),
+    ));
+
     let epoch_mgr = EpochManager::new(
         node_config,
         time_service,
@@ -72,13 +86,14 @@ pub fn start_consensus(
         consensus_network_client,
         timeout_sender,
         consensus_to_mempool_sender,
-        state_computer,
+        execution_client,
         storage.clone(),
         quorum_store_db.clone(),
         reconfig_events,
         bounded_executor,
         aptos_time_service::TimeService::real(),
         vtxn_pool,
+        rand_storage,
     );
 
     let (network_task, network_receiver) = NetworkTask::new(network_service_events, self_receiver);

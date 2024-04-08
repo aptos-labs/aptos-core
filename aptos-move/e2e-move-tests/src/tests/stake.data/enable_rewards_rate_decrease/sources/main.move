@@ -17,7 +17,7 @@ script {
             fixed_point64::create_from_rational(50, 100),
         );
         let feature = features::get_periodical_reward_rate_decrease_feature();
-        features::change_feature_flags(&framework_signer, vector[feature], vector[]);
+        features::change_feature_flags_for_next_epoch(&framework_signer, vector[feature], vector[]);
         reconfigure(&framework_signer);
     }
 }

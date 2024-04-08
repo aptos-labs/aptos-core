@@ -488,50 +488,89 @@ fun B::move_from_test_incorrect[baseline]
 spec {
   modifies global<B::T>($t1);
 }
+9 -> spec {
+  assert Eq<u64>($t3, $t4);
+}
+
 
 fun B::move_from_test_incorrect[verification]
 spec {
   modifies global<B::T>($t1);
 }
+9 -> spec {
+  assert Eq<u64>($t3, $t4);
+}
+
 
 fun B::move_to_test_incorrect[baseline]
 spec {
   modifies global<B::T>($t1);
 }
+10 -> spec {
+  assert Eq<u64>($t2, $t3);
+}
+
 
 fun B::move_to_test_incorrect[verification]
 spec {
   modifies global<B::T>($t1);
 }
+10 -> spec {
+  assert Eq<u64>($t2, $t3);
+}
+
 
 fun B::mutate_S_test1_incorrect[baseline]
 spec {
   requires Neq<address>($t0, $t1);
   modifies global<A::S>($t1);
 }
+8 -> spec {
+  assert Eq<u64>($t2, $t3);
+}
+
 
 fun B::mutate_S_test1_incorrect[verification]
 spec {
   requires Neq<address>($t0, $t1);
   modifies global<A::S>($t1);
 }
+8 -> spec {
+  assert Eq<u64>($t2, $t3);
+}
+
 
 fun B::mutate_S_test2_incorrect[baseline]
 spec {
   modifies global<A::S>($t0);
 }
+8 -> spec {
+  assert Eq<u64>($t1, $t2);
+}
+
 
 fun B::mutate_S_test2_incorrect[verification]
 spec {
   modifies global<A::S>($t0);
 }
+8 -> spec {
+  assert Eq<u64>($t1, $t2);
+}
+
 
 fun B::mutate_at_test_incorrect[baseline]
 spec {
   modifies global<B::T>($t1);
 }
+13 -> spec {
+  assert Eq<u64>($t3, $t4);
+}
+
 
 fun B::mutate_at_test_incorrect[verification]
 spec {
   modifies global<B::T>($t1);
+}
+13 -> spec {
+  assert Eq<u64>($t3, $t4);
 }

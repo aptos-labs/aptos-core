@@ -38,7 +38,7 @@ pub struct Ed25519PublicKey(pub(crate) ed25519_dalek::PublicKey);
 
 impl Ed25519PrivateKey {
     /// The length of the Ed25519PrivateKey
-    pub const LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
+    pub const LENGTH: usize = ED25519_PRIVATE_KEY_LENGTH;
 
     /// Serialize an Ed25519PrivateKey.
     pub fn to_bytes(&self) -> [u8; ED25519_PRIVATE_KEY_LENGTH] {
@@ -68,6 +68,9 @@ impl Ed25519PrivateKey {
 }
 
 impl Ed25519PublicKey {
+    /// The maximum size in bytes.
+    pub const LENGTH: usize = ED25519_PUBLIC_KEY_LENGTH;
+
     /// Serialize an Ed25519PublicKey.
     pub fn to_bytes(&self) -> [u8; ED25519_PUBLIC_KEY_LENGTH] {
         self.0.to_bytes()

@@ -10,13 +10,13 @@ use aptos_aggregator::{
     delayed_change::DelayedChange,
     delta_change_set::{delta_add, delta_sub, serialize, DeltaOp},
     resolver::TAggregatorV1View,
-    types::DelayedFieldID,
 };
 use aptos_mvhashmap::types::TxnIndex;
 use aptos_types::{
     access_path::AccessPath,
     account_address::AccountAddress,
     contract_event::TransactionEvent,
+    delayed_fields::PanicError,
     executable::ModulePath,
     fee_statement::FeeStatement,
     on_chain_config::CurrentTimeMicroseconds,
@@ -33,6 +33,7 @@ use aptos_vm_types::resolver::{TExecutorView, TResourceGroupView};
 use bytes::Bytes;
 use claims::{assert_ge, assert_le, assert_ok};
 use move_core_types::value::MoveTypeLayout;
+use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
@@ -296,13 +297,6 @@ impl TransactionWrite for ValueType {
     fn set_bytes(&mut self, bytes: Bytes) {
         self.bytes = bytes.into();
     }
-
-    fn convert_read_to_modification(&self) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        Some(self.clone())
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -412,7 +406,7 @@ pub(crate) enum MockTransaction<K, E> {
         incarnation_behaviors: Vec<MockIncarnation<K, E>>,
     },
     /// Skip the execution of trailing transactions.
-    SkipRest,
+    SkipRest(u64),
     /// Abort the execution.
     Abort,
 }
@@ -438,7 +432,7 @@ impl<K, E> MockTransaction<K, E> {
                 incarnation_behaviors,
                 ..
             } => incarnation_behaviors,
-            Self::SkipRest => unreachable!("SkipRest does not contain incarnation behaviors"),
+            Self::SkipRest(_) => unreachable!("SkipRest does not contain incarnation behaviors"),
             Self::Abort => unreachable!("Abort does not contain incarnation behaviors"),
         }
     }
@@ -965,9 +959,14 @@ where
                     read_group_sizes,
                     materialized_delta_writes: OnceCell::new(),
                     total_gas: behavior.gas,
+                    skipped: false,
                 })
             },
-            MockTransaction::SkipRest => ExecutionStatus::SkipRest(MockOutput::skip_output()),
+            MockTransaction::SkipRest(gas) => {
+                let mut mock_output = MockOutput::skip_output();
+                mock_output.total_gas = *gas;
+                ExecutionStatus::SkipRest(mock_output)
+            },
             MockTransaction::Abort => ExecutionStatus::Abort(txn_idx as usize),
         }
     }
@@ -992,6 +991,7 @@ pub(crate) struct MockOutput<K, E> {
     pub(crate) read_group_sizes: Vec<(K, u64)>,
     pub(crate) materialized_delta_writes: OnceCell<Vec<(K, WriteOp)>>,
     pub(crate) total_gas: u64,
+    pub(crate) skipped: bool,
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -1004,12 +1004,12 @@ where
     // TODO[agg_v2](tests): Assigning MoveTypeLayout as None for all the writes for now.
     // That means, the resources do not have any DelayedFields embedded in them.
     // Change it to test resources with DelayedFields as well.
-    fn resource_write_set(&self) -> Vec<(K, (ValueType, Option<Arc<MoveTypeLayout>>))> {
+    fn resource_write_set(&self) -> Vec<(K, Arc<ValueType>, Option<Arc<MoveTypeLayout>>)> {
         self.writes
             .iter()
             .filter(|(k, _)| k.module_path().is_none())
             .cloned()
-            .map(|(k, v)| (k, (v, None)))
+            .map(|(k, v)| (k, Arc::new(v), None))
             .collect()
     }
 
@@ -1027,8 +1027,8 @@ where
         BTreeMap::new()
     }
 
-    fn aggregator_v1_delta_set(&self) -> BTreeMap<K, DeltaOp> {
-        self.deltas.iter().cloned().collect()
+    fn aggregator_v1_delta_set(&self) -> Vec<(K, DeltaOp)> {
+        self.deltas.clone()
     }
 
     fn delayed_field_change_set(
@@ -1043,17 +1043,18 @@ where
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(<Self::Txn as Transaction>::Key, Arc<MoveTypeLayout>)> {
+    ) -> Vec<(
+        <Self::Txn as Transaction>::Key,
+        StateValueMetadata,
+        Arc<MoveTypeLayout>,
+    )> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         Vec::new()
     }
 
     fn group_reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(
-        <Self::Txn as Transaction>::Key,
-        <Self::Txn as Transaction>::Value,
-    )> {
+    ) -> Vec<(<Self::Txn as Transaction>::Key, StateValueMetadata)> {
         // TODO[agg_v2](tests): add aggregators V2 to the proptest?
         Vec::new()
     }
@@ -1064,7 +1065,7 @@ where
         self.events.iter().map(|e| (e.clone(), None)).collect()
     }
 
-    // TODO[agg_v2](fix) Using the concrete type layout here. Should we find a way to use generics?
+    // TODO[agg_v2](cleanup) Using the concrete type layout here. Should we find a way to use generics?
     fn resource_group_write_set(
         &self,
     ) -> Vec<(
@@ -1095,6 +1096,21 @@ where
             read_group_sizes: vec![],
             materialized_delta_writes: OnceCell::new(),
             total_gas: 0,
+            skipped: true,
+        }
+    }
+
+    fn discard_output(_discard_code: move_core_types::vm_status::StatusCode) -> Self {
+        Self {
+            writes: vec![],
+            group_writes: vec![],
+            deltas: vec![],
+            events: vec![],
+            read_results: vec![],
+            read_group_sizes: vec![],
+            materialized_delta_writes: OnceCell::new(),
+            total_gas: 0,
+            skipped: true,
         }
     }
 
@@ -1114,10 +1130,11 @@ where
             <Self::Txn as Transaction>::Value,
         )>,
         _patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    ) {
+    ) -> Result<(), PanicError> {
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO[agg_v2](tests): Set the patched resource write set and events. But that requires the function
         // to take &mut self as input
+        Ok(())
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&self) {

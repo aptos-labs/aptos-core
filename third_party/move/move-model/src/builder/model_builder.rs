@@ -24,11 +24,7 @@ use crate::{
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_binary_format::file_format::{AbilitySet, Visibility};
-use move_compiler::{
-    expansion::ast::{self as EA},
-    parser::ast as PA,
-    shared::NumericalAddress,
-};
+use move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_core_types::account_address::AccountAddress;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -40,7 +36,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(crate) struct ModelBuilder<'env> {
     /// The global environment we are building.
     pub env: &'env mut GlobalEnv,
-    /// A symbol table for specification functions. Because of overloading, and entry can
+    /// A symbol table for specification functions. Because of overloading, an entry can
     /// contain multiple functions.
     pub spec_fun_table: BTreeMap<QualifiedSymbol, Vec<SpecOrBuiltinFunEntry>>,
     /// A symbol table for specification variables.
@@ -59,8 +55,6 @@ pub(crate) struct ModelBuilder<'env> {
     pub fun_table: BTreeMap<QualifiedSymbol, FunEntry>,
     /// A symbol table for constants.
     pub const_table: BTreeMap<QualifiedSymbol, ConstEntry>,
-    /// A call graph mapping callers to callees that are Move functions.
-    pub move_fun_call_graph: BTreeMap<QualifiedId<SpecFunId>, BTreeSet<QualifiedId<SpecFunId>>>,
     /// A list of intrinsic declarations
     pub intrinsics: Vec<IntrinsicDecl>,
     /// A module lookup table from names to their ids.
@@ -132,7 +126,8 @@ pub(crate) struct StructEntry {
 /// A declaration of a function.
 #[derive(Debug, Clone)]
 pub(crate) struct FunEntry {
-    pub loc: Loc,
+    pub loc: Loc,      // location of the entire function span
+    pub name_loc: Loc, // location of just the function name
     pub module_id: ModuleId,
     pub fun_id: FunId,
     pub visibility: Visibility,
@@ -141,7 +136,6 @@ pub(crate) struct FunEntry {
     pub type_params: Vec<TypeParameter>,
     pub params: Vec<Parameter>,
     pub result_type: Type,
-    pub is_pure: bool,
     pub attributes: Vec<Attribute>,
     pub inline_specs: BTreeMap<EA::SpecId, EA::SpecBlock>,
 }
@@ -165,6 +159,16 @@ impl AnyFunEntry {
             AnyFunEntry::SpecOrBuiltin(e) => e.oper.clone(),
             AnyFunEntry::UserFun(e) => Operation::MoveFunction(e.module_id, e.fun_id),
         }
+    }
+
+    pub fn is_equality_on_ref(&self) -> bool {
+        matches!(self.get_operation(), Operation::Eq | Operation::Neq)
+            && self.get_signature().1[0].1.is_reference()
+    }
+
+    pub fn is_equality_on_non_ref(&self) -> bool {
+        matches!(self.get_operation(), Operation::Eq | Operation::Neq)
+            && !self.get_signature().1[0].1.is_reference()
     }
 }
 
@@ -201,7 +205,6 @@ impl<'env> ModelBuilder<'env> {
             reverse_struct_table: BTreeMap::new(),
             fun_table: BTreeMap::new(),
             const_table: BTreeMap::new(),
-            move_fun_call_graph: BTreeMap::new(),
             intrinsics: Vec::new(),
             module_table: BTreeMap::new(),
         };
@@ -235,6 +238,15 @@ impl<'env> ModelBuilder<'env> {
         name: QualifiedSymbol,
         entry: SpecOrBuiltinFunEntry,
     ) {
+        if self.fun_table.contains_key(&name) {
+            self.env.error(
+                &entry.loc,
+                &format!(
+                    "name clash between specification and Move function `{}`",
+                    name.symbol.display(self.env.symbol_pool())
+                ),
+            );
+        }
         // TODO: check whether overloads are distinguishable
         self.spec_fun_table.entry(name).or_default().push(entry);
     }
@@ -377,6 +389,13 @@ impl<'env> ModelBuilder<'env> {
             .unwrap_or_default()
     }
 
+    /// Looks up the abilities of a struct.
+    /// TODO(#12437): get rid of this once we have new UnificationContext
+    pub fn lookup_struct_abilities(&self, id: QualifiedId<StructId>) -> AbilitySet {
+        let entry = self.lookup_struct_entry(id);
+        entry.abilities
+    }
+
     /// Get all the structs which have been build so far.
     pub fn get_struct_ids(&self) -> impl Iterator<Item = QualifiedId<StructId>> + '_ {
         self.struct_table
@@ -386,10 +405,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Looks up the StructEntry for a qualified id.
     pub fn lookup_struct_entry(&self, id: QualifiedId<StructId>) -> &StructEntry {
-        let struct_name = self
-            .reverse_struct_table
-            .get(&(id.module_id, id.id))
-            .expect("invalid Type::Struct");
+        let struct_name = self.get_struct_name(id);
         self.struct_table
             .get(struct_name)
             .expect("invalid Type::Struct")
@@ -421,7 +437,7 @@ impl<'env> ModelBuilder<'env> {
             gen_get_ty_param_kinds(ty_params),
             self.gen_get_struct_sig(),
             loc,
-            |loc, err| self.error(loc, err),
+            |loc, _, err| self.error(loc, err),
         );
     }
 
@@ -451,6 +467,13 @@ impl<'env> ModelBuilder<'env> {
                 }
             }
         }
+    }
+
+    /// Gets the name of the struct
+    fn get_struct_name(&self, qid: QualifiedId<StructId>) -> &QualifiedSymbol {
+        self.reverse_struct_table
+            .get(&(qid.module_id, qid.id))
+            .expect("invalid Type::Struct")
     }
 
     // Generate warnings about unused schemas.
@@ -500,11 +523,6 @@ impl<'env> ModelBuilder<'env> {
         self.env.symbol_pool().make("old")
     }
 
-    /// Returns the symbol for the builtin Move function `assert`.
-    pub fn assert_symbol(&self) -> Symbol {
-        self.env.symbol_pool().make("assert")
-    }
-
     /// Returns the name for the pseudo builtin module.
     pub fn builtin_module(&self) -> ModuleName {
         ModuleName::new(
@@ -516,34 +534,6 @@ impl<'env> ModelBuilder<'env> {
     /// Adds a spec function to used_spec_funs set.
     pub fn add_used_spec_fun(&mut self, qid: QualifiedId<SpecFunId>) {
         self.env.used_spec_funs.insert(qid);
-        self.propagate_move_fun_usage(qid);
-    }
-
-    /// Adds an edge from the caller to the callee to the Move fun call graph. The callee is
-    /// is instantiated in dependency of the type parameters of the caller.
-    pub fn add_edge_to_move_fun_call_graph(
-        &mut self,
-        caller: QualifiedId<SpecFunId>,
-        callee: QualifiedId<SpecFunId>,
-    ) {
-        self.move_fun_call_graph
-            .entry(caller)
-            .or_default()
-            .insert(callee);
-    }
-
-    /// Runs DFS to propagate the usage of Move functions from callers
-    /// to callees on the call graph.
-    pub fn propagate_move_fun_usage(&mut self, qid: QualifiedId<SpecFunId>) {
-        if let Some(neighbors) = self.move_fun_call_graph.get(&qid) {
-            neighbors.clone().iter().for_each(|n| {
-                if self.env.used_spec_funs.insert(*n) {
-                    // If the callee's usage has not been recorded, recursively
-                    // propagate the usage to the callee's callees, and so on.
-                    self.propagate_move_fun_usage(*n);
-                }
-            });
-        }
     }
 
     /// Pass model-level information to the global env

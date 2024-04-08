@@ -4,8 +4,9 @@
 use crate::types::{AtomicTxnIndex, MVDelayedFieldsError, TxnIndex};
 use aptos_aggregator::{
     delayed_change::{ApplyBase, DelayedApplyEntry, DelayedEntry},
-    types::{code_invariant_error, DelayedFieldValue, PanicError, PanicOr, ReadPosition},
+    types::{code_invariant_error, DelayedFieldValue, PanicOr, ReadPosition},
 };
+use aptos_types::delayed_fields::PanicError;
 use claims::assert_matches;
 use crossbeam::utils::CachePadded;
 use dashmap::DashMap;
@@ -14,7 +15,8 @@ use std::{
     fmt::Debug,
     hash::Hash,
     iter::DoubleEndedIterator,
-    sync::atomic::Ordering,
+    ops::Deref,
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 pub enum CommitError {
@@ -57,7 +59,7 @@ enum VersionEntry<K: Clone> {
 // that update a given aggregator, alongside the corresponding entries.
 #[derive(Debug)]
 struct VersionedValue<K: Clone> {
-    versioned_map: BTreeMap<TxnIndex, CachePadded<VersionEntry<K>>>,
+    versioned_map: BTreeMap<TxnIndex, Box<CachePadded<VersionEntry<K>>>>,
 
     // The value of the given aggregator prior to the block execution. None implies that
     // the aggregator did not exist prior to the block.
@@ -100,13 +102,13 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
 
         match self.versioned_map.entry(txn_idx) {
             Entry::Occupied(mut o) => {
-                let bypass = match &**o.get() {
+                let bypass = match o.get().as_ref().deref() {
                     Value(_, maybe_apply) => maybe_apply.clone().map_or(NoBypass, Bypass),
                     Apply(apply) => Bypass(apply.clone()),
                     Estimate(_) => unreachable!("Entry already marked estimate"),
                 };
 
-                o.insert(CachePadded::new(Estimate(bypass)));
+                o.insert(Box::new(CachePadded::new(Estimate(bypass))));
             },
             Entry::Vacant(_) => unreachable!("Versioned entry must exist when marking as estimate"),
         };
@@ -117,7 +119,10 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         // Entries should only be deleted if the transaction that produced them is
         // aborted and re-executed, but abort must have marked the entry as an Estimate.
         assert_matches!(
-            &*deleted_entry.expect("Entry must exist to be removed"),
+            deleted_entry
+                .expect("Entry must exist to be removed")
+                .as_ref()
+                .deref(),
             VersionEntry::Estimate(_),
             "Removed entry must be an Estimate",
         );
@@ -142,7 +147,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
 
         match self.versioned_map.entry(txn_idx) {
             Entry::Occupied(mut o) => {
-                if !match (&**o.get(), &entry) {
+                if !match (o.get().as_ref().deref(), &entry) {
                     // These are the cases where the transaction behavior with respect to the
                     // aggregator may change (based on the information recorded in the Estimate).
                     (Estimate(Bypass(apply_l)), Apply(apply_r) | Value(_, Some(apply_r))) => {
@@ -167,13 +172,13 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                         )))
                     },
                 } {
-                    // TODO[agg_v2](fix): handle invalidation when we change read_estimate_deltas
+                    // TODO[agg_v2](optimize): See if we want to invalidate, when we change read_estimate_deltas
                     self.read_estimate_deltas = false;
                 }
-                o.insert(CachePadded::new(entry));
+                o.insert(Box::new(CachePadded::new(entry)));
             },
             Entry::Vacant(v) => {
-                v.insert(CachePadded::new(entry));
+                v.insert(Box::new(CachePadded::new(entry)));
             },
         }
         Ok(())
@@ -184,12 +189,12 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
 
         match self.versioned_map.entry(txn_idx) {
             Entry::Occupied(mut o) => {
-                match &**o.get() {
+                match o.get().as_ref().deref() {
                     Value(v, _) => assert_eq!(v, &value),
                     Apply(_) => (),
                     _ => unreachable!("When inserting final value, it needs to be either be Apply or have the same value"),
                 };
-                o.insert(CachePadded::new(VersionEntry::Value(value, None)));
+                o.insert(Box::new(CachePadded::new(VersionEntry::Value(value, None))));
             },
             Entry::Vacant(_) => unreachable!("When inserting final value, it needs to be present"),
         };
@@ -212,7 +217,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                         .clone()
                         .ok_or(MVDelayedFieldsError::NotFound)
                 },
-                |(_, entry)| match &**entry {
+                |(_, entry)| match entry.as_ref().deref() {
                     Value(v, _) => Ok(v.clone()),
                     Apply(_) => {
                         unreachable!("Apply entries may not exist for committed txn indices")
@@ -227,7 +232,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
     // Errors of not finding a value to resolve to take precedence over a DeltaApplicationError.
     fn apply_aggregator_change_suffix(
         &self,
-        iter: &mut dyn DoubleEndedIterator<Item = (&TxnIndex, &CachePadded<VersionEntry<K>>)>,
+        iter: &mut dyn DoubleEndedIterator<Item = (&TxnIndex, &Box<CachePadded<VersionEntry<K>>>)>,
         suffix: &DelayedApplyEntry<K>,
     ) -> Result<VersionedRead<K>, PanicOr<MVDelayedFieldsError>> {
         use DelayedApplyEntry::*;
@@ -241,7 +246,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
         };
 
         while let Some((idx, entry)) = iter.next_back() {
-            let delta = match (&**entry, self.read_estimate_deltas) {
+            let delta = match (entry.as_ref().deref(), self.read_estimate_deltas) {
                 (Value(DelayedFieldValue::Aggregator(v), _), _) => {
                     // Apply accumulated delta to resolve the aggregator value.
                     return accumulator
@@ -308,7 +313,7 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                     .map(VersionedRead::Value)
             },
             // Consider the latest entry below the provided version.
-            |(idx, entry)| match (&**entry, self.read_estimate_deltas) {
+            |(idx, entry)| match (entry.as_ref().deref(), self.read_estimate_deltas) {
                 (Value(v, _), _) => Ok(VersionedRead::Value(v.clone())),
                 (Apply(apply), _) | (Estimate(Bypass(apply)), true) => {
                     apply.get_apply_base_id_option().map_or_else(
@@ -377,7 +382,9 @@ pub struct VersionedDelayedFields<K: Clone> {
 
     /// No deltas are allowed below next_idx_to_commit version, as all deltas (and snapshots)
     /// must be materialized and converted to Values during commit.
-    next_idx_to_commit: AtomicTxnIndex,
+    next_idx_to_commit: CachePadded<AtomicTxnIndex>,
+
+    total_base_value_size: CachePadded<AtomicU64>,
 }
 
 impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
@@ -387,8 +394,17 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     pub(crate) fn new() -> Self {
         Self {
             values: DashMap::new(),
-            next_idx_to_commit: AtomicTxnIndex::new(0),
+            next_idx_to_commit: CachePadded::new(AtomicTxnIndex::new(0)),
+            total_base_value_size: CachePadded::new(AtomicU64::new(0)),
         }
+    }
+
+    pub(crate) fn num_keys(&self) -> usize {
+        self.values.len()
+    }
+
+    pub(crate) fn total_base_value_size(&self) -> u64 {
+        self.total_base_value_size.load(Ordering::Relaxed)
     }
 
     /// Must be called when an delayed field from storage is resolved, with ID replacing the
@@ -398,9 +414,13 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
     /// Setting base value multiple times, even concurrently, is okay for the same ID,
     /// because the corresponding value prior to the block is fixed.
     pub fn set_base_value(&self, id: K, base_value: DelayedFieldValue) {
-        self.values
-            .entry(id)
-            .or_insert(VersionedValue::new(Some(base_value)));
+        self.values.entry(id).or_insert_with(|| {
+            self.total_base_value_size.fetch_add(
+                base_value.get_approximate_memory_size() as u64,
+                Ordering::Relaxed,
+            );
+            VersionedValue::new(Some(base_value))
+        });
     }
 
     /// Must be called when an delayed field creation with a given ID and initial value is
@@ -511,7 +531,7 @@ impl<K: Eq + Hash + Clone + Debug + Copy> VersionedDelayedFields<K> {
                 .get(&idx_to_commit)
                 .expect("Value in commit at that transaction version needs to be in the HashMap");
 
-            let new_entry = match &**entry_to_commit {
+            let new_entry = match entry_to_commit.as_ref().deref() {
                 VersionEntry::Value(_, None) => None,
                 // remove delta in the commit
                 VersionEntry::Value(v, Some(_)) => Some(v.clone()),
@@ -711,10 +731,10 @@ mod test {
     use super::*;
     use aptos_aggregator::{
         bounded_math::SignedU128, delta_change_set::DeltaOp, delta_math::DeltaHistory,
-        types::DelayedFieldID,
     };
     use aptos_types::delayed_fields::SnapshotToStringFormula;
     use claims::{assert_err_eq, assert_ok_eq, assert_some};
+    use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
     use test_case::test_case;
 
     // Different type acronyms used for generating different test cases.
@@ -906,9 +926,11 @@ mod test {
 
         // Marking an Estimate (first we confirm) as estimate is not allowed.
         assert_matches!(
-            &**v.versioned_map
+            v.versioned_map
                 .get(&3)
-                .expect("Expecting an Estimate entry"),
+                .expect("Expecting an Estimate entry")
+                .as_ref()
+                .deref(),
             VersionEntry::Estimate(EstimatedEntry::NoBypass)
         );
         v.mark_estimate(3);
@@ -948,7 +970,7 @@ mod test {
         let val_bypass = v.versioned_map.get(&3);
         assert_some!(val_bypass);
         assert_matches!(
-            &**val_bypass.unwrap(),
+            val_bypass.unwrap().as_ref().deref(),
             VersionEntry::Estimate(EstimatedEntry::Bypass(
                 DelayedApplyEntry::AggregatorDelta { .. }
             ))
@@ -960,7 +982,7 @@ mod test {
         let delta_bypass = v.versioned_map.get(&4);
         assert_some!(delta_bypass);
         assert_matches!(
-            &**delta_bypass.unwrap(),
+            delta_bypass.unwrap().as_ref().deref(),
             VersionEntry::Estimate(EstimatedEntry::Bypass(
                 DelayedApplyEntry::AggregatorDelta { .. }
             ))
@@ -972,7 +994,7 @@ mod test {
         let val_no_bypass = v.versioned_map.get(&2);
         assert_some!(val_no_bypass);
         assert_matches!(
-            &**val_no_bypass.unwrap(),
+            val_no_bypass.unwrap().as_ref().deref(),
             VersionEntry::Estimate(EstimatedEntry::NoBypass)
         );
         assert_err_eq!(v.read(5), PanicOr::Or(MVDelayedFieldsError::Dependency(2)));
@@ -1014,7 +1036,7 @@ mod test {
             let val_no_bypass = v.versioned_map.get(&6);
             assert_some!(val_no_bypass);
             assert_matches!(
-                &**val_no_bypass.unwrap(),
+                val_no_bypass.unwrap().as_ref().deref(),
                 VersionEntry::Estimate(EstimatedEntry::NoBypass)
             );
             assert_err_eq!(v.read(7), PanicOr::Or(MVDelayedFieldsError::Dependency(6)));
@@ -1038,7 +1060,7 @@ mod test {
             let snapshot_bypass = v.versioned_map.get(&8);
             assert_some!(snapshot_bypass);
             assert_matches!(
-                &**snapshot_bypass.unwrap(),
+                snapshot_bypass.unwrap().as_ref().deref(),
                 VersionEntry::Estimate(EstimatedEntry::Bypass(
                     DelayedApplyEntry::SnapshotDelta { .. }
                 ))
@@ -1074,7 +1096,7 @@ mod test {
             let val_no_bypass = v.versioned_map.get(&6);
             assert_some!(val_no_bypass);
             assert_matches!(
-                &**val_no_bypass.unwrap(),
+                val_no_bypass.unwrap().as_ref().deref(),
                 VersionEntry::Estimate(EstimatedEntry::NoBypass)
             );
             assert_err_eq!(v.read(7), PanicOr::Or(MVDelayedFieldsError::Dependency(6)));
@@ -1098,7 +1120,7 @@ mod test {
             let snapshot_bypass = v.versioned_map.get(&8);
             assert_some!(snapshot_bypass);
             assert_matches!(
-                &**snapshot_bypass.unwrap(),
+                snapshot_bypass.unwrap().as_ref().deref(),
                 VersionEntry::Estimate(EstimatedEntry::Bypass(
                     DelayedApplyEntry::SnapshotDerived { .. }
                 ))
