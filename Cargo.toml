@@ -725,7 +725,7 @@ walkdir = "2.3.3"
 warp = { version = "0.3.5", features = ["tls"] }
 warp-reverse-proxy = "1.0.0"
 which = "4.2.5"
-x25519-dalek = "2.0.0" #Set to this version to be compatible with Sovereign Labs
+x25519-dalek = { git = "https://github.com/aptos-labs/x25519-dalek", branch = "zeroize_v1" } #Set to this version to be compatible with Sovereign Labs
 zeroize = "1.6.0" #Set to this version to be compatible with Sovereign Labs
 
 # MOVE DEPENDENCIES
