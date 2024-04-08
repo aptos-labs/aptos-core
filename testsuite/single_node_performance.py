@@ -33,6 +33,7 @@ class Flow(Flag):
     RESOURCE_GROUPS = auto()
     # Test fee payer
     FEE_PAYER = auto()
+    CUSTOM_TEST = auto()
 
 
 # Tests that are run on LAND_BLOCKING and continuously on main
@@ -60,7 +61,7 @@ class RunGroupConfig:
     waived: bool = field(default=False)
 
 
-SELECTED_FLOW = Flow[os.environ.get("FLOW", default="LAND_BLOCKING")]
+SELECTED_FLOW = Flow[os.environ.get("FLOW", default="CUSTOM_TEST")]
 IS_MAINNET = SELECTED_FLOW in [Flow.MAINNET, Flow.MAINNET_LARGE_DB]
 
 DEFAULT_NUM_INIT_ACCOUNTS = (
@@ -88,8 +89,8 @@ MAIN_SIGNER_ACCOUNTS = 2 * MAX_BLOCK_SIZE
 # https://app.axiom.co/aptoslabs-hghf/explorer?qid=29zYzeVi7FX-s4ukl5&relative=1
 # fmt: off
 TESTS = [
-    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C),
-    RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=1000), included_in=LAND_BLOCKING_AND_C),
+    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op"), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=11500, key=RunGroupKey("no-op", module_working_set_size=20), included_in=LAND_BLOCKING_AND_C | Flow.CUSTOM_TEST),
     RunGroupConfig(expected_tps=14200, key=RunGroupKey("coin-transfer"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     # RunGroupConfig(expected_tps=37000, key=RunGroupKey("coin-transfer", executor_type="native"), included_in=LAND_BLOCKING_AND_C),
     RunGroupConfig(expected_tps=12000, key=RunGroupKey("account-generation"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
@@ -142,14 +143,15 @@ TESTS = [
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-store-sequential"), included_in=Flow(0)),
     # RunGroupConfig(expected_tps=1000, key=RunGroupKey("token-v1nft-mint-and-transfer-parallel"), included_in=Flow(0)),
 
-    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers"), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=22200, key=RunGroupKey("no-op5-signers", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.CUSTOM_TEST),
    
     RunGroupConfig(expected_tps=7006, key=RunGroupKey("token-v2-ambassador-mint"), included_in=LAND_BLOCKING_AND_C | Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=6946, key=RunGroupKey("token-v2-ambassador-mint", module_working_set_size=20), included_in=Flow.CONTINUOUS),
 
     # fee payer sequentializes transactions today. in these tests module publisher is the fee payer, so larger number of modules tests throughput with multiple fee payers
-    RunGroupConfig(expected_tps=3000, key=RunGroupKey("no-op-fee-payer"), included_in=LAND_BLOCKING_AND_C | Flow.FEE_PAYER),
-    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=50), included_in=Flow.CONTINUOUS | Flow.FEE_PAYER),
+    RunGroupConfig(expected_tps=10000, key=RunGroupKey("no-op-fee-payer"), included_in=Flow.FEE_PAYER | Flow.CUSTOM_TEST),
+    RunGroupConfig(expected_tps=17747, key=RunGroupKey("no-op-fee-payer", module_working_set_size=20), included_in=Flow.CONTINUOUS | Flow.FEE_PAYER | Flow.CUSTOM_TEST),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded", sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded", sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE),
