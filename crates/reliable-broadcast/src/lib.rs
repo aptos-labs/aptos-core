@@ -127,7 +127,7 @@ where
                 tokio::select! {
                     Some((receiver, result)) = rpc_futures.next() => {
                         let aggregating = aggregating.clone();
-                        let future = executor.spawn(async move {
+                        let future = tokio::task::spawn_blocking(move || {
                             (
                                     receiver,
                                     result
@@ -136,7 +136,7 @@ where
                                         })
                                         .and_then(|ack| aggregating.add(receiver, ack)),
                             )
-                        }).await;
+                        });
                         aggregate_futures.push(future);
                     },
                     Some(result) = aggregate_futures.next() => {
