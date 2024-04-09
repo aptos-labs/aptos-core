@@ -262,3 +262,6 @@ fun m::test($t0: bool, $t1: bool) {
  11: label L1
  12: return ()
 }
+
+
+============ bytecode verification succeeded ========

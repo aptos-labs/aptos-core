@@ -134,3 +134,6 @@ fun m::test(): u64 {
   5: $t0 := infer($t1)
   6: return $t0
 }
+
+
+============ bytecode verification succeeded ========

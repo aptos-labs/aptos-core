@@ -435,7 +435,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             options: opts
                 .clone()
                 .set_experiment(Experiment::ABILITY_CHECK, false),
-            stop_after: StopAfter::BytecodePipeline(None),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::AllStages,
             dump_bytecode_filter: Some(vec![

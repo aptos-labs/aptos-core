@@ -270,3 +270,6 @@ fun m::test() {
  12: label L1
  13: return ()
 }
+
+
+============ bytecode verification succeeded ========

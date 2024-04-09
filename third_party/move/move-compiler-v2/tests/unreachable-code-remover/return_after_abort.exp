@@ -55,3 +55,6 @@ fun m::test(): u32 {
   0: $t1 := 0
   1: abort($t1)
 }
+
+
+============ bytecode verification succeeded ========

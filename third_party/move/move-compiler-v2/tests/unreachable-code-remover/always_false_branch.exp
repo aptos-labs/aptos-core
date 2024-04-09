@@ -155,3 +155,6 @@ fun m::test(): u64 {
  11: $t0 := 0
  12: return $t0
 }
+
+
+============ bytecode verification succeeded ========
