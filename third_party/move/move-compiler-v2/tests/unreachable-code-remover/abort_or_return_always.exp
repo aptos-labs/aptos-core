@@ -23,81 +23,26 @@ fun m::test($t0: bool): u64 {
 fun m::test($t0: bool): u64 {
      var $t1: u64
      var $t2: u64
-     # live vars: $t0
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # maybe
   0: if ($t0) goto 1 else goto 5
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # maybe
   1: label L0
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # maybe
   2: $t2 := 0
-     # live vars: $t2
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # maybe
   3: abort($t2)
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # no
   4: goto 8
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # maybe
   5: label L1
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # maybe
   6: $t1 := 1
-     # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # maybe
   7: return $t1
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # no
   8: label L2
-     # live vars:
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # no
   9: $t1 := 42
-     # live vars: $t1
-     # graph: {}
-     # locals: {}
-     # globals: {}
-     #
      # no
  10: return $t1
 }

@@ -432,9 +432,7 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/unreachable-code-remover/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts
-                .clone()
-                .set_experiment(Experiment::ABILITY_CHECK, false),
+            options: opts.clone(),
             // Run the entire compiler pipeline to double-check the result
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
