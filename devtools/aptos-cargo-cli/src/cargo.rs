@@ -46,7 +46,7 @@ impl Cargo {
         self
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, ignore_failed_exit_status: bool) {
         // Set up the output and arguments
         self.inner.stdout(Stdio::inherit()).stderr(Stdio::inherit());
         if !self.pass_through_args.is_empty() {
@@ -64,7 +64,7 @@ impl Cargo {
         // This will ensure that failures are not dropped silently.
         match result {
             Ok(output) => {
-                if !output.status.success() {
+                if !ignore_failed_exit_status && !output.status.success() {
                     panic!(
                         "Command failed: {:?}. Output: {:?}",
                         command_to_execute, output
