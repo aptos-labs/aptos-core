@@ -2078,6 +2078,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-in-memory-cache-benchmark"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-utils",
+ "aptos-protos 1.3.0",
+ "futures",
+ "jemallocator",
+ "lazy_static",
+ "once_cell",
+ "redis",
+ "redis-test",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-integration-tests"
 version = "0.1.0"
 dependencies = [
@@ -8777,7 +8793,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.5",
  "tokio",
  "tower-service",
  "tracing",
