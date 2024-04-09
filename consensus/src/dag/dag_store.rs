@@ -622,6 +622,9 @@ impl DagStore {
     }
 
     pub fn commit_callback(&self, commit_round: Round) {
+        if commit_round % 100 != 0 {
+            return;
+        }
         let to_prune = self.dag.write().commit_callback(commit_round);
         if let Some(to_prune) = to_prune {
             let digests = to_prune

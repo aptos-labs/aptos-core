@@ -103,6 +103,10 @@ impl NodeBroadcastHandler {
 
     pub fn gc(&self) {
         let lowest_round = self.dag.read().lowest_round();
+        if lowest_round % 100 != 0 {
+            return;
+        }
+
         if let Err(e) = self.gc_before_round(lowest_round) {
             error!("Error deleting votes: {}", e);
         }
