@@ -176,12 +176,9 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             exp_suffix: None,
             options: opts
                 .clone()
-                .set_experiment(Experiment::AST_SIMPLIFY_FULL, true)
-                // TODO: this check should not need to be turned off, but some
-                //   tests rely on it. Those tests should be fixed.
-                .set_experiment(Experiment::UNINITIALIZED_CHECK, false),
-            // Run the full bytecode pipeline as well for double-checking the result
-            stop_after: StopAfter::BytecodePipeline(None),
+                .set_experiment(Experiment::AST_SIMPLIFY_FULL, true),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::EndStage,
             dump_bytecode: DumpLevel::None, // do not dump anything
             dump_bytecode_filter: None,
