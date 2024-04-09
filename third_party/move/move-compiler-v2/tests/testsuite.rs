@@ -531,7 +531,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
                 .clone()
                 .set_experiment(Experiment::AST_SIMPLIFY, true)
                 .set_skip_attribute_checks(true),
-            stop_after: StopAfter::BytecodePipeline(None),
+            // Run the entire compiler pipeline to double-check the result
+            stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
             dump_bytecode: DumpLevel::None,
             dump_bytecode_filter: None,
