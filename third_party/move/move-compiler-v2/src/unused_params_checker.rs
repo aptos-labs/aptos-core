@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Implements an environment pipeline which checks for unused type parameters in struct definitions.
+//! Precondition: struct fields have valid types.
 
 use codespan_reporting::diagnostic::Severity;
 use move_model::{
@@ -55,11 +56,7 @@ fn used_type_parameters_in_ty(ty: &Type) -> BTreeSet<u16> {
         Type::Tuple(tys) | Type::Struct(_, _, tys) => {
             tys.iter().flat_map(used_type_parameters_in_ty).collect()
         },
-        Type::TypeParameter(i) => {
-            let mut set = BTreeSet::new();
-            set.insert(*i);
-            set
-        },
+        Type::TypeParameter(i) => BTreeSet::from([*i]),
         Type::Fun(from, to) => {
             let mut used_in_from = used_type_parameters_in_ty(from);
             used_in_from.append(&mut used_type_parameters_in_ty(to));
