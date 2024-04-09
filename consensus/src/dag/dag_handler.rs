@@ -94,7 +94,7 @@ impl NetworkHandler {
         let monitor = tokio_metrics_collector::TaskMonitor::new();
         tokio_metrics_collector::default_task_collector()
             .add("dag_handler", monitor.clone())
-            .unwrap();
+            .ok();
         // TODO: feed in the executor based on verification Runtime
         let mut verified_msg_stream =
             dag_rpc_rx.concurrent_map_blocking(move |rpc_request: IncomingDAGRequest| {
