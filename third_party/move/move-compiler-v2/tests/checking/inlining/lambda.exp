@@ -43,3 +43,6 @@ module 0x42::LambdaTest {
         Tuple()
     }
 } // end 0x42::LambdaTest
+
+
+============ bytecode verification succeeded ========
