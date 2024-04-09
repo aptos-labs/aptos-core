@@ -317,6 +317,7 @@ impl InnerBuilder {
                 self.author,
                 self.network_sender.clone(),
                 self.proof_manager_cmd_tx.clone(),
+                self.batch_generator_cmd_tx.clone(),
                 self.batch_store.clone().unwrap(),
                 self.config.receiver_max_batch_txns as u64,
                 self.config.receiver_max_batch_bytes as u64,

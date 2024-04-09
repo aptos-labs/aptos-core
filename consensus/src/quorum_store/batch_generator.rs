@@ -31,6 +31,7 @@ use tokio::time::Interval;
 pub enum BatchGeneratorCommand {
     CommitNotification(u64, Vec<BatchInfo>),
     ProofExpiration(Vec<BatchId>),
+    RemoteBatch(Batch),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -103,18 +104,7 @@ impl BatchGenerator {
         }
     }
 
-    fn create_new_batch(
-        &mut self,
-        txns: Vec<SignedTransaction>,
-        expiry_time: u64,
-        bucket_start: u64,
-    ) -> Batch {
-        let batch_id = self.batch_id;
-        self.batch_id.increment();
-        self.db
-            .save_batch_id(self.epoch, self.batch_id)
-            .expect("Could not save to db");
-
+    fn insert_batch(&mut self, batch_id: BatchId, txns: Vec<SignedTransaction>, expiry_time: u64) {
         let txns_in_progress: Vec<_> = txns
             .iter()
             .map(|txn| {
@@ -127,6 +117,21 @@ impl BatchGenerator {
 
         self.insert_batch_in_progress(batch_id, txns_in_progress);
         self.batch_expirations.add_item(batch_id, expiry_time);
+    }
+
+    fn create_new_batch(
+        &mut self,
+        txns: Vec<SignedTransaction>,
+        expiry_time: u64,
+        bucket_start: u64,
+    ) -> Batch {
+        let batch_id = self.batch_id;
+        self.batch_id.increment();
+        self.db
+            .save_batch_id(self.epoch, self.batch_id)
+            .expect("Could not save to db");
+
+        self.insert_batch(batch_id, txns.clone(), expiry_time);
 
         counters::CREATED_BATCHES_COUNT.inc();
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
@@ -477,7 +482,16 @@ impl BatchGenerator {
                                 // Not able to gather the proof, allow transactions to be polled again.
                                 self.remove_batch_in_progress(&batch_id);
                             }
-                        }
+                        },
+                        BatchGeneratorCommand::RemoteBatch(batch) => {
+                            let batch_id = batch.batch_id();
+                            let txns = batch.into_transactions();
+
+                            // TODO: need some expiration mechanism for remote batches and proofs
+                            let expiry_time_usecs = aptos_infallible::duration_since_epoch().as_micros() as u64
+                                + self.config.batch_expiry_gap_when_init_usecs;
+                            self.insert_batch(batch_id, txns, expiry_time_usecs);
+                        },
                         BatchGeneratorCommand::Shutdown(ack_tx) => {
                             ack_tx
                                 .send(())
