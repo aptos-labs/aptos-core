@@ -137,7 +137,7 @@ impl NodeBroadcastHandler {
         }))
     }
 
-    fn validate(&self, node: Node) -> anyhow::Result<Node> {
+    async fn validate(&self, node: Node) -> anyhow::Result<Node> {
         ensure!(
             node.epoch() == self.epoch_state.epoch,
             "different epoch {}, current {}",
@@ -168,34 +168,56 @@ impl NodeBroadcastHandler {
 
         let current_round = node.metadata().round();
 
-        let dag_reader = self.dag.read();
-        let lowest_round = dag_reader.lowest_round();
+        let (lowest_round, missing_parents) = {
+            let dag_reader = self.dag.read();
+            let lowest_round = dag_reader.lowest_round();
 
-        ensure!(
-            current_round >= lowest_round,
-            NodeBroadcastHandleError::StaleRound(current_round)
-        );
-
-        // check which parents are missing in the DAG
-        let missing_parents: Vec<NodeCertificate> = node
-            .parents()
-            .iter()
-            .filter(|parent| !dag_reader.exists(parent.metadata()))
-            .cloned()
-            .collect();
-        drop(dag_reader); // Drop the DAG store early as it is no longer required
-
-        if !missing_parents.is_empty() {
-            // For each missing parent, verify their signatures and voting power.
-            // Otherwise, a malicious node can send bad nodes with fake parents
-            // and cause this peer to issue unnecessary fetch requests.
             ensure!(
-                missing_parents
-                    .iter()
-                    .all(|parent| { parent.verify(&self.epoch_state.verifier).is_ok() }),
-                NodeBroadcastHandleError::InvalidParent
+                current_round >= lowest_round,
+                NodeBroadcastHandleError::StaleRound(current_round)
             );
 
+            // check which parents are missing in the DAG
+            let missing_parents: Vec<NodeCertificate> = node
+                .parents()
+                .iter()
+                .filter(|parent| !dag_reader.exists(parent.metadata()))
+                .cloned()
+                .collect();
+
+            (lowest_round, missing_parents)
+        };
+
+        let should_fetch = !missing_parents.is_empty();
+        let verifier = self.epoch_state.verifier.clone();
+        let quorum_store_enabled = self.quorum_store_enabled;
+        let node = tokio::task::spawn_blocking(move || {
+            if !missing_parents.is_empty() {
+                // For each missing parent, verify their signatures and voting power.
+                // Otherwise, a malicious node can send bad nodes with fake parents
+                // and cause this peer to issue unnecessary fetch requests.
+                ensure!(
+                    missing_parents
+                        .iter()
+                        .all(|parent| { parent.verify(&verifier).is_ok() }),
+                    NodeBroadcastHandleError::InvalidParent
+                );
+            }
+
+            let cache = Cache::builder().build();
+            ensure!(
+                node.payload()
+                    .verify(&verifier, &cache, quorum_store_enabled)
+                    .is_ok(),
+                "invalid payload"
+            );
+
+            Ok(node)
+        })
+        .await
+        .expect("task must finish")?;
+
+        if should_fetch {
             // Don't issue fetch requests for parents of the lowest round in the DAG
             // because they are already GC'ed
             if current_round > lowest_round {
@@ -206,18 +228,6 @@ impl NodeBroadcastHandler {
                 bail!(NodeBroadcastHandleError::MissingParents);
             }
         }
-
-        let cache = Cache::builder().build();
-        ensure!(
-            node.payload()
-                .verify(
-                    &self.epoch_state.verifier,
-                    &cache,
-                    self.quorum_store_enabled
-                )
-                .is_ok(),
-            "invalid payload"
-        );
 
         Ok(node)
     }
@@ -297,7 +307,7 @@ impl RpcHandler for NodeBroadcastHandler {
             .with_label_values(&[&"vote_check"])
             .observe(start.elapsed().as_secs_f64());
 
-        let node = self.validate(node)?;
+        let node = self.validate(node).await?;
 
         RB_HANDLER_PROCESS_DURATION
             .with_label_values(&[&"validate"])
@@ -347,6 +357,7 @@ impl RpcHandler for NodeBroadcastHandler {
         debug!(LogSchema::new(LogEvent::Vote)
             .remote_peer(*node.author())
             .round(node.round()));
+
         Ok(vote)
     }
 }
