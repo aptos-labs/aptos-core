@@ -133,3 +133,12 @@ pub static RB_HANDLER_PROCESS_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static NEW_ROUND_EVENT_PROCESS_DURATION: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "aptos_consensus_dag_new_round_process",
+        "New Round Event process breakdown",
+        &["step"]
+    )
+    .unwrap()
+});
