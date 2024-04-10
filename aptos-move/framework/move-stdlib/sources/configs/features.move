@@ -465,6 +465,7 @@ module std::features {
     public fun migrate_to_concurrent_fungible_balance_enabled(): bool acquires Features {
         // concurrent fungible assets cannot be used if aggregator v2 api is not enabled.
         is_enabled(MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE) && aggregator_v2_api_enabled()
+    }
     /// Whether delegators allowlisting for delegation pools is supported.
     /// Lifetime: transient
     const DELEGATION_POOL_ALLOWLISTING: u64 = 57;

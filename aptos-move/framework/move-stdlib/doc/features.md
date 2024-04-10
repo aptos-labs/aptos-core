@@ -397,7 +397,7 @@ Whether delegators allowlisting for delegation pools is supported.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>: u64 = 56;
+<pre><code><b>const</b> <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>: u64 = 57;
 </code></pre>
 
 
@@ -568,7 +568,7 @@ Whether aptos_framwork enables the behavior of module event migration.
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>: u64 = 57;
+<pre><code><b>const</b> <a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>: u64 = 58;
 </code></pre>
 
 
@@ -2473,6 +2473,46 @@ Lifetime: transient
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_migrate_to_concurrent_fungible_balance_feature">get_migrate_to_concurrent_fungible_balance_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_migrate_to_concurrent_fungible_balance_feature">get_migrate_to_concurrent_fungible_balance_feature</a>(): u64 { <a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_migrate_to_concurrent_fungible_balance_enabled"></a>
+
+## Function `migrate_to_concurrent_fungible_balance_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    // concurrent fungible assets cannot be used <b>if</b> aggregator v2 api is not enabled.
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_features_get_delegation_pool_allowlisting_feature"></a>
 
 ## Function `get_delegation_pool_allowlisting_feature`
@@ -2488,7 +2528,6 @@ Lifetime: transient
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_migrate_to_concurrent_fungible_balance_feature">get_migrate_to_concurrent_fungible_balance_feature</a>(): u64 { <a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a> }
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_delegation_pool_allowlisting_feature">get_delegation_pool_allowlisting_feature</a>(): u64 { <a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a> }
 </code></pre>
 
@@ -2496,13 +2535,6 @@ Lifetime: transient
 
 </details>
 
-<a id="0x1_features_migrate_to_concurrent_fungible_balance_enabled"></a>
-
-## Function `migrate_to_concurrent_fungible_balance_enabled`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool
 <a id="0x1_features_delegation_pool_allowlisting_enabled"></a>
 
 ## Function `delegation_pool_allowlisting_enabled`
@@ -2517,10 +2549,6 @@ Lifetime: transient
 <details>
 <summary>Implementation</summary>
 
-
-<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_migrate_to_concurrent_fungible_balance_enabled">migrate_to_concurrent_fungible_balance_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
-    // concurrent fungible assets cannot be used <b>if</b> aggregator v2 api is not enabled.
-    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE">MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE</a>) && <a href="features.md#0x1_features_aggregator_v2_api_enabled">aggregator_v2_api_enabled</a>()
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_delegation_pool_allowlisting_enabled">delegation_pool_allowlisting_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DELEGATION_POOL_ALLOWLISTING">DELEGATION_POOL_ALLOWLISTING</a>)
@@ -2570,7 +2598,6 @@ Lifetime: transient
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_migration_enabled">module_event_migration_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MODULE_EVENT_MIGRATION">MODULE_EVENT_MIGRATION</a>)
-
 }
 </code></pre>
 
