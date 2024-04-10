@@ -302,7 +302,7 @@ pub fn fetch_genesis_info(git_options: GitOptions) -> CliTypedResult<GenesisInfo
             gas_schedule: default_gas_schedule(),
             initial_features_override: None,
             randomness_config_override: None,
-            jwk_consensus_config_override: None,
+            jwk_consensus_config_override: layout.jwk_consensus_config_override.clone(),
         },
     )?)
 }

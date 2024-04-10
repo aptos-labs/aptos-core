@@ -7,6 +7,15 @@ public fun Test::test(): u64 {
   1: return $t0
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+public fun Test::test(): u64 {
+     var $t0: u64
+  0: $t0 := 3
+  1: return $t0
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -21,6 +30,15 @@ public fun Test::test(): u64 {
 }
 
 ============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+public fun Test::test(): u64 {
+     var $t0: u64
+  0: $t0 := 3
+  1: return $t0
+}
+
+============ after DeadStoreElimination: ================
 
 [variant baseline]
 public fun Test::test(): u64 {

@@ -32,13 +32,13 @@ pub use data_collection::*;
 pub use execution::*;
 use move_compiler::compiled_unit::CompiledUnitEnum;
 use move_core_types::language_storage::ModuleId;
+use move_model::metadata::CompilerVersion;
 use move_package::{
     compilation::compiled_package::CompiledPackage,
     source_package::{
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
         parsed_manifest::Dependency,
     },
-    CompilerVersion,
 };
 pub use online_execution::*;
 
@@ -414,7 +414,7 @@ fn compile_aptos_packages(
     for package in APTOS_PACKAGES {
         let root_package_dir = aptos_commons_path.join(get_aptos_dir(package).unwrap());
         let compiler_version = if v2_flag {
-            Some(CompilerVersion::V2)
+            Some(CompilerVersion::V2_0)
         } else {
             Some(CompilerVersion::V1)
         };
@@ -580,7 +580,7 @@ fn dump_and_compile_from_package_metadata(
         }
         if execution_mode.is_some_and(|mode| mode.is_v2_or_compare()) {
             let package_v2 =
-                compile_package(root_package_dir, &package_info, Some(CompilerVersion::V2));
+                compile_package(root_package_dir, &package_info, Some(CompilerVersion::V2_0));
             if let Ok(built_package) = package_v2 {
                 generate_compiled_blob(
                     &package_info,

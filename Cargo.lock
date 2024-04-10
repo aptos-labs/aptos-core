@@ -289,6 +289,7 @@ dependencies = [
  "move-coverage",
  "move-disassembler",
  "move-ir-types",
+ "move-model",
  "move-package",
  "move-symbol-pool",
  "move-unit-test",
@@ -764,6 +765,7 @@ dependencies = [
  "itertools 0.12.1",
  "move-compiler",
  "move-core-types",
+ "move-model",
  "move-package",
  "rocksdb",
  "serde",
@@ -2076,6 +2078,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-in-memory-cache-benchmark"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-utils",
+ "aptos-protos 1.3.0",
+ "futures",
+ "jemallocator",
+ "lazy_static",
+ "once_cell",
+ "redis",
+ "redis-test",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-integration-tests"
 version = "0.1.0"
 dependencies = [
@@ -2164,9 +2182,9 @@ dependencies = [
  "chrono",
  "cloud-storage",
  "dashmap",
- "flate2",
  "futures",
  "itertools 0.12.1",
+ "lz4",
  "once_cell",
  "prometheus",
  "prost 0.12.3",
@@ -3902,6 +3920,7 @@ dependencies = [
  "move-command-line-common",
  "move-compiler",
  "move-core-types",
+ "move-model",
  "move-resource-viewer",
  "move-transactional-test-runner",
  "move-vm-runtime",
@@ -6965,6 +6984,7 @@ dependencies = [
  "move-binary-format",
  "move-command-line-common",
  "move-core-types",
+ "move-model",
  "move-package",
  "move-symbol-pool",
  "once_cell",
@@ -10418,6 +10438,7 @@ dependencies = [
  "itertools 0.10.5",
  "move-command-line-common",
  "move-compiler-v2",
+ "move-model",
  "move-transactional-test-runner",
  "once_cell",
  "walkdir",
@@ -10916,6 +10937,7 @@ dependencies = [
  "move-disassembler",
  "move-ir-compiler",
  "move-ir-types",
+ "move-model",
  "move-resource-viewer",
  "move-stdlib",
  "move-symbol-pool",

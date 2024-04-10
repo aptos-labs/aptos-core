@@ -8,6 +8,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use move_command_line_common::env::read_env_var;
 use move_compiler::command_line as cli;
+use move_model::metadata::LanguageVersion;
 use once_cell::sync::Lazy;
 use std::{
     cell::RefCell,
@@ -33,6 +34,9 @@ pub struct Options {
     /// Output directory.
     #[clap(short, long, default_value = "")]
     pub output_dir: String,
+    /// The language version to use.
+    #[clap(long, value_parser = clap::value_parser!(LanguageVersion))]
+    pub language_version: Option<LanguageVersion>,
     /// Do not complain about unknown attributes in Move code.
     #[clap(long, default_value = "false")]
     pub skip_attribute_checks: bool,
@@ -64,6 +68,9 @@ pub struct Options {
     /// Whether to compile everything, including dependencies.
     #[clap(long)]
     pub whole_program: bool,
+    /// Whether to compile #[test] and #[test_only] code
+    #[clap(skip)]
+    pub compile_test_code: bool,
 }
 
 impl Default for Options {
@@ -89,6 +96,14 @@ impl Options {
         );
         self.experiment_cache.borrow_mut().insert(name, on);
         self
+    }
+
+    /// Sets the language version to use.
+    pub fn set_language_version(self, version: LanguageVersion) -> Self {
+        Self {
+            language_version: Some(version),
+            ..self
+        }
     }
 
     /// Returns true if an experiment is on.
@@ -128,6 +143,20 @@ impl Options {
             on
         } else {
             panic!("unknown experiment `{}`", name)
+        }
+    }
+
+    pub fn set_skip_attribute_checks(self, value: bool) -> Self {
+        Self {
+            skip_attribute_checks: value,
+            ..self
+        }
+    }
+
+    pub fn set_compile_test_code(self, value: bool) -> Self {
+        Self {
+            compile_test_code: value,
+            ..self
         }
     }
 }
