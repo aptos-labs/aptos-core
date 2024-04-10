@@ -312,13 +312,13 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
         let hash = state_key.hash().to_hex_literal();
-        let state_key = state_key.into_inner();
+        let state_key = state_key.inner();
         match state_key {
             StateKeyInner::AccessPath(access_path) => {
                 self.try_access_path_into_write_set_changes(hash, access_path, op)
             },
             StateKeyInner::TableItem { handle, key } => {
-                vec![self.try_table_item_into_write_set_change(hash, handle, key, op)]
+                vec![self.try_table_item_into_write_set_change(hash, *handle, key.to_owned(), op)]
                     .into_iter()
                     .collect()
             },
@@ -332,7 +332,7 @@ impl<'a, R: ModuleResolver + ?Sized> MoveConverter<'a, R> {
     pub fn try_access_path_into_write_set_changes(
         &self,
         state_key_hash: String,
-        access_path: AccessPath,
+        access_path: &AccessPath,
         op: WriteOp,
     ) -> Result<Vec<WriteSetChange>> {
         let ret = match op.bytes() {

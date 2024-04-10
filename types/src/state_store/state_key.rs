@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
+// FIXME(aldenhu): remove
+#![allow(dead_code)]
 
 use crate::{
     access_path::AccessPath, on_chain_config::OnChainConfig, state_store::table::TableHandle,
@@ -12,37 +14,22 @@ use aptos_crypto::{
     HashValue,
 };
 use aptos_crypto_derive::CryptoHasher;
-use derivative::Derivative;
+use bytes::Bytes;
 use move_core_types::{
     account_address::AccountAddress, language_storage::StructTag, move_resource::MoveResource,
 };
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
-use once_cell::sync::OnceCell;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
+    cmp::Ordering,
     convert::TryInto,
     fmt,
     fmt::{Debug, Formatter},
     hash::Hash,
-    ops::Deref,
+    sync::Arc,
 };
 use thiserror::Error;
-
-#[derive(Clone, Debug, Derivative)]
-#[derivative(PartialEq, PartialOrd, Hash, Ord)]
-#[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
-pub struct StateKey {
-    inner: StateKeyInner,
-    #[derivative(
-        Hash = "ignore",
-        Ord = "ignore",
-        PartialEq = "ignore",
-        PartialOrd = "ignore"
-    )]
-    #[cfg_attr(any(test, feature = "fuzzing"), proptest(value = "OnceCell::new()"))]
-    hash: OnceCell<HashValue>,
-}
 
 #[derive(Clone, CryptoHasher, Eq, PartialEq, Serialize, Deserialize, Ord, PartialOrd, Hash)]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
@@ -80,178 +67,6 @@ impl fmt::Debug for StateKeyInner {
     }
 }
 
-#[repr(u8)]
-#[derive(Clone, Debug, FromPrimitive, ToPrimitive)]
-pub enum StateKeyTag {
-    AccessPath,
-    TableItem,
-    Raw = 255,
-}
-
-impl StateKey {
-    pub fn new(inner: StateKeyInner) -> Self {
-        Self {
-            inner,
-            hash: OnceCell::new(),
-        }
-    }
-
-    /// Recovers from serialized bytes in physical storage.
-    pub fn decode(val: &[u8]) -> Result<StateKey, StateKeyDecodeErr> {
-        if val.is_empty() {
-            return Err(StateKeyDecodeErr::EmptyInput);
-        }
-        let tag = val[0];
-        let state_key_tag =
-            StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
-        match state_key_tag {
-            StateKeyTag::AccessPath => {
-                Ok(StateKeyInner::AccessPath(bcs::from_bytes(&val[1..])?).into())
-            },
-            StateKeyTag::TableItem => {
-                const HANDLE_SIZE: usize = std::mem::size_of::<TableHandle>();
-                if val.len() < 1 + HANDLE_SIZE {
-                    return Err(StateKeyDecodeErr::NotEnoughBytes {
-                        tag,
-                        num_bytes: val.len(),
-                    });
-                }
-                let handle = bcs::from_bytes(
-                    val[1..1 + HANDLE_SIZE]
-                        .try_into()
-                        .expect("Bytes too short."),
-                )?;
-                let key = val[1 + HANDLE_SIZE..].to_vec();
-                Ok(StateKey::table_item(handle, key))
-            },
-            StateKeyTag::Raw => Ok(StateKey::raw(val[1..].to_vec())),
-        }
-    }
-
-    pub fn size(&self) -> usize {
-        match &self.inner {
-            StateKeyInner::AccessPath(access_path) => access_path.size(),
-            StateKeyInner::TableItem { handle, key } => handle.size() + key.len(),
-            StateKeyInner::Raw(bytes) => bytes.len(),
-        }
-    }
-
-    pub fn access_path(access_path: AccessPath) -> Self {
-        Self::new(StateKeyInner::AccessPath(access_path))
-    }
-
-    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
-        Self::access_path(
-            AccessPath::resource_access_path(*address, struct_tag.to_owned()).unwrap(),
-        )
-    }
-
-    pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
-        Self::resource(address, &T::struct_tag())
-    }
-
-    pub fn on_chain_config<T: OnChainConfig>() -> Self {
-        Self::resource(T::address(), &T::struct_tag())
-    }
-
-    pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
-        Self::new(StateKeyInner::TableItem { handle, key })
-    }
-
-    pub fn raw(raw_key: Vec<u8>) -> Self {
-        Self::new(StateKeyInner::Raw(raw_key))
-    }
-
-    pub fn inner(&self) -> &StateKeyInner {
-        &self.inner
-    }
-
-    pub fn into_inner(self) -> StateKeyInner {
-        self.inner
-    }
-
-    pub fn get_shard_id(&self) -> u8 {
-        CryptoHash::hash(self).nibble(0)
-    }
-
-    pub fn is_aptos_code(&self) -> bool {
-        match self.inner() {
-            StateKeyInner::AccessPath(access_path) => {
-                access_path.is_code()
-                    && (access_path.address == AccountAddress::ONE
-                        || access_path.address == AccountAddress::THREE
-                        || access_path.address == AccountAddress::FOUR)
-            },
-            _ => false,
-        }
-    }
-}
-
-impl StateKeyInner {
-    /// Serializes to bytes for physical storage.
-    pub fn encode(&self) -> anyhow::Result<Vec<u8>> {
-        let mut out = vec![];
-
-        let (prefix, raw_key) = match self {
-            StateKeyInner::AccessPath(access_path) => {
-                (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
-            },
-            StateKeyInner::TableItem { handle, key } => {
-                let mut bytes = bcs::to_bytes(&handle)?;
-                bytes.extend(key);
-                (StateKeyTag::TableItem, bytes)
-            },
-            StateKeyInner::Raw(raw_bytes) => (StateKeyTag::Raw, raw_bytes.to_vec()),
-        };
-        out.push(prefix as u8);
-        out.extend(raw_key);
-        Ok(out)
-    }
-}
-
-impl CryptoHash for StateKey {
-    type Hasher = DummyHasher;
-
-    fn hash(&self) -> HashValue {
-        *self.hash.get_or_init(|| CryptoHash::hash(&self.inner))
-    }
-}
-
-impl Serialize for StateKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.inner.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for StateKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let inner = StateKeyInner::deserialize(deserializer)?;
-        Ok(Self::new(inner))
-    }
-}
-
-impl Deref for StateKey {
-    type Target = StateKeyInner;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl Eq for StateKey {}
-
-impl From<StateKeyInner> for StateKey {
-    fn from(inner: StateKeyInner) -> Self {
-        StateKey::new(inner)
-    }
-}
-
 impl CryptoHash for StateKeyInner {
     type Hasher = StateKeyInnerHasher;
 
@@ -283,6 +98,241 @@ pub enum StateKeyDecodeErr {
 
     #[error(transparent)]
     BcsError(#[from] bcs::Error),
+}
+
+#[repr(u8)]
+#[derive(Clone, Debug, FromPrimitive, ToPrimitive)]
+pub enum StateKeyTag {
+    AccessPath,
+    TableItem,
+    Raw = 255,
+}
+
+impl StateKeyInner {
+    fn encode(&self) -> Result<Vec<u8>> {
+        let mut out = vec![];
+
+        let (prefix, raw_key) = match self {
+            StateKeyInner::AccessPath(access_path) => {
+                (StateKeyTag::AccessPath, bcs::to_bytes(access_path)?)
+            },
+            StateKeyInner::TableItem { handle, key } => {
+                let mut bytes = bcs::to_bytes(&handle)?;
+                bytes.extend(key);
+                (StateKeyTag::TableItem, bytes)
+            },
+            StateKeyInner::Raw(raw_bytes) => (StateKeyTag::Raw, raw_bytes.to_vec()),
+        };
+        out.push(prefix as u8);
+        out.extend(raw_key);
+        Ok(out)
+    }
+
+    fn decode(val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
+        if val.is_empty() {
+            return Err(StateKeyDecodeErr::EmptyInput);
+        }
+        let tag = val[0];
+        let state_key_tag =
+            StateKeyTag::from_u8(tag).ok_or(StateKeyDecodeErr::UnknownTag { unknown_tag: tag })?;
+        match state_key_tag {
+            StateKeyTag::AccessPath => Ok(Self::AccessPath(bcs::from_bytes(&val[1..])?)),
+            StateKeyTag::TableItem => {
+                const HANDLE_SIZE: usize = std::mem::size_of::<TableHandle>();
+                if val.len() < 1 + HANDLE_SIZE {
+                    return Err(StateKeyDecodeErr::NotEnoughBytes {
+                        tag,
+                        num_bytes: val.len(),
+                    });
+                }
+                let handle = bcs::from_bytes(
+                    val[1..1 + HANDLE_SIZE]
+                        .try_into()
+                        .expect("Bytes too short."),
+                )?;
+                let key = val[1 + HANDLE_SIZE..].to_vec();
+                Ok(Self::TableItem { handle, key })
+            },
+            StateKeyTag::Raw => Ok(Self::Raw(val[1..].to_vec())),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct StateKeyInfo {
+    pub deserialized: StateKeyInner,
+    pub hash_value: HashValue,
+    pub serialized: Bytes,
+}
+
+impl StateKeyInfo {
+    pub fn from_deserialized(deserialized: StateKeyInner) -> Self {
+        let hash_value = CryptoHash::hash(&deserialized);
+        let serialized = bcs::to_bytes(&deserialized)
+            .expect("Failed to serialize StateKeyInner")
+            .into();
+
+        Self {
+            deserialized,
+            hash_value,
+            serialized,
+        }
+    }
+
+    pub fn from_serialized(serialized: Bytes) -> Result<Self> {
+        let deserialized = bcs::from_bytes(&serialized)?;
+        let hash_value = CryptoHash::hash(&deserialized);
+        Ok(Self {
+            deserialized,
+            hash_value,
+            serialized,
+        })
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct StateKey(Arc<StateKeyInfo>);
+
+impl StateKey {
+    pub fn size(&self) -> usize {
+        match self.inner() {
+            StateKeyInner::AccessPath(access_path) => access_path.size(),
+            StateKeyInner::TableItem { handle, key } => handle.size() + key.len(),
+            StateKeyInner::Raw(bytes) => bytes.len(),
+        }
+    }
+
+    pub fn inner(&self) -> &StateKeyInner {
+        &self.0.deserialized
+    }
+
+    pub fn get_shard_id(&self) -> u8 {
+        self.0.hash_value.nibble(0)
+    }
+
+    pub fn is_aptos_code(&self) -> bool {
+        match self.inner() {
+            StateKeyInner::AccessPath(access_path) => {
+                access_path.is_code()
+                    && (access_path.address == AccountAddress::ONE
+                        || access_path.address == AccountAddress::THREE
+                        || access_path.address == AccountAddress::FOUR)
+            },
+            _ => false,
+        }
+    }
+
+    fn from_deserialized(_deserialized: StateKeyInner) -> Self {
+        todo!()
+    }
+
+    pub fn table_item(_handle: TableHandle, _key: Vec<u8>) -> Self {
+        // FIXME(aldenhu): remove
+        todo!()
+    }
+
+    pub fn access_path(_access_path: AccessPath) -> Self {
+        // FIXME(aldenhu): remove
+        todo!()
+    }
+
+    pub fn resource(address: &AccountAddress, struct_tag: &StructTag) -> Self {
+        Self::access_path(
+            AccessPath::resource_access_path(*address, struct_tag.to_owned()).unwrap(),
+        )
+    }
+
+    pub fn resource_typed<T: MoveResource>(address: &AccountAddress) -> Self {
+        Self::resource(address, &T::struct_tag())
+    }
+
+    pub fn on_chain_config<T: OnChainConfig>() -> Self {
+        Self::resource(T::address(), &T::struct_tag())
+    }
+
+    pub fn raw(_bytes: Vec<u8>) -> Self {
+        // FIXME(aldenhu): remove
+        todo!()
+    }
+
+    pub fn encode(&self) -> Result<Vec<u8>> {
+        todo!()
+    }
+
+    pub fn decode(_val: &[u8]) -> Result<Self, StateKeyDecodeErr> {
+        todo!()
+    }
+}
+
+impl CryptoHash for StateKey {
+    type Hasher = DummyHasher;
+
+    fn hash(&self) -> HashValue {
+        self.0.hash_value
+    }
+}
+
+impl Serialize for StateKey {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // FIXME(aldenhu): write out cased bytes directly; or provide method to access serialized bytes
+        todo!()
+    }
+}
+
+impl<'de> Deserialize<'de> for StateKey {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // FIXME(aldenhu): check cache
+        todo!()
+    }
+}
+
+impl PartialEq for StateKey {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for StateKey {}
+
+impl Hash for StateKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        // FIXME(aldenhu): does it make a difference to hash less bytes?
+        state.write(&self.0.hash_value.as_ref()[0..16])
+    }
+}
+
+impl PartialOrd for StateKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // TODO: consider more efficient PartialOrd && Ord, maybe on another wrapper type, so keys
+        //       can be hosted more cheaply in a BTreeSet
+        self.0.deserialized.partial_cmp(&other.0.deserialized)
+    }
+}
+
+impl Ord for StateKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.deserialized.cmp(&other.0.deserialized)
+    }
+}
+
+#[cfg(any(test, feature = "fuzzing"))]
+impl proptest::arbitrary::Arbitrary for StateKey {
+    type Parameters = ();
+    type Strategy = proptest::strategy::BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: ()) -> Self::Strategy {
+        use proptest::strategy::Strategy;
+
+        proptest::prelude::any::<StateKeyInner>()
+            .prop_map(StateKey::from_deserialized)
+            .boxed()
+    }
 }
 
 #[cfg(test)]

@@ -14,10 +14,7 @@ use move_core_types::{
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
 };
-use std::{
-    fmt::{self, Display},
-    ops::Deref,
-};
+use std::fmt::{self, Display};
 
 /// Wrapper to help render the underlying data in human readable formats that are
 /// desirable for textual outputs and flamegraphs.
@@ -108,7 +105,7 @@ impl<'a> Display for Render<'a, StateKey> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use StateKeyInner::*;
 
-        match self.0.deref() {
+        match self.0.inner() {
             AccessPath(ap) => {
                 write!(f, "{}::{}", Render(&ap.address), Render(&ap.get_path()))
             },
