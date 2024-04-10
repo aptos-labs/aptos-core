@@ -44,7 +44,7 @@ runs:
     # Run the rust unit tests
     - name: Run all unit tests
       run: |
-        NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --retries 3 --no-fail-fast --message-format libtest-json > nextest_output.json || python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" -f
+        NEXTEST_EXPERIMENTAL_LIBTEST_JSON=1 cargo nextest run --profile ci --cargo-profile ci --locked --workspace --exclude smoke-test --exclude aptos-testcases --exclude aptos-keyless-circuit-tests --retries 3 --no-fail-fast --message-format libtest-json > nextest_output.json || python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" -f
         buildkite-test-collector < nextest_output.json || echo "Warning: buildkite-test-collector encountered an error"
         python3 .github/actions/rust-unit-tests/nextest_summary.py nextest_output.json "$GITHUB_STEP_SUMMARY" || echo "summary generation had an error"
         rm nextest_output.json

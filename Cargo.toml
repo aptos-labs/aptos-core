@@ -135,6 +135,8 @@ members = [
     "experimental/execution/ptx-executor",
     "experimental/runtimes",
     "experimental/storage/layered-map",
+    "keyless/circuit-tests",
+    "keyless/common",
     "keyless/pepper/common",
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",
@@ -393,6 +395,7 @@ aptos-package-builder = { path = "aptos-move/package-builder" }
 aptos-peer-monitoring-service-client = { path = "peer-monitoring-service/client" }
 aptos-peer-monitoring-service-server = { path = "peer-monitoring-service/server" }
 aptos-peer-monitoring-service-types = { path = "peer-monitoring-service/types" }
+aptos-keyless-common = { path = "keyless/common" }
 aptos-keyless-pepper-common = { path = "keyless/pepper/common" }
 aptos-keyless-pepper-service = { path = "keyless/pepper/service" }
 aptos-profiler = { path = "crates/aptos-profiler" }
