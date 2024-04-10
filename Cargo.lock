@@ -2078,6 +2078,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-indexer-grpc-in-memory-cache-benchmark"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "aptos-indexer-grpc-utils",
+ "aptos-protos 1.3.0",
+ "futures",
+ "jemallocator",
+ "lazy_static",
+ "once_cell",
+ "redis",
+ "redis-test",
+ "tokio",
+]
+
+[[package]]
 name = "aptos-indexer-grpc-integration-tests"
 version = "0.1.0"
 dependencies = [
@@ -2166,9 +2182,9 @@ dependencies = [
  "chrono",
  "cloud-storage",
  "dashmap",
- "flate2",
  "futures",
  "itertools 0.12.1",
+ "lz4",
  "once_cell",
  "prometheus",
  "prost 0.12.3",

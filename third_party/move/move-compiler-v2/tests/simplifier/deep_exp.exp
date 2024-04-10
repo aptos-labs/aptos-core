@@ -4,3 +4,6 @@ module 0x42::Test {
         625
     }
 } // end 0x42::Test
+
+
+============ bytecode verification succeeded ========
