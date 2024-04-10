@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 mod cargo;
 mod common;
@@ -6,7 +7,11 @@ mod common;
 use cargo::Cargo;
 use clap::{Args, Parser, Subcommand};
 pub use common::SelectedPackageArgs;
-use log::trace;
+use determinator::Utf8Paths0;
+use log::{debug, trace};
+
+// The targeted unit test packages to ignore (these will be run separately, by other jobs)
+const TARGETED_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
 
 #[derive(Args, Clone, Debug)]
 #[command(disable_help_flag = true)]
@@ -28,10 +33,13 @@ impl CommonArgs {
 
 #[derive(Clone, Subcommand, Debug)]
 pub enum AptosCargoCommand {
+    AffectedPackages(CommonArgs),
+    ChangedFiles(CommonArgs),
     Check(CommonArgs),
     Xclippy(CommonArgs),
     Fmt(CommonArgs),
     Nextest(CommonArgs),
+    TargetedUnitTests(CommonArgs),
     Test(CommonArgs),
 }
 
@@ -42,16 +50,21 @@ impl AptosCargoCommand {
             AptosCargoCommand::Xclippy(_) => "clippy",
             AptosCargoCommand::Fmt(_) => "fmt",
             AptosCargoCommand::Nextest(_) => "nextest",
+            AptosCargoCommand::TargetedUnitTests(_) => "nextest", // Invoke the nextest command directly
             AptosCargoCommand::Test(_) => "test",
+            command => panic!("Unsupported command attempted! Command: {:?}", command),
         }
     }
 
     fn command_args(&self) -> &CommonArgs {
         match self {
+            AptosCargoCommand::AffectedPackages(args) => args,
+            AptosCargoCommand::ChangedFiles(args) => args,
             AptosCargoCommand::Check(args) => args,
             AptosCargoCommand::Xclippy(args) => args,
             AptosCargoCommand::Fmt(args) => args,
             AptosCargoCommand::Nextest(args) => args,
+            AptosCargoCommand::TargetedUnitTests(args) => args,
             AptosCargoCommand::Test(args) => args,
         }
     }
@@ -70,40 +83,157 @@ impl AptosCargoCommand {
         }
     }
 
-    fn split_args(&self) -> (Vec<String>, Vec<String>) {
-        self.command_args().args()
+    fn get_args_and_affected_packages(
+        &self,
+        package_args: &SelectedPackageArgs,
+    ) -> anyhow::Result<(Vec<String>, Vec<String>, Vec<String>)> {
+        // Parse the args
+        let (direct_args, push_through_args) = self.parse_args();
+
+        // Compute the affected packages
+        let packages = package_args.compute_target_packages()?;
+        trace!("affected packages: {:?}", packages);
+
+        // Return the parsed args and packages
+        Ok((direct_args, push_through_args, packages))
+    }
+
+    fn parse_args(&self) -> (Vec<String>, Vec<String>) {
+        // Parse the args
+        let (direct_args, push_through_args) = self.command_args().args();
+
+        // Trace log for debugging
+        trace!("parsed direct_arg`s: {:?}", direct_args);
+        trace!("parsed push_through_args: {:?}", push_through_args);
+
+        (direct_args, push_through_args)
     }
 
     pub fn execute(&self, package_args: &SelectedPackageArgs) -> anyhow::Result<()> {
-        let (mut direct_args, mut push_through_args) = self.split_args();
+        match self {
+            AptosCargoCommand::AffectedPackages(_) => {
+                // Calculate and display the affected packages
+                let packages = package_args.compute_target_packages()?;
+                output_affected_packages(packages)
+            },
+            AptosCargoCommand::ChangedFiles(_) => {
+                // Calculate and display the changed files
+                let (_, _, changed_files) = package_args.identify_changed_files()?;
+                output_changed_files(changed_files)
+            },
+            AptosCargoCommand::TargetedUnitTests(_) => {
+                // Calculate and run the targeted unit tests.
+                // Start by fetching the arguments and affected packages.
+                let (mut direct_args, push_through_args, packages) =
+                    self.get_args_and_affected_packages(package_args)?;
 
-        trace!("parsed direct_args: {:?}", direct_args);
-        trace!("parsed push_through_args: {:?}", push_through_args);
+                // Add each affected package to the arguments, but filter out
+                // the packages that should not be run as unit tests.
+                let mut found_package_to_test = false;
+                for package_path in packages {
+                    // Extract the package name from the full path
+                    let package_name = package_path.split('#').last().unwrap();
 
-        let packages = package_args.compute_packages()?;
+                    // Only add the package if it is not in the ignore list
+                    if TARGETED_TEST_PACKAGES_TO_IGNORE.contains(&package_name) {
+                        debug!(
+                            "Ignoring package when running targeted-unit-tests: {:?}",
+                            package_name
+                        );
+                    } else {
+                        // Add the arguments for the package
+                        direct_args.push("-p".into());
+                        direct_args.push(package_path);
 
-        trace!("affected packages: {:?}", packages);
+                        // Mark that we found a package to test
+                        found_package_to_test = true;
+                    }
+                }
 
-        for p in packages {
-            direct_args.push("-p".into());
-            direct_args.push(p);
+                // Create and run the command if we found a package to test
+                if found_package_to_test {
+                    println!("Running the targeted unit tests...");
+                    return self.create_and_run_command(direct_args, push_through_args);
+                }
+
+                println!("Skipping targeted unit tests because no packages were affected to test.");
+                Ok(())
+            },
+            _ => {
+                // Otherwise, we need to parse and run the command.
+                // Start by fetching the arguments and affected packages.
+                let (mut direct_args, mut push_through_args, packages) =
+                    self.get_args_and_affected_packages(package_args)?;
+
+                // Add each affected package to the arguments
+                for package_path in packages {
+                    direct_args.push("-p".into());
+                    direct_args.push(package_path);
+                }
+
+                // Add any additional arguments
+                if let Some(opts) = self.extra_opts() {
+                    for &opt in opts {
+                        push_through_args.push(opt.into());
+                    }
+                }
+
+                // Create and run the command
+                self.create_and_run_command(direct_args, push_through_args)
+            },
         }
+    }
 
-        if let Some(opts) = self.extra_opts() {
-            for &opt in opts {
-                push_through_args.push(opt.into());
-            }
-        }
-
+    fn create_and_run_command(
+        &self,
+        direct_args: Vec<String>,
+        push_through_args: Vec<String>,
+    ) -> anyhow::Result<()> {
+        // Output the final arguments before running the command
         trace!("final direct_args: {:?}", direct_args);
         trace!("final push_through_args: {:?}", push_through_args);
 
-        Cargo::command(self.command())
-            .args(direct_args)
-            .pass_through(push_through_args)
-            .run();
+        // Construct and run the final command
+        let mut command = Cargo::command(self.command());
+        command.args(direct_args).pass_through(push_through_args);
+        command.run();
+
         Ok(())
     }
+}
+
+/// Outputs the specified affected packages
+fn output_affected_packages(packages: Vec<String>) -> anyhow::Result<()> {
+    // Output the affected packages (if they exist)
+    if packages.is_empty() {
+        println!("No packages were affected!");
+    } else {
+        println!("Affected packages detected:");
+        for package in packages {
+            println!("\t{:?}", package)
+        }
+    }
+    Ok(())
+}
+
+/// Outputs the changed files from the given package args
+fn output_changed_files(changed_files: Utf8Paths0) -> anyhow::Result<()> {
+    // Output the results
+    let mut changes_detected = false;
+    for (index, file) in changed_files.into_iter().enumerate() {
+        if index == 0 {
+            println!("Changed files detected:"); // Only print this if changes were detected!
+            changes_detected = true;
+        }
+        println!("\t{:?}", file)
+    }
+
+    // If no changes were detected, make it obvious
+    if !changes_detected {
+        println!("No changes were detected!")
+    }
+
+    Ok(())
 }
 
 #[derive(Parser, Debug, Clone)]

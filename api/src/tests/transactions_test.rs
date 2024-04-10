@@ -7,7 +7,7 @@ use crate::tests::new_test_context_with_config;
 use aptos_api_test_context::{assert_json, current_function_name, pretty, TestContext};
 use aptos_config::config::{GasEstimationStaticOverride, NodeConfig};
 use aptos_crypto::{
-    ed25519::Ed25519PrivateKey,
+    ed25519::{Ed25519PrivateKey, Ed25519Signature},
     multi_ed25519::{MultiEd25519PrivateKey, MultiEd25519PublicKey},
     PrivateKey, SigningKey, Uniform,
 };
@@ -1502,6 +1502,49 @@ async fn test_simulation_failure_error_message() {
         .as_str()
         .unwrap()
         .contains("Division by zero"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_runtime_error_message_in_interpreter() {
+    let context = new_test_context(current_function_name!());
+    let account = context.root_account().await;
+
+    let named_addresses = vec![("addr".to_string(), account.address())];
+    let path =
+        PathBuf::from(std::env!("CARGO_MANIFEST_DIR")).join("src/tests/move/pack_exceed_limit");
+    let payload = TestContext::build_package(path, named_addresses);
+    let txn = account.sign_with_transaction_builder(context.transaction_factory().payload(payload));
+    let body = bcs::to_bytes(&txn).unwrap();
+    let resp = context
+        .expect_status_code(202)
+        .post_bcs_txn("/transactions", body)
+        .await;
+
+    let resp = context
+        .expect_status_code(200)
+        .post(
+            "/transactions/simulate",
+            json!({
+                "sender": resp["sender"],
+                "sequence_number": resp["sequence_number"],
+                "max_gas_amount": resp["max_gas_amount"],
+                "gas_unit_price": resp["gas_unit_price"],
+                "expiration_timestamp_secs":resp["expiration_timestamp_secs"],
+                "payload": resp["payload"],
+                "signature": {
+                    "type": resp["signature"]["type"],
+                    "public_key": resp["signature"]["public_key"],
+                    "signature": Ed25519Signature::dummy_signature().to_string(),
+                }
+            }),
+        )
+        .await;
+
+    assert!(!resp[0]["success"].as_bool().unwrap());
+    let vm_status = resp[0]["vm_status"].as_str().unwrap();
+    assert!(vm_status.contains("VERIFICATION_ERROR"));
+    assert!(vm_status
+        .contains("Number of type nodes when constructing type layout exceeded the maximum"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

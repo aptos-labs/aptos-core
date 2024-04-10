@@ -602,7 +602,7 @@ module aptos_framework::fungible_asset {
             store.balance = store.balance + amount;
         };
 
-        event::emit<Deposit>(Deposit { store: store_addr, amount });
+        event::emit(Deposit { store: store_addr, amount });
     }
 
     /// Extract `amount` of the fungible asset from `store`.
@@ -630,7 +630,7 @@ module aptos_framework::fungible_asset {
 
         let store = borrow_global<FungibleStore>(store_addr);
         let metadata = store.metadata;
-        event::emit<Withdraw>(Withdraw { store: store_addr, amount });
+        event::emit(Withdraw { store: store_addr, amount });
 
         FungibleAsset { metadata, amount }
     }

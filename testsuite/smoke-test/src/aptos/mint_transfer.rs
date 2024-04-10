@@ -81,7 +81,7 @@ async fn test_mint_transfer() {
         .unwrap();
 
     let output = debugger
-        .execute_past_transactions(txn_ver, 1)
+        .execute_past_transactions(txn_ver, 1, 1)
         .await
         .unwrap()
         .pop()

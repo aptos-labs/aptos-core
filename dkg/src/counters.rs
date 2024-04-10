@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_metrics_core::{register_histogram_vec, register_int_gauge, HistogramVec, IntGauge};
 use once_cell::sync::Lazy;

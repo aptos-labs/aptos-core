@@ -57,10 +57,6 @@ move-compiler/tests/move_check/borrow_tests/{
   writeref_borrow_valid1.move,
   writeref_borrow_valid2.move,
 }
-move-compiler/tests/move_check/borrows/{
-  call_acquires.move,
-  call_acquires_invalid.move,
-}
 move-compiler/tests/move_check/commands/{
   abort_negative_stack_size.move,
   assign_resource.move,
@@ -81,6 +77,8 @@ move-compiler/tests/move_check/commands/{
   while_move_local_2.move,
 }
 move-compiler/tests/move_check/control_flow/{
+  for_loop_comment_following.move,
+  for_loop_lparen_following.move,
   infinite_loop_with_dead_exits.move,
 }
 move-compiler/tests/move_check/deprecated/{
@@ -120,6 +118,8 @@ move-compiler/tests/move_check/liveness/{
   explicit_last_copy.move,
   loop_weirdness.move,
   move_in_infinite_loop_branched.move,
+  mut_inline.move,
+  mut_ref.move,
   trailing_semi.move,
   trailing_semi_loops.move,
   unused_assignment.move,
@@ -130,6 +130,7 @@ move-compiler/tests/move_check/locals/{
   drop_conditional.move,
   eliminate_temps.move,
   reassign_parameter.move,
+  struct_use_before_assign.move,
   unused_copyable.move,
   unused_resource.move,
   unused_resource_explicit_return.move,
@@ -167,15 +168,13 @@ move-compiler/tests/move_check/signer/{
   unused_partial.move,
   write_ref.move,
 }
+move-compiler/tests/move_check/simplifier/{
+  moved_var_not_simplified3.move,
+}
 move-compiler/tests/move_check/to_bytecode/{
   unassigned_address.move,
 }
 move-compiler/tests/move_check/typing/{
-  ability_constraint_generic_in_field.move,
-  ability_constraint_prims_invalid.move,
-  ability_constraint_structs_invalid.move,
-  ability_constraint_tparams_invalid.move,
-  ability_constraints.move,
   abort_any_type.move,
   assign_pop_resource.move,
   bind_pop_resource.move,
@@ -195,13 +194,11 @@ move-compiler/tests/move_check/typing/{
   constraints_not_satisfied_type_arguments_internal_pack.move,
   declare_pop_resource.move,
   entry_signature_no_warning.move,
-  extraneous_acquire.move,
   ignore_inferred_resource.move,
   implicit_deref_borrow_field_not_copyable.move,
   infinite_instantiations_invalid.move,
   infinite_instantiations_valid.move,
-  invalid_type_acquire.move,
-  missing_acquire.move,
+  instantiate_signatures.move,
   module_call_constraints_not_satisfied.move,
   module_call_internal.move,
   mutable_borrow_from_immutable.move,
@@ -209,24 +206,17 @@ move-compiler/tests/move_check/typing/{
   non_phantom_in_phantom_pos.move,
   pack_constraint_not_satisfied.move,
   pack_private_with_field.move,
-  pack_unit.move,
   pack_unpack_private.move,
   pack_unpack_private_script.move,
   pay_me_a_river.move,
-  phantom_param_op_abilities.move,
-  phantom_param_op_abilities_invalid.move,
   phantom_param_struct_decl.move,
   phantom_param_struct_decl_invalid.move,
-  phantom_params_constraint_abilities.move,
-  phantom_params_constraint_abilities_invalid.move,
-  phantom_params_field_abilities.move,
-  phantom_params_field_abilities_invalid.move,
-  recursive_structs.move,
-  recursive_structs_malformed.move,
   seq_cannot_ignore_resource.move,
   tuple.move,
   unused_non_phantom_param.move,
-  valid_acquire.move,
+}
+move-compiler/tests/move_check/v2-not-supported/{
+  no_receiver_calls.move,
 }
 move-compiler/tests/move_check/verification/{
   cross_module_invalid.move,
@@ -234,4 +224,18 @@ move-compiler/tests/move_check/verification/{
   double_annotation.move,
   single_module_invalid.move,
   single_module_valid.move,
+}
+move-compiler/tests/move_check/unit_test/{
+  cross_module_members_non_test_function.move
+  expected_failure_bad_value.unit_test
+  expected_failure_constants_invalid.unit_test
+  expected_failure_invalid_literals.unit_test
+  expected_failure_not_test.unit_test
+  expected_failure_out_of_range_value.unit_test
+  extra_attributes.unit_test
+  invalid_expected_code_name.unit_test
+  invalid_expected_failure_name.unit_test
+  other_failures_invalid_assignment.unit_test
+  other_failures_invalid_location.unit_test
+  test_and_test_only_annotation.unit_test
 }

@@ -1,12 +1,16 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use aptos_keyless_pepper_common::{BadPepperRequestError, PepperRequest};
 use aptos_keyless_pepper_service::{
     about::ABOUT_JSON,
-    jwk, process,
+    jwk,
+    metrics::{start_metric_server, REQUEST_HANDLING_SECONDS},
+    process,
     vuf_keys::{PEPPER_V0_VUF_VERIFICATION_KEY_JSON, VUF_SK},
     ProcessingFailure::{BadRequest, InternalError},
 };
+use aptos_logger::info;
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
@@ -15,8 +19,13 @@ use hyper::{
     service::{make_service_fn, service_fn},
     Body, Method, Server, StatusCode,
 };
-use log::{info, LevelFilter};
-use std::{convert::Infallible, net::SocketAddr, ops::Deref, time::Duration};
+use std::{
+    convert::Infallible,
+    net::SocketAddr,
+    ops::Deref,
+    time::{Duration, Instant},
+};
+use uuid::Uuid;
 
 async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Body>, Infallible> {
     let origin = req
@@ -45,12 +54,24 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
             .body(Body::from(PEPPER_V0_VUF_VERIFICATION_KEY_JSON.as_str()))
             .expect("Response should build"),
         (&Method::POST, "/v0/fetch") => {
+            let session_id = Uuid::new_v4();
+            info!(session_id = session_id, "New pepper request v0!");
+            let timer = Instant::now();
             let body = req.into_body();
             let body_bytes = hyper::body::to_bytes(body).await.unwrap_or_default();
             let pepper_request = serde_json::from_slice::<PepperRequest>(&body_bytes);
-            info!("pepper_request={:?}", pepper_request);
-            let pepper_response = pepper_request.map(process);
-            info!("pepper_response={:?}", pepper_response);
+            let pepper_response = pepper_request.map(|req| process(&session_id, req));
+            let processing_time = timer.elapsed();
+            info!(
+                session_id = session_id,
+                microseconds_processing = processing_time.as_micros(),
+                "PepperResponse generated: {:?}.",
+                pepper_response
+            );
+            let result_str = pepper_response.is_ok().to_string();
+            REQUEST_HANDLING_SECONDS
+                .with_label_values(&["v0", result_str.as_str()])
+                .observe(processing_time.as_secs_f64());
             let (status_code, body_json) = match pepper_response {
                 Ok(Ok(pepper_response)) => (
                     StatusCode::OK,
@@ -72,7 +93,7 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
                     .unwrap(),
                 ),
             };
-            hyper::Response::builder()
+            let response = hyper::Response::builder()
                 .status(status_code)
                 .header(ACCESS_CONTROL_ALLOW_ORIGIN, origin)
                 .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
@@ -80,7 +101,9 @@ async fn handle_request(req: hyper::Request<Body>) -> Result<hyper::Response<Bod
                 .header(ACCESS_CONTROL_ALLOW_HEADERS, "*")
                 .header(CONTENT_TYPE, "application/json")
                 .body(Body::from(body_json))
-                .expect("Response should build")
+                .expect("Response should build");
+            info!(session_id = session_id, "HTTP response built.");
+            response
         },
         (&Method::OPTIONS, _) => hyper::Response::builder()
             .status(StatusCode::OK)
@@ -104,9 +127,8 @@ async fn main() {
     // Trigger private key loading.
     let _ = VUF_SK.deref();
 
-    env_logger::Builder::new()
-        .filter(None, LevelFilter::Info)
-        .init();
+    aptos_logger::Logger::new().init();
+    start_metric_server();
 
     // TODO: JWKs should be from on-chain states?
     jwk::start_jwk_refresh_loop(

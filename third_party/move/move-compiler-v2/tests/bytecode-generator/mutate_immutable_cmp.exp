@@ -1,0 +1,94 @@
+// -- Model dump before bytecode pipeline
+module 0x8675309::M {
+    struct T {
+        s: M::S,
+    }
+    struct G {
+        dummy_field: bool,
+    }
+    struct S {
+        f: u64,
+    }
+    private fun t0(s: &mut M::S) {
+        s = pack M::S(2);
+        s = pack M::S(0);
+        Borrow(Immutable)(0) = 1;
+        {
+          let x: u64 = 0;
+          {
+            let x_ref: &mut u64 = Borrow(Mutable)(x);
+            {
+              let x_ref: &u64 = Freeze(false)(x_ref);
+              x_ref = 0;
+              {
+                let g: M::S = pack M::S(0);
+                {
+                  let g_ref: &mut M::S = Borrow(Mutable)(g);
+                  g_ref = pack M::S(2);
+                  {
+                    let t: M::T = pack M::T(g);
+                    {
+                      let t_ref: &mut M::T = Borrow(Mutable)(t);
+                      {
+                        let g: M::S = pack M::S(2);
+                        select M::T.s<&mut M::T>(t_ref) = g;
+                        {
+                          let g: M::S = pack M::S(3);
+                          select M::T.s<&M::T>(t_ref) = g;
+                          Tuple()
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    }
+    private fun t1() {
+        {
+          let x: u64 = 3;
+          Borrow(Mutable)(x) = 5;
+          Tuple()
+        }
+    }
+} // end 0x8675309::M
+
+
+Diagnostics:
+error: expected `&mut` but found `&M::S`
+  ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:7:11
+  │
+7 │         *(s: &S) = S { f: 0 }; // this is not OK
+  │           ^
+
+error: expected `&mut` but found `&u64`
+  ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:8:10
+  │
+8 │         *&0 = 1;
+  │          ^^
+
+error: expected `&mut` but found `&u64`
+   ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:12:10
+   │
+12 │         *x_ref = 0;
+   │          ^^^^^
+
+error: expected `&mut` but found `&M::S`
+   ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:15:11
+   │
+15 │         *(g_ref: &S) = S {f : 2};
+   │           ^^^^^
+
+error: expected `&mut` but found `&M::T`
+   ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:21:10
+   │
+21 │         (t_ref: &T).s = g; // this is not OK
+   │          ^^^^^
+
+error: expected `&mut` but found `&u64`
+   ┌─ tests/bytecode-generator/mutate_immutable_cmp.move:28:11
+   │
+28 │         *(&mut x: &u64) = 5;
+   │           ^^^^^^

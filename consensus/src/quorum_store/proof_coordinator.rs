@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use aptos_consensus_types::proof_of_store::{
-    BatchInfo, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
+    BatchInfo, ProofCache, ProofOfStore, SignedBatchInfo, SignedBatchInfoError, SignedBatchInfoMsg,
 };
 use aptos_crypto::{bls12381, HashValue};
 use aptos_logger::prelude::*;
@@ -145,6 +145,7 @@ pub(crate) struct ProofCoordinator {
     committed_batches: HashMap<BatchInfo, IncrementalProofState>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
+    proof_cache: ProofCache,
     broadcast_proofs: bool,
 }
 
@@ -155,6 +156,7 @@ impl ProofCoordinator {
         peer_id: PeerId,
         batch_reader: Arc<dyn BatchReader>,
         batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
+        proof_cache: ProofCache,
         broadcast_proofs: bool,
     ) -> Self {
         Self {
@@ -166,6 +168,7 @@ impl ProofCoordinator {
             committed_batches: HashMap::new(),
             batch_reader,
             batch_generator_cmd_tx,
+            proof_cache,
             broadcast_proofs,
         }
     }
@@ -228,6 +231,9 @@ impl ProofCoordinator {
             value.add_signature(signed_batch_info, validator_verifier)?;
             if !value.completed && value.ready(validator_verifier) {
                 let proof = value.take(validator_verifier);
+                // proof validated locally, so adding to cache
+                self.proof_cache
+                    .insert(proof.info().clone(), proof.multi_signature().clone());
                 // quorum store measurements
                 let duration = chrono::Utc::now().naive_utc().timestamp_micros() as u64
                     - self

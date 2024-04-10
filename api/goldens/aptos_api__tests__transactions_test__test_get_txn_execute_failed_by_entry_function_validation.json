@@ -6,7 +6,7 @@
   "state_checkpoint_hash": null,
   "gas_used": "3",
   "success": false,
-  "vm_status": "Transaction Executed and Committed with Error LINKER_ERROR",
+  "vm_status": "LINKER_ERROR",
   "accumulator_root_hash": "",
   "changes": [
     {

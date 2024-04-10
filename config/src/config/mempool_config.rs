@@ -22,6 +22,8 @@ pub struct MempoolConfig {
     pub capacity_per_user: usize,
     /// Number of failover peers to broadcast to when the primary network is alive
     pub default_failovers: usize,
+    /// Whether or not to enable intelligent peer prioritization
+    pub enable_intelligent_peer_prioritization: bool,
     /// The maximum number of broadcasts sent to a single peer that are pending a response ACK at any point.
     pub max_broadcasts_per_peer: usize,
     /// Maximum number of inbound network messages to the Mempool application
@@ -40,7 +42,10 @@ pub struct MempoolConfig {
     pub shared_mempool_max_concurrent_inbound_syncs: usize,
     /// Interval to broadcast to upstream nodes.
     pub shared_mempool_tick_interval_ms: u64,
+    /// Interval to update peers in shared mempool.
     pub shared_mempool_peer_update_interval_ms: u64,
+    /// Interval to update peer priorities in shared mempool (seconds).
+    pub shared_mempool_priority_update_interval_secs: u64,
     /// Number of seconds until the transaction will be removed from the Mempool ignoring if the transaction has expired.
     ///
     /// This ensures that the Mempool isn't just full of non-expiring transactions that are way off into the future.
@@ -71,7 +76,9 @@ impl Default for MempoolConfig {
             capacity_bytes: 2 * 1024 * 1024 * 1024,
             capacity_per_user: 100,
             default_failovers: 1,
+            enable_intelligent_peer_prioritization: true,
             shared_mempool_peer_update_interval_ms: 1_000,
+            shared_mempool_priority_update_interval_secs: 600, // 10 minutes (frequent reprioritization is expensive)
             system_transaction_timeout_secs: 600,
             system_transaction_gc_interval_ms: 60_000,
             broadcast_buckets: DEFAULT_BUCKETS.to_vec(),

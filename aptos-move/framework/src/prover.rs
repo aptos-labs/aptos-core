@@ -8,7 +8,7 @@ use codespan_reporting::{
 };
 use log::LevelFilter;
 use move_core_types::account_address::AccountAddress;
-use move_package::CompilerVersion;
+use move_model::metadata::{CompilerVersion, LanguageVersion};
 use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
@@ -120,6 +120,7 @@ impl ProverOptions {
         named_addresses: BTreeMap<String, AccountAddress>,
         bytecode_version: Option<u32>,
         compiler_version: Option<CompilerVersion>,
+        language_version: Option<LanguageVersion>,
         skip_attribute_checks: bool,
         known_attributes: &BTreeSet<String>,
     ) -> anyhow::Result<()> {
@@ -132,6 +133,7 @@ impl ProverOptions {
             self.filter.clone(),
             bytecode_version,
             compiler_version,
+            language_version,
             skip_attribute_checks,
             known_attributes.clone(),
         )?;

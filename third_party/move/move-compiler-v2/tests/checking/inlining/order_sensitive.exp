@@ -40,3 +40,6 @@ module 0x42::OrderSensitiveTest3 {
         }))
     }
 } // end 0x42::OrderSensitiveTest3
+
+
+============ bytecode verification succeeded ========

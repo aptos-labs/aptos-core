@@ -324,6 +324,7 @@ impl NodeSetup {
             local_config,
             onchain_randomness_config.clone(),
             onchain_jwk_consensus_config.clone(),
+            None,
         );
         block_on(round_manager.init(last_vote_sent));
         Self {

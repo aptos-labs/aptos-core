@@ -148,7 +148,6 @@ error: post-condition does not hold
     =     at tests/sources/functional/nonlinear_arithm.move:207: mul5_incorrect
     =     at tests/sources/functional/nonlinear_arithm.move:208: mul5_incorrect
     =     at tests/sources/functional/nonlinear_arithm.move:210: mul5_incorrect
-    =         a = <redacted>
     =     at tests/sources/functional/nonlinear_arithm.move:203: mul5_incorrect
     =         result = <redacted>
     =     at tests/sources/functional/nonlinear_arithm.move:211: mul5_incorrect
@@ -166,8 +165,6 @@ error: post-condition does not hold
     =         c = <redacted>
     =         d = <redacted>
     =     at tests/sources/functional/nonlinear_arithm.move:225: distribution_law_incorrect
-    =         b = <redacted>
-    =         a = <redacted>
     =         result = <redacted>
     =     at tests/sources/functional/nonlinear_arithm.move:226: distribution_law_incorrect
     =     at tests/sources/functional/nonlinear_arithm.move:228: distribution_law_incorrect (spec)

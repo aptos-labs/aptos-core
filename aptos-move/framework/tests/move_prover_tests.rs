@@ -59,6 +59,7 @@ pub fn run_prover_for_pkg(path_to_pkg: impl Into<String>) {
                 BTreeMap::default(),
                 None,
                 None,
+                None,
                 skip_attribute_checks,
                 extended_checks::get_all_attribute_names(),
             )

@@ -1,0 +1,139 @@
+
+Diagnostics:
+error: not supported before language version `2.0-unstable`: read/write access specifiers. Try `acquires` instead.
+   ┌─ tests/checking-lang-v1/access_ok.move:11:20
+   │
+11 │     fun f2() reads S {
+   │                    ^^
+
+error: not supported before language version `2.0-unstable`: read/write access specifiers. Try `acquires` instead.
+   ┌─ tests/checking-lang-v1/access_ok.move:14:21
+   │
+14 │     fun f3() writes S {
+   │                     ^^
+
+error: not supported before language version `2.0-unstable`: wildcard address specifiers
+   ┌─ tests/checking-lang-v1/access_ok.move:17:24
+   │
+17 │     fun f4() acquires S(*) {
+   │                        ^^^
+
+error: not supported before language version `2.0-unstable`: read/write access specifiers. Try `acquires` instead.
+   ┌─ tests/checking-lang-v1/access_ok.move:20:39
+   │
+20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
+   │                                       ^^
+
+error: not supported before language version `2.0-unstable`: read/write access specifiers. Try `acquires` instead.
+   ┌─ tests/checking-lang-v1/access_ok.move:20:48
+   │
+20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
+   │                                                ^
+
+error: not supported before language version `2.0-unstable`: read/write access specifiers. Try `acquires` instead.
+   ┌─ tests/checking-lang-v1/access_ok.move:20:51
+   │
+20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
+   │                                                   ^^
+
+error: not supported before language version `2.0-unstable`: read/write access specifiers. Try `acquires` instead.
+   ┌─ tests/checking-lang-v1/access_ok.move:20:59
+   │
+20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
+   │                                                           ^^^^^^^
+
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/access_ok.move:23:23
+   │
+23 │     fun f5() acquires 0x42::*::* {
+   │                       ^^^^^^^^^^^
+
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/access_ok.move:26:23
+   │
+26 │     fun f6() acquires 0x42::m::* {
+   │                       ^^^^^^^^^^^
+
+error: not supported before language version `2.0-unstable`: wildcard address specifiers
+   ┌─ tests/checking-lang-v1/access_ok.move:29:24
+   │
+29 │     fun f7() acquires *(*) {
+   │                        ^^^
+
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/access_ok.move:29:23
+   │
+29 │     fun f7() acquires *(*) {
+   │                       ^^^^
+
+error: not supported before language version `2.0-unstable`: literal address specifiers
+   ┌─ tests/checking-lang-v1/access_ok.move:32:24
+   │
+32 │     fun f8() acquires *(0x42) {
+   │                        ^^^^^^
+
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/access_ok.move:32:23
+   │
+32 │     fun f8() acquires *(0x42) {
+   │                       ^^^^^^^
+
+error: not supported before language version `2.0-unstable`: named address specifiers
+   ┌─ tests/checking-lang-v1/access_ok.move:35:34
+   │
+35 │     fun f9(a: address) acquires *(a) {
+   │                                  ^^^
+
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/access_ok.move:35:33
+   │
+35 │     fun f9(a: address) acquires *(a) {
+   │                                 ^^^^
+
+error: not supported before language version `2.0-unstable`: derived address specifiers
+   ┌─ tests/checking-lang-v1/access_ok.move:38:31
+   │
+38 │     fun f10(x: u64) acquires *(make_up_address(x)) {
+   │                               ^^^^^^^^^^^^^^^^^^^^
+
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/access_ok.move:38:30
+   │
+38 │     fun f10(x: u64) acquires *(make_up_address(x)) {
+   │                              ^^^^^^^^^^^^^^^^^^^^^
+
+error: not supported before language version `2.0-unstable`: literal address specifiers
+   ┌─ tests/checking-lang-v1/access_ok.move:45:23
+   │
+45 │     fun f11() !reads *(0x42), *(0x43) {
+   │                       ^^^^^^
+
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/access_ok.move:45:22
+   │
+45 │     fun f11() !reads *(0x42), *(0x43) {
+   │                      ^^^^^^^
+
+error: not supported before language version `2.0-unstable`: read/write access specifiers. Try `acquires` instead.
+   ┌─ tests/checking-lang-v1/access_ok.move:45:22
+   │
+45 │     fun f11() !reads *(0x42), *(0x43) {
+   │                      ^^^^^^^
+
+error: not supported before language version `2.0-unstable`: literal address specifiers
+   ┌─ tests/checking-lang-v1/access_ok.move:45:32
+   │
+45 │     fun f11() !reads *(0x42), *(0x43) {
+   │                                ^^^^^^
+
+error: not supported before language version `2.0-unstable`: address and wildcard access specifiers. Only resource type names can be provided.
+   ┌─ tests/checking-lang-v1/access_ok.move:45:31
+   │
+45 │     fun f11() !reads *(0x42), *(0x43) {
+   │                               ^^^^^^^
+
+error: not supported before language version `2.0-unstable`: read/write access specifiers. Try `acquires` instead.
+   ┌─ tests/checking-lang-v1/access_ok.move:45:31
+   │
+45 │     fun f11() !reads *(0x42), *(0x43) {
+   │                               ^^^^^^^

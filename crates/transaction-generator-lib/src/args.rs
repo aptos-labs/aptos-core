@@ -52,8 +52,13 @@ pub enum TransactionTypeArg {
     TokenV1NFTMintAndTransferParallel,
     TokenV1FTMintAndStore,
     TokenV1FTMintAndTransfer,
+    // register if not registered already
+    CoinInitAndMint,
+    FungibleAssetMint,
     TokenV2AmbassadorMint,
     TokenV2AmbassadorMintAndBurn1M,
+    LiquidityPoolSwap,
+    LiquidityPoolSwapStable,
     VectorPictureCreate30k,
     VectorPicture30k,
     VectorPictureRead30k,
@@ -324,6 +329,16 @@ impl TransactionTypeArg {
                 num_modules: module_working_set_size,
                 use_account_pool: sender_use_account_pool,
             },
+            TransactionTypeArg::CoinInitAndMint => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::CoinInitAndMint,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::FungibleAssetMint => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::FungibleAssetMint,
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
             TransactionTypeArg::TokenV2AmbassadorMint => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::TokenV2AmbassadorMint { numbered: true },
                 num_modules: module_working_set_size,
@@ -337,6 +352,16 @@ impl TransactionTypeArg {
                 num_modules: 1,
                 use_account_pool: sender_use_account_pool,
                 progress_type: workflow_progress_type,
+            },
+            TransactionTypeArg::LiquidityPoolSwap => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::LiquidityPoolSwap { is_stable: false },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
+            },
+            TransactionTypeArg::LiquidityPoolSwapStable => TransactionType::CallCustomModules {
+                entry_point: EntryPoints::LiquidityPoolSwap { is_stable: true },
+                num_modules: module_working_set_size,
+                use_account_pool: sender_use_account_pool,
             },
             TransactionTypeArg::VectorPictureCreate30k => TransactionType::CallCustomModules {
                 entry_point: EntryPoints::InitializeVectorPicture { length: 30 * 1024 },

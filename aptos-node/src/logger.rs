@@ -82,7 +82,6 @@ fn log_config_and_build_information(node_config: &NodeConfig) {
         "default",
         "failpoints",
         "indexer",
-        "network-perf-test",
         "tokio-console"
     );
 

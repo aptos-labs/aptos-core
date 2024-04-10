@@ -72,6 +72,6 @@ jobs:
         if: needs.file_change_determinator.outputs.only_docs_changed != 'true'
         with:
           BRANCH: main
-          GCP_DOCKER_ARTIFACT_REPO: ${{ secrets.GCP_DOCKER_ARTIFACT_REPO }}
+          GCP_DOCKER_ARTIFACT_REPO: ${{ vars.GCP_DOCKER_ARTIFACT_REPO }}
       - run: echo "Skipping the tests on the main branch! Unrelated changes detected."
         if: needs.file_change_determinator.outputs.only_docs_changed == 'true'

@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::transcript_aggregation::TranscriptAggregationState;
 use aptos_crypto::{bls12381::bls12381_keys, Uniform};

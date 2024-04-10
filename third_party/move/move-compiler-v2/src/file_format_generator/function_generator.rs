@@ -252,6 +252,11 @@ impl<'a> FunctionGenerator<'a> {
             .expect(SOURCE_MAP_OK);
         match bc {
             Bytecode::Assign(_, dest, source, mode) => {
+                self.flush_any_conflicts(
+                    ctx,
+                    std::slice::from_ref(dest),
+                    std::slice::from_ref(source),
+                );
                 self.abstract_push_args(ctx, vec![*source], Some(mode));
                 let local = self.temp_to_local(ctx.fun_ctx, Some(ctx.attr_id), *dest);
                 self.emit(FF::Bytecode::StLoc(local));
@@ -366,6 +371,7 @@ impl<'a> FunctionGenerator<'a> {
         oper: &Operation,
         source: &[TempIndex],
     ) {
+        self.flush_any_conflicts(ctx, dest, source);
         let fun_ctx = ctx.fun_ctx;
         match oper {
             Operation::Function(mid, fid, inst) => {
@@ -501,7 +507,7 @@ impl<'a> FunctionGenerator<'a> {
                     self.gen_builtin(ctx, dest, FF::Bytecode::Pop, source)
                 }
             },
-            Operation::FreezeRef => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
+            Operation::FreezeRef(_) => self.gen_builtin(ctx, dest, FF::Bytecode::FreezeRef, source),
             Operation::CastU8 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU8, source),
             Operation::CastU16 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU16, source),
             Operation::CastU32 => self.gen_builtin(ctx, dest, FF::Bytecode::CastU32, source),
@@ -679,6 +685,7 @@ impl<'a> FunctionGenerator<'a> {
 
     /// Generate code for the load instruction.
     fn gen_load(&mut self, ctx: &BytecodeContext, dest: &TempIndex, cons: &Constant) {
+        self.flush_any_conflicts(ctx, std::slice::from_ref(dest), &[]);
         use Constant::*;
         match cons {
             Bool(b) => {
@@ -786,7 +793,8 @@ impl<'a> FunctionGenerator<'a> {
                     // Copy the temporary if it is copyable and still used after this code point, or
                     // if it appears again in temps_to_push.
                     if fun_ctx.is_copyable(*temp)
-                        && (ctx.is_alive_after(*temp) || temps_to_push[pos + 1..].contains(temp))
+                        && (ctx.is_alive_after(*temp, true)
+                            || temps_to_push[pos + 1..].contains(temp))
                     {
                         self.emit(FF::Bytecode::CopyLoc(local))
                     } else {
@@ -798,13 +806,34 @@ impl<'a> FunctionGenerator<'a> {
         }
     }
 
+    /// If a temp already on the abstract stack is both:
+    ///   - not a source of the current instruction
+    ///   - destination of the current instruction
+    /// then, we have a conflicting write to that temp.
+    ///
+    /// This method ensures that conflicting writes do not happen by flushing out such temps
+    /// from the abstract stack before emitting code for the current instruction.
+    fn flush_any_conflicts(
+        &mut self,
+        ctx: &BytecodeContext,
+        dests: &[TempIndex],
+        sources: &[TempIndex],
+    ) {
+        let dests = BTreeSet::from_iter(dests.iter());
+        let sources = BTreeSet::from_iter(sources.iter());
+        let conflicts = dests.difference(&sources).collect::<BTreeSet<_>>();
+        if let Some(pos) = self.stack.iter().position(|t| conflicts.contains(&t)) {
+            self.abstract_flush_stack_before(ctx, pos);
+        }
+    }
+
     /// Ensures that all `temps` which are on the stack and used after this program
     /// point are saved to locals. This flushes the stack as deep as needed for this.
     fn save_used_after(&mut self, ctx: &BytecodeContext, temps: &[TempIndex]) {
         let mut stack_to_flush = self.stack.len();
         for temp in temps {
             if let Some(pos) = self.stack.iter().position(|t| t == temp) {
-                if ctx.is_alive_after(*temp) {
+                if ctx.is_alive_after(*temp, true) {
                     // Determine new lowest point to which we need to flush
                     stack_to_flush = std::cmp::min(stack_to_flush, pos);
                 }
@@ -838,7 +867,7 @@ impl<'a> FunctionGenerator<'a> {
         while self.stack.len() > top {
             let temp = self.stack.pop().unwrap();
             if before && ctx.is_alive_before(temp)
-                || !before && ctx.is_alive_after(temp)
+                || !before && ctx.is_alive_after(temp, false)
                 || self.pinned.contains(&temp)
             {
                 // Only need to save to a local if the temp is still used afterwards
@@ -956,8 +985,15 @@ impl<'env> FunctionContext<'env> {
 }
 
 impl<'env> BytecodeContext<'env> {
-    /// Determine whether the temporary is alive (used) in the reachable code after this point.
-    pub fn is_alive_after(&self, temp: TempIndex) -> bool {
+    /// Determine whether `temp` is alive (used) in the reachable code after this point.
+    /// When `dest_check` is true, we additionally check if `temp` is also written to
+    /// by the current instruction; if it is, then the definition of `temp` being
+    /// considered here is killed, making it not alive after this point.
+    pub fn is_alive_after(&self, temp: TempIndex, dest_check: bool) -> bool {
+        let bc = &self.fun_ctx.fun.data.code[self.code_offset as usize];
+        if dest_check && bc.dests().contains(&temp) {
+            return false;
+        }
         let an = self
             .fun_ctx
             .fun
@@ -969,7 +1005,7 @@ impl<'env> BytecodeContext<'env> {
             .unwrap_or(false)
     }
 
-    /// Determine whether the temporary is alive (used) in the reachable code before and until
+    /// Determine whether `temp` is alive (used) in the reachable code before and until
     /// this point.
     pub fn is_alive_before(&self, temp: TempIndex) -> bool {
         let an = self
