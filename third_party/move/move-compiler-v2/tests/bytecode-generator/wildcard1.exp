@@ -1,6 +1,6 @@
 
 Diagnostics:
-error: the left-hand side has 2 items but the right-hand side provided 1
+error: the left-hand side has 1 item but the right-hand side provided 2
   ┌─ tests/bytecode-generator/wildcard1.move:7:13
   │
 7 │         let _ = tup();
