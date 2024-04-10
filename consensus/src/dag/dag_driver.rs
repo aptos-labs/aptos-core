@@ -10,10 +10,7 @@ use crate::{
         dag_fetcher::TFetchRequester,
         errors::DagDriverError,
         observability::{
-            counters::{
-                self, FETCH_ENQUEUE_FAILURES, NEW_ROUND_EVENT_PROCESS_DURATION, NODE_PAYLOAD_SIZE,
-                NUM_TXNS_PER_NODE,
-            },
+            counters::{self, FETCH_ENQUEUE_FAILURES, NODE_PAYLOAD_SIZE, NUM_TXNS_PER_NODE},
             logging::{LogEvent, LogSchema},
             tracing::{observe_node, observe_round, NodeStage, RoundStage},
         },
@@ -227,10 +224,6 @@ impl DagDriver {
                 return;
             }
 
-            NEW_ROUND_EVENT_PROCESS_DURATION
-                .with_label_values(&[&"highest_round"])
-                .observe(start.elapsed().as_secs_f64());
-
             debug!(LogSchema::new(LogEvent::NewRound).round(new_round));
             counters::CURRENT_ROUND.set(new_round as i64);
 
@@ -240,10 +233,6 @@ impl DagDriver {
                     assert_eq!(new_round, 1, "Only expect empty strong links for round 1");
                     vec![]
                 });
-
-            NEW_ROUND_EVENT_PROCESS_DURATION
-                .with_label_values(&[&"strong_links"])
-                .observe(start.elapsed().as_secs_f64());
 
             if strong_links.is_empty() {
                 (
@@ -265,10 +254,6 @@ impl DagDriver {
                     .map(|node_status| node_status.as_node())
                     .collect::<Vec<_>>();
 
-                NEW_ROUND_EVENT_PROCESS_DURATION
-                    .with_label_values(&[&"reachable_nodes"])
-                    .observe(start.elapsed().as_secs_f64());
-
                 let payload_filter =
                     PayloadFilter::from(&nodes.iter().map(|node| node.payload()).collect());
                 let validator_txn_hashes = nodes
@@ -282,10 +267,6 @@ impl DagDriver {
                 (strong_links, validator_payload_filter, payload_filter)
             }
         };
-
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"payload_filter"])
-            .observe(start.elapsed().as_secs_f64());
 
         let (max_txns, max_size_bytes) = self
             .health_backoff
@@ -322,10 +303,6 @@ impl DagDriver {
             },
         };
 
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"pull_payload"])
-            .observe(start.elapsed().as_secs_f64());
-
         // TODO: need to wait to pass median of parents timestamp
         let highest_parent_timestamp = strong_links
             .iter()
@@ -351,15 +328,7 @@ impl DagDriver {
             .save_pending_node(&new_node)
             .expect("node must be saved");
 
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"save_node"])
-            .observe(start.elapsed().as_secs_f64());
-
         self.broadcast_node(new_node, &start);
-
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"broadcast"])
-            .observe(start.elapsed().as_secs_f64());
     }
 
     fn broadcast_node(&self, node: Node, start: &Instant) {
@@ -377,10 +346,6 @@ impl DagDriver {
         let timestamp = node.timestamp();
         let ordered_peers = self.peers_by_latency.peers.clone();
         let ordered_peers_clone = ordered_peers.clone();
-
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"peers_by_latency"])
-            .observe(start.elapsed().as_secs_f64());
 
         let node_broadcast = async move {
             debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
@@ -438,10 +403,6 @@ impl DagDriver {
                 break;
             }
         }
-
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"drop_guards"])
-            .observe(start.elapsed().as_secs_f64());
     }
 
     pub fn fetch_callback(&self) {
