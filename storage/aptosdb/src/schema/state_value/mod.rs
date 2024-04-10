@@ -42,7 +42,7 @@ define_schema!(
 impl KeyCodec<StateValueSchema> for Key {
     fn encode_key(&self) -> Result<Vec<u8>> {
         let mut encoded = vec![];
-        encoded.write_all(&self.0.encode()?)?;
+        encoded.write_all(self.0.encoded())?;
         encoded.write_u64::<BigEndian>(!self.1)?;
         Ok(encoded)
     }
