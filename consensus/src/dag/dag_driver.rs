@@ -347,10 +347,6 @@ impl DagDriver {
             Extensions::empty(),
         );
 
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"new_node"])
-            .observe(start.elapsed().as_secs_f64());
-
         self.storage
             .save_pending_node(&new_node)
             .expect("node must be saved");
@@ -376,14 +372,10 @@ impl DagDriver {
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let latest_ledger_info = self.ledger_info_provider.clone();
 
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"broadcast_setup"])
-            .observe(start.elapsed().as_secs_f64());
-
         let round = node.round();
         let node_clone = node.clone();
         let timestamp = node.timestamp();
-        let ordered_peers = self.peers_by_latency.get_peers();
+        let ordered_peers = self.peers_by_latency.peers.clone();
         let ordered_peers_clone = ordered_peers.clone();
 
         NEW_ROUND_EVENT_PROCESS_DURATION
@@ -428,10 +420,6 @@ impl DagDriver {
         };
         tokio::spawn(Abortable::new(task, abort_registration));
 
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"spawn_bcast"])
-            .observe(start.elapsed().as_secs_f64());
-
         // TODO: a bounded vec queue can hold more than window rounds, but we want to limit
         // by number of rounds.
         let mut rb_handles = self.rb_handles.lock();
@@ -441,10 +429,6 @@ impl DagDriver {
             // TODO: this observation is inaccurate.
             observe_round(prev_round_timestamp, RoundStage::Finished);
         }
-
-        NEW_ROUND_EVENT_PROCESS_DURATION
-            .with_label_values(&[&"lock_rb_handles"])
-            .observe(start.elapsed().as_secs_f64());
 
         while let Some(front) = rb_handles.front() {
             if round.abs_diff(front.2) > self.window_size_config {
