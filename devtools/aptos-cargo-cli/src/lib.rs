@@ -13,6 +13,20 @@ use log::{debug, trace};
 // The CLI package name to match against for targeted CLI tests
 const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
 
+// The relevant file paths to monitor when deciding to run the targeted compiler V2 tests
+const TARGETED_COMPILER_V2_FILE_PATHS: [&str; 7] = [
+    "aptos-move/aptos-transactional-test-harness",
+    "aptos-move/e2e-move-tests",
+    "aptos-move/framework",
+    "aptos-move/move-examples",
+    "third_party/move",
+    ".github/workflows/move-test-compiler-v2.yaml",
+    ".github/actions/move-tests-compiler-v2",
+];
+
+// The relevant packages to test when running the targeted compiler V2 tests
+const TARGETED_COMPILER_V2_PACKAGES_TO_TEST: [&str; 2] = ["aptos-framework", "e2e-move-tests"];
+
 // The targeted unit test packages to ignore (these will be run separately, by other jobs)
 const TARGETED_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
 
@@ -43,6 +57,7 @@ pub enum AptosCargoCommand {
     Fmt(CommonArgs),
     Nextest(CommonArgs),
     TargetedCLITests(CommonArgs),
+    TargetedCompilerV2Tests(CommonArgs),
     TargetedUnitTests(CommonArgs),
     Test(CommonArgs),
 }
@@ -68,6 +83,7 @@ impl AptosCargoCommand {
             AptosCargoCommand::Fmt(args) => args,
             AptosCargoCommand::Nextest(args) => args,
             AptosCargoCommand::TargetedCLITests(args) => args,
+            AptosCargoCommand::TargetedCompilerV2Tests(args) => args,
             AptosCargoCommand::TargetedUnitTests(args) => args,
             AptosCargoCommand::Test(args) => args,
         }
@@ -126,8 +142,8 @@ impl AptosCargoCommand {
                 output_changed_files(changed_files)
             },
             AptosCargoCommand::TargetedCLITests(_) => {
-                // Calculate the affected packages and run the targeted CLI tests (if any).
-                // Start by fetching the affected packages.
+                // Run the targeted CLI tests (if necessary).
+                // First, start by calculating the affected packages.
                 let packages = package_args.compute_target_packages()?;
 
                 // Check if the affected packages contains the Aptos CLI
@@ -138,7 +154,7 @@ impl AptosCargoCommand {
 
                     // Check if the package is the Aptos CLI
                     if package_name == APTOS_CLI_PACKAGE_NAME {
-                        cli_affected = true;
+                        cli_affected = true; // The Aptos CLI was affected
                         break;
                     }
                 }
@@ -153,14 +169,54 @@ impl AptosCargoCommand {
                 println!("Skipping CLI tests as the Aptos CLI package was not affected!");
                 Ok(())
             },
-            AptosCargoCommand::TargetedUnitTests(_) => {
-                // Calculate the affected packages and run the targeted unit tests (if any).
-                // Start by fetching the arguments and affected packages.
+            AptosCargoCommand::TargetedCompilerV2Tests(_) => {
+                // Run the targeted compiler v2 tests (if necessary).
+                // Start by calculating the changed files and affected packages.
+                let (_, _, changed_files) = package_args.identify_changed_files()?;
                 let (direct_args, push_through_args, packages) =
                     self.get_args_and_affected_packages(package_args)?;
 
-                // Collect all the affected packages to test, but filter out the packages
-                // that should not be run as unit tests.
+                // Check if the changed files contain any of the relevant compiler v2 file paths
+                let mut relevant_file_changed = false;
+                for file_path in changed_files.into_iter() {
+                    for compiler_v2_file_path in TARGETED_COMPILER_V2_FILE_PATHS.iter() {
+                        if file_path.to_string().contains(compiler_v2_file_path) {
+                            relevant_file_changed = true; // A relevant file was changed
+                            break;
+                        }
+                    }
+                }
+
+                // Check if the affected packages contains the relevant compiler v2 packages
+                let mut relevant_packages_changed = false;
+                for package_path in packages {
+                    // Extract the package name from the full path
+                    let package_name = get_package_name_from_path(&package_path);
+
+                    // Check if the package is a relevant compiler v2 package
+                    if TARGETED_COMPILER_V2_PACKAGES_TO_TEST.contains(&package_name.as_str()) {
+                        relevant_packages_changed = true; // A relevant package was changed
+                        break;
+                    }
+                }
+
+                // If relevant files or packages were changed, run the targeted compiler v2 tests
+                if relevant_file_changed || relevant_packages_changed {
+                    println!("Running the targeted compiler v2 tests...");
+                    return run_targeted_compiler_v2_tests(direct_args, push_through_args);
+                }
+
+                // Otherwise, skip the targeted compiler v2 tests
+                println!("Skipping targeted compiler v2 tests because no relevant files or packages were affected!");
+                Ok(())
+            },
+            AptosCargoCommand::TargetedUnitTests(_) => {
+                // Run the targeted unit tests (if necessary).
+                // Start by calculating the affected packages.
+                let (direct_args, push_through_args, packages) =
+                    self.get_args_and_affected_packages(package_args)?;
+
+                // Filter out the ignored packages
                 let mut packages_to_test = vec![];
                 for package_path in packages {
                     // Extract the package name from the full path
@@ -173,7 +229,7 @@ impl AptosCargoCommand {
                             package_name
                         );
                     } else {
-                        packages_to_test.push(package_path);
+                        packages_to_test.push(package_path); // Add the package to the list
                     }
                 }
 
@@ -260,7 +316,28 @@ fn run_targeted_cli_tests() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Runs the targeted unit tests. This includes building and testing the unit tests.
+/// Runs the targeted compiler v2 tests
+fn run_targeted_compiler_v2_tests(
+    mut direct_args: Vec<String>,
+    push_through_args: Vec<String>,
+) -> anyhow::Result<()> {
+    // Add the compiler v2 packages to test to the arguments
+    for package in TARGETED_COMPILER_V2_PACKAGES_TO_TEST.iter() {
+        direct_args.push("-p".into());
+        direct_args.push(package.to_string());
+    }
+
+    // Create the command to run the compiler v2 tests
+    let mut command = Cargo::command("nextest");
+    command.args(["run"]);
+    command.args(direct_args).pass_through(push_through_args);
+
+    // Run the compiler v2 tests
+    command.run(false);
+    Ok(())
+}
+
+/// Runs the targeted unit tests
 fn run_targeted_unit_tests(
     packages_to_test: Vec<String>,
     mut direct_args: Vec<String>,
