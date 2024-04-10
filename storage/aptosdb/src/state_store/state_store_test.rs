@@ -114,7 +114,7 @@ fn test_empty_store() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let key = StateKey::raw(String::from("test_key").into_bytes());
+    let key = StateKey::raw(b"test_key");
     assert!(store
         .get_state_value_with_proof_by_version(&key, 0)
         .is_err());
@@ -125,9 +125,9 @@ fn test_state_store_reader_writer() {
     let tmp_dir = TempPath::new();
     let db = AptosDB::new_for_test(&tmp_dir);
     let store = &db.state_store;
-    let key1 = StateKey::raw(String::from("test_key1").into_bytes());
-    let key2 = StateKey::raw(String::from("test_key2").into_bytes());
-    let key3 = StateKey::raw(String::from("test_key3").into_bytes());
+    let key1 = StateKey::raw(b"test_key1");
+    let key2 = StateKey::raw(b"test_key2");
+    let key3 = StateKey::raw(b"test_key3");
 
     let value1 = StateValue::from(String::from("test_val1").into_bytes());
     let value1_update = StateValue::from(String::from("test_val1_update").into_bytes());
@@ -275,10 +275,7 @@ pub fn test_get_state_snapshot_before() {
     assert_eq!(store.get_state_snapshot_before(0).unwrap(), None,);
 
     // put in genesis
-    let kv = vec![(
-        StateKey::raw(b"key".to_vec()),
-        StateValue::from(b"value".to_vec()),
-    )];
+    let kv = vec![(StateKey::raw(b"key"), StateValue::from(b"value".to_vec()))];
     let hash = put_value_set(store, kv.clone(), 0, None);
     assert_eq!(store.get_state_snapshot_before(0).unwrap(), None);
     assert_eq!(store.get_state_snapshot_before(1).unwrap(), Some((0, hash)));
@@ -489,7 +486,7 @@ proptest! {
         let mut restore =
             StateSnapshotRestore::new(&store2.state_merkle_db, store2, version, expected_root_hash, true, /* async_commit */ StateSnapshotRestoreMode::Default).unwrap();
 
-        let dummy_state_key = StateKey::raw(vec![]);
+        let dummy_state_key = StateKey::raw(&[]);
         let (top_levels_batch, sharded_batches, _) = store2.state_merkle_db.merklize_value_set(vec![(max_hash, Some(&(HashValue::random(), dummy_state_key)))], 0, None, None).unwrap();
         store2.state_merkle_db.commit(version, top_levels_batch, sharded_batches).unwrap();
         assert!(store2.state_merkle_db.get_rightmost_leaf(version).unwrap().is_none());

@@ -825,8 +825,8 @@ mod tests {
 
     #[test]
     fn test_squash_groups_one_empty() {
-        let key_1 = StateKey::raw(vec![1]);
-        let key_2 = StateKey::raw(vec![2]);
+        let key_1 = StateKey::raw(&[1]);
+        let key_2 = StateKey::raw(&[2]);
 
         let mut base_update = BTreeMap::new();
         base_update.insert(
@@ -864,7 +864,7 @@ mod tests {
     #[test_case(1, 2)] // modify, delete
     #[test_case(2, 0)] // delete, create
     fn test_squash_groups_mergeable_metadata(base_type_idx: u8, additional_type_idx: u8) {
-        let key = StateKey::raw(vec![0]);
+        let key = StateKey::raw(&[0]);
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
@@ -902,7 +902,7 @@ mod tests {
     #[test_case(2, 1)] // delete, modify
     #[test_case(2, 2)] // delete, delete
     fn test_squash_groups_error(base_type_idx: u8, additional_type_idx: u8) {
-        let key = StateKey::raw(vec![0]);
+        let key = StateKey::raw(&[0]);
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
@@ -928,7 +928,7 @@ mod tests {
 
     #[test]
     fn test_squash_groups_noop() {
-        let key = StateKey::raw(vec![0]);
+        let key = StateKey::raw(&[0]);
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();
@@ -960,8 +960,8 @@ mod tests {
 
     #[test]
     fn test_inner_ops() {
-        let key_1 = StateKey::raw(vec![1]);
-        let key_2 = StateKey::raw(vec![2]);
+        let key_1 = StateKey::raw(&[1]);
+        let key_2 = StateKey::raw(&[2]);
 
         let mut base_update = BTreeMap::new();
         let mut additional_update = BTreeMap::new();

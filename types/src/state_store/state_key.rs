@@ -457,7 +457,17 @@ impl StateKey {
         Self(entry)
     }
 
-    pub fn raw_(bytes: &[u8]) -> Self {
+    pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
+        // FIXME(aldenhu): remove
+        todo!()
+    }
+
+    pub fn access_path(_access_path: AccessPath) -> Self {
+        // FIXME(aldenhu): remove
+        todo!()
+    }
+
+    pub fn raw(bytes: &[u8]) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.raw_keys.try_get(bytes, &()) {
             return Self(entry);
         }
@@ -469,21 +479,6 @@ impl StateKey {
             .raw_keys
             .lock_and_get_or_add(bytes, &(), maybe_add);
         Self(entry)
-    }
-
-    pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
-        // FIXME(aldenhu): remove
-        todo!()
-    }
-
-    pub fn access_path(_access_path: AccessPath) -> Self {
-        // FIXME(aldenhu): remove
-        todo!()
-    }
-
-    pub fn raw(_bytes: Vec<u8>) -> Self {
-        // FIXME(aldenhu): remove
-        todo!()
     }
 
     pub fn encode(&self) -> Result<Vec<u8>> {
@@ -592,7 +587,7 @@ mod tests {
 
     #[test]
     fn test_raw_hash() {
-        let key = StateKey::raw(vec![1, 2, 3]);
+        let key = StateKey::raw(&[1, 2, 3]);
         let expected_hash = "655ab5766bc87318e18d9287f32d318e15535d3db9d21a6e5a2b41a51b535aff"
             .parse()
             .unwrap();
@@ -632,7 +627,7 @@ mod tests {
         );
 
         // raw
-        let key = StateKey::raw(vec![1, 2, 3]);
+        let key = StateKey::raw(&[1, 2, 3]);
         assert_eq!(
             &format!("{:?}", key),
             "StateKey { inner: Raw(010203), hash: OnceCell(Uninit) }"
