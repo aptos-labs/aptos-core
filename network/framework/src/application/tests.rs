@@ -24,7 +24,7 @@ use crate::{
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
     config::{Peer, PeerRole, PeerSet, RoleType},
-    network_id::{NetworkId, PeerNetworkId},
+    network_id::{NetworkContext, NetworkId, PeerNetworkId},
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
@@ -33,7 +33,7 @@ use futures_util::StreamExt;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
     ops::Deref,
@@ -433,6 +433,15 @@ async fn test_peers_and_metadata_subscriptions() {
     // Create the peers and metadata container
     let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
     let peers_and_metadata = PeersAndMetadata::new(&network_ids);
+    // TODO: this goes away when ConnectionNotification becomes just NetworkId without full NetworkContext
+    let mut contexts = BTreeMap::new();
+    for network_id in network_ids {
+        contexts.insert(
+            network_id,
+            NetworkContext::new(RoleType::Validator, network_id, PeerId::random()),
+        );
+    }
+    peers_and_metadata.set_network_contexts(contexts);
 
     let mut connection_events = peers_and_metadata.subscribe();
 
@@ -458,20 +467,23 @@ async fn test_peers_and_metadata_subscriptions() {
         vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
         peers_and_metadata.clone(),
     );
-    match connection_events.try_recv() {
-        Ok(notif) => match notif {
-            ConnectionNotification::NewPeer(conn_meta, nc) => {
-                assert_eq!(nc.network_id(), NetworkId::Validator);
-                assert_eq!(nc.peer_id(), PeerId::ZERO);
-                assert_eq!(nc.role(), RoleType::Validator);
-                assert_eq!(conn_meta, connection_1);
+    match tokio::time::timeout(Duration::from_secs(1), connection_events.recv()).await {
+        Ok(msg) => match msg {
+            None => {
+                panic!("no pending connection event")
             },
-            ConnectionNotification::LostPeer(_, _, _) => {
-                panic!("should get connect but got lost")
+            Some(notif) => match notif {
+                ConnectionNotification::NewPeer(conn_meta, nc) => {
+                    assert_eq!(nc.network_id(), NetworkId::Validator);
+                    assert_eq!(conn_meta, connection_1);
+                },
+                ConnectionNotification::LostPeer(_, _, _) => {
+                    panic!("should get connect but got lost")
+                },
             },
         },
-        Err(_tre) => {
-            panic!("no pending connection event")
+        Err(te) => {
+            panic!("timeout waiting for connection event: {:?}", te);
         },
     }
 
@@ -489,8 +501,6 @@ async fn test_peers_and_metadata_subscriptions() {
             },
             ConnectionNotification::LostPeer(conn_meta, nc, reason) => {
                 assert_eq!(nc.network_id(), NetworkId::Validator);
-                assert_eq!(nc.peer_id(), PeerId::ZERO);
-                assert_eq!(nc.role(), RoleType::Validator);
                 assert_eq!(conn_meta, connection_1);
                 assert_eq!(reason, DisconnectReason::Requested);
             },
