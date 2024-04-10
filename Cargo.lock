@@ -2306,6 +2306,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-keyless-circuit-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-keyless-common",
+ "base64 0.13.1",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "aptos-keyless-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ark-bn254",
+ "base64 0.13.1",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "aptos-keyless-pepper-common"
 version = "0.1.0"
 dependencies = [
