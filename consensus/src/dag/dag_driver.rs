@@ -137,7 +137,7 @@ impl DagDriver {
                 .round_state
                 .set_current_round(node.round())
                 .expect("must succeed");
-            driver.broadcast_node(node);
+            driver.broadcast_node(node, &Instant::now());
         } else {
             // kick start a new round
             if !driver.dag.read().is_empty() {
@@ -303,7 +303,7 @@ impl DagDriver {
                 sys_payload_filter,
                 payload_filter,
                 Box::pin(async {}),
-                false,
+                true,
                 0,
                 0.0,
             )
@@ -359,14 +359,14 @@ impl DagDriver {
             .with_label_values(&[&"save_node"])
             .observe(start.elapsed().as_secs_f64());
 
-        self.broadcast_node(new_node);
+        self.broadcast_node(new_node, &start);
 
         NEW_ROUND_EVENT_PROCESS_DURATION
             .with_label_values(&[&"broadcast"])
             .observe(start.elapsed().as_secs_f64());
     }
 
-    fn broadcast_node(&self, node: Node) {
+    fn broadcast_node(&self, node: Node, start: &Instant) {
         let rb = self.reliable_broadcast.clone();
         let rb2 = self.reliable_broadcast.clone();
         let (abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -376,11 +376,20 @@ impl DagDriver {
         let cert_ack_set = CertificateAckState::new(self.epoch_state.verifier.len());
         let latest_ledger_info = self.ledger_info_provider.clone();
 
+        NEW_ROUND_EVENT_PROCESS_DURATION
+            .with_label_values(&[&"broadcast_setup"])
+            .observe(start.elapsed().as_secs_f64());
+
         let round = node.round();
         let node_clone = node.clone();
         let timestamp = node.timestamp();
         let ordered_peers = self.peers_by_latency.get_peers();
         let ordered_peers_clone = ordered_peers.clone();
+
+        NEW_ROUND_EVENT_PROCESS_DURATION
+            .with_label_values(&[&"peers_by_latency"])
+            .observe(start.elapsed().as_secs_f64());
+
         let node_broadcast = async move {
             debug!(LogSchema::new(LogEvent::BroadcastNode), id = node.id());
 
@@ -418,6 +427,11 @@ impl DagDriver {
             debug!("Finish reliable broadcast for round {}", round);
         };
         tokio::spawn(Abortable::new(task, abort_registration));
+
+        NEW_ROUND_EVENT_PROCESS_DURATION
+            .with_label_values(&[&"spawn_bcast"])
+            .observe(start.elapsed().as_secs_f64());
+
         // TODO: a bounded vec queue can hold more than window rounds, but we want to limit
         // by number of rounds.
         let mut rb_handles = self.rb_handles.lock();
@@ -428,6 +442,10 @@ impl DagDriver {
             observe_round(prev_round_timestamp, RoundStage::Finished);
         }
 
+        NEW_ROUND_EVENT_PROCESS_DURATION
+            .with_label_values(&[&"lock_rb_handles"])
+            .observe(start.elapsed().as_secs_f64());
+
         while let Some(front) = rb_handles.front() {
             if round.abs_diff(front.2) > self.window_size_config {
                 observe_round(front.1, RoundStage::Finished);
@@ -436,6 +454,10 @@ impl DagDriver {
                 break;
             }
         }
+
+        NEW_ROUND_EVENT_PROCESS_DURATION
+            .with_label_values(&[&"drop_guards"])
+            .observe(start.elapsed().as_secs_f64());
     }
 
     pub fn fetch_callback(&self) {
