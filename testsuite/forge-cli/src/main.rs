@@ -2010,6 +2010,14 @@ fn realistic_env_max_load_test(
                 serde_yaml::to_value(OnChainExecutionConfig::default_for_genesis())
                     .expect("must serialize");
         }))
+        .with_validator_resource_override(NodeResourceOverride {
+            cpu_cores: Some(58),
+            memory_gib: Some(200),
+        })
+        .with_fullnode_resource_override(NodeResourceOverride {
+            cpu_cores: Some(58),
+            memory_gib: Some(200),
+        })
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
         .with_emit_job(
             EmitJobRequest::default()
