@@ -23,3 +23,11 @@ module <SELF>_0 {
         }
     }
 } // end <SELF>_0
+
+
+Diagnostics:
+error: use of possibly unassigned local `y`
+   ┌─ tests/simplifier-elimination/else_assigns_if_doesnt.move:11:13
+   │
+11 │     assert!(y == 0, 42);
+   │             ^^^^^^

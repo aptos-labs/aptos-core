@@ -13,3 +13,6 @@ module 0xc0ffee::m {
         }
     }
 } // end 0xc0ffee::m
+
+
+============ bytecode verification succeeded ========
