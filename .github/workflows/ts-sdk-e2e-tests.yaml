@@ -37,7 +37,7 @@ jobs:
           required-permission: write
           comment-not-permitted: Sorry, you don't have permission to trigger this workflow.
 
-  # This job determines which files were changed
+  # This job determines which files were changed.
   file_change_determinator:
     needs: [permission-check]
     runs-on: ubuntu-latest
