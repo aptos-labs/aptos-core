@@ -5,10 +5,13 @@ mod cargo;
 mod common;
 
 use cargo::Cargo;
-use clap::{Args, Parser, Subcommand};
+use clap::{command, Args, Parser, Subcommand};
 pub use common::SelectedPackageArgs;
 use determinator::Utf8Paths0;
 use log::{debug, trace};
+
+// The CLI package name to match against for targeted CLI tests
+const APTOS_CLI_PACKAGE_NAME: &str = "aptos";
 
 // The targeted unit test packages to ignore (these will be run separately, by other jobs)
 const TARGETED_TEST_PACKAGES_TO_IGNORE: [&str; 2] = ["aptos-testcases", "smoke-test"];
@@ -39,6 +42,7 @@ pub enum AptosCargoCommand {
     Xclippy(CommonArgs),
     Fmt(CommonArgs),
     Nextest(CommonArgs),
+    TargetedCLITests(CommonArgs),
     TargetedUnitTests(CommonArgs),
     Test(CommonArgs),
 }
@@ -50,7 +54,6 @@ impl AptosCargoCommand {
             AptosCargoCommand::Xclippy(_) => "clippy",
             AptosCargoCommand::Fmt(_) => "fmt",
             AptosCargoCommand::Nextest(_) => "nextest",
-            AptosCargoCommand::TargetedUnitTests(_) => "nextest", // Invoke the nextest command directly
             AptosCargoCommand::Test(_) => "test",
             command => panic!("Unsupported command attempted! Command: {:?}", command),
         }
@@ -64,6 +67,7 @@ impl AptosCargoCommand {
             AptosCargoCommand::Xclippy(args) => args,
             AptosCargoCommand::Fmt(args) => args,
             AptosCargoCommand::Nextest(args) => args,
+            AptosCargoCommand::TargetedCLITests(args) => args,
             AptosCargoCommand::TargetedUnitTests(args) => args,
             AptosCargoCommand::Test(args) => args,
         }
@@ -121,42 +125,70 @@ impl AptosCargoCommand {
                 let (_, _, changed_files) = package_args.identify_changed_files()?;
                 output_changed_files(changed_files)
             },
-            AptosCargoCommand::TargetedUnitTests(_) => {
-                // Calculate and run the targeted unit tests.
-                // Start by fetching the arguments and affected packages.
-                let (mut direct_args, push_through_args, packages) =
-                    self.get_args_and_affected_packages(package_args)?;
+            AptosCargoCommand::TargetedCLITests(_) => {
+                // Calculate the affected packages and run the targeted CLI tests (if any).
+                // Start by fetching the affected packages.
+                let packages = package_args.compute_target_packages()?;
 
-                // Add each affected package to the arguments, but filter out
-                // the packages that should not be run as unit tests.
-                let mut found_package_to_test = false;
+                // Check if the affected packages contains the Aptos CLI
+                let mut cli_affected = false;
                 for package_path in packages {
                     // Extract the package name from the full path
-                    let package_name = package_path.split('#').last().unwrap();
+                    let package_name = get_package_name_from_path(&package_path);
+
+                    // Check if the package is the Aptos CLI
+                    if package_name == APTOS_CLI_PACKAGE_NAME {
+                        cli_affected = true;
+                        break;
+                    }
+                }
+
+                // If the Aptos CLI is affected, run the targeted CLI tests
+                if cli_affected {
+                    println!("Running the targeted CLI tests...");
+                    return run_targeted_cli_tests();
+                }
+
+                // Otherwise, skip the CLI tests
+                println!("Skipping CLI tests as the Aptos CLI package was not affected!");
+                Ok(())
+            },
+            AptosCargoCommand::TargetedUnitTests(_) => {
+                // Calculate the affected packages and run the targeted unit tests (if any).
+                // Start by fetching the arguments and affected packages.
+                let (direct_args, push_through_args, packages) =
+                    self.get_args_and_affected_packages(package_args)?;
+
+                // Collect all the affected packages to test, but filter out the packages
+                // that should not be run as unit tests.
+                let mut packages_to_test = vec![];
+                for package_path in packages {
+                    // Extract the package name from the full path
+                    let package_name = get_package_name_from_path(&package_path);
 
                     // Only add the package if it is not in the ignore list
-                    if TARGETED_TEST_PACKAGES_TO_IGNORE.contains(&package_name) {
+                    if TARGETED_TEST_PACKAGES_TO_IGNORE.contains(&package_name.as_str()) {
                         debug!(
                             "Ignoring package when running targeted-unit-tests: {:?}",
                             package_name
                         );
                     } else {
-                        // Add the arguments for the package
-                        direct_args.push("-p".into());
-                        direct_args.push(package_path);
-
-                        // Mark that we found a package to test
-                        found_package_to_test = true;
+                        packages_to_test.push(package_path);
                     }
                 }
 
-                // Create and run the command if we found a package to test
-                if found_package_to_test {
+                // Create and run the command if we found packages to test
+                if !packages_to_test.is_empty() {
                     println!("Running the targeted unit tests...");
-                    return self.create_and_run_command(direct_args, push_through_args);
+                    return run_targeted_unit_tests(
+                        packages_to_test,
+                        direct_args,
+                        push_through_args,
+                    );
                 }
 
-                println!("Skipping targeted unit tests because no packages were affected to test.");
+                // Otherwise, skip the targeted unit tests
+                println!("Skipping targeted unit tests because no test packages were affected!");
                 Ok(())
             },
             _ => {
@@ -196,10 +228,58 @@ impl AptosCargoCommand {
         // Construct and run the final command
         let mut command = Cargo::command(self.command());
         command.args(direct_args).pass_through(push_through_args);
-        command.run();
+        command.run(false);
 
         Ok(())
     }
+}
+
+/// Returns the package name from the given package path
+fn get_package_name_from_path(package_path: &str) -> String {
+    package_path.split('#').last().unwrap().to_string()
+}
+
+/// Runs the targeted CLI tests. This includes building and testing the CLI.
+fn run_targeted_cli_tests() -> anyhow::Result<()> {
+    // First, run the CLI tests
+    let mut command = Cargo::command("test");
+    command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command.run(false);
+
+    // Next, build the CLI binary
+    let mut command = Cargo::command("build");
+    command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command.run(false);
+
+    // Finally, run the CLI --help command. Here, we ignore the exit status
+    // because the CLI will return a non-zero exit status when running --help.
+    let mut command = Cargo::command("run");
+    command.args(["-p", APTOS_CLI_PACKAGE_NAME]);
+    command.run(true);
+
+    Ok(())
+}
+
+/// Runs the targeted unit tests. This includes building and testing the unit tests.
+fn run_targeted_unit_tests(
+    packages_to_test: Vec<String>,
+    mut direct_args: Vec<String>,
+    push_through_args: Vec<String>,
+) -> anyhow::Result<()> {
+    // Add each package to the arguments
+    for package in packages_to_test {
+        direct_args.push("-p".into());
+        direct_args.push(package);
+    }
+
+    // Create the command to run the unit tests
+    let mut command = Cargo::command("nextest");
+    command.args(["run"]);
+    command.args(direct_args).pass_through(push_through_args);
+
+    // Run the unit tests
+    command.run(false);
+    Ok(())
 }
 
 /// Outputs the specified affected packages
