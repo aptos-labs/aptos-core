@@ -32,7 +32,7 @@ use futures_util::StreamExt;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
     ops::Deref,
