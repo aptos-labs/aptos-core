@@ -344,7 +344,7 @@ impl DagDriver {
         let round = node.round();
         let node_clone = node.clone();
         let timestamp = node.timestamp();
-        let ordered_peers = self.peers_by_latency.peers.clone();
+        let ordered_peers = self.peers_by_latency.get_peers();
         let ordered_peers_clone = ordered_peers.clone();
 
         let node_broadcast = async move {
