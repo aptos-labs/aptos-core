@@ -440,7 +440,7 @@ impl StateKey {
         Self(entry)
     }
 
-    pub fn table_item_(handle: &TableHandle, key: &[u8]) -> Self {
+    pub fn table_item(handle: &TableHandle, key: &[u8]) -> Self {
         if let Some(entry) = GLOBAL_REGISTRY.table_item_keys.try_get(handle, key) {
             return Self(entry);
         }
@@ -455,11 +455,6 @@ impl StateKey {
             .table_item_keys
             .lock_and_get_or_add(handle, key, maybe_add);
         Self(entry)
-    }
-
-    pub fn table_item(handle: TableHandle, key: Vec<u8>) -> Self {
-        // FIXME(aldenhu): remove
-        todo!()
     }
 
     pub fn access_path(_access_path: AccessPath) -> Self {
@@ -578,7 +573,7 @@ mod tests {
 
     #[test]
     fn test_table_item_hash() {
-        let key = StateKey::table_item("0x1002".parse().unwrap(), vec![7, 2, 3]);
+        let key = StateKey::table_item(&"0x1002".parse().unwrap(), &[7, 2, 3]);
         let expected_hash = "6f5550015f7a6036f88b2458f98a7e4800aba09e83f8f294dbf70bff77f224e6"
             .parse()
             .unwrap();
@@ -620,7 +615,7 @@ mod tests {
         );
 
         // table item
-        let key = StateKey::table_item("0x123".parse().unwrap(), vec![1]);
+        let key = StateKey::table_item(&"0x123".parse().unwrap(), &[1]);
         assert_eq!(
             &format!("{:?}", key),
             "StateKey { inner: TableItem { handle: 0000000000000000000000000000000000000000000000000000000000000123, key: 01 }, hash: OnceCell(Uninit) }"

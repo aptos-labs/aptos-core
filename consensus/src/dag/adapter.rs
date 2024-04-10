@@ -388,7 +388,7 @@ impl DAGStorage for StorageAdapter {
             let new_block_event = bcs::from_bytes::<NewBlockEvent>(
                 self.aptos_db
                     .get_state_value_by_version(
-                        &StateKey::table_item(*handle, bcs::to_bytes(&idx).unwrap()),
+                        &StateKey::table_item(handle, &bcs::to_bytes(&idx).unwrap()),
                         version,
                     )?
                     .ok_or_else(|| format_err!("Table item doesn't exist"))?

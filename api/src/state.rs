@@ -448,7 +448,7 @@ impl StateApi {
         })?;
 
         // Retrieve value from the state key
-        let state_key = StateKey::table_item(TableHandle(table_handle.into()), raw_key);
+        let state_key = StateKey::table_item(&TableHandle(table_handle.into()), &raw_key);
         let bytes = state_view
             .get_state_value_bytes(&state_key)
             .context(format!(
@@ -502,10 +502,8 @@ impl StateApi {
             .context
             .state_view(ledger_version.map(|inner| inner.0))?;
 
-        let state_key = StateKey::table_item(
-            TableHandle(table_handle.into()),
-            table_item_request.key.0.clone(),
-        );
+        let state_key =
+            StateKey::table_item(&TableHandle(table_handle.into()), &table_item_request.key.0);
         let bytes = state_view
             .get_state_value_bytes(&state_key)
             .context(format!(

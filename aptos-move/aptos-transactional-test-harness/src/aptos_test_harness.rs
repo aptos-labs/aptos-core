@@ -900,7 +900,7 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                 let raw_key = vm_key.undecorate().simple_serialize().unwrap();
 
                 let state_key =
-                    StateKey::table_item(TableHandle(view_table_cmd.table_handle), raw_key);
+                    StateKey::table_item(&TableHandle(view_table_cmd.table_handle), &raw_key);
 
                 let bytes = self
                     .storage
