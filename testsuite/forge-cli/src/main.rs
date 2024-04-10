@@ -1469,7 +1469,6 @@ fn adverserial_workload_test() -> ForgeConfig {
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
         .with_initial_fullnode_count(3)
-        .add_network_test(PerformanceBenchmark)
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
         }))
