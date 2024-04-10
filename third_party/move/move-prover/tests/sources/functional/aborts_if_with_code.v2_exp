@@ -54,7 +54,7 @@ error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
    =     at tests/sources/functional/aborts_if_with_code.move:70: aborts_if_with_code_mixed_invalid
    =         x = <redacted>
    =     at tests/sources/functional/aborts_if_with_code.move:73: aborts_if_with_code_mixed_invalid
-   =         x = <redacted>
+   =         <redacted> = <redacted>
    =     at tests/sources/functional/aborts_if_with_code.move:74: aborts_if_with_code_mixed_invalid
    =         ABORTED
 
@@ -74,7 +74,7 @@ error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
     =     at tests/sources/functional/aborts_if_with_code.move:98: aborts_with_invalid
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if_with_code.move:101: aborts_with_invalid
-    =         x = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if_with_code.move:102: aborts_with_invalid
     =         ABORTED
 
@@ -96,6 +96,6 @@ error: abort code not covered by any of the `aborts_if` or `aborts_with` clauses
     =     at tests/sources/functional/aborts_if_with_code.move:124: aborts_with_mixed_invalid
     =         x = <redacted>
     =     at tests/sources/functional/aborts_if_with_code.move:127: aborts_with_mixed_invalid
-    =         x = <redacted>
+    =         <redacted> = <redacted>
     =     at tests/sources/functional/aborts_if_with_code.move:128: aborts_with_mixed_invalid
     =         ABORTED

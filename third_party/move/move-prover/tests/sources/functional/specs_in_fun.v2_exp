@@ -9,7 +9,6 @@ error: unknown assertion failed
    =         x = <redacted>
    =         y = <redacted>
    =     at tests/sources/functional/specs_in_fun.move:43: simple1_incorrect
-   =         x = <redacted>
    =     at tests/sources/functional/specs_in_fun.move:45: simple1_incorrect
 
 error: unknown assertion failed

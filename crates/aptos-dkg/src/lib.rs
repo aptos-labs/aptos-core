@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 #![allow(clippy::redundant_static_lifetimes)]
 #![allow(clippy::needless_return)]

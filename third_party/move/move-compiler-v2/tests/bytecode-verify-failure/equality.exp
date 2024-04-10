@@ -12,6 +12,8 @@ B0:
 	3: Ret
 }
 }
+============ bytecode verification failed ========
+
 Diagnostics:
 bug: BYTECODE VERIFICATION FAILED
   ┌─ tests/bytecode-verify-failure/equality.move:3:9

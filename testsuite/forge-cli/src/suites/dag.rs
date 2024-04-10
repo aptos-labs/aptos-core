@@ -1,4 +1,5 @@
 // Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 use crate::{changing_working_quorum_test_helper, wrap_with_realistic_env, TestCommand};
 use aptos_forge::{
@@ -149,6 +150,7 @@ fn dag_changing_working_quorum_test() -> ForgeConfig {
         70,
         true,
         true,
+        false,
         ChangingWorkingQuorumTest {
             min_tps: 15,
             always_healthy_nodes: 0,

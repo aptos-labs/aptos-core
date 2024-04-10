@@ -302,6 +302,23 @@ impl FunctionTargetPipeline {
         self.processors.is_empty()
     }
 
+    pub fn processor_count(&self) -> usize {
+        self.processors.len()
+    }
+
+    /// Cuts down the pipeline to stop after the given named processor
+    pub fn stop_after_for_testing(&mut self, name: &str) {
+        for i in 0..self.processor_count() {
+            if self.processors[i].name() == name {
+                for _ in i + 1..self.processor_count() {
+                    self.processors.remove(i + 1);
+                }
+                return;
+            }
+        }
+        panic!("no processor named `{}`", name)
+    }
+
     /// Adds a processor to this pipeline. Processor will be called in the order they have been
     /// added.
     pub fn add_processor(&mut self, processor: Box<dyn FunctionTargetProcessor>) {

@@ -13,7 +13,9 @@ use aptos_sdk::{
 };
 use args::TransactionTypeArg;
 use async_trait::async_trait;
+use clap::{Parser, ValueEnum};
 use rand::{rngs::StdRng, seq::SliceRandom, Rng};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::{
@@ -84,6 +86,13 @@ pub enum TransactionType {
         use_account_pool: bool,
         progress_type: WorkflowProgress,
     },
+}
+
+#[derive(Debug, Copy, Clone, ValueEnum, Default, Deserialize, Parser, Serialize)]
+pub enum AccountType {
+    #[default]
+    Local,
+    Keyless,
 }
 
 #[derive(Debug, Copy, Clone)]

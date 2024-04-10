@@ -1,11 +1,3 @@
-
-Diagnostics:
-warning: Function `0xc0ffee::m::foo` is unused: it has no current callers and is private to its module.
-  ┌─ tests/checking/inlining/unused_inline.move:2:16
-  │
-2 │     inline fun foo(): u64 {
-  │                ^^^
-
 // -- Model dump before bytecode pipeline
 module 0xc0ffee::m {
     public fun bar(): u64 {
@@ -28,3 +20,6 @@ module 0xc0ffee::m {
         }
     }
 } // end 0xc0ffee::m
+
+
+============ bytecode verification succeeded ========

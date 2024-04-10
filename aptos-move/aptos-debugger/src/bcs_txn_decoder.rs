@@ -72,7 +72,7 @@ impl Command {
             println!("===============================");
             println!(
                 "{:#?}",
-                debugger.execute_past_transactions(version, 1).await?
+                debugger.execute_past_transactions(version, 1, 1).await?
             );
         }
 

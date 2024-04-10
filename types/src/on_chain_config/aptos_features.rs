@@ -68,6 +68,8 @@ pub enum FeatureFlag {
     KEYLESS_ACCOUNTS_WITH_PASSKEYS = 54,
     MULTISIG_V2_ENHANCEMENT = 55,
     MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE = 56,
+    DELEGATION_POOL_ALLOWLISTING = 57,
+    MODULE_EVENT_MIGRATION = 58,
 }
 
 impl FeatureFlag {
@@ -123,6 +125,8 @@ impl FeatureFlag {
             FeatureFlag::MULTISIG_V2_ENHANCEMENT,
             FeatureFlag::CONCURRENT_FUNGIBLE_ASSETS,
             FeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE,
+            FeatureFlag::DELEGATION_POOL_ALLOWLISTING,
+            FeatureFlag::MODULE_EVENT_MIGRATION,
         ]
     }
 }

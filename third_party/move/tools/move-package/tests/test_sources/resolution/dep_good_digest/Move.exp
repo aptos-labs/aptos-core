@@ -30,6 +30,7 @@ ResolutionGraph {
             compiler_version: Some(
                 V1,
             ),
+            language_version: None,
         },
     },
     root_package: SourceManifest {

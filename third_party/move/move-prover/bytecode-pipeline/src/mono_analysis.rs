@@ -330,7 +330,7 @@ impl<'a> Analyzer<'a> {
                     // make sure these two types unify before trying to instantiate them
                     let adapter = TypeUnificationAdapter::new_pair(&lhs_ty, &rhs_ty, true, true);
                     if adapter
-                        .unify(&NoUnificationContext, Variance::SpecVariance, false)
+                        .unify(&mut NoUnificationContext, Variance::SpecVariance, false)
                         .is_none()
                     {
                         continue;

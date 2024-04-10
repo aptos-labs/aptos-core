@@ -7,6 +7,7 @@
 use crate::{
     ast::ModuleName,
     builder::{model_builder::ModelBuilder, module_builder::BytecodeModule},
+    metadata::LanguageVersion,
     model::{FunId, GlobalEnv, Loc, ModuleId, StructId},
     options::ModelBuilderOptions,
 };
@@ -30,7 +31,7 @@ use move_compiler::{
     diagnostics::{codes::Severity, Diagnostics},
     expansion::ast::{self as E, ModuleIdent, ModuleIdent_},
     naming::ast as N,
-    parser::ast::{self as P, ModuleName as ParserModuleName},
+    parser::ast::{self as P, CallKind, ModuleName as ParserModuleName},
     shared::{
         parse_named_address, unique_map::UniqueMap, CompilationEnv, Identifier as IdentifierTrait,
         NumericalAddress, PackagePaths,
@@ -53,6 +54,7 @@ pub mod constant_folder;
 pub mod exp_generator;
 pub mod exp_rewriter;
 pub mod intrinsics;
+pub mod metadata;
 pub mod model;
 pub mod options;
 pub mod pragmas;
@@ -82,6 +84,8 @@ pub fn run_model_builder_in_compiler_mode(
     deps: Vec<PackageInfo>,
     skip_attribute_checks: bool,
     known_attributes: &BTreeSet<String>,
+    language_version: LanguageVersion,
+    compile_test_code: bool,
 ) -> anyhow::Result<GlobalEnv> {
     let to_package_paths = |PackageInfo {
                                 sources,
@@ -96,9 +100,12 @@ pub fn run_model_builder_in_compiler_mode(
         deps.into_iter().map(to_package_paths).collect(),
         ModelBuilderOptions {
             compile_via_model: true,
+            language_version,
             ..ModelBuilderOptions::default()
         },
-        Flags::model_compilation().set_skip_attribute_checks(skip_attribute_checks),
+        Flags::model_compilation()
+            .set_skip_attribute_checks(skip_attribute_checks)
+            .set_keep_testing_functions(compile_test_code),
         known_attributes,
     )
 }
@@ -140,6 +147,7 @@ pub fn run_model_builder_with_options_and_compilation_flags<
     known_attributes: &BTreeSet<String>,
 ) -> anyhow::Result<GlobalEnv> {
     let mut env = GlobalEnv::new();
+    env.set_language_version(options.language_version);
     let compile_via_model = options.compile_via_model;
     env.set_extension(options);
 
@@ -1047,7 +1055,11 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
                 .collect();
             Exp_::Call(
                 sp(name.loc(), access),
-                *is_macro,
+                if *is_macro {
+                    CallKind::Macro
+                } else {
+                    CallKind::Regular
+                },
                 if rewritten_ty_args.is_empty() {
                     None
                 } else {
@@ -1065,7 +1077,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             };
             Exp_::Call(
                 sp(target.loc(), access),
-                false,
+                CallKind::Regular,
                 None,
                 sp(exp.exp.loc, rewritten_arguments),
             )
@@ -1082,7 +1094,7 @@ fn downgrade_exp_inlining_to_expansion(exp: &T::Exp) -> E::Exp {
             };
             Exp_::Call(
                 sp(builtin.loc, access),
-                false,
+                CallKind::Regular,
                 None,
                 sp(exp.exp.loc, rewritten_arguments),
             )

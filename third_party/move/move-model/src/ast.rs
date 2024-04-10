@@ -643,6 +643,7 @@ pub enum RewriteResult {
 }
 
 /// Visitor position
+#[derive(Clone)]
 pub enum VisitorPosition {
     Pre,              // before visiting any subexpressions
     MidMutate,        // after RHS and before LHS of Mutate expression.
@@ -1568,7 +1569,7 @@ pub enum Operation {
     Deref,
     MoveTo,
     MoveFrom,
-    Freeze,
+    Freeze(/*explicit*/ bool),
     Abort,
     Vector,
 
@@ -2417,7 +2418,7 @@ impl Operation {
             Deref => false,            // Move-related
             MoveTo => false,           // Move-related
             MoveFrom => false,         // Move-related
-            Freeze => false,           // Move-related
+            Freeze(_) => false,        // Move-related
             Abort => false,            // Move-related
             Vector => false,           // Move-related
 

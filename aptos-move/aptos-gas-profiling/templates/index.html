@@ -124,7 +124,7 @@
         {{else}}
         (No operations to show.)
         {{/if}}
-        <h4>Storage Reads</h4>
+        <h4>State Reads</h4>
         {{#if reads}}
         <table>
             <tr>
@@ -145,27 +145,62 @@
         {{else}}
         (No reads to show.)
         {{/if}}
-        <h4>Storage Writes</h4>
-        {{#if writes}}
-        <table>
-            <tr>
-                <td><b>Resource Name</b></td>
-                <td style="text-align: right"><b>Number of Hits</td>
-                <td style="text-align: right"><b>Cost in Gas Units</b></td>
-                <td style="text-align: right"><b>Percentage</b></td>
-            </tr>
-            {{#each writes}}
-            <tr>
-                <td>{{name}}</td>
-                <td style="text-align: right">{{hits}}</td>
-                <td style="text-align: right">{{cost}}</td>
-                <td style="text-align: right">{{percentage}}</td>
-            </tr>
-            {{/each}}
-        </table>
-        {{else}}
-        (No writes to show.)
-        {{/if}}
+        <h4>Ledger Writes</h4>
+        <h5>Transaction Itself</h5>
+            <table>
+                <tr>
+                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#with transaction_write}}
+                <tr>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/with}}
+            </table>
+        <h5>Events</h5>
+            {{#if event_writes}}
+            <table>
+                <tr>
+                    <td><b>Event Type</b></td>
+                    <td style="text-align: right"><b>Number of Hits</td>
+                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#each event_writes}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{hits}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No writes to show.)
+            {{/if}}
+        <h5>State Write Ops</h5>
+            {{#if writes}}
+            <table>
+                <tr>
+                    <td><b>Resource Name</b></td>
+                    <td style="text-align: right"><b>Number of Hits</td>
+                    <td style="text-align: right"><b>Cost in Gas Units</b></td>
+                    <td style="text-align: right"><b>Percentage</b></td>
+                </tr>
+                {{#each writes}}
+                <tr>
+                    <td>{{name}}</td>
+                    <td style="text-align: right">{{hits}}</td>
+                    <td style="text-align: right">{{cost}}</td>
+                    <td style="text-align: right">{{percentage}}</td>
+                </tr>
+                {{/each}}
+            </table>
+            {{else}}
+            (No writes to show.)
+            {{/if}}
         <h3>Storage</h3>
         The storage fees cover the extended-term storage of states and events and are assessed at a fixed price in APT.
 

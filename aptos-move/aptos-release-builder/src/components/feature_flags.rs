@@ -107,6 +107,8 @@ pub enum FeatureFlag {
     KeylessAccountsWithPasskeys,
     MultisigV2Enhancement,
     MigrateToConcurrentFungibleBalance,
+    DelegationPoolAllowlisting,
+    ModuleEventMigration,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -270,6 +272,10 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::MigrateToConcurrentFungibleBalance => {
                 AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE
             },
+            FeatureFlag::DelegationPoolAllowlisting => {
+                AptosFeatureFlag::DELEGATION_POOL_ALLOWLISTING
+            },
+            FeatureFlag::ModuleEventMigration => AptosFeatureFlag::MODULE_EVENT_MIGRATION,
         }
     }
 }
@@ -362,6 +368,10 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::MIGRATE_TO_CONCURRENT_FUNGIBLE_BALANCE => {
                 FeatureFlag::MigrateToConcurrentFungibleBalance
             },
+            AptosFeatureFlag::DELEGATION_POOL_ALLOWLISTING => {
+                FeatureFlag::DelegationPoolAllowlisting
+            },
+            AptosFeatureFlag::MODULE_EVENT_MIGRATION => FeatureFlag::ModuleEventMigration,
         }
     }
 }

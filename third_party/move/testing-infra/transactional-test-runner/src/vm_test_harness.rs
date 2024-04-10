@@ -31,6 +31,7 @@ use move_core_types::{
     resolver::MoveResolver,
     value::MoveValue,
 };
+use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
 use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
@@ -130,7 +131,7 @@ impl<'a> MoveTestAdapter<'a> for SimpleVMTestAdapter<'a> {
     }
 
     fn run_config(&self) -> TestRunConfig {
-        self.run_config
+        self.run_config.clone()
     }
 
     fn init(
@@ -445,11 +446,17 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
     }
 });
 
-#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum TestRunConfig {
     CompilerV1,
-    CompilerV2,
-    ComparisonV1V2,
+    CompilerV2 {
+        language_version: LanguageVersion,
+        v2_experiments: Vec<(String, bool)>,
+    },
+    ComparisonV1V2 {
+        language_version: LanguageVersion,
+        v2_experiments: Vec<(String, bool)>,
+    },
 }
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -460,7 +467,15 @@ pub fn run_test_with_config(
     config: TestRunConfig,
     path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB))
+    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB), &None)
+}
+
+pub fn run_test_with_config_and_exp_suffix(
+    config: TestRunConfig,
+    path: &Path,
+    exp_suffix: &Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    run_test_impl::<SimpleVMTestAdapter>(config, path, Some(&*PRECOMPILED_MOVE_STDLIB), exp_suffix)
 }
 
 impl From<AdapterExecuteArgs> for VMConfig {

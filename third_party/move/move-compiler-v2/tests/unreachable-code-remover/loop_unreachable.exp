@@ -35,3 +35,6 @@ fun m::test(): u64 {
   0: label L0
   1: goto 0
 }
+
+
+============ bytecode verification succeeded ========

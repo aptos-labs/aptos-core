@@ -766,7 +766,7 @@ impl FakeExecutor {
             .expect("Must execute transactions");
 
         // Check if we emit the expected event for block metadata, there might be more events for transaction fees.
-        let event = outputs[0].events()[0]
+        let event = outputs[0].events()[1]
             .v1()
             .expect("The first event must be a block metadata v0 event")
             .clone();
@@ -924,7 +924,7 @@ impl FakeExecutor {
             let elapsed = start.elapsed();
             if let Err(err) = result {
                 if !should_error {
-                    println!("Should error, but ignoring for now... {}", err);
+                    println!("Shouldn't error, but ignoring for now... {}", err);
                 }
             }
             times.push(elapsed.as_micros());

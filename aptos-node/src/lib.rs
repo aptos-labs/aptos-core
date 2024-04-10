@@ -29,14 +29,14 @@ use aptos_jwk_consensus::start_jwk_consensus_runtime;
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog, Level, LoggerFilterUpdater};
 use aptos_safety_rules::safety_rules_manager::load_consensus_key_from_secure_storage;
 use aptos_state_sync_driver::driver_factory::StateSyncRuntimes;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, on_chain_config::OnChainJWKConsensusConfig};
 use aptos_validator_transaction_pool::VTxnPoolState;
 use clap::Parser;
 use futures::channel::mpsc;
 use hex::{FromHex, FromHexError};
 use rand::{rngs::StdRng, SeedableRng};
 use std::{
-    fs,
+    env, fs,
     io::Write,
     path::{Path, PathBuf},
     sync::{
@@ -529,6 +529,14 @@ where
             genesis_config.allow_new_validators = true;
             genesis_config.epoch_duration_secs = EPOCH_LENGTH_SECS;
             genesis_config.recurring_lockup_duration_secs = 7200;
+            genesis_config.jwk_consensus_config_override = match env::var("INITIALIZE_JWK_CONSENSUS") {
+                Ok(val) if val.as_str() == "1" => {
+                    let config = OnChainJWKConsensusConfig::default_enabled();
+                    println!("Flag `INITIALIZE_JWK_CONSENSUS` detected, will enable JWK Consensus for all default OIDC providers in genesis: {:?}", config);
+                    Some(config)
+                },
+                _ => None,
+            };
         })))
         .with_randomize_first_validator_ports(random_ports);
     let (root_key, _genesis, genesis_waypoint, mut validators) = builder.build(rng)?;
@@ -685,6 +693,7 @@ pub fn setup_environment_and_start_node(
             let (reconfig_events, dkg_start_events) = dkg_subscriptions
                 .expect("DKG needs to listen to NewEpochEvents events and DKGStartEvents");
             let my_addr = node_config.validator_network.as_ref().unwrap().peer_id();
+            let rb_config = node_config.consensus.rand_rb_config.clone();
             let dkg_runtime = start_dkg_runtime(
                 my_addr,
                 dkg_dealer_sk,
@@ -693,6 +702,7 @@ pub fn setup_environment_and_start_node(
                 reconfig_events,
                 dkg_start_events,
                 vtxn_pool.clone(),
+                rb_config,
             );
             Some(dkg_runtime)
         },

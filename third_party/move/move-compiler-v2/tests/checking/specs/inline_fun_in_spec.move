@@ -29,5 +29,5 @@ module 0x42::m {
         invariant forall a: address:
             exists<S>(a) ==> exec(|a| get<S>(a).f < 10, a);
     }
-    inline fun get<R>(a: address): &R { borrow_global<R>(a) }
+    inline fun get<R:key>(a: address): &R { borrow_global<R>(a) }
 }

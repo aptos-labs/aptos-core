@@ -45,4 +45,4 @@ fn runner(path: &Path) -> datatest_stable::Result<()> {
     }
 }
 
-datatest_stable::harness!(runner, "tests/sources", r".*\.move");
+datatest_stable::harness!(runner, "tests/sources", r".*\.move$");

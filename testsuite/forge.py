@@ -1249,6 +1249,11 @@ async def run_multiple(
             )
 
 
+def seeded_random_choice(namespace: str, cluster_names: Sequence[str]) -> str:
+    random.seed(namespace)
+    return random.choice(cluster_names)
+
+
 @main.command()
 # output files
 @envoption("FORGE_OUTPUT")
@@ -1366,6 +1371,7 @@ def test(
         forge_namespace = f"forge-{processes.user()}-{time.epoch()}"
 
     assert forge_namespace is not None, "Forge namespace is required"
+    assert len(forge_namespace) <= 63, "Forge namespace must be 63 characters or less"
 
     forge_namespace = sanitize_forge_resource_name(forge_namespace)
 
@@ -1418,7 +1424,7 @@ def test(
     # Perform cluster selection
     if not forge_cluster_name or balance_clusters:
         cluster_names = config.get("enabled_clusters")
-        forge_cluster_name = random.choice(cluster_names)
+        forge_cluster_name = seeded_random_choice(forge_namespace, cluster_names)
 
     assert forge_cluster_name, "Forge cluster name is required"
 
