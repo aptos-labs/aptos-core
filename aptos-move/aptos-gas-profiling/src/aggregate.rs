@@ -7,10 +7,7 @@ use crate::{
 };
 use aptos_gas_algebra::{GasQuantity, GasScalingFactor, InternalGas};
 use aptos_types::state_store::state_key::StateKeyInner;
-use std::{
-    collections::{btree_map, BTreeMap},
-    ops::Deref,
-};
+use std::collections::{btree_map, BTreeMap};
 
 /// Represents an aggregation of execution gas events, including the count and total gas costs for each type of event.
 ///
@@ -118,7 +115,7 @@ impl ExecutionAndIOCosts {
         for write in &self.write_set_transient {
             use StateKeyInner::*;
 
-            let key = match write.key.deref() {
+            let key = match write.key.inner() {
                 AccessPath(ap) => format!("{}", Render(&ap.get_path())),
                 TableItem { handle, key } => {
                     format!("table_item<{},{}>", Render(handle), TableKey { bytes: key },)

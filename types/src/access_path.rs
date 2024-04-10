@@ -208,8 +208,8 @@ impl TryFrom<StateKey> for AccessPath {
     type Error = Error;
 
     fn try_from(state_key: StateKey) -> Result<Self> {
-        match state_key.into_inner() {
-            StateKeyInner::AccessPath(access_path) => Ok(access_path),
+        match &state_key.inner() {
+            StateKeyInner::AccessPath(access_path) => Ok(access_path.clone()),
             _ => anyhow::bail!("Unsupported state key type"),
         }
     }

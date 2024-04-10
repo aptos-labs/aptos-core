@@ -11,7 +11,7 @@ use crate::{
 use aptos_types::{
     chain_id::ChainId,
     on_chain_config::OnChainConfig,
-    state_store::state_key::{StateKey, StateKeyInner},
+    state_store::state_key::StateKey,
     transaction::{Transaction, WriteSetPayload},
 };
 use serde_yaml::Value;
@@ -173,8 +173,7 @@ fn get_chain_id(node_config: &NodeConfig) -> Result<ChainId, Error> {
                     error
                 ))
             })?;
-            let chain_id_state_key =
-                StateKey::from(StateKeyInner::AccessPath(chain_id_access_path));
+            let chain_id_state_key = StateKey::access_path(chain_id_access_path);
 
             // Get the write op from the write set
             let write_set_mut = change_set.clone().write_set().clone().into_mut();
