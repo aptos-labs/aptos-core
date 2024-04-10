@@ -180,7 +180,7 @@ pub struct Claims {
 }
 
 impl Claims {
-    fn get_uid_val(&self, uid_key: &String) -> anyhow::Result<String> {
+    pub fn get_uid_val(&self, uid_key: &String) -> anyhow::Result<String> {
         match uid_key.as_str() {
             "email" => {
                 let email_verified = self
