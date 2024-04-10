@@ -450,6 +450,7 @@ aptos-cargo-cli = { path = "devtools/aptos-cargo-cli" }
 # External crate dependencies.
 # Please do not add any test features here: they should be declared by the individual crate.
 aes-gcm = "0.10.3"
+ahash = "0.8.11"
 atty = "0.2.14"
 nalgebra = "0.32"
 float-cmp = "0.9.0"
@@ -562,6 +563,7 @@ futures = "0.3.29"
 futures-channel = "0.3.29"
 futures-core = "0.3.29"
 futures-util = "0.3.29"
+fxhash = "0.2.1"
 getrandom = "0.2.2"
 gcp-bigquery-client = "0.13.0"
 get_if_addrs = "0.5.3"
