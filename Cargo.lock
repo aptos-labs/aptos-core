@@ -3917,6 +3917,7 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-dkg",
  "aptos-experimental-runtimes",
+ "aptos-infallible",
  "ark-bn254",
  "ark-ff",
  "ark-groth16",
