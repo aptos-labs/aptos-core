@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn test_cross_shard_state_view_get_state_value() {
-        let state_key = StateKey::raw("key1".as_bytes().to_owned());
+        let state_key = StateKey::raw(b"key1");
         let state_value = StateValue::from("value1".as_bytes().to_owned());
         let state_value_clone = state_value.clone();
         let state_key_clone = state_key.clone();

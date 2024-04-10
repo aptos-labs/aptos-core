@@ -168,7 +168,7 @@ mod tests {
         let fetcher = AsyncProofFetcher::new(Arc::new(MockDbReaderWriter));
         let mut expected_key_hashes = vec![];
         for i in 0..10 {
-            let state_key: StateKey = StateKey::raw(format!("test_key_{}", i).into_bytes());
+            let state_key: StateKey = StateKey::raw(format!("test_key_{}", i).as_bytes());
             expected_key_hashes.push(state_key.hash());
             let result = fetcher
                 .fetch_state_value_with_version_and_schedule_proof_read(&state_key, 0, None)
