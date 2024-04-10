@@ -1457,7 +1457,7 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
 }
 
 fn adverserial_workload_test() -> ForgeConfig {
-    let num_contended_resources = 50;
+    let num_contended_resources = 4;
     let transaction_mix = (0..num_contended_resources)
         .map(|_| {
             (
@@ -1484,7 +1484,7 @@ fn adverserial_workload_test() -> ForgeConfig {
         .with_emit_job(
             EmitJobRequest::default()
                 .mode(EmitJobMode::MaxLoad {
-                    mempool_backlog: 50000,
+                    mempool_backlog: 100000,
                 })
                 .transaction_mix(transaction_mix).init_gas_price_multiplier(20),
         )
