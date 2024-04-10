@@ -333,7 +333,8 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             include: vec!["/acquires-checker/"],
             exclude: vec![],
             exp_suffix: None,
-            options: opts.clone(),
+            // Skip access check to avoid error message change in the acquires-checker
+            options: opts.clone().set_experiment(Experiment::ACCESS_CHECK, false),
             // Run the full compiler pipeline to double-check the result.
             stop_after: StopAfter::FileFormat,
             dump_ast: DumpLevel::None,
