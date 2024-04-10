@@ -603,14 +603,15 @@ fn get_land_blocking_test(
     duration: Duration,
     test_cmd: &TestCommand,
 ) -> Option<ForgeConfig> {
-    let test = match test_name {
-        "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
-        "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
-        "compat" => compat(),
-        "framework_upgrade" => framework_upgrade(),
-        _ => return None, // The test name does not match a land-blocking test
-    };
-    Some(test)
+    Some(adverserial_workload_test())
+    // let test = match test_name {
+    //     "land_blocking" => land_blocking_test_suite(duration), // TODO: remove land_blocking, superseded by below
+    //     "realistic_env_max_load" => realistic_env_max_load_test(duration, test_cmd, 7, 5),
+    //     "compat" => compat(),
+    //     "framework_upgrade" => framework_upgrade(),
+    //     _ => return None, // The test name does not match a land-blocking test
+    // };
+    // Some(test)
 }
 
 /// Attempts to match the test name to a network benchmark test
@@ -1451,6 +1452,49 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
                 .add_chain_progress(StateProgressThreshold {
                     max_no_progress_secs: 30.0,
                     max_round_gap: 10,
+                }),
+        )
+}
+
+fn adverserial_workload_test() -> ForgeConfig {
+    let num_contended_resources = 50;
+    let transaction_mix = (0..num_contended_resources)
+        .map(|_| {
+            (
+                TransactionTypeArg::ModifyGlobalResource.materialize_default(),
+                1000,
+            )
+        })
+        .collect::<Vec<_>>();
+    ForgeConfig::default()
+        .with_initial_validator_count(NonZeroUsize::new(5).unwrap())
+        .with_initial_fullnode_count(3)
+        .add_network_test(PerformanceBenchmark)
+        .with_validator_override_node_config_fn(Arc::new(|config, _| {
+            config.execution.processed_transactions_detailed_counters = true;
+        }))
+        .add_network_test(wrap_with_realistic_env(TwoTrafficsTest {
+            inner_traffic: EmitJobRequest::default()
+                .mode(EmitJobMode::ConstTps { tps: 100 }),
+            // Additionally - we are not really gracefully handling overlaods,
+            // setting limits based on current reality, to make sure they
+            // don't regress, but something to investigate
+            inner_success_criteria: SuccessCriteria::new(100),
+        }))
+        .with_emit_job(
+            EmitJobRequest::default()
+                .mode(EmitJobMode::MaxLoad {
+                    mempool_backlog: 50000,
+                })
+                .transaction_mix(transaction_mix).init_gas_price_multiplier(20),
+        )
+        .with_success_criteria(
+            SuccessCriteria::new(3000)
+                .add_no_restarts()
+                .add_wait_for_catchup_s(240)
+                .add_chain_progress(StateProgressThreshold {
+                    max_no_progress_secs: 20.0,
+                    max_round_gap: 6,
                 }),
         )
 }
