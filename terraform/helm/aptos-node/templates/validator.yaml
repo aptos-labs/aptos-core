@@ -78,29 +78,11 @@ spec:
         app.kubernetes.io/name: validator
         app.kubernetes.io/instance: validator-{{$i}}
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
         checksum/validator.yaml: {{ tpl ($.Files.Get "files/configs/validator.yaml") $ | sha256sum }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "9101"
     spec:
       terminationGracePeriodSeconds: 0
-      initContainers:
-        - name: run-script
-          image: curlimages/curl:latest
-          command:
-            - sh
-            - -c
-            - |
-              set -x
-              cp /opt/aptos/genesis_readonly/* /opt/aptos/genesis
-              signed_url=$(curl -s -X GET "{{ $.Values.genesis_blob_upload_url }}?cluster_name={{ $.Values.cluster_name }}&namespace={{ $.Release.Namespace }}&era={{ $.Values.chain.era }}&method=GET")
-              curl -o /opt/aptos/genesis/genesis.blob "$signed_url"
-              ls -l /opt/aptos/genesis
-          volumeMounts:
-            - name: genesis-config
-              mountPath: /opt/aptos/genesis_readonly
-            - name: writable-genesis
-              mountPath: /opt/aptos/genesis
       containers:
       - name: validator
         {{- if and $validator_statefulset (not $.Values.manageImages) }} # if the statefulset already exists and we do not want helm to simply overwrite the image, use the existing image
@@ -141,7 +123,7 @@ spec:
         volumeMounts:
         - name: aptos-config
           mountPath: /opt/aptos/etc
-        - name: writable-genesis
+        - name: genesis-config
           mountPath: /opt/aptos/genesis
         - name: aptos-data
           mountPath: /opt/aptos/data
@@ -203,8 +185,6 @@ spec:
       - name: aptos-data
         persistentVolumeClaim:
           claimName: {{ include "aptos-validator.fullname" $ }}-{{$i}}-validator-e{{ $.Values.chain.era }}
-      - name: writable-genesis
-        emptyDir: {}
       serviceAccountName: {{ include "aptos-validator.fullname" $ }}-validator
       {{- if $.Values.imagePullSecret }}
       imagePullSecrets:
