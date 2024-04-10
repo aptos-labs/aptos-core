@@ -32,7 +32,7 @@ use futures_util::StreamExt;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
     ops::Deref,
@@ -457,18 +457,23 @@ async fn test_peers_and_metadata_subscriptions() {
         vec![ProtocolId::MempoolDirectSend, ProtocolId::StorageServiceRpc],
         peers_and_metadata.clone(),
     );
-    match connection_events.try_recv() {
-        Ok(notif) => match notif {
-            ConnectionNotification::NewPeer(conn_meta, network_id) => {
-                assert_eq!(network_id, NetworkId::Validator);
-                assert_eq!(conn_meta, connection_1);
+    match tokio::time::timeout(Duration::from_secs(1), connection_events.recv()).await {
+        Ok(msg) => match msg {
+            None => {
+                panic!("no pending connection event")
             },
-            ConnectionNotification::LostPeer(_, _) => {
-                panic!("should get connect but got lost")
+            Some(notif) => match notif {
+                ConnectionNotification::NewPeer(conn_meta, network_id) => {
+                    assert_eq!(network_id, NetworkId::Validator);
+                    assert_eq!(conn_meta, connection_1);
+                },
+                ConnectionNotification::LostPeer(_, _) => {
+                    panic!("should get connect but got lost")
+                },
             },
         },
-        Err(_tre) => {
-            panic!("no pending connection event")
+        Err(te) => {
+            panic!("timeout waiting for connection event: {:?}", te);
         },
     }
 

@@ -17,6 +17,7 @@ def main():
     badlines = 0
     eventCounts = {}
     failnames = []
+    flakey = []
     with open(args.nextest_json, 'rt') as fin:
         for line in fin:
             try:
@@ -35,6 +36,11 @@ def main():
             eventCounts[event] = eventCounts.get(event, 0) + 1
             if event == 'failed':
                 failnames.append(rec.get('name', '_'))
+            if event == 'ok':
+                testname = rec.get('name', '_')
+                if '#' in testname:
+                    # flakey test passed on retry
+                    flakey.append(rec)
     with open(args.summary_out_path, 'at') as fout:
         rows = []
         for event in ('ok', 'ignored', 'failed'):
@@ -59,6 +65,18 @@ def main():
             if len(failnames) > FAIL_HEAD_LINES:
                 fout.write(f'    ... and {len(failnames)-FAIL_HEAD_LINES} more\n')
             fout.write('\n')
+        elif flakey:
+            flakeshow = flakey
+            if len(flakeshow) > FAIL_HEAD_LINES:
+                flakeshow = flakeshow[:FAIL_HEAD_LINES]
+            fout.write("## Flakey\n\n")
+            for rec in flakeshow:
+                name = rec['name']
+                etime = rec.get('exec_time', '')
+                fout.write(f"    {name} ({etime})\n")
+            if len(flakey) > FAIL_HEAD_LINES:
+                fout.write(f"    ... and {len(flakey)-FAIL_HEAD_LINES} more\n")
+            fout.write("\n")
     if failnames:
         print(f"{len(failnames)} FAILING tests:")
         print("\n".join(failnames))

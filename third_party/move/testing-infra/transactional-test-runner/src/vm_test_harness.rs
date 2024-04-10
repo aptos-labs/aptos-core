@@ -31,6 +31,7 @@ use move_core_types::{
     resolver::MoveResolver,
     value::MoveValue,
 };
+use move_model::metadata::LanguageVersion;
 use move_resource_viewer::MoveValueAnnotator;
 use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
@@ -448,8 +449,14 @@ static MOVE_STDLIB_COMPILED: Lazy<Vec<CompiledModule>> = Lazy::new(|| {
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
 pub enum TestRunConfig {
     CompilerV1,
-    CompilerV2 { v2_experiments: Vec<(String, bool)> },
-    ComparisonV1V2 { v2_experiments: Vec<(String, bool)> },
+    CompilerV2 {
+        language_version: LanguageVersion,
+        v2_experiments: Vec<(String, bool)>,
+    },
+    ComparisonV1V2 {
+        language_version: LanguageVersion,
+        v2_experiments: Vec<(String, bool)>,
+    },
 }
 
 pub fn run_test(path: &Path) -> Result<(), Box<dyn std::error::Error>> {

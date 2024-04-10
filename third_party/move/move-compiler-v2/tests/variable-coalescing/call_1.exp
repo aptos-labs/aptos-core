@@ -163,15 +163,11 @@ B0:
 }
 test(Arg0: u64): u64 /* def_idx: 1 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
+	0: MoveLoc[0](Arg0: u64)
 	1: Call id(u64): u64
-	2: StLoc[0](Arg0: u64)
-	3: CopyLoc[0](Arg0: u64)
-	4: Call id(u64): u64
-	5: StLoc[0](Arg0: u64)
-	6: CopyLoc[0](Arg0: u64)
-	7: Call id(u64): u64
-	8: Ret
+	2: Call id(u64): u64
+	3: Call id(u64): u64
+	4: Ret
 }
 }
 ============ bytecode verification succeeded ========

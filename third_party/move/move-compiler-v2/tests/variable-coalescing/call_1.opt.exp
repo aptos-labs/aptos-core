@@ -33,6 +33,32 @@ fun m::test($t0: u64): u64 {
   6: return $t1
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::id($t0: u64): u64 {
+     var $t1: u64
+  0: $t1 := move($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64 [unused]
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t3 := move($t0)
+  1: $t4 := move($t3)
+  2: $t6 := m::id($t4)
+  3: $t5 := m::id($t6)
+  4: $t1 := m::id($t5)
+  5: return $t1
+}
+
 ============ after VariableCoalescingAnnotator: ================
 
 [variant baseline]
@@ -101,6 +127,29 @@ fun m::test($t0: u64): u64 {
   5: return $t0
 }
 
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::id($t0: u64): u64 {
+     var $t1: u64 [unused]
+  0: return $t0
+}
+
+
+[variant baseline]
+fun m::test($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     var $t5: u64 [unused]
+     var $t6: u64 [unused]
+  0: $t0 := m::id($t0)
+  1: $t0 := m::id($t0)
+  2: $t0 := m::id($t0)
+  3: return $t0
+}
+
 
 ============ disassembled file-format ==================
 // Move bytecode v7
@@ -114,15 +163,11 @@ B0:
 }
 test(Arg0: u64): u64 /* def_idx: 1 */ {
 B0:
-	0: CopyLoc[0](Arg0: u64)
+	0: MoveLoc[0](Arg0: u64)
 	1: Call id(u64): u64
-	2: StLoc[0](Arg0: u64)
-	3: CopyLoc[0](Arg0: u64)
-	4: Call id(u64): u64
-	5: StLoc[0](Arg0: u64)
-	6: CopyLoc[0](Arg0: u64)
-	7: Call id(u64): u64
-	8: Ret
+	2: Call id(u64): u64
+	3: Call id(u64): u64
+	4: Ret
 }
 }
 ============ bytecode verification succeeded ========

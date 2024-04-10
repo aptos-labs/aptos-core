@@ -112,14 +112,12 @@ B0:
 	3: StLoc[0](loc0: u64)
 	4: StLoc[1](loc1: u64)
 	5: StLoc[2](loc2: u64)
-	6: CopyLoc[2](loc2: u64)
+	6: MoveLoc[2](loc2: u64)
 	7: MoveLoc[1](loc1: u64)
 	8: Add
-	9: StLoc[2](loc2: u64)
-	10: CopyLoc[2](loc2: u64)
-	11: MoveLoc[0](loc0: u64)
-	12: Add
-	13: Ret
+	9: MoveLoc[0](loc0: u64)
+	10: Add
+	11: Ret
 }
 }
 ============ bytecode verification succeeded ========

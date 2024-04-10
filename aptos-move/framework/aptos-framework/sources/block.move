@@ -59,6 +59,27 @@ module aptos_framework::block {
         new_epoch_interval: u64,
     }
 
+    #[event]
+    /// Should be in-sync with NewBlockEvent rust struct in new_block.rs
+    struct NewBlock has drop, store {
+        hash: address,
+        epoch: u64,
+        round: u64,
+        height: u64,
+        previous_block_votes_bitvec: vector<u8>,
+        proposer: address,
+        failed_proposer_indices: vector<u64>,
+        /// On-chain time during the block at the given height
+        time_microseconds: u64,
+    }
+
+    #[event]
+    /// Event emitted when a proposal is created.
+    struct UpdateEpochInterval has drop, store {
+        old_epoch_interval: u64,
+        new_epoch_interval: u64,
+    }
+
     /// The number of new block events does not equal the current block height.
     const ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT: u64 = 1;
     /// An invalid proposer was provided. Expected the proposer to be the VM or an active validator.
@@ -113,6 +134,11 @@ module aptos_framework::block {
         let old_epoch_interval = block_resource.epoch_interval;
         block_resource.epoch_interval = new_epoch_interval;
 
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(
+                UpdateEpochInterval { old_epoch_interval, new_epoch_interval },
+            );
+        };
         event::emit_event<UpdateEpochIntervalEvent>(
             &mut block_resource.update_epoch_interval_events,
             UpdateEpochIntervalEvent { old_epoch_interval, new_epoch_interval },
@@ -153,6 +179,7 @@ module aptos_framework::block {
         let block_metadata_ref = borrow_global_mut<BlockResource>(@aptos_framework);
         block_metadata_ref.height = event::counter(&block_metadata_ref.new_block_events);
 
+        // Emit both event v1 and v2 for compatibility. Eventually only module events will be kept.
         let new_block_event = NewBlockEvent {
             hash,
             epoch,
@@ -163,7 +190,17 @@ module aptos_framework::block {
             failed_proposer_indices,
             time_microseconds: timestamp,
         };
-        emit_new_block_event(vm, &mut block_metadata_ref.new_block_events, new_block_event);
+        let new_block_event_v2 = NewBlock {
+            hash,
+            epoch,
+            round,
+            height: block_metadata_ref.height,
+            previous_block_votes_bitvec,
+            proposer,
+            failed_proposer_indices,
+            time_microseconds: timestamp,
+        };
+        emit_new_block_event(vm, &mut block_metadata_ref.new_block_events, new_block_event, new_block_event_v2);
 
         if (features::collect_and_distribute_gas_fees()) {
             // Assign the fees collected from the previous block to the previous block proposer.
@@ -237,7 +274,12 @@ module aptos_framework::block {
     }
 
     /// Emit the event and update height and global timestamp
-    fun emit_new_block_event(vm: &signer, event_handle: &mut EventHandle<NewBlockEvent>, new_block_event: NewBlockEvent) acquires CommitHistory {
+    fun emit_new_block_event(
+        vm: &signer,
+        event_handle: &mut EventHandle<NewBlockEvent>,
+        new_block_event: NewBlockEvent,
+        new_block_event_v2: NewBlock
+    ) acquires CommitHistory {
         if (exists<CommitHistory>(@aptos_framework)) {
             let commit_history_ref = borrow_global_mut<CommitHistory>(@aptos_framework);
             let idx = commit_history_ref.next_idx;
@@ -255,6 +297,9 @@ module aptos_framework::block {
             event::counter(event_handle) == new_block_event.height,
             error::invalid_argument(ENUM_NEW_BLOCK_EVENTS_DOES_NOT_MATCH_BLOCK_HEIGHT),
         );
+        if (std::features::module_event_migration_enabled()) {
+            event::emit(new_block_event_v2);
+        };
         event::emit_event<NewBlockEvent>(event_handle, new_block_event);
     }
 
@@ -267,6 +312,16 @@ module aptos_framework::block {
             &vm,
             &mut block_metadata_ref.new_block_events,
             NewBlockEvent {
+                hash: genesis_id,
+                epoch: 0,
+                round: 0,
+                height: 0,
+                previous_block_votes_bitvec: vector::empty(),
+                proposer: @vm_reserved,
+                failed_proposer_indices: vector::empty(),
+                time_microseconds: 0,
+            },
+            NewBlock {
                 hash: genesis_id,
                 epoch: 0,
                 round: 0,
@@ -290,6 +345,16 @@ module aptos_framework::block {
             vm_signer,
             &mut block_metadata_ref.new_block_events,
             NewBlockEvent {
+                hash: fake_block_hash,
+                epoch: reconfiguration::current_epoch(),
+                round: MAX_U64,
+                height: block_metadata_ref.height,
+                previous_block_votes_bitvec: vector::empty(),
+                proposer: @vm_reserved,
+                failed_proposer_indices: vector::empty(),
+                time_microseconds: timestamp::now_microseconds(),
+            },
+            NewBlock {
                 hash: fake_block_hash,
                 epoch: reconfiguration::current_epoch(),
                 round: MAX_U64,

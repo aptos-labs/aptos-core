@@ -21,8 +21,8 @@ const IN_MEMORY_CACHE_EVICTION_TRIGGER_SIZE_IN_BYTES: u64 = 3_500_000_000;
 // Max cache entry TTL: 30 seconds.
 // const MAX_IN_MEMORY_CACHE_ENTRY_TTL: u64 = 30;
 // Warm-up cache entries. Pre-fetch the cache entries to warm up the cache.
-const WARM_UP_CACHE_ENTRIES: u64 = 20_000;
-const MAX_REDIS_FETCH_BATCH_SIZE: usize = 500;
+pub const WARM_UP_CACHE_ENTRIES: u64 = 20_000;
+pub const MAX_REDIS_FETCH_BATCH_SIZE: usize = 500;
 
 #[derive(Debug, Clone, Copy)]
 struct CacheMetadata {

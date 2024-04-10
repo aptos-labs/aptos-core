@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::anyhow;
-use aptos_config::config::{NodeConfig, DEFAULT_CONCURRENCY_LEVEL};
+use aptos_config::config::{NodeConfig, DEFAULT_EXECUTION_CONCURRENCY_LEVEL};
 use aptos_storage_interface::{state_view::LatestDbStateCheckpointView, DbReaderWriter};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, account_view::AccountView, chain_id::ChainId,
@@ -51,7 +51,10 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
 pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     AptosVM::set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
     let effective_concurrency_level = if node_config.execution.concurrency_level == 0 {
-        min(DEFAULT_CONCURRENCY_LEVEL, (num_cpus::get() / 2) as u16)
+        min(
+            DEFAULT_EXECUTION_CONCURRENCY_LEVEL,
+            (num_cpus::get() / 2) as u16,
+        )
     } else {
         node_config.execution.concurrency_level
     };
