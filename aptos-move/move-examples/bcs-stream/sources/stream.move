@@ -74,7 +74,7 @@ module bcs_stream::bcs_stream {
     }
 
     public fun next_u8(stream: &mut BCSStream): u8 {
-        let data = &mut stream.data;
+        let data = &stream.data;
         let cur = stream.cur;
 
         assert!(cur < vector::length(data), EOUT_OF_BYTES);
@@ -85,7 +85,7 @@ module bcs_stream::bcs_stream {
     }
 
     public fun next_u16(stream: &mut BCSStream): u16 {
-        let data = &mut stream.data;
+        let data = &stream.data;
         let cur = stream.cur;
 
         assert!(cur + 2 <= vector::length(data), EOUT_OF_BYTES);
@@ -99,7 +99,7 @@ module bcs_stream::bcs_stream {
     }
 
     public fun next_u32(stream: &mut BCSStream): u32 {
-        let data = &mut stream.data;
+        let data = &stream.data;
         let cur = stream.cur;
 
         assert!(cur + 4 <= vector::length(data), EOUT_OF_BYTES);
@@ -115,7 +115,7 @@ module bcs_stream::bcs_stream {
     }
 
     public fun next_u64(stream: &mut BCSStream): u64 {
-        let data = &mut stream.data;
+        let data = &stream.data;
         let cur = stream.cur;
 
         assert!(cur + 8 <= vector::length(data), EOUT_OF_BYTES);
@@ -135,7 +135,7 @@ module bcs_stream::bcs_stream {
     }
 
     public fun next_u128(stream: &mut BCSStream): u128 {
-        let data = &mut stream.data;
+        let data = &stream.data;
         let cur = stream.cur;
 
         assert!(cur + 16 <= vector::length(data), EOUT_OF_BYTES);
