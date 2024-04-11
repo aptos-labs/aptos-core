@@ -89,10 +89,11 @@ spec:
       labels:
         {{- include "aptos-genesis.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/name: genesis
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: runtime/default
     spec:
       restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: genesis
         image: {{ .Values.genesis.image.repo }}:{{ .Values.genesis.image.tag | default .Values.imageTag }}

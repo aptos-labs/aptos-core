@@ -22,24 +22,32 @@
 | backup.image.repo | string | `"aptoslabs/tools"` | Image repo to use for backup images |
 | backup.image.tag | string | `nil` | Image tag to use for backup images |
 | backup.nodeSelector | object | `{}` |  |
-| backup.resources.limits.cpu | int | `1` |  |
-| backup.resources.limits.memory | string | `"1Gi"` |  |
-| backup.resources.requests.cpu | int | `1` |  |
-| backup.resources.requests.memory | string | `"1Gi"` |  |
+| backup.resources.limits.cpu | int | `4` |  |
+| backup.resources.limits.memory | string | `"8Gi"` |  |
+| backup.resources.requests.cpu | int | `4` |  |
+| backup.resources.requests.memory | string | `"8Gi"` |  |
 | backup.tolerations | list | `[]` |  |
+| backup_compaction.affinity | object | `{}` |  |
+| backup_compaction.nodeSelector | object | `{}` |  |
+| backup_compaction.resources.limits.cpu | int | `8` |  |
+| backup_compaction.resources.limits.memory | string | `"32Gi"` |  |
+| backup_compaction.resources.requests.cpu | int | `4` |  |
+| backup_compaction.resources.requests.memory | string | `"16Gi"` |  |
+| backup_compaction.schedule | string | `"@daily"` | The schedule for backup compaction |
+| backup_compaction.tolerations | list | `[]` |  |
 | backup_verify.affinity | object | `{}` |  |
 | backup_verify.nodeSelector | object | `{}` |  |
-| backup_verify.resources.limits.cpu | int | `4` |  |
-| backup_verify.resources.limits.memory | string | `"4Gi"` |  |
+| backup_verify.resources.limits.cpu | int | `8` |  |
+| backup_verify.resources.limits.memory | string | `"32Gi"` |  |
 | backup_verify.resources.requests.cpu | int | `4` |  |
-| backup_verify.resources.requests.memory | string | `"4Gi"` |  |
+| backup_verify.resources.requests.memory | string | `"16Gi"` |  |
 | backup_verify.schedule | string | `"@daily"` | The schedule for backup verification |
 | backup_verify.tolerations | list | `[]` |  |
 | chain.era | int | `1` | Bump this number to wipe the underlying storage |
 | chain.genesisConfigmap | string | `nil` | Kubernetes Configmap from which to load the genesis.blob and waypoint.txt |
 | chain.genesisSecret | string | `nil` | Kubernetes Secret from which to load the genesis.blob and waypoint.txt |
 | chain.name | string | `"devnet"` | Name of the testnet to connect to. There must be a corresponding entry in .Values.aptos_chains |
-| fullnode.config | object | `{"full_node_networks":[{"identity":{},"inbound_rate_limit_config":null,"max_inbound_connections":100,"network_id":"public","outbound_rate_limit_config":null,"seeds":{}}]}` | Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
+| fullnode.config | object | `{"full_node_networks":[{"identity":{},"inbound_rate_limit_config":null,"network_id":"public","outbound_rate_limit_config":null,"seeds":{}}]}` | Fullnode configuration. See NodeConfig https://github.com/aptos-labs/aptos-core/blob/main/config/src/config/mod.rs |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for fullnode images |
 | image.repo | string | `"aptoslabs/validator"` | Image repo to use for fullnode images. Fullnodes and validators use the same image |
 | image.tag | string | `nil` | Image tag to use for fullnode images. If set, overrides `imageTag` |
@@ -52,31 +60,37 @@
 | manageImages | bool | `true` | If true, helm will always override the deployed image with what is configured in the helm values. If not, helm will take the latest image from the currently running workloads, which is useful if you have a separate procedure to update images (e.g. rollout) |
 | nodeSelector | object | `{}` |  |
 | resources.limits.cpu | int | `14` |  |
-| resources.limits.memory | string | `"26Gi"` |  |
+| resources.limits.memory | string | `"56Gi"` |  |
 | resources.requests.cpu | int | `14` |  |
-| resources.requests.memory | string | `"26Gi"` |  |
+| resources.requests.memory | string | `"56Gi"` |  |
 | restore.affinity | object | `{}` |  |
 | restore.config.azure.account | string | `nil` |  |
 | restore.config.azure.container | string | `nil` |  |
 | restore.config.azure.sas | string | `nil` |  |
-| restore.config.concurrent_downloads | int | `2` | Number of concurrent downloads for restore |
+| restore.config.concurrent_downloads | int | `16` | Number of concurrent downloads for restore |
 | restore.config.gcs.bucket | string | `nil` |  |
 | restore.config.location | string | `nil` | Which of the below backup configurations to use |
+| restore.config.restore_epoch | int | `0` | Increase this value to trigger a restore from scratch, wiping the DB. |
 | restore.config.restore_era | string | `nil` | If set, specifies a different era to restore other than the default era set in chain.era |
 | restore.config.s3.bucket | string | `nil` |  |
+| restore.config.start_version | int | `0` | Start from genesis. |
+| restore.config.target_version | string | `nil` | Restore to the latest version. |
 | restore.config.trusted_waypoints | list | `[]` | List of trusted waypoints for restore |
+| restore.enabled | bool | `false` |  |
 | restore.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for restore images |
 | restore.image.repo | string | `"aptoslabs/tools"` | Image repo to use for restore images |
 | restore.image.tag | string | `nil` | Image tag to use for restore images |
 | restore.nodeSelector | object | `{}` |  |
-| restore.resources.limits.cpu | int | `6` |  |
-| restore.resources.limits.memory | string | `"15Gi"` |  |
-| restore.resources.requests.cpu | int | `6` |  |
-| restore.resources.requests.memory | string | `"15Gi"` |  |
+| restore.resources.limits.cpu | int | `16` |  |
+| restore.resources.limits.memory | string | `"120Gi"` |  |
+| restore.resources.requests.cpu | int | `16` |  |
+| restore.resources.requests.memory | string | `"120Gi"` |  |
 | restore.tolerations | list | `[]` |  |
 | rust_log | string | `"info"` | Log level for the fullnode |
 | service.annotations | object | `{}` |  |
+| service.exposeAdmin | bool | `false` | Whether to expose the admin port on fullnodes |
 | service.exposeApi | bool | `true` | Whether to expose the node REST API |
+| service.exposeMetrics | bool | `false` | Whether to expose the metrics port on fullnodes |
 | service.externalTrafficPolicy | string | `nil` | The externalTrafficPolicy for the fullnode service |
 | service.loadBalancerSourceRanges | list | `[]` | If set and if the ServiceType is LoadBalancer, allow traffic to fullnode from these CIDRs |
 | service.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, aptosnet endpoint externally |
