@@ -82,7 +82,7 @@ pub struct BlockTree {
     /// The quorum certificate that has highest commit info.
     highest_ordered_cert: Arc<QuorumCert>,
     /// The quorum certificate that has highest commit decision info.
-    highest_commit_cert: Arc<QuorumCert>,
+    highest_commit_decision: Arc<LedgerInfoWithSignatures>,
     /// Map of block id to its completed quorum certificate (2f + 1 votes)
     id_to_quorum_cert: HashMap<HashValue, Arc<QuorumCert>>,
     /// To keep the IDs of the elements that have been pruned from the tree but not cleaned up yet.
@@ -96,7 +96,7 @@ impl BlockTree {
         root: PipelinedBlock,
         root_quorum_cert: QuorumCert,
         root_ordered_cert: QuorumCert,
-        root_commit_cert: QuorumCert,
+        root_commit_decision: LedgerInfoWithSignatures,
         max_pruned_blocks_in_mem: usize,
         highest_2chain_timeout_cert: Option<Arc<TwoChainTimeoutCertificate>>,
     ) -> Self {
@@ -127,7 +127,7 @@ impl BlockTree {
             highest_certified_block_id: root_id,
             highest_quorum_cert: Arc::clone(&root_quorum_cert),
             highest_ordered_cert: Arc::new(root_ordered_cert),
-            highest_commit_cert: Arc::new(root_commit_cert),
+            highest_commit_decision: Arc::new(root_commit_decision),
             id_to_quorum_cert,
             pruned_block_ids,
             max_pruned_blocks_in_mem,
@@ -210,8 +210,8 @@ impl BlockTree {
         Arc::clone(&self.highest_ordered_cert)
     }
 
-    pub(super) fn highest_commit_cert(&self) -> Arc<QuorumCert> {
-        Arc::clone(&self.highest_commit_cert)
+    pub(super) fn highest_commit_decision(&self) -> Arc<LedgerInfoWithSignatures> {
+        Arc::clone(&self.highest_commit_decision)
     }
 
     pub(super) fn get_quorum_cert_for_block(
@@ -246,10 +246,12 @@ impl BlockTree {
         }
     }
 
-    fn update_highest_commit_cert(&mut self, new_commit_cert: QuorumCert) {
-        if new_commit_cert.commit_info().round() > self.highest_commit_cert.commit_info().round() {
-            self.highest_commit_cert = Arc::new(new_commit_cert);
-            self.update_commit_root(self.highest_commit_cert.commit_info().id());
+    fn update_highest_commit_decision(&mut self, new_commit_decision: LedgerInfoWithSignatures) {
+        if new_commit_decision.commit_info().round()
+            > self.highest_commit_decision.commit_info().round()
+        {
+            self.highest_commit_decision = Arc::new(new_commit_decision);
+            self.update_commit_root(self.highest_commit_decision.commit_info().id());
         }
     }
 
@@ -418,13 +420,8 @@ impl BlockTree {
         &mut self,
         storage: Arc<dyn PersistentLivenessStorage>,
         blocks_to_commit: &[Arc<PipelinedBlock>],
-        finality_proof: QuorumCert,
         commit_decision: LedgerInfoWithSignatures,
     ) {
-        let commit_proof = finality_proof
-            .create_merged_with_executed_state(commit_decision)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
-
         let block_to_commit = blocks_to_commit.last().unwrap().clone();
         update_counters_for_committed_blocks(blocks_to_commit);
         let current_round = self.commit_root().round();
@@ -443,7 +440,7 @@ impl BlockTree {
             warn!(error = ?e, "fail to delete block");
         }
         self.process_pruned_blocks(id_to_remove);
-        self.update_highest_commit_cert(commit_proof);
+        self.update_highest_commit_decision(commit_decision);
     }
 }
 

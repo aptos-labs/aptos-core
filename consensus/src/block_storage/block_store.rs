@@ -120,7 +120,7 @@ impl BlockStore {
                     qc.ledger_info()
                 );
 
-                if let Err(e) = self.send_for_execution(qc.clone()).await {
+                if let Err(e) = self.send_for_execution(qc.ledger_info().clone()).await {
                     error!("Error in try-committing blocks. {}", e.to_string());
                 }
             }
@@ -140,7 +140,7 @@ impl BlockStore {
         vote_back_pressure_limit: Round,
         payload_manager: Arc<PayloadManager>,
     ) -> Self {
-        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_cert) = root;
+        let RootInfo(root_block, root_qc, root_ordered_cert, root_commit_decision) = root;
 
         //verify root is correct
         assert!(
@@ -183,7 +183,7 @@ impl BlockStore {
             pipelined_root_block,
             root_qc,
             root_ordered_cert,
-            root_commit_cert,
+            root_commit_decision,
             max_pruned_blocks_in_mem,
             highest_2chain_timeout_cert.map(Arc::new),
         );
@@ -220,7 +220,10 @@ impl BlockStore {
     }
 
     /// Send an ordered block id with the proof for execution, returns () on success or error
-    pub async fn send_for_execution(&self, finality_proof: QuorumCert) -> anyhow::Result<()> {
+    pub async fn send_for_execution(
+        &self,
+        finality_proof: LedgerInfoWithSignatures,
+    ) -> anyhow::Result<()> {
         let block_id_to_commit = finality_proof.commit_info().id();
         let block_to_commit = self
             .get_block(block_id_to_commit)
@@ -245,14 +248,13 @@ impl BlockStore {
         self.execution_client
             .finalize_order(
                 &blocks_to_commit,
-                finality_proof.ledger_info().clone(),
+                finality_proof.clone(),
                 Box::new(
                     move |committed_blocks: &[Arc<PipelinedBlock>],
                           commit_decision: LedgerInfoWithSignatures| {
                         block_tree.write().commit_callback(
                             storage,
                             committed_blocks,
-                            finality_proof,
                             commit_decision,
                         );
                     },
@@ -471,8 +473,11 @@ impl BlockStore {
             .map(|b| Duration::from_micros(b.timestamp_usecs()))
             .unwrap_or(Duration::ZERO);
         let committed_timestamp = Duration::from_micros(commit_root.timestamp_usecs());
-        let commit_cert_timestamp =
-            Duration::from_micros(self.highest_commit_cert().commit_info().timestamp_usecs());
+        let commit_decision_timestamp = Duration::from_micros(
+            self.highest_commit_decision()
+                .commit_info()
+                .timestamp_usecs(),
+        );
 
         fn latency_from_proposal(proposal_timestamp: Duration, timestamp: Duration) -> Duration {
             if timestamp.is_zero() {
@@ -498,8 +503,9 @@ impl BlockStore {
             latency_to_ordered_ms = latency_to_ordered.as_millis() as u64,
             latency_to_oldest_not_committed = latency_to_oldest_not_committed.as_millis() as u64,
             latency_to_committed_ms = latency_to_committed.as_millis() as u64,
-            latency_to_commit_cert_ms =
-                latency_from_proposal(proposal_timestamp, commit_cert_timestamp).as_millis() as u64,
+            latency_to_commit_decision_ms =
+                latency_from_proposal(proposal_timestamp, commit_decision_timestamp).as_millis()
+                    as u64,
             "Pipeline pending latency on proposal creation",
         );
 
@@ -562,8 +568,8 @@ impl BlockReader for BlockStore {
         self.inner.read().highest_ordered_cert()
     }
 
-    fn highest_commit_cert(&self) -> Arc<QuorumCert> {
-        self.inner.read().highest_commit_cert()
+    fn highest_commit_decision(&self) -> Arc<LedgerInfoWithSignatures> {
+        self.inner.read().highest_commit_decision()
     }
 
     fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>> {
@@ -574,7 +580,7 @@ impl BlockReader for BlockStore {
         SyncInfo::new_decoupled(
             self.highest_quorum_cert().as_ref().clone(),
             self.highest_ordered_cert().as_ref().clone(),
-            self.highest_commit_cert().as_ref().clone(),
+            self.highest_commit_decision().as_ref().clone(),
             self.highest_2chain_timeout_cert()
                 .map(|tc| tc.as_ref().clone()),
         )
@@ -610,7 +616,8 @@ impl BlockStore {
     pub async fn insert_block_with_qc(&self, block: Block) -> anyhow::Result<Arc<PipelinedBlock>> {
         self.insert_single_quorum_cert(block.quorum_cert().clone())?;
         if self.ordered_root().round() < block.quorum_cert().commit_info().round() {
-            self.send_for_execution(block.quorum_cert().clone()).await?;
+            self.send_for_execution(block.quorum_cert().ledger_info().clone())
+                .await?;
         }
         self.insert_ordered_block(block).await
     }

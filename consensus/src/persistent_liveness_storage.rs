@@ -61,7 +61,8 @@ pub struct RootInfo(
     pub Box<Block>,
     pub QuorumCert,
     pub QuorumCert,
-    pub QuorumCert,
+    // TODO: Changing this to LedgerInfoWithSignatures could lead to backward incompatibility?
+    pub LedgerInfoWithSignatures,
 );
 
 /// LedgerRecoveryData is a subset of RecoveryData that we can get solely from ledger info.
@@ -135,15 +136,17 @@ impl LedgerRecoveryData {
 
         info!("Consensus root block is {}", root_block);
 
-        let root_commit_cert = root_ordered_cert
+        let root_commit_decision = root_ordered_cert
             .create_merged_with_executed_state(latest_ledger_info_sig)
-            .expect("Inconsistent commit proof and evaluation decision, cannot commit block");
+            .expect("Inconsistent commit proof and evaluation decision, cannot commit block")
+            .ledger_info()
+            .clone();
 
         Ok(RootInfo(
             Box::new(root_block),
             root_quorum_cert,
             root_ordered_cert,
-            root_commit_cert,
+            root_commit_decision,
         ))
     }
 }

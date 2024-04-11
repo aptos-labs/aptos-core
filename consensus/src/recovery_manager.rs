@@ -92,7 +92,7 @@ impl RecoveryManager {
         );
         let recovery_data = BlockStore::fast_forward_sync(
             sync_info.highest_ordered_cert(),
-            sync_info.highest_commit_cert(),
+            sync_info.highest_commit_decision(),
             &mut retriever,
             self.storage.clone(),
             self.execution_client.clone(),

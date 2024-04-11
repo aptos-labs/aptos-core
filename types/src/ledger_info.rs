@@ -174,6 +174,12 @@ impl LedgerInfoWithSignatures {
             validator_set,
         ))
     }
+
+    pub fn commit_info(&self) -> &BlockInfo {
+        match self {
+            LedgerInfoWithSignatures::V0(ledger) => ledger.commit_info(),
+        }
+    }
 }
 
 /// Helper function to generate LedgerInfoWithSignature from a set of validator signers used for testing

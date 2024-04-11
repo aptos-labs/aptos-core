@@ -7,6 +7,7 @@ use aptos_consensus_types::{
     timeout_2chain::TwoChainTimeoutCertificate,
 };
 use aptos_crypto::HashValue;
+use aptos_types::ledger_info::LedgerInfoWithSignatures;
 pub use block_store::{sync_manager::BlockRetriever, BlockStore};
 use std::{sync::Arc, time::Duration};
 
@@ -52,8 +53,8 @@ pub trait BlockReader: Send + Sync {
     /// Return the highest timeout certificate if available.
     fn highest_2chain_timeout_cert(&self) -> Option<Arc<TwoChainTimeoutCertificate>>;
 
-    /// Return the highest commit decision quorum certificate.
-    fn highest_commit_cert(&self) -> Arc<QuorumCert>;
+    /// Return the highest commit decision.
+    fn highest_commit_decision(&self) -> Arc<LedgerInfoWithSignatures>;
 
     /// Return the combination of highest quorum cert, timeout cert and commit cert.
     fn sync_info(&self) -> SyncInfo;
