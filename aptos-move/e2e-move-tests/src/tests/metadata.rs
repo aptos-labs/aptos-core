@@ -12,7 +12,9 @@ use aptos_framework::{
 };
 use aptos_package_builder::PackageBuilder;
 use aptos_types::{
-    chain_id::ChainId, on_chain_config::OnChainConfig, transaction::TransactionStatus,
+    chain_id::ChainId,
+    on_chain_config::{FeatureFlag, OnChainConfig},
+    transaction::TransactionStatus,
 };
 use move_binary_format::CompiledModule;
 use move_core_types::{
@@ -201,8 +203,17 @@ fn test_compilation_metadata_with_changes(
     )
 }
 
-fn test_compilation_metadata_internal(mainnet_flag: bool, v2_flag: bool) -> TransactionStatus {
+fn test_compilation_metadata_internal(
+    mainnet_flag: bool,
+    v2_flag: bool,
+    feature_enabled: bool,
+) -> TransactionStatus {
     let mut h = MoveHarness::new();
+    if feature_enabled {
+        h.enable_features(vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE], vec![]);
+    } else {
+        h.enable_features(vec![], vec![FeatureFlag::REJECT_UNSTABLE_BYTECODE]);
+    }
     let account = h.new_account_at(AccountAddress::from_hex_literal("0xf00d").unwrap());
     let mut builder = PackageBuilder::new("Package");
     builder.add_source(
@@ -258,15 +269,51 @@ fn test_compilation_metadata_internal(mainnet_flag: bool, v2_flag: bool) -> Tran
 
 #[test]
 fn test_compilation_metadata() {
+    let mut enable_check = true;
     // publish compiler v2 code to mainnet
     assert_vm_status!(
-        test_compilation_metadata_internal(true, true),
+        test_compilation_metadata_internal(true, true, enable_check),
         StatusCode::UNSTABLE_BYTECODE_REJECTED
     );
     // publish compiler v2 code to test
-    assert_success!(test_compilation_metadata_internal(false, true));
+    assert_success!(test_compilation_metadata_internal(
+        false,
+        true,
+        enable_check
+    ));
     // publish compiler v1 code to mainnet
-    assert_success!(test_compilation_metadata_internal(true, false));
+    assert_success!(test_compilation_metadata_internal(
+        true,
+        false,
+        enable_check
+    ));
     // publish compiler v1 code to test
-    assert_success!(test_compilation_metadata_internal(false, false));
+    assert_success!(test_compilation_metadata_internal(
+        false,
+        false,
+        enable_check
+    ));
+
+    enable_check = false;
+    // publish compiler v2 code to mainnet
+    // success because the feature flag is disabled
+    assert_success!(test_compilation_metadata_internal(true, true, enable_check));
+    // publish compiler v2 code to test
+    assert_success!(test_compilation_metadata_internal(
+        false,
+        true,
+        enable_check
+    ));
+    // publish compiler v1 code to mainnet
+    assert_success!(test_compilation_metadata_internal(
+        true,
+        false,
+        enable_check
+    ));
+    // publish compiler v1 code to test
+    assert_success!(test_compilation_metadata_internal(
+        false,
+        false,
+        enable_check
+    ));
 }
