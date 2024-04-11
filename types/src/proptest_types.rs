@@ -43,7 +43,7 @@ use aptos_crypto::{
 };
 use arr_macro::arr;
 use bytes::Bytes;
-use move_core_types::{language_storage::TypeTag, move_resource::MoveStructType};
+use move_core_types::language_storage::TypeTag;
 use proptest::{
     collection::{vec, SizeRange},
     option,
@@ -681,18 +681,18 @@ impl AccountStateGen {
         account_index: Index,
         universe: &AccountInfoUniverse,
     ) -> impl IntoIterator<Item = (StateKey, Vec<u8>)> {
-        let address = universe.get_account_info(account_index).address;
+        let address = &universe.get_account_info(account_index).address;
         let account_resource = self
             .account_resource_gen
             .materialize(account_index, universe);
         let balance_resource = self.balance_resource_gen.materialize();
         vec![
             (
-                StateKey::resource(address, AccountResource::struct_tag()),
+                StateKey::move_resource::<AccountResource>(address),
                 bcs::to_bytes(&account_resource).unwrap(),
             ),
             (
-                StateKey::resource(address, CoinStoreResource::struct_tag()),
+                StateKey::move_resource::<CoinStoreResource>(address),
                 bcs::to_bytes(&balance_resource).unwrap(),
             ),
         ]

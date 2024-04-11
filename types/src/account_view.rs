@@ -73,10 +73,6 @@ pub trait AccountView {
         self.get_resource::<AccountResource>()
     }
 
-    fn get_config<T: OnChainConfig>(&self) -> anyhow::Result<Option<T>> {
-        self.get_resource_impl(T::access_path()?.path)
-    }
-
     fn get_resource_impl<T: DeserializeOwned>(&self, path: Vec<u8>) -> anyhow::Result<Option<T>> {
         self.get_state_value(&self.get_state_key_for_path(path)?)?
             .map(|bytes| bcs::from_bytes(&bytes))
