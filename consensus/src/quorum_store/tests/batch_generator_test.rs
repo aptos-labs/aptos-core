@@ -746,3 +746,8 @@ async fn test_batches_in_progress_same_txn_across_batches() {
         .remove_batch_in_progress_for_test(&first_one_result.first().unwrap().batch_id());
     assert_eq!(batch_generator.txns_in_progress_sorted_len(), 0);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_remote_batches_in_progress() {
+    // TODO: Implement this test
+}
