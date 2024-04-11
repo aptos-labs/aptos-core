@@ -168,7 +168,7 @@ impl TestHarness {
         let network_context = NetworkContext::mock();
         let notif = peer_manager::ConnectionNotification::NewPeer(
             ConnectionMetadata::mock(peer_id),
-            network_context,
+            network_context.network_id(),
         );
         self.connection_notifs_tx.send(notif).await.unwrap();
 

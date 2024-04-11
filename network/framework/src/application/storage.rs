@@ -9,18 +9,18 @@ use crate::{
     },
     peer_manager::ConnectionNotification,
     transport::{ConnectionId, ConnectionMetadata},
-    DisconnectReason, ProtocolId,
+    ProtocolId,
 };
 use aptos_config::{
     config::{Peer, PeerSet},
-    network_id::{NetworkContext, NetworkId, PeerNetworkId},
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_infallible::RwLock;
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
 use arc_swap::ArcSwap;
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::{hash_map::Entry, HashMap},
     ops::Deref,
     sync::{Arc, RwLockWriteGuard},
 };
@@ -47,9 +47,6 @@ pub struct PeersAndMetadata {
     cached_peers_and_metadata: Arc<ArcSwap<HashMap<NetworkId, HashMap<PeerId, PeerMetadata>>>>,
 
     subscribers: RwLock<Vec<tokio::sync::mpsc::Sender<ConnectionNotification>>>,
-
-    // NetworkContext when we only know the NetworkId
-    contexts: Arc<ArcSwap<BTreeMap<NetworkId, NetworkContext>>>,
 }
 
 impl PeersAndMetadata {
@@ -60,7 +57,6 @@ impl PeersAndMetadata {
             trusted_peers: HashMap::new(),
             cached_peers_and_metadata: Arc::new(ArcSwap::from(Arc::new(HashMap::new()))),
             subscribers: RwLock::new(vec![]),
-            contexts: Arc::new(ArcSwap::new(Arc::new(BTreeMap::new()))),
         };
 
         // Initialize each network mapping and trusted peer set
@@ -206,22 +202,11 @@ impl PeersAndMetadata {
         // Update the cached peers and metadata
         self.set_cached_peers_and_metadata(peers_and_metadata.clone());
 
-        let net_context = self.get_network_context(&peer_network_id.network_id());
-        if let Some(net_context) = net_context {
-            let event = ConnectionNotification::NewPeer(connection_metadata, net_context);
-            self.broadcast(event);
-        }
+        let event =
+            ConnectionNotification::NewPeer(connection_metadata, peer_network_id.network_id());
+        self.broadcast(event);
 
         Ok(())
-    }
-
-    pub fn set_network_contexts(&self, contexts: BTreeMap<NetworkId, NetworkContext>) {
-        self.contexts.store(Arc::new(contexts));
-    }
-
-    // Return NetworkContext for a NetworkId, or fake-up something best effort because it's just for logging.
-    fn get_network_context(&self, network_id: &NetworkId) -> Option<NetworkContext> {
-        self.contexts.load().get(network_id).cloned()
     }
 
     /// Removes the peer metadata from the container. If the peer
@@ -231,7 +216,6 @@ impl PeersAndMetadata {
         &self,
         peer_network_id: PeerNetworkId,
         connection_id: ConnectionId,
-        reason: DisconnectReason,
     ) -> Result<PeerMetadata, Error> {
         // Grab the write lock for the peer metadata
         let mut peers_and_metadata = self.peers_and_metadata.write();
@@ -250,15 +234,11 @@ impl PeersAndMetadata {
             let active_connection_id = entry.get().connection_metadata.connection_id;
             if active_connection_id == connection_id {
                 let peer_metadata = entry.remove();
-                let nc = self.get_network_context(&peer_network_id.network_id());
-                if let Some(nc) = nc {
-                    let event = ConnectionNotification::LostPeer(
-                        peer_metadata.connection_metadata.clone(),
-                        nc,
-                        reason,
-                    );
-                    self.broadcast(event);
-                }
+                let event = ConnectionNotification::LostPeer(
+                    peer_metadata.connection_metadata.clone(),
+                    peer_network_id.network_id(),
+                );
+                self.broadcast(event);
                 peer_metadata
             } else {
                 return Err(Error::UnexpectedError(format!(

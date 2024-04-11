@@ -19,12 +19,11 @@ use crate::{
         wire::handshake::v1::{ProtocolId, ProtocolIdSet},
     },
     transport::ConnectionMetadata,
-    DisconnectReason,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{Peer, PeerRole, PeerSet, RoleType},
-    network_id::{NetworkContext, NetworkId, PeerNetworkId},
+    config::{Peer, PeerRole, PeerSet},
+    network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_peer_monitoring_service_types::PeerMonitoringMetadata;
 use aptos_types::{account_address::AccountAddress, PeerId};
@@ -33,7 +32,7 @@ use futures_util::StreamExt;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
     ops::Deref,
@@ -433,15 +432,6 @@ async fn test_peers_and_metadata_subscriptions() {
     // Create the peers and metadata container
     let network_ids = vec![NetworkId::Validator, NetworkId::Vfn];
     let peers_and_metadata = PeersAndMetadata::new(&network_ids);
-    // TODO: this goes away when ConnectionNotification becomes just NetworkId without full NetworkContext
-    let mut contexts = BTreeMap::new();
-    for network_id in network_ids {
-        contexts.insert(
-            network_id,
-            NetworkContext::new(RoleType::Validator, network_id, PeerId::random()),
-        );
-    }
-    peers_and_metadata.set_network_contexts(contexts);
 
     let mut connection_events = peers_and_metadata.subscribe();
 
@@ -473,11 +463,11 @@ async fn test_peers_and_metadata_subscriptions() {
                 panic!("no pending connection event")
             },
             Some(notif) => match notif {
-                ConnectionNotification::NewPeer(conn_meta, nc) => {
-                    assert_eq!(nc.network_id(), NetworkId::Validator);
+                ConnectionNotification::NewPeer(conn_meta, network_id) => {
+                    assert_eq!(network_id, NetworkId::Validator);
                     assert_eq!(conn_meta, connection_1);
                 },
-                ConnectionNotification::LostPeer(_, _, _) => {
+                ConnectionNotification::LostPeer(_, _) => {
                     panic!("should get connect but got lost")
                 },
             },
@@ -488,21 +478,16 @@ async fn test_peers_and_metadata_subscriptions() {
     }
 
     peers_and_metadata
-        .remove_peer_metadata(
-            peer_network_id_1,
-            connection_1.connection_id,
-            DisconnectReason::Requested,
-        )
+        .remove_peer_metadata(peer_network_id_1, connection_1.connection_id)
         .unwrap();
     match connection_events.try_recv() {
         Ok(notif) => match notif {
             ConnectionNotification::NewPeer(_, _) => {
                 panic!("expecting lost but got new")
             },
-            ConnectionNotification::LostPeer(conn_meta, nc, reason) => {
-                assert_eq!(nc.network_id(), NetworkId::Validator);
+            ConnectionNotification::LostPeer(conn_meta, network_id) => {
+                assert_eq!(network_id, NetworkId::Validator);
                 assert_eq!(conn_meta, connection_1);
-                assert_eq!(reason, DisconnectReason::Requested);
             },
         },
         Err(_tre) => {
@@ -1094,11 +1079,7 @@ fn remove_peer_metadata(
     peer_network_id: PeerNetworkId,
     connection_id: u32,
 ) -> Result<PeerMetadata, Error> {
-    peers_and_metadata.remove_peer_metadata(
-        peer_network_id,
-        connection_id.into(),
-        DisconnectReason::Requested,
-    )
+    peers_and_metadata.remove_peer_metadata(peer_network_id, connection_id.into())
 }
 
 /// Updates the connection metadata for the specified peer
