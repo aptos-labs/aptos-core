@@ -124,6 +124,14 @@ impl NetworkHandler {
                 monitor!("dag_node_receiver_gc", {
                     node_receiver_clone.gc();
                 });
+                if new_round % 2 == 0 {
+                    let driver = dag_driver_clone.clone();
+                    tokio::task::spawn_blocking(move || {
+                        monitor!("dag_sort_peers", {
+                            driver.peers_by_latency.write().sort();
+                        })
+                    });
+                }
             }
         });
         defer!(handle.abort());

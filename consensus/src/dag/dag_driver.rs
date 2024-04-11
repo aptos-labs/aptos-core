@@ -33,7 +33,7 @@ use aptos_config::{
 };
 use aptos_consensus_types::common::{Author, Payload, PayloadFilter};
 use aptos_crypto::hash::CryptoHash;
-use aptos_infallible::Mutex;
+use aptos_infallible::{Mutex, RwLock};
 use aptos_logger::{debug, error};
 use aptos_network::application::storage::PeersAndMetadata;
 use aptos_reliable_broadcast::{DropGuard, ReliableBroadcast};
@@ -71,7 +71,7 @@ pub(crate) struct DagDriver {
     health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
     allow_batches_without_pos_in_proposal: bool,
-    peers_by_latency: PeersByLatency,
+    pub peers_by_latency: RwLock<PeersByLatency>,
 }
 
 impl DagDriver {
@@ -119,7 +119,7 @@ impl DagDriver {
             health_backoff,
             quorum_store_enabled,
             allow_batches_without_pos_in_proposal,
-            peers_by_latency,
+            peers_by_latency: RwLock::new(peers_by_latency),
         };
 
         // If we were broadcasting the node for the round already, resume it
@@ -344,7 +344,7 @@ impl DagDriver {
         let round = node.round();
         let node_clone = node.clone();
         let timestamp = node.timestamp();
-        let ordered_peers = self.peers_by_latency.get_peers();
+        let ordered_peers = self.peers_by_latency.read().get_peers();
         let ordered_peers_clone = ordered_peers.clone();
 
         let node_broadcast = async move {
@@ -453,13 +453,15 @@ impl PeersByLatency {
     }
 
     fn get_peers(&self) -> Vec<Author> {
-        let mut peers = self.peers.clone();
-        peers.sort_unstable_by(|a, b| {
+        self.peers.clone()
+    }
+
+    pub fn sort(&mut self) {
+        self.peers.sort_unstable_by(|a, b| {
             let a = Self::get_latency(&self.peers_and_metadata, *a).unwrap_or(0.0);
             let b = Self::get_latency(&self.peers_and_metadata, *b).unwrap_or(0.0);
             b.partial_cmp(&a).unwrap()
         });
-        peers
     }
 
     fn get_latency(peers_and_metadata: &PeersAndMetadata, peer: Author) -> Option<f64> {
