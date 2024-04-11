@@ -69,6 +69,7 @@ impl Ed25519PrivateKey {
     }
 
     /// Derive the actual scalar represented by the secret key.
+    /// TODO: We are temporarily breaking the abstraction here and exposing the SK scalar. In the future, we should add traits for encryption inside aptos-crypto so that we can both sign and decrypt with an Ed25519PrivateKey.
     pub fn derive_scalar(&self) -> Scalar {
         let expanded_bytes = ExpandedSecretKey::from(&self.0).to_bytes();
         let bits = expanded_bytes[..32]

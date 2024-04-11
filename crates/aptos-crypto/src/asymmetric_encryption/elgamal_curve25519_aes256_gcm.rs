@@ -152,5 +152,16 @@ mod tests {
             msg,
             ElGamalCurve25519Aes256Gcm::dec(&sk, ciphertext.as_slice()).unwrap()
         );
+
+        // Empty message should also work.
+        let msg = b""
+            .to_vec();
+        let ciphertext =
+            ElGamalCurve25519Aes256Gcm::enc(&mut main_rng, &mut aead_rng, &pk, msg.as_slice())
+                .unwrap();
+        assert_eq!(
+            msg,
+            ElGamalCurve25519Aes256Gcm::dec(&sk, ciphertext.as_slice()).unwrap()
+        );
     }
 }
