@@ -1457,7 +1457,7 @@ fn realistic_env_graceful_overload() -> ForgeConfig {
 }
 
 fn adverserial_workload_test() -> ForgeConfig {
-    let num_contended_resources = 4;
+    let num_contended_resources = 1;
     let transaction_mix = (0..num_contended_resources)
         .map(|_| {
             (
