@@ -14,7 +14,7 @@ use crate::{
         observability::counters::INCOMING_MSG_PROCESSING,
         rb_handler::NodeBroadcastHandler,
         types::{DAGMessage, DAGRpcResult},
-        CertifiedNode, Node,
+        CertifiedNode, Node, Vote,
     },
     monitor,
     network::{IncomingDAGRequest, RpcResponder},
@@ -28,9 +28,9 @@ use aptos_logger::{
     warn,
 };
 use aptos_types::epoch_state::EpochState;
-use futures::{stream::FuturesUnordered, StreamExt};
-use std::{sync::Arc, time::Duration};
-use tokio::{runtime::Handle, select};
+use futures::{stream::FuturesUnordered, FutureExt, StreamExt};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use tokio::{runtime::Handle, select, task::JoinHandle};
 
 pub(crate) struct NetworkHandler {
     epoch_state: Arc<EpochState>,
@@ -40,12 +40,13 @@ pub(crate) struct NetworkHandler {
     certified_node_fetch_waiter: FetchWaiter<CertifiedNode>,
     new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     verified_msg_processor: Arc<VerifiedMessageProcessor>,
+    missing_parents_rx: tokio::sync::mpsc::UnboundedReceiver<Node>,
 }
 
 impl NetworkHandler {
     pub(super) fn new(
         epoch_state: Arc<EpochState>,
-        node_receiver: NodeBroadcastHandler,
+        mut node_receiver: NodeBroadcastHandler,
         dag_driver: DagDriver,
         fetch_receiver: FetchRequestHandler,
         node_fetch_waiter: FetchWaiter<Node>,
@@ -53,6 +54,8 @@ impl NetworkHandler {
         state_sync_trigger: StateSyncTrigger,
         new_round_event: tokio::sync::mpsc::UnboundedReceiver<Round>,
     ) -> Self {
+        let (missing_parents_tx, missing_parents_rx) = tokio::sync::mpsc::unbounded_channel();
+        node_receiver.set_missing_parent_tx(missing_parents_tx);
         let node_receiver = Arc::new(node_receiver);
         let dag_driver = Arc::new(dag_driver);
         Self {
@@ -62,6 +65,7 @@ impl NetworkHandler {
             node_fetch_waiter,
             certified_node_fetch_waiter,
             new_round_event,
+            missing_parents_rx,
             verified_msg_processor: Arc::new(VerifiedMessageProcessor {
                 node_receiver,
                 dag_driver,
@@ -87,6 +91,7 @@ impl NetworkHandler {
             mut certified_node_fetch_waiter,
             mut new_round_event,
             verified_msg_processor,
+            mut missing_parents_rx,
             ..
         } = self;
 
@@ -130,6 +135,32 @@ impl NetworkHandler {
                 monitor!("dag_node_receiver_gc", {
                     node_receiver_clone.gc();
                 });
+            }
+        });
+        defer!(handle.abort());
+
+        let task_node_receiver = node_receiver.clone();
+        let handle = tokio::spawn(async move {
+            let mut pending_parents = BTreeMap::new();
+            let mut interval = tokio::time::interval(Duration::from_millis(10));
+            loop {
+                select! {
+                    Some(msg) = missing_parents_rx.recv() => {
+                        pending_parents.insert((msg.round(), *msg.author()), msg);
+                        while let Some(Some(msg)) = missing_parents_rx.recv().now_or_never() {
+                            pending_parents.insert((msg.round(), *msg.author()), msg);
+                        }
+                    },
+                    _ = interval.tick() => {
+                        for (k, node) in pending_parents.into_iter() {
+                            let receiver = task_node_receiver.clone();
+                            tokio::task::spawn(async move {
+                                (k, receiver.process(node).await)
+                            });
+                        }
+                        pending_parents = BTreeMap::new();
+                    },
+                }
             }
         });
         defer!(handle.abort());

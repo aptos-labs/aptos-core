@@ -41,7 +41,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::task::JoinHandle;
+use tokio::{sync::mpsc::UnboundedSender, task::JoinHandle};
 
 pub(crate) struct NodeBroadcastHandler {
     dag: Arc<DagStore>,
@@ -61,6 +61,7 @@ pub(crate) struct NodeBroadcastHandler {
     jwk_consensus_config: OnChainJWKConsensusConfig,
     health_backoff: HealthBackoff,
     quorum_store_enabled: bool,
+    missing_parent_tx: Option<UnboundedSender<Node>>,
 }
 
 impl NodeBroadcastHandler {
@@ -100,6 +101,7 @@ impl NodeBroadcastHandler {
             jwk_consensus_config,
             health_backoff,
             quorum_store_enabled,
+            missing_parent_tx: None,
         }
     }
 
@@ -223,6 +225,9 @@ impl NodeBroadcastHandler {
             // Don't issue fetch requests for parents of the lowest round in the DAG
             // because they are already GC'ed
             if current_round > lowest_round {
+                if let Some(tx) = &self.missing_parent_tx {
+                    tx.send(node.clone()).expect("must send");
+                }
                 if let Err(err) = self.fetch_requester.request_for_node(node) {
                     FETCH_ENQUEUE_FAILURES.with_label_values(&[&"node"]).inc();
                     error!("request to fetch failed: {}", err);
@@ -232,6 +237,13 @@ impl NodeBroadcastHandler {
         }
 
         Ok(node)
+    }
+
+    pub(crate) fn set_missing_parent_tx(
+        &mut self,
+        missing_parents_tx: tokio::sync::mpsc::UnboundedSender<Node>,
+    ) {
+        self.missing_parent_tx = Some(missing_parents_tx);
     }
 }
 
